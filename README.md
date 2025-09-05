@@ -58,13 +58,69 @@ Agent Actions:
 4. ✅ log_incident - Incident with severity classification
 ```
 
+### 📦 **Inventory Intelligence Agent Action Tools**
+
+The Inventory Intelligence Agent includes **8 comprehensive action tools** for complete inventory management:
+
+#### **Stock Management**
+- **`check_stock`** - Check inventory levels with on-hand, available-to-promise, and location details
+- **`reserve_inventory`** - Create inventory reservations with hold periods and order linking
+- **`start_cycle_count`** - Initiate cycle counting with priority and location targeting
+
+#### **Replenishment & Procurement**
+- **`create_replenishment_task`** - Generate putaway/replenishment tasks for WMS queue
+- **`generate_purchase_requisition`** - Create purchase requisitions with supplier and contract linking
+- **`adjust_reorder_point`** - Modify reorder points with rationale and RBAC validation
+
+#### **Optimization & Analysis**
+- **`recommend_reslotting`** - Suggest optimal bin locations based on velocity and travel time
+- **`investigate_discrepancy`** - Link movements, picks, and counts for discrepancy analysis
+
+#### **Example Workflow**
+```
+User: "ATPs for SKU123?"
+Agent Actions:
+1. ✅ check_stock - Check current inventory levels
+2. ✅ reserve_inventory - Reserve 5 units for Order 9001 (Tier 1 propose)
+3. ✅ generate_purchase_requisition - Create PR if below reorder point
+4. ✅ create_replenishment_task - Generate replenishment task
+```
+
+### 👥 **Operations Coordination Agent Action Tools**
+
+The Operations Coordination Agent includes **8 comprehensive action tools** for complete operations management:
+
+#### **Task Management**
+- **`assign_tasks`** - Assign tasks to workers/equipment with constraints and skill matching
+- **`rebalance_workload`** - Reassign tasks based on SLA rules and worker capacity
+- **`generate_pick_wave`** - Create pick waves with zone-based or order-based strategies
+
+#### **Optimization & Planning**
+- **`optimize_pick_paths`** - Generate route suggestions for pickers to minimize travel time
+- **`manage_shift_schedule`** - Handle shift changes, worker swaps, and time & attendance
+- **`dock_scheduling`** - Schedule dock door appointments with capacity management
+
+#### **Equipment & KPIs**
+- **`dispatch_equipment`** - Dispatch forklifts/tuggers for specific tasks
+- **`publish_kpis`** - Emit throughput, SLA, and utilization metrics to Kafka
+
+#### **Example Workflow**
+```
+User: "We got a 120-line order; create a wave for Zone A"
+Agent Actions:
+1. ✅ generate_pick_wave - Create wave plan with Zone A strategy
+2. ✅ optimize_pick_paths - Generate picker routes for efficiency
+3. ✅ assign_tasks - Assign tasks to available workers
+4. ✅ publish_kpis - Update metrics for dashboard
+```
+
 ---
 
 ## ✨ What it does
 - **Planner/Router Agent** — intent classification, multi-agent coordination, context management, response synthesis.
 - **Specialized Agents**
-  - **Inventory Intelligence** — stock lookup, replenishment advice, cycle counting context.
-  - **Operations Coordination** — workforce scheduling, task assignment, equipment allocation, KPIs.
+  - **Inventory Intelligence** — stock lookup, replenishment advice, cycle counting context, inventory reservations, purchase requisitions, reorder point management, reslotting recommendations, discrepancy investigations.
+  - **Operations Coordination** — workforce scheduling, task assignment, equipment allocation, KPIs, pick wave generation, path optimization, shift management, dock scheduling, equipment dispatch.
   - **Safety & Compliance** — incident logging, policy lookup, safety checklists, alert broadcasting, LOTO procedures, corrective actions, SDS retrieval, near-miss reporting.
 - **Hybrid Retrieval**
   - **Structured**: PostgreSQL/TimescaleDB (IoT time-series).
@@ -731,8 +787,8 @@ GH Actions CI; IaC (K8s, Helm, Terraform); blue-green deploys; production deploy
 
 ### ✅ **Fully Implemented & Tested**
 - **🧠 Multi-Agent System**: Planner/Router with LangGraph orchestration
-- **📦 Inventory Intelligence Agent**: Stock lookup, replenishment, cycle counting
-- **👥 Operations Coordination Agent**: Workforce scheduling, task management, KPIs
+- **📦 Inventory Intelligence Agent**: Stock lookup, replenishment, cycle counting, action tools (8 comprehensive inventory management tools)
+- **👥 Operations Coordination Agent**: Workforce scheduling, task management, KPIs, action tools (8 comprehensive operations management tools)
 - **🛡️ Safety & Compliance Agent**: Incident reporting, policy lookup, compliance, alert broadcasting, LOTO procedures, corrective actions, SDS retrieval, near-miss reporting
 - **💾 Memory Manager**: Conversation persistence, user profiles, session context
 - **🔗 NVIDIA NIM Integration**: Llama 3.1 70B + NV-EmbedQA-E5-v5 embeddings
@@ -745,7 +801,8 @@ GH Actions CI; IaC (K8s, Helm, Terraform); blue-green deploys; production deploy
 - **🛡️ NeMo Guardrails**: Content safety, compliance checks, and security validation
 
 ### 🧪 **Test Results**
-- **Operations Agent**: ✅ PASSED - Workforce and task management
+- **Inventory Agent**: ✅ PASSED - Stock lookup, replenishment, action tools (8 comprehensive inventory management tools)
+- **Operations Agent**: ✅ PASSED - Workforce and task management, action tools (8 comprehensive operations management tools)
 - **Safety Agent**: ✅ PASSED - Incident reporting, policy lookup, action tools (7 comprehensive safety management tools)  
 - **Memory Manager**: ✅ PASSED - Conversation persistence and user profiles
 - **Authentication System**: ✅ PASSED - JWT/OAuth2 with RBAC

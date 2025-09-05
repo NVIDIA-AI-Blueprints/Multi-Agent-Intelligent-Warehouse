@@ -21,8 +21,8 @@ graph TB
     %% Agent Orchestration Layer
     subgraph "Agent Orchestration (LangGraph)"
         Planner[Planner/Router Agent<br/>Intent Classification]
-        Inventory[Inventory Intelligence Agent<br/>Stock Lookup & Replenishment]
-        Operations[Operations Coordination Agent<br/>Workforce & Task Management]
+        Inventory[Inventory Intelligence Agent<br/>Stock Lookup & Replenishment & Action Tools<br/>8 Comprehensive Inventory Management Tools]
+        Operations[Operations Coordination Agent<br/>Workforce & Task Management & Action Tools<br/>8 Comprehensive Operations Management Tools]
         Safety[Safety & Compliance Agent<br/>Incident Reporting, Policies & Action Tools<br/>7 Comprehensive Safety Management Tools]
         Chat[Chat Agent<br/>General Queries]
     end
@@ -234,6 +234,62 @@ Agent Actions:
 2. ✅ lockout_tagout_request - LOTO request (Tier 1)  
 3. ✅ start_checklist - Safety checklist for area lead
 4. ✅ log_incident - Incident with severity classification
+```
+
+### 📦 **Inventory Intelligence Agent Action Tools**
+
+The Inventory Intelligence Agent includes **8 comprehensive action tools** for complete inventory management:
+
+#### **Stock Management Tools**
+- **`check_stock`** - Check inventory levels with on-hand, available-to-promise, and location details
+- **`reserve_inventory`** - Create inventory reservations with hold periods and order linking
+- **`start_cycle_count`** - Initiate cycle counting with priority and location targeting
+
+#### **Replenishment & Procurement Tools**
+- **`create_replenishment_task`** - Generate putaway/replenishment tasks for WMS queue
+- **`generate_purchase_requisition`** - Create purchase requisitions with supplier and contract linking
+- **`adjust_reorder_point`** - Modify reorder points with rationale and RBAC validation
+
+#### **Optimization & Analysis Tools**
+- **`recommend_reslotting`** - Suggest optimal bin locations based on velocity and travel time
+- **`investigate_discrepancy`** - Link movements, picks, and counts for discrepancy analysis
+
+#### **Example Inventory Workflow**
+```
+User Query: "ATPs for SKU123?"
+Agent Actions:
+1. ✅ check_stock - Check current inventory levels
+2. ✅ reserve_inventory - Reserve 5 units for Order 9001 (Tier 1 propose)
+3. ✅ generate_purchase_requisition - Create PR if below reorder point
+4. ✅ create_replenishment_task - Generate replenishment task
+```
+
+### 👥 **Operations Coordination Agent Action Tools**
+
+The Operations Coordination Agent includes **8 comprehensive action tools** for complete operations management:
+
+#### **Task Management Tools**
+- **`assign_tasks`** - Assign tasks to workers/equipment with constraints and skill matching
+- **`rebalance_workload`** - Reassign tasks based on SLA rules and worker capacity
+- **`generate_pick_wave`** - Create pick waves with zone-based or order-based strategies
+
+#### **Optimization & Planning Tools**
+- **`optimize_pick_paths`** - Generate route suggestions for pickers to minimize travel time
+- **`manage_shift_schedule`** - Handle shift changes, worker swaps, and time & attendance
+- **`dock_scheduling`** - Schedule dock door appointments with capacity management
+
+#### **Equipment & KPIs Tools**
+- **`dispatch_equipment`** - Dispatch forklifts/tuggers for specific tasks
+- **`publish_kpis`** - Emit throughput, SLA, and utilization metrics to Kafka
+
+#### **Example Operations Workflow**
+```
+User Query: "We got a 120-line order; create a wave for Zone A"
+Agent Actions:
+1. ✅ generate_pick_wave - Create wave plan with Zone A strategy
+2. ✅ optimize_pick_paths - Generate picker routes for efficiency
+3. ✅ assign_tasks - Assign tasks to available workers
+4. ✅ publish_kpis - Update metrics for dashboard
 ```
 
 ## Data Flow Architecture
@@ -496,8 +552,8 @@ graph TB
 ### ✅ **Fully Operational Features**
 
 - **🤖 AI-Powered Chat**: Real-time conversation with NVIDIA NIMs integration
-- **📦 Inventory Management**: Stock lookup, replenishment recommendations, cycle counting
-- **👥 Operations Coordination**: Workforce scheduling, task management, KPI tracking
+- **📦 Inventory Management**: Stock lookup, replenishment recommendations, cycle counting, action tools (8 comprehensive inventory management tools)
+- **👥 Operations Coordination**: Workforce scheduling, task management, KPI tracking, action tools (8 comprehensive operations management tools)
 - **🛡️ Safety & Compliance**: Incident reporting, policy lookup, safety checklists, alert broadcasting, LOTO procedures, corrective actions, SDS retrieval, near-miss reporting
 - **🔐 Authentication & Authorization**: JWT-based auth with 5 user roles and RBAC
 - **🛡️ Content Safety**: NeMo Guardrails for input/output validation
