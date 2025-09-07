@@ -9,10 +9,15 @@ from .sql_retriever import SQLRetriever
 from .inventory_queries import InventoryQueries
 from .task_queries import TaskQueries
 from .telemetry_queries import TelemetryQueries
+from .sql_query_router import SQLQueryRouter, QueryType, QueryComplexity, RoutingDecision
 
 __all__ = [
     "SQLRetriever",
     "InventoryQueries", 
     "TaskQueries",
-    "TelemetryQueries"
+    "TelemetryQueries",
+    "SQLQueryRouter",
+    "QueryType",
+    "QueryComplexity", 
+    "RoutingDecision"
 ]

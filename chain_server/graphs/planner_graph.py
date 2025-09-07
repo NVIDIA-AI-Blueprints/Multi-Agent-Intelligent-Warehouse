@@ -36,12 +36,16 @@ class IntentClassifier:
     EQUIPMENT_KEYWORDS = [
         "equipment", "forklift", "conveyor", "scanner", "amr", "agv", "charger", 
         "assignment", "utilization", "maintenance", "availability", "telemetry",
-        "battery", "truck", "lane", "pm", "loto", "lockout", "tagout"
+        "battery", "truck", "lane", "pm", "loto", "lockout", "tagout",
+        "sku", "stock", "inventory", "quantity", "available", "atp", "on_hand"
     ]
     
     OPERATIONS_KEYWORDS = [
-        "shift", "task", "workforce", "pick", "pack", "putaway", 
-        "schedule", "assignment", "kpi", "performance", "equipment"
+        "shift", "task", "tasks", "workforce", "pick", "pack", "putaway", 
+        "schedule", "assignment", "kpi", "performance", "equipment", "main",
+        "today", "work", "job", "operation", "operations", "worker", "workers",
+        "team", "team members", "staff", "employee", "employees", "active workers",
+        "how many", "roles", "team members"
     ]
     
     SAFETY_KEYWORDS = [

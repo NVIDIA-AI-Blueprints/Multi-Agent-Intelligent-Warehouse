@@ -171,7 +171,7 @@ User Query: "{query}"
 Previous Context: {context_str}
 
 Extract the following information:
-1. Intent: One of ["equipment_lookup", "assignment", "utilization", "maintenance", "availability", "telemetry", "charger_status", "pm_schedule", "loto_request", "general"]
+1. Intent: One of ["equipment_lookup", "atp_lookup", "assignment", "utilization", "maintenance", "availability", "telemetry", "charger_status", "pm_schedule", "loto_request", "general"]
 2. Entities: Extract equipment_id, location, assignment, maintenance_type, utilization_period, charger_id, etc.
 3. Context: Any additional relevant context
 
@@ -232,7 +232,9 @@ Respond in JSON format:
             intent = "charger_status"
         elif any(word in query_lower for word in ["loto", "lockout", "tagout", "lock out"]):
             intent = "loto_request"
-        elif any(word in query_lower for word in ["equipment", "forklift", "conveyor", "scanner", "amr", "agv"]):
+        elif any(word in query_lower for word in ["atp", "available to promise", "available_to_promise"]):
+            intent = "atp_lookup"
+        elif any(word in query_lower for word in ["equipment", "forklift", "conveyor", "scanner", "amr", "agv", "sku", "stock", "inventory", "quantity", "available"]):
             intent = "equipment_lookup"
         elif any(word in query_lower for word in ["location", "where", "aisle", "zone"]):
             intent = "equipment_lookup"
@@ -291,8 +293,30 @@ Respond in JSON format:
             location = equipment_query.entities.get("location")
             order_id = equipment_query.entities.get("order_id")
             
+            # If no SKU in entities, try to extract from query text
+            if not sku and equipment_query.user_query:
+                import re
+                sku_match = re.search(r'SKU\d+', equipment_query.user_query.upper())
+                if sku_match:
+                    sku = sku_match.group()
+                    logger.info(f"Extracted SKU from query: {sku}")
+            
             # Execute actions based on intent
-            if equipment_query.intent == "stock_lookup" and sku:
+            if equipment_query.intent == "equipment_lookup" and sku:
+                # Check equipment stock levels
+                stock_info = await self.action_tools.check_stock(
+                    sku=sku,
+                    site=equipment_query.entities.get("site"),
+                    locations=equipment_query.entities.get("locations")
+                )
+                actions_taken.append({
+                    "action": "check_stock",
+                    "sku": sku,
+                    "result": asdict(stock_info),
+                    "timestamp": datetime.now().isoformat()
+                })
+            
+            elif equipment_query.intent == "stock_lookup" and sku:
                 # Check stock levels
                 stock_info = await self.action_tools.check_stock(
                     sku=sku,
@@ -568,57 +592,83 @@ Respond in JSON format:
             search_results = retrieved_data.get("search_results")
             items = []
             
-            if search_results and hasattr(search_results, 'structured_results') and search_results.structured_results:
+            # Check if we have data from actions_taken first
+            if actions_taken:
+                for action in actions_taken:
+                    if action.get("action") == "check_stock" and action.get("result"):
+                        stock_data = action.get("result")
+                        items.append({
+                            "sku": stock_data.get("sku"),
+                            "name": stock_data.get("name", "Unknown"),
+                            "quantity": stock_data.get("on_hand", 0),
+                            "location": stock_data.get("locations", [{}])[0].get("location", "Unknown") if stock_data.get("locations") else "Unknown",
+                            "reorder_point": stock_data.get("reorder_point", 0)
+                        })
+                        break
+            
+            # Fallback to search results if no actions data
+            if not items and search_results and hasattr(search_results, 'structured_results') and search_results.structured_results:
                 items = search_results.structured_results
-                
-                # Generate more intelligent response based on query intent
-                if equipment_query.intent == "stock_lookup":
-                    if len(items) == 1:
-                        item = items[0]
-                        natural_language = f"Found {item.name} (SKU: {item.sku}) with {item.quantity} units in stock at {item.location}. "
-                        if item.quantity <= item.reorder_point:
-                            natural_language += f"⚠️ This item is at or below reorder point ({item.reorder_point} units)."
-                        else:
-                            natural_language += f"Stock level is healthy (reorder point: {item.reorder_point} units)."
+            
+            # Generate more intelligent response based on query intent
+            if equipment_query.intent == "equipment_lookup":
+                if items:
+                    item = items[0]  # Take first item
+                    natural_language = f"📦 Equipment Status for {item.get('sku', 'Unknown')}:\n"
+                    natural_language += f"• Name: {item.get('name', 'Unknown')}\n"
+                    natural_language += f"• Available Quantity: {item.get('quantity', 0)} units\n"
+                    natural_language += f"• Location: {item.get('location', 'Unknown')}\n"
+                    natural_language += f"• Reorder Point: {item.get('reorder_point', 0)} units\n"
+                    if item.get('quantity', 0) <= item.get('reorder_point', 0):
+                        natural_language += f"⚠️ This equipment is at or below reorder point!"
                     else:
-                        natural_language = f"I found {len(items)} inventory items matching your query."
-                elif equipment_query.intent == "atp_lookup":
-                    if len(items) == 1:
-                        item = items[0]
-                        # Get ATP data from actions taken
-                        atp_data = None
-                        for action in actions_taken:
-                            if action.get("action") == "atp_lookup":
-                                atp_data = action.get("result")
-                                break
-                        
-                        if atp_data:
-                            natural_language = f"📊 Available to Promise (ATP) for {item.name} (SKU: {item.sku}):\n"
-                            natural_language += f"• Current Stock: {atp_data['current_stock']} units\n"
-                            natural_language += f"• Reserved Quantity: {atp_data['reserved_quantity']} units\n"
-                            natural_language += f"• Incoming Orders: {atp_data['incoming_orders']} units\n"
-                            natural_language += f"• Available to Promise: {atp_data['available_to_promise']} units\n"
-                            natural_language += f"• Location: {item.location}"
-                        else:
-                            natural_language = f"Found {item.name} (SKU: {item.sku}) with {item.quantity} units available at {item.location}."
+                        natural_language += f"✅ Stock level is healthy."
+                else:
+                    natural_language = f"I couldn't find equipment data for your query."
+            elif equipment_query.intent == "stock_lookup":
+                if len(items) == 1:
+                    item = items[0]
+                    natural_language = f"Found {item.name} (SKU: {item.sku}) with {item.quantity} units in stock at {item.location}. "
+                    if item.quantity <= item.reorder_point:
+                        natural_language += f"⚠️ This item is at or below reorder point ({item.reorder_point} units)."
                     else:
-                        natural_language = f"I found {len(items)} inventory items matching your ATP query."
+                        natural_language += f"Stock level is healthy (reorder point: {item.reorder_point} units)."
                 else:
                     natural_language = f"I found {len(items)} inventory items matching your query."
-                
-                if equipment_query.intent == "atp_lookup":
-                    recommendations = ["Monitor ATP levels regularly", "Consider safety stock for critical items", "Review reserved quantities"]
+            elif equipment_query.intent == "atp_lookup":
+                if len(items) == 1:
+                    item = items[0]
+                    # Get ATP data from actions taken
+                    atp_data = None
+                    for action in actions_taken or []:
+                        if action.get("action") == "atp_lookup":
+                            atp_data = action.get("result")
+                            break
+                    
+                    if atp_data:
+                        natural_language = f"📊 Available to Promise (ATP) for {item.get('name', 'Unknown')} (SKU: {item.get('sku', 'Unknown')}):\n"
+                        natural_language += f"• Current Stock: {atp_data['current_stock']} units\n"
+                        natural_language += f"• Reserved Quantity: {atp_data['reserved_quantity']} units\n"
+                        natural_language += f"• Incoming Orders: {atp_data['incoming_orders']} units\n"
+                        natural_language += f"• Available to Promise: {atp_data['available_to_promise']} units\n"
+                        natural_language += f"• Location: {item.get('location', 'Unknown')}"
+                    else:
+                        natural_language = f"Found {item.get('name', 'Unknown')} (SKU: {item.get('sku', 'Unknown')}) with {item.get('quantity', 0)} units available at {item.get('location', 'Unknown')}."
                 else:
-                    recommendations = ["Consider reviewing stock levels", "Check reorder points"]
-                confidence = 0.8 if items else 0.6
+                    natural_language = f"I found {len(items)} inventory items matching your ATP query."
             else:
-                natural_language = "I couldn't find specific equipment data for your query."
-                recommendations = ["Try rephrasing your question", "Check if the equipment ID exists"]
-                confidence = 0.3
+                natural_language = f"I found {len(items)} inventory items matching your query."
+            
+            # Set recommendations based on intent
+            if equipment_query.intent == "atp_lookup":
+                recommendations = ["Monitor ATP levels regularly", "Consider safety stock for critical items", "Review reserved quantities"]
+            else:
+                recommendations = ["Consider reviewing stock levels", "Check reorder points"]
+            confidence = 0.8 if items else 0.6
             
             return EquipmentResponse(
                 response_type="fallback",
-                data={"items": [asdict(item) for item in items] if items else []},
+                data={"items": items if items else []},
                 natural_language=natural_language,
                 recommendations=recommendations,
                 confidence=confidence,

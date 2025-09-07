@@ -172,10 +172,23 @@ User Query: "{query}"
 
 Previous Context: {context_str}
 
+IMPORTANT: For queries about workers, employees, staff, workforce, shifts, or team members, use intent "workforce".
+IMPORTANT: For queries about tasks, work orders, assignments, job status, or "latest tasks", use intent "task_management".
+
 Extract the following information:
 1. Intent: One of ["workforce", "task_management", "equipment", "kpi", "scheduling", "task_assignment", "workload_rebalance", "pick_wave", "optimize_paths", "shift_management", "dock_scheduling", "equipment_dispatch", "publish_kpis", "general"]
+   - "workforce": For queries about workers, employees, staff, shifts, team members, headcount, active workers
+   - "task_management": For queries about tasks, assignments, work orders, job status, latest tasks, pending tasks, in-progress tasks
+   - "equipment": For queries about machinery, forklifts, conveyors, equipment status
+   - "kpi": For queries about performance metrics, productivity, efficiency
 2. Entities: Extract shift times, employee names, task types, equipment IDs, time periods, etc.
 3. Context: Any additional relevant context
+
+Examples:
+- "How many active workers we have?" → intent: "workforce"
+- "What are the latest tasks?" → intent: "task_management"
+- "What are the main tasks today?" → intent: "task_management"
+- "Show me equipment status" → intent: "equipment"
 
 Respond in JSON format:
 {{
@@ -221,7 +234,7 @@ Respond in JSON format:
         """Fallback intent detection using keyword matching."""
         query_lower = query.lower()
         
-        if any(word in query_lower for word in ["shift", "workforce", "employee", "staff", "team"]):
+        if any(word in query_lower for word in ["shift", "workforce", "employee", "staff", "team", "worker", "workers", "active workers", "how many"]):
             intent = "workforce"
         elif any(word in query_lower for word in ["assign", "task assignment", "assign task"]):
             intent = "task_assignment"
@@ -239,7 +252,7 @@ Respond in JSON format:
             intent = "equipment_dispatch"
         elif any(word in query_lower for word in ["publish", "kpi", "metrics", "dashboard"]):
             intent = "publish_kpis"
-        elif any(word in query_lower for word in ["task", "work", "job", "pick", "pack"]):
+        elif any(word in query_lower for word in ["task", "tasks", "work", "job", "pick", "pack", "latest", "pending", "in progress", "assignment", "assignments"]):
             intent = "task_management"
         elif any(word in query_lower for word in ["equipment", "forklift", "conveyor", "machine"]):
             intent = "equipment"
@@ -534,17 +547,23 @@ Generate a response that includes:
 3. Actionable recommendations for operations improvement
 4. Confidence score (0.0 to 1.0)
 
+IMPORTANT: For workforce queries, always provide the total count of active workers and break down by shifts.
+
 Respond in JSON format:
 {{
     "response_type": "workforce_info",
     "data": {{
-        "shifts": {{...}},
-        "metrics": {{...}}
+        "total_active_workers": 6,
+        "shifts": {{
+            "morning": {{"total_count": 3, "employees": [...]}},
+            "afternoon": {{"total_count": 3, "employees": [...]}}
+        }},
+        "productivity_metrics": {{...}}
     }},
-    "natural_language": "Based on your query, here's the current workforce status...",
+    "natural_language": "Currently, we have 6 active workers across all shifts: Morning shift: 3 workers, Afternoon shift: 3 workers...",
     "recommendations": [
-        "Recommendation 1",
-        "Recommendation 2"
+        "Monitor shift productivity metrics",
+        "Consider cross-training employees for flexibility"
     ],
     "confidence": 0.95
 }}
@@ -588,24 +607,127 @@ Respond in JSON format:
             data = retrieved_data
             
             if intent == "workforce":
-                natural_language = "Here's the current workforce information for your warehouse operations."
-                recommendations = ["Consider cross-training employees", "Monitor shift productivity metrics"]
+                # Extract workforce data and provide specific worker count
+                workforce_info = data.get("workforce_info", {})
+                shifts = workforce_info.get("shifts", {})
+                
+                # Calculate total active workers across all shifts
+                total_workers = 0
+                shift_details = []
+                for shift_name, shift_data in shifts.items():
+                    shift_count = shift_data.get("total_count", 0)
+                    total_workers += shift_count
+                    shift_details.append(f"{shift_name.title()} shift: {shift_count} workers")
+                
+                natural_language = f"Currently, we have **{total_workers} active workers** across all shifts:\n\n" + "\n".join(shift_details)
+                
+                if workforce_info.get("productivity_metrics"):
+                    metrics = workforce_info["productivity_metrics"]
+                    natural_language += f"\n\n**Productivity Metrics:**\n"
+                    natural_language += f"- Picks per hour: {metrics.get('picks_per_hour', 0)}\n"
+                    natural_language += f"- Packages per hour: {metrics.get('packages_per_hour', 0)}\n"
+                    natural_language += f"- Accuracy rate: {metrics.get('accuracy_rate', 0)}%"
+                
+                recommendations = [
+                    "Monitor shift productivity metrics",
+                    "Consider cross-training employees for flexibility",
+                    "Ensure adequate coverage during peak hours"
+                ]
+                
+                # Set response data with workforce information
+                response_data = {
+                    "total_active_workers": total_workers,
+                    "shifts": shifts,
+                    "productivity_metrics": workforce_info.get("productivity_metrics", {})
+                }
+                
             elif intent == "task_management":
-                natural_language = "Here's the current task status and assignments."
-                recommendations = ["Prioritize urgent tasks", "Balance workload across team members"]
+                # Extract task data and provide detailed task information
+                task_summary = data.get("task_summary", {})
+                pending_tasks = data.get("pending_tasks", [])
+                in_progress_tasks = data.get("in_progress_tasks", [])
+                
+                # Build detailed task response
+                natural_language = "Here's the current task status and assignments:\n\n"
+                
+                # Add task summary
+                if task_summary:
+                    total_tasks = task_summary.get("total_tasks", 0)
+                    pending_count = task_summary.get("pending_tasks", 0)
+                    in_progress_count = task_summary.get("in_progress_tasks", 0)
+                    completed_count = task_summary.get("completed_tasks", 0)
+                    
+                    natural_language += f"**Task Summary:**\n"
+                    natural_language += f"- Total Tasks: {total_tasks}\n"
+                    natural_language += f"- Pending: {pending_count}\n"
+                    natural_language += f"- In Progress: {in_progress_count}\n"
+                    natural_language += f"- Completed: {completed_count}\n\n"
+                    
+                    # Add task breakdown by kind
+                    tasks_by_kind = task_summary.get("tasks_by_kind", [])
+                    if tasks_by_kind:
+                        natural_language += f"**Tasks by Type:**\n"
+                        for task_kind in tasks_by_kind:
+                            natural_language += f"- {task_kind.get('kind', 'Unknown').title()}: {task_kind.get('count', 0)}\n"
+                        natural_language += "\n"
+                
+                # Add pending tasks details
+                if pending_tasks:
+                    natural_language += f"**Pending Tasks ({len(pending_tasks)}):**\n"
+                    for i, task in enumerate(pending_tasks[:5], 1):  # Show first 5
+                        task_id = task.get("id", "N/A")
+                        task_kind = task.get("kind", "Unknown")
+                        priority = task.get("payload", {}).get("priority", "medium") if isinstance(task.get("payload"), dict) else "medium"
+                        zone = task.get("payload", {}).get("zone", "N/A") if isinstance(task.get("payload"), dict) else "N/A"
+                        natural_language += f"{i}. {task_kind.title()} (ID: {task_id}, Priority: {priority}, Zone: {zone})\n"
+                    if len(pending_tasks) > 5:
+                        natural_language += f"... and {len(pending_tasks) - 5} more pending tasks\n"
+                    natural_language += "\n"
+                
+                # Add in-progress tasks details
+                if in_progress_tasks:
+                    natural_language += f"**In Progress Tasks ({len(in_progress_tasks)}):**\n"
+                    for i, task in enumerate(in_progress_tasks[:5], 1):  # Show first 5
+                        task_id = task.get("id", "N/A")
+                        task_kind = task.get("kind", "Unknown")
+                        assignee = task.get("assignee", "Unassigned")
+                        priority = task.get("payload", {}).get("priority", "medium") if isinstance(task.get("payload"), dict) else "medium"
+                        zone = task.get("payload", {}).get("zone", "N/A") if isinstance(task.get("payload"), dict) else "N/A"
+                        natural_language += f"{i}. {task_kind.title()} (ID: {task_id}, Assigned to: {assignee}, Priority: {priority}, Zone: {zone})\n"
+                    if len(in_progress_tasks) > 5:
+                        natural_language += f"... and {len(in_progress_tasks) - 5} more in-progress tasks\n"
+                
+                recommendations = [
+                    "Prioritize urgent tasks",
+                    "Balance workload across team members",
+                    "Monitor task completion rates",
+                    "Review task assignments for efficiency"
+                ]
+                
+                # Set response data with task information
+                response_data = {
+                    "task_summary": task_summary,
+                    "pending_tasks": pending_tasks,
+                    "in_progress_tasks": in_progress_tasks,
+                    "total_pending": len(pending_tasks),
+                    "total_in_progress": len(in_progress_tasks)
+                }
             elif intent == "equipment":
                 natural_language = "Here's the current equipment status and health information."
                 recommendations = ["Schedule preventive maintenance", "Monitor equipment performance"]
+                response_data = data
             elif intent == "kpi":
                 natural_language = "Here are the current operational KPIs and performance metrics."
                 recommendations = ["Focus on accuracy improvements", "Optimize workflow efficiency"]
+                response_data = data
             else:
                 natural_language = "I processed your operations query and retrieved relevant information."
                 recommendations = ["Review operational procedures", "Monitor performance metrics"]
+                response_data = data
             
             return OperationsResponse(
                 response_type="fallback",
-                data=data,
+                data=response_data,
                 natural_language=natural_language,
                 recommendations=recommendations,
                 confidence=0.6,
@@ -651,12 +773,73 @@ Respond in JSON format:
             # Add task summary
             if "task_summary" in retrieved_data:
                 task_summary = retrieved_data["task_summary"]
-                context_parts.append(f"Task Summary: {task_summary}")
+                task_context = f"Task Summary:\n"
+                task_context += f"- Total Tasks: {task_summary.get('total_tasks', 0)}\n"
+                task_context += f"- Pending: {task_summary.get('pending_tasks', 0)}\n"
+                task_context += f"- In Progress: {task_summary.get('in_progress_tasks', 0)}\n"
+                task_context += f"- Completed: {task_summary.get('completed_tasks', 0)}\n"
+                
+                # Add task breakdown by kind
+                tasks_by_kind = task_summary.get("tasks_by_kind", [])
+                if tasks_by_kind:
+                    task_context += f"- Tasks by Type:\n"
+                    for task_kind in tasks_by_kind:
+                        task_context += f"  - {task_kind.get('kind', 'Unknown').title()}: {task_kind.get('count', 0)}\n"
+                
+                context_parts.append(task_context)
+            
+            # Add pending tasks
+            if "pending_tasks" in retrieved_data:
+                pending_tasks = retrieved_data["pending_tasks"]
+                if pending_tasks:
+                    pending_context = f"Pending Tasks ({len(pending_tasks)}):\n"
+                    for i, task in enumerate(pending_tasks[:3], 1):  # Show first 3
+                        task_id = task.get("id", "N/A")
+                        task_kind = task.get("kind", "Unknown")
+                        priority = task.get("payload", {}).get("priority", "medium") if isinstance(task.get("payload"), dict) else "medium"
+                        pending_context += f"{i}. {task_kind.title()} (ID: {task_id}, Priority: {priority})\n"
+                    if len(pending_tasks) > 3:
+                        pending_context += f"... and {len(pending_tasks) - 3} more pending tasks\n"
+                    context_parts.append(pending_context)
+            
+            # Add in-progress tasks
+            if "in_progress_tasks" in retrieved_data:
+                in_progress_tasks = retrieved_data["in_progress_tasks"]
+                if in_progress_tasks:
+                    in_progress_context = f"In Progress Tasks ({len(in_progress_tasks)}):\n"
+                    for i, task in enumerate(in_progress_tasks[:3], 1):  # Show first 3
+                        task_id = task.get("id", "N/A")
+                        task_kind = task.get("kind", "Unknown")
+                        assignee = task.get("assignee", "Unassigned")
+                        in_progress_context += f"{i}. {task_kind.title()} (ID: {task_id}, Assigned to: {assignee})\n"
+                    if len(in_progress_tasks) > 3:
+                        in_progress_context += f"... and {len(in_progress_tasks) - 3} more in-progress tasks\n"
+                    context_parts.append(in_progress_context)
             
             # Add workforce info
             if "workforce_info" in retrieved_data:
                 workforce_info = retrieved_data["workforce_info"]
-                context_parts.append(f"Workforce Info: {workforce_info}")
+                shifts = workforce_info.get("shifts", {})
+                
+                # Calculate total workers
+                total_workers = sum(shift.get("total_count", 0) for shift in shifts.values())
+                
+                workforce_context = f"Workforce Info:\n"
+                workforce_context += f"- Total Active Workers: {total_workers}\n"
+                
+                for shift_name, shift_data in shifts.items():
+                    workforce_context += f"- {shift_name.title()} Shift: {shift_data.get('total_count', 0)} workers\n"
+                    workforce_context += f"  - Active Tasks: {shift_data.get('active_tasks', 0)}\n"
+                    workforce_context += f"  - Employees: {', '.join([emp.get('name', 'Unknown') for emp in shift_data.get('employees', [])])}\n"
+                
+                if workforce_info.get("productivity_metrics"):
+                    metrics = workforce_info["productivity_metrics"]
+                    workforce_context += f"- Productivity Metrics:\n"
+                    workforce_context += f"  - Picks per hour: {metrics.get('picks_per_hour', 0)}\n"
+                    workforce_context += f"  - Packages per hour: {metrics.get('packages_per_hour', 0)}\n"
+                    workforce_context += f"  - Accuracy rate: {metrics.get('accuracy_rate', 0)}%\n"
+                
+                context_parts.append(workforce_context)
             
             # Add equipment health
             if "equipment_health" in retrieved_data:
