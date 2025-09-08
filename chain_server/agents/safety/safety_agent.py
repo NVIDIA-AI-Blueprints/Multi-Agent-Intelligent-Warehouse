@@ -15,6 +15,7 @@ import asyncio
 from chain_server.services.llm.nim_client import get_nim_client, LLMResponse
 from inventory_retriever.hybrid_retriever import get_hybrid_retriever, SearchContext
 from inventory_retriever.structured.sql_retriever import get_sql_retriever
+from chain_server.services.reasoning import get_reasoning_engine, ReasoningType, ReasoningChain
 from .action_tools import get_safety_action_tools, SafetyActionTools
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,8 @@ class SafetyResponse:
     recommendations: List[str]  # Actionable recommendations
     confidence: float  # Confidence score (0.0 to 1.0)
     actions_taken: List[Dict[str, Any]]  # Actions performed by the agent
+    reasoning_chain: Optional[ReasoningChain] = None  # Advanced reasoning chain
+    reasoning_steps: List[Dict[str, Any]] = None  # Individual reasoning steps
 
 @dataclass
 class SafetyIncident:
@@ -66,6 +69,7 @@ class SafetyComplianceAgent:
         self.hybrid_retriever = None
         self.sql_retriever = None
         self.action_tools = None
+        self.reasoning_engine = None
         self.conversation_context = {}  # Maintain conversation context
     
     async def initialize(self) -> None:
@@ -75,6 +79,7 @@ class SafetyComplianceAgent:
             self.hybrid_retriever = await get_hybrid_retriever()
             self.sql_retriever = await get_sql_retriever()
             self.action_tools = await get_safety_action_tools()
+            self.reasoning_engine = await get_reasoning_engine()
             
             logger.info("Safety & Compliance Agent initialized successfully")
         except Exception as e:
@@ -85,18 +90,22 @@ class SafetyComplianceAgent:
         self, 
         query: str, 
         session_id: str = "default",
-        context: Optional[Dict[str, Any]] = None
+        context: Optional[Dict[str, Any]] = None,
+        enable_reasoning: bool = True,
+        reasoning_types: List[ReasoningType] = None
     ) -> SafetyResponse:
         """
-        Process safety and compliance queries with full intelligence.
+        Process safety and compliance queries with full intelligence and advanced reasoning.
         
         Args:
             query: User's safety/compliance query
             session_id: Session identifier for context
             context: Additional context
+            enable_reasoning: Whether to enable advanced reasoning
+            reasoning_types: Types of reasoning to apply
             
         Returns:
-            SafetyResponse with structured data and natural language
+            SafetyResponse with structured data, natural language, and reasoning chain
         """
         try:
             # Initialize if needed
@@ -111,19 +120,43 @@ class SafetyComplianceAgent:
                     "last_entities": {}
                 }
             
-            # Step 1: Understand intent and extract entities using LLM
+            # Step 1: Advanced Reasoning Analysis (if enabled)
+            reasoning_chain = None
+            if enable_reasoning and self.reasoning_engine:
+                try:
+                    # Determine reasoning types based on query complexity
+                    if reasoning_types is None:
+                        reasoning_types = self._determine_reasoning_types(query, context)
+                    
+                    reasoning_chain = await self.reasoning_engine.process_with_reasoning(
+                        query=query,
+                        context=context or {},
+                        reasoning_types=reasoning_types,
+                        session_id=session_id
+                    )
+                    logger.info(f"Advanced reasoning completed: {len(reasoning_chain.steps)} steps")
+                except Exception as e:
+                    logger.warning(f"Advanced reasoning failed, continuing with standard processing: {e}")
+            
+            # Step 2: Understand intent and extract entities using LLM
             safety_query = await self._understand_query(query, session_id, context)
             
-            # Step 2: Retrieve relevant data using hybrid retriever and safety queries
+            # Step 3: Retrieve relevant data using hybrid retriever and safety queries
             retrieved_data = await self._retrieve_safety_data(safety_query)
             
-            # Step 3: Execute action tools if needed
+            # Step 4: Execute action tools if needed
             actions_taken = await self._execute_action_tools(safety_query, context)
             
-            # Step 4: Generate intelligent response using LLM
-            response = await self._generate_safety_response(safety_query, retrieved_data, session_id, actions_taken)
+            # Step 5: Generate intelligent response using LLM (with reasoning context)
+            response = await self._generate_safety_response(
+                safety_query, 
+                retrieved_data, 
+                session_id, 
+                actions_taken,
+                reasoning_chain
+            )
             
-            # Step 5: Update conversation context
+            # Step 6: Update conversation context
             self._update_context(session_id, safety_query, response)
             
             return response
@@ -136,7 +169,9 @@ class SafetyComplianceAgent:
                 natural_language=f"I encountered an error processing your safety query: {str(e)}",
                 recommendations=[],
                 confidence=0.0,
-                actions_taken=[]
+                actions_taken=[],
+                reasoning_chain=None,
+                reasoning_steps=None
             )
     
     async def _understand_query(
@@ -636,7 +671,8 @@ Respond in JSON format:
         safety_query: SafetyQuery, 
         retrieved_data: Dict[str, Any],
         session_id: str,
-        actions_taken: Optional[List[Dict[str, Any]]] = None
+        actions_taken: Optional[List[Dict[str, Any]]] = None,
+        reasoning_chain: Optional[ReasoningChain] = None
     ) -> SafetyResponse:
         """Generate intelligent response using LLM with retrieved context."""
         try:
@@ -649,8 +685,16 @@ Respond in JSON format:
             if actions_taken:
                 actions_str = f"\nActions Taken:\n{json.dumps(actions_taken, indent=2, default=str)}"
             
+            # Add reasoning context if available
+            reasoning_str = ""
+            if reasoning_chain:
+                reasoning_steps = []
+                for step in reasoning_chain.steps:
+                    reasoning_steps.append(f"Step {step.step_id}: {step.description}\n{step.reasoning}")
+                reasoning_str = f"\nAdvanced Reasoning Analysis:\n{chr(10).join(reasoning_steps)}\n\nFinal Conclusion: {reasoning_chain.final_conclusion}"
+            
             prompt = f"""
-You are a safety and compliance agent. Generate a comprehensive response based on the user query and retrieved data.
+You are a safety and compliance agent. Generate a comprehensive response based on the user query, retrieved data, and advanced reasoning analysis.
 
 User Query: "{safety_query.user_query}"
 Intent: {safety_query.intent}
@@ -659,6 +703,7 @@ Entities: {safety_query.entities}
 Retrieved Data:
 {context_str}
 {actions_str}
+{reasoning_str}
 
 Conversation History: {conversation_history[-3:] if conversation_history else "None"}
 
@@ -667,6 +712,7 @@ Generate a response that includes:
 2. Structured data in JSON format
 3. Actionable recommendations for safety improvement
 4. Confidence score (0.0 to 1.0)
+5. Reasoning insights if available
 
 Respond in JSON format:
 {{
@@ -675,7 +721,7 @@ Respond in JSON format:
         "incidents": [...],
         "policies": [...]
     }},
-    "natural_language": "Based on your query, here's the safety information...",
+    "natural_language": "Based on your query and analysis, here's the safety information...",
     "recommendations": [
         "Recommendation 1",
         "Recommendation 2"
@@ -694,17 +740,34 @@ Respond in JSON format:
             # Parse LLM response
             try:
                 parsed_response = json.loads(response.content)
+                
+                # Prepare reasoning steps for response
+                reasoning_steps = None
+                if reasoning_chain:
+                    reasoning_steps = []
+                    for step in reasoning_chain.steps:
+                        reasoning_steps.append({
+                            "step_id": step.step_id,
+                            "step_type": step.step_type,
+                            "description": step.description,
+                            "reasoning": step.reasoning,
+                            "confidence": step.confidence,
+                            "timestamp": step.timestamp.isoformat()
+                        })
+                
                 return SafetyResponse(
                     response_type=parsed_response.get("response_type", "general"),
                     data=parsed_response.get("data", {}),
                     natural_language=parsed_response.get("natural_language", "I processed your safety query."),
                     recommendations=parsed_response.get("recommendations", []),
                     confidence=parsed_response.get("confidence", 0.8),
-                    actions_taken=actions_taken or []
+                    actions_taken=actions_taken or [],
+                    reasoning_chain=reasoning_chain,
+                    reasoning_steps=reasoning_steps
                 )
             except json.JSONDecodeError:
                 # Fallback response
-                return self._generate_fallback_response(safety_query, retrieved_data, actions_taken)
+                return self._generate_fallback_response(safety_query, retrieved_data, actions_taken, reasoning_chain)
                 
         except Exception as e:
             logger.error(f"Response generation failed: {e}")
@@ -714,7 +777,8 @@ Respond in JSON format:
         self, 
         safety_query: SafetyQuery, 
         retrieved_data: Dict[str, Any],
-        actions_taken: Optional[List[Dict[str, Any]]] = None
+        actions_taken: Optional[List[Dict[str, Any]]] = None,
+        reasoning_chain: Optional[ReasoningChain] = None
     ) -> SafetyResponse:
         """Generate fallback response when LLM fails."""
         try:
@@ -803,13 +867,29 @@ Respond in JSON format:
                     natural_language = "I processed your safety query and retrieved relevant information."
                 recommendations = ["Review policy updates", "Ensure team compliance", "Follow all safety procedures"]
             
+            # Prepare reasoning steps for fallback response
+            reasoning_steps = None
+            if reasoning_chain:
+                reasoning_steps = []
+                for step in reasoning_chain.steps:
+                    reasoning_steps.append({
+                        "step_id": step.step_id,
+                        "step_type": step.step_type,
+                        "description": step.description,
+                        "reasoning": step.reasoning,
+                        "confidence": step.confidence,
+                        "timestamp": step.timestamp.isoformat()
+                    })
+            
             return SafetyResponse(
                 response_type="fallback",
                 data=data,
                 natural_language=natural_language,
                 recommendations=recommendations,
                 confidence=0.6,
-                actions_taken=actions_taken or []
+                actions_taken=actions_taken or [],
+                reasoning_chain=reasoning_chain,
+                reasoning_steps=reasoning_steps
             )
             
         except Exception as e:
@@ -940,6 +1020,35 @@ Respond in JSON format:
         """Clear conversation context for a session."""
         if session_id in self.conversation_context:
             del self.conversation_context[session_id]
+    
+    def _determine_reasoning_types(self, query: str, context: Optional[Dict[str, Any]]) -> List[ReasoningType]:
+        """Determine appropriate reasoning types based on query complexity and context."""
+        reasoning_types = [ReasoningType.CHAIN_OF_THOUGHT]  # Always include chain-of-thought
+        
+        query_lower = query.lower()
+        
+        # Multi-hop reasoning for complex queries
+        if any(keyword in query_lower for keyword in ["analyze", "compare", "relationship", "connection", "across", "multiple"]):
+            reasoning_types.append(ReasoningType.MULTI_HOP)
+        
+        # Scenario analysis for what-if questions
+        if any(keyword in query_lower for keyword in ["what if", "scenario", "alternative", "option", "if", "when", "suppose"]):
+            reasoning_types.append(ReasoningType.SCENARIO_ANALYSIS)
+        
+        # Causal reasoning for cause-effect questions
+        if any(keyword in query_lower for keyword in ["why", "cause", "effect", "because", "result", "consequence", "due to", "leads to"]):
+            reasoning_types.append(ReasoningType.CAUSAL)
+        
+        # Pattern recognition for learning queries
+        if any(keyword in query_lower for keyword in ["pattern", "trend", "learn", "insight", "recommendation", "optimize", "improve"]):
+            reasoning_types.append(ReasoningType.PATTERN_RECOGNITION)
+        
+        # For safety queries, always include causal reasoning
+        if any(keyword in query_lower for keyword in ["safety", "incident", "hazard", "risk", "compliance"]):
+            if ReasoningType.CAUSAL not in reasoning_types:
+                reasoning_types.append(ReasoningType.CAUSAL)
+        
+        return reasoning_types
 
 # Global safety agent instance
 _safety_agent: Optional[SafetyComplianceAgent] = None
