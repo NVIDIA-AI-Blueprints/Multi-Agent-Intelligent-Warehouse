@@ -92,15 +92,19 @@ async def get_all_equipment(
         where_conditions = []
         params = []
         
+        param_count = 1
         if equipment_type:
-            where_conditions.append("type = %s")
+            where_conditions.append(f"type = ${param_count}")
             params.append(equipment_type)
+            param_count += 1
         if zone:
-            where_conditions.append("zone = %s")
+            where_conditions.append(f"zone = ${param_count}")
             params.append(zone)
+            param_count += 1
         if status:
-            where_conditions.append("status = %s")
+            where_conditions.append(f"status = ${param_count}")
             params.append(status)
+            param_count += 1
         
         where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
         
@@ -112,7 +116,8 @@ async def get_all_equipment(
             ORDER BY asset_id
         """
         
-        results = await sql_retriever.fetch_all(query, params)
+        # Use execute_query for parameterized queries
+        results = await sql_retriever.execute_query(query, tuple(params))
         
         equipment_list = []
         for row in results:
@@ -127,7 +132,7 @@ async def get_all_equipment(
                 last_maintenance=row['last_maintenance'].isoformat() if row['last_maintenance'] else None,
                 created_at=row['created_at'].isoformat(),
                 updated_at=row['updated_at'].isoformat(),
-                metadata=row['metadata'] if row['metadata'] else {}
+                metadata=row['metadata'] if isinstance(row['metadata'], dict) else (eval(row['metadata']) if row['metadata'] and row['metadata'] != '{}' else {})
             ))
         
         return equipment_list
@@ -164,7 +169,7 @@ async def get_equipment_by_id(asset_id: str):
             last_maintenance=result['last_maintenance'].isoformat() if result['last_maintenance'] else None,
             created_at=result['created_at'].isoformat(),
             updated_at=result['updated_at'].isoformat(),
-            metadata=result['metadata'] if result['metadata'] else {}
+            metadata=result['metadata'] if isinstance(result['metadata'], dict) else (eval(result['metadata']) if result['metadata'] and result['metadata'] != '{}' else {})
         )
         
     except HTTPException:
@@ -389,7 +394,8 @@ async def get_equipment_assignments(
             ORDER BY assigned_at DESC
         """
         
-        results = await sql_retriever.fetch_all(query, params)
+        # Use execute_query for parameterized queries
+        results = await sql_retriever.execute_query(query, tuple(params))
         
         assignments = []
         for row in results:

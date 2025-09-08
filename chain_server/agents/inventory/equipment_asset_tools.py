@@ -121,18 +121,23 @@ class EquipmentAssetTools:
             where_conditions = []
             params = []
             
+            param_count = 1
             if asset_id:
-                where_conditions.append("asset_id = %s")
+                where_conditions.append(f"asset_id = ${param_count}")
                 params.append(asset_id)
+                param_count += 1
             if equipment_type:
-                where_conditions.append("type = %s")
+                where_conditions.append(f"type = ${param_count}")
                 params.append(equipment_type)
+                param_count += 1
             if zone:
-                where_conditions.append("zone = %s")
+                where_conditions.append(f"zone = ${param_count}")
                 params.append(zone)
+                param_count += 1
             if status:
-                where_conditions.append("status = %s")
+                where_conditions.append(f"status = ${param_count}")
                 params.append(status)
+                param_count += 1
             
             where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
             
@@ -145,22 +150,25 @@ class EquipmentAssetTools:
                 ORDER BY asset_id
             """
             
-            results = await self.sql_retriever.execute_query(query, params)
+            if params:
+                results = await self.sql_retriever.fetch_all(query, *params)
+            else:
+                results = await self.sql_retriever.fetch_all(query)
             
             equipment_list = []
             for row in results:
                 equipment_list.append({
-                    "asset_id": row[0],
-                    "type": row[1],
-                    "model": row[2],
-                    "zone": row[3],
-                    "status": row[4],
-                    "owner_user": row[5],
-                    "next_pm_due": row[6].isoformat() if row[6] else None,
-                    "last_maintenance": row[7].isoformat() if row[7] else None,
-                    "created_at": row[8].isoformat(),
-                    "updated_at": row[9].isoformat(),
-                    "metadata": row[10] if row[10] else {}
+                    "asset_id": row['asset_id'],
+                    "type": row['type'],
+                    "model": row['model'],
+                    "zone": row['zone'],
+                    "status": row['status'],
+                    "owner_user": row['owner_user'],
+                    "next_pm_due": row['next_pm_due'].isoformat() if row['next_pm_due'] else None,
+                    "last_maintenance": row['last_maintenance'].isoformat() if row['last_maintenance'] else None,
+                    "created_at": row['created_at'].isoformat(),
+                    "updated_at": row['updated_at'].isoformat(),
+                    "metadata": row['metadata'] if row['metadata'] else {}
                 })
             
             # Get summary statistics
@@ -175,12 +183,15 @@ class EquipmentAssetTools:
                 ORDER BY type, status
             """
             
-            summary_results = await self.sql_retriever.execute_query(summary_query, params)
+            if params:
+                summary_results = await self.sql_retriever.fetch_all(summary_query, *params)
+            else:
+                summary_results = await self.sql_retriever.fetch_all(summary_query)
             summary = {}
             for row in summary_results:
-                equipment_type = row[0]
-                status = row[1]
-                count = row[2]
+                equipment_type = row['type']
+                status = row['status']
+                count = row['count']
                 
                 if equipment_type not in summary:
                     summary[equipment_type] = {}
@@ -235,8 +246,8 @@ class EquipmentAssetTools:
         
         try:
             # Check if equipment is available
-            status_query = "SELECT status, owner_user FROM equipment_assets WHERE asset_id = %s"
-            status_result = await self.sql_retriever.execute_query(status_query, [asset_id])
+            status_query = "SELECT status, owner_user FROM equipment_assets WHERE asset_id = $1"
+            status_result = await self.sql_retriever.fetch_all(status_query, asset_id)
             
             if not status_result:
                 return {
@@ -245,7 +256,8 @@ class EquipmentAssetTools:
                     "assignment_id": None
                 }
             
-            current_status, current_owner = status_result[0]
+            current_status = status_result[0]['status']
+            current_owner = status_result[0]['owner_user']
             
             if current_status != "available":
                 return {
@@ -258,25 +270,25 @@ class EquipmentAssetTools:
             assignment_query = """
                 INSERT INTO equipment_assignments 
                 (asset_id, task_id, assignee, assignment_type, notes)
-                VALUES (%s, %s, %s, %s, %s)
+                VALUES ($1, $2, $3, $4, $5)
                 RETURNING id
             """
             
-            assignment_result = await self.sql_retriever.execute_query(
+            assignment_result = await self.sql_retriever.fetch_all(
                 assignment_query, 
-                [asset_id, task_id, assignee, assignment_type, notes]
+                asset_id, task_id, assignee, assignment_type, notes
             )
             
-            assignment_id = assignment_result[0][0] if assignment_result else None
+            assignment_id = assignment_result[0]['id'] if assignment_result else None
             
             # Update equipment status
             update_query = """
                 UPDATE equipment_assets 
-                SET status = 'assigned', owner_user = %s, updated_at = now()
-                WHERE asset_id = %s
+                SET status = 'assigned', owner_user = $1, updated_at = now()
+                WHERE asset_id = $2
             """
             
-            await self.sql_retriever.execute_query(update_query, [assignee, asset_id])
+            await self.sql_retriever.execute_command(update_query, assignee, asset_id)
             
             return {
                 "success": True,
@@ -320,12 +332,12 @@ class EquipmentAssetTools:
             assignment_query = """
                 SELECT id, assignee, assignment_type 
                 FROM equipment_assignments 
-                WHERE asset_id = %s AND released_at IS NULL
+                WHERE asset_id = $1 AND released_at IS NULL
                 ORDER BY assigned_at DESC
                 LIMIT 1
             """
             
-            assignment_result = await self.sql_retriever.execute_query(assignment_query, [asset_id])
+            assignment_result = await self.sql_retriever.fetch_all(assignment_query, asset_id)
             
             if not assignment_result:
                 return {
@@ -339,15 +351,15 @@ class EquipmentAssetTools:
             # Update assignment with release info
             release_query = """
                 UPDATE equipment_assignments 
-                SET released_at = now(), notes = COALESCE(notes || ' | ', '') || %s
-                WHERE id = %s
+                SET released_at = now(), notes = COALESCE(notes || ' | ', '') || $1
+                WHERE id = $2
             """
             
             release_notes = f"Released by {released_by}"
             if notes:
                 release_notes += f": {notes}"
             
-            await self.sql_retriever.execute_query(release_query, [release_notes, assignment_id])
+            await self.sql_retriever.execute_command(release_query, release_notes, assignment_id)
             
             # Update equipment status
             update_query = """
@@ -356,7 +368,7 @@ class EquipmentAssetTools:
                 WHERE asset_id = %s
             """
             
-            await self.sql_retriever.execute_query(update_query, [asset_id])
+            await self.sql_retriever.execute_command(update_query, asset_id)
             
             return {
                 "success": True,
@@ -412,7 +424,10 @@ class EquipmentAssetTools:
                 ORDER BY ts DESC
             """
             
-            results = await self.sql_retriever.execute_query(query, params)
+            if params:
+                results = await self.sql_retriever.fetch_all(query, *params)
+            else:
+                results = await self.sql_retriever.fetch_all(query)
             
             telemetry_data = []
             for row in results:
@@ -428,13 +443,13 @@ class EquipmentAssetTools:
             metrics_query = """
                 SELECT DISTINCT metric, unit
                 FROM equipment_telemetry 
-                WHERE asset_id = %s AND ts >= %s
+                WHERE asset_id = $1 AND ts >= $2
                 ORDER BY metric
             """
             
-            metrics_result = await self.sql_retriever.execute_query(
+            metrics_result = await self.sql_retriever.fetch_all(
                 metrics_query, 
-                [asset_id, datetime.now() - timedelta(hours=hours_back)]
+                asset_id, datetime.now() - timedelta(hours=hours_back)
             )
             
             available_metrics = [{"metric": row[0], "unit": row[1]} for row in metrics_result]
@@ -486,8 +501,8 @@ class EquipmentAssetTools:
         
         try:
             # Check if equipment exists
-            equipment_query = "SELECT asset_id, type, model FROM equipment_assets WHERE asset_id = %s"
-            equipment_result = await self.sql_retriever.execute_query(equipment_query, [asset_id])
+            equipment_query = "SELECT asset_id, type, model FROM equipment_assets WHERE asset_id = $1"
+            equipment_result = await self.sql_retriever.fetch_all(equipment_query, asset_id)
             
             if not equipment_result:
                 return {
@@ -501,16 +516,16 @@ class EquipmentAssetTools:
                 INSERT INTO equipment_maintenance 
                 (asset_id, maintenance_type, description, performed_by, performed_at, 
                  duration_minutes, notes)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
                 RETURNING id
             """
             
             notes = f"Scheduled by {scheduled_by}, Priority: {priority}, Duration: {estimated_duration_minutes} minutes"
             
-            maintenance_result = await self.sql_retriever.execute_query(
+            maintenance_result = await self.sql_retriever.fetch_all(
                 maintenance_query,
-                [asset_id, maintenance_type, description, scheduled_by, scheduled_for, 
-                 estimated_duration_minutes, notes]
+                asset_id, maintenance_type, description, scheduled_by, scheduled_for, 
+                estimated_duration_minutes, notes
             )
             
             maintenance_id = maintenance_result[0][0] if maintenance_result else None
@@ -522,7 +537,7 @@ class EquipmentAssetTools:
                     SET status = 'maintenance', updated_at = now()
                     WHERE asset_id = %s
                 """
-                await self.sql_retriever.execute_query(update_query, [asset_id])
+                await self.sql_retriever.execute_command(update_query, asset_id)
             
             return {
                 "success": True,
@@ -587,7 +602,10 @@ class EquipmentAssetTools:
                 ORDER BY m.performed_at ASC
             """
             
-            results = await self.sql_retriever.execute_query(query, params)
+            if params:
+                results = await self.sql_retriever.fetch_all(query, *params)
+            else:
+                results = await self.sql_retriever.fetch_all(query)
             
             maintenance_schedule = []
             for row in results:

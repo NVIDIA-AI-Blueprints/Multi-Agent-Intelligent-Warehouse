@@ -282,12 +282,21 @@ const EquipmentNew: React.FC = () => {
               pageSize={10}
               rowsPerPageOptions={[10, 25, 50]}
               disableSelectionOnClick
+              getRowId={(row) => row.asset_id}
+              autoHeight
               sx={{
                 '& .MuiDataGrid-root': {
                   border: 'none',
                 },
                 '& .MuiDataGrid-cell': {
                   borderBottom: '1px solid #f0f0f0',
+                },
+                '& .MuiDataGrid-row': {
+                  minHeight: '48px !important',
+                },
+                '& .MuiDataGrid-columnHeaders': {
+                  backgroundColor: '#f5f5f5',
+                  fontWeight: 'bold',
                 },
               }}
             />
