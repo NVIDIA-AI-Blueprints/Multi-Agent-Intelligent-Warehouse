@@ -21,7 +21,7 @@ graph TB
     %% Agent Orchestration Layer
     subgraph "Agent Orchestration (LangGraph)"
         Planner[Planner/Router Agent<br/>Intent Classification]
-        Equipment[Equipment & Asset Operations Agent<br/>Equipment Availability & Maintenance & Action Tools<br/>8 Comprehensive Equipment Management Tools]
+        Equipment[Equipment & Asset Operations Agent<br/>Equipment Availability & Maintenance & Action Tools<br/>6 Core Equipment Management Tools]
         Operations[Operations Coordination Agent<br/>Workforce & Task Management & Action Tools<br/>8 Comprehensive Operations Management Tools]
         Safety[Safety & Compliance Agent<br/>Incident Reporting, Policies & Action Tools<br/>7 Comprehensive Safety Management Tools]
         Chat[Chat Agent<br/>General Queries]
@@ -94,10 +94,13 @@ graph TB
         OPERATIONS_API[/api/v1/operations<br/>Workforce & Tasks]
         SAFETY_API[/api/v1/safety<br/>Incidents & Policies]
         WMS_API[/api/v1/wms<br/>External WMS Integration]
+        ERP_API[/api/v1/erp<br/>ERP Integration]
         IOT_API[/api/v1/iot<br/>IoT Sensor Data]
+        SCANNING_API[/api/v1/scanning<br/>RFID/Barcode Scanning]
+        ATTENDANCE_API[/api/v1/attendance<br/>Time & Attendance]
+        REASONING_API[/api/v1/reasoning<br/>AI Reasoning]
         AUTH_API[/api/v1/auth<br/>Authentication]
         HEALTH_API[/api/v1/health<br/>System Health]
-        METRICS_API[/api/v1/metrics<br/>Prometheus Metrics]
     end
 
     %% Connections - User Interface
@@ -109,9 +112,12 @@ graph TB
     API_GW --> OPERATIONS_API
     API_GW --> SAFETY_API
     API_GW --> WMS_API
+    API_GW --> ERP_API
     API_GW --> IOT_API
+    API_GW --> SCANNING_API
+    API_GW --> ATTENDANCE_API
+    API_GW --> REASONING_API
     API_GW --> HEALTH_API
-    API_GW --> METRICS_API
 
     %% Security Flow
     AUTH_API --> Auth
@@ -254,21 +260,17 @@ The Equipment & Asset Operations Agent (EAO) is the core AI agent responsible fo
 
 #### **Action Tools**
 
-The Equipment & Asset Operations Agent includes **8 comprehensive action tools** for complete equipment and asset management:
+The Equipment & Asset Operations Agent includes **6 core action tools** for equipment and asset management:
 
 #### **Equipment Management Tools**
-- **`check_stock`** - Check equipment availability with on-hand, available-to-promise, and location details
-- **`reserve_inventory`** - Create equipment reservations with hold periods and task linking
-- **`start_cycle_count`** - Initiate equipment cycle counting with priority and location targeting
+- **`get_equipment_status`** - Check equipment availability, status, and location details
+- **`assign_equipment`** - Assign equipment to users, tasks, or zones with duration and notes
+- **`release_equipment`** - Release equipment assignments and update status
 
-#### **Maintenance & Procurement Tools**
-- **`create_replenishment_task`** - Generate equipment maintenance tasks for CMMS queue
-- **`generate_purchase_requisition`** - Create equipment purchase requisitions with supplier and contract linking
-- **`adjust_reorder_point`** - Modify equipment reorder points with rationale and RBAC validation
-
-#### **Optimization & Analysis Tools**
-- **`recommend_reslotting`** - Suggest optimal equipment locations based on utilization and efficiency
-- **`investigate_discrepancy`** - Link equipment movements, assignments, and maintenance for discrepancy analysis
+#### **Maintenance & Telemetry Tools**
+- **`get_equipment_telemetry`** - Retrieve real-time equipment sensor data and performance metrics
+- **`schedule_maintenance`** - Create maintenance schedules and work orders
+- **`get_maintenance_schedule`** - View upcoming and past maintenance activities
 
 #### **Example Equipment Workflow**
 ```
@@ -376,7 +378,7 @@ sequenceDiagram
 | **JWT Authentication** | ✅ Complete | PyJWT, bcrypt | - | 5 user roles, RBAC permissions |
 | **NeMo Guardrails** | ✅ Complete | NeMo Guardrails | - | Content safety, compliance checks |
 | **Planner Agent** | ✅ Complete | LangGraph | - | Intent classification, routing |
-| **Equipment & Asset Operations Agent** | ✅ Complete | Python, async | - | Equipment availability, maintenance scheduling |
+| **Equipment & Asset Operations Agent** | ✅ Complete | Python, async | - | Equipment availability, maintenance scheduling, asset tracking |
 | **Operations Agent** | ✅ Complete | Python, async | - | Workforce scheduling, task management |
 | **Safety Agent** | ✅ Complete | Python, async | - | Incident reporting, policy lookup |
 | **Memory Manager** | ✅ Complete | PostgreSQL, Redis | - | Session context, conversation history |
@@ -391,23 +393,26 @@ sequenceDiagram
 | Component | Status | Technology | Description |
 |-----------|--------|------------|-------------|
 | **React Native Mobile** | 📋 Pending | React Native | Handheld devices, field operations |
-| **ERP Adapters** | 📋 Pending | SAP ECC, Oracle | ERP system integration |
-| **RFID/Barcode Adapters** | 📋 Pending | RFID, Barcode | Scanning system integration |
-| **Time Attendance** | 📋 Pending | Biometric, Card | Employee time tracking |
+| **ERP Adapters** | ✅ Complete | SAP ECC, Oracle | ERP system integration |
+| **RFID/Barcode Adapters** | ✅ Complete | RFID, Barcode | Scanning system integration |
+| **Time Attendance** | ✅ Complete | Biometric, Card | Employee time tracking |
 
 ### 🔧 **API Endpoints**
 
 | Endpoint | Method | Status | Description |
 |----------|--------|--------|-------------|
 | `/api/v1/chat` | POST | ✅ Working | AI-powered chat with LLM integration |
-| `/api/v1/equipment` | GET/POST | ✅ Working | Equipment & asset management, SKU lookup |
+| `/api/v1/equipment` | GET/POST | ✅ Working | Equipment & asset management, status lookup |
 | `/api/v1/operations` | GET/POST | ✅ Working | Workforce, tasks, KPIs |
 | `/api/v1/safety` | GET/POST | ✅ Working | Incidents, policies, compliance |
 | `/api/v1/wms` | GET/POST | ✅ Working | External WMS integration |
+| `/api/v1/erp` | GET/POST | ✅ Working | ERP system integration |
 | `/api/v1/iot` | GET/POST | ✅ Working | IoT sensor data |
+| `/api/v1/scanning` | GET/POST | ✅ Working | RFID/Barcode scanning systems |
+| `/api/v1/attendance` | GET/POST | ✅ Working | Time & attendance tracking |
+| `/api/v1/reasoning` | POST | ✅ Working | AI reasoning and analysis |
 | `/api/v1/auth` | POST | ✅ Working | Login, token management |
 | `/api/v1/health` | GET | ✅ Working | System health checks |
-| `/api/v1/metrics` | GET | ✅ Working | Prometheus metrics |
 
 ### 🏗️ **Infrastructure Components**
 
@@ -568,7 +573,7 @@ graph TB
 ### ✅ **Fully Operational Features**
 
 - **🤖 AI-Powered Chat**: Real-time conversation with NVIDIA NIMs integration
-- **🔧 Equipment & Asset Operations**: Equipment availability, maintenance scheduling, asset tracking, action tools (8 comprehensive equipment management tools)
+- **🔧 Equipment & Asset Operations**: Equipment availability, maintenance scheduling, asset tracking, action tools (6 core equipment management tools)
 - **👥 Operations Coordination**: Workforce scheduling, task management, KPI tracking, action tools (8 comprehensive operations management tools)
 - **🛡️ Safety & Compliance**: Incident reporting, policy lookup, safety checklists, alert broadcasting, LOTO procedures, corrective actions, SDS retrieval, near-miss reporting
 - **🔐 Authentication & Authorization**: JWT-based auth with 5 user roles and RBAC
@@ -583,9 +588,6 @@ graph TB
 ### 📋 **Planned Features**
 
 - **📱 Mobile App**: React Native for handheld devices and field operations
-- **🏢 ERP Integration**: SAP ECC, Oracle ERP adapters
-- **📱 RFID/Barcode**: Scanning system integration
-- **⏰ Time Attendance**: Employee time tracking and biometric systems
 
 ## System Status Overview
 
@@ -606,9 +608,6 @@ graph LR
 
     subgraph "📋 Pending Implementation"
         B1[React Native Mobile<br/>📱]
-        B2[ERP Adapters<br/>SAP ECC, Oracle]
-        B3[RFID/Barcode<br/>Scanning Systems]
-        B4[Time Attendance<br/>Biometric Systems]
     end
 
     subgraph "🔧 Infrastructure"
@@ -626,7 +625,7 @@ graph LR
     classDef infrastructure fill:#e3f2fd,stroke:#2196f3,stroke-width:2px
 
     class A1,A2,A3,A4,A5,A6,A7,A8,A9,A10 operational
-    class B1,B2,B3,B4 pending
+    class B1 pending
     class C1,C2,C3,C4,C5,C6 infrastructure
 ```
 
@@ -652,7 +651,9 @@ graph LR
 
 ### 📊 **Data Architecture**
 - **Multi-Modal Storage**: PostgreSQL for structured data, Milvus for vectors, Redis for cache
-- **Time-Series Support**: TimescaleDB for IoT sensor data and telemetry
+- **Time-Series Support**: TimescaleDB for IoT sensor data and equipment telemetry
+- **Equipment Management**: Dedicated equipment_assets table with assignment tracking
+- **User Management**: JWT-based authentication with 5 user roles and session management
 - **Object Storage**: MinIO for file management and document storage
 - **Configuration Management**: etcd for distributed configuration
 
@@ -664,19 +665,27 @@ graph LR
 - **✅ API Endpoints Updated**: All `/api/v1/inventory` → `/api/v1/equipment`
 - **✅ Frontend Updated**: Navigation, labels, and terminology updated throughout the UI
 - **✅ Mission Defined**: Ensure equipment is available, safe, and optimally used for warehouse workflows
-- **✅ Action Tools**: 8 comprehensive tools for equipment management, maintenance, and optimization
+- **✅ Action Tools**: 6 core tools for equipment management, maintenance, and asset tracking
 
-### **Key Benefits of the Update**
+### **System Integration Updates**
+- **✅ ERP Integration**: Complete ERP adapters for SAP ECC and Oracle systems
+- **✅ RFID/Barcode Integration**: Full scanning system integration with device management
+- **✅ Time & Attendance**: Complete biometric and card-based time tracking
+- **✅ AI Reasoning**: Advanced reasoning capabilities for complex warehouse queries
+- **✅ Intent Classification**: Improved routing for equipment dispatch queries
+
+### **Key Benefits of the Updates**
 - **Clearer Separation**: Equipment management vs. stock/parts inventory management
 - **Better Alignment**: Agent name now matches its actual function in warehouse operations
 - **Improved UX**: Users can easily distinguish between equipment and inventory queries
 - **Enhanced Capabilities**: Focus on equipment availability, maintenance, and asset tracking
+- **Complete Integration**: Full external system integration for comprehensive warehouse management
 
 ### **Example Queries Now Supported**
 - "charger status for Truck-07" → Equipment status and location
 - "assign a forklift to lane B" → Equipment assignment
 - "create PM for conveyor C3" → Maintenance scheduling
-- "ATPs for SKU123" → Available to Promise calculations
+- "Dispatch forklift FL-03 to Zone A" → Equipment dispatch with intelligent routing
 - "utilization last week" → Equipment utilization analytics
 
 ---
