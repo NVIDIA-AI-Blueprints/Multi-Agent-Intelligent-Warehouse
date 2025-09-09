@@ -31,8 +31,9 @@ graph TB
     subgraph "Memory Management"
         Memory[Memory Manager<br/>Session Context]
         Profiles[User Profiles<br/>PostgreSQL]
-        Sessions[Session Context<br/>Redis Cache]
+        Sessions[Session Context<br/>PostgreSQL]
         History[Conversation History<br/>PostgreSQL]
+        Redis_Cache[Redis Cache<br/>Session Caching]
     end
 
     %% AI Services (NVIDIA NIMs)
@@ -139,6 +140,7 @@ graph TB
     Memory --> Profiles
     Memory --> Sessions
     Memory --> History
+    Memory --> Redis_Cache
 
     %% Data Retrieval
     Equipment --> SQL
@@ -147,10 +149,12 @@ graph TB
     Equipment --> Vector
     Operations --> Vector
     Safety --> Vector
+    SQL --> Postgres
+    Vector --> Milvus
     SQL --> Hybrid
     Vector --> Hybrid
+    NIM_EMB --> Vector
     Hybrid --> NIM_LLM
-    NIM_LLM --> NIM_EMB
 
     %% Core Services
     WMS_SVC --> WMS_ADAPTERS
@@ -158,10 +162,8 @@ graph TB
     Metrics --> Prometheus
 
     %% Data Storage
-    SQL --> Postgres
-    Vector --> Milvus
-    Memory --> Redis
     Memory --> Postgres
+    Memory --> Redis
     WMS_SVC --> MinIO
     IoT_SVC --> MinIO
 
@@ -324,7 +326,8 @@ sequenceDiagram
     participant Memory as Memory Manager
     participant Retriever as Hybrid Retriever
     participant NIM as NVIDIA NIMs
-    participant DB as Database
+    participant Postgres as PostgreSQL/TimescaleDB
+    participant Milvus as Milvus Vector DB
     participant WMS as WMS Systems
     participant IoT as IoT Sensors
 
@@ -338,20 +341,21 @@ sequenceDiagram
     API->>Planner: Route Intent
     Planner->>Agent: Process Query
     Agent->>Memory: Get Context
-    Memory->>DB: Retrieve History
-    DB-->>Memory: Return Context
+    Memory->>Postgres: Retrieve History
+    Postgres-->>Memory: Return Context
     Memory-->>Agent: Context Data
     
     Agent->>Retriever: Search Data
-    Retriever->>DB: Structured Query (SQL)
-    Retriever->>DB: Vector Search (Milvus)
-    DB-->>Retriever: Results
+    Retriever->>Postgres: Structured Query (SQL)
+    Retriever->>Milvus: Vector Search (Milvus)
+    Postgres-->>Retriever: SQL Results
+    Milvus-->>Retriever: Vector Results
     Retriever-->>Agent: Ranked Results
     
     Agent->>NIM: Generate Response
     NIM-->>Agent: Natural Language + Structured
     Agent->>Memory: Store Conversation
-    Memory->>DB: Persist Data
+    Memory->>Postgres: Persist Data
     
     Agent-->>Planner: Response
     Planner->>Guardrails: Check Output Safety
@@ -501,7 +505,8 @@ graph TB
     OpAgent --> NIM_LLM
     SafeAgent --> NIM_LLM
     ChatAgent --> NIM_LLM
-    NIM_LLM --> NIM_EMB
+    Retriever --> NIM_LLM
+    NIM_EMB --> Retriever
 
     %% Data Processing
     EquipAgent --> Memory
@@ -658,6 +663,15 @@ graph LR
 - **Configuration Management**: etcd for distributed configuration
 
 ## 🔄 **Latest Updates (December 2024)**
+
+### **Architecture Diagram Corrections - Data Flow Accuracy**
+- **✅ Memory Management**: Corrected to show Memory Manager as service class with PostgreSQL storage and Redis caching
+- **✅ Hybrid Retrieval**: Fixed data flow to show direct SQL→PostgreSQL and Vector→Milvus connections
+- **✅ NIM Integration**: Corrected NIM_EMB→Vector connection for embedding generation
+- **✅ Database Connections**: Updated sequence diagram to show separate PostgreSQL and Milvus connections
+- **✅ Agent Connections**: Added proper agent-to-memory connections for context retrieval
+
+## 🔄 **Previous Updates (December 2024)**
 
 ### **Equipment & Asset Operations Agent (EAO) - Major Update**
 - **✅ Agent Renamed**: "Inventory Intelligence Agent" → "Equipment & Asset Operations Agent (EAO)"
