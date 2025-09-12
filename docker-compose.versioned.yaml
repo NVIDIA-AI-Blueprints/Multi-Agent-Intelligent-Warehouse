@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  warehouse-assistant:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VERSION: ${VERSION:-latest}
+        GIT_SHA: ${GIT_SHA:-unknown}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+    image: warehouse-assistant:${VERSION:-latest}
+    container_name: warehouse-assistant
+    ports:
+      - "8001:8001"
+    environment:
+      - VERSION=${VERSION:-latest}
+      - GIT_SHA=${GIT_SHA:-unknown}
+      - BUILD_TIME=${BUILD_TIME:-unknown}
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/warehouse_ops
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MILVUS_HOST=milvus
+      - MILVUS_PORT=19530
+    depends_on:
+      - postgres
+      - redis
+      - milvus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    labels:
+      - "app.kubernetes.io/name=warehouse-assistant"
+      - "app.kubernetes.io/version=${VERSION:-latest}"
+      - "app.kubernetes.io/component=backend"
+
+  postgres:
+    image: timescale/timescaledb:latest-pg14
+    container_name: warehouse-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=warehouse_ops
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./data/postgres:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    labels:
+      - "app.kubernetes.io/name=postgres"
+      - "app.kubernetes.io/component=database"
+
+  redis:
+    image: redis:7-alpine
+    container_name: warehouse-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    labels:
+      - "app.kubernetes.io/name=redis"
+      - "app.kubernetes.io/component=cache"
+
+  milvus:
+    image: milvusdb/milvus:v2.3.0
+    container_name: warehouse-milvus
+    ports:
+      - "19530:19530"
+    environment:
+      - ETCD_USE_EMBED=true
+      - ETCD_DATA_DIR=/var/lib/milvus/etcd
+      - COMMON_STORAGETYPE=local
+    volumes:
+      - milvus_data:/var/lib/milvus
+    command: ["milvus", "run", "standalone"]
+    restart: unless-stopped
+    labels:
+      - "app.kubernetes.io/name=milvus"
+      - "app.kubernetes.io/component=vector-db"
+
+volumes:
+  postgres_data:
+  redis_data:
+  milvus_data:

@@ -12,6 +12,7 @@ import Equipment from './pages/EquipmentNew';
 import Operations from './pages/Operations';
 import Safety from './pages/Safety';
 import Analytics from './pages/Analytics';
+import VersionFooter from './components/VersionFooter';
 
 function App() {
   return (
@@ -38,6 +39,7 @@ function App() {
             }
           />
         </Routes>
+        <VersionFooter />
       </Box>
     </AuthProvider>
   );

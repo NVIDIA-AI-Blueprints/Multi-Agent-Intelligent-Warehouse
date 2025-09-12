@@ -1,0 +1,140 @@
+# Database Migration Configuration
+# This file defines the migration system configuration and metadata
+
+migration_system:
+  version: "1.0.0"
+  description: "Warehouse Operational Assistant Database Migration System"
+  created: "2024-01-01T00:00:00Z"
+  last_updated: "2024-01-01T00:00:00Z"
+
+# Migration settings
+settings:
+  # Database connection settings
+  database:
+    host: "${DB_HOST:localhost}"
+    port: "${DB_PORT:5435}"
+    name: "${DB_NAME:warehouse_assistant}"
+    user: "${DB_USER:warehouse_user}"
+    password: "${DB_PASSWORD:warehouse_pass}"
+    ssl_mode: "${DB_SSL_MODE:prefer}"
+    
+  # Migration execution settings
+  execution:
+    timeout_seconds: 300  # 5 minutes timeout for migrations
+    retry_attempts: 3
+    retry_delay_seconds: 5
+    dry_run_enabled: true
+    rollback_enabled: true
+    
+  # Logging settings
+  logging:
+    level: "${MIGRATION_LOG_LEVEL:INFO}"
+    format: "json"
+    include_sql: true
+    include_timing: true
+    
+  # Backup settings
+  backup:
+    enabled: true
+    backup_before_migration: true
+    backup_retention_days: 30
+    backup_location: "${BACKUP_LOCATION:./backups}"
+
+# Migration metadata
+migrations:
+  - version: "001"
+    filename: "001_initial_schema.sql"
+    description: "Initial database schema setup"
+    dependencies: []
+    rollback_supported: true
+    estimated_duration_seconds: 30
+    
+  - version: "002"
+    filename: "002_warehouse_tables.sql"
+    description: "Create core warehouse operational tables"
+    dependencies: ["001"]
+    rollback_supported: true
+    estimated_duration_seconds: 60
+    
+  - version: "003"
+    filename: "003_timescale_hypertables.sql"
+    description: "Create TimescaleDB hypertables for time-series data"
+    dependencies: ["001", "002"]
+    rollback_supported: false  # TimescaleDB operations are complex to rollback
+    estimated_duration_seconds: 45
+
+# Environment-specific overrides
+environments:
+  development:
+    database:
+      ssl_mode: "disable"
+    execution:
+      timeout_seconds: 600  # Longer timeout for dev
+    logging:
+      level: "DEBUG"
+      
+  staging:
+    database:
+      ssl_mode: "require"
+    execution:
+      timeout_seconds: 300
+    logging:
+      level: "INFO"
+      
+  production:
+    database:
+      ssl_mode: "require"
+    execution:
+      timeout_seconds: 180  # Shorter timeout for prod
+    logging:
+      level: "WARN"
+    backup:
+      enabled: true
+      backup_before_migration: true
+      backup_retention_days: 90
+
+# Validation rules
+validation:
+  # SQL validation rules
+  sql:
+    allow_ddl: true
+    allow_dml: false  # Migrations should only contain DDL
+    allow_drop: true
+    require_transaction: true
+    
+  # File validation rules
+  files:
+    require_version_prefix: true
+    require_description: true
+    max_file_size_mb: 10
+    allowed_extensions: [".sql"]
+    
+  # Migration validation rules
+  migrations:
+    require_unique_versions: true
+    require_sequential_versions: false  # Allow gaps in version numbers
+    require_dependency_validation: true
+    require_rollback_validation: true
+
+# Monitoring and alerting
+monitoring:
+  # Health check settings
+  health_check:
+    enabled: true
+    interval_seconds: 60
+    timeout_seconds: 10
+    
+  # Metrics collection
+  metrics:
+    enabled: true
+    collect_timing: true
+    collect_success_rate: true
+    collect_error_details: true
+    
+  # Alerting
+  alerts:
+    enabled: true
+    migration_failure: true
+    migration_timeout: true
+    database_connection_failure: true
+    rollback_failure: true
