@@ -66,7 +66,7 @@ const EquipmentNew: React.FC = () => {
 
   const { data: telemetryData } = useQuery(
     ['equipment-telemetry', selectedAssetId],
-    () => selectedAssetId ? equipmentAPI.getTelemetry(selectedAssetId, undefined, 24) : [],
+    () => selectedAssetId ? equipmentAPI.getTelemetry(selectedAssetId, undefined, 168) : [],
     { enabled: !!selectedAssetId && activeTab === 3 }
   );
 

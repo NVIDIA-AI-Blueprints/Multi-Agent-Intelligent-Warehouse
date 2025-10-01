@@ -24,6 +24,40 @@
 
 This repository implements a production-grade assistant patterned on NVIDIA's AI Blueprints (planner/router + specialized agents), adapted for warehouse domains. It uses a **hybrid RAG** stack (Postgres/Timescale + Milvus), **NeMo Guardrails**, **production-grade vector search with NV-EmbedQA-E5-v5 embeddings**, **enhanced vector search optimization with evidence scoring and intelligent clarifying questions**, **intelligent SQL path optimization**, **advanced Redis caching**, **comprehensive response quality control**, **real-time equipment status and telemetry monitoring**, **advanced reasoning capabilities with 5 reasoning types**, **MCP (Model Context Protocol) integration for seamless tool discovery and execution**, and a clean API surface for UI or system integrations.
 
+## System Architecture
+
+The Warehouse Operational Assistant follows a comprehensive multi-agent architecture designed for scalability, reliability, and intelligent decision-making. The system is structured into several logical layers that work together to provide real-time warehouse operations support.
+
+### **High-Level Architecture Overview**
+
+![Warehouse Operational Assistant Architecture](docs/architecture/diagrams/warehouse-assistant-architecture.png)
+
+The architecture consists of:
+
+1. **User/External Interaction Layer** - Entry point for users and external systems
+2. **Warehouse Operational Assistant** - Central orchestrator managing specialized AI agents
+3. **NVIDIA NeMo Agent Toolkit** - Framework for building and managing AI agents
+4. **Multi-Agent System** - Three specialized agents:
+   - **Inventory Agent** - Equipment assets, assignments, maintenance, and telemetry
+   - **Operations Agent** - Task planning and workflow management  
+   - **Safety Agent** - Safety monitoring and incident response
+5. **API Services Layer** - Standardized interfaces for business logic and data access
+6. **Data Retrieval & Processing** - SQL, Vector, and Knowledge Graph retrievers
+7. **LLM Integration & Orchestration** - NVIDIA NIMs with LangGraph orchestration
+8. **Data Storage Layer** - PostgreSQL, Vector DB, Knowledge Graph, and Telemetry databases
+9. **Infrastructure Layer** - Kubernetes, NVIDIA GPU infrastructure, Edge devices, and Cloud
+
+### **Key Architectural Components**
+
+- **Multi-Agent Coordination**: LangGraph orchestrates complex workflows between specialized agents
+- **MCP Integration**: Model Context Protocol enables seamless tool discovery and execution
+- **Hybrid Data Processing**: Combines structured (PostgreSQL/TimescaleDB) and vector (Milvus) data
+- **NVIDIA NIMs Integration**: LLM inference and embedding services for intelligent processing
+- **Real-time Monitoring**: Comprehensive telemetry and equipment status tracking
+- **Scalable Infrastructure**: Kubernetes orchestration with GPU acceleration
+
+The system emphasizes modular design, clear separation of concerns, and enterprise-grade reliability while maintaining the flexibility to adapt to various warehouse operational requirements.
+
 ## Status & Features
 
 [![System Status](https://img.shields.io/badge/System%20Status-Online-brightgreen.svg)](http://localhost:8001/api/v1/health)

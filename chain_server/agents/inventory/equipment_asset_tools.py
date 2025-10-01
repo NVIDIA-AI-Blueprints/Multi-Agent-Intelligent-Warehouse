@@ -407,52 +407,52 @@ class EquipmentAssetTools:
         logger.info(f"Getting telemetry for equipment {asset_id}, metric: {metric}, hours_back: {hours_back}")
         
         try:
-            # Build query
-            where_conditions = ["asset_id = %s", "ts >= %s"]
+            # Build query with PostgreSQL parameter style
+            where_conditions = ["equipment_id = $1", "ts >= $2"]
             params = [asset_id, datetime.now() - timedelta(hours=hours_back)]
+            param_count = 3
             
             if metric:
-                where_conditions.append("metric = %s")
+                where_conditions.append(f"metric = ${param_count}")
                 params.append(metric)
+                param_count += 1
             
             where_clause = " AND ".join(where_conditions)
             
             query = f"""
-                SELECT ts, metric, value, unit, quality_score
+                SELECT ts, metric, value
                 FROM equipment_telemetry 
                 WHERE {where_clause}
                 ORDER BY ts DESC
             """
             
-            if params:
-                results = await self.sql_retriever.fetch_all(query, *params)
-            else:
-                results = await self.sql_retriever.fetch_all(query)
+            results = await self.sql_retriever.execute_query(query, tuple(params))
             
             telemetry_data = []
             for row in results:
                 telemetry_data.append({
-                    "timestamp": row[0].isoformat(),
-                    "metric": row[1],
-                    "value": row[2],
-                    "unit": row[3],
-                    "quality_score": row[4]
+                    "timestamp": row['ts'].isoformat(),
+                    "asset_id": asset_id,
+                    "metric": row['metric'],
+                    "value": row['value'],
+                    "unit": "unknown",  # Default unit since column doesn't exist
+                    "quality_score": 1.0  # Default quality score since column doesn't exist
                 })
             
             # Get available metrics
             metrics_query = """
-                SELECT DISTINCT metric, unit
+                SELECT DISTINCT metric
                 FROM equipment_telemetry 
-                WHERE asset_id = $1 AND ts >= $2
+                WHERE equipment_id = $1 AND ts >= $2
                 ORDER BY metric
             """
             
-            metrics_result = await self.sql_retriever.fetch_all(
+            metrics_result = await self.sql_retriever.execute_query(
                 metrics_query, 
-                asset_id, datetime.now() - timedelta(hours=hours_back)
+                (asset_id, datetime.now() - timedelta(hours=hours_back))
             )
             
-            available_metrics = [{"metric": row[0], "unit": row[1]} for row in metrics_result]
+            available_metrics = [{"metric": row['metric'], "unit": "unknown"} for row in metrics_result]
             
             return {
                 "asset_id": asset_id,
@@ -578,16 +578,20 @@ class EquipmentAssetTools:
         logger.info(f"Getting maintenance schedule for asset_id: {asset_id}, type: {maintenance_type}")
         
         try:
-            # Build query
-            where_conditions = ["performed_at >= %s"]
-            params = [datetime.now()]
+            # Build query with PostgreSQL parameter style - look for maintenance within the specified days ahead
+            end_date = datetime.now() + timedelta(days=days_ahead)
+            where_conditions = ["performed_at >= $1 AND performed_at <= $2"]
+            params = [datetime.now() - timedelta(days=30), end_date]  # Look back 30 days and ahead
+            param_count = 3
             
             if asset_id:
-                where_conditions.append("asset_id = %s")
+                where_conditions.append(f"asset_id = ${param_count}")
                 params.append(asset_id)
+                param_count += 1
             if maintenance_type:
-                where_conditions.append("maintenance_type = %s")
+                where_conditions.append(f"maintenance_type = ${param_count}")
                 params.append(maintenance_type)
+                param_count += 1
             
             where_clause = " AND ".join(where_conditions)
             
@@ -602,26 +606,23 @@ class EquipmentAssetTools:
                 ORDER BY m.performed_at ASC
             """
             
-            if params:
-                results = await self.sql_retriever.fetch_all(query, *params)
-            else:
-                results = await self.sql_retriever.fetch_all(query)
+            results = await self.sql_retriever.execute_query(query, tuple(params))
             
             maintenance_schedule = []
             for row in results:
                 maintenance_schedule.append({
-                    "id": row[0],
-                    "asset_id": row[1],
-                    "equipment_type": row[2],
-                    "model": row[3],
-                    "zone": row[4],
-                    "maintenance_type": row[5],
-                    "description": row[6],
-                    "performed_by": row[7],
-                    "performed_at": row[8].isoformat(),
-                    "duration_minutes": row[9],
-                    "cost": float(row[10]) if row[10] else None,
-                    "notes": row[11]
+                    "id": row['id'],
+                    "asset_id": row['asset_id'],
+                    "equipment_type": row['type'],
+                    "model": row['model'],
+                    "zone": row['zone'],
+                    "maintenance_type": row['maintenance_type'],
+                    "description": row['description'],
+                    "performed_by": row['performed_by'],
+                    "performed_at": row['performed_at'].isoformat() if row['performed_at'] else None,
+                    "duration_minutes": row['duration_minutes'],
+                    "cost": float(row['cost']) if row['cost'] else None,
+                    "notes": row['notes']
                 })
             
             return {
