@@ -104,7 +104,7 @@ const ChatInterfaceNew: React.FC = () => {
   const [warehouse, setWarehouse] = useState('WH-01');
   const [role, setRole] = useState('manager');
   const [environment, setEnvironment] = useState('Dev');
-  const [connections, setConnections] = useState({
+  const [connections] = useState({
     nim: true,
     db: true,
     milvus: true,
@@ -112,7 +112,7 @@ const ChatInterfaceNew: React.FC = () => {
   });
 
   // Recent tasks
-  const [recentTasks, setRecentTasks] = useState([
+  const [recentTasks] = useState([
     {
       id: '1',
       title: 'Create pick wave for orders 1001-1010',
@@ -583,7 +583,7 @@ const ChatInterfaceNew: React.FC = () => {
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}
-        onClose={(event?: React.SyntheticEvent | Event, reason?: string) => {
+        onClose={(_, reason?: string) => {
           if (reason !== 'clickaway') {
             setSnackbar(prev => ({ ...prev, open: false }));
           }
