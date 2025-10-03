@@ -195,7 +195,13 @@ Return JSON format:
     "context": {"priority": "high", "zone": "A"}
 }
 
-Intent options: equipment_lookup, assignment, utilization, maintenance, availability, telemetry, safety
+Intent options: equipment_lookup, equipment_dispatch, equipment_assignment, equipment_utilization, equipment_maintenance, equipment_availability, equipment_telemetry, equipment_safety
+
+Examples:
+- "Show me forklift FL-001" → {"intent": "equipment_lookup", "entities": {"equipment_id": "FL-001", "equipment_type": "forklift"}}
+- "Dispatch forklift FL-01 to Zone A" → {"intent": "equipment_dispatch", "entities": {"equipment_id": "FL-01", "equipment_type": "forklift", "destination": "Zone A"}}
+- "Assign loader L-003 to task T-456" → {"intent": "equipment_assignment", "entities": {"equipment_id": "L-003", "equipment_type": "loader", "task_id": "T-456"}}
+
 Return only valid JSON."""
                 },
                 {
@@ -446,9 +452,16 @@ Return JSON format:
     "actions_taken": [{"action": "tool_execution", "tool": "get_equipment_status"}]
 }
 
+Response types based on intent:
+- equipment_lookup: "equipment_info" with equipment details
+- equipment_dispatch: "equipment_dispatch" with dispatch status and location
+- equipment_assignment: "equipment_assignment" with assignment details
+- equipment_maintenance: "equipment_maintenance" with maintenance status
+- equipment_availability: "equipment_availability" with availability status
+
 Include:
 1. Natural language explanation of results
-2. Structured data summary
+2. Structured data summary appropriate for the intent
 3. Actionable recommendations
 4. Confidence assessment
 Return only valid JSON."""

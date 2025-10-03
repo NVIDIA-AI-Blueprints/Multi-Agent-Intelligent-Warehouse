@@ -290,7 +290,16 @@ class MCPPlannerGraph:
             )
             
             # Store the response
-            state["agent_responses"]["equipment"] = response
+            state["agent_responses"]["equipment"] = {
+                "natural_language": response.natural_language,
+                "data": response.data,
+                "recommendations": response.recommendations,
+                "confidence": response.confidence,
+                "response_type": response.response_type,
+                "mcp_tools_used": response.mcp_tools_used or [],
+                "tool_execution_results": response.tool_execution_results or {},
+                "actions_taken": response.actions_taken or []
+            }
             
             logger.info(f"MCP Equipment agent processed request with confidence: {response.confidence}")
             
