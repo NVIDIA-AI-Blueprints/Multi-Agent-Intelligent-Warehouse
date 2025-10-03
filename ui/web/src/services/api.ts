@@ -140,6 +140,13 @@ export const mcpAPI = {
   }
 };
 
+export const chatAPI = {
+  sendMessage: async (request: ChatRequest): Promise<ChatResponse> => {
+    const response = await api.post('/api/v1/chat', request);
+    return response.data;
+  },
+};
+
 export const equipmentAPI = {
   getAsset: async (asset_id: string): Promise<EquipmentAsset> => {
     const response = await api.get(`/api/v1/equipment/${asset_id}`);

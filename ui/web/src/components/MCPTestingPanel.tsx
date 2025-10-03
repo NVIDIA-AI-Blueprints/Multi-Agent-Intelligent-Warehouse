@@ -26,9 +26,7 @@ import {
   PlayArrow as PlayIcon,
   Refresh as RefreshIcon,
   Search as SearchIcon,
-  Info as InfoIcon,
   CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
 } from '@mui/icons-material';
 import { mcpAPI } from '../services/api';
 
