@@ -60,8 +60,8 @@ The system emphasizes modular design, clear separation of concerns, and enterpri
 
 ## Status & Features
 
-[![System Status](https://img.shields.io/badge/System%20Status-Online-brightgreen.svg)](http://localhost:8001/api/v1/health)
-[![API Server](https://img.shields.io/badge/API%20Server-Running%20on%20Port%208001-success.svg)](http://localhost:8001)
+[![System Status](https://img.shields.io/badge/System%20Status-Online-brightgreen.svg)](http://localhost:8002/api/v1/health)
+[![API Server](https://img.shields.io/badge/API%20Server-Running%20on%20Port%208002-success.svg)](http://localhost:8002)
 [![Frontend](https://img.shields.io/badge/Frontend-Running%20on%20Port%203001-success.svg)](http://localhost:3001)
 [![Database](https://img.shields.io/badge/Database-PostgreSQL%20%2B%20TimescaleDB-success.svg)](http://localhost:5435)
 [![Vector DB](https://img.shields.io/badge/Vector%20DB-Milvus%20GPU-success.svg)](http://localhost:19530)
@@ -645,7 +645,7 @@ Agent Actions:
 [![Docker Compose](https://img.shields.io/badge/Docker%20Compose-Ready-2496ED.svg)](docker-compose.yaml)
 [![One-Click Deploy](https://img.shields.io/badge/One--Click-Deploy%20Script-brightgreen.svg)](RUN_LOCAL.sh)
 [![Environment Setup](https://img.shields.io/badge/Environment-Setup%20Script-blue.svg)](scripts/dev_up.sh)
-[![Health Check](https://img.shields.io/badge/Health%20Check-Available-success.svg)](http://localhost:8001/api/v1/health)
+[![Health Check](https://img.shields.io/badge/Health%20Check-Available-success.svg)](http://localhost:8002/api/v1/health)
 
 ### 0) Prerequisites
 - Python **3.11+**
@@ -668,7 +668,7 @@ Agent Actions:
 ### 2) Start the API
 ```bash
 ./RUN_LOCAL.sh
-# starts FastAPI server on http://localhost:8001
+# starts FastAPI server on http://localhost:8002
 # Chat endpoint working with NVIDIA NIMs integration
 ```
 
@@ -686,7 +686,7 @@ npm start # starts React app on http://localhost:3001
 [![Grafana](https://img.shields.io/badge/Grafana-Dashboards-F46800.svg)](http://localhost:3000)
 [![Prometheus](https://img.shields.io/badge/Prometheus-Metrics-E6522C.svg)](http://localhost:9090)
 [![Alertmanager](https://img.shields.io/badge/Alertmanager-Alerts-E6522C.svg)](http://localhost:9093)
-[![Metrics](https://img.shields.io/badge/Metrics-Real--time%20Monitoring-brightgreen.svg)](http://localhost:8001/api/v1/metrics)
+[![Metrics](https://img.shields.io/badge/Metrics-Real--time%20Monitoring-brightgreen.svg)](http://localhost:8002/api/v1/metrics)
 
 ```bash
 # Start Prometheus/Grafana monitoring
@@ -713,8 +713,8 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 
 ### 6) Smoke tests
 
-[![API Documentation](https://img.shields.io/badge/API-Documentation%20%2F%20Swagger-FF6B35.svg)](http://localhost:8001/docs)
-[![OpenAPI Spec](https://img.shields.io/badge/OpenAPI-3.0%20Spec-85EA2D.svg)](http://localhost:8001/openapi.json)
+[![API Documentation](https://img.shields.io/badge/API-Documentation%20%2F%20Swagger-FF6B35.svg)](http://localhost:8002/docs)
+[![OpenAPI Spec](https://img.shields.io/badge/OpenAPI-3.0%20Spec-85EA2D.svg)](http://localhost:8002/openapi.json)
 [![Test Coverage](https://img.shields.io/badge/Test%20Coverage-80%25+-brightgreen.svg)](tests/)
 [![Linting](https://img.shields.io/badge/Linting-Black%20%2B%20Flake8%20%2B%20MyPy-success.svg)](requirements.txt)
 
@@ -860,7 +860,7 @@ docker exec -it wosa-timescaledb psql -U warehouse -d warehouse -c \
 
 ## API (current)
 
-Base path: `http://localhost:8001/api/v1`
+Base path: `http://localhost:8002/api/v1`
 
 ### Health
 ```
@@ -1006,10 +1006,11 @@ GET /wms/health
 
 ### Frontend UI
 - `ui/web/` — React-based dashboard with Material-UI components.
-- `ui/web/src/pages/` — Dashboard, Login, Chat, and system monitoring pages.
+- `ui/web/src/pages/` — Dashboard, Login, Chat, MCP Testing, and system monitoring pages.
 - `ui/web/src/contexts/` — Authentication context and state management.
 - `ui/web/src/services/` — API client with JWT token handling and proxy configuration.
-- **Features**: Real-time chat interface, system status monitoring, user authentication, responsive design.
+- **Features**: Real-time chat interface, MCP Testing panel, system status monitoring, user authentication, responsive design.
+- **Navigation**: Left sidebar includes Dashboard, Chat Assistant, Equipment & Assets, Operations, Safety, Analytics, and **MCP Testing**.
 
 ### Guardrails & Security
 - `guardrails/rails.yaml` — NeMo Guardrails configuration with safety, compliance, and security rules.
@@ -1076,7 +1077,7 @@ The system supports integration with external WMS systems for seamless warehouse
 ### Quick Start
 ```bash
 # Add SAP EWM connection
-curl -X POST "http://localhost:8001/api/v1/wms/connections" \
+curl -X POST "http://localhost:8002/api/v1/wms/connections" \
  -H "Content-Type: application/json" \
  -d '{
  "connection_id": "sap_ewm_main",
@@ -1090,10 +1091,10 @@ curl -X POST "http://localhost:8001/api/v1/wms/connections" \
  }'
 
 # Get inventory from WMS
-curl "http://localhost:8001/api/v1/wms/connections/sap_ewm_main/inventory"
+curl "http://localhost:8002/api/v1/wms/connections/sap_ewm_main/inventory"
 
 # Create a pick task
-curl -X POST "http://localhost:8001/api/v1/wms/connections/sap_ewm_main/tasks" \
+curl -X POST "http://localhost:8002/api/v1/wms/connections/sap_ewm_main/tasks" \
  -H "Content-Type: application/json" \
  -d '{
  "task_type": "pick",
@@ -1132,7 +1133,7 @@ The system supports comprehensive IoT integration for real-time equipment monito
 ### Quick Start
 ```bash
 # Add Equipment Monitor connection
-curl -X POST "http://localhost:8001/api/v1/iot/connections/equipment_monitor_main" \
+curl -X POST "http://localhost:8002/api/v1/iot/connections/equipment_monitor_main" \
  -H "Content-Type: application/json" \
  -d '{
  "iot_type": "equipment_monitor",
@@ -1145,7 +1146,7 @@ curl -X POST "http://localhost:8001/api/v1/iot/connections/equipment_monitor_mai
  }'
 
 # Add Environmental Sensor connection
-curl -X POST "http://localhost:8001/api/v1/iot/connections/environmental_main" \
+curl -X POST "http://localhost:8002/api/v1/iot/connections/environmental_main" \
  -H "Content-Type: application/json" \
  -d '{
  "iot_type": "environmental",
@@ -1159,13 +1160,13 @@ curl -X POST "http://localhost:8001/api/v1/iot/connections/environmental_main" \
  }'
 
 # Get sensor readings
-curl "http://localhost:8001/api/v1/iot/connections/equipment_monitor_main/sensor-readings"
+curl "http://localhost:8002/api/v1/iot/connections/equipment_monitor_main/sensor-readings"
 
 # Get equipment health summary
-curl "http://localhost:8001/api/v1/iot/equipment/health-summary"
+curl "http://localhost:8002/api/v1/iot/equipment/health-summary"
 
 # Get aggregated sensor data
-curl "http://localhost:8001/api/v1/iot/sensor-readings/aggregated"
+curl "http://localhost:8002/api/v1/iot/sensor-readings/aggregated"
 ```
 
 ### Key Features

@@ -11,6 +11,8 @@ All notable changes to this project will be documented in this file. See [Conven
 - Fixed MessageBubble component syntax error (missing opening brace)
 - Fixed ChatInterfaceNew component "event is undefined" runtime error
 - Cleaned up all ESLint warnings in UI (25 warnings resolved)
+- Fixed missing chatAPI export causing compilation errors
+- Fixed API port conflict by updating frontend to use port 8002
 
 ### Features
 - Initial implementation of Warehouse Operational Assistant
@@ -31,6 +33,8 @@ All notable changes to this project will be documented in this file. See [Conven
 - MCP-integrated planner graph with intelligent routing
 - End-to-end MCP workflow processing
 - Cross-agent tool sharing and communication
+- MCP Testing UI with dynamic tool discovery interface
+- MCP Testing navigation link in left sidebar
 - Comprehensive monitoring with Prometheus/Grafana
 - Enterprise security with JWT/OAuth2 and RBAC
 

@@ -4,7 +4,7 @@
 
 The Warehouse Operational Assistant provides a comprehensive REST API for warehouse operations management. The API is built with FastAPI and provides OpenAPI/Swagger documentation.
 
-**Current Status**: All core endpoints are working and tested. Recent fixes have resolved critical issues with equipment assignments and chat interface. MCP framework is now fully integrated with dynamic tool discovery and execution.
+**Current Status**: All core endpoints are working and tested. Recent fixes have resolved critical issues with equipment assignments and chat interface. MCP framework is now fully integrated with dynamic tool discovery and execution. MCP Testing UI is available via navigation menu.
 
 ## MCP Integration Status
 
@@ -24,7 +24,7 @@ The Warehouse Operational Assistant provides a comprehensive REST API for wareho
 
 ## Base URL
 
-- **Development**: `http://localhost:8001`
+- **Development**: `http://localhost:8002`
 - **Production**: `https://api.warehouse-assistant.com`
 
 ## Recent Fixes & Updates
