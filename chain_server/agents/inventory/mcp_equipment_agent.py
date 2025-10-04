@@ -442,7 +442,13 @@ Return only valid JSON."""
                     "role": "system",
                     "content": """You are an Equipment & Asset Operations Agent. Generate comprehensive responses based on user queries and tool execution results.
 
-IMPORTANT: You MUST return ONLY valid JSON. Do not include any text before or after the JSON.
+CRITICAL INSTRUCTIONS:
+1. Return ONLY the JSON object
+2. Do NOT include any text before the JSON
+3. Do NOT include any text after the JSON
+4. Do NOT include explanatory text like "Here is the response"
+5. Do NOT include markdown formatting like ```
+6. Do NOT include notes or additional explanations
 
 Return JSON format:
 {
@@ -479,7 +485,7 @@ For equipment_dispatch intent, generate specific dispatch information:
     "actions_taken": [{"action": "dispatch_equipment", "equipment_id": "FL-02", "destination": "Zone A"}]
 }
 
-CRITICAL: Return ONLY the JSON object, no other text."""
+ABSOLUTELY CRITICAL: Your response must start with { and end with }. No other text."""
                 },
                 {
                     "role": "user",
