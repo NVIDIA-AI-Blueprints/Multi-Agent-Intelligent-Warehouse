@@ -180,22 +180,32 @@ class MCPSafetyComplianceAgent:
         """Parse safety query and extract intent and entities."""
         try:
             # Use LLM to parse the query
-            parse_prompt = f"""
-            Parse this safety and compliance query and extract:
-            1. Intent (incident_reporting, compliance_check, safety_audit, hazard_identification, policy_lookup, training_tracking)
-            2. Entities (incident_id, hazard_type, location, policy_id, training_id, etc.)
-            3. Context (priority, urgency, specific requirements)
-            
-            Query: "{query}"
-            Context: {context or {}}
-            
-            Return JSON format:
-            {{
-                "intent": "incident_reporting",
-                "entities": {{"incident_type": "safety", "location": "Zone A"}},
-                "context": {{"priority": "high", "severity": "critical"}}
-            }}
-            """
+            parse_prompt = [
+                {
+                    "role": "system",
+                    "content": """You are a safety and compliance expert. Parse warehouse safety queries and extract intent, entities, and context.
+
+Return JSON format:
+{
+    "intent": "incident_reporting",
+    "entities": {"incident_type": "safety", "location": "Zone A"},
+    "context": {"priority": "high", "severity": "critical"}
+}
+
+Intent options: incident_reporting, compliance_check, safety_audit, hazard_identification, policy_lookup, training_tracking
+
+Examples:
+- "Report a safety incident in Zone A" → {"intent": "incident_reporting", "entities": {"location": "Zone A"}, "context": {"priority": "high"}}
+- "Check compliance for forklift operations" → {"intent": "compliance_check", "entities": {"equipment": "forklift"}, "context": {"priority": "normal"}}
+- "Identify hazards in warehouse" → {"intent": "hazard_identification", "entities": {"location": "warehouse"}, "context": {"priority": "high"}}
+
+Return only valid JSON."""
+                },
+                {
+                    "role": "user",
+                    "content": f"Query: \"{query}\"\nContext: {context or {}}"
+                }
+            ]
             
             response = await self.nim_client.generate_response(parse_prompt)
             
@@ -423,43 +433,63 @@ class MCPSafetyComplianceAgent:
             failed_results = {k: v for k, v in tool_results.items() if not v.get("success", False)}
             
             # Create response prompt
-            response_prompt = f"""
-            You are a Safety & Compliance Agent. Generate a comprehensive response based on the user query and tool execution results.
-            
-            User Query: "{query.user_query}"
-            Intent: {query.intent}
-            Entities: {query.entities}
-            Context: {query.context}
-            
-            Tool Execution Results:
-            {json.dumps(successful_results, indent=2)}
-            
-            Failed Tool Executions:
-            {json.dumps(failed_results, indent=2)}
-            
-            Generate a response that includes:
-            1. Natural language explanation of the results
-            2. Structured data summary
-            3. Actionable recommendations
-            4. Confidence assessment
-            
-            Return JSON format:
-            {{
-                "response_type": "safety_info",
-                "data": {{"incidents": [], "compliance": {{}}, "hazards": []}},
-                "natural_language": "Based on the tool results...",
-                "recommendations": ["Recommendation 1", "Recommendation 2"],
-                "confidence": 0.85,
-                "actions_taken": [{{"action": "tool_execution", "tool": "report_incident"}}]
-            }}
-            """
+            response_prompt = [
+                {
+                    "role": "system",
+                    "content": """You are a Safety & Compliance Agent. Generate comprehensive responses based on user queries and tool execution results.
+
+IMPORTANT: You MUST return ONLY valid JSON. Do not include any text before or after the JSON.
+
+Return JSON format:
+{
+    "response_type": "safety_info",
+    "data": {"incidents": [], "compliance": {}, "hazards": []},
+    "natural_language": "Based on the tool results...",
+    "recommendations": ["Recommendation 1", "Recommendation 2"],
+    "confidence": 0.85,
+    "actions_taken": [{"action": "tool_execution", "tool": "report_incident"}]
+}
+
+Response types based on intent:
+- incident_reporting: "incident_reporting" with incident details and reporting status
+- compliance_check: "compliance_check" with compliance status and violations
+- safety_audit: "safety_audit" with audit results and findings
+- hazard_identification: "hazard_identification" with identified hazards and risk levels
+- policy_lookup: "policy_lookup" with policy details and requirements
+- training_tracking: "training_tracking" with training status and completion
+
+Include:
+1. Natural language explanation of results
+2. Structured data summary appropriate for the intent
+3. Actionable recommendations
+4. Confidence assessment
+
+CRITICAL: Return ONLY the JSON object, no other text."""
+                },
+                {
+                    "role": "user",
+                    "content": f"""User Query: "{query.user_query}"
+Intent: {query.intent}
+Entities: {query.entities}
+Context: {query.context}
+
+Tool Execution Results:
+{json.dumps(successful_results, indent=2)}
+
+Failed Tool Executions:
+{json.dumps(failed_results, indent=2)}"""
+                }
+            ]
             
             response = await self.nim_client.generate_response(response_prompt)
             
             # Parse JSON response
             try:
                 response_data = json.loads(response.content)
-            except json.JSONDecodeError:
+                logger.info(f"Successfully parsed LLM response: {response_data}")
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse LLM response as JSON: {e}")
+                logger.warning(f"Raw LLM response: {response.content}")
                 # Fallback response
                 response_data = {
                     "response_type": "safety_info",
