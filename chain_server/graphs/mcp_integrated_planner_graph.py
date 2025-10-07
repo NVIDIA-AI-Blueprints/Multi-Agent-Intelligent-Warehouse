@@ -75,6 +75,15 @@ class MCPIntentClassifier:
         "issues", "problem", "concern", "violation", "breach"
     ]
     
+    DOCUMENT_KEYWORDS = [
+        "document", "upload", "scan", "extract", "process", "pdf", "image", 
+        "invoice", "receipt", "bol", "bill of lading", "purchase order", "po",
+        "quality", "validation", "approve", "review", "ocr", "text extraction",
+        "file", "photo", "picture", "documentation", "paperwork", "neural",
+        "nemo", "retriever", "parse", "vision", "multimodal", "document processing",
+        "document analytics", "document search", "document status"
+    ]
+    
     async def classify_intent_with_mcp(self, message: str) -> str:
         """Classify user intent using MCP tool discovery for enhanced accuracy."""
         try:
@@ -111,7 +120,11 @@ class MCPIntentClassifier:
         """Classify user intent based on message content."""
         message_lower = message.lower()
         
-        # Check for safety-related keywords first (highest priority)
+        # Check for document-related keywords first (high priority)
+        if any(keyword in message_lower for keyword in cls.DOCUMENT_KEYWORDS):
+            return "document"
+        
+        # Check for safety-related keywords (highest priority)
         if any(keyword in message_lower for keyword in cls.SAFETY_KEYWORDS):
             return "safety"
         
@@ -193,6 +206,7 @@ class MCPPlannerGraph:
         workflow.add_node("equipment", self._mcp_equipment_agent)
         workflow.add_node("operations", self._mcp_operations_agent)
         workflow.add_node("safety", self._mcp_safety_agent)
+        workflow.add_node("document", self._mcp_document_agent)
         workflow.add_node("general", self._mcp_general_agent)
         workflow.add_node("synthesize", self._mcp_synthesize_response)
         
@@ -207,6 +221,7 @@ class MCPPlannerGraph:
                 "equipment": "equipment",
                 "operations": "operations", 
                 "safety": "safety",
+                "document": "document",
                 "general": "general"
             }
         )
@@ -215,6 +230,7 @@ class MCPPlannerGraph:
         workflow.add_edge("equipment", "synthesize")
         workflow.add_edge("operations", "synthesize")
         workflow.add_edge("safety", "synthesize")
+        workflow.add_edge("document", "synthesize")
         workflow.add_edge("general", "synthesize")
         
         # Add edge from synthesis to end
@@ -417,6 +433,54 @@ class MCPPlannerGraph:
                 "mcp_tools_used": [],
                 "tool_execution_results": {}
             }
+        
+        return state
+
+    async def _mcp_document_agent(self, state: MCPWarehouseState) -> MCPWarehouseState:
+        """Handle document-related queries with MCP tool discovery."""
+        try:
+            # Get the latest user message
+            if not state["messages"]:
+                state["agent_responses"]["document"] = "No message to process"
+                return state
+                
+            latest_message = state["messages"][-1]
+            if isinstance(latest_message, HumanMessage):
+                message_text = latest_message.content
+            else:
+                message_text = str(latest_message.content)
+            
+            # Use MCP document agent
+            try:
+                from chain_server.agents.document.mcp_document_agent import get_mcp_document_agent
+                
+                # Get document agent
+                document_agent = await get_mcp_document_agent()
+                
+                # Process query
+                response = await document_agent.process_query(
+                    query=message_text,
+                    session_id=state.get("session_id", "default"),
+                    context=state.get("context", {}),
+                    mcp_results=state.get("mcp_results")
+                )
+                
+                # Convert response to string
+                if hasattr(response, 'natural_language'):
+                    response_text = response.natural_language
+                else:
+                    response_text = str(response)
+                
+                state["agent_responses"]["document"] = f"[MCP DOCUMENT AGENT] {response_text}"
+                logger.info("MCP Document agent processed request")
+                
+            except Exception as e:
+                logger.error(f"Error calling MCP document agent: {e}")
+                state["agent_responses"]["document"] = f"[MCP DOCUMENT AGENT] Error processing document request: {str(e)}"
+            
+        except Exception as e:
+            logger.error(f"Error in MCP document agent: {e}")
+            state["agent_responses"]["document"] = f"Error processing document request: {str(e)}"
         
         return state
 
