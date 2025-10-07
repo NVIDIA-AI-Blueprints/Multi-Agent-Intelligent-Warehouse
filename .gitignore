@@ -140,5 +140,11 @@ dmypy.json
 .pyre/
 
 # Test files
+# Test files (allow our test files but ignore generated ones)
 test_*.py
 *_test.py
+!tests/test_*.py
+!tests/*_test.py
+!**/test_*.py
+!**/*_test.py
+!tests/test_basic.py
