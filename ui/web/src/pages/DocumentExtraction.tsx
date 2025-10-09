@@ -16,7 +16,18 @@ import {
   ListItemText,
   ListItemIcon,
   Paper,
-  Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  CircularProgress,
+  Snackbar,
 } from '@mui/material';
 import {
   CloudUpload as UploadIcon,
@@ -29,8 +40,10 @@ import {
   Visibility as ViewIcon,
   Download as DownloadIcon,
   CheckCircle,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { documentAPI } from '../services/api';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -67,6 +80,34 @@ interface DocumentItem {
   uploadTime: Date;
   progress: number;
   stages: DocumentProcessingStage[];
+  qualityScore?: number;
+  processingTime?: number;
+  extractedData?: any;
+  routingDecision?: string;
+}
+
+interface DocumentResults {
+  document_id: string;
+  extracted_data: any;
+  confidence_scores: any;
+  quality_score: number;
+  routing_decision: string;
+  processing_stages: string[];
+}
+
+interface AnalyticsData {
+  metrics: {
+    total_documents: number;
+    processed_today: number;
+    average_quality: number;
+    auto_approved: number;
+    success_rate: number;
+  };
+  trends: {
+    daily_processing: number[];
+    quality_trends: number[];
+  };
+  summary: string;
 }
 
 const DocumentExtraction: React.FC = () => {
@@ -74,97 +115,168 @@ const DocumentExtraction: React.FC = () => {
   const [uploadedDocuments, setUploadedDocuments] = useState<DocumentItem[]>([]);
   const [processingDocuments, setProcessingDocuments] = useState<DocumentItem[]>([]);
   const [completedDocuments, setCompletedDocuments] = useState<DocumentItem[]>([]);
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<DocumentItem | null>(null);
+  const [resultsDialogOpen, setResultsDialogOpen] = useState(false);
+  const [documentResults, setDocumentResults] = useState<DocumentResults | null>(null);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
   const navigate = useNavigate();
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
   };
 
-  const handleDocumentUpload = async (file: File) => {
+  // Load analytics data when component mounts
+  useEffect(() => {
+    loadAnalyticsData();
+  }, []);
+
+  const loadAnalyticsData = async () => {
     try {
-      // Mock document upload
-      const documentId = `doc-${Date.now()}`;
-      const newDocument: DocumentItem = {
-        id: documentId,
-        filename: file.name,
-        status: 'processing',
-        uploadTime: new Date(),
-        progress: 0,
-        stages: [
-          { name: 'Preprocessing', completed: false, current: true, description: 'Document preprocessing with NeMo Retriever' },
-          { name: 'OCR Extraction', completed: false, current: false, description: 'Intelligent OCR with NeMoRetriever-OCR-v1' },
-          { name: 'LLM Processing', completed: false, current: false, description: 'Small LLM processing with Llama Nemotron Nano VL 8B' },
-          { name: 'Validation', completed: false, current: false, description: 'Large LLM judge and validator' },
-          { name: 'Routing', completed: false, current: false, description: 'Intelligent routing based on quality scores' },
-        ]
-      };
-      
-      setProcessingDocuments(prev => [...prev, newDocument]);
-      
-      // Simulate processing
-      simulateDocumentProcessing(documentId);
-      
+      const response = await documentAPI.getDocumentAnalytics();
+      if (response.success) {
+        setAnalyticsData(response.data);
+      }
     } catch (error) {
-      console.error('Upload failed:', error);
+      console.error('Failed to load analytics data:', error);
     }
   };
 
-  const simulateDocumentProcessing = (documentId: string) => {
-    const stages = [
-      { name: 'Preprocessing', duration: 2000 },
-      { name: 'OCR Extraction', duration: 3000 },
-      { name: 'LLM Processing', duration: 4000 },
-      { name: 'Validation', duration: 2000 },
-      { name: 'Routing', duration: 1000 },
-    ];
-
-    let currentStage = 0;
-    let progress = 0;
-
-    const processStage = () => {
-      if (currentStage < stages.length) {
-        const stage = stages[currentStage];
-        
-        setProcessingDocuments(prev => prev.map(doc => {
-          if (doc.id === documentId) {
-            const updatedStages = doc.stages.map((s, index) => ({
-              ...s,
-              completed: index < currentStage,
-              current: index === currentStage
-            }));
-            
-            return {
-              ...doc,
-              stages: updatedStages,
-              progress: Math.round((currentStage + 1) / stages.length * 100)
-            };
+  const handleDocumentUpload = async (file: File) => {
+    setIsUploading(true);
+    setUploadProgress(0);
+    
+    try {
+      // Simulate upload progress
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
           }
-          return doc;
-        }));
-
-        currentStage++;
-        progress = Math.round(currentStage / stages.length * 100);
-        
-        setTimeout(processStage, stage.duration);
-      } else {
-        // Move to completed
-        setProcessingDocuments(prev => {
-          const completedDoc = prev.find(doc => doc.id === documentId);
-          if (completedDoc) {
-            setCompletedDocuments(prevCompleted => [...prevCompleted, {
-              ...completedDoc,
-              status: 'completed',
-              progress: 100,
-              stages: completedDoc.stages.map(stage => ({ ...stage, completed: true, current: false }))
-            }]);
-            return prev.filter(doc => doc.id !== documentId);
-          }
-          return prev;
+          return prev + 10;
         });
+      }, 200);
+
+      // Create FormData for file upload
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('document_type', 'invoice'); // Default type
+      formData.append('user_id', 'admin'); // Default user
+      
+      // Upload document to backend
+      const response = await documentAPI.uploadDocument(formData);
+      
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+      
+      if (response.success) {
+        const documentId = response.document_id;
+        const newDocument: DocumentItem = {
+          id: documentId,
+          filename: file.name,
+          status: 'processing',
+          uploadTime: new Date(),
+          progress: 0,
+          stages: [
+            { name: 'Preprocessing', completed: false, current: true, description: 'Document preprocessing with NeMo Retriever' },
+            { name: 'OCR Extraction', completed: false, current: false, description: 'Intelligent OCR with NeMoRetriever-OCR-v1' },
+            { name: 'LLM Processing', completed: false, current: false, description: 'Small LLM processing with Llama Nemotron Nano VL 8B' },
+            { name: 'Validation', completed: false, current: false, description: 'Large LLM judge and validator' },
+            { name: 'Routing', completed: false, current: false, description: 'Intelligent routing based on quality scores' },
+          ]
+        };
+        
+        setProcessingDocuments(prev => [...prev, newDocument]);
+        setSnackbarMessage('Document uploaded successfully!');
+        setSnackbarOpen(true);
+        
+        // Start monitoring processing status
+        monitorDocumentProcessing(documentId);
+        
+      } else {
+        throw new Error(response.message || 'Upload failed');
+      }
+      
+    } catch (error) {
+      console.error('Upload failed:', error);
+      setSnackbarMessage(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setSnackbarOpen(true);
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const monitorDocumentProcessing = async (documentId: string) => {
+    const checkStatus = async () => {
+      try {
+        const statusResponse = await documentAPI.getDocumentStatus(documentId);
+        if (statusResponse.success) {
+          const status = statusResponse.data;
+          
+          setProcessingDocuments(prev => prev.map(doc => {
+            if (doc.id === documentId) {
+              const updatedDoc = {
+                ...doc,
+                progress: status.progress_percentage,
+                stages: doc.stages.map((stage, index) => ({
+                  ...stage,
+                  completed: status.stages_completed.includes(stage.name),
+                  current: stage.name === status.current_stage
+                }))
+              };
+              
+              // If processing is complete, move to completed documents
+              if (status.status === 'completed') {
+                setCompletedDocuments(prevCompleted => [...prevCompleted, {
+                  ...updatedDoc,
+                  status: 'completed',
+                  progress: 100,
+                  qualityScore: 4.2, // Mock quality score
+                  processingTime: 45, // Mock processing time
+                  routingDecision: 'Auto-Approved'
+                }]);
+                return null; // Remove from processing
+              }
+              
+              return updatedDoc;
+            }
+            return doc;
+          }).filter(doc => doc !== null) as DocumentItem[]);
+          
+          // Continue monitoring if not completed
+          if (status.status !== 'completed' && status.status !== 'failed') {
+            setTimeout(checkStatus, 2000); // Check every 2 seconds
+          }
+        }
+      } catch (error) {
+        console.error('Failed to check document status:', error);
       }
     };
+    
+    checkStatus();
+  };
 
-    processStage();
+  const handleViewResults = async (document: DocumentItem) => {
+    try {
+      const response = await documentAPI.getDocumentResults(document.id);
+      if (response.success) {
+        setDocumentResults(response.data);
+        setSelectedDocument(document);
+        setResultsDialogOpen(true);
+      } else {
+        setSnackbarMessage('Failed to load document results');
+        setSnackbarOpen(true);
+      }
+    } catch (error) {
+      console.error('Failed to get document results:', error);
+      setSnackbarMessage('Failed to load document results');
+      setSnackbarOpen(true);
+    }
   };
 
   const ProcessingPipelineCard = () => (
@@ -203,19 +315,32 @@ const DocumentExtraction: React.FC = () => {
         <Typography variant="h6" gutterBottom>
           Upload Documents
         </Typography>
+        
+        {isUploading && (
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Uploading document... {uploadProgress}%
+            </Typography>
+            <LinearProgress variant="determinate" value={uploadProgress} />
+          </Box>
+        )}
+        
         <Box
           sx={{
             border: '2px dashed #ccc',
             borderRadius: 2,
             p: 4,
             textAlign: 'center',
-            cursor: 'pointer',
+            cursor: isUploading ? 'not-allowed' : 'pointer',
+            opacity: isUploading ? 0.6 : 1,
             '&:hover': {
-              borderColor: 'primary.main',
-              backgroundColor: 'action.hover',
+              borderColor: isUploading ? '#ccc' : 'primary.main',
+              backgroundColor: isUploading ? 'transparent' : 'action.hover',
             },
           }}
           onClick={() => {
+            if (isUploading) return;
+            
             // Create a mock file input
             const input = document.createElement('input');
             input.type = 'file';
@@ -231,7 +356,7 @@ const DocumentExtraction: React.FC = () => {
         >
           <UploadIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
           <Typography variant="h6" gutterBottom>
-            Click to Upload Document
+            {isUploading ? 'Uploading...' : 'Click to Upload Document'}
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Supported formats: PDF, PNG, JPG, JPEG, TIFF, BMP
@@ -303,16 +428,20 @@ const DocumentExtraction: React.FC = () => {
           <Typography variant="h6">{document.filename}</Typography>
           <Box>
             <Chip label="Completed" color="success" size="small" sx={{ mr: 1 }} />
-            <Chip label="Auto-Approved" color="success" size="small" />
+            <Chip label={document.routingDecision || "Auto-Approved"} color="success" size="small" />
           </Box>
         </Box>
         
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Quality Score: 4.2/5.0 | Processing Time: 45s
+          Quality Score: {document.qualityScore || 4.2}/5.0 | Processing Time: {document.processingTime || 45}s
         </Typography>
         
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button size="small" startIcon={<ViewIcon />}>
+          <Button 
+            size="small" 
+            startIcon={<ViewIcon />}
+            onClick={() => handleViewResults(document)}
+          >
             View Results
           </Button>
           <Button size="small" startIcon={<DownloadIcon />}>
@@ -407,20 +536,29 @@ const DocumentExtraction: React.FC = () => {
                 <Typography variant="h6" gutterBottom>
                   Processing Statistics
                 </Typography>
-                <List>
-                  <ListItem>
-                    <ListItemText primary="Total Documents" secondary="1,250" />
-                  </ListItem>
-                  <ListItem>
-                    <ListItemText primary="Processed Today" secondary="45" />
-                  </ListItem>
-                  <ListItem>
-                    <ListItemText primary="Average Quality" secondary="4.2/5.0" />
-                  </ListItem>
-                  <ListItem>
-                    <ListItemText primary="Auto-Approved" secondary="78%" />
-                  </ListItem>
-                </List>
+                {analyticsData ? (
+                  <List>
+                    <ListItem>
+                      <ListItemText primary="Total Documents" secondary={analyticsData.metrics.total_documents.toLocaleString()} />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText primary="Processed Today" secondary={analyticsData.metrics.processed_today.toString()} />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText primary="Average Quality" secondary={`${analyticsData.metrics.average_quality}/5.0`} />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText primary="Auto-Approved" secondary={`${analyticsData.metrics.auto_approved}%`} />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText primary="Success Rate" secondary={`${analyticsData.metrics.success_rate}%`} />
+                    </ListItem>
+                  </List>
+                ) : (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+                    <CircularProgress size={24} />
+                  </Box>
+                )}
               </CardContent>
             </Card>
           </Grid>
@@ -431,16 +569,121 @@ const DocumentExtraction: React.FC = () => {
                 <Typography variant="h6" gutterBottom>
                   Quality Score Trends
                 </Typography>
-                <Box sx={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Quality trend chart would be displayed here
-                  </Typography>
-                </Box>
+                {analyticsData ? (
+                  <Box sx={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Quality trend chart would be displayed here
+                      <br />
+                      Recent trend: {analyticsData.trends.quality_trends.slice(-5).join(', ')}
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Box sx={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <CircularProgress />
+                  </Box>
+                )}
               </CardContent>
             </Card>
           </Grid>
         </Grid>
       </TabPanel>
+
+      {/* Results Dialog */}
+      <Dialog 
+        open={resultsDialogOpen} 
+        onClose={() => setResultsDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6">
+              Document Results - {selectedDocument?.filename}
+            </Typography>
+            <Button
+              onClick={() => setResultsDialogOpen(false)}
+              startIcon={<CloseIcon />}
+            >
+              Close
+            </Button>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {documentResults ? (
+            <Box>
+              <Typography variant="h6" gutterBottom>
+                Extracted Data
+              </Typography>
+              <TableContainer component={Paper} sx={{ mb: 3 }}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell><strong>Field</strong></TableCell>
+                      <TableCell><strong>Value</strong></TableCell>
+                      <TableCell><strong>Confidence</strong></TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {Object.entries(documentResults.extracted_data).map(([key, value]) => (
+                      <TableRow key={key}>
+                        <TableCell>{key.replace(/_/g, ' ').toUpperCase()}</TableCell>
+                        <TableCell>{typeof value === 'object' ? JSON.stringify(value) : String(value)}</TableCell>
+                        <TableCell>
+                          {documentResults.confidence_scores[key] ? 
+                            `${Math.round(documentResults.confidence_scores[key] * 100)}%` : 
+                            'N/A'
+                          }
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              
+              <Typography variant="h6" gutterBottom>
+                Processing Summary
+              </Typography>
+              <List>
+                <ListItem>
+                  <ListItemText 
+                    primary="Overall Quality Score" 
+                    secondary={`${documentResults.quality_score}/5.0`} 
+                  />
+                </ListItem>
+                <ListItem>
+                  <ListItemText 
+                    primary="Routing Decision" 
+                    secondary={documentResults.routing_decision} 
+                  />
+                </ListItem>
+                <ListItem>
+                  <ListItemText 
+                    primary="Processing Stages" 
+                    secondary={documentResults.processing_stages.join(', ')} 
+                  />
+                </ListItem>
+              </List>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+              <CircularProgress />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setResultsDialogOpen(false)}>
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={() => setSnackbarOpen(false)}
+        message={snackbarMessage}
+      />
     </Box>
   );
 };

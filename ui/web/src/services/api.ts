@@ -290,6 +290,54 @@ export const safetyAPI = {
   },
 };
 
+export const documentAPI = {
+  uploadDocument: async (formData: FormData): Promise<any> => {
+    const response = await api.post('/api/v1/document/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+  
+  getDocumentStatus: async (documentId: string): Promise<any> => {
+    const response = await api.get(`/api/v1/document/status/${documentId}`);
+    return response.data;
+  },
+  
+  getDocumentResults: async (documentId: string): Promise<any> => {
+    const response = await api.get(`/api/v1/document/results/${documentId}`);
+    return response.data;
+  },
+  
+  getDocumentAnalytics: async (): Promise<any> => {
+    const response = await api.get('/api/v1/document/analytics');
+    return response.data;
+  },
+  
+  searchDocuments: async (query: string, filters?: any): Promise<any> => {
+    const response = await api.post('/api/v1/document/search', { query, filters });
+    return response.data;
+  },
+  
+  approveDocument: async (documentId: string, approverId: string, notes?: string): Promise<any> => {
+    const response = await api.post(`/api/v1/document/approve/${documentId}`, {
+      approver_id: approverId,
+      approval_notes: notes,
+    });
+    return response.data;
+  },
+  
+  rejectDocument: async (documentId: string, rejectorId: string, reason: string, suggestions?: string[]): Promise<any> => {
+    const response = await api.post(`/api/v1/document/reject/${documentId}`, {
+      rejector_id: rejectorId,
+      rejection_reason: reason,
+      suggestions: suggestions || [],
+    });
+    return response.data;
+  },
+};
+
 export const healthAPI = {
   check: async (): Promise<{ ok: boolean }> => {
     const response = await api.get('/api/v1/health/simple');
