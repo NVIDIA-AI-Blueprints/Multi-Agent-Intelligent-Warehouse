@@ -2060,5 +2060,110 @@
     "upload_time": "2025-10-08T23:17:28.888795",
     "estimated_completion": 1759990708.888795,
     "error_message": "'content'"
+  },
+  "5e643fcc-83fd-4519-bef3-86e8fe508251": {
+    "status": "completed",
+    "current_stage": "Completed",
+    "progress": 100.0,
+    "stages": [
+      {
+        "name": "preprocessing",
+        "status": "completed",
+        "started_at": "2025-10-09T09:20:43.904791"
+      },
+      {
+        "name": "ocr_extraction",
+        "status": "completed",
+        "started_at": "2025-10-09T09:20:56.106687"
+      },
+      {
+        "name": "llm_processing",
+        "status": "completed",
+        "started_at": "2025-10-09T09:21:08.198132"
+      },
+      {
+        "name": "validation",
+        "status": "completed",
+        "started_at": "2025-10-09T09:21:20.258471"
+      },
+      {
+        "name": "routing",
+        "status": "processing",
+        "started_at": "2025-10-09T09:21:32.314078"
+      }
+    ],
+    "upload_time": "2025-10-09T09:20:43.904796",
+    "estimated_completion": 1760026903.904797,
+    "error_message": "'content'"
+  },
+  "ba37c4a3-c0af-4fb8-b03a-19b8e30a1bce": {
+    "status": "completed",
+    "current_stage": "Completed",
+    "progress": 100.0,
+    "stages": [
+      {
+        "name": "preprocessing",
+        "status": "completed",
+        "started_at": "2025-10-09T09:28:15.655971"
+      },
+      {
+        "name": "ocr_extraction",
+        "status": "completed",
+        "started_at": "2025-10-09T09:28:27.853107"
+      },
+      {
+        "name": "llm_processing",
+        "status": "completed",
+        "started_at": "2025-10-09T09:28:39.923783"
+      },
+      {
+        "name": "validation",
+        "status": "completed",
+        "started_at": "2025-10-09T09:28:51.985012"
+      },
+      {
+        "name": "routing",
+        "status": "processing",
+        "started_at": "2025-10-09T09:29:04.045925"
+      }
+    ],
+    "upload_time": "2025-10-09T09:28:15.655976",
+    "estimated_completion": 1760027355.655977,
+    "error_message": "'content'"
+  },
+  "81ece76d-850b-4985-9322-3c8957cffbd1": {
+    "status": "completed",
+    "current_stage": "Completed",
+    "progress": 100.0,
+    "stages": [
+      {
+        "name": "preprocessing",
+        "status": "completed",
+        "started_at": "2025-10-09T09:36:41.432187"
+      },
+      {
+        "name": "ocr_extraction",
+        "status": "completed",
+        "started_at": null
+      },
+      {
+        "name": "llm_processing",
+        "status": "completed",
+        "started_at": "2025-10-09T09:37:06.025705"
+      },
+      {
+        "name": "validation",
+        "status": "completed",
+        "started_at": "2025-10-09T09:37:24.106869"
+      },
+      {
+        "name": "routing",
+        "status": "processing",
+        "started_at": "2025-10-09T09:37:36.990581"
+      }
+    ],
+    "upload_time": "2025-10-09T09:36:41.432190",
+    "estimated_completion": 1760027861.432191,
+    "error_message": "'JudgeEvaluation' object has no attribute 'get'"
   }
 }
