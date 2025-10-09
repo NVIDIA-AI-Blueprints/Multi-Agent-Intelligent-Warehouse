@@ -205,7 +205,7 @@ class NeMoRetrieverPreprocessor:
             # Call NeMo Retriever API for element detection
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(
-                    f"{self.base_url}/models/nv-yolox-page-elements-v1/infer",
+                    f"{self.base_url}/v1/models/nv-yolox-page-elements-v1/infer",
                     headers={
                         "Authorization": f"Bearer {self.api_key}",
                         "Content-Type": "application/json"

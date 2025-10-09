@@ -121,7 +121,7 @@ class NeMoOCRService:
             # Call NeMo OCR API
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(
-                    f"{self.base_url}/models/nemoretriever-ocr-v1/infer",
+                    f"{self.base_url}/v1/models/nemoretriever-ocr-v1/infer",
                     headers={
                         "Authorization": f"Bearer {self.api_key}",
                         "Content-Type": "application/json"
