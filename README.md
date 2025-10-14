@@ -11,18 +11,36 @@
 [![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED.svg)](https://www.docker.com/)
 [![Prometheus](https://img.shields.io/badge/Prometheus-Monitoring-E6522C.svg)](https://prometheus.io/)
 [![Grafana](https://img.shields.io/badge/Grafana-Dashboards-F46800.svg)](https://grafana.com/)
-[![Vector Search](https://img.shields.io/badge/Vector%20Search-GPU%20Accelerated-FF6B6B.svg)](https://github.com/T-DevH/warehouse-operational-assistant)
-[![Evidence Scoring](https://img.shields.io/badge/Evidence%20Scoring-Advanced-9C27B0.svg)](https://github.com/T-DevH/warehouse-operational-assistant)
-[![Clarifying Questions](https://img.shields.io/badge/Clarifying%20Questions-Intelligent-4CAF50.svg)](https://github.com/T-DevH/warehouse-operational-assistant)
-[![SQL Path Optimization](https://img.shields.io/badge/SQL%20Path%20Optimization-Intelligent-FF9800.svg)](https://github.com/T-DevH/warehouse-operational-assistant)
-[![Redis Caching](https://img.shields.io/badge/Redis%20Caching-Advanced-4CAF50.svg)](https://github.com/T-DevH/warehouse-operational-assistant)
-[![Response Quality Control](https://img.shields.io/badge/Response%20Quality%20Control-Intelligent-2196F3.svg)](https://github.com/T-DevH/warehouse-operational-assistant)
-[![Equipment Status & Telemetry](https://img.shields.io/badge/Equipment%20Status%20%26%20Telemetry-Real--time-FF9800.svg)](https://github.com/T-DevH/warehouse-operational-assistant)
-[![Advanced Reasoning](https://img.shields.io/badge/Advanced%20Reasoning-5%20Types-9C27B0.svg)](https://github.com/T-DevH/warehouse-operational-assistant)
-[![NV-EmbedQA Integration](https://img.shields.io/badge/NV--EmbedQA-1024%20Dim%20Embeddings-76B900.svg)](https://github.com/T-DevH/warehouse-operational-assistant)
+[![Document Processing](https://img.shields.io/badge/Document%20Processing-NVIDIA%20NeMo-76B900.svg)](https://github.com/T-DevH/warehouse-operational-assistant)
 [![MCP Integration](https://img.shields.io/badge/MCP-Fully%20Integrated-green.svg)](https://github.com/T-DevH/warehouse-operational-assistant)
 
-This repository implements a production-grade assistant patterned on NVIDIA's AI Blueprints (planner/router + specialized agents), adapted for warehouse domains. It uses a **hybrid RAG** stack (Postgres/Timescale + Milvus), **NeMo Guardrails**, **production-grade vector search with NV-EmbedQA-E5-v5 embeddings**, **enhanced vector search optimization with evidence scoring and intelligent clarifying questions**, **intelligent SQL path optimization**, **advanced Redis caching**, **comprehensive response quality control**, **real-time equipment status and telemetry monitoring**, **advanced reasoning capabilities with 5 reasoning types**, **MCP (Model Context Protocol) framework fully integrated with dynamic tool discovery and execution**, and a clean API surface for UI or system integrations.
+## 📋 Table of Contents
+
+- [Overview](#overview)
+- [System Architecture](#system-architecture)
+- [Key Features](#key-features)
+- [Quick Start](#quick-start)
+- [Document Processing](#document-processing)
+- [Multi-Agent System](#multi-agent-system)
+- [System Integrations](#system-integrations)
+- [API Reference](#api-reference)
+- [Monitoring & Observability](#monitoring--observability)
+- [Development Guide](#development-guide)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Overview
+
+This repository implements a production-grade warehouse operational assistant patterned on NVIDIA's AI Blueprints, featuring:
+
+- **Multi-Agent AI System** - Planner/Router + Specialized Agents (Equipment, Operations, Safety)
+- **NVIDIA NeMo Integration** - Complete document processing pipeline with OCR and structured data extraction
+- **MCP Framework** - Model Context Protocol with dynamic tool discovery and execution
+- **Hybrid RAG Stack** - PostgreSQL/TimescaleDB + Milvus vector database
+- **Production-Grade Vector Search** - NV-EmbedQA-E5-v5 embeddings with GPU acceleration
+- **Real-Time Monitoring** - Equipment status, telemetry, and system health
+- **Enterprise Security** - JWT/OAuth2 + RBAC with comprehensive user management
+- **System Integrations** - WMS, ERP, IoT, RFID/Barcode, Time Attendance
 
 ## System Architecture
 
@@ -58,26 +76,43 @@ The architecture consists of:
 
 The system emphasizes modular design, clear separation of concerns, and enterprise-grade reliability while maintaining the flexibility to adapt to various warehouse operational requirements.
 
-## Status & Features
+## Key Features
 
-[![System Status](https://img.shields.io/badge/System%20Status-Online-brightgreen.svg)](http://localhost:8002/api/v1/health)
-[![API Server](https://img.shields.io/badge/API%20Server-Running%20on%20Port%208002-success.svg)](http://localhost:8002)
-[![Frontend](https://img.shields.io/badge/Frontend-Running%20on%20Port%203001-success.svg)](http://localhost:3001)
-[![Database](https://img.shields.io/badge/Database-PostgreSQL%20%2B%20TimescaleDB-success.svg)](http://localhost:5435)
-[![Vector DB](https://img.shields.io/badge/Vector%20DB-Milvus%20GPU-success.svg)](http://localhost:19530)
-[![Monitoring](https://img.shields.io/badge/Monitoring-Prometheus%20%2B%20Grafana-success.svg)](http://localhost:3000)
+### 🤖 **Multi-Agent AI System**
+- **Planner/Router** - Intelligent query routing and workflow orchestration
+- **Equipment & Asset Operations Agent** - Equipment management, maintenance, and telemetry
+- **Operations Coordination Agent** - Task planning and workflow management
+- **Safety & Compliance Agent** - Safety monitoring and incident response
+- **MCP Integration** - Model Context Protocol with dynamic tool discovery
 
-### **Core Capabilities**
-- **Multi-Agent AI System** - Planner/Router + Specialized Agents (Equipment & Asset Operations, Operations, Safety)
-- **NVIDIA NIMs Integration** - Llama 3.1 70B (LLM) + NV-EmbedQA-E5-v5 (1024-dim embeddings)
-- **GPU-Accelerated Vector Search** - NVIDIA cuVS-powered vector search with 19x performance improvement
-- **Intelligent Chat Interface** - Real-time AI-powered warehouse assistance
-- **Advanced Reasoning Capabilities** - 5 reasoning types with transparent, explainable AI responses
-- **Equipment Status & Telemetry** - Real-time equipment monitoring with battery, temperature, and charging analytics
-- **MCP Framework** - Model Context Protocol fully integrated with dynamic tool discovery and execution
-- **Enterprise Security** - JWT/OAuth2 + RBAC with 5 user roles
-- **Real-time Monitoring** - Prometheus metrics + Grafana dashboards
-- **System Integrations** - WMS, ERP, IoT, RFID/Barcode, Time Attendance
+### 📄 **Document Processing Pipeline**
+- **Multi-Format Support** - PDF, PNG, JPG, JPEG, TIFF, BMP files
+- **5-Stage NVIDIA NeMo Pipeline** - Complete OCR and structured data extraction
+- **Real-Time Processing** - Background processing with status tracking
+- **Intelligent OCR** - `meta/llama-3.2-11b-vision-instruct` for text extraction
+- **Structured Data Extraction** - Entity recognition and quality validation
+
+### 🔍 **Advanced Search & Retrieval**
+- **Hybrid RAG Stack** - PostgreSQL/TimescaleDB + Milvus vector database
+- **Production-Grade Vector Search** - NV-EmbedQA-E5-v5 embeddings (1024-dim)
+- **GPU-Accelerated Search** - NVIDIA cuVS-powered vector search (19x performance)
+- **Intelligent Query Routing** - Automatic SQL vs Vector vs Hybrid classification
+- **Evidence Scoring** - Multi-factor confidence assessment with clarifying questions
+
+### 🔧 **System Integrations**
+- **WMS Integration** - SAP EWM, Manhattan, Oracle WMS
+- **ERP Integration** - SAP ECC, Oracle ERP
+- **IoT Integration** - Equipment monitoring, environmental sensors, safety systems
+- **RFID/Barcode Scanning** - Honeywell, Zebra, generic scanners
+- **Time Attendance** - Biometric systems, card readers, mobile apps
+
+### 🛡️ **Enterprise Security & Monitoring**
+- **Authentication** - JWT/OAuth2 + RBAC with 5 user roles
+- **Real-Time Monitoring** - Prometheus metrics + Grafana dashboards
+- **Equipment Telemetry** - Battery, temperature, charging analytics
+- **System Health** - Comprehensive observability and alerting
+
+## Quick Start
 
 ### **Current System Status & Recent Fixes**
 
@@ -126,7 +161,80 @@ The system now features **complete MCP integration** with dynamic tool discovery
 - `chain_server/services/mcp/` - Complete MCP framework implementation
 - Dynamic tool discovery, binding, routing, and validation services
 
-### **Intelligent Document Processing with NVIDIA NeMo** - (NEW)
+## Quick Start
+
+### Prerequisites
+- Python **3.11+**
+- Docker + (either) **docker compose** plugin or **docker-compose v1**
+- (Optional) `psql`, `curl`, `jq`
+
+### 1. Start Development Infrastructure
+```bash
+# Start TimescaleDB, Redis, Kafka, Milvus
+./scripts/dev_up.sh
+```
+
+**Service Endpoints:**
+- Postgres/Timescale: `postgresql://warehouse:warehousepw@localhost:5435/warehouse`
+- Redis: `localhost:6379`
+- Milvus gRPC: `localhost:19530`
+- Kafka: `localhost:9092`
+
+### 2. Start the API Server
+```bash
+# Start FastAPI server on http://localhost:8002
+./RUN_LOCAL.sh
+```
+
+### 3. Start the Frontend
+```bash
+cd ui/web
+npm install  # first time only
+npm start    # starts React app on http://localhost:3001
+```
+
+### 4. Start Monitoring (Optional)
+```bash
+# Start Prometheus/Grafana monitoring
+./scripts/setup_monitoring.sh
+```
+
+**Access URLs:**
+- **Grafana**: http://localhost:3000 (admin/warehouse123)
+- **Prometheus**: http://localhost:9090
+- **Alertmanager**: http://localhost:9093
+
+### 5. Environment Setup
+Create `.env` file with required API keys:
+```bash
+# NVIDIA NIMs Configuration
+NVIDIA_API_KEY=nvapi-your-key-here
+
+# Document Processing Agent - NVIDIA NeMo API Keys
+NEMO_RETRIEVER_API_KEY=nvapi-your-key-here
+NEMO_OCR_API_KEY=nvapi-your-key-here
+NEMO_PARSE_API_KEY=nvapi-your-key-here
+LLAMA_NANO_VL_API_KEY=nvapi-your-key-here
+LLAMA_70B_API_KEY=nvapi-your-key-here
+```
+
+### 6. Quick Test
+```bash
+# Test API health
+curl http://localhost:8002/api/v1/health
+
+# Test chat endpoint
+curl -X POST http://localhost:8002/api/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "What equipment is available?"}'
+
+# Test document upload
+curl -X POST http://localhost:8002/api/v1/document/upload \
+  -F "file=@test_invoice.png" \
+  -F "document_type=invoice"
+```
+
+## Document Processing
 
 The system now features **complete document processing capabilities** powered by NVIDIA's NeMo models, providing intelligent OCR, text extraction, and structured data processing for warehouse documents.
 
@@ -175,6 +283,80 @@ NEMO_PARSE_API_KEY=nvapi-xxx
 LLAMA_NANO_VL_API_KEY=nvapi-xxx
 LLAMA_70B_API_KEY=nvapi-xxx
 ```
+
+## Multi-Agent System
+
+The Warehouse Operational Assistant uses a sophisticated multi-agent architecture with specialized AI agents for different aspects of warehouse operations.
+
+### 🤖 **Equipment & Asset Operations Agent (EAO)**
+
+**Mission**: Ensure equipment is available, safe, and optimally used for warehouse workflows.
+
+**Key Capabilities:**
+- **Equipment Assignment** - Assign forklifts, scanners, and other equipment to tasks
+- **Real-time Telemetry** - Monitor battery levels, temperature, charging status
+- **Maintenance Management** - Schedule PMs, track maintenance requests
+- **Asset Tracking** - Real-time equipment location and status monitoring
+
+**Action Tools:**
+- `assign_equipment` - Assign equipment to operators or tasks
+- `get_equipment_status` - Check equipment availability and status
+- `create_maintenance_request` - Schedule maintenance and repairs
+- `get_equipment_telemetry` - Access real-time equipment data
+- `update_equipment_location` - Track equipment movement
+- `get_equipment_utilization` - Analyze equipment usage patterns
+- `create_equipment_reservation` - Reserve equipment for specific tasks
+- `get_equipment_history` - Access equipment maintenance and usage history
+
+### 🎯 **Operations Coordination Agent**
+
+**Mission**: Coordinate warehouse operations, task planning, and workflow optimization.
+
+**Key Capabilities:**
+- **Task Management** - Create, assign, and track warehouse tasks
+- **Workflow Optimization** - Optimize pick paths and resource allocation
+- **Performance Monitoring** - Track KPIs and operational metrics
+- **Resource Planning** - Coordinate equipment and personnel allocation
+
+**Action Tools:**
+- `create_task` - Create new warehouse tasks
+- `assign_task` - Assign tasks to operators
+- `optimize_pick_path` - Optimize picking routes
+- `get_task_status` - Check task progress and status
+- `update_task_progress` - Update task completion status
+- `get_performance_metrics` - Access operational KPIs
+- `create_work_order` - Generate work orders
+- `get_task_history` - Access task completion history
+
+### 🛡️ **Safety & Compliance Agent**
+
+**Mission**: Ensure warehouse safety compliance and incident management.
+
+**Key Capabilities:**
+- **Incident Management** - Log and track safety incidents
+- **Safety Procedures** - Manage checklists and safety protocols
+- **Compliance Monitoring** - Track safety compliance and training
+- **Emergency Response** - Coordinate emergency procedures
+
+**Action Tools:**
+- `log_incident` - Log safety incidents with severity classification
+- `start_checklist` - Manage safety checklists (forklift pre-op, PPE, LOTO)
+- `broadcast_alert` - Send multi-channel safety alerts
+- `create_corrective_action` - Track corrective actions
+- `lockout_tagout_request` - Create LOTO procedures
+- `near_miss_capture` - Capture near-miss reports
+- `retrieve_sds` - Safety Data Sheet retrieval
+
+### 🔄 **MCP Integration**
+
+All agents are integrated with the **Model Context Protocol (MCP)** framework:
+
+- **Dynamic Tool Discovery** - Real-time tool registration and discovery
+- **Cross-Agent Communication** - Seamless tool sharing between agents
+- **Intelligent Routing** - MCP-enhanced intent classification
+- **Tool Execution Planning** - Context-aware tool execution
+
+## System Integrations
 
 ### **Production-Grade Vector Search with NV-EmbedQA** - (NEW)
 
