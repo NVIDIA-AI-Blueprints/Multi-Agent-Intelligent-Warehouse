@@ -89,13 +89,16 @@ class MCPOperationsCoordinationAgent:
     async def _register_mcp_sources(self) -> None:
         """Register MCP sources for tool discovery."""
         try:
-            # Register the operations tools as an MCP source
-            if self.operations_tools:
-                await self.tool_discovery.register_discovery_source(
-                    "operations_action_tools",
-                    self.operations_tools,
-                    "mcp_adapter"
-                )
+            # Import and register the operations MCP adapter
+            from chain_server.services.mcp.adapters.operations_adapter import get_operations_adapter
+            
+            # Register the operations adapter as an MCP source
+            operations_adapter = await get_operations_adapter()
+            await self.tool_discovery.register_discovery_source(
+                "operations_action_tools",
+                operations_adapter,
+                "mcp_adapter"
+            )
             
             logger.info("MCP sources registered successfully")
         except Exception as e:

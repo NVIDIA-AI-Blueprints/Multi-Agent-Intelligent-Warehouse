@@ -89,13 +89,16 @@ class MCPSafetyComplianceAgent:
     async def _register_mcp_sources(self) -> None:
         """Register MCP sources for tool discovery."""
         try:
-            # Register the safety tools as an MCP source
-            if self.safety_tools:
-                await self.tool_discovery.register_discovery_source(
-                    "safety_action_tools",
-                    self.safety_tools,
-                    "mcp_adapter"
-                )
+            # Import and register the safety MCP adapter
+            from chain_server.services.mcp.adapters.safety_adapter import get_safety_adapter
+            
+            # Register the safety adapter as an MCP source
+            safety_adapter = await get_safety_adapter()
+            await self.tool_discovery.register_discovery_source(
+                "safety_action_tools",
+                safety_adapter,
+                "mcp_adapter"
+            )
             
             logger.info("MCP sources registered successfully")
         except Exception as e:

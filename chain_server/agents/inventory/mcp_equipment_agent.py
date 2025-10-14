@@ -89,13 +89,16 @@ class MCPEquipmentAssetOperationsAgent:
     async def _register_mcp_sources(self) -> None:
         """Register MCP sources for tool discovery."""
         try:
-            # Register the asset tools as an MCP source
-            if self.asset_tools:
-                await self.tool_discovery.register_discovery_source(
-                    "equipment_asset_tools",
-                    self.asset_tools,
-                    "mcp_adapter"
-                )
+            # Import and register the equipment MCP adapter
+            from chain_server.services.mcp.adapters.equipment_adapter import get_equipment_adapter
+            
+            # Register the equipment adapter as an MCP source
+            equipment_adapter = await get_equipment_adapter()
+            await self.tool_discovery.register_discovery_source(
+                "equipment_asset_tools",
+                equipment_adapter,
+                "mcp_adapter"
+            )
             
             # Register any other MCP servers or adapters
             # This would be expanded based on available MCP sources
