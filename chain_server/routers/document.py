@@ -506,16 +506,16 @@ async def process_document_background(
         # Stage 4: Large LLM Judge & Validation
         logger.info(f"Stage 4: Large LLM judge validation for {document_id}")
         validation_result = await judge.evaluate_document(
-            llm_result,
-            document_type,
-            preprocessing_result.get("metadata", {})
+            llm_result.get("structured_data", {}),
+            llm_result.get("entities", {}),
+            document_type
         )
         
         # Stage 5: Intelligent Routing
         logger.info(f"Stage 5: Intelligent routing for {document_id}")
         routing_result = await router.route_document(
-            validation_result,
             llm_result,
+            validation_result,
             document_type
         )
         

@@ -31,6 +31,57 @@ class DocumentActionTools:
         self.document_statuses = {}  # Track document processing status
         self.status_file = Path("document_statuses.json")  # Persistent storage
     
+    def _get_value(self, obj, key: str, default=None):
+        """Get value from object (dict or object with attributes)."""
+        if hasattr(obj, key):
+            return getattr(obj, key)
+        elif hasattr(obj, 'get'):
+            return obj.get(key, default)
+        else:
+            return default
+    
+    def _parse_processing_time(self, time_str: str) -> Optional[int]:
+        """Parse processing time string to seconds."""
+        if not time_str:
+            return None
+        
+        # Handle different time formats
+        if isinstance(time_str, int):
+            return time_str
+        
+        time_str = str(time_str).lower()
+        
+        # Parse "4-8 hours" format
+        if "hours" in time_str:
+            if "-" in time_str:
+                # Take the average of the range
+                parts = time_str.split("-")
+                if len(parts) == 2:
+                    try:
+                        min_hours = int(parts[0].strip())
+                        max_hours = int(parts[1].strip().split()[0])
+                        avg_hours = (min_hours + max_hours) / 2
+                        return int(avg_hours * 3600)  # Convert to seconds
+                    except (ValueError, IndexError):
+                        pass
+            else:
+                try:
+                    hours = int(time_str.split()[0])
+                    return hours * 3600  # Convert to seconds
+                except (ValueError, IndexError):
+                    pass
+        
+        # Parse "30 minutes" format
+        elif "minutes" in time_str:
+            try:
+                minutes = int(time_str.split()[0])
+                return minutes * 60  # Convert to seconds
+            except (ValueError, IndexError):
+                pass
+        
+        # Default fallback
+        return 3600  # 1 hour default
+    
     async def initialize(self):
         """Initialize document processing tools."""
         try:
@@ -516,7 +567,7 @@ class DocumentActionTools:
                     "llm_processing": llm_result,
                     "validation": validation_result,
                     "routing": routing_result,
-                    "stored_at": datetime.now()
+                    "stored_at": datetime.now().isoformat()
                 }
                 self.document_statuses[document_id]["status"] = ProcessingStage.COMPLETED
                 self.document_statuses[document_id]["progress"] = 100
@@ -524,7 +575,7 @@ class DocumentActionTools:
                 # Update all stages to completed
                 for stage in self.document_statuses[document_id]["stages"]:
                     stage["status"] = "completed"
-                    stage["completed_at"] = datetime.now()
+                    stage["completed_at"] = datetime.now().isoformat()
                 
                 # Save to persistent storage
                 self._save_status_data()
@@ -571,12 +622,12 @@ class DocumentActionTools:
                         ocr_data = results["ocr"]
                         extraction_results.append(ExtractionResult(
                             stage="ocr_extraction",
-                            raw_data=ocr_data.get("raw_text", ""),
-                            processed_data=ocr_data.get("extracted_data", {}),
+                            raw_data={"text": ocr_data.get("text", ""), "pages": ocr_data.get("page_results", [])},
+                            processed_data={"extracted_text": ocr_data.get("text", ""), "total_pages": ocr_data.get("total_pages", 0)},
                             confidence_score=ocr_data.get("confidence", 0.0),
-                            processing_time_ms=ocr_data.get("processing_time_ms", 0),
-                            model_used="NeMoRetriever-OCR-v1",
-                            metadata=ocr_data.get("metadata", {})
+                            processing_time_ms=0,  # OCR doesn't track processing time yet
+                            model_used=ocr_data.get("model_used", "NeMoRetriever-OCR-v1"),
+                            metadata={"layout_enhanced": ocr_data.get("layout_enhanced", False), "timestamp": ocr_data.get("processing_timestamp", "")}
                         ))
                     
                     # LLM Processing Results
@@ -584,7 +635,7 @@ class DocumentActionTools:
                         llm_data = results["llm_processing"]
                         extraction_results.append(ExtractionResult(
                             stage="llm_processing",
-                            raw_data=llm_data.get("raw_entities", []),
+                            raw_data={"entities": llm_data.get("raw_entities", []), "raw_response": llm_data.get("raw_response", "")},
                             processed_data=llm_data.get("structured_data", {}),
                             confidence_score=llm_data.get("confidence", 0.0),
                             processing_time_ms=llm_data.get("processing_time_ms", 0),
@@ -596,31 +647,54 @@ class DocumentActionTools:
                     quality_score = None
                     if "validation" in results and results["validation"]:
                         validation_data = results["validation"]
-                        quality_score = QualityScore(
-                            overall_score=validation_data.get("overall_score", 0.0),
-                            completeness_score=validation_data.get("completeness_score", 0.0),
-                            accuracy_score=validation_data.get("accuracy_score", 0.0),
-                            compliance_score=validation_data.get("compliance_score", 0.0),
-                            quality_score=validation_data.get("quality_score", 0.0),
-                            decision=QualityDecision(validation_data.get("decision", "REVIEW")),
-                            reasoning=validation_data.get("reasoning", {}),
-                            issues_found=validation_data.get("issues_found", []),
-                            confidence=validation_data.get("confidence", 0.0),
-                            judge_model="Llama 3.1 Nemotron 70B"
-                        )
+                        
+                        # Handle both JudgeEvaluation object and dictionary
+                        if hasattr(validation_data, 'overall_score'):
+                            # It's a JudgeEvaluation object
+                            reasoning_text = getattr(validation_data, 'reasoning', '')
+                            quality_score = QualityScore(
+                                overall_score=getattr(validation_data, 'overall_score', 0.0),
+                                completeness_score=getattr(validation_data, 'completeness_score', 0.0),
+                                accuracy_score=getattr(validation_data, 'accuracy_score', 0.0),
+                                compliance_score=getattr(validation_data, 'compliance_score', 0.0),
+                                quality_score=getattr(validation_data, 'quality_score', getattr(validation_data, 'overall_score', 0.0)),
+                                decision=QualityDecision(getattr(validation_data, 'decision', "REVIEW")),
+                                reasoning={"summary": reasoning_text, "details": reasoning_text},
+                                issues_found=getattr(validation_data, 'issues_found', []),
+                                confidence=getattr(validation_data, 'confidence', 0.0),
+                                judge_model="Llama 3.1 Nemotron 70B"
+                            )
+                        else:
+                            # It's a dictionary
+                            reasoning_data = validation_data.get("reasoning", {})
+                            if isinstance(reasoning_data, str):
+                                reasoning_data = {"summary": reasoning_data, "details": reasoning_data}
+                            
+                            quality_score = QualityScore(
+                                overall_score=validation_data.get("overall_score", 0.0),
+                                completeness_score=validation_data.get("completeness_score", 0.0),
+                                accuracy_score=validation_data.get("accuracy_score", 0.0),
+                                compliance_score=validation_data.get("compliance_score", 0.0),
+                                quality_score=validation_data.get("quality_score", validation_data.get("overall_score", 0.0)),
+                                decision=QualityDecision(validation_data.get("decision", "REVIEW")),
+                                reasoning=reasoning_data,
+                                issues_found=validation_data.get("issues_found", []),
+                                confidence=validation_data.get("confidence", 0.0),
+                                judge_model="Llama 3.1 Nemotron 70B"
+                            )
                     
                     # Routing Decision
                     routing_decision = None
                     if "routing" in results and results["routing"]:
                         routing_data = results["routing"]
                         routing_decision = RoutingDecision(
-                            routing_action=RoutingAction(routing_data.get("routing_action", "flag_review")),
-                            routing_reason=routing_data.get("routing_reason", ""),
-                            wms_integration_status=routing_data.get("wms_integration_status", "pending"),
-                            wms_integration_data=routing_data.get("wms_integration_data"),
-                            human_review_required=routing_data.get("human_review_required", False),
-                            human_reviewer_id=routing_data.get("human_reviewer_id"),
-                            estimated_processing_time=routing_data.get("estimated_processing_time")
+                            routing_action=RoutingAction(self._get_value(routing_data, "routing_action", "flag_review")),
+                            routing_reason=self._get_value(routing_data, "routing_reason", ""),
+                            wms_integration_status=self._get_value(routing_data, "wms_integration_status", "pending"),
+                            wms_integration_data=self._get_value(routing_data, "wms_integration_data"),
+                            human_review_required=self._get_value(routing_data, "human_review_required", False),
+                            human_reviewer_id=self._get_value(routing_data, "human_reviewer_id"),
+                            estimated_processing_time=self._parse_processing_time(self._get_value(routing_data, "estimated_processing_time"))
                         )
                     
                     return {

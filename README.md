@@ -126,6 +126,56 @@ The system now features **complete MCP integration** with dynamic tool discovery
 - `chain_server/services/mcp/` - Complete MCP framework implementation
 - Dynamic tool discovery, binding, routing, and validation services
 
+### **Intelligent Document Processing with NVIDIA NeMo** - (NEW)
+
+The system now features **complete document processing capabilities** powered by NVIDIA's NeMo models, providing intelligent OCR, text extraction, and structured data processing for warehouse documents.
+
+#### **Document Processing Pipeline**
+- **Multi-Format Support** - PDF, PNG, JPG, JPEG, TIFF, BMP files
+- **5-Stage Processing Pipeline** - Complete NVIDIA NeMo integration
+- **Real-Time Processing** - Background processing with status tracking
+- **Structured Data Extraction** - Intelligent parsing of invoices, receipts, BOLs
+- **Quality Assessment** - Automated quality scoring and validation
+
+#### **NVIDIA NeMo Integration**
+- **Stage 1: Document Preprocessing** - PDF decomposition and image extraction
+- **Stage 2: Intelligent OCR** - `meta/llama-3.2-11b-vision-instruct` for text extraction
+- **Stage 3: Small LLM Processing** - Structured data extraction and entity recognition
+- **Stage 4: Large LLM Judge** - Quality validation and confidence scoring
+- **Stage 5: Intelligent Routing** - Quality-based routing decisions
+
+#### **API Endpoints**
+```bash
+# Upload document for processing
+POST /api/v1/document/upload
+- file: Document file (PDF/image)
+- document_type: invoice, receipt, BOL, etc.
+
+# Check processing status
+GET /api/v1/document/status/{document_id}
+
+# Get extraction results
+GET /api/v1/document/results/{document_id}
+```
+
+#### **Real Data Extraction**
+The pipeline successfully extracts real data from documents:
+- **Invoice Numbers** - INV-2024-001
+- **Vendor Information** - ABC Supply Company
+- **Amounts** - $250.00
+- **Dates** - 2024-01-15
+- **Line Items** - Detailed item breakdowns
+
+#### **Environment Variables**
+```bash
+# NVIDIA NeMo API Keys (same key for all services)
+NEMO_RETRIEVER_API_KEY=nvapi-xxx
+NEMO_OCR_API_KEY=nvapi-xxx
+NEMO_PARSE_API_KEY=nvapi-xxx
+LLAMA_NANO_VL_API_KEY=nvapi-xxx
+LLAMA_70B_API_KEY=nvapi-xxx
+```
+
 ### **Production-Grade Vector Search with NV-EmbedQA** - (NEW)
 
 The system now features **production-grade vector search** powered by NVIDIA's NV-EmbedQA-E5-v5 model, providing high-quality 1024-dimensional embeddings for accurate semantic search over warehouse documentation and operational procedures.

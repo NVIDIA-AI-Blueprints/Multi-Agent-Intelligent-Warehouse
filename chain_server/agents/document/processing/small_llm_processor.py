@@ -344,7 +344,7 @@ class SmallLLMProcessor:
                         "Content-Type": "application/json"
                     },
                     json={
-                        "model": "meta/llama-3.1-70b-instruct",
+                        "model": "meta/llama-3.2-11b-vision-instruct",
                         "messages": messages,
                         "max_tokens": 2000,
                         "temperature": 0.1

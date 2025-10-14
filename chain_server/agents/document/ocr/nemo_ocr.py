@@ -127,11 +127,22 @@ class NeMoOCRService:
                         "Content-Type": "application/json"
                     },
                     json={
-                        "model": "meta/llama-3.1-70b-instruct",
+                        "model": "meta/llama-3.2-11b-vision-instruct",
                         "messages": [
                             {
                                 "role": "user",
-                                "content": f"Extract all text from this document image with high accuracy. Include bounding boxes and confidence scores for each text element. Image data: {image_base64[:100]}..."
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": "Extract all text from this document image with high accuracy. Include bounding boxes and confidence scores for each text element."
+                                    },
+                                    {
+                                        "type": "image_url",
+                                        "image_url": {
+                                            "url": f"data:image/png;base64,{image_base64}"
+                                        }
+                                    }
+                                ]
                             }
                         ],
                         "max_tokens": 2000,
@@ -144,7 +155,13 @@ class NeMoOCRService:
                 
                 # Parse OCR results from chat completions response
                 content = result["choices"][0]["message"]["content"]
-                ocr_data = self._parse_ocr_result({"text": content, "words": [], "confidence_scores": [0.9]}, image.size)
+                
+                # Parse the extracted text and create proper structure
+                ocr_data = self._parse_ocr_result({
+                    "text": content,
+                    "words": self._extract_words_from_text(content),
+                    "confidence_scores": [0.9] * len(content.split()) if content else [0.9]
+                }, image.size)
                 
                 return {
                     "page_number": page_number,
@@ -165,6 +182,40 @@ class NeMoOCRService:
         image.save(buffer, format='PNG')
         return base64.b64encode(buffer.getvalue()).decode()
     
+    def _extract_words_from_text(self, text: str) -> List[Dict[str, Any]]:
+        """Extract words from text with basic bounding box estimation."""
+        if not text:
+            return []
+        
+        words = []
+        lines = text.split('\n')
+        y_offset = 0
+        
+        for line_num, line in enumerate(lines):
+            if not line.strip():
+                y_offset += 20  # Approximate line height
+                continue
+                
+            words_in_line = line.split()
+            x_offset = 0
+            
+            for word in words_in_line:
+                # Estimate bounding box (simplified)
+                word_width = len(word) * 8  # Approximate character width
+                word_height = 16  # Approximate character height
+                
+                words.append({
+                    "text": word,
+                    "bbox": [x_offset, y_offset, x_offset + word_width, y_offset + word_height],
+                    "confidence": 0.9
+                })
+                
+                x_offset += word_width + 5  # Add space between words
+            
+            y_offset += 20  # Move to next line
+        
+        return words
+
     def _parse_ocr_result(self, api_result: Dict[str, Any], image_size: tuple) -> Dict[str, Any]:
         """Parse NeMo OCR API result."""
         try:
