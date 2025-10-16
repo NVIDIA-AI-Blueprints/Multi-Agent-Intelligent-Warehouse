@@ -120,23 +120,29 @@ class MCPIntentClassifier:
         """Enhanced intent classification with better logic and ambiguity handling."""
         message_lower = message.lower()
         
-        # Check for document-related keywords first (highest priority)
-        if any(keyword in message_lower for keyword in cls.DOCUMENT_KEYWORDS):
-            return "document"
-        
-        # Check for specific safety-related queries (not general equipment)
+        # Check for specific safety-related queries first (highest priority)
         safety_score = sum(1 for keyword in cls.SAFETY_KEYWORDS if keyword in message_lower)
         if safety_score > 0:
             # Only route to safety if it's clearly safety-related, not general equipment
-            safety_context_indicators = ["procedure", "policy", "incident", "compliance", "safety", "ppe", "hazard"]
+            safety_context_indicators = ["procedure", "policy", "incident", "compliance", "safety", "ppe", "hazard", "report"]
             if any(indicator in message_lower for indicator in safety_context_indicators):
                 return "safety"
         
+        # Check for document-related keywords (but only if it's clearly document-related)
+        document_indicators = ["document", "upload", "scan", "extract", "pdf", "image", "invoice", "receipt", "bol", "bill of lading", "purchase order", "po", "quality", "validation", "approve", "review", "ocr", "text extraction", "file", "photo", "picture", "documentation", "paperwork", "neural", "nemo", "retriever", "parse", "vision", "multimodal", "document processing", "document analytics", "document search", "document status"]
+        if any(keyword in message_lower for keyword in document_indicators):
+            return "document"
+        
         # Check for equipment-specific queries (availability, status, assignment)
-        equipment_indicators = ["available", "status", "assign", "dispatch", "utilization", "maintenance", "telemetry"]
+        # But only if it's not a workflow operation
+        equipment_indicators = ["available", "status", "utilization", "maintenance", "telemetry"]
         equipment_objects = ["forklift", "scanner", "conveyor", "truck", "amr", "agv", "equipment"]
         
-        if any(indicator in message_lower for indicator in equipment_indicators) and \
+        # Only route to equipment if it's a pure equipment query (not workflow-related)
+        workflow_terms = ["wave", "order", "create", "pick", "pack", "task", "workflow"]
+        is_workflow_query = any(term in message_lower for term in workflow_terms)
+        
+        if not is_workflow_query and any(indicator in message_lower for indicator in equipment_indicators) and \
            any(obj in message_lower for obj in equipment_objects):
             return "equipment"
         
@@ -144,7 +150,7 @@ class MCPIntentClassifier:
         operations_score = sum(1 for keyword in cls.OPERATIONS_KEYWORDS if keyword in message_lower)
         if operations_score > 0:
             # Prioritize operations for workflow-related terms
-            workflow_terms = ["task", "wave", "order", "create", "pick", "pack", "management", "workflow"]
+            workflow_terms = ["task", "wave", "order", "create", "pick", "pack", "management", "workflow", "dispatch"]
             if any(term in message_lower for term in workflow_terms):
                 return "operations"
         
@@ -761,6 +767,7 @@ class MCPPlannerGraph:
                 "context": context,
                 "structured_response": structured_response,  # Explicitly include structured response
                 "mcp_tools_used": context.get("mcp_tools_used", []),
+                "tool_execution_results": context.get("tool_execution_results", {}),
                 "available_tools": result.get("available_tools", [])
             }
             

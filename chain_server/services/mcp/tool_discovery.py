@@ -257,6 +257,17 @@ class ToolDiscoveryService:
         tools_discovered = 0
         
         try:
+            logger.info(f"Discovering tools from MCP adapter '{source_name}'")
+            logger.info(f"Adapter type: {type(adapter)}")
+            logger.info(f"Adapter has tools attribute: {hasattr(adapter, 'tools')}")
+            
+            if hasattr(adapter, 'tools'):
+                logger.info(f"Adapter tools count: {len(adapter.tools)}")
+                logger.info(f"Adapter tools keys: {list(adapter.tools.keys())}")
+            else:
+                logger.error(f"Adapter '{source_name}' does not have 'tools' attribute")
+                return 0
+            
             # Get tools from adapter
             for tool_name, tool in adapter.tools.items():
                 discovered_tool = DiscoveredTool(
@@ -298,7 +309,7 @@ class ToolDiscoveryService:
     
     async def _register_discovered_tool(self, tool: DiscoveredTool) -> None:
         """Register a discovered tool."""
-        tool_key = f"{tool.source}:{tool.name}"
+        tool_key = tool.tool_id
         
         # Update existing tool or add new one
         if tool_key in self.discovered_tools:

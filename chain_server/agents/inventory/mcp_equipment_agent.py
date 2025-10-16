@@ -257,12 +257,12 @@ Return only valid JSON."""
             
             # Search by category based on intent
             category_mapping = {
-                "equipment_lookup": ToolCategory.DATA_ACCESS,
+                "equipment_lookup": ToolCategory.EQUIPMENT,
                 "assignment": ToolCategory.OPERATIONS,
                 "utilization": ToolCategory.ANALYSIS,
                 "maintenance": ToolCategory.OPERATIONS,
-                "availability": ToolCategory.DATA_ACCESS,
-                "telemetry": ToolCategory.DATA_ACCESS,
+                "availability": ToolCategory.EQUIPMENT,
+                "telemetry": ToolCategory.EQUIPMENT,
                 "safety": ToolCategory.SAFETY
             }
             
@@ -301,9 +301,9 @@ Return only valid JSON."""
             
             # Create execution steps based on query intent
             if query.intent == "equipment_lookup":
-                # Look for data access tools
-                data_tools = [t for t in tools if t.category == ToolCategory.DATA_ACCESS]
-                for tool in data_tools[:3]:  # Limit to 3 tools
+                # Look for equipment tools
+                equipment_tools = [t for t in tools if t.category == ToolCategory.EQUIPMENT]
+                for tool in equipment_tools[:3]:  # Limit to 3 tools
                     execution_plan.append({
                         "tool_id": tool.tool_id,
                         "tool_name": tool.name,
@@ -373,10 +373,16 @@ Return only valid JSON."""
         """Prepare arguments for tool execution based on query entities."""
         arguments = {}
         
+        # Get tool parameters from the properties section
+        tool_params = tool.parameters.get("properties", {})
+        
         # Map query entities to tool parameters
-        for param_name, param_schema in tool.parameters.items():
-            if param_name in query.entities:
+        for param_name, param_schema in tool_params.items():
+            if param_name in query.entities and query.entities[param_name] is not None:
                 arguments[param_name] = query.entities[param_name]
+            elif param_name == "asset_id" and "equipment_id" in query.entities:
+                # Map equipment_id to asset_id
+                arguments[param_name] = query.entities["equipment_id"]
             elif param_name == "query" or param_name == "search_term":
                 arguments[param_name] = query.user_query
             elif param_name == "context":

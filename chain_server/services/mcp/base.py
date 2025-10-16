@@ -43,10 +43,10 @@ class ToolCategory(Enum):
 @dataclass
 class AdapterConfig:
     """Configuration for an adapter."""
-    name: str
-    adapter_type: AdapterType
-    endpoint: str
-    connection_type: MCPConnectionType
+    name: str = ""
+    adapter_type: AdapterType = AdapterType.CUSTOM
+    endpoint: str = ""
+    connection_type: MCPConnectionType = MCPConnectionType.STDIO
     credentials: Dict[str, Any] = None
     timeout: int = 30
     retry_attempts: int = 3
