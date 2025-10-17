@@ -119,6 +119,12 @@ const Documentation: React.FC = () => {
       icon: <SpeedIcon />
     },
     {
+      name: "Document Processing",
+      description: "6-stage NVIDIA NeMo pipeline with Llama Nemotron Nano VL 8B",
+      status: "✅ Production Ready",
+      icon: <ArticleIcon />
+    },
+    {
       name: "Security & RBAC",
       description: "JWT/OAuth2 with 5 user roles",
       status: "✅ Production Ready",
@@ -150,6 +156,15 @@ const Documentation: React.FC = () => {
         { method: "GET", path: "/api/v1/mcp/status", description: "MCP system status" },
         { method: "POST", path: "/api/v1/mcp/test-workflow", description: "Test MCP workflow execution" },
         { method: "GET", path: "/api/v1/mcp/adapters", description: "List MCP adapters" }
+      ]
+    },
+    {
+      category: "Document Processing",
+      endpoints: [
+        { method: "POST", path: "/api/v1/document/upload", description: "Upload document for processing" },
+        { method: "GET", path: "/api/v1/document/status/{id}", description: "Get processing status" },
+        { method: "GET", path: "/api/v1/document/results/{id}", description: "Get extraction results" },
+        { method: "GET", path: "/api/v1/document/analytics", description: "Document processing analytics" }
       ]
     },
     {
@@ -270,6 +285,166 @@ const Documentation: React.FC = () => {
               </Grid>
             ))}
           </Grid>
+        </AccordionDetails>
+      </Accordion>
+
+      {/* Document Processing Pipeline */}
+      <Accordion expanded={expandedSection === 'document-processing'} onChange={handleChange('document-processing')}>
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <ArticleIcon color="primary" />
+            Document Processing Pipeline
+          </Typography>
+        </AccordionSummary>
+        <AccordionDetails>
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="h5" gutterBottom>
+              📄 6-Stage NVIDIA NeMo Document Processing Pipeline
+            </Typography>
+            <Typography variant="body1" sx={{ mb: 2 }}>
+              The system implements a comprehensive document processing pipeline using NVIDIA NeMo models for warehouse document understanding, 
+              from PDF decomposition to intelligent routing based on quality scores.
+            </Typography>
+          </Box>
+
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <Card variant="outlined" sx={{ height: '100%' }}>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom color="primary">
+                    Stage 1: Document Preprocessing
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 2 }}>
+                    <strong>Model:</strong> NeMo Retriever (NVIDIA NeMo)
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    PDF decomposition and image extraction with layout-aware processing for optimal document structure understanding.
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Card variant="outlined" sx={{ height: '100%' }}>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom color="primary">
+                    Stage 2: Intelligent OCR
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 2 }}>
+                    <strong>Model:</strong> NeMoRetriever-OCR-v1 + Nemotron Parse
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Fast, accurate text extraction with layout awareness, preserving spatial relationships and document structure.
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Card variant="outlined" sx={{ height: '100%', bgcolor: 'success.light', color: 'success.contrastText' }}>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>
+                    Stage 3: Small LLM Processing ⭐
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 2 }}>
+                    <strong>Model:</strong> Llama Nemotron Nano VL 8B (NVIDIA NeMo)
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 2 }}>
+                    <strong>Features:</strong>
+                  </Typography>
+                  <List dense>
+                    <ListItem sx={{ py: 0 }}>
+                      <ListItemText primary="Native vision understanding" />
+                    </ListItem>
+                    <ListItem sx={{ py: 0 }}>
+                      <ListItemText primary="OCRBench v2 leader for document understanding" />
+                    </ListItem>
+                    <ListItem sx={{ py: 0 }}>
+                      <ListItemText primary="Specialized for invoice/receipt/BOL processing" />
+                    </ListItem>
+                    <ListItem sx={{ py: 0 }}>
+                      <ListItemText primary="Fast inference (~100-200ms)" />
+                    </ListItem>
+                  </List>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Card variant="outlined" sx={{ height: '100%' }}>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom color="primary">
+                    Stage 4: Embedding & Indexing
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 2 }}>
+                    <strong>Model:</strong> nv-embedqa-e5-v5 (NVIDIA NeMo)
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Vector embeddings generation for semantic search and intelligent document indexing with GPU acceleration.
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Card variant="outlined" sx={{ height: '100%' }}>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom color="primary">
+                    Stage 5: Large LLM Judge
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 2 }}>
+                    <strong>Model:</strong> Llama 3.1 Nemotron 70B Instruct NIM
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Comprehensive quality validation with 4 evaluation criteria: completeness, accuracy, compliance, and quality scoring.
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Card variant="outlined" sx={{ height: '100%' }}>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom color="primary">
+                    Stage 6: Intelligent Routing
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 2 }}>
+                    <strong>System:</strong> Quality-based routing decisions
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Smart routing based on quality scores and business rules to determine document processing workflow and next actions.
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+
+          <Box sx={{ mt: 4 }}>
+            <Typography variant="h6" gutterBottom>
+              🔧 Technical Implementation Details
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={4}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography variant="subtitle1" gutterBottom>API Integration</Typography>
+                    <Typography variant="body2">NVIDIA NIMs API with automatic fallback to mock implementations for development</Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography variant="subtitle1" gutterBottom>Error Handling</Typography>
+                    <Typography variant="body2">Graceful degradation with comprehensive error recovery and retry mechanisms</Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography variant="subtitle1" gutterBottom>Performance</Typography>
+                    <Typography variant="body2">Optimized for warehouse document types with fast processing and high accuracy</Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+          </Box>
         </AccordionDetails>
       </Accordion>
 
