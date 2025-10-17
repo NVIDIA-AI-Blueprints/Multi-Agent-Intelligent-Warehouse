@@ -109,23 +109,17 @@ export const mcpAPI = {
   },
   
   searchTools: async (query: string): Promise<any> => {
-    const response = await api.post('/api/v1/mcp/tools/search', { query });
+    const response = await api.post(`/api/v1/mcp/tools/search?query=${encodeURIComponent(query)}`);
     return response.data;
   },
   
   executeTool: async (tool_id: string, parameters: any = {}): Promise<any> => {
-    const response = await api.post('/api/v1/mcp/tools/execute', {
-      tool_id,
-      parameters
-    });
+    const response = await api.post(`/api/v1/mcp/tools/execute?tool_id=${encodeURIComponent(tool_id)}`, parameters);
     return response.data;
   },
   
   testWorkflow: async (message: string, session_id: string = 'test'): Promise<any> => {
-    const response = await api.post('/api/v1/mcp/test-workflow', {
-      message,
-      session_id
-    });
+    const response = await api.post(`/api/v1/mcp/test-workflow?message=${encodeURIComponent(message)}&session_id=${encodeURIComponent(session_id)}`);
     return response.data;
   },
   
