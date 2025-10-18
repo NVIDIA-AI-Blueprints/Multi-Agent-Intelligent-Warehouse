@@ -11,6 +11,7 @@ router = APIRouter(prefix="/api/v1", tags=["Safety"])
 # Initialize SQL retriever
 sql_retriever = SQLRetriever()
 
+
 class SafetyIncident(BaseModel):
     id: int
     severity: str
@@ -18,10 +19,12 @@ class SafetyIncident(BaseModel):
     reported_by: str
     occurred_at: str
 
+
 class SafetyIncidentCreate(BaseModel):
     severity: str
     description: str
     reported_by: str
+
 
 class SafetyPolicy(BaseModel):
     id: str
@@ -30,6 +33,7 @@ class SafetyPolicy(BaseModel):
     last_updated: str
     status: str
     summary: str
+
 
 @router.get("/safety/incidents", response_model=List[SafetyIncident])
 async def get_incidents():
@@ -42,21 +46,28 @@ async def get_incidents():
             ORDER BY occurred_at DESC
         """
         results = await sql_retriever.fetch_all(query)
-        
+
         incidents = []
         for row in results:
-            incidents.append(SafetyIncident(
-                id=row['id'],
-                severity=row['severity'],
-                description=row['description'],
-                reported_by=row['reported_by'],
-                occurred_at=row['occurred_at'].isoformat() if row['occurred_at'] else ""
-            ))
-        
+            incidents.append(
+                SafetyIncident(
+                    id=row["id"],
+                    severity=row["severity"],
+                    description=row["description"],
+                    reported_by=row["reported_by"],
+                    occurred_at=(
+                        row["occurred_at"].isoformat() if row["occurred_at"] else ""
+                    ),
+                )
+            )
+
         return incidents
     except Exception as e:
         logger.error(f"Failed to get safety incidents: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve safety incidents")
+        raise HTTPException(
+            status_code=500, detail="Failed to retrieve safety incidents"
+        )
+
 
 @router.get("/safety/incidents/{incident_id}", response_model=SafetyIncident)
 async def get_incident(incident_id: int):
@@ -69,22 +80,30 @@ async def get_incident(incident_id: int):
             WHERE id = $1
         """
         result = await sql_retriever.fetch_one(query, incident_id)
-        
+
         if not result:
-            raise HTTPException(status_code=404, detail=f"Safety incident with ID {incident_id} not found")
-        
+            raise HTTPException(
+                status_code=404,
+                detail=f"Safety incident with ID {incident_id} not found",
+            )
+
         return SafetyIncident(
-            id=result['id'],
-            severity=result['severity'],
-            description=result['description'],
-            reported_by=result['reported_by'],
-            occurred_at=result['occurred_at'].isoformat() if result['occurred_at'] else ""
+            id=result["id"],
+            severity=result["severity"],
+            description=result["description"],
+            reported_by=result["reported_by"],
+            occurred_at=(
+                result["occurred_at"].isoformat() if result["occurred_at"] else ""
+            ),
         )
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Failed to get safety incident {incident_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve safety incident")
+        raise HTTPException(
+            status_code=500, detail="Failed to retrieve safety incident"
+        )
+
 
 @router.post("/safety/incidents", response_model=SafetyIncident)
 async def create_incident(incident: SafetyIncidentCreate):
@@ -96,18 +115,23 @@ async def create_incident(incident: SafetyIncidentCreate):
             VALUES ($1, $2, $3, NOW())
             RETURNING id, severity, description, reported_by, occurred_at
         """
-        result = await sql_retriever.fetch_one(query, incident.severity, incident.description, incident.reported_by)
-        
+        result = await sql_retriever.fetch_one(
+            query, incident.severity, incident.description, incident.reported_by
+        )
+
         return SafetyIncident(
-            id=result['id'],
-            severity=result['severity'],
-            description=result['description'],
-            reported_by=result['reported_by'],
-            occurred_at=result['occurred_at'].isoformat() if result['occurred_at'] else ""
+            id=result["id"],
+            severity=result["severity"],
+            description=result["description"],
+            reported_by=result["reported_by"],
+            occurred_at=(
+                result["occurred_at"].isoformat() if result["occurred_at"] else ""
+            ),
         )
     except Exception as e:
         logger.error(f"Failed to create safety incident: {e}")
         raise HTTPException(status_code=500, detail="Failed to create safety incident")
+
 
 @router.get("/safety/policies", response_model=List[SafetyPolicy])
 async def get_policies():
@@ -121,7 +145,7 @@ async def get_policies():
                 category="Safety Equipment",
                 last_updated="2024-01-15",
                 status="Active",
-                summary="All personnel must wear appropriate PPE in designated areas"
+                summary="All personnel must wear appropriate PPE in designated areas",
             ),
             SafetyPolicy(
                 id="POL-002",
@@ -129,7 +153,7 @@ async def get_policies():
                 category="Equipment Safety",
                 last_updated="2024-01-10",
                 status="Active",
-                summary="Comprehensive guidelines for safe forklift operation"
+                summary="Comprehensive guidelines for safe forklift operation",
             ),
             SafetyPolicy(
                 id="POL-003",
@@ -137,7 +161,7 @@ async def get_policies():
                 category="Emergency Response",
                 last_updated="2024-01-05",
                 status="Active",
-                summary="Step-by-step emergency evacuation procedures"
+                summary="Step-by-step emergency evacuation procedures",
             ),
             SafetyPolicy(
                 id="POL-004",
@@ -145,7 +169,7 @@ async def get_policies():
                 category="Chemical Safety",
                 last_updated="2024-01-12",
                 status="Active",
-                summary="Safe handling and storage procedures for chemicals"
+                summary="Safe handling and storage procedures for chemicals",
             ),
             SafetyPolicy(
                 id="POL-005",
@@ -153,14 +177,17 @@ async def get_policies():
                 category="Fall Prevention",
                 last_updated="2024-01-08",
                 status="Active",
-                summary="Safety requirements for working at heights"
-            )
+                summary="Safety requirements for working at heights",
+            ),
         ]
-        
+
         return policies
     except Exception as e:
         logger.error(f"Failed to get safety policies: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve safety policies")
+        raise HTTPException(
+            status_code=500, detail="Failed to retrieve safety policies"
+        )
+
 
 @router.get("/safety/policies/{policy_id}", response_model=SafetyPolicy)
 async def get_policy(policy_id: str):
@@ -171,8 +198,10 @@ async def get_policy(policy_id: str):
         for policy in policies:
             if policy.id == policy_id:
                 return policy
-        
-        raise HTTPException(status_code=404, detail=f"Safety policy with ID {policy_id} not found")
+
+        raise HTTPException(
+            status_code=404, detail=f"Safety policy with ID {policy_id} not found"
+        )
     except HTTPException:
         raise
     except Exception as e:

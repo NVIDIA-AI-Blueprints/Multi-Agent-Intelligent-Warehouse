@@ -21,15 +21,21 @@ from chain_server.routers.reasoning import router as reasoning_router
 from chain_server.routers.migration import router as migration_router
 from chain_server.routers.mcp import router as mcp_router
 from chain_server.routers.document import router as document_router
-from chain_server.services.monitoring.metrics import record_request_metrics, get_metrics_response
+from chain_server.services.monitoring.metrics import (
+    record_request_metrics,
+    get_metrics_response,
+)
 
 app = FastAPI(title="Warehouse Operational Assistant", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], allow_credentials=True,
-    allow_methods=["*"], allow_headers=["*"],
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
+
 
 # Add metrics middleware
 @app.middleware("http")
@@ -39,6 +45,7 @@ async def metrics_middleware(request: Request, call_next):
     duration = time.time() - start_time
     record_request_metrics(request, response, duration)
     return response
+
 
 app.include_router(health_router)
 app.include_router(chat_router)
@@ -55,6 +62,7 @@ app.include_router(reasoning_router)
 app.include_router(migration_router)
 app.include_router(mcp_router)
 app.include_router(document_router)
+
 
 # Add metrics endpoint
 @app.get("/api/v1/metrics")
