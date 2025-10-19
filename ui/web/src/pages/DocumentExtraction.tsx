@@ -1033,18 +1033,35 @@ const DocumentExtraction: React.FC = () => {
                           🎯 Quality Assessment
                         </Typography>
                         <Grid container spacing={2}>
-                          {Object.entries(JSON.parse(documentResults.extracted_data.quality_assessment)).map(([key, value]) => (
-                            <Grid item xs={12} sm={4} key={key}>
-                              <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                                <Typography variant="subtitle2" color="text.secondary">
-                                  {key.replace(/_/g, ' ').toUpperCase()}
-                                </Typography>
-                                <Typography variant="h6" color="primary">
-                                  {Math.round(Number(value) * 100)}%
-                                </Typography>
-                              </Box>
-                            </Grid>
-                          ))}
+                          {(() => {
+                            try {
+                              const qualityData = typeof documentResults.extracted_data.quality_assessment === 'string' 
+                                ? JSON.parse(documentResults.extracted_data.quality_assessment)
+                                : documentResults.extracted_data.quality_assessment;
+                              
+                              return Object.entries(qualityData).map(([key, value]) => (
+                                <Grid item xs={12} sm={4} key={key}>
+                                  <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                                    <Typography variant="subtitle2" color="text.secondary">
+                                      {key.replace(/_/g, ' ').toUpperCase()}
+                                    </Typography>
+                                    <Typography variant="h6" color="primary">
+                                      {Math.round(Number(value) * 100)}%
+                                    </Typography>
+                                  </Box>
+                                </Grid>
+                              ));
+                            } catch (error) {
+                              console.error('Error parsing quality assessment:', error);
+                              return (
+                                <Grid item xs={12}>
+                                  <Typography variant="body2" color="error">
+                                    Error displaying quality assessment data
+                                  </Typography>
+                                </Grid>
+                              );
+                            }
+                          })()}
                         </Grid>
                       </CardContent>
                     </Card>
@@ -1058,13 +1075,30 @@ const DocumentExtraction: React.FC = () => {
                           ⚙️ Processing Information
                         </Typography>
                         <Grid container spacing={2}>
-                          {Object.entries(JSON.parse(documentResults.extracted_data.processing_metadata)).map(([key, value]) => (
-                            <Grid item xs={12} sm={6} key={key}>
-                              <Typography variant="body2">
-                                <strong>{key.replace(/_/g, ' ').toUpperCase()}:</strong> {String(value)}
-                              </Typography>
-                            </Grid>
-                          ))}
+                          {(() => {
+                            try {
+                              const metadata = typeof documentResults.extracted_data.processing_metadata === 'string' 
+                                ? JSON.parse(documentResults.extracted_data.processing_metadata)
+                                : documentResults.extracted_data.processing_metadata;
+                              
+                              return Object.entries(metadata).map(([key, value]) => (
+                                <Grid item xs={12} sm={6} key={key}>
+                                  <Typography variant="body2">
+                                    <strong>{key.replace(/_/g, ' ').toUpperCase()}:</strong> {String(value)}
+                                  </Typography>
+                                </Grid>
+                              ));
+                            } catch (error) {
+                              console.error('Error parsing processing metadata:', error);
+                              return (
+                                <Grid item xs={12}>
+                                  <Typography variant="body2" color="error">
+                                    Error displaying processing metadata
+                                  </Typography>
+                                </Grid>
+                              );
+                            }
+                          })()}
                         </Grid>
                       </CardContent>
                     </Card>
