@@ -16,15 +16,15 @@ from .reasoning_engine import (
     ReasoningChain,
     PatternInsight,
     CausalRelationship,
-    get_reasoning_engine
+    get_reasoning_engine,
 )
 
 __all__ = [
     "AdvancedReasoningEngine",
-    "ReasoningType", 
+    "ReasoningType",
     "ReasoningStep",
     "ReasoningChain",
     "PatternInsight",
     "CausalRelationship",
-    "get_reasoning_engine"
+    "get_reasoning_engine",
 ]

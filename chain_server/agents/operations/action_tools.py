@@ -24,9 +24,11 @@ from chain_server.services.iot.integration_service import get_iot_service
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class TaskAssignment:
     """Task assignment details."""
+
     task_id: str
     task_type: str
     quantity: int
@@ -40,9 +42,11 @@ class TaskAssignment:
     equipment_required: List[str]
     skills_required: List[str]
 
+
 @dataclass
 class WorkloadRebalance:
     """Workload rebalancing result."""
+
     rebalance_id: str
     original_assignments: List[Dict[str, Any]]
     new_assignments: List[Dict[str, Any]]
@@ -50,9 +54,11 @@ class WorkloadRebalance:
     efficiency_gain: float
     created_at: datetime
 
+
 @dataclass
 class PickWave:
     """Pick wave details."""
+
     wave_id: str
     order_ids: List[str]
     strategy: str
@@ -65,9 +71,11 @@ class PickWave:
     labels_generated: bool
     route_optimized: bool
 
+
 @dataclass
 class PickPathOptimization:
     """Pick path optimization result."""
+
     picker_id: str
     optimized_route: List[Dict[str, Any]]
     total_distance: float
@@ -75,9 +83,11 @@ class PickPathOptimization:
     efficiency_score: float
     waypoints: List[Dict[str, Any]]
 
+
 @dataclass
 class ShiftSchedule:
     """Shift schedule management."""
+
     shift_id: str
     shift_type: str
     start_time: datetime
@@ -88,9 +98,11 @@ class ShiftSchedule:
     changes: List[Dict[str, Any]]
     created_at: datetime
 
+
 @dataclass
 class DockAppointment:
     """Dock appointment details."""
+
     appointment_id: str
     dock_door: str
     carrier: str
@@ -102,9 +114,11 @@ class DockAppointment:
     status: str
     created_at: datetime
 
+
 @dataclass
 class EquipmentDispatch:
     """Equipment dispatch details."""
+
     dispatch_id: str
     equipment_id: str
     equipment_type: str
@@ -115,9 +129,11 @@ class EquipmentDispatch:
     created_at: datetime
     estimated_completion: datetime
 
+
 @dataclass
 class KPIMetrics:
     """KPI metrics for publishing."""
+
     timestamp: datetime
     throughput: Dict[str, float]
     sla_metrics: Dict[str, Any]
@@ -125,10 +141,11 @@ class KPIMetrics:
     productivity: Dict[str, float]
     quality_metrics: Dict[str, float]
 
+
 class OperationsActionTools:
     """
     Action tools for Operations Coordination Agent.
-    
+
     Provides comprehensive operations management capabilities including:
     - Task assignment and workload balancing
     - Pick wave generation and optimization
@@ -136,13 +153,13 @@ class OperationsActionTools:
     - Dock scheduling and equipment dispatch
     - KPI publishing and monitoring
     """
-    
+
     def __init__(self):
         self.nim_client = None
         self.wms_service = None
         self.attendance_service = None
         self.iot_service = None
-    
+
     async def initialize(self) -> None:
         """Initialize action tools with required services."""
         try:
@@ -154,37 +171,39 @@ class OperationsActionTools:
         except Exception as e:
             logger.error(f"Failed to initialize Operations Action Tools: {e}")
             raise
-    
+
     async def assign_tasks(
         self,
         task_type: str,
         quantity: int,
         constraints: Dict[str, Any],
-        assignees: Optional[List[str]] = None
+        assignees: Optional[List[str]] = None,
     ) -> TaskAssignment:
         """
         Assign tasks to workers with constraints.
-        
+
         Args:
             task_type: Type of task (pick, pack, receive, putaway, etc.)
             quantity: Number of tasks to assign
             constraints: Zone, equipment, skill requirements
             assignees: Optional specific assignees
-            
+
         Returns:
             TaskAssignment with assignment details
         """
         try:
             if not self.wms_service:
                 await self.initialize()
-            
+
             # Generate unique task ID
-            task_id = f"TASK_{task_type.upper()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            
+            task_id = (
+                f"TASK_{task_type.upper()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            )
+
             # Determine assignees based on constraints
             if not assignees:
                 assignees = await self._find_qualified_assignees(task_type, constraints)
-            
+
             # Create task assignment
             assignment = TaskAssignment(
                 task_id=task_id,
@@ -198,27 +217,27 @@ class OperationsActionTools:
                 due_date=constraints.get("due_date"),
                 zone=constraints.get("zone"),
                 equipment_required=constraints.get("equipment", []),
-                skills_required=constraints.get("skills", [])
+                skills_required=constraints.get("skills", []),
             )
-            
+
             # Create WMS work queue entries
             wms_result = await self.wms_service.create_work_queue_entry(
                 task_id=task_id,
                 task_type=task_type,
                 quantity=quantity,
                 assigned_workers=assignees,
-                constraints=constraints
+                constraints=constraints,
             )
-            
+
             if wms_result and wms_result.get("success"):
                 assignment.status = "queued"
                 logger.info(f"Task {task_id} successfully queued in WMS")
             else:
                 assignment.status = "pending"
                 logger.warning(f"Task {task_id} created but not queued in WMS")
-            
+
             return assignment
-            
+
         except Exception as e:
             logger.error(f"Failed to assign tasks: {e}")
             return TaskAssignment(
@@ -233,44 +252,43 @@ class OperationsActionTools:
                 due_date=None,
                 zone=constraints.get("zone"),
                 equipment_required=constraints.get("equipment", []),
-                skills_required=constraints.get("skills", [])
+                skills_required=constraints.get("skills", []),
             )
-    
+
     async def rebalance_workload(
-        self,
-        sla_rules: Optional[Dict[str, Any]] = None
+        self, sla_rules: Optional[Dict[str, Any]] = None
     ) -> WorkloadRebalance:
         """
         Rebalance workload across workers based on SLA rules.
-        
+
         Args:
             sla_rules: SLA rules for rebalancing
-            
+
         Returns:
             WorkloadRebalance with rebalancing results
         """
         try:
             if not self.wms_service:
                 await self.initialize()
-            
+
             rebalance_id = f"REBAL_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            
+
             # Get current workload distribution
             current_workload = await self.wms_service.get_workload_distribution()
-            
+
             # Get worker availability and capacity
             worker_capacity = await self.attendance_service.get_worker_capacity()
-            
+
             # Apply rebalancing algorithm
             rebalanced_assignments = await self._apply_rebalancing_algorithm(
                 current_workload, worker_capacity, sla_rules
             )
-            
+
             # Calculate efficiency gain
             original_efficiency = self._calculate_workload_efficiency(current_workload)
             new_efficiency = self._calculate_workload_efficiency(rebalanced_assignments)
             efficiency_gain = new_efficiency - original_efficiency
-            
+
             # Create rebalance result
             rebalance = WorkloadRebalance(
                 rebalance_id=rebalance_id,
@@ -278,18 +296,22 @@ class OperationsActionTools:
                 new_assignments=rebalanced_assignments.get("assignments", []),
                 sla_impact=rebalanced_assignments.get("sla_impact", {}),
                 efficiency_gain=efficiency_gain,
-                created_at=datetime.now()
+                created_at=datetime.now(),
             )
-            
+
             # Apply rebalancing if efficiency gain is positive
             if efficiency_gain > 0:
-                await self.wms_service.apply_workload_rebalancing(rebalanced_assignments)
-                logger.info(f"Workload rebalancing applied with {efficiency_gain:.2f}% efficiency gain")
+                await self.wms_service.apply_workload_rebalancing(
+                    rebalanced_assignments
+                )
+                logger.info(
+                    f"Workload rebalancing applied with {efficiency_gain:.2f}% efficiency gain"
+                )
             else:
                 logger.info("No rebalancing needed - current distribution is optimal")
-            
+
             return rebalance
-            
+
         except Exception as e:
             logger.error(f"Failed to rebalance workload: {e}")
             return WorkloadRebalance(
@@ -298,30 +320,28 @@ class OperationsActionTools:
                 new_assignments=[],
                 sla_impact={},
                 efficiency_gain=0.0,
-                created_at=datetime.now()
+                created_at=datetime.now(),
             )
-    
+
     async def generate_pick_wave(
-        self,
-        order_ids: List[str],
-        wave_strategy: str = "zone_based"
+        self, order_ids: List[str], wave_strategy: str = "zone_based"
     ) -> PickWave:
         """
         Generate pick wave with labels and route optimization.
-        
+
         Args:
             order_ids: List of order IDs to include in wave
             wave_strategy: Strategy for wave generation (zone_based, time_based, etc.)
-            
+
         Returns:
             PickWave with wave details
         """
         try:
             if not self.wms_service:
                 await self.initialize()
-            
+
             wave_id = f"WAVE_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            
+
             # Get order details - for now, simulate order data since we don't have real orders
             # In a real implementation, this would query the WMS system
             order_details = []
@@ -331,22 +351,30 @@ class OperationsActionTools:
                     "order_id": order_id,
                     "line_count": 120,  # Default line count from the query
                     "items": [
-                        {"zone": "A", "sku": f"SKU_{i:03d}", "quantity": 1} 
+                        {"zone": "A", "sku": f"SKU_{i:03d}", "quantity": 1}
                         for i in range(1, 21)  # Simulate 20 items for Zone A
-                    ]
+                    ],
                 }
                 order_details.append(simulated_order)
-            
+
             # Calculate wave metrics
             total_lines = sum(order.get("line_count", 0) for order in order_details)
-            zones = list(set(item.get("zone") for order in order_details for item in order.get("items", [])))
-            
+            zones = list(
+                set(
+                    item.get("zone")
+                    for order in order_details
+                    for item in order.get("items", [])
+                )
+            )
+
             # Assign pickers based on strategy
             assigned_pickers = await self._assign_pickers_for_wave(zones, wave_strategy)
-            
+
             # Estimate duration
-            estimated_duration = await self._estimate_wave_duration(total_lines, len(assigned_pickers))
-            
+            estimated_duration = await self._estimate_wave_duration(
+                total_lines, len(assigned_pickers)
+            )
+
             # Create pick wave
             pick_wave = PickWave(
                 wave_id=wave_id,
@@ -359,26 +387,26 @@ class OperationsActionTools:
                 status="generated",
                 created_at=datetime.now(),
                 labels_generated=False,
-                route_optimized=False
+                route_optimized=False,
             )
-            
+
             # Generate labels - simulate for now
             # In a real implementation, this would call the WMS system
             pick_wave.labels_generated = True
             pick_wave.status = "labels_ready"
-            
+
             # Optimize routes
             route_result = await self._optimize_pick_routes(pick_wave)
             if route_result:
                 pick_wave.route_optimized = True
                 pick_wave.status = "ready"
-            
+
             # Create WMS wave - simulate for now
             # In a real implementation, this would call the WMS system
             pick_wave.status = "active"
-            
+
             return pick_wave
-            
+
         except Exception as e:
             logger.error(f"Failed to generate pick wave: {e}")
             return PickWave(
@@ -392,31 +420,29 @@ class OperationsActionTools:
                 status="error",
                 created_at=datetime.now(),
                 labels_generated=False,
-                route_optimized=False
+                route_optimized=False,
             )
-    
+
     async def optimize_pick_paths(
-        self,
-        picker_id: str,
-        wave_id: Optional[str] = None
+        self, picker_id: str, wave_id: Optional[str] = None
     ) -> PickPathOptimization:
         """
         Optimize pick paths for a picker.
-        
+
         Args:
             picker_id: ID of the picker
             wave_id: Optional wave ID to optimize
-            
+
         Returns:
             PickPathOptimization with optimized route
         """
         try:
             if not self.wms_service:
                 await self.initialize()
-            
+
             # Get picker's current tasks
             picker_tasks = await self.wms_service.get_picker_tasks(picker_id, wave_id)
-            
+
             if not picker_tasks:
                 return PickPathOptimization(
                     picker_id=picker_id,
@@ -424,28 +450,34 @@ class OperationsActionTools:
                     total_distance=0.0,
                     time_savings=0,
                     efficiency_score=0.0,
-                    waypoints=[]
+                    waypoints=[],
                 )
-            
+
             # Apply path optimization algorithm
             optimized_route = await self._apply_path_optimization(picker_tasks)
-            
+
             # Calculate metrics
             original_distance = self._calculate_original_distance(picker_tasks)
             optimized_distance = optimized_route.get("total_distance", 0.0)
-            time_savings = int((original_distance - optimized_distance) * 2)  # Assume 2 min per unit distance
-            
-            efficiency_score = min(100.0, (1 - optimized_distance / original_distance) * 100) if original_distance > 0 else 0.0
-            
+            time_savings = int(
+                (original_distance - optimized_distance) * 2
+            )  # Assume 2 min per unit distance
+
+            efficiency_score = (
+                min(100.0, (1 - optimized_distance / original_distance) * 100)
+                if original_distance > 0
+                else 0.0
+            )
+
             return PickPathOptimization(
                 picker_id=picker_id,
                 optimized_route=optimized_route.get("route", []),
                 total_distance=optimized_distance,
                 time_savings=time_savings,
                 efficiency_score=efficiency_score,
-                waypoints=optimized_route.get("waypoints", [])
+                waypoints=optimized_route.get("waypoints", []),
             )
-            
+
         except Exception as e:
             logger.error(f"Failed to optimize pick paths for {picker_id}: {e}")
             return PickPathOptimization(
@@ -454,62 +486,66 @@ class OperationsActionTools:
                 total_distance=0.0,
                 time_savings=0,
                 efficiency_score=0.0,
-                waypoints=[]
+                waypoints=[],
             )
-    
+
     async def manage_shift_schedule(
         self,
         shift_id: str,
         action: str,
         workers: Optional[List[str]] = None,
-        swaps: Optional[List[Dict[str, str]]] = None
+        swaps: Optional[List[Dict[str, str]]] = None,
     ) -> ShiftSchedule:
         """
         Manage shift schedule with worker changes.
-        
+
         Args:
             shift_id: ID of the shift
             action: Action to perform (add, remove, swap)
             workers: List of workers to add/remove
             swaps: List of worker swaps
-            
+
         Returns:
             ShiftSchedule with updated schedule
         """
         try:
             if not self.attendance_service:
                 await self.initialize()
-            
+
             # Get current shift details
             shift_details = await self.attendance_service.get_shift_details(shift_id)
-            
+
             if not shift_details:
                 raise ValueError(f"Shift {shift_id} not found")
-            
+
             # Apply changes based on action
             changes = []
             current_workers = shift_details.get("workers", [])
-            
+
             if action == "add" and workers:
                 for worker_id in workers:
                     if worker_id not in current_workers:
                         current_workers.append(worker_id)
-                        changes.append({
-                            "action": "add",
-                            "worker_id": worker_id,
-                            "timestamp": datetime.now().isoformat()
-                        })
-            
+                        changes.append(
+                            {
+                                "action": "add",
+                                "worker_id": worker_id,
+                                "timestamp": datetime.now().isoformat(),
+                            }
+                        )
+
             elif action == "remove" and workers:
                 for worker_id in workers:
                     if worker_id in current_workers:
                         current_workers.remove(worker_id)
-                        changes.append({
-                            "action": "remove",
-                            "worker_id": worker_id,
-                            "timestamp": datetime.now().isoformat()
-                        })
-            
+                        changes.append(
+                            {
+                                "action": "remove",
+                                "worker_id": worker_id,
+                                "timestamp": datetime.now().isoformat(),
+                            }
+                        )
+
             elif action == "swap" and swaps:
                 for swap in swaps:
                     worker_a = swap.get("from")
@@ -517,31 +553,37 @@ class OperationsActionTools:
                     if worker_a in current_workers and worker_b not in current_workers:
                         current_workers.remove(worker_a)
                         current_workers.append(worker_b)
-                        changes.append({
-                            "action": "swap",
-                            "from": worker_a,
-                            "to": worker_b,
-                            "timestamp": datetime.now().isoformat()
-                        })
-            
+                        changes.append(
+                            {
+                                "action": "swap",
+                                "from": worker_a,
+                                "to": worker_b,
+                                "timestamp": datetime.now().isoformat(),
+                            }
+                        )
+
             # Update shift schedule
             updated_shift = ShiftSchedule(
                 shift_id=shift_id,
                 shift_type=shift_details.get("shift_type", "regular"),
-                start_time=datetime.fromisoformat(shift_details.get("start_time", datetime.now().isoformat())),
-                end_time=datetime.fromisoformat(shift_details.get("end_time", datetime.now().isoformat())),
+                start_time=datetime.fromisoformat(
+                    shift_details.get("start_time", datetime.now().isoformat())
+                ),
+                end_time=datetime.fromisoformat(
+                    shift_details.get("end_time", datetime.now().isoformat())
+                ),
                 workers=[{"worker_id": w, "status": "active"} for w in current_workers],
                 capacity=shift_details.get("capacity", len(current_workers)),
                 status="updated",
                 changes=changes,
-                created_at=datetime.now()
+                created_at=datetime.now(),
             )
-            
+
             # Apply changes to attendance system
             await self.attendance_service.update_shift_schedule(shift_id, updated_shift)
-            
+
             return updated_shift
-            
+
         except Exception as e:
             logger.error(f"Failed to manage shift schedule: {e}")
             return ShiftSchedule(
@@ -553,34 +595,32 @@ class OperationsActionTools:
                 capacity=0,
                 status="error",
                 changes=[],
-                created_at=datetime.now()
+                created_at=datetime.now(),
             )
-    
+
     async def dock_scheduling(
-        self,
-        appointments: List[Dict[str, Any]],
-        capacity: Dict[str, int]
+        self, appointments: List[Dict[str, Any]], capacity: Dict[str, int]
     ) -> List[DockAppointment]:
         """
         Schedule dock appointments with capacity constraints.
-        
+
         Args:
             appointments: List of appointment requests
             capacity: Dock capacity by door
-            
+
         Returns:
             List[DockAppointment] with scheduled appointments
         """
         try:
             if not self.wms_service:
                 await self.initialize()
-            
+
             scheduled_appointments = []
-            
+
             for appointment in appointments:
                 # Find optimal dock door
                 optimal_door = await self._find_optimal_dock_door(appointment, capacity)
-                
+
                 if optimal_door:
                     # Create dock appointment
                     dock_appointment = DockAppointment(
@@ -588,77 +628,95 @@ class OperationsActionTools:
                         dock_door=optimal_door,
                         carrier=appointment.get("carrier", "Unknown"),
                         trailer_id=appointment.get("trailer_id", ""),
-                        scheduled_time=datetime.fromisoformat(appointment.get("requested_time", datetime.now().isoformat())),
+                        scheduled_time=datetime.fromisoformat(
+                            appointment.get(
+                                "requested_time", datetime.now().isoformat()
+                            )
+                        ),
                         duration=appointment.get("duration", 60),
                         cargo_type=appointment.get("cargo_type", "general"),
                         priority=appointment.get("priority", "normal"),
                         status="scheduled",
-                        created_at=datetime.now()
+                        created_at=datetime.now(),
                     )
-                    
+
                     scheduled_appointments.append(dock_appointment)
-                    
+
                     # Update capacity
                     capacity[optimal_door] -= 1
                 else:
-                    logger.warning(f"No available dock door for appointment: {appointment}")
-            
+                    logger.warning(
+                        f"No available dock door for appointment: {appointment}"
+                    )
+
             # Create dock schedule in WMS
             await self.wms_service.create_dock_schedule(scheduled_appointments)
-            
+
             return scheduled_appointments
-            
+
         except Exception as e:
             logger.error(f"Failed to schedule dock appointments: {e}")
             return []
-    
+
     async def dispatch_equipment(
-        self,
-        equipment_id: str,
-        task_id: str,
-        operator: Optional[str] = None
+        self, equipment_id: str, task_id: str, operator: Optional[str] = None
     ) -> EquipmentDispatch:
         """
         Dispatch equipment for a task.
-        
+
         Args:
             equipment_id: ID of the equipment
             task_id: ID of the task
             operator: Optional specific operator
-            
+
         Returns:
             EquipmentDispatch with dispatch details
         """
         try:
             if not self.iot_service:
                 await self.initialize()
-            
+
             dispatch_id = f"DISP_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            
+
             # Get equipment details from IoT service first
-            equipment_details = await self.iot_service.get_equipment_details(equipment_id)
-            
+            equipment_details = await self.iot_service.get_equipment_details(
+                equipment_id
+            )
+
             # Fallback to database if not found in IoT service
             if not equipment_details:
-                logger.info(f"Equipment {equipment_id} not found in IoT service, checking database...")
-                from chain_server.agents.inventory.equipment_asset_tools import get_equipment_asset_tools
+                logger.info(
+                    f"Equipment {equipment_id} not found in IoT service, checking database..."
+                )
+                from chain_server.agents.inventory.equipment_asset_tools import (
+                    get_equipment_asset_tools,
+                )
+
                 asset_tools = await get_equipment_asset_tools()
-                equipment_status = await asset_tools.get_equipment_status(asset_id=equipment_id)
-                
+                equipment_status = await asset_tools.get_equipment_status(
+                    asset_id=equipment_id
+                )
+
                 if equipment_status and equipment_status.get("equipment"):
-                    equipment_data = equipment_status["equipment"][0] if equipment_status["equipment"] else {}
+                    equipment_data = (
+                        equipment_status["equipment"][0]
+                        if equipment_status["equipment"]
+                        else {}
+                    )
                     equipment_details = {
                         "type": equipment_data.get("type", "unknown"),
                         "current_location": equipment_data.get("zone", "unknown"),
-                        "status": equipment_data.get("status", "unknown")
+                        "status": equipment_data.get("status", "unknown"),
                     }
                 else:
-                    raise ValueError(f"Equipment {equipment_id} not found in database or IoT service")
-            
+                    raise ValueError(
+                        f"Equipment {equipment_id} not found in database or IoT service"
+                    )
+
             # Find operator if not specified
             if not operator:
                 operator = await self._find_available_operator(equipment_id)
-            
+
             # Create dispatch
             dispatch = EquipmentDispatch(
                 dispatch_id=dispatch_id,
@@ -669,19 +727,21 @@ class OperationsActionTools:
                 location=equipment_details.get("current_location", "unknown"),
                 status="dispatched",
                 created_at=datetime.now(),
-                estimated_completion=datetime.now() + timedelta(hours=2)
+                estimated_completion=datetime.now() + timedelta(hours=2),
             )
-            
+
             # Update equipment status in IoT service if available
             try:
-                await self.iot_service.update_equipment_status(equipment_id, "in_use", task_id)
+                await self.iot_service.update_equipment_status(
+                    equipment_id, "in_use", task_id
+                )
                 await self.iot_service.notify_operator(operator, dispatch)
             except Exception as e:
                 logger.warning(f"Could not update IoT service: {e}")
                 # Continue with dispatch even if IoT update fails
-            
+
             return dispatch
-            
+
         except Exception as e:
             logger.error(f"Failed to dispatch equipment {equipment_id}: {e}")
             return EquipmentDispatch(
@@ -693,19 +753,18 @@ class OperationsActionTools:
                 location="unknown",
                 status="error",
                 created_at=datetime.now(),
-                estimated_completion=datetime.now()
+                estimated_completion=datetime.now(),
             )
-    
+
     async def publish_kpis(
-        self,
-        metrics: Optional[KPIMetrics] = None
+        self, metrics: Optional[KPIMetrics] = None
     ) -> Dict[str, Any]:
         """
         Publish KPI metrics to Kafka for dashboard updates.
-        
+
         Args:
             metrics: Optional specific metrics to publish
-            
+
         Returns:
             Dict with publishing results
         """
@@ -713,85 +772,93 @@ class OperationsActionTools:
             if not metrics:
                 # Generate current metrics
                 metrics = await self._generate_current_kpis()
-            
+
             # Publish to Kafka
             kafka_result = await self._publish_to_kafka(metrics)
-            
+
             return {
                 "success": kafka_result,
                 "metrics_published": asdict(metrics),
                 "timestamp": datetime.now().isoformat(),
-                "topics": ["warehouse.throughput", "warehouse.sla", "warehouse.utilization"]
+                "topics": [
+                    "warehouse.throughput",
+                    "warehouse.sla",
+                    "warehouse.utilization",
+                ],
             }
-            
+
         except Exception as e:
             logger.error(f"Failed to publish KPIs: {e}")
             return {
                 "success": False,
                 "error": str(e),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
-    
+
     # Helper methods
-    async def _find_qualified_assignees(self, task_type: str, constraints: Dict[str, Any]) -> List[str]:
+    async def _find_qualified_assignees(
+        self, task_type: str, constraints: Dict[str, Any]
+    ) -> List[str]:
         """Find qualified assignees for a task."""
         # This would integrate with HR/attendance system
         return ["worker_001", "worker_002", "worker_003"]
-    
-    async def _apply_rebalancing_algorithm(self, workload: Dict, capacity: Dict, sla_rules: Dict) -> Dict:
+
+    async def _apply_rebalancing_algorithm(
+        self, workload: Dict, capacity: Dict, sla_rules: Dict
+    ) -> Dict:
         """Apply workload rebalancing algorithm."""
         # Simplified rebalancing logic
         return {
             "assignments": workload.get("assignments", []),
-            "sla_impact": {"improvement": 0.05}
+            "sla_impact": {"improvement": 0.05},
         }
-    
+
     def _calculate_workload_efficiency(self, workload: Dict) -> float:
         """Calculate workload efficiency score."""
         # Simplified efficiency calculation
         return 0.85
-    
-    async def _assign_pickers_for_wave(self, zones: List[str], strategy: str) -> List[str]:
+
+    async def _assign_pickers_for_wave(
+        self, zones: List[str], strategy: str
+    ) -> List[str]:
         """Assign pickers for a wave based on strategy."""
         # Simplified picker assignment
         return ["picker_001", "picker_002"]
-    
+
     async def _estimate_wave_duration(self, total_lines: int, picker_count: int) -> int:
         """Estimate wave duration in minutes."""
         # Simplified duration estimation
         return max(30, total_lines // max(1, picker_count) * 2)
-    
+
     async def _optimize_pick_routes(self, pick_wave: PickWave) -> Optional[Dict]:
         """Optimize pick routes for a wave."""
         # Simplified route optimization
         return {"optimized": True, "efficiency_gain": 0.15}
-    
+
     def _calculate_original_distance(self, tasks: List[Dict]) -> float:
         """Calculate original distance for tasks."""
         return len(tasks) * 10.0  # Simplified calculation
-    
+
     async def _apply_path_optimization(self, tasks: List[Dict]) -> Dict:
         """Apply path optimization algorithm."""
         # Simplified path optimization
-        return {
-            "route": tasks,
-            "total_distance": len(tasks) * 8.0,
-            "waypoints": []
-        }
-    
-    async def _find_optimal_dock_door(self, appointment: Dict, capacity: Dict) -> Optional[str]:
+        return {"route": tasks, "total_distance": len(tasks) * 8.0, "waypoints": []}
+
+    async def _find_optimal_dock_door(
+        self, appointment: Dict, capacity: Dict
+    ) -> Optional[str]:
         """Find optimal dock door for appointment."""
         # Simplified dock door selection
         for door, cap in capacity.items():
             if cap > 0:
                 return door
         return None
-    
+
     async def _find_available_operator(self, equipment_id: str) -> str:
         """Find available operator for equipment."""
         # Simplified operator assignment
         return "operator_001"
-    
+
     async def _generate_current_kpis(self) -> KPIMetrics:
         """Generate current KPI metrics."""
         return KPIMetrics(
@@ -800,17 +867,19 @@ class OperationsActionTools:
             sla_metrics={"on_time_delivery": 0.95, "pick_accuracy": 0.98},
             utilization={"equipment": 0.78, "labor": 0.82},
             productivity={"picks_per_hour": 15.3, "moves_per_hour": 8.7},
-            quality_metrics={"error_rate": 0.02, "rework_rate": 0.01}
+            quality_metrics={"error_rate": 0.02, "rework_rate": 0.01},
         )
-    
+
     async def _publish_to_kafka(self, metrics: KPIMetrics) -> bool:
         """Publish metrics to Kafka."""
         # Simplified Kafka publishing
         logger.info(f"Publishing KPIs to Kafka: {metrics.timestamp}")
         return True
 
+
 # Global action tools instance
 _action_tools: Optional[OperationsActionTools] = None
+
 
 async def get_operations_action_tools() -> OperationsActionTools:
     """Get or create the global operations action tools instance."""

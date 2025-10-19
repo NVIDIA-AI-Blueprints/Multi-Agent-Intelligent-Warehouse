@@ -7,11 +7,11 @@ from .document_models import *
 __all__ = [
     "DocumentUpload",
     "DocumentStatus",
-    "DocumentResponse", 
+    "DocumentResponse",
     "ExtractionResult",
     "QualityScore",
     "RoutingDecision",
     "DocumentSearchRequest",
     "DocumentSearchResponse",
-    "DocumentProcessingError"
+    "DocumentProcessingError",
 ]

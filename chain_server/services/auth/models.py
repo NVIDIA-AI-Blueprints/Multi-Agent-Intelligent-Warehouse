@@ -3,97 +3,122 @@ from typing import Optional, List
 from enum import Enum
 from datetime import datetime
 
+
 class UserRole(str, Enum):
     """User roles in the system."""
+
     ADMIN = "admin"
     MANAGER = "manager"
     SUPERVISOR = "supervisor"
     OPERATOR = "operator"
     VIEWER = "viewer"
 
+
 class UserStatus(str, Enum):
     """User account status."""
+
     ACTIVE = "active"
     INACTIVE = "inactive"
     SUSPENDED = "suspended"
     PENDING = "pending"
 
+
 class UserBase(BaseModel):
     """Base user model."""
+
     username: str
     email: EmailStr
     full_name: str
     role: UserRole
     status: UserStatus = UserStatus.ACTIVE
 
+
 class UserCreate(UserBase):
     """User creation model."""
+
     password: str
+
 
 class UserUpdate(BaseModel):
     """User update model."""
+
     email: Optional[EmailStr] = None
     full_name: Optional[str] = None
     role: Optional[UserRole] = None
     status: Optional[UserStatus] = None
 
+
 class UserInDB(UserBase):
     """User model for database storage."""
+
     id: int
     hashed_password: str
     created_at: datetime
     updated_at: datetime
     last_login: Optional[datetime] = None
 
+
 class User(UserBase):
     """User model for API responses."""
+
     id: int
     created_at: datetime
     updated_at: datetime
     last_login: Optional[datetime] = None
 
+
 class UserLogin(BaseModel):
     """User login model."""
+
     username: str
     password: str
 
+
 class Token(BaseModel):
     """Token response model."""
+
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
     expires_in: int
 
+
 class TokenRefresh(BaseModel):
     """Token refresh model."""
+
     refresh_token: str
+
 
 class PasswordChange(BaseModel):
     """Password change model."""
+
     current_password: str
     new_password: str
 
+
 class Permission(str, Enum):
     """System permissions."""
+
     # Inventory permissions
     INVENTORY_READ = "inventory:read"
     INVENTORY_WRITE = "inventory:write"
     INVENTORY_DELETE = "inventory:delete"
-    
+
     # Operations permissions
     OPERATIONS_READ = "operations:read"
     OPERATIONS_WRITE = "operations:write"
     OPERATIONS_ASSIGN = "operations:assign"
-    
+
     # Safety permissions
     SAFETY_READ = "safety:read"
     SAFETY_WRITE = "safety:write"
     SAFETY_APPROVE = "safety:approve"
-    
+
     # System permissions
     SYSTEM_ADMIN = "system:admin"
     USER_MANAGE = "user:manage"
     REPORTS_VIEW = "reports:view"
+
 
 # Role-based permissions mapping
 ROLE_PERMISSIONS = {
@@ -142,6 +167,7 @@ ROLE_PERMISSIONS = {
         Permission.SAFETY_READ,
     ],
 }
+
 
 def get_user_permissions(role: UserRole) -> List[Permission]:
     """Get permissions for a user role."""

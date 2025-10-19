@@ -26,8 +26,10 @@ from chain_server.services.mcp.base import MCPManager
 
 logger = logging.getLogger(__name__)
 
+
 class MCPWarehouseState(TypedDict):
     """Enhanced state management for MCP-enabled warehouse assistant workflow."""
+
     messages: Annotated[List[BaseMessage], "Chat messages"]
     user_intent: Optional[str]
     routing_decision: Optional[str]
@@ -39,139 +41,357 @@ class MCPWarehouseState(TypedDict):
     tool_execution_plan: Optional[List[Dict[str, Any]]]  # Planned tool executions
     available_tools: Optional[List[Dict[str, Any]]]  # Available MCP tools
 
+
 class MCPIntentClassifier:
     """MCP-enhanced intent classifier with dynamic tool discovery."""
-    
+
     def __init__(self, tool_discovery: ToolDiscoveryService):
         self.tool_discovery = tool_discovery
         self.tool_routing = None  # Will be set by MCP planner graph
-        
+
     EQUIPMENT_KEYWORDS = [
-        "equipment", "forklift", "conveyor", "scanner", "amr", "agv", "charger", 
-        "assignment", "utilization", "maintenance", "availability", "telemetry",
-        "battery", "truck", "lane", "pm", "loto", "lockout", "tagout",
-        "sku", "stock", "inventory", "quantity", "available", "atp", "on_hand"
+        "equipment",
+        "forklift",
+        "conveyor",
+        "scanner",
+        "amr",
+        "agv",
+        "charger",
+        "assignment",
+        "utilization",
+        "maintenance",
+        "availability",
+        "telemetry",
+        "battery",
+        "truck",
+        "lane",
+        "pm",
+        "loto",
+        "lockout",
+        "tagout",
+        "sku",
+        "stock",
+        "inventory",
+        "quantity",
+        "available",
+        "atp",
+        "on_hand",
     ]
-    
+
     OPERATIONS_KEYWORDS = [
-        "shift", "task", "tasks", "workforce", "pick", "pack", "putaway", 
-        "schedule", "assignment", "kpi", "performance", "equipment", "main",
-        "today", "work", "job", "operation", "operations", "worker", "workers",
-        "team", "team members", "staff", "employee", "employees", "active workers",
-        "how many", "roles", "team members", "wave", "waves", "order", "orders",
-        "zone", "zones", "line", "lines", "create", "generating", "pick wave",
-        "pick waves", "order management", "zone a", "zone b", "zone c"
+        "shift",
+        "task",
+        "tasks",
+        "workforce",
+        "pick",
+        "pack",
+        "putaway",
+        "schedule",
+        "assignment",
+        "kpi",
+        "performance",
+        "equipment",
+        "main",
+        "today",
+        "work",
+        "job",
+        "operation",
+        "operations",
+        "worker",
+        "workers",
+        "team",
+        "team members",
+        "staff",
+        "employee",
+        "employees",
+        "active workers",
+        "how many",
+        "roles",
+        "team members",
+        "wave",
+        "waves",
+        "order",
+        "orders",
+        "zone",
+        "zones",
+        "line",
+        "lines",
+        "create",
+        "generating",
+        "pick wave",
+        "pick waves",
+        "order management",
+        "zone a",
+        "zone b",
+        "zone c",
     ]
-    
+
     SAFETY_KEYWORDS = [
-        "safety", "incident", "compliance", "policy", "checklist", 
-        "hazard", "accident", "protocol", "training", "audit",
-        "over-temp", "overtemp", "temperature", "event", "detected",
-        "alert", "warning", "emergency", "malfunction", "failure",
-        "ppe", "protective", "helmet", "gloves", "boots", "safety harness",
-        "procedures", "guidelines", "standards", "regulations",
-        "evacuation", "fire", "chemical", "lockout", "tagout", "loto",
-        "injury", "report", "investigation", "corrective", "action",
-        "issues", "problem", "concern", "violation", "breach"
+        "safety",
+        "incident",
+        "compliance",
+        "policy",
+        "checklist",
+        "hazard",
+        "accident",
+        "protocol",
+        "training",
+        "audit",
+        "over-temp",
+        "overtemp",
+        "temperature",
+        "event",
+        "detected",
+        "alert",
+        "warning",
+        "emergency",
+        "malfunction",
+        "failure",
+        "ppe",
+        "protective",
+        "helmet",
+        "gloves",
+        "boots",
+        "safety harness",
+        "procedures",
+        "guidelines",
+        "standards",
+        "regulations",
+        "evacuation",
+        "fire",
+        "chemical",
+        "lockout",
+        "tagout",
+        "loto",
+        "injury",
+        "report",
+        "investigation",
+        "corrective",
+        "action",
+        "issues",
+        "problem",
+        "concern",
+        "violation",
+        "breach",
     ]
-    
+
     DOCUMENT_KEYWORDS = [
-        "document", "upload", "scan", "extract", "process", "pdf", "image", 
-        "invoice", "receipt", "bol", "bill of lading", "purchase order", "po",
-        "quality", "validation", "approve", "review", "ocr", "text extraction",
-        "file", "photo", "picture", "documentation", "paperwork", "neural",
-        "nemo", "retriever", "parse", "vision", "multimodal", "document processing",
-        "document analytics", "document search", "document status"
+        "document",
+        "upload",
+        "scan",
+        "extract",
+        "process",
+        "pdf",
+        "image",
+        "invoice",
+        "receipt",
+        "bol",
+        "bill of lading",
+        "purchase order",
+        "po",
+        "quality",
+        "validation",
+        "approve",
+        "review",
+        "ocr",
+        "text extraction",
+        "file",
+        "photo",
+        "picture",
+        "documentation",
+        "paperwork",
+        "neural",
+        "nemo",
+        "retriever",
+        "parse",
+        "vision",
+        "multimodal",
+        "document processing",
+        "document analytics",
+        "document search",
+        "document status",
     ]
-    
+
     async def classify_intent_with_mcp(self, message: str) -> str:
         """Classify user intent using MCP tool discovery for enhanced accuracy."""
         try:
             # First, use traditional keyword-based classification
             base_intent = self.classify_intent(message)
-            
+
             # If we have MCP tools available, use them to enhance classification
             if self.tool_discovery and len(self.tool_discovery.discovered_tools) > 0:
                 # Search for tools that might help with intent classification
                 relevant_tools = await self.tool_discovery.search_tools(message)
-                
+
                 # If we found relevant tools, use them to refine the intent
                 if relevant_tools:
                     # Use tool categories to refine intent
                     for tool in relevant_tools[:3]:  # Check top 3 most relevant tools
-                        if "equipment" in tool.name.lower() or "equipment" in tool.description.lower():
+                        if (
+                            "equipment" in tool.name.lower()
+                            or "equipment" in tool.description.lower()
+                        ):
                             if base_intent in ["general", "operations"]:
                                 return "equipment"
-                        elif "operations" in tool.name.lower() or "workforce" in tool.description.lower():
+                        elif (
+                            "operations" in tool.name.lower()
+                            or "workforce" in tool.description.lower()
+                        ):
                             if base_intent in ["general", "equipment"]:
                                 return "operations"
-                        elif "safety" in tool.name.lower() or "incident" in tool.description.lower():
+                        elif (
+                            "safety" in tool.name.lower()
+                            or "incident" in tool.description.lower()
+                        ):
                             if base_intent in ["general", "equipment", "operations"]:
                                 return "safety"
-            
+
             return base_intent
-            
+
         except Exception as e:
             logger.error(f"Error in MCP intent classification: {e}")
             return self.classify_intent(message)
-    
+
     @classmethod
     def classify_intent(cls, message: str) -> str:
         """Enhanced intent classification with better logic and ambiguity handling."""
         message_lower = message.lower()
-        
+
         # Check for specific safety-related queries first (highest priority)
-        safety_score = sum(1 for keyword in cls.SAFETY_KEYWORDS if keyword in message_lower)
+        safety_score = sum(
+            1 for keyword in cls.SAFETY_KEYWORDS if keyword in message_lower
+        )
         if safety_score > 0:
             # Only route to safety if it's clearly safety-related, not general equipment
-            safety_context_indicators = ["procedure", "policy", "incident", "compliance", "safety", "ppe", "hazard", "report"]
-            if any(indicator in message_lower for indicator in safety_context_indicators):
+            safety_context_indicators = [
+                "procedure",
+                "policy",
+                "incident",
+                "compliance",
+                "safety",
+                "ppe",
+                "hazard",
+                "report",
+            ]
+            if any(
+                indicator in message_lower for indicator in safety_context_indicators
+            ):
                 return "safety"
-        
+
         # Check for document-related keywords (but only if it's clearly document-related)
-        document_indicators = ["document", "upload", "scan", "extract", "pdf", "image", "invoice", "receipt", "bol", "bill of lading", "purchase order", "po", "quality", "validation", "approve", "review", "ocr", "text extraction", "file", "photo", "picture", "documentation", "paperwork", "neural", "nemo", "retriever", "parse", "vision", "multimodal", "document processing", "document analytics", "document search", "document status"]
+        document_indicators = [
+            "document",
+            "upload",
+            "scan",
+            "extract",
+            "pdf",
+            "image",
+            "invoice",
+            "receipt",
+            "bol",
+            "bill of lading",
+            "purchase order",
+            "po",
+            "quality",
+            "validation",
+            "approve",
+            "review",
+            "ocr",
+            "text extraction",
+            "file",
+            "photo",
+            "picture",
+            "documentation",
+            "paperwork",
+            "neural",
+            "nemo",
+            "retriever",
+            "parse",
+            "vision",
+            "multimodal",
+            "document processing",
+            "document analytics",
+            "document search",
+            "document status",
+        ]
         if any(keyword in message_lower for keyword in document_indicators):
             return "document"
-        
+
         # Check for equipment-specific queries (availability, status, assignment)
         # But only if it's not a workflow operation
-        equipment_indicators = ["available", "status", "utilization", "maintenance", "telemetry"]
-        equipment_objects = ["forklift", "scanner", "conveyor", "truck", "amr", "agv", "equipment"]
-        
+        equipment_indicators = [
+            "available",
+            "status",
+            "utilization",
+            "maintenance",
+            "telemetry",
+        ]
+        equipment_objects = [
+            "forklift",
+            "scanner",
+            "conveyor",
+            "truck",
+            "amr",
+            "agv",
+            "equipment",
+        ]
+
         # Only route to equipment if it's a pure equipment query (not workflow-related)
         workflow_terms = ["wave", "order", "create", "pick", "pack", "task", "workflow"]
         is_workflow_query = any(term in message_lower for term in workflow_terms)
-        
-        if not is_workflow_query and any(indicator in message_lower for indicator in equipment_indicators) and \
-           any(obj in message_lower for obj in equipment_objects):
+
+        if (
+            not is_workflow_query
+            and any(indicator in message_lower for indicator in equipment_indicators)
+            and any(obj in message_lower for obj in equipment_objects)
+        ):
             return "equipment"
-        
+
         # Check for operations-related keywords (workflow, tasks, management)
-        operations_score = sum(1 for keyword in cls.OPERATIONS_KEYWORDS if keyword in message_lower)
+        operations_score = sum(
+            1 for keyword in cls.OPERATIONS_KEYWORDS if keyword in message_lower
+        )
         if operations_score > 0:
             # Prioritize operations for workflow-related terms
-            workflow_terms = ["task", "wave", "order", "create", "pick", "pack", "management", "workflow", "dispatch"]
+            workflow_terms = [
+                "task",
+                "wave",
+                "order",
+                "create",
+                "pick",
+                "pack",
+                "management",
+                "workflow",
+                "dispatch",
+            ]
             if any(term in message_lower for term in workflow_terms):
                 return "operations"
-        
+
         # Check for equipment-related keywords (fallback)
-        equipment_score = sum(1 for keyword in cls.EQUIPMENT_KEYWORDS if keyword in message_lower)
+        equipment_score = sum(
+            1 for keyword in cls.EQUIPMENT_KEYWORDS if keyword in message_lower
+        )
         if equipment_score > 0:
             return "equipment"
-        
+
         # Handle ambiguous queries
         ambiguous_patterns = [
-            "inventory", "management", "help", "assistance", "support"
+            "inventory",
+            "management",
+            "help",
+            "assistance",
+            "support",
         ]
         if any(pattern in message_lower for pattern in ambiguous_patterns):
             return "ambiguous"
-        
+
         # Default to equipment for general queries
         return "equipment"
 
+
 class MCPPlannerGraph:
     """MCP-enabled planner graph for warehouse operations."""
-    
+
     def __init__(self):
         self.tool_discovery: Optional[ToolDiscoveryService] = None
         self.tool_binding: Optional[ToolBindingService] = None
@@ -192,17 +412,17 @@ class MCPPlannerGraph:
             self.tool_routing = None
             self.tool_validation = ToolValidationService(self.tool_discovery)
             self.mcp_manager = MCPManager()
-            
+
             # Start tool discovery
             await self.tool_discovery.start_discovery()
-            
+
             # Initialize intent classifier with MCP
             self.intent_classifier = MCPIntentClassifier(self.tool_discovery)
             self.intent_classifier.tool_routing = self.tool_routing
-            
+
             # Create the graph
             self.graph = self._create_graph()
-            
+
             self.initialized = True
             logger.info("MCP Planner Graph initialized successfully")
         except Exception as e:
@@ -213,7 +433,7 @@ class MCPPlannerGraph:
         """Create the MCP-enabled planner graph."""
         # Initialize the state graph
         workflow = StateGraph(MCPWarehouseState)
-        
+
         # Add nodes
         workflow.add_node("route_intent", self._mcp_route_intent)
         workflow.add_node("equipment", self._mcp_equipment_agent)
@@ -223,24 +443,24 @@ class MCPPlannerGraph:
         workflow.add_node("general", self._mcp_general_agent)
         workflow.add_node("ambiguous", self._handle_ambiguous_query)
         workflow.add_node("synthesize", self._mcp_synthesize_response)
-        
+
         # Set entry point
         workflow.set_entry_point("route_intent")
-        
+
         # Add conditional edges for routing
         workflow.add_conditional_edges(
             "route_intent",
             self._route_to_agent,
             {
                 "equipment": "equipment",
-                "operations": "operations", 
+                "operations": "operations",
                 "safety": "safety",
                 "document": "document",
                 "general": "general",
-                "ambiguous": "ambiguous"
-            }
+                "ambiguous": "ambiguous",
+            },
         )
-        
+
         # Add edges from agents to synthesis
         workflow.add_edge("equipment", "synthesize")
         workflow.add_edge("operations", "synthesize")
@@ -248,10 +468,10 @@ class MCPPlannerGraph:
         workflow.add_edge("document", "synthesize")
         workflow.add_edge("general", "synthesize")
         workflow.add_edge("ambiguous", "synthesize")
-        
+
         # Add edge from synthesis to end
         workflow.add_edge("synthesize", END)
-        
+
         return workflow.compile()
 
     async def _mcp_route_intent(self, state: MCPWarehouseState) -> MCPWarehouseState:
@@ -262,18 +482,18 @@ class MCPPlannerGraph:
                 state["user_intent"] = "general"
                 state["routing_decision"] = "general"
                 return state
-                
+
             latest_message = state["messages"][-1]
             if isinstance(latest_message, HumanMessage):
                 message_text = latest_message.content
             else:
                 message_text = str(latest_message.content)
-            
+
             # Use MCP-enhanced intent classification
             intent = await self.intent_classifier.classify_intent_with_mcp(message_text)
             state["user_intent"] = intent
             state["routing_decision"] = intent
-            
+
             # Discover available tools for this query
             if self.tool_discovery:
                 available_tools = await self.tool_discovery.get_available_tools()
@@ -282,55 +502,59 @@ class MCPPlannerGraph:
                         "tool_id": tool.tool_id,
                         "name": tool.name,
                         "description": tool.description,
-                        "category": tool.category.value
+                        "category": tool.category.value,
                     }
                     for tool in available_tools
                 ]
-            
-            logger.info(f"MCP Intent classified as: {intent} for message: {message_text[:100]}...")
-            
+
+            logger.info(
+                f"MCP Intent classified as: {intent} for message: {message_text[:100]}..."
+            )
+
             # Handle ambiguous queries with clarifying questions
             if intent == "ambiguous":
                 return await self._handle_ambiguous_query(state)
-            
+
         except Exception as e:
             logger.error(f"Error in MCP intent routing: {e}")
             state["user_intent"] = "general"
             state["routing_decision"] = "general"
-        
+
         return state
 
-    async def _handle_ambiguous_query(self, state: MCPWarehouseState) -> MCPWarehouseState:
+    async def _handle_ambiguous_query(
+        self, state: MCPWarehouseState
+    ) -> MCPWarehouseState:
         """Handle ambiguous queries with clarifying questions."""
         try:
             if not state["messages"]:
                 return state
-                
+
             latest_message = state["messages"][-1]
             if isinstance(latest_message, HumanMessage):
                 message_text = latest_message.content
             else:
                 message_text = str(latest_message.content)
-            
+
             message_lower = message_text.lower()
-            
+
             # Define clarifying questions based on ambiguous patterns
             clarifying_responses = {
                 "inventory": {
                     "question": "I can help with inventory management. Are you looking for:",
                     "options": [
                         "Equipment inventory and status",
-                        "Product inventory management", 
-                        "Inventory tracking and reporting"
-                    ]
+                        "Product inventory management",
+                        "Inventory tracking and reporting",
+                    ],
                 },
                 "management": {
                     "question": "What type of management do you need help with?",
                     "options": [
                         "Equipment management",
                         "Task management",
-                        "Safety management"
-                    ]
+                        "Safety management",
+                    ],
                 },
                 "help": {
                     "question": "I'm here to help! What would you like to do?",
@@ -338,38 +562,38 @@ class MCPPlannerGraph:
                         "Check equipment status",
                         "Create a task",
                         "View safety procedures",
-                        "Upload a document"
-                    ]
+                        "Upload a document",
+                    ],
                 },
                 "assistance": {
                     "question": "I can assist you with warehouse operations. What do you need?",
                     "options": [
                         "Equipment assistance",
-                        "Task assistance", 
+                        "Task assistance",
                         "Safety assistance",
-                        "Document assistance"
-                    ]
-                }
+                        "Document assistance",
+                    ],
+                },
             }
-            
+
             # Find matching pattern
             for pattern, response in clarifying_responses.items():
                 if pattern in message_lower:
                     # Create clarifying question response
                     clarifying_message = AIMessage(content=response["question"])
                     state["messages"].append(clarifying_message)
-                    
+
                     # Store clarifying context
                     state["context"]["clarifying"] = {
                         "text": response["question"],
                         "options": response["options"],
-                        "original_query": message_text
+                        "original_query": message_text,
                     }
-                    
+
                     state["agent_responses"]["clarifying"] = response["question"]
                     state["final_response"] = response["question"]
                     return state
-            
+
             # Default clarifying question
             default_response = {
                 "question": "I can help with warehouse operations. What would you like to do?",
@@ -377,58 +601,62 @@ class MCPPlannerGraph:
                     "Check equipment status",
                     "Create a task",
                     "View safety procedures",
-                    "Upload a document"
-                ]
+                    "Upload a document",
+                ],
             }
-            
+
             clarifying_message = AIMessage(content=default_response["question"])
             state["messages"].append(clarifying_message)
-            
+
             state["context"]["clarifying"] = {
                 "text": default_response["question"],
                 "options": default_response["options"],
-                "original_query": message_text
+                "original_query": message_text,
             }
-            
+
             state["agent_responses"]["clarifying"] = default_response["question"]
             state["final_response"] = default_response["question"]
-            
+
         except Exception as e:
             logger.error(f"Error handling ambiguous query: {e}")
-            state["final_response"] = "I'm not sure how to help with that. Could you please be more specific?"
-        
+            state["final_response"] = (
+                "I'm not sure how to help with that. Could you please be more specific?"
+            )
+
         return state
 
     async def _mcp_equipment_agent(self, state: MCPWarehouseState) -> MCPWarehouseState:
         """Handle equipment queries using MCP-enabled Equipment Agent."""
         try:
-            from chain_server.agents.inventory.mcp_equipment_agent import get_mcp_equipment_agent
-            
+            from chain_server.agents.inventory.mcp_equipment_agent import (
+                get_mcp_equipment_agent,
+            )
+
             # Get the latest user message
             if not state["messages"]:
                 state["agent_responses"]["equipment"] = "No message to process"
                 return state
-                
+
             latest_message = state["messages"][-1]
             if isinstance(latest_message, HumanMessage):
                 message_text = latest_message.content
             else:
                 message_text = str(latest_message.content)
-            
+
             # Get session ID from context
             session_id = state.get("session_id", "default")
-            
+
             # Get MCP equipment agent
             mcp_equipment_agent = await get_mcp_equipment_agent()
-            
+
             # Process with MCP equipment agent
             response = await mcp_equipment_agent.process_query(
                 query=message_text,
                 session_id=session_id,
                 context=state.get("context", {}),
-                mcp_results=state.get("mcp_results")
+                mcp_results=state.get("mcp_results"),
             )
-            
+
             # Store the response
             state["agent_responses"]["equipment"] = {
                 "natural_language": response.natural_language,
@@ -438,11 +666,13 @@ class MCPPlannerGraph:
                 "response_type": response.response_type,
                 "mcp_tools_used": response.mcp_tools_used or [],
                 "tool_execution_results": response.tool_execution_results or {},
-                "actions_taken": response.actions_taken or []
+                "actions_taken": response.actions_taken or [],
             }
-            
-            logger.info(f"MCP Equipment agent processed request with confidence: {response.confidence}")
-            
+
+            logger.info(
+                f"MCP Equipment agent processed request with confidence: {response.confidence}"
+            )
+
         except Exception as e:
             logger.error(f"Error in MCP equipment agent: {e}")
             state["agent_responses"]["equipment"] = {
@@ -452,46 +682,52 @@ class MCPPlannerGraph:
                 "confidence": 0.0,
                 "response_type": "error",
                 "mcp_tools_used": [],
-                "tool_execution_results": {}
+                "tool_execution_results": {},
             }
-        
+
         return state
 
-    async def _mcp_operations_agent(self, state: MCPWarehouseState) -> MCPWarehouseState:
+    async def _mcp_operations_agent(
+        self, state: MCPWarehouseState
+    ) -> MCPWarehouseState:
         """Handle operations queries using MCP-enabled Operations Agent."""
         try:
-            from chain_server.agents.operations.mcp_operations_agent import get_mcp_operations_agent
-            
+            from chain_server.agents.operations.mcp_operations_agent import (
+                get_mcp_operations_agent,
+            )
+
             # Get the latest user message
             if not state["messages"]:
                 state["agent_responses"]["operations"] = "No message to process"
                 return state
-                
+
             latest_message = state["messages"][-1]
             if isinstance(latest_message, HumanMessage):
                 message_text = latest_message.content
             else:
                 message_text = str(latest_message.content)
-            
+
             # Get session ID from context
             session_id = state.get("session_id", "default")
-            
+
             # Get MCP operations agent
             mcp_operations_agent = await get_mcp_operations_agent()
-            
+
             # Process with MCP operations agent
             response = await mcp_operations_agent.process_query(
                 query=message_text,
                 session_id=session_id,
                 context=state.get("context", {}),
-                mcp_results=state.get("mcp_results")
+                mcp_results=state.get("mcp_results"),
             )
-            
+
             # Store the response
             state["agent_responses"]["operations"] = response
-            
-            logger.info(f"MCP Operations agent processed request with confidence: {response.confidence}")
-            
+
+            logger.info(
+                f"MCP Operations agent processed request with confidence: {response.confidence}"
+            )
+
         except Exception as e:
             logger.error(f"Error in MCP operations agent: {e}")
             state["agent_responses"]["operations"] = {
@@ -501,46 +737,48 @@ class MCPPlannerGraph:
                 "confidence": 0.0,
                 "response_type": "error",
                 "mcp_tools_used": [],
-                "tool_execution_results": {}
+                "tool_execution_results": {},
             }
-        
+
         return state
 
     async def _mcp_safety_agent(self, state: MCPWarehouseState) -> MCPWarehouseState:
         """Handle safety queries using MCP-enabled Safety Agent."""
         try:
             from chain_server.agents.safety.mcp_safety_agent import get_mcp_safety_agent
-            
+
             # Get the latest user message
             if not state["messages"]:
                 state["agent_responses"]["safety"] = "No message to process"
                 return state
-                
+
             latest_message = state["messages"][-1]
             if isinstance(latest_message, HumanMessage):
                 message_text = latest_message.content
             else:
                 message_text = str(latest_message.content)
-            
+
             # Get session ID from context
             session_id = state.get("session_id", "default")
-            
+
             # Get MCP safety agent
             mcp_safety_agent = await get_mcp_safety_agent()
-            
+
             # Process with MCP safety agent
             response = await mcp_safety_agent.process_query(
                 query=message_text,
                 session_id=session_id,
                 context=state.get("context", {}),
-                mcp_results=state.get("mcp_results")
+                mcp_results=state.get("mcp_results"),
             )
-            
+
             # Store the response
             state["agent_responses"]["safety"] = response
-            
-            logger.info(f"MCP Safety agent processed request with confidence: {response.confidence}")
-            
+
+            logger.info(
+                f"MCP Safety agent processed request with confidence: {response.confidence}"
+            )
+
         except Exception as e:
             logger.error(f"Error in MCP safety agent: {e}")
             state["agent_responses"]["safety"] = {
@@ -550,9 +788,9 @@ class MCPPlannerGraph:
                 "confidence": 0.0,
                 "response_type": "error",
                 "mcp_tools_used": [],
-                "tool_execution_results": {}
+                "tool_execution_results": {},
             }
-        
+
         return state
 
     async def _mcp_document_agent(self, state: MCPWarehouseState) -> MCPWarehouseState:
@@ -562,45 +800,53 @@ class MCPPlannerGraph:
             if not state["messages"]:
                 state["agent_responses"]["document"] = "No message to process"
                 return state
-                
+
             latest_message = state["messages"][-1]
             if isinstance(latest_message, HumanMessage):
                 message_text = latest_message.content
             else:
                 message_text = str(latest_message.content)
-            
+
             # Use MCP document agent
             try:
-                from chain_server.agents.document.mcp_document_agent import get_mcp_document_agent
-                
+                from chain_server.agents.document.mcp_document_agent import (
+                    get_mcp_document_agent,
+                )
+
                 # Get document agent
                 document_agent = await get_mcp_document_agent()
-                
+
                 # Process query
                 response = await document_agent.process_query(
                     query=message_text,
                     session_id=state.get("session_id", "default"),
                     context=state.get("context", {}),
-                    mcp_results=state.get("mcp_results")
+                    mcp_results=state.get("mcp_results"),
                 )
-                
+
                 # Convert response to string
-                if hasattr(response, 'natural_language'):
+                if hasattr(response, "natural_language"):
                     response_text = response.natural_language
                 else:
                     response_text = str(response)
-                
-                state["agent_responses"]["document"] = f"[MCP DOCUMENT AGENT] {response_text}"
+
+                state["agent_responses"][
+                    "document"
+                ] = f"[MCP DOCUMENT AGENT] {response_text}"
                 logger.info("MCP Document agent processed request")
-                
+
             except Exception as e:
                 logger.error(f"Error calling MCP document agent: {e}")
-                state["agent_responses"]["document"] = f"[MCP DOCUMENT AGENT] Error processing document request: {str(e)}"
-            
+                state["agent_responses"][
+                    "document"
+                ] = f"[MCP DOCUMENT AGENT] Error processing document request: {str(e)}"
+
         except Exception as e:
             logger.error(f"Error in MCP document agent: {e}")
-            state["agent_responses"]["document"] = f"Error processing document request: {str(e)}"
-        
+            state["agent_responses"][
+                "document"
+            ] = f"Error processing document request: {str(e)}"
+
         return state
 
     async def _mcp_general_agent(self, state: MCPWarehouseState) -> MCPWarehouseState:
@@ -610,43 +856,46 @@ class MCPPlannerGraph:
             if not state["messages"]:
                 state["agent_responses"]["general"] = "No message to process"
                 return state
-                
+
             latest_message = state["messages"][-1]
             if isinstance(latest_message, HumanMessage):
                 message_text = latest_message.content
             else:
                 message_text = str(latest_message.content)
-            
+
             # Use MCP tools to help with general queries
             if self.tool_discovery and len(self.tool_discovery.discovered_tools) > 0:
                 # Search for relevant tools
                 relevant_tools = await self.tool_discovery.search_tools(message_text)
-                
+
                 if relevant_tools:
                     # Use the most relevant tool
                     best_tool = relevant_tools[0]
                     try:
                         # Execute the tool
                         result = await self.tool_discovery.execute_tool(
-                            best_tool.tool_id, 
-                            {"query": message_text}
+                            best_tool.tool_id, {"query": message_text}
                         )
-                        
+
                         response = f"[MCP GENERAL AGENT] Found relevant tool '{best_tool.name}' and executed it. Result: {str(result)[:200]}..."
                     except Exception as e:
                         response = f"[MCP GENERAL AGENT] Found relevant tool '{best_tool.name}' but execution failed: {str(e)}"
                 else:
-                    response = "[MCP GENERAL AGENT] No relevant tools found for this query."
+                    response = (
+                        "[MCP GENERAL AGENT] No relevant tools found for this query."
+                    )
             else:
                 response = "[MCP GENERAL AGENT] No MCP tools available. Processing general query... (stub implementation)"
-            
+
             state["agent_responses"]["general"] = response
             logger.info("MCP General agent processed request")
-            
+
         except Exception as e:
             logger.error(f"Error in MCP general agent: {e}")
-            state["agent_responses"]["general"] = f"Error processing general request: {str(e)}"
-        
+            state["agent_responses"][
+                "general"
+            ] = f"Error processing general request: {str(e)}"
+
         return state
 
     def _mcp_synthesize_response(self, state: MCPWarehouseState) -> MCPWarehouseState:
@@ -654,11 +903,11 @@ class MCPPlannerGraph:
         try:
             routing_decision = state.get("routing_decision", "general")
             agent_responses = state.get("agent_responses", {})
-            
+
             # Get the response from the appropriate agent
             if routing_decision in agent_responses:
                 agent_response = agent_responses[routing_decision]
-                
+
                 # Handle MCP response format
                 if hasattr(agent_response, "natural_language"):
                     # Convert dataclass to dict
@@ -667,47 +916,63 @@ class MCPPlannerGraph:
                     else:
                         # Use asdict for dataclasses
                         from dataclasses import asdict
+
                         agent_response_dict = asdict(agent_response)
-                    
+
                     final_response = agent_response_dict["natural_language"]
                     # Store structured data in context for API response
                     state["context"]["structured_response"] = agent_response_dict
-                    
+
                     # Add MCP tool information to context
                     if "mcp_tools_used" in agent_response_dict:
-                        state["context"]["mcp_tools_used"] = agent_response_dict["mcp_tools_used"]
+                        state["context"]["mcp_tools_used"] = agent_response_dict[
+                            "mcp_tools_used"
+                        ]
                     if "tool_execution_results" in agent_response_dict:
-                        state["context"]["tool_execution_results"] = agent_response_dict["tool_execution_results"]
-                    
-                elif isinstance(agent_response, dict) and "natural_language" in agent_response:
+                        state["context"]["tool_execution_results"] = (
+                            agent_response_dict["tool_execution_results"]
+                        )
+
+                elif (
+                    isinstance(agent_response, dict)
+                    and "natural_language" in agent_response
+                ):
                     final_response = agent_response["natural_language"]
                     # Store structured data in context for API response
                     state["context"]["structured_response"] = agent_response
-                    
+
                     # Add MCP tool information to context
                     if "mcp_tools_used" in agent_response:
-                        state["context"]["mcp_tools_used"] = agent_response["mcp_tools_used"]
+                        state["context"]["mcp_tools_used"] = agent_response[
+                            "mcp_tools_used"
+                        ]
                     if "tool_execution_results" in agent_response:
-                        state["context"]["tool_execution_results"] = agent_response["tool_execution_results"]
+                        state["context"]["tool_execution_results"] = agent_response[
+                            "tool_execution_results"
+                        ]
                 else:
                     # Handle legacy string response format
                     final_response = str(agent_response)
             else:
                 final_response = "I'm sorry, I couldn't process your request. Please try rephrasing your question."
-            
+
             state["final_response"] = final_response
-            
+
             # Add AI message to conversation
             if state["messages"]:
                 ai_message = AIMessage(content=final_response)
                 state["messages"].append(ai_message)
-            
-            logger.info(f"MCP Response synthesized for routing decision: {routing_decision}")
-            
+
+            logger.info(
+                f"MCP Response synthesized for routing decision: {routing_decision}"
+            )
+
         except Exception as e:
             logger.error(f"Error synthesizing MCP response: {e}")
-            state["final_response"] = "I encountered an error processing your request. Please try again."
-        
+            state["final_response"] = (
+                "I encountered an error processing your request. Please try again."
+            )
+
         return state
 
     def _route_to_agent(self, state: MCPWarehouseState) -> str:
@@ -716,19 +981,16 @@ class MCPPlannerGraph:
         return routing_decision
 
     async def process_warehouse_query(
-        self,
-        message: str, 
-        session_id: str = "default",
-        context: Optional[Dict] = None
+        self, message: str, session_id: str = "default", context: Optional[Dict] = None
     ) -> Dict[str, any]:
         """
         Process a warehouse query through the MCP-enabled planner graph.
-        
+
         Args:
             message: User's message/query
             session_id: Session identifier for context
             context: Additional context for the query
-            
+
         Returns:
             Dictionary containing the response and metadata
         """
@@ -736,7 +998,7 @@ class MCPPlannerGraph:
             # Initialize if needed
             if not self.initialized:
                 await self.initialize()
-            
+
             # Initialize state
             initial_state = MCPWarehouseState(
                 messages=[HumanMessage(content=message)],
@@ -748,17 +1010,16 @@ class MCPPlannerGraph:
                 session_id=session_id,
                 mcp_results=None,
                 tool_execution_plan=None,
-                available_tools=None
+                available_tools=None,
             )
-            
+
             # Run the graph asynchronously
             result = await self.graph.ainvoke(initial_state)
-            
+
             # Ensure structured response is properly included
             context = result.get("context", {})
             structured_response = context.get("structured_response", {})
-            
-            
+
             return {
                 "response": result.get("final_response", "No response generated"),
                 "intent": result.get("user_intent", "unknown"),
@@ -768,9 +1029,9 @@ class MCPPlannerGraph:
                 "structured_response": structured_response,  # Explicitly include structured response
                 "mcp_tools_used": context.get("mcp_tools_used", []),
                 "tool_execution_results": context.get("tool_execution_results", {}),
-                "available_tools": result.get("available_tools", [])
+                "available_tools": result.get("available_tools", []),
             }
-            
+
         except Exception as e:
             logger.error(f"Error processing MCP warehouse query: {e}")
             return {
@@ -780,11 +1041,13 @@ class MCPPlannerGraph:
                 "session_id": session_id,
                 "context": {},
                 "mcp_tools_used": [],
-                "available_tools": []
+                "available_tools": [],
             }
+
 
 # Global MCP planner graph instance
 _mcp_planner_graph = None
+
 
 async def get_mcp_planner_graph() -> MCPPlannerGraph:
     """Get the global MCP planner graph instance."""
@@ -794,19 +1057,18 @@ async def get_mcp_planner_graph() -> MCPPlannerGraph:
         await _mcp_planner_graph.initialize()
     return _mcp_planner_graph
 
+
 async def process_mcp_warehouse_query(
-    message: str, 
-    session_id: str = "default",
-    context: Optional[Dict] = None
+    message: str, session_id: str = "default", context: Optional[Dict] = None
 ) -> Dict[str, any]:
     """
     Process a warehouse query through the MCP-enabled planner graph.
-    
+
     Args:
         message: User's message/query
         session_id: Session identifier for context
         context: Additional context for the query
-        
+
     Returns:
         Dictionary containing the response and metadata
     """

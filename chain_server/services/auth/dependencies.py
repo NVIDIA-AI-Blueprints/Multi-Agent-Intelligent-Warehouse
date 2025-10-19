@@ -11,21 +11,26 @@ logger = logging.getLogger(__name__)
 # Security scheme
 security = HTTPBearer()
 
+
 class CurrentUser:
     """Current authenticated user context."""
+
     def __init__(self, user: User, permissions: List[Permission]):
         self.user = user
         self.permissions = permissions
-    
+
     def has_permission(self, permission: Permission) -> bool:
         """Check if user has a specific permission."""
         return permission in self.permissions
-    
+
     def has_role(self, role: str) -> bool:
         """Check if user has a specific role."""
         return self.user.role.value == role
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> User:
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> User:
     """Get the current authenticated user."""
     try:
         # Verify token
@@ -36,7 +41,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
                 detail="Invalid authentication credentials",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        
+
         # Get user from database
         user_id = payload.get("sub")
         if not user_id:
@@ -45,7 +50,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
                 detail="Invalid token payload",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        
+
         await user_service.initialize()
         user = await user_service.get_user_by_id(int(user_id))
         if not user:
@@ -54,7 +59,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
                 detail="User not found",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        
+
         # Check if user is active
         if user.status.value != "active":
             raise HTTPException(
@@ -62,7 +67,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
                 detail="User account is not active",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        
+
         return user
     except HTTPException:
         raise
@@ -74,32 +79,45 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-async def get_current_user_context(current_user: User = Depends(get_current_user)) -> CurrentUser:
+
+async def get_current_user_context(
+    current_user: User = Depends(get_current_user),
+) -> CurrentUser:
     """Get the current user with permissions context."""
     permissions = get_user_permissions(current_user.role)
     return CurrentUser(user=current_user, permissions=permissions)
 
+
 def require_permission(permission: Permission):
     """Dependency factory for requiring specific permissions."""
-    async def permission_checker(user_context: CurrentUser = Depends(get_current_user_context)):
+
+    async def permission_checker(
+        user_context: CurrentUser = Depends(get_current_user_context),
+    ):
         if not user_context.has_permission(permission):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Permission required: {permission.value}"
+                detail=f"Permission required: {permission.value}",
             )
         return user_context
+
     return permission_checker
+
 
 def require_role(role: str):
     """Dependency factory for requiring specific roles."""
-    async def role_checker(user_context: CurrentUser = Depends(get_current_user_context)):
+
+    async def role_checker(
+        user_context: CurrentUser = Depends(get_current_user_context),
+    ):
         if not user_context.has_role(role):
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Role required: {role}"
+                status_code=status.HTTP_403_FORBIDDEN, detail=f"Role required: {role}"
             )
         return user_context
+
     return role_checker
+
 
 # Common permission dependencies
 require_admin = require_permission(Permission.SYSTEM_ADMIN)
@@ -109,22 +127,28 @@ require_operations_write = require_permission(Permission.OPERATIONS_WRITE)
 require_safety_write = require_permission(Permission.SAFETY_WRITE)
 require_reports_view = require_permission(Permission.REPORTS_VIEW)
 
+
 # Optional authentication (for endpoints that work with or without auth)
-async def get_optional_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> Optional[User]:
+async def get_optional_current_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> Optional[User]:
     """Get the current user if authenticated, otherwise return None."""
     if not credentials:
         return None
-    
+
     try:
         return await get_current_user(credentials)
     except HTTPException:
         return None
 
-async def get_optional_user_context(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> Optional[CurrentUser]:
+
+async def get_optional_user_context(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> Optional[CurrentUser]:
     """Get the current user context if authenticated, otherwise return None."""
     if not credentials:
         return None
-    
+
     try:
         user = await get_current_user(credentials)
         permissions = get_user_permissions(user.role)

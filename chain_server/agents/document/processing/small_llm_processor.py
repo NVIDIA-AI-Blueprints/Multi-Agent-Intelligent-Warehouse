@@ -16,10 +16,11 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+
 class SmallLLMProcessor:
     """
     Stage 3: Small LLM Processing using Llama Nemotron Nano VL 8B.
-    
+
     Features:
     - Native vision understanding (processes doc images directly)
     - OCRBench v2 leader for document understanding
@@ -27,53 +28,54 @@ class SmallLLMProcessor:
     - Single GPU deployment (cost-effective)
     - Fast inference (~100-200ms)
     """
-    
+
     def __init__(self):
         self.api_key = os.getenv("LLAMA_NANO_VL_API_KEY", "")
-        self.base_url = os.getenv("LLAMA_NANO_VL_URL", "https://integrate.api.nvidia.com/v1")
+        self.base_url = os.getenv(
+            "LLAMA_NANO_VL_URL", "https://integrate.api.nvidia.com/v1"
+        )
         self.timeout = 60
-        
+
     async def initialize(self):
         """Initialize the Small LLM Processor."""
         try:
             if not self.api_key:
-                logger.warning("LLAMA_NANO_VL_API_KEY not found, using mock implementation")
+                logger.warning(
+                    "LLAMA_NANO_VL_API_KEY not found, using mock implementation"
+                )
                 return
-            
+
             # Test API connection
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(
                     f"{self.base_url}/models",
-                    headers={"Authorization": f"Bearer {self.api_key}"}
+                    headers={"Authorization": f"Bearer {self.api_key}"},
                 )
                 response.raise_for_status()
-                
+
             logger.info("Small LLM Processor initialized successfully")
-            
+
         except Exception as e:
             logger.error(f"Failed to initialize Small LLM Processor: {e}")
             logger.warning("Falling back to mock implementation")
-    
+
     async def process_document(
-        self, 
-        images: List[Image.Image], 
-        ocr_text: str, 
-        document_type: str
+        self, images: List[Image.Image], ocr_text: str, document_type: str
     ) -> Dict[str, Any]:
         """
         Process document using Llama Nemotron Nano VL 8B.
-        
+
         Args:
             images: List of PIL Images
             ocr_text: Text extracted from OCR
             document_type: Type of document (invoice, receipt, etc.)
-            
+
         Returns:
             Structured data extracted from the document
         """
         try:
             logger.info(f"Processing document with Small LLM (Llama 3.1 70B)")
-            
+
             # Try multimodal processing first, fallback to text-only if it fails
             if not self.api_key:
                 # Mock implementation for development
@@ -81,38 +83,41 @@ class SmallLLMProcessor:
             else:
                 try:
                     # Try multimodal processing with vision-language model
-                    multimodal_input = await self._prepare_multimodal_input(images, ocr_text, document_type)
+                    multimodal_input = await self._prepare_multimodal_input(
+                        images, ocr_text, document_type
+                    )
                     result = await self._call_nano_vl_api(multimodal_input)
                 except Exception as multimodal_error:
-                    logger.warning(f"Multimodal processing failed, falling back to text-only: {multimodal_error}")
+                    logger.warning(
+                        f"Multimodal processing failed, falling back to text-only: {multimodal_error}"
+                    )
                     try:
                         # Fallback to text-only processing
                         result = await self._call_text_only_api(ocr_text, document_type)
                     except Exception as text_error:
-                        logger.warning(f"Text-only processing also failed, using mock data: {text_error}")
+                        logger.warning(
+                            f"Text-only processing also failed, using mock data: {text_error}"
+                        )
                         # Final fallback to mock processing
                         result = await self._mock_llm_processing(document_type)
-            
+
             # Post-process results
             structured_data = await self._post_process_results(result, document_type)
-            
+
             return {
                 "structured_data": structured_data,
                 "confidence": result.get("confidence", 0.8),
                 "model_used": "Llama-3.1-70B-Instruct",
                 "processing_timestamp": datetime.now().isoformat(),
-                "multimodal_processed": False  # Always text-only for now
+                "multimodal_processed": False,  # Always text-only for now
             }
-            
+
         except Exception as e:
             logger.error(f"Small LLM processing failed: {e}")
             raise
-    
+
     async def _prepare_multimodal_input(
-        self, 
-        images: List[Image.Image], 
-        ocr_text: str, 
-        document_type: str
+        self, images: List[Image.Image], ocr_text: str, document_type: str
     ) -> Dict[str, Any]:
         """Prepare multimodal input for the vision-language model."""
         try:
@@ -120,29 +125,27 @@ class SmallLLMProcessor:
             image_data = []
             for i, image in enumerate(images):
                 image_base64 = await self._image_to_base64(image)
-                image_data.append({
-                    "page": i + 1,
-                    "image": image_base64,
-                    "dimensions": image.size
-                })
-            
+                image_data.append(
+                    {"page": i + 1, "image": image_base64, "dimensions": image.size}
+                )
+
             # Create structured prompt
             prompt = self._create_processing_prompt(document_type, ocr_text)
-            
+
             return {
                 "images": image_data,
                 "prompt": prompt,
                 "document_type": document_type,
-                "ocr_text": ocr_text
+                "ocr_text": ocr_text,
             }
-            
+
         except Exception as e:
             logger.error(f"Failed to prepare multimodal input: {e}")
             raise
-    
+
     def _create_processing_prompt(self, document_type: str, ocr_text: str) -> str:
         """Create a structured prompt for document processing."""
-        
+
         prompts = {
             "invoice": """
             You are an expert document processor specializing in invoice analysis. 
@@ -158,7 +161,6 @@ class SmallLLMProcessor:
             
             Return the information in structured JSON format with confidence scores for each field.
             """,
-            
             "receipt": """
             You are an expert document processor specializing in receipt analysis.
             Please analyze the provided document image(s) and OCR text to extract:
@@ -173,7 +175,6 @@ class SmallLLMProcessor:
             
             Return the information in structured JSON format with confidence scores.
             """,
-            
             "bol": """
             You are an expert document processor specializing in Bill of Lading (BOL) analysis.
             Please analyze the provided document image(s) and OCR text to extract:
@@ -188,7 +189,6 @@ class SmallLLMProcessor:
             
             Return the information in structured JSON format with confidence scores.
             """,
-            
             "purchase_order": """
             You are an expert document processor specializing in Purchase Order (PO) analysis.
             Please analyze the provided document image(s) and OCR text to extract:
@@ -202,11 +202,11 @@ class SmallLLMProcessor:
             7. Terms and Conditions
             
             Return the information in structured JSON format with confidence scores.
-            """
+            """,
         }
-        
+
         base_prompt = prompts.get(document_type, prompts["invoice"])
-        
+
         return f"""
         {base_prompt}
         
@@ -239,8 +239,10 @@ class SmallLLMProcessor:
             }}
         }}
         """
-    
-    async def _call_text_only_api(self, ocr_text: str, document_type: str) -> Dict[str, Any]:
+
+    async def _call_text_only_api(
+        self, ocr_text: str, document_type: str
+    ) -> Dict[str, Any]:
         """Call Llama 3.1 70B API with text-only input."""
         try:
             # Create a text-only prompt for document processing
@@ -260,35 +262,30 @@ class SmallLLMProcessor:
 
             Return only valid JSON without any additional text.
             """
-            
-            messages = [
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ]
-            
+
+            messages = [{"role": "user", "content": prompt}]
+
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(
                     f"{self.base_url}/chat/completions",
                     headers={
                         "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json"
+                        "Content-Type": "application/json",
                     },
                     json={
                         "model": "meta/llama-3.1-70b-instruct",
                         "messages": messages,
                         "max_tokens": 2000,
-                        "temperature": 0.1
-                    }
+                        "temperature": 0.1,
+                    },
                 )
                 response.raise_for_status()
-                
+
                 result = response.json()
-                
+
                 # Extract response content from chat completions
                 content = result["choices"][0]["message"]["content"]
-                
+
                 # Try to parse JSON response
                 try:
                     parsed_content = json.loads(content)
@@ -296,7 +293,7 @@ class SmallLLMProcessor:
                         "structured_data": parsed_content,
                         "confidence": 0.85,
                         "raw_response": content,
-                        "processing_method": "text_only"
+                        "processing_method": "text_only",
                     }
                 except json.JSONDecodeError:
                     # If JSON parsing fails, return the raw content
@@ -304,80 +301,83 @@ class SmallLLMProcessor:
                         "structured_data": {"raw_text": content},
                         "confidence": 0.7,
                         "raw_response": content,
-                        "processing_method": "text_only"
+                        "processing_method": "text_only",
                     }
-                
+
         except Exception as e:
             logger.error(f"Text-only API call failed: {e}")
             raise
 
-    async def _call_nano_vl_api(self, multimodal_input: Dict[str, Any]) -> Dict[str, Any]:
+    async def _call_nano_vl_api(
+        self, multimodal_input: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Call Llama Nemotron Nano VL 8B API."""
         try:
             # Prepare API request
             messages = [
                 {
                     "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": multimodal_input["prompt"]
-                        }
-                    ]
+                    "content": [{"type": "text", "text": multimodal_input["prompt"]}],
                 }
             ]
-            
+
             # Add images to the message
             for image_data in multimodal_input["images"]:
-                messages[0]["content"].append({
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/png;base64,{image_data['image']}"
+                messages[0]["content"].append(
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{image_data['image']}"
+                        },
                     }
-                })
-            
+                )
+
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(
                     f"{self.base_url}/chat/completions",
                     headers={
                         "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json"
+                        "Content-Type": "application/json",
                     },
                     json={
                         "model": "meta/llama-3.2-11b-vision-instruct",
                         "messages": messages,
                         "max_tokens": 2000,
-                        "temperature": 0.1
-                    }
+                        "temperature": 0.1,
+                    },
                 )
                 response.raise_for_status()
-                
+
                 result = response.json()
-                
+
                 # Extract response content from chat completions
                 content = result["choices"][0]["message"]["content"]
-                
+
                 # Try to parse JSON response
                 try:
                     parsed_content = json.loads(content)
                     return {
                         "content": parsed_content,
-                        "confidence": parsed_content.get("quality_assessment", {}).get("overall_confidence", 0.8),
-                        "raw_response": content
+                        "confidence": parsed_content.get("quality_assessment", {}).get(
+                            "overall_confidence", 0.8
+                        ),
+                        "raw_response": content,
                     }
                 except json.JSONDecodeError:
                     # If JSON parsing fails, return raw content
                     return {
                         "content": {"raw_text": content},
                         "confidence": 0.7,
-                        "raw_response": content
+                        "raw_response": content,
                     }
-                
+
         except Exception as e:
             logger.error(f"Nano VL API call failed: {e}")
             raise
-    
-    async def _post_process_results(self, result: Dict[str, Any], document_type: str) -> Dict[str, Any]:
+
+    async def _post_process_results(
+        self, result: Dict[str, Any], document_type: str
+    ) -> Dict[str, Any]:
         """Post-process LLM results for consistency."""
         try:
             # Handle different response formats from multimodal vs text-only processing
@@ -390,37 +390,39 @@ class SmallLLMProcessor:
             else:
                 # Fallback: use the entire result
                 content = result
-            
+
             # Ensure required fields are present
             structured_data = {
                 "document_type": document_type,
                 "extracted_fields": content.get("extracted_fields", {}),
                 "line_items": content.get("line_items", []),
-                "quality_assessment": content.get("quality_assessment", {
-                    "overall_confidence": result.get("confidence", 0.8),
-                    "completeness": 0.8,
-                    "accuracy": 0.8
-                }),
+                "quality_assessment": content.get(
+                    "quality_assessment",
+                    {
+                        "overall_confidence": result.get("confidence", 0.8),
+                        "completeness": 0.8,
+                        "accuracy": 0.8,
+                    },
+                ),
                 "processing_metadata": {
                     "model_used": "Llama-3.1-70B-Instruct",
                     "timestamp": datetime.now().isoformat(),
-                    "multimodal": result.get("multimodal_processed", False)
-                }
+                    "multimodal": result.get("multimodal_processed", False),
+                },
             }
-            
+
             # Validate and clean extracted fields
             structured_data["extracted_fields"] = self._validate_extracted_fields(
-                structured_data["extracted_fields"], 
-                document_type
+                structured_data["extracted_fields"], document_type
             )
-            
+
             # Validate line items
             structured_data["line_items"] = self._validate_line_items(
                 structured_data["line_items"]
             )
-            
+
             return structured_data
-            
+
         except Exception as e:
             logger.error(f"Post-processing failed: {e}")
             # Return a safe fallback structure
@@ -431,52 +433,71 @@ class SmallLLMProcessor:
                 "quality_assessment": {
                     "overall_confidence": 0.5,
                     "completeness": 0.5,
-                    "accuracy": 0.5
+                    "accuracy": 0.5,
                 },
                 "processing_metadata": {
                     "model_used": "Llama-3.1-70B-Instruct",
                     "timestamp": datetime.now().isoformat(),
                     "multimodal": False,
-                    "error": str(e)
-                }
+                    "error": str(e),
+                },
             }
-    
-    def _validate_extracted_fields(self, fields: Dict[str, Any], document_type: str) -> Dict[str, Any]:
+
+    def _validate_extracted_fields(
+        self, fields: Dict[str, Any], document_type: str
+    ) -> Dict[str, Any]:
         """Validate and clean extracted fields."""
         validated_fields = {}
-        
+
         # Define required fields by document type
         required_fields = {
-            "invoice": ["invoice_number", "vendor_name", "invoice_date", "total_amount"],
-            "receipt": ["receipt_number", "merchant_name", "transaction_date", "total_amount"],
+            "invoice": [
+                "invoice_number",
+                "vendor_name",
+                "invoice_date",
+                "total_amount",
+            ],
+            "receipt": [
+                "receipt_number",
+                "merchant_name",
+                "transaction_date",
+                "total_amount",
+            ],
             "bol": ["bol_number", "shipper_name", "consignee_name", "ship_date"],
-            "purchase_order": ["po_number", "buyer_name", "supplier_name", "order_date"]
+            "purchase_order": [
+                "po_number",
+                "buyer_name",
+                "supplier_name",
+                "order_date",
+            ],
         }
-        
+
         doc_required = required_fields.get(document_type, [])
-        
+
         for field_name, field_data in fields.items():
             if isinstance(field_data, dict):
                 validated_fields[field_name] = {
                     "value": field_data.get("value", ""),
                     "confidence": field_data.get("confidence", 0.5),
                     "source": field_data.get("source", "unknown"),
-                    "required": field_name in doc_required
+                    "required": field_name in doc_required,
                 }
             else:
                 validated_fields[field_name] = {
                     "value": str(field_data),
                     "confidence": 0.5,
                     "source": "unknown",
-                    "required": field_name in doc_required
+                    "required": field_name in doc_required,
                 }
-        
+
         return validated_fields
-    
-    def _validate_line_items(self, line_items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+
+    def _validate_line_items(
+        self, line_items: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """Validate and clean line items."""
         validated_items = []
-        
+
         for item in line_items:
             if isinstance(item, dict):
                 validated_item = {
@@ -484,17 +505,23 @@ class SmallLLMProcessor:
                     "quantity": self._safe_float(item.get("quantity", 0)),
                     "unit_price": self._safe_float(item.get("unit_price", 0)),
                     "total": self._safe_float(item.get("total", 0)),
-                    "confidence": item.get("confidence", 0.5)
+                    "confidence": item.get("confidence", 0.5),
                 }
-                
+
                 # Calculate total if missing
-                if validated_item["total"] == 0 and validated_item["quantity"] > 0 and validated_item["unit_price"] > 0:
-                    validated_item["total"] = validated_item["quantity"] * validated_item["unit_price"]
-                
+                if (
+                    validated_item["total"] == 0
+                    and validated_item["quantity"] > 0
+                    and validated_item["unit_price"] > 0
+                ):
+                    validated_item["total"] = (
+                        validated_item["quantity"] * validated_item["unit_price"]
+                    )
+
                 validated_items.append(validated_item)
-        
+
         return validated_items
-    
+
     def _safe_float(self, value: Any) -> float:
         """Safely convert value to float."""
         try:
@@ -502,55 +529,130 @@ class SmallLLMProcessor:
                 return float(value)
             elif isinstance(value, str):
                 # Remove currency symbols and commas
-                cleaned = value.replace("$", "").replace(",", "").replace("€", "").replace("£", "")
+                cleaned = (
+                    value.replace("$", "")
+                    .replace(",", "")
+                    .replace("€", "")
+                    .replace("£", "")
+                )
                 return float(cleaned)
             else:
                 return 0.0
         except (ValueError, TypeError):
             return 0.0
-    
+
     async def _image_to_base64(self, image: Image.Image) -> str:
         """Convert PIL Image to base64 string."""
         buffer = io.BytesIO()
-        image.save(buffer, format='PNG')
+        image.save(buffer, format="PNG")
         return base64.b64encode(buffer.getvalue()).decode()
-    
+
     async def _mock_llm_processing(self, document_type: str) -> Dict[str, Any]:
         """Mock LLM processing for development."""
-        
+
         mock_data = {
             "invoice": {
                 "extracted_fields": {
-                    "invoice_number": {"value": "INV-2024-001", "confidence": 0.95, "source": "both"},
-                    "vendor_name": {"value": "ABC Supply Company", "confidence": 0.92, "source": "both"},
-                    "vendor_address": {"value": "123 Warehouse St, City, State 12345", "confidence": 0.88, "source": "both"},
-                    "invoice_date": {"value": "2024-01-15", "confidence": 0.90, "source": "both"},
-                    "due_date": {"value": "2024-02-15", "confidence": 0.85, "source": "both"},
-                    "total_amount": {"value": "1763.13", "confidence": 0.94, "source": "both"},
-                    "payment_terms": {"value": "Net 30", "confidence": 0.80, "source": "ocr"}
+                    "invoice_number": {
+                        "value": "INV-2024-001",
+                        "confidence": 0.95,
+                        "source": "both",
+                    },
+                    "vendor_name": {
+                        "value": "ABC Supply Company",
+                        "confidence": 0.92,
+                        "source": "both",
+                    },
+                    "vendor_address": {
+                        "value": "123 Warehouse St, City, State 12345",
+                        "confidence": 0.88,
+                        "source": "both",
+                    },
+                    "invoice_date": {
+                        "value": "2024-01-15",
+                        "confidence": 0.90,
+                        "source": "both",
+                    },
+                    "due_date": {
+                        "value": "2024-02-15",
+                        "confidence": 0.85,
+                        "source": "both",
+                    },
+                    "total_amount": {
+                        "value": "1763.13",
+                        "confidence": 0.94,
+                        "source": "both",
+                    },
+                    "payment_terms": {
+                        "value": "Net 30",
+                        "confidence": 0.80,
+                        "source": "ocr",
+                    },
                 },
                 "line_items": [
-                    {"description": "Widget A", "quantity": 10, "unit_price": 125.00, "total": 1250.00, "confidence": 0.92},
-                    {"description": "Widget B", "quantity": 5, "unit_price": 75.00, "total": 375.00, "confidence": 0.88}
+                    {
+                        "description": "Widget A",
+                        "quantity": 10,
+                        "unit_price": 125.00,
+                        "total": 1250.00,
+                        "confidence": 0.92,
+                    },
+                    {
+                        "description": "Widget B",
+                        "quantity": 5,
+                        "unit_price": 75.00,
+                        "total": 375.00,
+                        "confidence": 0.88,
+                    },
                 ],
-                "quality_assessment": {"overall_confidence": 0.90, "completeness": 0.95, "accuracy": 0.88}
+                "quality_assessment": {
+                    "overall_confidence": 0.90,
+                    "completeness": 0.95,
+                    "accuracy": 0.88,
+                },
             },
             "receipt": {
                 "extracted_fields": {
-                    "receipt_number": {"value": "RCP-2024-001", "confidence": 0.93, "source": "both"},
-                    "merchant_name": {"value": "Warehouse Store", "confidence": 0.90, "source": "both"},
-                    "transaction_date": {"value": "2024-01-15", "confidence": 0.88, "source": "both"},
-                    "total_amount": {"value": "45.67", "confidence": 0.95, "source": "both"}
+                    "receipt_number": {
+                        "value": "RCP-2024-001",
+                        "confidence": 0.93,
+                        "source": "both",
+                    },
+                    "merchant_name": {
+                        "value": "Warehouse Store",
+                        "confidence": 0.90,
+                        "source": "both",
+                    },
+                    "transaction_date": {
+                        "value": "2024-01-15",
+                        "confidence": 0.88,
+                        "source": "both",
+                    },
+                    "total_amount": {
+                        "value": "45.67",
+                        "confidence": 0.95,
+                        "source": "both",
+                    },
                 },
                 "line_items": [
-                    {"description": "Office Supplies", "quantity": 1, "unit_price": 45.67, "total": 45.67, "confidence": 0.90}
+                    {
+                        "description": "Office Supplies",
+                        "quantity": 1,
+                        "unit_price": 45.67,
+                        "total": 45.67,
+                        "confidence": 0.90,
+                    }
                 ],
-                "quality_assessment": {"overall_confidence": 0.90, "completeness": 0.85, "accuracy": 0.92}
-            }
+                "quality_assessment": {
+                    "overall_confidence": 0.90,
+                    "completeness": 0.85,
+                    "accuracy": 0.92,
+                },
+            },
         }
-        
+
         return {
             "content": mock_data.get(document_type, mock_data["invoice"]),
             "confidence": 0.90,
-            "raw_response": "Mock response for development"
+            "raw_response": "Mock response for development",
         }
