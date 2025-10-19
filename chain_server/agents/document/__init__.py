@@ -11,17 +11,17 @@ from .models.document_models import (
     RoutingDecision,
     DocumentSearchRequest,
     DocumentSearchResponse,
-    DocumentProcessingError
+    DocumentProcessingError,
 )
 
 __all__ = [
     "DocumentUpload",
-    "DocumentStatus", 
+    "DocumentStatus",
     "DocumentResponse",
     "ExtractionResult",
     "QualityScore",
     "RoutingDecision",
     "DocumentSearchRequest",
     "DocumentSearchResponse",
-    "DocumentProcessingError"
+    "DocumentProcessingError",
 ]

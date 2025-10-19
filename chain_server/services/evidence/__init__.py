@@ -12,24 +12,24 @@ from .evidence_collector import (
     EvidenceType,
     EvidenceSource,
     EvidenceQuality,
-    get_evidence_collector
+    get_evidence_collector,
 )
 
 from .evidence_integration import (
     EvidenceIntegrationService,
     EnhancedResponse,
-    get_evidence_integration_service
+    get_evidence_integration_service,
 )
 
 __all__ = [
     "EvidenceCollector",
     "Evidence",
-    "EvidenceContext", 
+    "EvidenceContext",
     "EvidenceType",
     "EvidenceSource",
     "EvidenceQuality",
     "get_evidence_collector",
     "EvidenceIntegrationService",
     "EnhancedResponse",
-    "get_evidence_integration_service"
+    "get_evidence_integration_service",
 ]

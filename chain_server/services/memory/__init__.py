@@ -10,21 +10,18 @@ from .conversation_memory import (
     MemoryType,
     MemoryPriority,
     MemoryItem,
-    ConversationContext
+    ConversationContext,
 )
 
-from .context_enhancer import (
-    get_context_enhancer,
-    ContextEnhancer
-)
+from .context_enhancer import get_context_enhancer, ContextEnhancer
 
 __all__ = [
     "get_conversation_memory_service",
-    "ConversationMemoryService", 
+    "ConversationMemoryService",
     "MemoryType",
     "MemoryPriority",
     "MemoryItem",
     "ConversationContext",
     "get_context_enhancer",
-    "ContextEnhancer"
+    "ContextEnhancer",
 ]

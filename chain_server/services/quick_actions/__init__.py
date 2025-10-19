@@ -11,7 +11,7 @@ from .smart_quick_actions import (
     ActionContext,
     ActionType,
     ActionPriority,
-    get_smart_quick_actions_service
+    get_smart_quick_actions_service,
 )
 
 __all__ = [
@@ -20,5 +20,5 @@ __all__ = [
     "ActionContext",
     "ActionType",
     "ActionPriority",
-    "get_smart_quick_actions_service"
+    "get_smart_quick_actions_service",
 ]
