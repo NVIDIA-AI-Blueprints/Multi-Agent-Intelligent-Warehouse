@@ -44,6 +44,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { documentAPI } from '../services/api';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -772,12 +773,88 @@ const DocumentExtraction: React.FC = () => {
                   Quality Score Trends
                 </Typography>
                 {analyticsData ? (
+                  <Box sx={{ height: 300 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={analyticsData.trends.quality_trends.map((score, index) => ({
+                          day: `Day ${index + 1}`,
+                          quality: score,
+                        }))}
+                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis 
+                          dataKey="day" 
+                          tick={{ fontSize: 12 }}
+                        />
+                        <YAxis 
+                          domain={[0, 5]}
+                          tick={{ fontSize: 12 }}
+                          label={{ value: 'Quality Score', angle: -90, position: 'insideLeft' }}
+                        />
+                        <Tooltip 
+                          formatter={(value: number) => [`${value.toFixed(2)}/5.0`, 'Quality Score']}
+                          labelFormatter={(label) => `${label}`}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="quality" 
+                          stroke="#1976d2" 
+                          strokeWidth={2}
+                          dot={{ fill: '#1976d2', strokeWidth: 2, r: 4 }}
+                          activeDot={{ r: 6, stroke: '#1976d2', strokeWidth: 2 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </Box>
+                ) : (
                   <Box sx={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Typography variant="body2" color="text.secondary">
-                      Quality trend chart would be displayed here
-                      <br />
-                      Recent trend: {analyticsData.trends.quality_trends.slice(-5).join(', ')}
-                    </Typography>
+                    <CircularProgress />
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          <Grid item xs={12}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Processing Volume Trends
+                </Typography>
+                {analyticsData ? (
+                  <Box sx={{ height: 300 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={analyticsData.trends.daily_processing.map((count, index) => ({
+                          day: `Day ${index + 1}`,
+                          documents: count,
+                        }))}
+                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis 
+                          dataKey="day" 
+                          tick={{ fontSize: 12 }}
+                        />
+                        <YAxis 
+                          tick={{ fontSize: 12 }}
+                          label={{ value: 'Documents Processed', angle: -90, position: 'insideLeft' }}
+                        />
+                        <Tooltip 
+                          formatter={(value: number) => [`${value}`, 'Documents']}
+                          labelFormatter={(label) => `${label}`}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="documents" 
+                          stroke="#4caf50" 
+                          strokeWidth={2}
+                          dot={{ fill: '#4caf50', strokeWidth: 2, r: 4 }}
+                          activeDot={{ r: 6, stroke: '#4caf50', strokeWidth: 2 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
                   </Box>
                 ) : (
                   <Box sx={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
