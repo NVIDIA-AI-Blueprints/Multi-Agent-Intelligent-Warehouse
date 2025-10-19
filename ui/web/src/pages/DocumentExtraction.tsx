@@ -890,27 +890,6 @@ const DocumentExtraction: React.FC = () => {
         <DialogContent>
           {documentResults ? (
             <Box>
-              {/* Debug Info - Remove this in production */}
-              <Card sx={{ mb: 2, bgcolor: 'warning.50' }}>
-                <CardContent>
-                  <Typography variant="subtitle2" color="warning.dark">
-                    🔍 Debug Info (Remove in production)
-                  </Typography>
-                  <Typography variant="caption" sx={{ display: 'block', mt: 1 }}>
-                    Has extracted_data: {documentResults.extracted_data ? 'Yes' : 'No'}
-                  </Typography>
-                  <Typography variant="caption" sx={{ display: 'block' }}>
-                    Extracted data keys: {documentResults.extracted_data ? Object.keys(documentResults.extracted_data).join(', ') : 'None'}
-                  </Typography>
-                  <Typography variant="caption" sx={{ display: 'block' }}>
-                    Quality score: {documentResults.quality_score}
-                  </Typography>
-                  <Typography variant="caption" sx={{ display: 'block' }}>
-                    Routing decision: {documentResults.routing_decision}
-                  </Typography>
-                </CardContent>
-              </Card>
-
               {/* Document Overview */}
               <Card sx={{ mb: 3, bgcolor: 'primary.50' }}>
                 <CardContent>
@@ -920,12 +899,12 @@ const DocumentExtraction: React.FC = () => {
                   <Grid container spacing={2}>
                     <Grid item xs={12} sm={6}>
                       <Typography variant="body2" color="text.secondary">
-                        <strong>Document Type:</strong> {documentResults.extracted_data?.DOCUMENT_TYPE || 'Unknown'}
+                        <strong>Document Type:</strong> {documentResults.extracted_data?.document_type || 'Unknown'}
                       </Typography>
                     </Grid>
                     <Grid item xs={12} sm={6}>
                       <Typography variant="body2" color="text.secondary">
-                        <strong>Total Pages:</strong> {documentResults.extracted_data?.TOTAL_PAGES || 'N/A'}
+                        <strong>Total Pages:</strong> {documentResults.extracted_data?.total_pages || 'N/A'}
                       </Typography>
                     </Grid>
                     <Grid item xs={12} sm={6}>
@@ -958,7 +937,7 @@ const DocumentExtraction: React.FC = () => {
               {documentResults.extracted_data && Object.keys(documentResults.extracted_data).length > 0 ? (
                 <>
                   {/* Invoice Details */}
-                  {documentResults.extracted_data.DOCUMENT_TYPE === 'invoice' && (
+                  {documentResults.extracted_data.document_type === 'invoice' && (
                     <Card sx={{ mb: 3 }}>
                       <CardContent>
                         <Typography variant="h6" gutterBottom>
@@ -971,16 +950,16 @@ const DocumentExtraction: React.FC = () => {
                                 Invoice Information
                               </Typography>
                               <Typography variant="body2">
-                                <strong>Invoice Number:</strong> {documentResults.extracted_data.EXTRACTED_TEXT?.match(/Invoice Number:\s*([A-Z0-9-]+)/i)?.[1] || 'N/A'}
+                                <strong>Invoice Number:</strong> {documentResults.extracted_data.extracted_text?.match(/Invoice Number:\s*([A-Z0-9-]+)/i)?.[1] || 'N/A'}
                               </Typography>
                               <Typography variant="body2">
-                                <strong>Order Number:</strong> {documentResults.extracted_data.EXTRACTED_TEXT?.match(/Order Number:\s*(\d+)/i)?.[1] || 'N/A'}
+                                <strong>Order Number:</strong> {documentResults.extracted_data.extracted_text?.match(/Order Number:\s*(\d+)/i)?.[1] || 'N/A'}
                               </Typography>
                               <Typography variant="body2">
-                                <strong>Invoice Date:</strong> {documentResults.extracted_data.EXTRACTED_TEXT?.match(/Invoice Date:\s*([^+]+)/i)?.[1] || 'N/A'}
+                                <strong>Invoice Date:</strong> {documentResults.extracted_data.extracted_text?.match(/Invoice Date:\s*([^+]+)/i)?.[1] || 'N/A'}
                               </Typography>
                               <Typography variant="body2">
-                                <strong>Due Date:</strong> {documentResults.extracted_data.EXTRACTED_TEXT?.match(/Due Date:\s*([^+]+)/i)?.[1] || 'N/A'}
+                                <strong>Due Date:</strong> {documentResults.extracted_data.extracted_text?.match(/Due Date:\s*([^+]+)/i)?.[1] || 'N/A'}
                               </Typography>
                             </Box>
                           </Grid>
@@ -990,19 +969,19 @@ const DocumentExtraction: React.FC = () => {
                                 Financial Information
                               </Typography>
                               <Typography variant="body2">
-                                <strong>Service:</strong> {documentResults.extracted_data.EXTRACTED_TEXT?.match(/Service:\s*([^+]+)/i)?.[1] || 'N/A'}
+                                <strong>Service:</strong> {documentResults.extracted_data.extracted_text?.match(/Service:\s*([^+]+)/i)?.[1] || 'N/A'}
                               </Typography>
                               <Typography variant="body2">
-                                <strong>Rate/Price:</strong> {documentResults.extracted_data.EXTRACTED_TEXT?.match(/Rate\/Price:\s*([^+]+)/i)?.[1] || 'N/A'}
+                                <strong>Rate/Price:</strong> {documentResults.extracted_data.extracted_text?.match(/Rate\/Price:\s*([^+]+)/i)?.[1] || 'N/A'}
                               </Typography>
                               <Typography variant="body2">
-                                <strong>Sub Total:</strong> {documentResults.extracted_data.EXTRACTED_TEXT?.match(/Sub Total:\s*([^+]+)/i)?.[1] || 'N/A'}
+                                <strong>Sub Total:</strong> {documentResults.extracted_data.extracted_text?.match(/Sub Total:\s*([^+]+)/i)?.[1] || 'N/A'}
                               </Typography>
                               <Typography variant="body2">
-                                <strong>Tax:</strong> {documentResults.extracted_data.EXTRACTED_TEXT?.match(/Tax:\s*([^+]+)/i)?.[1] || 'N/A'}
+                                <strong>Tax:</strong> {documentResults.extracted_data.extracted_text?.match(/Tax:\s*([^+]+)/i)?.[1] || 'N/A'}
                               </Typography>
                               <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                                <strong>Total:</strong> {documentResults.extracted_data.EXTRACTED_TEXT?.match(/Total:\s*([^+]+)/i)?.[1] || 'N/A'}
+                                <strong>Total:</strong> {documentResults.extracted_data.extracted_text?.match(/Total:\s*([^+]+)/i)?.[1] || 'N/A'}
                               </Typography>
                             </Box>
                           </Grid>
@@ -1012,7 +991,7 @@ const DocumentExtraction: React.FC = () => {
                   )}
 
                   {/* Extracted Text */}
-                  {documentResults.extracted_data.EXTRACTED_TEXT && (
+                  {documentResults.extracted_data.extracted_text && (
                     <Card sx={{ mb: 3 }}>
                       <CardContent>
                         <Typography variant="h6" gutterBottom>
@@ -1028,7 +1007,7 @@ const DocumentExtraction: React.FC = () => {
                           borderColor: 'grey.300'
                         }}>
                           <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
-                            {documentResults.extracted_data.EXTRACTED_TEXT}
+                            {documentResults.extracted_data.extracted_text}
                           </Typography>
                         </Box>
                         <Box sx={{ mt: 1, display: 'flex', alignItems: 'center' }}>
@@ -1036,8 +1015,8 @@ const DocumentExtraction: React.FC = () => {
                             Confidence: 
                           </Typography>
                           <Chip 
-                            label={`${Math.round((documentResults.confidence_scores?.EXTRACTED_TEXT || 0) * 100)}%`}
-                            color={documentResults.confidence_scores?.EXTRACTED_TEXT >= 0.8 ? 'success' : documentResults.confidence_scores?.EXTRACTED_TEXT >= 0.6 ? 'warning' : 'error'}
+                            label={`${Math.round((documentResults.confidence_scores?.extracted_text || 0) * 100)}%`}
+                            color={documentResults.confidence_scores?.extracted_text >= 0.8 ? 'success' : documentResults.confidence_scores?.extracted_text >= 0.6 ? 'warning' : 'error'}
                             size="small"
                             sx={{ ml: 1 }}
                           />
@@ -1047,14 +1026,14 @@ const DocumentExtraction: React.FC = () => {
                   )}
 
                   {/* Quality Assessment */}
-                  {documentResults.extracted_data.QUALITY_ASSESSMENT && (
+                  {documentResults.extracted_data.quality_assessment && (
                     <Card sx={{ mb: 3 }}>
                       <CardContent>
                         <Typography variant="h6" gutterBottom>
                           🎯 Quality Assessment
                         </Typography>
                         <Grid container spacing={2}>
-                          {Object.entries(JSON.parse(documentResults.extracted_data.QUALITY_ASSESSMENT)).map(([key, value]) => (
+                          {Object.entries(JSON.parse(documentResults.extracted_data.quality_assessment)).map(([key, value]) => (
                             <Grid item xs={12} sm={4} key={key}>
                               <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
                                 <Typography variant="subtitle2" color="text.secondary">
@@ -1072,14 +1051,14 @@ const DocumentExtraction: React.FC = () => {
                   )}
 
                   {/* Processing Metadata */}
-                  {documentResults.extracted_data.PROCESSING_METADATA && (
+                  {documentResults.extracted_data.processing_metadata && (
                     <Card sx={{ mb: 3 }}>
                       <CardContent>
                         <Typography variant="h6" gutterBottom>
                           ⚙️ Processing Information
                         </Typography>
                         <Grid container spacing={2}>
-                          {Object.entries(JSON.parse(documentResults.extracted_data.PROCESSING_METADATA)).map(([key, value]) => (
+                          {Object.entries(JSON.parse(documentResults.extracted_data.processing_metadata)).map(([key, value]) => (
                             <Grid item xs={12} sm={6} key={key}>
                               <Typography variant="body2">
                                 <strong>{key.replace(/_/g, ' ').toUpperCase()}:</strong> {String(value)}
