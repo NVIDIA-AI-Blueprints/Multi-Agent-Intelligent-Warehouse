@@ -285,19 +285,37 @@ class RAPIDSForecastingAgent:
                 'mae': mean_absolute_error(y_test, lr_pred)
             }
         
-        # 3. XGBoost (CPU only for now)
-        if not self.use_gpu:
-            logger.info("🚀 Training XGBoost...")
+        # 3. XGBoost (GPU-enabled)
+        logger.info("🚀 Training XGBoost...")
+        if self.use_gpu:
+            # GPU-enabled XGBoost
+            xgb_model = xgb.XGBRegressor(
+                n_estimators=100,
+                max_depth=6,
+                learning_rate=0.1,
+                random_state=self.config['random_state'],
+                tree_method='hist',
+                device='cuda'
+            )
+        else:
+            # CPU XGBoost
             xgb_model = xgb.XGBRegressor(
                 n_estimators=100,
                 max_depth=6,
                 learning_rate=0.1,
                 random_state=self.config['random_state']
             )
-            xgb_model.fit(X_train_scaled, y_train)
-            xgb_pred = xgb_model.predict(X_test_scaled)
-            
-            models['xgboost'] = xgb_model
+        
+        xgb_model.fit(X_train_scaled, y_train)
+        xgb_pred = xgb_model.predict(X_test_scaled)
+        
+        models['xgboost'] = xgb_model
+        if self.use_gpu:
+            metrics['xgboost'] = {
+                'mse': cu_mean_squared_error(y_test, xgb_pred),
+                'mae': cu_mean_absolute_error(y_test, xgb_pred)
+            }
+        else:
             metrics['xgboost'] = {
                 'mse': mean_squared_error(y_test, xgb_pred),
                 'mae': mean_absolute_error(y_test, xgb_pred)

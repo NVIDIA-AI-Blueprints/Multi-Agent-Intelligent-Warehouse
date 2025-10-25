@@ -1,45 +1,39 @@
 {
-  "e7adfac4-c5a8-465f-9e53-1b60039233e9": {
-    "status": "completed",
+  "43a9dadd-aa85-4cee-a5d2-f5beb3b63ca7": {
+    "status": "failed",
     "current_stage": "Completed",
-    "progress": 100.0,
+    "progress": 0,
+    "file_path": "/tmp/document_uploads_ee4opgn7/43a9dadd-aa85-4cee-a5d2-f5beb3b63ca7_sample.pdf",
+    "filename": "43a9dadd-aa85-4cee-a5d2-f5beb3b63ca7_sample.pdf",
+    "document_type": "invoice",
     "stages": [
       {
         "name": "preprocessing",
         "status": "completed",
-        "started_at": "2025-10-23T11:16:27.593960",
-        "completed_at": "2025-10-23T11:16:53.611446"
+        "started_at": "2025-10-25T02:12:34.385699"
       },
       {
         "name": "ocr_extraction",
         "status": "completed",
-        "started_at": "2025-10-23T11:16:39.928083",
-        "completed_at": "2025-10-23T11:16:53.611450"
+        "started_at": "2025-10-25T02:12:46.671843"
       },
       {
         "name": "llm_processing",
         "status": "completed",
-        "started_at": "2025-10-23T11:16:52.007974",
-        "completed_at": "2025-10-23T11:16:53.611453"
+        "started_at": "2025-10-25T02:12:58.707655"
       },
       {
         "name": "validation",
         "status": "completed",
-        "started_at": "2025-10-23T11:17:04.062629",
-        "completed_at": "2025-10-23T11:16:53.611456"
+        "started_at": "2025-10-25T02:13:10.742272"
       },
       {
         "name": "routing",
         "status": "processing",
-        "started_at": "2025-10-23T11:17:16.115469",
-        "completed_at": "2025-10-23T11:16:53.611459"
+        "started_at": "2025-10-25T02:13:22.778214"
       }
     ],
-    "upload_time": "2025-10-23T11:16:27.593967",
-    "estimated_completion": 1761243447.593968,
-    "processing_results": {
-      "preprocessing": {
-        "document_type": "pdf",
-        "total_pages": 1,
-        "images": [
-          
+    "upload_time": "2025-10-25T02:12:34.385708",
+    "estimated_completion": 1761383614.385708
+  }
+}

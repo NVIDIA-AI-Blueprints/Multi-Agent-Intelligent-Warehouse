@@ -187,7 +187,7 @@
       "quarter_encoded": 0.0009702711493289877,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-10-24T17:28:42.456569",
+    "forecast_date": "2025-10-25T02:09:58.958317",
     "horizon_days": 30
   },
   "LAY002": {
@@ -378,7 +378,7 @@
       "quarter_encoded": 0.0011169756719244708,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-10-24T17:29:13.340157",
+    "forecast_date": "2025-10-25T02:10:34.202549",
     "horizon_days": 30
   },
   "DOR001": {
@@ -569,7 +569,7 @@
       "quarter_encoded": 0.0009233916519416123,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-10-24T17:29:26.246693",
+    "forecast_date": "2025-10-25T02:11:04.113060",
     "horizon_days": 30
   },
   "CHE001": {
@@ -760,7 +760,7 @@
       "quarter_encoded": 0.0018189378914847238,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-10-24T17:29:53.830417",
+    "forecast_date": "2025-10-25T02:11:42.506034",
     "horizon_days": 30
   }
 }

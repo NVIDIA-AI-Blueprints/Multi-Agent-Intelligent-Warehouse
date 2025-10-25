@@ -192,6 +192,9 @@ class DocumentActionTools:
                 "status": ProcessingStage.UPLOADED,
                 "current_stage": "Preprocessing",
                 "progress": 0,
+                "file_path": file_path,  # Store the file path for local processing
+                "filename": os.path.basename(file_path),
+                "document_type": document_type,
                 "stages": [
                     {
                         "name": "preprocessing",
@@ -637,7 +640,7 @@ class DocumentActionTools:
             logger.error(f"Failed to update document status: {e}", exc_info=True)
 
     async def _get_extraction_data(self, document_id: str) -> Dict[str, Any]:
-        """Get extraction data from actual NVIDIA NeMo processing results."""
+        """Get extraction data from actual processing results."""
         from .models.document_models import (
             ExtractionResult,
             QualityScore,
@@ -836,16 +839,109 @@ class DocumentActionTools:
                         "routing_decision": routing_decision,
                     }
 
-            # Fallback to mock data if no actual results
-            logger.warning(
-                f"No actual processing results found for {document_id}, returning mock data"
-            )
-            return self._get_mock_extraction_data()
+            # Try to process the document locally if no results found
+            logger.info(f"No processing results found for {document_id}, attempting local processing")
+            return await self._process_document_locally(document_id)
 
         except Exception as e:
             logger.error(
                 f"Failed to get extraction data for {document_id}: {e}", exc_info=True
             )
+            return self._get_mock_extraction_data()
+
+    async def _process_document_locally(self, document_id: str) -> Dict[str, Any]:
+        """Process document locally using the local processor."""
+        try:
+            from .processing.local_processor import local_processor
+            
+            # Get document info from status
+            if document_id not in self.document_statuses:
+                logger.error(f"Document {document_id} not found in status tracking")
+                return self._get_mock_extraction_data()
+            
+            doc_status = self.document_statuses[document_id]
+            file_path = doc_status.get("file_path")
+            
+            if not file_path or not os.path.exists(file_path):
+                logger.error(f"File not found for document {document_id}: {file_path}")
+                return self._get_mock_extraction_data()
+            
+            # Process the document locally
+            result = await local_processor.process_document(file_path, "invoice")
+            
+            if not result["success"]:
+                logger.error(f"Local processing failed for {document_id}: {result.get('error')}")
+                return self._get_mock_extraction_data()
+            
+            # Convert local processing result to expected format
+            from .models.document_models import ExtractionResult, QualityScore, RoutingDecision, QualityDecision
+            
+            extraction_results = []
+            
+            # OCR Result
+            extraction_results.append(
+                ExtractionResult(
+                    stage="ocr_extraction",
+                    raw_data={"text": result["raw_text"]},
+                    processed_data={"extracted_text": result["raw_text"]},
+                    confidence_score=result["confidence_scores"]["ocr"],
+                    processing_time_ms=result["processing_time_ms"],
+                    model_used=result["model_used"],
+                    metadata=result["metadata"]
+                )
+            )
+            
+            # LLM Processing Result
+            extraction_results.append(
+                ExtractionResult(
+                    stage="llm_processing",
+                    raw_data={"raw_response": result["raw_text"]},
+                    processed_data=result["structured_data"],
+                    confidence_score=result["confidence_scores"]["entity_extraction"],
+                    processing_time_ms=result["processing_time_ms"],
+                    model_used=result["model_used"],
+                    metadata=result["metadata"]
+                )
+            )
+            
+            # Quality Score
+            quality_score = QualityScore(
+                overall_score=result["confidence_scores"]["overall"] * 5.0,  # Convert to 0-5 scale
+                completeness_score=result["confidence_scores"]["overall"] * 5.0,
+                accuracy_score=result["confidence_scores"]["overall"] * 5.0,
+                compliance_score=result["confidence_scores"]["overall"] * 5.0,
+                quality_score=result["confidence_scores"]["overall"] * 5.0,
+                decision=QualityDecision.APPROVE if result["confidence_scores"]["overall"] > 0.7 else QualityDecision.REVIEW,
+                reasoning={
+                    "summary": "Document processed successfully using local extraction",
+                    "details": f"Extracted {len(result['structured_data'])} fields with {result['confidence_scores']['overall']:.2f} confidence"
+                },
+                issues_found=[],
+                confidence=result["confidence_scores"]["overall"],
+                judge_model="Local Processing Engine"
+            )
+            
+            # Routing Decision
+            routing_decision = RoutingDecision(
+                routing_action="auto_approve" if result["confidence_scores"]["overall"] > 0.8 else "flag_review",
+                routing_reason="High confidence local processing" if result["confidence_scores"]["overall"] > 0.8 else "Requires human review",
+                wms_integration_status="ready" if result["confidence_scores"]["overall"] > 0.8 else "pending",
+                wms_integration_data=result["structured_data"],
+                human_review_required=result["confidence_scores"]["overall"] <= 0.8,
+                human_reviewer_id=None,
+                estimated_processing_time=3600  # 1 hour
+            )
+            
+            return {
+                "extraction_results": extraction_results,
+                "confidence_scores": result["confidence_scores"],
+                "stages": [result.stage for result in extraction_results],
+                "quality_score": quality_score,
+                "routing_decision": routing_decision,
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to process document locally: {e}", exc_info=True)
             return self._get_mock_extraction_data()
 
     def _get_mock_extraction_data(self) -> Dict[str, Any]:
