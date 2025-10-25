@@ -1014,7 +1014,7 @@ const ForecastingPage: React.FC = () => {
                         {dashboardData.business_intelligence.model_analytics?.models_above_80 || 0}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        High Accuracy (>80%)
+                        High Accuracy (&gt;80%)
                       </Typography>
                     </Box>
                   </Grid>
@@ -1024,7 +1024,7 @@ const ForecastingPage: React.FC = () => {
                         {dashboardData.business_intelligence.model_analytics?.models_below_70 || 0}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Low Accuracy (<70%)
+                        Low Accuracy (&lt;70%)
                       </Typography>
                     </Box>
                   </Grid>
