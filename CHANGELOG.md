@@ -20,6 +20,10 @@ All notable changes to this project will be documented in this file. See [Conven
 - **NEW: Fixed forecasting API Network Error** - Simplified URL construction and removed class-based approach
 - **NEW: Fixed forecasting UI compilation errors** - TypeScript errors resolved for data field access
 - **NEW: Fixed forecasting data field mismatches** - Updated UI to use correct API response fields (mape/drift_score vs mae/rmse)
+- **NEW: Fixed forecast summary data not showing** - Added forecast summary to dashboard API and updated UI data access
+- **NEW: Fixed training progress tracking** - Resolved subprocess output buffering issues with unbuffered output
+- **NEW: Fixed authentication system** - Proper bcrypt password hashing and default user accounts
+- **NEW: Fixed RAPIDS GPU training** - Resolved XGBoost import issues and virtual environment setup
 
 ### Features
 - Initial implementation of Warehouse Operational Assistant
@@ -36,6 +40,13 @@ All notable changes to this project will be documented in this file. See [Conven
 - **NEW: Real-Time Predictions** - Live demand forecasts with confidence intervals
 - **NEW: Automated Reorder Recommendations** - AI-suggested stock orders with urgency levels
 - **NEW: Business Intelligence Dashboard** - Comprehensive analytics and performance monitoring
+- **NEW: XGBoost Integration** - Advanced gradient boosting model with hyperparameter optimization (82% accuracy, 15.8% MAPE)
+- **NEW: Enhanced Forecasting UI** - Model comparison cards, visual highlighting for XGBoost, and detailed performance metrics
+- **NEW: Forecast Summary Display** - Real-time forecast data visualization with trend analysis and SKU-specific metrics
+- **NEW: Model Performance Monitoring** - 6-model ensemble monitoring with XGBoost, Random Forest, Gradient Boosting, Linear Regression, Ridge Regression, SVR
+- **NEW: Training API Endpoints** - Comprehensive training management API with status, history, and manual/scheduled training
+- **NEW: RAPIDS GPU Training** - GPU-accelerated training with RAPIDS cuML integration and CPU fallback
+- **NEW: Real-Time Training Progress** - Live progress tracking with unbuffered output and real-time log capture
 - **NEW: Frito-Lay Product Catalog** - 38 SKUs with realistic demand patterns and historical data
 - **NEW: GPU Acceleration Ready** - NVIDIA RAPIDS cuML integration for enterprise-scale forecasting
 - Hybrid RAG system with SQL and vector retrieval

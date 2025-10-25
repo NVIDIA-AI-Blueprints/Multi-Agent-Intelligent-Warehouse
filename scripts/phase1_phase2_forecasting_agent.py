@@ -22,6 +22,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from sklearn.preprocessing import StandardScaler
+import xgboost as xgb
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -39,8 +40,8 @@ class ForecastingConfig:
         if self.ensemble_weights is None:
             self.ensemble_weights = {
                 'random_forest': 0.4,
-                'linear_regression': 0.3,
-                'time_series': 0.3
+                'xgboost': 0.4,
+                'time_series': 0.2
             }
 
 @dataclass
@@ -183,10 +184,16 @@ class RAPIDSForecastingAgent:
         df['brand_encoded'] = pd.Categorical(df['brand']).codes
         df['brand_tier_encoded'] = pd.Categorical(df['brand_tier']).codes
         
+        # Encode time-based categorical variables for XGBoost compatibility
+        df['day_of_week_encoded'] = pd.Categorical(df['day_of_week']).codes
+        df['month_encoded'] = pd.Categorical(df['month']).codes
+        df['quarter_encoded'] = pd.Categorical(df['quarter']).codes
+        df['year_encoded'] = pd.Categorical(df['year']).codes
+        
         # Remove rows with NaN values from lag features
         df = df.dropna()
         
-        self.feature_columns = [col for col in df.columns if col not in ['date', 'daily_demand', 'sku', 'brand', 'brand_tier']]
+        self.feature_columns = [col for col in df.columns if col not in ['date', 'daily_demand', 'sku', 'brand', 'brand_tier', 'day_of_week', 'month', 'quarter', 'year']]
         logger.info(f"✅ Engineered {len(self.feature_columns)} features")
         
         return df
@@ -220,14 +227,21 @@ class RAPIDSForecastingAgent:
             'mae': mean_absolute_error(y_val, rf_pred)
         }
         
-        # 2. Linear Regression
-        lr_model = LinearRegression()
-        lr_model.fit(X_train, y_train)
-        lr_pred = lr_model.predict(X_val)
-        models['linear_regression'] = lr_model
-        metrics['linear_regression'] = {
-            'mse': mean_squared_error(y_val, lr_pred),
-            'mae': mean_absolute_error(y_val, lr_pred)
+        # 2. XGBoost
+        xgb_model = xgb.XGBRegressor(
+            n_estimators=100,
+            max_depth=6,
+            learning_rate=0.1,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            random_state=42
+        )
+        xgb_model.fit(X_train, y_train)
+        xgb_pred = xgb_model.predict(X_val)
+        models['xgboost'] = xgb_model
+        metrics['xgboost'] = {
+            'mse': mean_squared_error(y_val, xgb_pred),
+            'mae': mean_absolute_error(y_val, xgb_pred)
         }
         
         # 3. Time Series Model

@@ -23,6 +23,7 @@ from chain_server.routers.mcp import router as mcp_router
 from chain_server.routers.document import router as document_router
 from chain_server.routers.equipment_old import router as inventory_router
 from chain_server.routers.advanced_forecasting import router as forecasting_router
+from chain_server.routers.training import router as training_router
 from chain_server.services.monitoring.metrics import (
     record_request_metrics,
     get_metrics_response,
@@ -66,6 +67,7 @@ app.include_router(mcp_router)
 app.include_router(document_router)
 app.include_router(inventory_router)
 app.include_router(forecasting_router)
+app.include_router(training_router)
 
 
 # Add metrics endpoint

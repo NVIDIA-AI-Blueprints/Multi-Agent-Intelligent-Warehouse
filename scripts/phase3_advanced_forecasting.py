@@ -41,6 +41,7 @@ from sklearn.linear_model import LinearRegression, Ridge, Lasso
 from sklearn.svm import SVR
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import GridSearchCV
+import xgboost as xgb
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -61,11 +62,12 @@ class ModelConfig:
     def __post_init__(self):
         if self.ensemble_weights is None:
             self.ensemble_weights = {
-                'random_forest': 0.3,
-                'gradient_boosting': 0.25,
-                'linear_regression': 0.2,
-                'ridge_regression': 0.15,
-                'svr': 0.1
+                'random_forest': 0.25,
+                'gradient_boosting': 0.2,
+                'xgboost': 0.25,
+                'linear_regression': 0.15,
+                'ridge_regression': 0.1,
+                'svr': 0.05
             }
 
 @dataclass
@@ -258,6 +260,18 @@ class AdvancedRAPIDSForecastingAgent:
                 }
                 model = GradientBoostingRegressor(**params, random_state=42)
                 
+            elif model_name == 'xgboost':
+                params = {
+                    'n_estimators': trial.suggest_int('n_estimators', 50, 300),
+                    'max_depth': trial.suggest_int('max_depth', 3, 12),
+                    'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3),
+                    'subsample': trial.suggest_float('subsample', 0.6, 1.0),
+                    'colsample_bytree': trial.suggest_float('colsample_bytree', 0.6, 1.0),
+                    'reg_alpha': trial.suggest_float('reg_alpha', 0.0, 10.0),
+                    'reg_lambda': trial.suggest_float('reg_lambda', 0.0, 10.0)
+                }
+                model = xgb.XGBRegressor(**params, random_state=42)
+                
             elif model_name == 'ridge_regression':
                 params = {
                     'alpha': trial.suggest_float('alpha', 0.1, 100.0, log=True)
@@ -339,11 +353,12 @@ class AdvancedRAPIDSForecastingAgent:
         
         # Train each model with hyperparameter optimization
         model_configs = {
-            'random_forest': {'weight': 0.3},
-            'gradient_boosting': {'weight': 0.25},
-            'linear_regression': {'weight': 0.2},
-            'ridge_regression': {'weight': 0.15},
-            'svr': {'weight': 0.1}
+            'random_forest': {'weight': 0.25},
+            'gradient_boosting': {'weight': 0.2},
+            'xgboost': {'weight': 0.25},
+            'linear_regression': {'weight': 0.15},
+            'ridge_regression': {'weight': 0.1},
+            'svr': {'weight': 0.05}
         }
         
         for model_name, config in model_configs.items():
@@ -363,6 +378,9 @@ class AdvancedRAPIDSForecastingAgent:
                     
             elif model_name == 'gradient_boosting':
                 model = GradientBoostingRegressor(**best_params, random_state=42)
+                
+            elif model_name == 'xgboost':
+                model = xgb.XGBRegressor(**best_params, random_state=42)
                 
             elif model_name == 'linear_regression':
                 if self.use_gpu:

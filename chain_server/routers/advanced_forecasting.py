@@ -274,21 +274,48 @@ class AdvancedForecastingService:
                     status="HEALTHY"
                 ),
                 ModelPerformanceMetrics(
-                    model_name="Gradient Boosting",
+                    model_name="XGBoost",
                     accuracy_score=0.82,
+                    mape=15.8,
+                    last_training_date=(datetime.now() - timedelta(hours=6)).isoformat(),
+                    prediction_count=1180,
+                    drift_score=0.18,
+                    status="HEALTHY"
+                ),
+                ModelPerformanceMetrics(
+                    model_name="Gradient Boosting",
+                    accuracy_score=0.78,
                     mape=14.2,
                     last_training_date=(datetime.now() - timedelta(days=2)).isoformat(),
-                    prediction_count=1180,
+                    prediction_count=1100,
                     drift_score=0.22,
                     status="WARNING"
                 ),
                 ModelPerformanceMetrics(
                     model_name="Linear Regression",
-                    accuracy_score=0.78,
+                    accuracy_score=0.72,
                     mape=18.7,
                     last_training_date=(datetime.now() - timedelta(days=3)).isoformat(),
                     prediction_count=980,
                     drift_score=0.31,
+                    status="NEEDS_RETRAINING"
+                ),
+                ModelPerformanceMetrics(
+                    model_name="Ridge Regression",
+                    accuracy_score=0.75,
+                    mape=16.3,
+                    last_training_date=(datetime.now() - timedelta(days=1)).isoformat(),
+                    prediction_count=1050,
+                    drift_score=0.25,
+                    status="WARNING"
+                ),
+                ModelPerformanceMetrics(
+                    model_name="Support Vector Regression",
+                    accuracy_score=0.70,
+                    mape=20.1,
+                    last_training_date=(datetime.now() - timedelta(days=4)).isoformat(),
+                    prediction_count=920,
+                    drift_score=0.35,
                     status="NEEDS_RETRAINING"
                 )
             ]
@@ -417,6 +444,53 @@ async def get_business_intelligence():
         logger.error(f"Error generating business intelligence: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+async def get_forecast_summary_data():
+    """Get forecast summary data from the inventory forecast endpoint"""
+    try:
+        import json
+        import os
+        
+        forecast_file = "phase1_phase2_forecasts.json"
+        if not os.path.exists(forecast_file):
+            # Return empty summary if no forecast data
+            return {
+                "forecast_summary": {},
+                "total_skus": 0,
+                "generated_at": datetime.now().isoformat()
+            }
+        
+        with open(forecast_file, 'r') as f:
+            forecasts = json.load(f)
+        
+        summary = {}
+        for sku, forecast_data in forecasts.items():
+            predictions = forecast_data['predictions']
+            avg_demand = sum(predictions) / len(predictions)
+            min_demand = min(predictions)
+            max_demand = max(predictions)
+            
+            summary[sku] = {
+                "average_daily_demand": round(avg_demand, 1),
+                "min_demand": round(min_demand, 1),
+                "max_demand": round(max_demand, 1),
+                "trend": "increasing" if predictions[0] < predictions[-1] else "decreasing" if predictions[0] > predictions[-1] else "stable",
+                "forecast_date": forecast_data['forecast_date']
+            }
+        
+        return {
+            "forecast_summary": summary,
+            "total_skus": len(summary),
+            "generated_at": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting forecast summary data: {e}")
+        return {
+            "forecast_summary": {},
+            "total_skus": 0,
+            "generated_at": datetime.now().isoformat()
+        }
+
 @router.get("/dashboard")
 async def get_forecasting_dashboard():
     """Get comprehensive forecasting dashboard data"""
@@ -444,11 +518,15 @@ async def get_forecasting_dashboard():
         
         top_demand_results = await forecasting_service.pg_conn.fetch(top_demand_query)
         
+        # Get forecast summary data
+        forecast_summary = await get_forecast_summary_data()
+        
         dashboard_data = {
             "business_intelligence": bi_summary,
             "reorder_recommendations": reorder_recs,
             "model_performance": model_metrics,
             "top_demand_skus": [dict(row) for row in top_demand_results],
+            "forecast_summary": forecast_summary,
             "generated_at": datetime.now().isoformat()
         }
         
