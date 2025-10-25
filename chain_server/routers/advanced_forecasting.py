@@ -586,6 +586,234 @@ class AdvancedForecastingService:
             logger.error(f"❌ Failed to generate business intelligence summary: {e}")
             raise
 
+    async def get_enhanced_business_intelligence(self) -> Dict[str, Any]:
+        """Get comprehensive business intelligence with analytics, trends, and visualizations"""
+        logger.info("📊 Generating enhanced business intelligence...")
+        
+        try:
+            # Load forecast data
+            import json
+            import os
+            
+            forecast_file = "all_sku_forecasts.json"
+            forecasts = {}
+            if os.path.exists(forecast_file):
+                with open(forecast_file, 'r') as f:
+                    forecasts = json.load(f)
+            
+            # 1. Inventory Analytics
+            inventory_query = """
+            SELECT 
+                COUNT(*) as total_skus,
+                COUNT(CASE WHEN quantity <= reorder_point THEN 1 END) as low_stock_items,
+                COUNT(CASE WHEN quantity > reorder_point * 2 THEN 1 END) as overstock_items,
+                AVG(quantity) as avg_quantity,
+                SUM(quantity) as total_quantity,
+                AVG(reorder_point) as avg_reorder_point
+            FROM inventory_items
+            """
+            inventory_analytics = await self.pg_conn.fetchrow(inventory_query)
+            
+            # 2. Demand Analytics (Last 30 days)
+            demand_query = """
+            SELECT 
+                sku,
+                DATE(timestamp) as date,
+                SUM(CASE WHEN movement_type = 'outbound' THEN quantity ELSE 0 END) as daily_demand,
+                SUM(CASE WHEN movement_type = 'inbound' THEN quantity ELSE 0 END) as daily_receipts
+            FROM inventory_movements 
+            WHERE timestamp >= NOW() - INTERVAL '30 days'
+            GROUP BY sku, DATE(timestamp)
+            ORDER BY date DESC
+            """
+            demand_data = await self.pg_conn.fetch(demand_query)
+            
+            # 3. Category Performance Analysis
+            category_query = """
+            SELECT 
+                SUBSTRING(sku, 1, 3) as category,
+                COUNT(*) as sku_count,
+                AVG(quantity) as avg_quantity,
+                SUM(quantity) as category_quantity,
+                COUNT(CASE WHEN quantity <= reorder_point THEN 1 END) as low_stock_count
+            FROM inventory_items
+            GROUP BY SUBSTRING(sku, 1, 3)
+            ORDER BY category_quantity DESC
+            """
+            category_analytics = await self.pg_conn.fetch(category_query)
+            
+            # 4. Top/Bottom Performers
+            top_performers_query = """
+            SELECT 
+                sku,
+                SUM(CASE WHEN movement_type = 'outbound' THEN quantity ELSE 0 END) as total_demand,
+                COUNT(CASE WHEN movement_type = 'outbound' THEN 1 END) as movement_count,
+                AVG(CASE WHEN movement_type = 'outbound' THEN quantity ELSE 0 END) as avg_daily_demand
+            FROM inventory_movements 
+            WHERE timestamp >= NOW() - INTERVAL '30 days'
+                AND movement_type = 'outbound'
+            GROUP BY sku
+            ORDER BY total_demand DESC
+            LIMIT 10
+            """
+            top_performers = await self.pg_conn.fetch(top_performers_query)
+            
+            bottom_performers_query = """
+            SELECT 
+                sku,
+                SUM(CASE WHEN movement_type = 'outbound' THEN quantity ELSE 0 END) as total_demand,
+                COUNT(CASE WHEN movement_type = 'outbound' THEN 1 END) as movement_count,
+                AVG(CASE WHEN movement_type = 'outbound' THEN quantity ELSE 0 END) as avg_daily_demand
+            FROM inventory_movements 
+            WHERE timestamp >= NOW() - INTERVAL '30 days'
+                AND movement_type = 'outbound'
+            GROUP BY sku
+            ORDER BY total_demand ASC
+            LIMIT 10
+            """
+            bottom_performers = await self.pg_conn.fetch(bottom_performers_query)
+            
+            # 5. Forecast Analytics
+            forecast_analytics = {}
+            if forecasts:
+                total_predicted_demand = 0
+                trending_up = 0
+                trending_down = 0
+                stable_trends = 0
+                
+                for sku, forecast_data in forecasts.items():
+                    predictions = forecast_data['predictions']
+                    avg_demand = sum(predictions) / len(predictions)
+                    total_predicted_demand += avg_demand
+                    
+                    # Determine trend
+                    if predictions[0] < predictions[-1] * 1.05:  # 5% threshold
+                        trending_up += 1
+                    elif predictions[0] > predictions[-1] * 1.05:
+                        trending_down += 1
+                    else:
+                        stable_trends += 1
+                
+                forecast_analytics = {
+                    "total_predicted_demand": round(total_predicted_demand, 1),
+                    "trending_up": trending_up,
+                    "trending_down": trending_down,
+                    "stable_trends": stable_trends,
+                    "avg_forecast_accuracy": round(np.mean([f.get('model_metrics', {}).get('best_model', {}).get('accuracy', 85) for f in forecasts.values()]), 1)
+                }
+            
+            # 6. Seasonal Analysis
+            seasonal_query = """
+            SELECT 
+                EXTRACT(MONTH FROM timestamp) as month,
+                EXTRACT(DOW FROM timestamp) as day_of_week,
+                SUM(CASE WHEN movement_type = 'outbound' THEN quantity ELSE 0 END) as demand
+            FROM inventory_movements 
+            WHERE timestamp >= NOW() - INTERVAL '90 days'
+                AND movement_type = 'outbound'
+            GROUP BY EXTRACT(MONTH FROM timestamp), EXTRACT(DOW FROM timestamp)
+            ORDER BY month, day_of_week
+            """
+            seasonal_data = await self.pg_conn.fetch(seasonal_query)
+            
+            # 7. Reorder Analysis
+            reorder_query = """
+            SELECT 
+                sku,
+                quantity,
+                reorder_point,
+                CASE 
+                    WHEN quantity <= reorder_point THEN 'CRITICAL'
+                    WHEN quantity <= reorder_point * 1.5 THEN 'HIGH'
+                    WHEN quantity <= reorder_point * 2 THEN 'MEDIUM'
+                    ELSE 'LOW'
+                END as urgency_level
+            FROM inventory_items
+            WHERE quantity <= reorder_point * 2
+            ORDER BY quantity ASC
+            """
+            reorder_analysis = await self.pg_conn.fetch(reorder_query)
+            
+            # 8. Model Performance Analytics
+            model_performance = await self.get_model_performance_metrics()
+            model_analytics = {
+                "total_models": len(model_performance),
+                "avg_accuracy": round(np.mean([m.accuracy_score for m in model_performance]), 1),
+                "best_model": max(model_performance, key=lambda x: x.accuracy_score).model_name if model_performance else "N/A",
+                "worst_model": min(model_performance, key=lambda x: x.accuracy_score).model_name if model_performance else "N/A",
+                "models_above_80": len([m for m in model_performance if m.accuracy_score > 80]),
+                "models_below_70": len([m for m in model_performance if m.accuracy_score < 70])
+            }
+            
+            # 9. Business KPIs
+            kpis = {
+                "inventory_turnover": round(inventory_analytics['total_quantity'] / max(sum([r['total_demand'] for r in top_performers]), 1), 2),
+                "stockout_risk": round((inventory_analytics['low_stock_items'] / inventory_analytics['total_skus']) * 100, 1),
+                "overstock_percentage": round((inventory_analytics['overstock_items'] / inventory_analytics['total_skus']) * 100, 1),
+                "forecast_coverage": round((len(forecasts) / inventory_analytics['total_skus']) * 100, 1),
+                "demand_volatility": round(np.std([r['total_demand'] for r in top_performers]) / np.mean([r['total_demand'] for r in top_performers]), 2) if top_performers else 0
+            }
+            
+            # 10. Recommendations
+            recommendations = []
+            
+            # Low stock recommendations
+            if inventory_analytics['low_stock_items'] > 0:
+                recommendations.append({
+                    "type": "urgent",
+                    "title": "Low Stock Alert",
+                    "description": f"{inventory_analytics['low_stock_items']} items are below reorder point",
+                    "action": "Review and place orders immediately"
+                })
+            
+            # Overstock recommendations
+            if inventory_analytics['overstock_items'] > 0:
+                recommendations.append({
+                    "type": "warning",
+                    "title": "Overstock Alert",
+                    "description": f"{inventory_analytics['overstock_items']} items are overstocked",
+                    "action": "Consider promotional pricing or redistribution"
+                })
+            
+            # Model performance recommendations
+            if model_analytics['models_below_70'] > 0:
+                recommendations.append({
+                    "type": "info",
+                    "title": "Model Performance",
+                    "description": f"{model_analytics['models_below_70']} models performing below 70% accuracy",
+                    "action": "Retrain models with more recent data"
+                })
+            
+            # Forecast trend recommendations
+            if forecast_analytics and forecast_analytics['trending_down'] > forecast_analytics['trending_up']:
+                recommendations.append({
+                    "type": "warning",
+                    "title": "Demand Trend",
+                    "description": "More SKUs showing declining demand trends",
+                    "action": "Review marketing strategies and product positioning"
+                })
+            
+            enhanced_bi = {
+                "inventory_analytics": dict(inventory_analytics),
+                "category_analytics": [dict(row) for row in category_analytics],
+                "top_performers": [dict(row) for row in top_performers],
+                "bottom_performers": [dict(row) for row in bottom_performers],
+                "forecast_analytics": forecast_analytics,
+                "seasonal_data": [dict(row) for row in seasonal_data],
+                "reorder_analysis": [dict(row) for row in reorder_analysis],
+                "model_analytics": model_analytics,
+                "business_kpis": kpis,
+                "recommendations": recommendations,
+                "generated_at": datetime.now().isoformat()
+            }
+            
+            logger.info("✅ Enhanced business intelligence generated successfully")
+            return enhanced_bi
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to generate enhanced business intelligence: {e}")
+            raise
+
 # Global service instance
 forecasting_service = AdvancedForecastingService()
 
@@ -644,6 +872,17 @@ async def get_business_intelligence():
         logger.error(f"Error generating business intelligence: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/business-intelligence/enhanced")
+async def get_enhanced_business_intelligence():
+    """Get comprehensive business intelligence with analytics and trends"""
+    try:
+        await forecasting_service.initialize()
+        enhanced_bi = await forecasting_service.get_enhanced_business_intelligence()
+        return enhanced_bi
+    except Exception as e:
+        logger.error(f"Error generating enhanced business intelligence: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 async def get_forecast_summary_data():
     """Get forecast summary data from the inventory forecast endpoint"""
     try:
@@ -698,34 +937,18 @@ async def get_forecasting_dashboard():
         await forecasting_service.initialize()
         
         # Get all dashboard data
-        bi_summary = await forecasting_service.get_business_intelligence_summary()
+        # Get enhanced business intelligence
+        enhanced_bi = await forecasting_service.get_enhanced_business_intelligence()
         reorder_recs = await forecasting_service.generate_reorder_recommendations()
         model_metrics = await forecasting_service.get_model_performance_metrics()
-        
-        # Get top SKUs by demand
-        top_demand_query = """
-        SELECT 
-            sku,
-            SUM(quantity) as total_demand,
-            COUNT(*) as movement_count
-        FROM inventory_movements 
-        WHERE movement_type = 'outbound'
-            AND timestamp >= NOW() - INTERVAL '30 days'
-        GROUP BY sku
-        ORDER BY total_demand DESC
-        LIMIT 10
-        """
-        
-        top_demand_results = await forecasting_service.pg_conn.fetch(top_demand_query)
         
         # Get forecast summary data
         forecast_summary = await get_forecast_summary_data()
         
         dashboard_data = {
-            "business_intelligence": bi_summary,
+            "business_intelligence": enhanced_bi,
             "reorder_recommendations": reorder_recs,
             "model_performance": model_metrics,
-            "top_demand_skus": [dict(row) for row in top_demand_results],
             "forecast_summary": forecast_summary,
             "generated_at": datetime.now().isoformat()
         }

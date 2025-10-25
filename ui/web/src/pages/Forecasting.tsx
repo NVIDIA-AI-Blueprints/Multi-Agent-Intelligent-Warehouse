@@ -57,6 +57,20 @@ import {
   Schedule as ScheduleIcon,
   History as HistoryIcon,
   Build as BuildIcon,
+  Error as ErrorIcon,
+  Info as InfoIcon,
+  Assessment as AssessmentIcon,
+  Memory as MemoryIcon,
+  Storage as StorageIcon,
+  Timeline as TimelineIcon,
+  BarChart as BarChartIcon,
+  PieChart as PieChartIcon,
+  ShowChart as ShowChartIcon,
+  Star as StarIcon,
+  StarBorder as StarBorderIcon,
+  ArrowUpward as ArrowUpwardIcon,
+  ArrowDownward as ArrowDownwardIcon,
+  Remove as RemoveIcon,
 } from '@mui/icons-material';
 import { useQuery } from 'react-query';
 import { forecastingAPI } from '../services/forecastingAPI';
@@ -629,48 +643,408 @@ const ForecastingPage: React.FC = () => {
 
       {/* Business Intelligence Tab */}
       <TabPanel value={selectedTab} index={3}>
-        <Typography variant="h5" gutterBottom>
-          Business Intelligence Summary
+        <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <AnalyticsIcon color="primary" />
+          Enhanced Business Intelligence Dashboard
         </Typography>
+        
         {dashboardData?.business_intelligence ? (
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    Overall Performance
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Forecast Accuracy: {(dashboardData.business_intelligence.forecast_accuracy * 100).toFixed(1)}%
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Total SKUs: {dashboardData.business_intelligence.total_skus}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Low Stock Items: {dashboardData.business_intelligence.low_stock_items}
-                  </Typography>
-                </CardContent>
-              </Card>
+          <Box>
+            {/* Key Performance Indicators */}
+            <Grid container spacing={3} sx={{ mb: 3 }}>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card sx={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Box>
+                        <Typography variant="h4" fontWeight="bold">
+                          {dashboardData.business_intelligence.inventory_analytics?.total_skus || 0}
+                        </Typography>
+                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                          Total SKUs
+                        </Typography>
+                      </Box>
+                      <InventoryIcon sx={{ fontSize: 40, opacity: 0.8 }} />
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+              
+              <Grid item xs={12} sm={6} md={3}>
+                <Card sx={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white' }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Box>
+                        <Typography variant="h4" fontWeight="bold">
+                          {dashboardData.business_intelligence.inventory_analytics?.total_quantity?.toLocaleString() || '0'}
+                        </Typography>
+                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                          Total Quantity
+                        </Typography>
+                      </Box>
+                      <StorageIcon sx={{ fontSize: 40, opacity: 0.8 }} />
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+              
+              <Grid item xs={12} sm={6} md={3}>
+                <Card sx={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', color: 'white' }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Box>
+                        <Typography variant="h4" fontWeight="bold">
+                          {dashboardData.business_intelligence.business_kpis?.forecast_coverage || 0}%
+                        </Typography>
+                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                          Forecast Coverage
+                        </Typography>
+                      </Box>
+                      <AssessmentIcon sx={{ fontSize: 40, opacity: 0.8 }} />
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+              
+              <Grid item xs={12} sm={6} md={3}>
+                <Card sx={{ background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', color: 'white' }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Box>
+                        <Typography variant="h4" fontWeight="bold">
+                          {dashboardData.business_intelligence.model_analytics?.avg_accuracy || 0}%
+                        </Typography>
+                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                          Avg Accuracy
+                        </Typography>
+                      </Box>
+                      <SpeedIcon sx={{ fontSize: 40, opacity: 0.8 }} />
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
             </Grid>
-            <Grid item xs={12} md={6}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    Key Insights
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    High Demand Items: {dashboardData.business_intelligence.high_demand_items}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Reorder Recommendations: {dashboardData.business_intelligence.reorder_recommendations}
-                  </Typography>
-                </CardContent>
-              </Card>
+
+            {/* Risk Indicators */}
+            <Grid container spacing={3} sx={{ mb: 3 }}>
+              <Grid item xs={12} md={4}>
+                <Card sx={{ border: '2px solid', borderColor: 'error.main' }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                      <WarningIcon color="error" />
+                      <Typography variant="h6" color="error">
+                        Stockout Risk
+                      </Typography>
+                    </Box>
+                    <Typography variant="h3" color="error" fontWeight="bold">
+                      {dashboardData.business_intelligence.business_kpis?.stockout_risk || 0}%
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {dashboardData.business_intelligence.inventory_analytics?.low_stock_items || 0} items below reorder point
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              
+              <Grid item xs={12} md={4}>
+                <Card sx={{ border: '2px solid', borderColor: 'warning.main' }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                      <InfoIcon color="warning" />
+                      <Typography variant="h6" color="warning.main">
+                        Overstock Alert
+                      </Typography>
+                    </Box>
+                    <Typography variant="h3" color="warning.main" fontWeight="bold">
+                      {dashboardData.business_intelligence.business_kpis?.overstock_percentage || 0}%
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {dashboardData.business_intelligence.inventory_analytics?.overstock_items || 0} items overstocked
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              
+              <Grid item xs={12} md={4}>
+                <Card sx={{ border: '2px solid', borderColor: 'info.main' }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                      <TimelineIcon color="info" />
+                      <Typography variant="h6" color="info.main">
+                        Demand Volatility
+                      </Typography>
+                    </Box>
+                    <Typography variant="h3" color="info.main" fontWeight="bold">
+                      {dashboardData.business_intelligence.business_kpis?.demand_volatility || 0}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Coefficient of variation
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
             </Grid>
-          </Grid>
+
+            {/* Category Performance */}
+            <Grid container spacing={3} sx={{ mb: 3 }}>
+              <Grid item xs={12} md={6}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <BarChartIcon color="primary" />
+                      Category Performance
+                    </Typography>
+                    <TableContainer>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Category</TableCell>
+                            <TableCell align="right">SKUs</TableCell>
+                            <TableCell align="right">Value</TableCell>
+                            <TableCell align="right">Low Stock</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {dashboardData.business_intelligence.category_analytics?.slice(0, 5).map((category: any) => (
+                            <TableRow key={category.category}>
+                              <TableCell>
+                                <Chip 
+                                  label={category.category} 
+                                  size="small" 
+                                  color="primary" 
+                                  variant="outlined"
+                                />
+                              </TableCell>
+                              <TableCell align="right">{category.sku_count}</TableCell>
+                              <TableCell align="right">${category.category_quantity?.toLocaleString()}</TableCell>
+                              <TableCell align="right">
+                                <Chip 
+                                  label={category.low_stock_count} 
+                                  size="small" 
+                                  color={category.low_stock_count > 0 ? 'error' : 'success'}
+                                />
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </CardContent>
+                </Card>
+              </Grid>
+              
+              <Grid item xs={12} md={6}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <ShowChartIcon color="primary" />
+                      Forecast Trends
+                    </Typography>
+                    {dashboardData.business_intelligence.forecast_analytics ? (
+                      <Box>
+                        <Grid container spacing={2}>
+                          <Grid item xs={4}>
+                            <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'success.light', borderRadius: 2 }}>
+                              <ArrowUpwardIcon color="success" sx={{ fontSize: 30 }} />
+                              <Typography variant="h4" color="success.dark" fontWeight="bold">
+                                {dashboardData.business_intelligence.forecast_analytics.trending_up}
+                              </Typography>
+                              <Typography variant="body2">Trending Up</Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={4}>
+                            <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'error.light', borderRadius: 2 }}>
+                              <ArrowDownwardIcon color="error" sx={{ fontSize: 30 }} />
+                              <Typography variant="h4" color="error.dark" fontWeight="bold">
+                                {dashboardData.business_intelligence.forecast_analytics.trending_down}
+                              </Typography>
+                              <Typography variant="body2">Trending Down</Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={4}>
+                            <Box sx={{ textAlign: 'center', p: 2, bgcolor: 'info.light', borderRadius: 2 }}>
+                              <RemoveIcon color="info" sx={{ fontSize: 30 }} />
+                              <Typography variant="h4" color="info.dark" fontWeight="bold">
+                                {dashboardData.business_intelligence.forecast_analytics.stable_trends}
+                              </Typography>
+                              <Typography variant="body2">Stable</Typography>
+                            </Box>
+                          </Grid>
+                        </Grid>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
+                          Total Predicted Demand: {dashboardData.business_intelligence.forecast_analytics.total_predicted_demand?.toLocaleString()}
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        Forecast analytics not available
+                      </Typography>
+                    )}
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+
+            {/* Top & Bottom Performers */}
+            <Grid container spacing={3} sx={{ mb: 3 }}>
+              <Grid item xs={12} md={6}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <StarIcon color="primary" />
+                      Top Performers
+                    </Typography>
+                    <TableContainer>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>SKU</TableCell>
+                            <TableCell align="right">Demand</TableCell>
+                            <TableCell align="right">Avg Daily</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {dashboardData.business_intelligence.top_performers?.slice(0, 5).map((performer: any, index: number) => (
+                            <TableRow key={performer.sku}>
+                              <TableCell>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <StarIcon color="primary" sx={{ fontSize: 16 }} />
+                                  {performer.sku}
+                                </Box>
+                              </TableCell>
+                              <TableCell align="right">{performer.total_demand?.toLocaleString()}</TableCell>
+                              <TableCell align="right">{performer.avg_daily_demand?.toFixed(1)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </CardContent>
+                </Card>
+              </Grid>
+              
+              <Grid item xs={12} md={6}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <StarBorderIcon color="secondary" />
+                      Bottom Performers
+                    </Typography>
+                    <TableContainer>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>SKU</TableCell>
+                            <TableCell align="right">Demand</TableCell>
+                            <TableCell align="right">Avg Daily</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {dashboardData.business_intelligence.bottom_performers?.slice(0, 5).map((performer: any, index: number) => (
+                            <TableRow key={performer.sku}>
+                              <TableCell>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <StarBorderIcon color="secondary" sx={{ fontSize: 16 }} />
+                                  {performer.sku}
+                                </Box>
+                              </TableCell>
+                              <TableCell align="right">{performer.total_demand?.toLocaleString()}</TableCell>
+                              <TableCell align="right">{performer.avg_daily_demand?.toFixed(1)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+
+            {/* Recommendations */}
+            <Card sx={{ mb: 3 }}>
+              <CardContent>
+                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <InfoIcon color="primary" />
+                  AI Recommendations
+                </Typography>
+                <Grid container spacing={2}>
+                  {dashboardData.business_intelligence.recommendations?.map((rec: any, index: number) => (
+                    <Grid item xs={12} md={6} key={index}>
+                      <Alert 
+                        severity={rec.type === 'urgent' ? 'error' : rec.type === 'warning' ? 'warning' : 'info'}
+                        sx={{ height: '100%' }}
+                      >
+                        <Typography variant="subtitle2" fontWeight="bold">
+                          {rec.title}
+                        </Typography>
+                        <Typography variant="body2">
+                          {rec.description}
+                        </Typography>
+                        <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic' }}>
+                          💡 {rec.action}
+                        </Typography>
+                      </Alert>
+                    </Grid>
+                  ))}
+                </Grid>
+              </CardContent>
+            </Card>
+
+            {/* Model Performance Summary */}
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <MemoryIcon color="primary" />
+                  Model Performance Analytics
+                </Typography>
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={3}>
+                    <Box sx={{ textAlign: 'center', p: 2 }}>
+                      <Typography variant="h4" color="primary" fontWeight="bold">
+                        {dashboardData.business_intelligence.model_analytics?.total_models || 0}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Active Models
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} md={3}>
+                    <Box sx={{ textAlign: 'center', p: 2 }}>
+                      <Typography variant="h4" color="success.main" fontWeight="bold">
+                        {dashboardData.business_intelligence.model_analytics?.models_above_80 || 0}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        High Accuracy (>80%)
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} md={3}>
+                    <Box sx={{ textAlign: 'center', p: 2 }}>
+                      <Typography variant="h4" color="warning.main" fontWeight="bold">
+                        {dashboardData.business_intelligence.model_analytics?.models_below_70 || 0}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Low Accuracy (<70%)
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={12} md={3}>
+                    <Box sx={{ textAlign: 'center', p: 2 }}>
+                      <Typography variant="h4" color="info.main" fontWeight="bold">
+                        {dashboardData.business_intelligence.model_analytics?.best_model || 'N/A'}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Best Model
+                      </Typography>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
+          </Box>
         ) : (
           <Alert severity="info">
-            Business intelligence data is being generated...
+            Enhanced business intelligence data is being generated...
           </Alert>
         )}
       </TabPanel>
