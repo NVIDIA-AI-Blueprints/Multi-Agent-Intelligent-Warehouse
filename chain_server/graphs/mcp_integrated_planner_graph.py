@@ -413,8 +413,16 @@ class MCPPlannerGraph:
             self.tool_validation = ToolValidationService(self.tool_discovery)
             self.mcp_manager = MCPManager()
 
-            # Start tool discovery
-            await self.tool_discovery.start_discovery()
+            # Start tool discovery with timeout
+            try:
+                await asyncio.wait_for(
+                    self.tool_discovery.start_discovery(),
+                    timeout=2.0  # 2 second timeout for tool discovery
+                )
+            except asyncio.TimeoutError:
+                logger.warning("Tool discovery timed out, continuing without full discovery")
+            except Exception as discovery_error:
+                logger.warning(f"Tool discovery failed: {discovery_error}, continuing without full discovery")
 
             # Initialize intent classifier with MCP
             self.intent_classifier = MCPIntentClassifier(self.tool_discovery)

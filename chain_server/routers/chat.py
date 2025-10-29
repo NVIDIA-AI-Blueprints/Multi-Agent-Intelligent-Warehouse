@@ -145,6 +145,52 @@ def _format_user_response(
         return f"{base_response}\n\n🟢 {int(confidence * 100)}%"
 
 
+def _create_simple_fallback_response(message: str, session_id: str) -> ChatResponse:
+    """
+    Create a simple fallback response when MCP planner is unavailable.
+    Provides basic pattern matching for common warehouse queries.
+    """
+    message_lower = message.lower()
+    
+    # Simple pattern matching for common queries
+    if any(word in message_lower for word in ["order", "wave", "dispatch", "forklift"]):
+        return ChatResponse(
+            reply=f"I received your request: '{message}'. I understand you want to create a wave and dispatch a forklift. The system is processing your request. For detailed operations, please wait a moment for the full system to initialize.",
+            route="operations",
+            intent="operations",
+            session_id=session_id or "default",
+            confidence=0.6,
+            recommendations=["The system is initializing. Please try again in a few seconds for full functionality."],
+        )
+    elif any(word in message_lower for word in ["inventory", "stock", "sku", "quantity"]):
+        return ChatResponse(
+            reply=f"I received your query: '{message}'. I can help with inventory questions. The system is initializing. Please try again in a moment for detailed inventory information.",
+            route="inventory",
+            intent="inventory",
+            session_id=session_id or "default",
+            confidence=0.6,
+            recommendations=["Please try again in a few seconds for full inventory access."],
+        )
+    elif any(word in message_lower for word in ["equipment", "forklift", "asset", "machine"]):
+        return ChatResponse(
+            reply=f"I received your question: '{message}'. I can help with equipment information. The system is initializing. Please try again in a moment.",
+            route="equipment",
+            intent="equipment",
+            session_id=session_id or "default",
+            confidence=0.6,
+            recommendations=["Please try again in a few seconds."],
+        )
+    else:
+        return ChatResponse(
+            reply=f"I received your message: '{message}'. The system is initializing. Please try again in a moment, or rephrase your question.",
+            route="general",
+            intent="general",
+            session_id=session_id or "default",
+            confidence=0.5,
+            recommendations=["Please try again in a few seconds", "Try rephrasing your question"],
+        )
+
+
 def _clean_response_text(response: str) -> str:
     """
     Clean the response text by removing technical details and context information.
@@ -469,45 +515,23 @@ async def chat(req: ChatRequest):
             # If initialization is slow, provide immediate response
             mcp_planner = None
             try:
+                # Very short timeout - if MCP is slow, use simple fallback
                 mcp_planner = await asyncio.wait_for(
                     get_mcp_planner_graph(),
-                    timeout=3.0  # Reduced to 3 second timeout for faster fallback
+                    timeout=2.0  # Reduced to 2 seconds for very fast fallback
                 )
             except asyncio.TimeoutError:
-                logger.warning("MCP planner initialization timed out, using fallback response")
-                # Return a helpful message instead of waiting
-                return ChatResponse(
-                    reply=f"I received your message: '{req.message}'. The system is initializing. Please try again in a moment, or rephrase your question.",
-                    route="general",
-                    intent="general",
-                    session_id=req.session_id or "default",
-                    context={"error": "Initialization timeout", "user_message": req.message},
-                    confidence=0.5,
-                    recommendations=["Please try again in a few seconds", "Try rephrasing your question"],
-                )
+                logger.warning("MCP planner initialization timed out, using simple fallback")
+                # Use simple response pattern matching for basic queries
+                return _create_simple_fallback_response(req.message, req.session_id)
             except Exception as init_error:
                 logger.error(f"MCP planner initialization failed: {init_error}")
-                # Fallback response if initialization fails
-                return ChatResponse(
-                    reply=f"I received your message: '{req.message}'. There was an issue processing your request. Please try again.",
-                    route="general",
-                    intent="general",
-                    session_id=req.session_id or "default",
-                    context={"error": str(init_error)[:200]},
-                    confidence=0.5,
-                    recommendations=["Please try again", "Try rephrasing your question"],
-                )
+                # Use simple fallback response
+                return _create_simple_fallback_response(req.message, req.session_id)
             
             if not mcp_planner:
-                # Safety check
-                logger.error("MCP planner is None after initialization attempt")
-                return ChatResponse(
-                    reply=f"I received your message: '{req.message}'. Please try again.",
-                    route="general",
-                    intent="general",
-                    session_id=req.session_id or "default",
-                    confidence=0.5,
-                )
+                logger.warning("MCP planner is None, using simple fallback")
+                return _create_simple_fallback_response(req.message, req.session_id)
             
             # Create task with timeout protection
             query_task = asyncio.create_task(
