@@ -433,6 +433,8 @@ async def chat(req: ChatRequest):
     (Inventory, Operations, Safety) based on intent classification and
     returns synthesized responses. All inputs and outputs are checked for
     safety, compliance, and security violations.
+    
+    Includes timeout protection for async operations to prevent hanging requests.
     """
     try:
         # Check input safety with guardrails
@@ -451,12 +453,18 @@ async def chat(req: ChatRequest):
             )
 
         # Process the query through the MCP planner graph with error handling
+        # Add timeout to prevent hanging on slow queries
+        MAIN_QUERY_TIMEOUT = 30  # seconds for main query processing
+        
         try:
             mcp_planner = await get_mcp_planner_graph()
-            result = await mcp_planner.process_warehouse_query(
-                message=req.message,
-                session_id=req.session_id or "default",
-                context=req.context,
+            result = await asyncio.wait_for(
+                mcp_planner.process_warehouse_query(
+                    message=req.message,
+                    session_id=req.session_id or "default",
+                    context=req.context,
+                ),
+                timeout=MAIN_QUERY_TIMEOUT
             )
             
             # Determine if enhancements should be skipped for simple queries
@@ -559,68 +567,106 @@ async def chat(req: ChatRequest):
                         return None
 
                 # Run evidence and quick actions in parallel (context enhancement needs base response)
-                evidence_task = asyncio.create_task(enhance_with_evidence())
-                quick_actions_task = asyncio.create_task(generate_quick_actions())
+                # Add timeout protection to prevent hanging requests
+                ENHANCEMENT_TIMEOUT = 25  # seconds - leave time for main response
                 
-                # Wait for evidence first as quick actions can benefit from it
-                enhanced_response = await evidence_task
-                
-                # Update result with evidence if available
-                if enhanced_response:
-                    result["response"] = enhanced_response.response
-                    result["evidence_summary"] = enhanced_response.evidence_summary
-                    result["source_attributions"] = enhanced_response.source_attributions
-                    result["evidence_count"] = enhanced_response.evidence_count
-                    result["key_findings"] = enhanced_response.key_findings
+                try:
+                    evidence_task = asyncio.create_task(enhance_with_evidence())
+                    quick_actions_task = asyncio.create_task(generate_quick_actions())
                     
-                    if enhanced_response.confidence_score > 0:
-                        original_confidence = structured_response.get("confidence", 0.5)
-                        result["confidence"] = max(
-                            original_confidence, enhanced_response.confidence_score
+                    # Wait for evidence first as quick actions can benefit from it (with timeout)
+                    try:
+                        enhanced_response = await asyncio.wait_for(evidence_task, timeout=ENHANCEMENT_TIMEOUT)
+                    except asyncio.TimeoutError:
+                        logger.warning("Evidence enhancement timed out")
+                        enhanced_response = None
+                    except Exception as e:
+                        logger.error(f"Evidence enhancement error: {e}")
+                        enhanced_response = None
+                    
+                    # Update result with evidence if available
+                    if enhanced_response:
+                        result["response"] = enhanced_response.response
+                        result["evidence_summary"] = enhanced_response.evidence_summary
+                        result["source_attributions"] = enhanced_response.source_attributions
+                        result["evidence_count"] = enhanced_response.evidence_count
+                        result["key_findings"] = enhanced_response.key_findings
+                        
+                        if enhanced_response.confidence_score > 0:
+                            original_confidence = structured_response.get("confidence", 0.5)
+                            result["confidence"] = max(
+                                original_confidence, enhanced_response.confidence_score
+                            )
+                        
+                        # Merge recommendations
+                        original_recommendations = structured_response.get("recommendations", [])
+                        evidence_recommendations = enhanced_response.recommendations or []
+                        all_recommendations = list(
+                            set(original_recommendations + evidence_recommendations)
                         )
-                    
-                    # Merge recommendations
-                    original_recommendations = structured_response.get("recommendations", [])
-                    evidence_recommendations = enhanced_response.recommendations or []
-                    all_recommendations = list(
-                        set(original_recommendations + evidence_recommendations)
-                    )
-                    if all_recommendations:
-                        result["recommendations"] = all_recommendations
+                        if all_recommendations:
+                            result["recommendations"] = all_recommendations
 
-                # Get quick actions (may have completed in parallel)
-                quick_actions = await quick_actions_task
-                
-                if quick_actions:
-                    # Convert actions to dictionary format
-                    actions_dict = []
-                    action_suggestions = []
+                    # Get quick actions (may have completed in parallel, with timeout)
+                    try:
+                        quick_actions = await asyncio.wait_for(quick_actions_task, timeout=ENHANCEMENT_TIMEOUT)
+                    except asyncio.TimeoutError:
+                        logger.warning("Quick actions generation timed out")
+                        quick_actions = []
+                    except Exception as e:
+                        logger.error(f"Quick actions generation error: {e}")
+                        quick_actions = []
                     
-                    for action in quick_actions:
-                        action_dict = {
-                            "action_id": action.action_id,
-                            "title": action.title,
-                            "description": action.description,
-                            "action_type": action.action_type.value,
-                            "priority": action.priority.value,
-                            "icon": action.icon,
-                            "command": action.command,
-                            "parameters": action.parameters,
-                            "requires_confirmation": action.requires_confirmation,
-                            "enabled": action.enabled,
-                        }
-                        actions_dict.append(action_dict)
-                        action_suggestions.append(action.title)
-                    
-                    result["quick_actions"] = actions_dict
-                    result["action_suggestions"] = action_suggestions
+                    if quick_actions:
+                        # Convert actions to dictionary format
+                        actions_dict = []
+                        action_suggestions = []
+                        
+                        for action in quick_actions:
+                            action_dict = {
+                                "action_id": action.action_id,
+                                "title": action.title,
+                                "description": action.description,
+                                "action_type": action.action_type.value,
+                                "priority": action.priority.value,
+                                "icon": action.icon,
+                                "command": action.command,
+                                "parameters": action.parameters,
+                                "requires_confirmation": action.requires_confirmation,
+                                "enabled": action.enabled,
+                            }
+                            actions_dict.append(action_dict)
+                            action_suggestions.append(action.title)
+                        
+                        result["quick_actions"] = actions_dict
+                        result["action_suggestions"] = action_suggestions
 
-                # Enhance with context (runs after evidence since it may use evidence summary)
-                context_enhanced = await enhance_with_context()
-                if context_enhanced and context_enhanced.get("context_enhanced", False):
-                    result["response"] = context_enhanced["response"]
-                    result["context_info"] = context_enhanced.get("context_info", {})
+                    # Enhance with context (runs after evidence since it may use evidence summary, with timeout)
+                    try:
+                        context_enhanced = await asyncio.wait_for(
+                            enhance_with_context(), timeout=ENHANCEMENT_TIMEOUT
+                        )
+                        if context_enhanced and context_enhanced.get("context_enhanced", False):
+                            result["response"] = context_enhanced["response"]
+                            result["context_info"] = context_enhanced.get("context_info", {})
+                    except asyncio.TimeoutError:
+                        logger.warning("Context enhancement timed out")
+                    except Exception as e:
+                        logger.error(f"Context enhancement error: {e}")
+                        
+                except Exception as enhancement_error:
+                    # Catch any unexpected errors in enhancement orchestration
+                    logger.error(f"Enhancement orchestration error: {enhancement_error}")
+                    # Continue with base result if enhancements fail
                     
+        except asyncio.TimeoutError:
+            logger.error("Main query processing timed out")
+            user_message = (
+                "The request timed out. The system is taking longer than expected. "
+                "Please try again with a simpler question or try again in a moment."
+            )
+            error_type = "TimeoutError"
+            error_message = "Main query processing timed out after 30 seconds"
         except Exception as query_error:
             logger.error(f"Query processing error: {query_error}")
             # Return a more helpful fallback response
@@ -628,7 +674,7 @@ async def chat(req: ChatRequest):
             error_message = str(query_error)
 
             # Provide specific error messages based on error type
-            if "timeout" in error_message.lower():
+            if "timeout" in error_message.lower() or isinstance(query_error, asyncio.TimeoutError):
                 user_message = (
                     "The request timed out. Please try again with a simpler question."
                 )

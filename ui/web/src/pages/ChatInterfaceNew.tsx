@@ -182,9 +182,21 @@ const ChatInterfaceNew: React.FC = () => {
     },
     onError: (error: any) => {
       console.error('Chat error:', error);
+      // Handle network errors more gracefully
+      let errorMessage = 'Failed to send message';
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        errorMessage = 'Request timed out. The system is taking longer than expected. Please try again.';
+      } else if (error.message?.includes('Network Error') || !error.response) {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      } else if (error.response?.status === 500) {
+        errorMessage = 'Server error. Please try again or contact support if the issue persists.';
+      } else {
+        errorMessage = `Failed to send message: ${error.message || 'Unknown error'}`;
+      }
+      
       setSnackbar({
         open: true,
-        message: `Failed to send message: ${error.message || 'Unknown error'}`,
+        message: errorMessage,
         severity: 'error',
       });
     },
