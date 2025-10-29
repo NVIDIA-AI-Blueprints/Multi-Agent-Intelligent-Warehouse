@@ -137,12 +137,25 @@ const ChatInterfaceNew: React.FC = () => {
   // Recent tasks - get from actual API
   const { data: tasks } = useQuery('recent-tasks', () => 
     operationsAPI.getTasks().then(tasks => 
-      tasks?.slice(0, 5).map(task => ({
-        id: String(task.id),
-        title: `${task.kind} - ${task.assignee || 'Unassigned'}`,
-        status: task.status as 'completed' | 'pending' | 'in_progress',
-        timestamp: new Date(task.created_at),
-      })) || []
+      tasks?.slice(0, 5).map(task => {
+        // Map task status to LeftRail expected status values
+        let status: 'completed' | 'pending' | 'failed' = 'pending';
+        if (task.status === 'completed') {
+          status = 'completed';
+        } else if (task.status === 'failed' || task.status === 'error') {
+          status = 'failed';
+        } else {
+          // 'pending' or 'in_progress' both map to 'pending'
+          status = 'pending';
+        }
+        
+        return {
+          id: String(task.id),
+          title: `${task.kind} - ${task.assignee || 'Unassigned'}`,
+          status,
+          timestamp: new Date(task.created_at),
+        };
+      }) || []
     ),
     {
       refetchInterval: 60000, // Refresh every minute
