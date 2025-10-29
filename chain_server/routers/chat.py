@@ -922,39 +922,53 @@ async def chat(req: ChatRequest):
             enhancement_applied = False
             enhancement_summary = None
 
-        return ChatResponse(
-            reply=formatted_reply,
-            route=result.get("route", "general"),
-            intent=result.get("intent", "unknown"),
-            session_id=result.get("session_id", req.session_id or "default"),
-            context=result.get("context"),
-            structured_data=structured_response.get("data"),
-            recommendations=result.get(
-                "recommendations", structured_response.get("recommendations")
-            ),
-            confidence=confidence,  # Use the confidence we calculated above
-            actions_taken=structured_response.get("actions_taken"),
-            # Evidence enhancement fields
-            evidence_summary=result.get("evidence_summary"),
-            source_attributions=result.get("source_attributions"),
-            evidence_count=result.get("evidence_count"),
-            key_findings=result.get("key_findings"),
-            # Quick actions fields
-            quick_actions=result.get("quick_actions"),
-            action_suggestions=result.get("action_suggestions"),
-            # Conversation memory fields
-            context_info=result.get("context_info"),
-            conversation_enhanced=result.get("context_info") is not None,
-            # Response validation fields
-            validation_score=validation_score,
-            validation_passed=validation_passed,
-            validation_issues=validation_issues,
-            enhancement_applied=enhancement_applied,
-            enhancement_summary=enhancement_summary,
-            # MCP tool execution fields
-            mcp_tools_used=mcp_tools_used,
-            tool_execution_results=tool_execution_results,
-        )
+        try:
+            return ChatResponse(
+                reply=formatted_reply,
+                route=result.get("route", "general") if result else "general",
+                intent=result.get("intent", "unknown") if result else "unknown",
+                session_id=result.get("session_id", req.session_id or "default") if result else (req.session_id or "default"),
+                context=result.get("context") if result else {},
+                structured_data=structured_response.get("data") if structured_response else None,
+                recommendations=result.get(
+                    "recommendations", structured_response.get("recommendations") if structured_response else []
+                ) if result else [],
+                confidence=confidence,  # Use the confidence we calculated above
+                actions_taken=structured_response.get("actions_taken") if structured_response else None,
+                # Evidence enhancement fields
+                evidence_summary=result.get("evidence_summary") if result else None,
+                source_attributions=result.get("source_attributions") if result else None,
+                evidence_count=result.get("evidence_count") if result else None,
+                key_findings=result.get("key_findings") if result else None,
+                # Quick actions fields
+                quick_actions=result.get("quick_actions") if result else None,
+                action_suggestions=result.get("action_suggestions") if result else None,
+                # Conversation memory fields
+                context_info=result.get("context_info") if result else None,
+                conversation_enhanced=result.get("context_info") is not None if result else False,
+                # Response validation fields
+                validation_score=validation_score,
+                validation_passed=validation_passed,
+                validation_issues=validation_issues,
+                enhancement_applied=enhancement_applied,
+                enhancement_summary=enhancement_summary,
+                # MCP tool execution fields
+                mcp_tools_used=mcp_tools_used,
+                tool_execution_results=tool_execution_results,
+            )
+        except Exception as response_error:
+            logger.error(f"Error creating ChatResponse: {response_error}")
+            logger.error(f"Result data: {result if result else 'None'}")
+            logger.error(f"Structured response: {structured_response if structured_response else 'None'}")
+            # Return a minimal response
+            return ChatResponse(
+                reply=formatted_reply if formatted_reply else f"I received your message: '{req.message}'. However, there was an issue formatting the response.",
+                route="general",
+                intent="general",
+                session_id=req.session_id or "default",
+                confidence=confidence if confidence else 0.5,
+                recommendations=["Please try rephrasing your question"],
+            )
 
     except asyncio.TimeoutError:
         logger.error("Chat endpoint timed out - main query processing exceeded timeout")
