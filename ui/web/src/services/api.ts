@@ -339,4 +339,26 @@ export const healthAPI = {
   },
 };
 
+export interface User {
+  id: number;
+  username: string;
+  email: string;
+  full_name: string;
+  role: string;
+  status: string;
+}
+
+export const userAPI = {
+  getUsers: async (): Promise<User[]> => {
+    try {
+      const response = await api.get('/auth/users');
+      return response.data;
+    } catch (error) {
+      // If not admin or endpoint doesn't exist, return empty array
+      console.warn('Could not fetch users:', error);
+      return [];
+    }
+  },
+};
+
 export default api;

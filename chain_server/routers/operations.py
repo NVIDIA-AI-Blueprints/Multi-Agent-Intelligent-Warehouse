@@ -257,12 +257,26 @@ async def get_workforce_status():
         """
         task_stats = await sql_retriever.fetch_one(tasks_query)
 
-        # Mock workforce data (in a real system, this would come from a workforce management system)
+        # Get actual worker data from users table
+        users_query = """
+            SELECT 
+                COUNT(*) as total_users,
+                COUNT(CASE WHEN status = 'active' THEN 1 END) as active_users,
+                COUNT(CASE WHEN role IN ('operator', 'supervisor', 'manager') AND status = 'active' THEN 1 END) as operational_workers
+            FROM users
+        """
+        user_stats = await sql_retriever.fetch_one(users_query)
+        
+        # Calculate available workers (operational workers minus those with in-progress tasks)
+        operational_workers = user_stats.get("operational_workers") or 0
+        tasks_in_progress_count = task_stats["in_progress"] or 0
+        available_workers = max(0, operational_workers - tasks_in_progress_count)
+        
         return WorkforceStatus(
-            total_workers=25,
-            active_workers=20,
-            available_workers=5,
-            tasks_in_progress=task_stats["in_progress"] or 0,
+            total_workers=user_stats.get("total_users") or 0,
+            active_workers=user_stats.get("active_users") or 0,
+            available_workers=available_workers,
+            tasks_in_progress=tasks_in_progress_count,
             tasks_pending=task_stats["pending"] or 0,
         )
     except Exception as e:

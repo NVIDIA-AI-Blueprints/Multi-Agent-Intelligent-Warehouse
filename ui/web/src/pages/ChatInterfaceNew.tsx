@@ -17,8 +17,8 @@ import {
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
 } from '@mui/icons-material';
-import { useMutation } from 'react-query';
-import { chatAPI } from '../services/api';
+import { useMutation, useQuery } from 'react-query';
+import { chatAPI, healthAPI, operationsAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import TopBar from '../components/chat/TopBar';
 import LeftRail from '../components/chat/LeftRail';
@@ -100,38 +100,56 @@ const ChatInterfaceNew: React.FC = () => {
     severity: 'info',
   });
 
-  // Top bar state
-  const [warehouse, setWarehouse] = useState('WH-01');
-  const [role, setRole] = useState('manager');
-  const [environment, setEnvironment] = useState('Dev');
-  const [connections] = useState({
-    nim: true,
-    db: true,
-    milvus: true,
-    kafka: true,
+  // Top bar state - use environment/config values
+  const [warehouse, setWarehouse] = useState(process.env.REACT_APP_WAREHOUSE_ID || 'WH-01');
+  const [environment, setEnvironment] = useState(process.env.NODE_ENV === 'production' ? 'Prod' : 'Dev');
+  
+  // Get user role from auth context if available
+  const getUserRole = () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        // In a real app, decode JWT to get role
+        // For now, default to manager
+        return 'manager';
+      }
+      return 'guest';
+    } catch {
+      return 'guest';
+    }
+  };
+  const [role, setRole] = useState(getUserRole());
+  
+  // Connection status - check health endpoints
+  const { data: healthStatus } = useQuery('health', healthAPI.check, {
+    refetchInterval: 30000, // Check every 30 seconds
+    retry: false,
   });
+  
+  // Update connections based on health status
+  const connections = {
+    nim: true, // NVIDIA NIM - assume available if we're using it
+    db: healthStatus?.ok || false,
+    milvus: true, // Milvus health could be checked separately
+    kafka: true, // Kafka health could be checked separately
+  };
 
-  // Recent tasks
-  const [recentTasks] = useState([
+  // Recent tasks - get from actual API
+  const { data: tasks } = useQuery('recent-tasks', () => 
+    operationsAPI.getTasks().then(tasks => 
+      tasks?.slice(0, 5).map(task => ({
+        id: String(task.id),
+        title: `${task.kind} - ${task.assignee || 'Unassigned'}`,
+        status: task.status as 'completed' | 'pending' | 'in_progress',
+        timestamp: new Date(task.created_at),
+      })) || []
+    ),
     {
-      id: '1',
-      title: 'Create pick wave for orders 1001-1010',
-      status: 'completed' as const,
-      timestamp: new Date(Date.now() - 1000 * 60 * 30),
-    },
-    {
-      id: '2',
-      title: 'Dispatch forklift FL-07 to Zone A',
-      status: 'completed' as const,
-      timestamp: new Date(Date.now() - 1000 * 60 * 15),
-    },
-    {
-      id: '3',
-      title: 'Safety incident report - Dock D2',
-      status: 'pending' as const,
-      timestamp: new Date(Date.now() - 1000 * 60 * 5),
-    },
-  ]);
+      refetchInterval: 60000, // Refresh every minute
+    }
+  );
+  
+  const recentTasks = tasks || [];
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);

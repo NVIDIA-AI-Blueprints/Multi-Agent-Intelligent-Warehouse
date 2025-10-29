@@ -303,8 +303,7 @@ const DocumentExtraction: React.FC = () => {
                   ...updatedDoc,
                   status: 'completed',
                   progress: 100,
-                  qualityScore: 4.2, // Mock quality score
-                  processingTime: 45, // Mock processing time
+                  // Quality score and processing time will be loaded from API when viewing results
                   routingDecision: 'Auto-Approved'
                 }];
               });
@@ -337,10 +336,24 @@ const DocumentExtraction: React.FC = () => {
         document_id: response.document_id,
         extracted_data: {},
         confidence_scores: {},
-        quality_score: response.quality_score?.overall_score || 0,
+        quality_score: response.quality_score?.overall_score || response.processing_summary?.quality_score || 0,
         routing_decision: response.routing_decision?.routing_action || 'unknown',
         processing_stages: response.extraction_results?.map((result: any) => result.stage) || []
       };
+      
+      // Update document with actual quality score and processing time from API
+      setCompletedDocuments(prevCompleted => 
+        prevCompleted.map(doc => 
+          doc.id === document.id 
+            ? {
+                ...doc,
+                qualityScore: transformedResults.quality_score,
+                processingTime: response.processing_summary?.total_processing_time ? 
+                  Math.round(response.processing_summary.total_processing_time / 1000) : undefined
+              }
+            : doc
+        )
+      );
       
       // Flatten extraction results into extracted_data
       if (response.extraction_results && Array.isArray(response.extraction_results)) {
@@ -636,7 +649,8 @@ const DocumentExtraction: React.FC = () => {
         </Box>
         
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Quality Score: {document.qualityScore || 4.2}/5.0 | Processing Time: {document.processingTime || 45}s
+          Quality Score: {document.qualityScore ? `${document.qualityScore}/5.0` : 'N/A'} | 
+          Processing Time: {document.processingTime ? `${document.processingTime}s` : 'N/A'}
         </Typography>
         
         <Box sx={{ display: 'flex', gap: 1 }}>

@@ -20,7 +20,7 @@ import {
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { Report as ReportIcon } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
-import { safetyAPI, SafetyIncident } from '../services/api';
+import { safetyAPI, SafetyIncident, userAPI, User } from '../services/api';
 
 const Safety: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -36,6 +36,11 @@ const Safety: React.FC = () => {
   const { data: policies } = useQuery(
     'policies',
     safetyAPI.getPolicies
+  );
+
+  const { data: users } = useQuery(
+    'users',
+    userAPI.getUsers
   );
 
   const reportMutation = useMutation(safetyAPI.reportIncident, {
@@ -201,12 +206,15 @@ const Safety: React.FC = () => {
                   label="Reported By"
                   required
                 >
-                  <MenuItem value="John Smith">John Smith</MenuItem>
-                  <MenuItem value="Sarah Johnson">Sarah Johnson</MenuItem>
-                  <MenuItem value="Mike Wilson">Mike Wilson</MenuItem>
-                  <MenuItem value="Lisa Brown">Lisa Brown</MenuItem>
-                  <MenuItem value="David Lee">David Lee</MenuItem>
-                  <MenuItem value="Amy Chen">Amy Chen</MenuItem>
+                  {users && users.length > 0 ? (
+                    users.map((user: User) => (
+                      <MenuItem key={user.id} value={user.full_name || user.username}>
+                        {user.full_name || user.username} ({user.role})
+                      </MenuItem>
+                    ))
+                  ) : (
+                    <MenuItem value="">No users available</MenuItem>
+                  )}
                 </Select>
               </FormControl>
             </Grid>

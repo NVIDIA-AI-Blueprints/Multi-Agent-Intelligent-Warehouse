@@ -64,8 +64,7 @@ const InventoryPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [brandFilter, setBrandFilter] = useState('all');
   const [tabValue, setTabValue] = useState(0);
-
-  const brands = ['all', 'LAY', 'DOR', 'CHE', 'TOS', 'FRI', 'RUF', 'SUN', 'POP', 'FUN', 'SMA'];
+  const [brands, setBrands] = useState<string[]>(['all']);
 
   useEffect(() => {
     fetchInventoryItems();
@@ -101,6 +100,17 @@ const InventoryPage: React.FC = () => {
       setError(null);
       const items = await inventoryAPI.getAllItems();
       setInventoryItems(items);
+      
+      // Dynamically extract brands from actual SKUs
+      const uniqueBrands = new Set<string>(['all']);
+      items.forEach(item => {
+        // Extract brand prefix (first 3 characters of SKU)
+        if (item.sku && item.sku.length >= 3) {
+          const brandPrefix = item.sku.substring(0, 3).toUpperCase();
+          uniqueBrands.add(brandPrefix);
+        }
+      });
+      setBrands(Array.from(uniqueBrands).sort());
     } catch (err) {
       setError('Failed to fetch inventory items');
       // console.error('Error fetching inventory items:', err);
@@ -197,7 +207,10 @@ const InventoryPage: React.FC = () => {
                 Total Value
               </Typography>
               <Typography variant="h4">
-                ${inventoryItems.reduce((sum, item) => sum + (item.quantity * 2.5), 0).toLocaleString()}
+                N/A
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Cost data not available
               </Typography>
             </CardContent>
           </Card>
