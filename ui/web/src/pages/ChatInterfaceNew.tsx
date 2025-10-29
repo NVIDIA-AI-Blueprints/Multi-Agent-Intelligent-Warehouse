@@ -469,21 +469,23 @@ const ChatInterfaceNew: React.FC = () => {
                   <Typography variant="body2" sx={{ color: '#76B900', mb: 1 }}>
                     Processing...
                   </Typography>
-                  {streamingEvents.map((event, index) => (
-                    <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                      <Typography variant="caption" sx={{ color: '#666666', minWidth: '100px' }}>
-                        {event.stage}:
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: '#ffffff' }}>
-                        {event.agent && `Agent: ${event.agent}`}
-                        {event.confidence && ` (${(event.confidence * 100).toFixed(1)}%)`}
-                        {event.k && ` K=${event.k}→${event.reranked}`}
-                        {event.lat_ms && ` (${event.lat_ms}ms)`}
-                        {event.action && ` ${event.action}`}
-                        {event.text && ` ${event.text}`}
-                      </Typography>
-                    </Box>
-                  ))}
+                  {streamingEvents
+                    .filter((event): event is StreamingEvent => event !== null && event !== undefined)
+                    .map((event, index) => (
+                      <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                        <Typography variant="caption" sx={{ color: '#666666', minWidth: '100px' }}>
+                          {event?.stage || 'unknown'}:
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#ffffff' }}>
+                          {event?.agent && `Agent: ${event.agent}`}
+                          {event?.confidence && ` (${(event.confidence * 100).toFixed(1)}%)`}
+                          {event?.k !== undefined && ` K=${event.k}→${event.reranked}`}
+                          {event?.lat_ms !== undefined && ` (${event.lat_ms}ms)`}
+                          {event?.action && ` ${event.action}`}
+                          {event?.text && ` ${event.text}`}
+                        </Typography>
+                      </Box>
+                    ))}
                 </Paper>
               </Box>
             )}
