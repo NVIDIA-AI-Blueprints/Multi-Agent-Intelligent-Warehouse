@@ -35,5 +35,51 @@
     ],
     "upload_time": "2025-10-25T02:12:34.385708",
     "estimated_completion": 1761383614.385708
-  }
-}
+  },
+  "fb9ccb23-92d1-4d3e-abf8-956347843a91": {
+    "status": "completed",
+    "current_stage": "Completed",
+    "progress": 100.0,
+    "file_path": "/tmp/document_uploads_1ybhx3nv/fb9ccb23-92d1-4d3e-abf8-956347843a91_sample.pdf",
+    "filename": "fb9ccb23-92d1-4d3e-abf8-956347843a91_sample.pdf",
+    "document_type": "invoice",
+    "stages": [
+      {
+        "name": "preprocessing",
+        "status": "completed",
+        "started_at": "2025-10-27T14:49:50.805061",
+        "completed_at": "2025-10-27T14:50:21.592787"
+      },
+      {
+        "name": "ocr_extraction",
+        "status": "completed",
+        "started_at": "2025-10-27T14:50:03.079871",
+        "completed_at": "2025-10-27T14:50:21.592791"
+      },
+      {
+        "name": "llm_processing",
+        "status": "completed",
+        "started_at": "2025-10-27T14:50:15.116045",
+        "completed_at": "2025-10-27T14:50:21.592794"
+      },
+      {
+        "name": "validation",
+        "status": "completed",
+        "started_at": "2025-10-27T14:50:27.154613",
+        "completed_at": "2025-10-27T14:50:21.592797"
+      },
+      {
+        "name": "routing",
+        "status": "processing",
+        "started_at": "2025-10-27T14:50:39.191596",
+        "completed_at": "2025-10-27T14:50:21.592800"
+      }
+    ],
+    "upload_time": "2025-10-27T14:49:50.805068",
+    "estimated_completion": 1761601850.805068,
+    "processing_results": {
+      "preprocessing": {
+        "document_type": "pdf",
+        "total_pages": 1,
+        "images": [
+          
