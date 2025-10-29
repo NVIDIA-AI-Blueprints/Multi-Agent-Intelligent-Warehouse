@@ -457,15 +457,31 @@ async def chat(req: ChatRequest):
         MAIN_QUERY_TIMEOUT = 30  # seconds for main query processing
         
         try:
+            logger.info(f"Processing chat query: {req.message[:50]}...")
             mcp_planner = await get_mcp_planner_graph()
-            result = await asyncio.wait_for(
+            
+            # Create task with timeout protection
+            query_task = asyncio.create_task(
                 mcp_planner.process_warehouse_query(
                     message=req.message,
                     session_id=req.session_id or "default",
                     context=req.context,
-                ),
-                timeout=MAIN_QUERY_TIMEOUT
+                )
             )
+            
+            try:
+                result = await asyncio.wait_for(query_task, timeout=MAIN_QUERY_TIMEOUT)
+                logger.info(f"Query processing completed in time: route={result.get('route', 'unknown')}")
+            except asyncio.TimeoutError:
+                logger.error(f"Query processing timed out after {MAIN_QUERY_TIMEOUT}s")
+                # Cancel the task
+                query_task.cancel()
+                try:
+                    await query_task
+                except asyncio.CancelledError:
+                    pass
+                # Re-raise to be caught by outer exception handler
+                raise
             
             # Determine if enhancements should be skipped for simple queries
             # Simple queries: short messages, greetings, or basic status checks
@@ -707,20 +723,26 @@ async def chat(req: ChatRequest):
                 ],
             )
 
-        # Check output safety with guardrails
-        output_safety = await guardrails_service.check_output_safety(
-            result["response"], req.context
-        )
-        if not output_safety.is_safe:
-            logger.warning(f"Output safety violation: {output_safety.violations}")
-            return ChatResponse(
-                reply=guardrails_service.get_safety_response(output_safety.violations),
-                route="guardrails",
-                intent="safety_violation",
-                session_id=req.session_id or "default",
-                context={"safety_violations": output_safety.violations},
-                confidence=output_safety.confidence,
+        # Check output safety with guardrails (with timeout protection)
+        try:
+            output_safety = await asyncio.wait_for(
+                guardrails_service.check_output_safety(result["response"], req.context),
+                timeout=5.0  # 5 second timeout for safety check
             )
+            if not output_safety.is_safe:
+                logger.warning(f"Output safety violation: {output_safety.violations}")
+                return ChatResponse(
+                    reply=guardrails_service.get_safety_response(output_safety.violations),
+                    route="guardrails",
+                    intent="safety_violation",
+                    session_id=req.session_id or "default",
+                    context={"safety_violations": output_safety.violations},
+                    confidence=output_safety.confidence,
+                )
+        except asyncio.TimeoutError:
+            logger.warning("Output safety check timed out, proceeding with response")
+        except Exception as safety_error:
+            logger.warning(f"Output safety check failed: {safety_error}, proceeding with response")
 
         # Extract structured response if available
         structured_response = result.get("structured_response", {})
@@ -872,30 +894,71 @@ async def chat(req: ChatRequest):
             tool_execution_results=tool_execution_results,
         )
 
-    except Exception as e:
-        logger.error(f"Error in chat endpoint: {e}")
-        # Return a user-friendly error response with helpful suggestions
+    except asyncio.TimeoutError:
+        logger.error("Chat endpoint timed out - main query processing exceeded timeout")
         return ChatResponse(
-            reply="I'm sorry, I encountered an unexpected error. Please try again or contact support if the issue persists.",
+            reply="The request timed out. Please try again with a simpler question or try again in a moment.",
             route="error",
-            intent="error",
+            intent="timeout",
             session_id=req.session_id or "default",
             context={
-                "error": str(e),
-                "error_type": type(e).__name__,
+                "error": "Request timed out",
+                "error_type": "TimeoutError",
                 "suggestions": [
-                    "Try refreshing the page",
-                    "Check your internet connection",
-                    "Contact support if the issue persists",
+                    "Try rephrasing your question",
+                    "Simplify your request",
+                    "Try again in a moment",
                 ],
             },
             confidence=0.0,
             recommendations=[
-                "Try refreshing the page",
-                "Check your internet connection",
-                "Contact support if the issue persists",
+                "Try rephrasing your question",
+                "Simplify your request",
+                "Try again in a moment",
             ],
         )
+    except Exception as e:
+        import traceback
+        logger.error(f"Error in chat endpoint: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        # Return a user-friendly error response with helpful suggestions
+        try:
+            return ChatResponse(
+                reply="I'm sorry, I encountered an unexpected error. Please try again or contact support if the issue persists.",
+                route="error",
+                intent="error",
+                session_id=req.session_id or "default",
+                context={
+                    "error": str(e)[:200],  # Limit error message length
+                    "error_type": type(e).__name__,
+                    "suggestions": [
+                        "Try refreshing the page",
+                        "Check your internet connection",
+                        "Contact support if the issue persists",
+                    ],
+                },
+                confidence=0.0,
+                recommendations=[
+                    "Try refreshing the page",
+                    "Check your internet connection",
+                    "Contact support if the issue persists",
+                ],
+            )
+        except Exception as fallback_error:
+            # If even ChatResponse creation fails, log and return minimal error
+            logger.critical(f"Failed to create error response: {fallback_error}")
+            # Return a minimal response that FastAPI can handle
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "reply": "I encountered a critical error. Please try again.",
+                    "route": "error",
+                    "intent": "error",
+                    "session_id": req.session_id or "default",
+                    "confidence": 0.0,
+                }
+            )
 
 
 @router.post("/chat/conversation/summary")
