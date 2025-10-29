@@ -177,8 +177,24 @@ const ChatInterfaceNew: React.FC = () => {
 
   const chatMutation = useMutation(chatAPI.sendMessage, {
     onSuccess: (response) => {
-      // Simulate streaming response
-      simulateStreamingResponse(response);
+      console.log('Chat response received:', response);
+      // Add message immediately so user sees it right away
+      try {
+        simulateStreamingResponse(response);
+      } catch (error) {
+        console.error('Error processing response:', error);
+        // Fallback: add message directly if streaming fails
+        const fallbackMessage: Message = {
+          id: Date.now().toString(),
+          type: 'answer',
+          content: response.reply || response.content || 'Response received but could not be displayed',
+          sender: 'assistant',
+          timestamp: new Date(),
+          route: response.route || 'general',
+          confidence: response.confidence || 0.75,
+        };
+        setMessages(prev => [...prev, fallbackMessage]);
+      }
     },
     onError: (error: any) => {
       console.error('Chat error:', error);
@@ -206,7 +222,24 @@ const ChatInterfaceNew: React.FC = () => {
   });
 
   const simulateStreamingResponse = (response: any) => {
-    // Simulate streaming events
+    // Add the message immediately so user sees response right away
+    const assistantMessage: Message = {
+      id: Date.now().toString(),
+      type: response.clarifying ? 'clarifying_question' : 'answer',
+      content: response.reply || response.content || 'No response received',
+      sender: 'assistant',
+      timestamp: new Date(),
+      route: response.route,
+      confidence: response.confidence,
+      structured_data: response.structured_data,
+      proposals: response.proposals,
+      clarifying: response.clarifying,
+      evidence: response.evidence,
+    };
+
+    setMessages(prev => [...prev, assistantMessage]);
+
+    // Simulate streaming events for UI enhancement (optional)
     const events: StreamingEvent[] = [
       { stage: 'route_decision', agent: response.route || 'operations', confidence: response.confidence || 0.87 },
       { stage: 'retrieval_debug', k: 12, reranked: 6, evidence_score: 0.82 },
@@ -235,7 +268,7 @@ const ChatInterfaceNew: React.FC = () => {
 
     events.push({ stage: 'final_answer', text: response.reply || response.content });
 
-    // Simulate streaming
+    // Simulate streaming (non-blocking, just for UI enhancement)
     let eventIndex = 0;
     const streamInterval = setInterval(() => {
       if (eventIndex < events.length) {
@@ -243,22 +276,6 @@ const ChatInterfaceNew: React.FC = () => {
         eventIndex++;
       } else {
         clearInterval(streamInterval);
-        // Add final message
-        const assistantMessage: Message = {
-          id: Date.now().toString(),
-          type: response.clarifying ? 'clarifying_question' : 'answer',
-          content: response.reply || response.content,
-          sender: 'assistant',
-          timestamp: new Date(),
-          route: response.route,
-          confidence: response.confidence,
-          structured_data: response.structured_data,
-          proposals: response.proposals,
-          clarifying: response.clarifying,
-          evidence: response.evidence,
-        };
-
-        setMessages(prev => [...prev, assistantMessage]);
         
         // Process evidence data properly
         const evidenceData = [];
