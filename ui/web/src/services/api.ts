@@ -29,11 +29,39 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Handle unauthorized access
-      localStorage.removeItem('auth_token');
-      window.location.href = '/login';
+    const status = error.response?.status;
+    const url = error.config?.url || '';
+    
+    // 403 (Forbidden) = authenticated but not authorized - never redirect to login
+    if (status === 403) {
+      // Let the component handle permission errors gracefully
+      return Promise.reject(error);
     }
+    
+    // 401 (Unauthorized) handling - only redirect if token is truly invalid
+    if (status === 401) {
+      // Don't redirect for endpoints that handle their own auth errors gracefully
+      const isOptionalEndpoint = url.includes('/auth/users') || url.includes('/auth/me');
+      
+      // Check if request had auth token - if yes, token is likely invalid/expired
+      const hasAuthHeader = error.config?.headers?.Authorization;
+      const token = localStorage.getItem('auth_token');
+      
+      // Only redirect if:
+      // 1. We have a token in localStorage (user thinks they're logged in)
+      // 2. Request included auth header (token was sent)
+      // 3. It's not an optional endpoint that handles its own errors
+      // 4. We're not already on login page
+      if (token && hasAuthHeader && !isOptionalEndpoint && window.location.pathname !== '/login') {
+        // Token exists but request failed with 401 - token is invalid/expired
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user_info');
+        window.location.href = '/login';
+      }
+      // For /auth/me and /auth/users, let the calling component handle the error gracefully
+      // For other cases (no token, optional endpoints), let component handle it
+    }
+    
     return Promise.reject(error);
   }
 );
