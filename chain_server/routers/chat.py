@@ -466,21 +466,47 @@ async def chat(req: ChatRequest):
             logger.info(f"Processing chat query: {req.message[:50]}...")
             
             # Get planner with timeout protection (initialization might hang)
+            # If initialization is slow, provide immediate response
+            mcp_planner = None
             try:
                 mcp_planner = await asyncio.wait_for(
                     get_mcp_planner_graph(),
-                    timeout=5.0  # 5 second timeout for initialization
+                    timeout=3.0  # Reduced to 3 second timeout for faster fallback
                 )
             except asyncio.TimeoutError:
-                logger.error("MCP planner initialization timed out")
+                logger.warning("MCP planner initialization timed out, using fallback response")
+                # Return a helpful message instead of waiting
                 return ChatResponse(
-                    reply="The system is initializing. Please try again in a moment.",
-                    route="error",
-                    intent="initialization_timeout",
+                    reply=f"I received your message: '{req.message}'. The system is initializing. Please try again in a moment, or rephrase your question.",
+                    route="general",
+                    intent="general",
                     session_id=req.session_id or "default",
-                    context={"error": "Initialization timeout"},
-                    confidence=0.0,
-                    recommendations=["Please try again in a few seconds"],
+                    context={"error": "Initialization timeout", "user_message": req.message},
+                    confidence=0.5,
+                    recommendations=["Please try again in a few seconds", "Try rephrasing your question"],
+                )
+            except Exception as init_error:
+                logger.error(f"MCP planner initialization failed: {init_error}")
+                # Fallback response if initialization fails
+                return ChatResponse(
+                    reply=f"I received your message: '{req.message}'. There was an issue processing your request. Please try again.",
+                    route="general",
+                    intent="general",
+                    session_id=req.session_id or "default",
+                    context={"error": str(init_error)[:200]},
+                    confidence=0.5,
+                    recommendations=["Please try again", "Try rephrasing your question"],
+                )
+            
+            if not mcp_planner:
+                # Safety check
+                logger.error("MCP planner is None after initialization attempt")
+                return ChatResponse(
+                    reply=f"I received your message: '{req.message}'. Please try again.",
+                    route="general",
+                    intent="general",
+                    session_id=req.session_id or "default",
+                    confidence=0.5,
                 )
             
             # Create task with timeout protection

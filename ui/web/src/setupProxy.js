@@ -10,7 +10,7 @@ module.exports = function(app) {
       changeOrigin: true,
       secure: false,
       logLevel: 'debug',
-      timeout: 30000,
+      timeout: 60000, // Match axios timeout - 60 seconds
       onError: function (err, req, res) {
         console.log('Proxy error:', err.message);
         res.status(500).json({ error: 'Proxy error: ' + err.message });
