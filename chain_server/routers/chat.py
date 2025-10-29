@@ -437,20 +437,26 @@ async def chat(req: ChatRequest):
     Includes timeout protection for async operations to prevent hanging requests.
     """
     try:
-        # Check input safety with guardrails
-        input_safety = await guardrails_service.check_input_safety(
-            req.message, req.context
-        )
-        if not input_safety.is_safe:
-            logger.warning(f"Input safety violation: {input_safety.violations}")
-            return ChatResponse(
-                reply=guardrails_service.get_safety_response(input_safety.violations),
-                route="guardrails",
-                intent="safety_violation",
-                session_id=req.session_id or "default",
-                context={"safety_violations": input_safety.violations},
-                confidence=input_safety.confidence,
+        # Check input safety with guardrails (with timeout)
+        try:
+            input_safety = await asyncio.wait_for(
+                guardrails_service.check_input_safety(req.message, req.context),
+                timeout=3.0  # 3 second timeout for safety check
             )
+            if not input_safety.is_safe:
+                logger.warning(f"Input safety violation: {input_safety.violations}")
+                return ChatResponse(
+                    reply=guardrails_service.get_safety_response(input_safety.violations),
+                    route="guardrails",
+                    intent="safety_violation",
+                    session_id=req.session_id or "default",
+                    context={"safety_violations": input_safety.violations},
+                    confidence=input_safety.confidence,
+                )
+        except asyncio.TimeoutError:
+            logger.warning("Input safety check timed out, proceeding")
+        except Exception as safety_error:
+            logger.warning(f"Input safety check failed: {safety_error}, proceeding")
 
         # Process the query through the MCP planner graph with error handling
         # Add timeout to prevent hanging on slow queries
@@ -499,6 +505,19 @@ async def chat(req: ChatRequest):
                     pass
                 # Re-raise to be caught by outer exception handler
                 raise
+            
+            # Handle empty or invalid results
+            if not result or not result.get("response"):
+                logger.warning("MCP planner returned empty result, creating fallback response")
+                result = {
+                    "response": f"I received your message: '{req.message}'. However, I'm having trouble processing it right now. Please try rephrasing your question.",
+                    "intent": "general",
+                    "route": "general",
+                    "session_id": req.session_id or "default",
+                    "structured_response": {},
+                    "mcp_tools_used": [],
+                    "tool_execution_results": {},
+                }
             
             # Determine if enhancements should be skipped for simple queries
             # Simple queries: short messages, greetings, or basic status checks
