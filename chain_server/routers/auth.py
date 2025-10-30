@@ -50,11 +50,40 @@ async def register(
 @router.post("/auth/login", response_model=Token)
 async def login(user_login: UserLogin):
     """Authenticate user and return tokens."""
+    import asyncio
     try:
-        await user_service.initialize()
+        # Initialize with timeout to prevent hanging
+        try:
+            await asyncio.wait_for(
+                user_service.initialize(),
+                timeout=3.0  # 3 second timeout for initialization
+            )
+        except asyncio.TimeoutError:
+            logger.error("User service initialization timed out")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Authentication service is unavailable. Please try again.",
+            )
+        except Exception as init_err:
+            logger.error(f"User service initialization failed: {init_err}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Authentication service error. Please try again.",
+            )
 
-        # Get user with hashed password
-        user = await user_service.get_user_for_auth(user_login.username)
+        # Get user with hashed password (with timeout)
+        try:
+            user = await asyncio.wait_for(
+                user_service.get_user_for_auth(user_login.username),
+                timeout=2.0  # 2 second timeout for user lookup
+            )
+        except asyncio.TimeoutError:
+            logger.error(f"User lookup timed out for username: {user_login.username}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Authentication service is slow. Please try again.",
+            )
+        
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -75,8 +104,15 @@ async def login(user_login: UserLogin):
                 detail="Invalid username or password",
             )
 
-        # Update last login
-        await user_service.update_last_login(user.id)
+        # Update last login (with timeout, but don't fail if it times out)
+        try:
+            await asyncio.wait_for(
+                user_service.update_last_login(user.id),
+                timeout=2.0
+            )
+        except (asyncio.TimeoutError, Exception) as e:
+            logger.warning(f"Failed to update last login: {e}")
+            # Continue anyway - last login update is not critical
 
         # Create tokens
         user_data = {
@@ -93,7 +129,7 @@ async def login(user_login: UserLogin):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Login failed: {e}")
+        logger.error(f"Login failed: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Login failed"
         )
