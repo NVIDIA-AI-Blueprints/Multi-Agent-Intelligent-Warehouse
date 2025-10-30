@@ -68,10 +68,10 @@ class SQLRetriever:
                             min_size=self.config.min_size,
                             max_size=self.config.max_size,
                             command_timeout=30,
-                            timeout=5.0,  # Connection timeout: 5 seconds
                             server_settings={
                                 'application_name': 'warehouse_assistant',
-                                'jit': 'off'  # Disable JIT for better connection stability
+                                'jit': 'off',  # Disable JIT for better connection stability
+                                'connect_timeout': '5'  # Connection timeout: 5 seconds (PostgreSQL setting)
                             }
                         ),
                         timeout=10.0  # Overall timeout: 10 seconds for pool creation
