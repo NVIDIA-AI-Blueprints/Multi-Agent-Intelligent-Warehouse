@@ -56,7 +56,7 @@ async def login(user_login: UserLogin):
         try:
             await asyncio.wait_for(
                 user_service.initialize(),
-                timeout=3.0  # 3 second timeout for initialization
+                timeout=5.0  # 5 second timeout for initialization (increased from 3s to allow DB connection)
             )
         except asyncio.TimeoutError:
             logger.error("User service initialization timed out")

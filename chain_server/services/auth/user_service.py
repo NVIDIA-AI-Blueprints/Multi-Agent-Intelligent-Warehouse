@@ -23,7 +23,7 @@ class UserService:
                 # Add timeout to prevent hanging if database is unreachable
                 self.sql_retriever = await asyncio.wait_for(
                     get_sql_retriever(),
-                    timeout=8.0  # 8 second timeout for retriever initialization
+                    timeout=6.0  # 6 second timeout for retriever initialization (reduced from 8s)
                 )
                 self._initialized = True
             except asyncio.TimeoutError:

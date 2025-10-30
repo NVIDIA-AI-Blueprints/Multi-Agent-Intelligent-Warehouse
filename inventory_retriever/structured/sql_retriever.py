@@ -71,10 +71,10 @@ class SQLRetriever:
                             server_settings={
                                 'application_name': 'warehouse_assistant',
                                 'jit': 'off',  # Disable JIT for better connection stability
-                                'connect_timeout': '5'  # Connection timeout: 5 seconds (PostgreSQL setting)
+                                'connect_timeout': '3'  # Connection timeout: 3 seconds (PostgreSQL setting, reduced from 5s)
                             }
                         ),
-                        timeout=10.0  # Overall timeout: 10 seconds for pool creation
+                        timeout=7.0  # Overall timeout: 7 seconds for pool creation (reduced from 10s)
                     )
                     logger.info(f"Database connection pool initialized for {self.config.database}")
                 except asyncio.TimeoutError:
