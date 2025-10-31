@@ -71,8 +71,8 @@ class SQLRetriever:
                             server_settings={
                                 'application_name': 'warehouse_assistant',
                                 'jit': 'off',  # Disable JIT for better connection stability
-                                'connect_timeout': '3'  # Connection timeout: 3 seconds (PostgreSQL setting, reduced from 5s)
-                            }
+                            },
+                            timeout=3.0,  # Connection timeout: 3 seconds
                         ),
                         timeout=7.0  # Overall timeout: 7 seconds for pool creation (reduced from 10s)
                     )
