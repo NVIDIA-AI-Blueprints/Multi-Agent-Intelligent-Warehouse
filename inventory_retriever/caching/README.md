@@ -2,7 +2,7 @@
 
 A comprehensive Redis caching system that provides intelligent caching for SQL results, evidence packs, vector searches, and query preprocessing with advanced monitoring, warming, and optimization capabilities.
 
-## 🚀 Features
+##  Features
 
 ### Core Caching
 - **Multi-Type Caching**: SQL results, evidence packs, vector searches, query preprocessing
@@ -39,7 +39,7 @@ inventory_retriever/caching/
 └── __init__.py                 # Module exports
 ```
 
-## 🔧 Configuration
+##  Configuration
 
 ### Cache Types and Default TTLs
 
@@ -80,7 +80,7 @@ manager_policy = CachePolicy(
 )
 ```
 
-## 🚀 Usage
+##  Usage
 
 ### Basic Caching
 
@@ -189,7 +189,7 @@ async def monitoring_example():
     monitoring.add_alert_callback(alert_callback)
 ```
 
-## 📊 Performance Metrics
+##  Performance Metrics
 
 ### Cache Metrics
 
@@ -226,7 +226,7 @@ async def monitoring_example():
 - **High Error Rate**: > 10% error rate
 - **Critical Hit Rate**: < 10% hit rate
 
-## 🔧 Advanced Configuration
+##  Advanced Configuration
 
 ### Redis Configuration
 
@@ -264,7 +264,7 @@ config = CacheIntegrationConfig(
 )
 ```
 
-## 🧪 Testing
+## Testing
 
 Run the comprehensive cache system test:
 
@@ -279,7 +279,7 @@ This will test:
 - Monitoring and alerting
 - Performance metrics collection
 
-## 📈 Best Practices
+##  Best Practices
 
 ### Cache Key Design
 - Use consistent, descriptive key patterns
@@ -305,7 +305,7 @@ This will test:
 - Regular health checks
 - Performance report analysis
 
-## 🔍 Troubleshooting
+##  Troubleshooting
 
 ### Common Issues
 
@@ -345,7 +345,7 @@ cleared = await cache_service.clear_cache(CacheType.SQL_RESULT)
 print(f"Cleared {cleared} SQL result entries")
 ```
 
-## 📚 API Reference
+## API Reference
 
 ### RedisCacheService
 - `get(key, cache_type)` - Retrieve cached data
@@ -371,7 +371,7 @@ print(f"Cleared {cleared} SQL result entries")
 - `get_performance_report(hours)` - Get performance report
 - `add_alert_callback(callback)` - Add alert callback
 
-## 🎯 Future Enhancements
+##  Future Enhancements
 
 - **Distributed Caching**: Multi-node Redis cluster support
 - **Cache Analytics**: Advanced analytics and reporting

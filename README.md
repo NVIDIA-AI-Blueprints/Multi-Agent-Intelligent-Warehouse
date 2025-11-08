@@ -14,7 +14,7 @@
 [![Document Processing](https://img.shields.io/badge/Document%20Processing-NVIDIA%20NeMo-76B900.svg)](https://github.com/T-DevH/warehouse-operational-assistant)
 [![MCP Integration](https://img.shields.io/badge/MCP-Fully%20Integrated-green.svg)](https://github.com/T-DevH/warehouse-operational-assistant)
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Overview](#overview)
 - [System Architecture](#system-architecture)
@@ -78,35 +78,35 @@ The system emphasizes modular design, clear separation of concerns, and enterpri
 
 ## Key Features
 
-### 🤖 **Multi-Agent AI System**
+### Multi-Agent AI System
 - **Planner/Router** - Intelligent query routing and workflow orchestration
 - **Equipment & Asset Operations Agent** - Equipment management, maintenance, and telemetry
 - **Operations Coordination Agent** - Task planning and workflow management
 - **Safety & Compliance Agent** - Safety monitoring and incident response
 - **MCP Integration** - Model Context Protocol with dynamic tool discovery
 
-### 📄 **Document Processing Pipeline**
+### Document Processing Pipeline
 - **Multi-Format Support** - PDF, PNG, JPG, JPEG, TIFF, BMP files
 - **5-Stage NVIDIA NeMo Pipeline** - Complete OCR and structured data extraction
 - **Real-Time Processing** - Background processing with status tracking
 - **Intelligent OCR** - `meta/llama-3.2-11b-vision-instruct` for text extraction
 - **Structured Data Extraction** - Entity recognition and quality validation
 
-### 🔍 **Advanced Search & Retrieval**
+### Advanced Search & Retrieval
 - **Hybrid RAG Stack** - PostgreSQL/TimescaleDB + Milvus vector database
 - **Production-Grade Vector Search** - NV-EmbedQA-E5-v5 embeddings (1024-dim)
 - **GPU-Accelerated Search** - NVIDIA cuVS-powered vector search (19x performance)
 - **Intelligent Query Routing** - Automatic SQL vs Vector vs Hybrid classification
 - **Evidence Scoring** - Multi-factor confidence assessment with clarifying questions
 
-### 🔧 **System Integrations**
+### System Integrations
 - **WMS Integration** - SAP EWM, Manhattan, Oracle WMS
 - **ERP Integration** - SAP ECC, Oracle ERP
 - **IoT Integration** - Equipment monitoring, environmental sensors, safety systems
 - **RFID/Barcode Scanning** - Honeywell, Zebra, generic scanners
 - **Time Attendance** - Biometric systems, card readers, mobile apps
 
-### 📈 **Demand Forecasting & Inventory Intelligence**
+### Demand Forecasting & Inventory Intelligence
 - **AI-Powered Demand Forecasting** - Multi-model ensemble with Random Forest, XGBoost, Gradient Boosting, Linear Regression, Ridge Regression, SVR
 - **XGBoost Integration** - Advanced gradient boosting with hyperparameter optimization and GPU acceleration ready
 - **Advanced Feature Engineering** - Lag features, rolling statistics, seasonal patterns, promotional impacts
@@ -118,7 +118,7 @@ The system emphasizes modular design, clear separation of concerns, and enterpri
 - **GPU Acceleration Ready** - NVIDIA RAPIDS cuML integration for enterprise-scale forecasting
 - **Historical Data Generation** - Realistic Frito-Lay product demand patterns with seasonal variations
 
-### 🛡️ **Enterprise Security & Monitoring**
+### Enterprise Security & Monitoring
 - **Authentication** - JWT/OAuth2 + RBAC with 5 user roles
 - **Real-Time Monitoring** - Prometheus metrics + Grafana dashboards
 - **Equipment Telemetry** - Battery, temperature, charging analytics
@@ -128,13 +128,14 @@ The system emphasizes modular design, clear separation of concerns, and enterpri
 
 ### **Current System Status & Recent Fixes**
 
-**✅ Fully Working Features:**
+**Fully Working Features:**
+
 - Multi-agent AI system with 3 specialized agents (Equipment, Operations, Safety)
 - Equipment asset management and telemetry monitoring
-- Equipment assignments endpoint (✅ **FIXED** - no more 404 errors)
+- Equipment assignments endpoint (Fixed - no more 404 errors)
 - Maintenance schedule tracking and management
 - Real-time equipment status monitoring
-- React frontend with chat interface (✅ **FIXED** - no more runtime errors)
+- React frontend with chat interface (Fixed - no more runtime errors)
 - PostgreSQL/TimescaleDB integration
 - Vector search with Milvus GPU acceleration
 - Authentication and RBAC security
@@ -143,13 +144,13 @@ The system emphasizes modular design, clear separation of concerns, and enterpri
 - **Forecasting Dashboard** - Real-time predictions, reorder recommendations, and business intelligence
 - **Advanced Analytics** - Model performance monitoring and hyperparameter optimization
 - **XGBoost Integration** - Advanced gradient boosting model with 82% accuracy and hyperparameter optimization
-- **Forecast Summary Display** - Real-time forecast data visualization with trend analysis (✅ **FIXED** - data now showing)
+- **Forecast Summary Display** - Real-time forecast data visualization with trend analysis (Fixed - data now showing)
 - API endpoints for equipment, assignments, maintenance, and telemetry
-- MessageBubble component (✅ **FIXED** - syntax error resolved)
-- ChatInterfaceNew component (✅ **FIXED** - event undefined error resolved)
+- MessageBubble component (Fixed - syntax error resolved)
+- ChatInterfaceNew component (Fixed - event undefined error resolved)
 - ESLint warnings cleaned up (0 warnings)
 
-**✅ Recent Achievements:**
+**Recent Achievements:**
 - MCP framework fully integrated with Phase 3 complete
 - All adapters migrated to MCP framework
 - MCP Testing UI accessible via navigation
@@ -168,14 +169,14 @@ The system emphasizes modular design, clear separation of concerns, and enterpri
 - **NEW: Response Formatting Engine** - Technical details removed, user-friendly formatting
 - **NEW: Real Tool Execution** - All MCP tools executing with actual database data
 
-**🔧 Next Priority:**
+**Next Priority:**
 - Implement Evidence & Context System for enhanced responses
 - Add Smart Quick Actions for contextual user assistance
 - Enhance Response Quality with advanced formatting
 - Optimize Conversation Memory for better continuity
 - Implement Response Validation for quality assurance
 
-### **MCP (Model Context Protocol) Integration** - ✅ **PRODUCTION READY**
+### MCP (Model Context Protocol) Integration - Production Ready
 
 The system features **complete MCP integration** with dynamic tool discovery and execution capabilities:
 
@@ -185,10 +186,10 @@ The system features **complete MCP integration** with dynamic tool discovery and
 - **Tool Execution Planning**: Intelligent planning for tool execution based on context
 - **Cross-Agent Integration**: Seamless communication and tool sharing between agents
 - **End-to-End Workflow**: Complete query processing pipeline with MCP tool results
-- **✅ NEW: Parameter Validation**: Comprehensive validation with helpful warnings and suggestions
-- **✅ NEW: Real Tool Execution**: All MCP tools executing with actual database data
-- **✅ NEW: Response Formatting**: Clean, professional responses without technical jargon
-- **✅ NEW: Error Handling**: Graceful error handling with actionable suggestions
+- **Parameter Validation**: Comprehensive validation with helpful warnings and suggestions
+- **Real Tool Execution**: All MCP tools executing with actual database data
+- **Response Formatting**: Clean, professional responses without technical jargon
+- **Error Handling**: Graceful error handling with actionable suggestions
 
 **Key MCP Components:**
 - `chain_server/graphs/mcp_integrated_planner_graph.py` - MCP-enabled planner graph
@@ -197,7 +198,7 @@ The system features **complete MCP integration** with dynamic tool discovery and
 - `chain_server/services/mcp/parameter_validator.py` - Comprehensive parameter validation
 - Dynamic tool discovery, binding, routing, and validation services
 
-### **📈 Demand Forecasting System** - ✅ **PRODUCTION READY**
+### Demand Forecasting System - Production Ready
 
 The system features **complete AI-powered demand forecasting** with multi-model ensemble and advanced analytics:
 
@@ -361,7 +362,7 @@ LLAMA_70B_API_KEY=nvapi-xxx
 
 The Warehouse Operational Assistant uses a sophisticated multi-agent architecture with specialized AI agents for different aspects of warehouse operations.
 
-### 🤖 **Equipment & Asset Operations Agent (EAO)**
+### Equipment & Asset Operations Agent (EAO)
 
 **Mission**: Ensure equipment is available, safe, and optimally used for warehouse workflows.
 
@@ -381,7 +382,7 @@ The Warehouse Operational Assistant uses a sophisticated multi-agent architectur
 - `create_equipment_reservation` - Reserve equipment for specific tasks
 - `get_equipment_history` - Access equipment maintenance and usage history
 
-### 🎯 **Operations Coordination Agent**
+### Operations Coordination Agent
 
 **Mission**: Coordinate warehouse operations, task planning, and workflow optimization.
 
@@ -401,7 +402,7 @@ The Warehouse Operational Assistant uses a sophisticated multi-agent architectur
 - `create_work_order` - Generate work orders
 - `get_task_history` - Access task completion history
 
-### 🛡️ **Safety & Compliance Agent**
+### Safety & Compliance Agent
 
 **Mission**: Ensure warehouse safety compliance and incident management.
 
@@ -420,7 +421,7 @@ The Warehouse Operational Assistant uses a sophisticated multi-agent architectur
 - `near_miss_capture` - Capture near-miss reports
 - `retrieve_sds` - Safety Data Sheet retrieval
 
-### 🔄 **MCP Integration**
+###  **MCP Integration**
 
 All agents are integrated with the **Model Context Protocol (MCP)** framework:
 
@@ -1624,14 +1625,14 @@ GH Actions CI; IaC (K8s, Helm, Terraform); blue-green deploys; production deploy
 
 ### **Recent Updates (Phase 9 Complete!)**
 
-#### **NV-EmbedQA Integration** - ✅ Complete
+#### NV-EmbedQA Integration - Complete
 - **Real NVIDIA Embeddings**: Replaced placeholder random vectors with actual NVIDIA NIM API calls
 - **1024-Dimensional Vectors**: High-quality embeddings optimized for Q&A tasks
 - **Batch Processing**: Efficient batch embedding generation for better performance
 - **Semantic Understanding**: Accurate similarity calculations for warehouse operations
 - **Production Ready**: Robust error handling and validation
 
-#### **System Improvements** - ✅ Complete
+#### System Improvements - Complete
 - **Equipment-Focused UI**: Updated analytics, quick actions, and demo scripts for equipment assets
 - **Interactive Demo Scripts**: Added progress tracking and checkmarks for better UX
 - **Safety Agent Routing**: Fixed intent classification for safety-related queries
@@ -1639,18 +1640,18 @@ GH Actions CI; IaC (K8s, Helm, Terraform); blue-green deploys; production deploy
 - **Architecture Documentation**: Updated diagrams to reflect current implementation
 
 ### **Test Results**
-- **Equipment & Asset Operations Agent**: ✅ Complete - Equipment availability, maintenance scheduling, action tools (6 equipment management tools)
-- **Operations Agent**: ✅ Complete - Workforce and task management, action tools (8 operations management tools)
-- **Safety Agent**: ✅ Complete - Incident reporting, policy lookup, action tools (7 safety management tools) 
-- **Memory Manager**: ✅ Complete - Conversation persistence and user profiles
-- **Authentication System**: ✅ Complete - JWT/OAuth2 with RBAC
-- **Frontend UI**: ✅ Complete - React dashboard with chat interface and interactive demo scripts
-- **WMS Integration**: ✅ Complete - Multi-WMS adapter system (SAP EWM, Manhattan, Oracle)
-- **Monitoring Stack**: ✅ Complete - Prometheus/Grafana dashboards
-- **NV-EmbedQA Integration**: ✅ Complete - Real NVIDIA embeddings for semantic search
-- **Vector Search Pipeline**: ✅ Complete - Production-grade vector search with evidence scoring
-- **Full Integration**: ✅ Complete - System integration and end-to-end testing
-- **API Endpoints**: ✅ Complete - REST API functionality with 14 active endpoints
+- **Equipment & Asset Operations Agent**: Complete - Equipment availability, maintenance scheduling, action tools (6 equipment management tools)
+- **Operations Agent**: Complete - Workforce and task management, action tools (8 operations management tools)
+- **Safety Agent**: Complete - Incident reporting, policy lookup, action tools (7 safety management tools) 
+- **Memory Manager**: Complete - Conversation persistence and user profiles
+- **Authentication System**: Complete - JWT/OAuth2 with RBAC
+- **Frontend UI**: Complete - React dashboard with chat interface and interactive demo scripts
+- **WMS Integration**: Complete - Multi-WMS adapter system (SAP EWM, Manhattan, Oracle)
+- **Monitoring Stack**: Complete - Prometheus/Grafana dashboards
+- **NV-EmbedQA Integration**: Complete - Real NVIDIA embeddings for semantic search
+- **Vector Search Pipeline**: Complete - Production-grade vector search with evidence scoring
+- **Full Integration**: Complete - System integration and end-to-end testing
+- **API Endpoints**: Complete - REST API functionality with 14 active endpoints
 
 ### **Production Ready Features**
 - **Intent Classification**: Automatic routing to specialized agents
@@ -1711,7 +1712,7 @@ npm start
 - For any non-trivial change, add an ADR in `docs/architecture/adr/`.
 - Add unit tests for new services/routers; avoid breaking public endpoints.
 
-## 📄 License
+## License
 TBD (add your organization's license file).
 
 ---
@@ -1720,29 +1721,29 @@ TBD (add your organization's license file).
 
 ## **Latest Updates**
 
-### **Chat Interface & MCP System - Production Ready** ✅
+### **Chat Interface & MCP System - Production Ready** 
 
 The chat interface and MCP system have been **fully optimized** and are now production-ready:
 
-#### **Chat Interface Improvements - Complete** ✅
+#### **Chat Interface Improvements - Complete** 
 - **Response Formatting Engine** - Technical details removed, clean professional responses
 - **Parameter Validation System** - Comprehensive validation with helpful warnings
 - **Real Tool Execution** - All MCP tools executing with actual database data
 - **Error Handling** - Graceful error handling with actionable suggestions
 - **User Experience** - Clean, professional responses without technical jargon
 
-#### **MCP System Enhancements - Complete** ✅
+#### **MCP System Enhancements - Complete** 
 - **Tool Execution Pipeline** - Fixed and optimized for reliable execution
 - **Parameter Validation** - Comprehensive validation with business rules
 - **Response Quality** - Professional formatting and user-friendly language
 - **Error Recovery** - Graceful degradation with helpful suggestions
 - **Performance Optimization** - Fast, reliable tool execution
 
-### **MCP (Model Context Protocol) Framework - Fully Integrated** ✅
+### **MCP (Model Context Protocol) Framework - Fully Integrated** 
 
 The system includes a **comprehensive MCP framework** that has been fully implemented and integrated into the main workflow:
 
-#### **Phase 1: MCP Foundation - Complete** ✅
+#### **Phase 1: MCP Foundation - Complete** 
 - **MCP Server Implementation** - Tool registration, discovery, and execution with full protocol compliance
 - **MCP Client Implementation** - Multi-server communication with HTTP and WebSocket support
 - **MCP-Enabled Base Classes** - MCPAdapter and MCPToolBase for consistent adapter development
@@ -1750,7 +1751,7 @@ The system includes a **comprehensive MCP framework** that has been fully implem
 - **Comprehensive Testing Framework** - Unit and integration tests for all MCP components
 - **Complete Documentation** - Architecture, API, and deployment guides
 
-#### **Phase 2: Agent Integration - Complete** ✅
+#### **Phase 2: Agent Integration - Complete** 
 - **Dynamic Tool Discovery** - Framework integrated into agents with real-time tool discovery
 - **MCP-Enabled Agents** - Equipment, Operations, and Safety agents fully updated to use MCP tools
 - **MCP Planner Graph** - Complete workflow orchestration with MCP-enhanced intent classification
@@ -1758,14 +1759,14 @@ The system includes a **comprehensive MCP framework** that has been fully implem
 - **Cross-Agent Integration** - Seamless communication and tool sharing between agents
 - **End-to-End Workflow** - Complete query processing pipeline with MCP tool results
 
-#### **Phase 3: UI Integration - Complete** ✅
+#### **Phase 3: UI Integration - Complete** 
 - **MCP Testing UI** - Comprehensive testing interface for dynamic tool discovery
 - **MCP Navigation** - Direct access via left sidebar navigation menu
 - **Real-time Status** - Live MCP framework status and tool discovery monitoring
 - **Tool Execution Testing** - Interactive tool execution with parameter testing
 - **Workflow Testing** - Complete end-to-end MCP workflow validation
 
-#### **Phase 3: Full Migration - In Progress** 🔄
+#### **Phase 3: Full Migration - In Progress** 
 - **Complete Adapter Migration** - WMS, IoT, RFID/Barcode, and Time Attendance adapters ready for MCP migration
 - **Service Discovery & Registry** - Framework implemented and ready for integration
 - **MCP Monitoring & Management** - Framework implemented and ready for connection to main system
@@ -1783,7 +1784,7 @@ The system includes a **comprehensive MCP framework** that has been fully implem
 - **Security Hardened** - Authentication, authorization, encryption, and vulnerability testing
 - **Performance Optimized** - Load testing, stress testing, and scalability validation
 
-#### **MCP Testing Suite - Fully Integrated** ✅
+#### **MCP Testing Suite - Fully Integrated** 
 - **End-to-End Integration Tests** - Complete test framework integrated with main workflow
 - **Agent Workflow Tests** - All agents using MCP tools with comprehensive testing
 - **System Integration Tests** - Complete integration with main system
@@ -1931,7 +1932,7 @@ The system now features **comprehensive response quality control** with validati
 - **Transparency**: Clear source attribution in all user-facing responses
 
 #### **Confidence Indicators & User Experience**
-- **Visual Indicators**: 🟢 High, 🟡 Medium, 🟠 Low, 🔴 Very Low confidence levels
+- **Visual Indicators**: High, Medium, Low, Very Low confidence levels
 - **Confidence Scores**: 0.0 to 1.0 with percentage display and factor analysis
 - **Response Explanations**: Detailed explanations for complex or low-confidence responses
 - **Warning System**: Clear warnings for low-quality responses with actionable guidance
@@ -2026,25 +2027,25 @@ print(f"Recommendations: {report.recommendations}")
 - **Reliability**: Automated quality control with improvement suggestions
 - **Intelligence**: Smart follow-up suggestions and response explanations
 
-### **MCP (Model Context Protocol) Framework - Fully Integrated** ✅
+### **MCP (Model Context Protocol) Framework - Fully Integrated** 
 
 The system includes a **comprehensive MCP framework** that has been fully implemented and integrated into the main workflow:
 
-#### **Phase 1: MCP Foundation - Complete** ✅
+#### **Phase 1: MCP Foundation - Complete** 
 - **MCP Server** - Tool registration, discovery, and execution with protocol compliance
 - **MCP Client** - Multi-server communication with HTTP and WebSocket support
 - **MCP Adapters** - ERP adapter with 10+ tools for customer, order, and inventory management
 - **Base Classes** - MCPAdapter and MCPToolBase for consistent adapter development
 - **Testing Framework** - Comprehensive unit and integration tests for all MCP components
 
-#### **Phase 2: Agent Integration - Complete** ✅
+#### **Phase 2: Agent Integration - Complete** 
 - **Dynamic Tool Discovery** - Automatic tool discovery and registration system
 - **MCP-Enabled Agents** - Equipment, Operations, and Safety agents with MCP integration
 - **Dynamic Tool Binding** - Intelligent tool binding and execution framework
 - **MCP-Based Routing** - Advanced routing and tool selection logic
 - **Tool Validation** - Comprehensive validation and error handling
 
-#### **Phase 3: Full Migration - In Progress** 🔄
+#### **Phase 3: Full Migration - In Progress** 
 - **Complete Adapter Migration** - WMS, IoT, RFID/Barcode, and Time Attendance adapters ready for MCP migration
 - **Service Discovery & Registry** - Framework implemented and ready for integration
 - **MCP Monitoring & Management** - Framework implemented and ready for connection to main system
@@ -2053,7 +2054,7 @@ The system includes a **comprehensive MCP framework** that has been fully implem
 - **Security Integration** - Framework ready for integration with main security system
 - **Performance Testing** - Framework ready for integration with main performance monitoring
 
-#### **Phase 4: UI Integration - Complete** ✅
+#### **Phase 4: UI Integration - Complete** 
 - **MCP Testing UI** - Comprehensive testing interface for dynamic tool discovery
 - **MCP Navigation** - Direct access via left sidebar navigation menu
 - **Real-time Status** - Live MCP framework status and tool discovery monitoring

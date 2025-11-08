@@ -449,9 +449,9 @@ WMS_API_KEY=your-wms-key
 
 ### Migration Roadmap
 
-- **Phase 1**: Core MCP system (✅ Complete)
-- **Phase 2**: Agent integration (🔄 In Progress)
-- **Phase 3**: Full system migration (📋 Planned)
+- **Phase 1**: Core MCP system ( Complete)
+- **Phase 2**: Agent integration ( In Progress)
+- **Phase 3**: Full system migration ( Planned)
 
 ## References
 

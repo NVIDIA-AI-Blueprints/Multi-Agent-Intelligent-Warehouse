@@ -1,10 +1,10 @@
 # GPU Acceleration with Milvus + cuVS - Implementation Guide
 
-## 🚀 **Overview**
+##  **Overview**
 
 This guide covers the implementation of **GPU-accelerated vector search** using **Milvus with NVIDIA cuVS (CUDA Vector Search)** for our warehouse operational assistant system. This provides **dramatic performance improvements** for semantic search over warehouse documentation and operational procedures.
 
-## 📊 **Performance Benefits**
+##  **Performance Benefits**
 
 ### **Quantified Improvements**
 - **21x Speedup** in index building vs CPU
@@ -19,7 +19,7 @@ This guide covers the implementation of **GPU-accelerated vector search** using 
 - **High Concurrency**: Support for multiple warehouse operators simultaneously
 - **Scalable Performance**: Linear scaling with additional GPUs
 
-## 🔧 **Implementation Architecture**
+##  **Implementation Architecture**
 
 ### **1. GPU-Accelerated Milvus Configuration**
 
@@ -115,7 +115,7 @@ services:
 - **CUDA Drivers**: Compatible NVIDIA drivers
 - **GPU Memory**: Minimum 8GB VRAM recommended
 
-## 🚀 **Implementation Steps**
+##  **Implementation Steps**
 
 ### **Step 1: Environment Setup**
 
@@ -170,7 +170,7 @@ print(f"GPU Available: {stats['gpu_available']}")
 print(f"Index Type: {stats['index_type']}")
 ```
 
-## 📈 **Performance Optimization**
+##  **Performance Optimization**
 
 ### **1. Batch Processing**
 
@@ -222,7 +222,7 @@ search_params = {
 }
 ```
 
-## 🔍 **Use Cases in Warehouse Operations**
+##  **Use Cases in Warehouse Operations**
 
 ### **1. Real-Time Document Search**
 
@@ -268,7 +268,7 @@ result = await retriever.search(context)
 # Combines structured equipment data with documentation search
 ```
 
-## 📊 **Monitoring and Metrics**
+##  **Monitoring and Metrics**
 
 ### **1. Performance Monitoring**
 
@@ -347,7 +347,7 @@ for index in indexes:
     print(f"Index Status: {index.state}")
 ```
 
-## 🎯 **Best Practices**
+##  **Best Practices**
 
 ### **1. Query Optimization**
 - Use **batch processing** for multiple queries
@@ -367,7 +367,7 @@ for index in indexes:
 - Implement **fallback to CPU** when GPU unavailable
 - Set appropriate **timeout values** for queries
 
-## 🚀 **Deployment Considerations**
+##  **Deployment Considerations**
 
 ### **1. Production Deployment**
 - Use **Kubernetes** with GPU node pools
@@ -387,7 +387,7 @@ for index in indexes:
 - Set up **access controls** for GPU resources
 - Monitor **GPU usage** for security compliance
 
-## 📈 **Expected Performance Improvements**
+##  **Expected Performance Improvements**
 
 ### **For Warehouse Operations**
 - **Document Search**: 10-50x faster response times
@@ -401,4 +401,4 @@ for index in indexes:
 - **Real-time Updates**: Faster index updates for new documents
 - **Global Deployment**: Consistent performance across regions
 
-This GPU acceleration implementation provides **enterprise-grade performance** for warehouse operations while maintaining **cost efficiency** and **scalability**! 🚀
+This GPU acceleration implementation provides **enterprise-grade performance** for warehouse operations while maintaining **cost efficiency** and **scalability**! 

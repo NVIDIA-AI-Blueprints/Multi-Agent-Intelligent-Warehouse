@@ -2,7 +2,7 @@
 
 ## Default Development Credentials
 
-**⚠️ WARNING: These are development-only credentials. NEVER use in production!**
+** WARNING: These are development-only credentials. NEVER use in production!**
 
 ### Authentication
 - **Username**: `admin`
@@ -82,4 +82,4 @@ ERP_API_KEY=your-erp-api-key
 your-super-secret-jwt-key-here-must-be-at-least-32-characters-long
 ```
 
-**⚠️ This is a sample only - change in production!**
+** This is a sample only - change in production!**

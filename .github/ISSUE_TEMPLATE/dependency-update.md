@@ -6,7 +6,7 @@ labels: ['dependencies', 'enhancement']
 assignees: ['T-DevH']
 ---
 
-## 📦 Dependency Update Request
+## Dependency Update Request
 
 ### Package Information
 - **Package Name**: 
