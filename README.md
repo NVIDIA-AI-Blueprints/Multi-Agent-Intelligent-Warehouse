@@ -124,18 +124,18 @@ The system emphasizes modular design, clear separation of concerns, and enterpri
 - **Equipment Telemetry** - Battery, temperature, charging analytics
 - **System Health** - Comprehensive observability and alerting
 
-## Quick Start
+## System Status
 
-### **Current System Status & Recent Fixes**
+### Current Features
 
 **Fully Working Features:**
 
 - Multi-agent AI system with 3 specialized agents (Equipment, Operations, Safety)
 - Equipment asset management and telemetry monitoring
-- Equipment assignments endpoint (Fixed - no more 404 errors)
+- Equipment assignments endpoint
 - Maintenance schedule tracking and management
 - Real-time equipment status monitoring
-- React frontend with chat interface (Fixed - no more runtime errors)
+- React frontend with chat interface
 - PostgreSQL/TimescaleDB integration
 - Vector search with Milvus GPU acceleration
 - Authentication and RBAC security
@@ -144,11 +144,8 @@ The system emphasizes modular design, clear separation of concerns, and enterpri
 - **Forecasting Dashboard** - Real-time predictions, reorder recommendations, and business intelligence
 - **Advanced Analytics** - Model performance monitoring and hyperparameter optimization
 - **XGBoost Integration** - Advanced gradient boosting model with 82% accuracy and hyperparameter optimization
-- **Forecast Summary Display** - Real-time forecast data visualization with trend analysis (Fixed - data now showing)
+- **Forecast Summary Display** - Real-time forecast data visualization with trend analysis
 - API endpoints for equipment, assignments, maintenance, and telemetry
-- MessageBubble component (Fixed - syntax error resolved)
-- ChatInterfaceNew component (Fixed - event undefined error resolved)
-- ESLint warnings cleaned up (0 warnings)
 
 **Recent Achievements:**
 - MCP framework fully integrated with Phase 3 complete
@@ -156,25 +153,18 @@ The system emphasizes modular design, clear separation of concerns, and enterpri
 - MCP Testing UI accessible via navigation
 - Dynamic tool discovery and execution working
 - End-to-end MCP workflow processing operational
-- **NEW: XGBoost Integration Complete** - Advanced gradient boosting model with hyperparameter optimization
-- **NEW: Enhanced Forecasting UI** - Model comparison cards, visual highlighting, and detailed performance metrics
-- **NEW: Forecast Summary Fixed** - Real-time forecast data now properly displayed in UI dashboard
-- **NEW: Model Performance Monitoring** - 6-model ensemble with XGBoost, Random Forest, Gradient Boosting, and more
-- **NEW: Chat Interface Fully Optimized** - Clean, professional responses with real MCP tool execution
-- **NEW: RAPIDS GPU Training** - GPU-accelerated training with RAPIDS cuML integration and CPU fallback
-- **NEW: Real-Time Training Progress** - Fixed training progress tracking with unbuffered output and real-time log capture
-- **NEW: Training API Endpoints** - Comprehensive training management API with status, history, and manual/scheduled training
-- **NEW: Authentication System Fixed** - Proper bcrypt password hashing and default user accounts (admin/password123)
-- **NEW: Parameter Validation System** - Comprehensive validation with helpful warnings and suggestions
-- **NEW: Response Formatting Engine** - Technical details removed, user-friendly formatting
-- **NEW: Real Tool Execution** - All MCP tools executing with actual database data
-
-**Next Priority:**
-- Implement Evidence & Context System for enhanced responses
-- Add Smart Quick Actions for contextual user assistance
-- Enhance Response Quality with advanced formatting
-- Optimize Conversation Memory for better continuity
-- Implement Response Validation for quality assurance
+- XGBoost Integration Complete - Advanced gradient boosting model with hyperparameter optimization
+- Enhanced Forecasting UI - Model comparison cards, visual highlighting, and detailed performance metrics
+- Forecast Summary Fixed - Real-time forecast data now properly displayed in UI dashboard
+- Model Performance Monitoring - 6-model ensemble with XGBoost, Random Forest, Gradient Boosting, and more
+- Chat Interface Fully Optimized - Clean, professional responses with real MCP tool execution
+- RAPIDS GPU Training - GPU-accelerated training with RAPIDS cuML integration and CPU fallback
+- Real-Time Training Progress - Fixed training progress tracking with unbuffered output and real-time log capture
+- Training API Endpoints - Comprehensive training management API with status, history, and manual/scheduled training
+- Authentication System Fixed - Proper bcrypt password hashing and default user accounts (admin/password123)
+- Parameter Validation System - Comprehensive validation with helpful warnings and suggestions
+- Response Formatting Engine - Technical details removed, user-friendly formatting
+- Real Tool Execution - All MCP tools executing with actual database data
 
 ### MCP (Model Context Protocol) Integration - Production Ready
 
@@ -237,39 +227,215 @@ The system features **complete AI-powered demand forecasting** with multi-model 
 
 ## Quick Start
 
-### Prerequisites
-- Python **3.11+**
-- Docker + (either) **docker compose** plugin or **docker-compose v1**
-- (Optional) `psql`, `curl`, `jq`
+This guide will help you get the Warehouse Operational Assistant running from a fresh clone of the repository.
 
-### 1. Start Development Infrastructure
+### Prerequisites
+
+Before starting, ensure you have the following installed:
+
+- **Python 3.11+** (check with `python3 --version`)
+- **Node.js 18+** and npm (check with `node --version` and `npm --version`)
+- **Docker** and Docker Compose (either `docker compose` plugin or `docker-compose v1`)
+- **Git** (to clone the repository)
+- (Optional) `psql`, `curl`, `jq` for testing and database operations
+
+### Step 1: Clone and Navigate to Repository
+
 ```bash
-# Start TimescaleDB, Redis, Kafka, Milvus
+git clone https://github.com/T-DevH/warehouse-operational-assistant.git
+cd warehouse-operational-assistant
+```
+
+### Step 2: Set Up Python Virtual Environment
+
+```bash
+# Create virtual environment (use 'env' directory to match RUN_LOCAL.sh)
+python3 -m venv env
+
+# Activate virtual environment
+# On Linux/macOS:
+source env/bin/activate
+# On Windows:
+# env\Scripts\activate
+
+# Install Python dependencies
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+### Step 3: Configure Environment Variables
+
+Create a `.env` file in the project root by copying the example file:
+
+```bash
+# Copy the example environment file
+cp .env.example .env
+
+# Edit .env file with your configuration
+# At minimum, ensure database credentials match the Docker setup:
+# PGHOST=localhost
+# PGPORT=5435
+# PGUSER=warehouse
+# PGPASSWORD=warehousepw
+# PGDATABASE=warehouse
+```
+
+**Required Environment Variables:**
+- Database connection settings (PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE)
+- Redis connection (REDIS_HOST, REDIS_PORT)
+- Milvus connection (MILVUS_HOST, MILVUS_PORT)
+- JWT secret key (JWT_SECRET_KEY) - change from default in production
+
+**Optional Environment Variables (for full AI features):**
+- NVIDIA API keys (NVIDIA_API_KEY, NEMO_*_API_KEY, LLAMA_*_API_KEY)
+
+**Note:** The application will work without NVIDIA API keys, but AI features (chat, document processing) will be limited. See [docs/secrets.md](docs/secrets.md) for development credentials and default values.
+
+### Step 4: Start Development Infrastructure
+
+Start all required services (TimescaleDB, Redis, Kafka, Milvus) using Docker:
+
+```bash
+# Make script executable if needed
+chmod +x scripts/dev_up.sh
+
+# Start infrastructure services
 ./scripts/dev_up.sh
 ```
 
-**Service Endpoints:**
-- Postgres/Timescale: `postgresql://warehouse:warehousepw@localhost:5435/warehouse`
-- Redis: `localhost:6379`
-- Milvus gRPC: `localhost:19530`
-- Kafka: `localhost:9092`
+This script will:
+- Start TimescaleDB on port 5435 (to avoid conflicts with local Postgres)
+- Start Redis on port 6379
+- Start Milvus on port 19530
+- Start Kafka on port 9092
+- Wait for services to be ready
 
-### 2. Start the API Server
+**Service Endpoints:**
+- **Postgres/Timescale**: `postgresql://warehouse:warehousepw@localhost:5435/warehouse`
+- **Redis**: `localhost:6379`
+- **Milvus gRPC**: `localhost:19530`
+- **Milvus HTTP**: `localhost:9091`
+- **Kafka**: `localhost:9092`
+
+### Step 5: Initialize Database Schema
+
+Run database migrations to create all required tables:
+
 ```bash
-# Start FastAPI server on http://localhost:8002
+# Ensure virtual environment is activated
+source env/bin/activate  # Linux/macOS
+# or: env\Scripts\activate  # Windows
+
+# Run all required schema files in order
+PGPASSWORD=warehousepw psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/000_schema.sql
+PGPASSWORD=warehousepw psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/001_equipment_schema.sql
+PGPASSWORD=warehousepw psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/002_document_schema.sql
+PGPASSWORD=warehousepw psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/004_inventory_movements_schema.sql
+
+# Create model tracking tables (required for forecasting features)
+PGPASSWORD=warehousepw psql -h localhost -p 5435 -U warehouse -d warehouse -f scripts/create_model_tracking_tables.sql
+```
+
+**Alternative:** If `psql` is not available, you can use the Python migration script:
+
+```bash
+# Ensure virtual environment is activated
+source env/bin/activate  # Linux/macOS
+
+# Run Python migration script
+python scripts/simple_migrate.py
+```
+
+**Note:** The Python migration script may not include all schema files. Using `psql` directly is recommended for complete setup.
+
+### Step 6: Create Default Users
+
+Create default admin and operator users for testing:
+
+```bash
+# Ensure virtual environment is activated
+source env/bin/activate  # Linux/macOS
+
+# Create default users
+python scripts/create_default_users.py
+```
+
+This creates:
+- **Admin user**: `admin` / `password123` (role: admin)
+- **Operator user**: `user` / `user123` (role: operator)
+
+**Important:** The script uses bcrypt password hashing to match the authentication system. If users already exist, the script will skip creation.
+
+**Note:** See [docs/secrets.md](docs/secrets.md) for all development credentials.
+
+### Step 7: Start the API Server
+
+Start the FastAPI backend server:
+
+```bash
+# Ensure virtual environment is activated
+source env/bin/activate  # Linux/macOS
+
+# Make script executable if needed
+chmod +x RUN_LOCAL.sh
+
+# Start API server on http://localhost:8002
 ./RUN_LOCAL.sh
 ```
 
-### 3. Start the Frontend
+The API will be available at:
+- **API**: http://localhost:8002
+- **API Documentation (Swagger)**: http://localhost:8002/docs
+- **OpenAPI Schema**: http://localhost:8002/openapi.json
+- **Health Check**: http://localhost:8002/api/v1/health
+
+### Step 8: Start the Frontend
+
+In a new terminal window, start the React frontend:
+
 ```bash
+# Navigate to frontend directory
 cd ui/web
-npm install  # first time only
-npm start    # starts React app on http://localhost:3001
+
+# Install dependencies (first time only)
+npm install
+
+# Start React development server
+npm start
 ```
 
-### 4. Start Monitoring (Optional)
+The frontend will be available at:
+- **Web UI**: http://localhost:3001
+- **Login**: Use `admin` / `password123` (see [docs/secrets.md](docs/secrets.md))
+
+### Step 9: Verify Installation
+
+Test that everything is working:
+
 ```bash
-# Start Prometheus/Grafana monitoring
+# Test API health endpoint
+curl http://localhost:8002/api/v1/health
+
+# Test authentication (should return JWT tokens)
+curl -X POST http://localhost:8002/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"password123"}'
+
+# Test chat endpoint (if NVIDIA API keys are configured)
+curl -X POST http://localhost:8002/api/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "What equipment is available?"}'
+```
+
+### Step 10: (Optional) Start Monitoring Stack
+
+For production-like monitoring with Prometheus and Grafana:
+
+```bash
+# Make script executable if needed
+chmod +x scripts/setup_monitoring.sh
+
+# Start monitoring stack
 ./scripts/setup_monitoring.sh
 ```
 
@@ -278,35 +444,30 @@ npm start    # starts React app on http://localhost:3001
 - **Prometheus**: http://localhost:9090
 - **Alertmanager**: http://localhost:9093
 
-### 5. Environment Setup
-Create `.env` file with required API keys:
-```bash
-# NVIDIA NIMs Configuration
-NVIDIA_API_KEY=nvapi-your-key-here
+### Troubleshooting
 
-# Document Processing Agent - NVIDIA NeMo API Keys
-NEMO_RETRIEVER_API_KEY=nvapi-your-key-here
-NEMO_OCR_API_KEY=nvapi-your-key-here
-NEMO_PARSE_API_KEY=nvapi-your-key-here
-LLAMA_NANO_VL_API_KEY=nvapi-your-key-here
-LLAMA_70B_API_KEY=nvapi-your-key-here
-```
+**Database Connection Issues:**
+- Ensure Docker containers are running: `docker ps`
+- Check TimescaleDB logs: `docker logs wosa-timescaledb`
+- Verify port 5435 is not in use: `lsof -i :5435` or `netstat -an | grep 5435`
 
-### 6. Quick Test
-```bash
-# Test API health
-curl http://localhost:8002/api/v1/health
+**API Server Won't Start:**
+- Ensure virtual environment is activated
+- Check Python version: `python3 --version` (must be 3.11+)
+- Verify all dependencies installed: `pip list`
+- Check for port conflicts: `lsof -i :8002`
 
-# Test chat endpoint
-curl -X POST http://localhost:8002/api/v1/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "What equipment is available?"}'
+**Frontend Won't Start:**
+- Ensure Node.js 18+ is installed: `node --version`
+- Clear npm cache: `npm cache clean --force`
+- Delete `node_modules` and reinstall: `rm -rf node_modules && npm install`
 
-# Test document upload
-curl -X POST http://localhost:8002/api/v1/document/upload \
-  -F "file=@test_invoice.png" \
-  -F "document_type=invoice"
-```
+**Authentication Fails:**
+- Ensure database migrations ran successfully
+- Verify default users were created: `python scripts/create_default_users.py`
+- Check database connection in `.env` file
+
+**For more help:** See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) or open an issue on GitHub.
 
 ## Document Processing
 
@@ -974,89 +1135,50 @@ Agent Actions:
 
 ---
 
-## Quick Start
+## Additional Setup Information
 
-[![Docker Compose](https://img.shields.io/badge/Docker%20Compose-Ready-2496ED.svg)](docker-compose.yaml)
-[![One-Click Deploy](https://img.shields.io/badge/One--Click-Deploy%20Script-brightgreen.svg)](RUN_LOCAL.sh)
-[![Environment Setup](https://img.shields.io/badge/Environment-Setup%20Script-blue.svg)](scripts/dev_up.sh)
-[![Health Check](https://img.shields.io/badge/Health%20Check-Available-success.svg)](http://localhost:8002/api/v1/health)
+### Database Migrations
 
-### 0) Prerequisites
-- Python **3.11+**
-- Docker + (either) **docker compose** plugin or **docker-compose v1**
-- (Optional) `psql`, `curl`, `jq`
-
-### 1) Bring up dev infrastructure (TimescaleDB, Redis, Kafka, Milvus)
-```bash
-# from repo root
-./scripts/dev_up.sh
-# TimescaleDB binds to host port 5435 (to avoid conflicts with local Postgres)
-```
-
-**Dev endpoints**
-- Postgres/Timescale: `postgresql://warehouse:warehousepw@localhost:5435/warehouse`
-- Redis: `localhost:6379`
-- Milvus gRPC: `localhost:19530`
-- Kafka (host tools): `localhost:9092` (container name: `kafka:9092`)
-
-### 2) Start the API
-```bash
-./RUN_LOCAL.sh
-# starts FastAPI server on http://localhost:8002
-# Chat endpoint working with NVIDIA NIMs integration
-```
-
-### 3) Start the Frontend
-```bash
-cd ui/web
-npm install # first time only
-npm start # starts React app on http://localhost:3001
-# Login: (see docs/secrets.md for dev credentials)
-# Chat interface fully functional
-```
-
-### 4) Start Monitoring Stack (Optional)
-
-[![Grafana](https://img.shields.io/badge/Grafana-Dashboards-F46800.svg)](http://localhost:3000)
-[![Prometheus](https://img.shields.io/badge/Prometheus-Metrics-E6522C.svg)](http://localhost:9090)
-[![Alertmanager](https://img.shields.io/badge/Alertmanager-Alerts-E6522C.svg)](http://localhost:9093)
-[![Metrics](https://img.shields.io/badge/Metrics-Real--time%20Monitoring-brightgreen.svg)](http://localhost:8002/api/v1/metrics)
+The system uses a migration-based approach for database schema management. After starting the infrastructure, run:
 
 ```bash
-# Start Prometheus/Grafana monitoring
-./scripts/setup_monitoring.sh
-
-# Access URLs:
-# • Grafana: http://localhost:3000 (admin/warehouse123)
-# • Prometheus: http://localhost:9090
-# • Alertmanager: http://localhost:9093
+# Run all migrations in order
+PGPASSWORD=warehousepw psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/000_schema.sql
+PGPASSWORD=warehousepw psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/001_equipment_schema.sql
+PGPASSWORD=warehousepw psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/002_document_schema.sql
+PGPASSWORD=warehousepw psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/004_inventory_movements_schema.sql
 ```
 
-### 5) Authentication
+### Generating Sample Data
+
+To populate the database with sample data for testing:
+
 ```bash
-# Login with sample admin user
-curl -s -X POST http://localhost:$PORT/api/v1/auth/login \
- -H "Content-Type: application/json" \
- -d '{"username":"<dev_user>","password":"<dev_password>"}' | jq
+# Quick demo data (recommended for first-time setup)
+cd scripts
+./run_quick_demo.sh
 
-# Use token for protected endpoints
-TOKEN="your_access_token_here"
-curl -s -H "Authorization: Bearer $TOKEN" \
- http://localhost:$PORT/api/v1/auth/me | jq
+# Or comprehensive synthetic data
+./run_data_generation.sh
 ```
 
-### 6) Smoke tests
+### API Testing Examples
 
 [![API Documentation](https://img.shields.io/badge/API-Documentation%20%2F%20Swagger-FF6B35.svg)](http://localhost:8002/docs)
 [![OpenAPI Spec](https://img.shields.io/badge/OpenAPI-3.0%20Spec-85EA2D.svg)](http://localhost:8002/openapi.json)
-[![Test Coverage](https://img.shields.io/badge/Test%20Coverage-80%25+-brightgreen.svg)](tests/)
-[![Linting](https://img.shields.io/badge/Linting-Black%20%2B%20Flake8%20%2B%20MyPy-success.svg)](requirements.txt)
 
 ```bash
 PORT=8002 # API runs on port 8002
+
+# Health check
 curl -s http://localhost:$PORT/api/v1/health
 
-# Chat endpoint working with NVIDIA NIMs
+# Authentication
+curl -s -X POST http://localhost:$PORT/api/v1/auth/login \
+ -H "Content-Type: application/json" \
+ -d '{"username":"admin","password":"password123"}' | jq
+
+# Chat endpoint (requires NVIDIA API keys for full functionality)
 curl -s -X POST http://localhost:$PORT/api/v1/chat \
  -H "Content-Type: application/json" \
  -d '{"message":"What is the inventory level yesterday"}' | jq
@@ -1066,7 +1188,7 @@ curl -s -X POST http://localhost:$PORT/api/v1/chat \
  -H "Content-Type: application/json" \
  -d '{"message":"Help me with workforce scheduling"}' | jq
 
-# Equipment lookups (seeded example below)
+# Equipment lookups
 curl -s http://localhost:$PORT/api/v1/equipment/SKU123 | jq
 
 # WMS Integration

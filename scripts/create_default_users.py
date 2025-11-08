@@ -27,7 +27,7 @@ async def create_default_admin():
             database="warehouse"
         )
         
-        logger.info("✅ Connected to database")
+        logger.info("Connected to database")
         
         # Check if users table exists
         table_exists = await conn.fetchval("""
@@ -38,7 +38,7 @@ async def create_default_admin():
         """)
         
         if not table_exists:
-            logger.info("📋 Creating users table...")
+            logger.info("Creating users table...")
             await conn.execute("""
                 CREATE TABLE users (
                     id SERIAL PRIMARY KEY,
@@ -53,16 +53,16 @@ async def create_default_admin():
                     last_login TIMESTAMP
                 );
             """)
-            logger.info("✅ Users table created")
+            logger.info("Users table created")
         
         # Check if admin user exists
         admin_exists = await conn.fetchval("SELECT EXISTS(SELECT 1 FROM users WHERE username = 'admin')")
         
         if not admin_exists:
-            logger.info("👤 Creating default admin user...")
+            logger.info("Creating default admin user...")
             
             # Hash password using bcrypt (same as JWT handler)
-            password = "admin123"
+            password = "password123"
             hashed_password = pwd_context.hash(password)
             
             await conn.execute("""
@@ -70,18 +70,18 @@ async def create_default_admin():
                 VALUES ($1, $2, $3, $4, $5, $6)
             """, "admin", "admin@warehouse.com", "System Administrator", hashed_password, "admin", "active")
             
-            logger.info("✅ Default admin user created")
-            logger.info("📝 Login credentials:")
+            logger.info("Default admin user created")
+            logger.info("Login credentials:")
             logger.info("   Username: admin")
-            logger.info("   Password: admin123")
+            logger.info("   Password: password123")
         else:
-            logger.info("ℹ️ Admin user already exists")
+            logger.info("Admin user already exists")
         
         # Create a regular user for testing
         user_exists = await conn.fetchval("SELECT EXISTS(SELECT 1 FROM users WHERE username = 'user')")
         
         if not user_exists:
-            logger.info("👤 Creating default user...")
+            logger.info("Creating default user...")
             
             password = "user123"
             hashed_password = pwd_context.hash(password)
@@ -91,16 +91,16 @@ async def create_default_admin():
                 VALUES ($1, $2, $3, $4, $5, $6)
             """, "user", "user@warehouse.com", "Regular User", hashed_password, "operator", "active")
             
-            logger.info("✅ Default user created")
-            logger.info("📝 User credentials:")
+            logger.info("Default user created")
+            logger.info("User credentials:")
             logger.info("   Username: user")
             logger.info("   Password: user123")
         
         await conn.close()
-        logger.info("🎉 User setup complete!")
+        logger.info("User setup complete!")
         
     except Exception as e:
-        logger.error(f"❌ Error creating users: {e}")
+        logger.error(f"Error creating users: {e}")
         raise
 
 if __name__ == "__main__":
