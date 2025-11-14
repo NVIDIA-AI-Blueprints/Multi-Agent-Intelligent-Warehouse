@@ -1,45 +1,45 @@
 {
-  "9d8289e7-abfa-431d-a460-ea6f8ddd0a88": {
+  "86da11a9-eea4-4b96-bed9-88916d016586": {
     "status": "completed",
     "current_stage": "Completed",
     "progress": 100.0,
-    "file_path": "/tmp/document_uploads_hfasdo8t/9d8289e7-abfa-431d-a460-ea6f8ddd0a88_sample.pdf",
-    "filename": "9d8289e7-abfa-431d-a460-ea6f8ddd0a88_sample.pdf",
+    "file_path": "/tmp/document_uploads_82xlctbp/86da11a9-eea4-4b96-bed9-88916d016586_sample.pdf",
+    "filename": "86da11a9-eea4-4b96-bed9-88916d016586_sample.pdf",
     "document_type": "invoice",
     "stages": [
       {
         "name": "preprocessing",
         "status": "completed",
-        "started_at": "2025-11-14T09:01:24.493609",
-        "completed_at": "2025-11-14T09:01:50.668270"
+        "started_at": "2025-11-14T13:32:29.567045",
+        "completed_at": "2025-11-14T13:32:56.709026"
       },
       {
         "name": "ocr_extraction",
         "status": "completed",
-        "started_at": "2025-11-14T09:01:36.816629",
-        "completed_at": "2025-11-14T09:01:50.668273"
+        "started_at": "2025-11-14T13:32:41.979492",
+        "completed_at": "2025-11-14T13:32:56.709030"
       },
       {
         "name": "llm_processing",
         "status": "completed",
-        "started_at": "2025-11-14T09:01:48.887424",
-        "completed_at": "2025-11-14T09:01:50.668277"
+        "started_at": "2025-11-14T13:32:54.029669",
+        "completed_at": "2025-11-14T13:32:56.709033"
       },
       {
         "name": "validation",
         "status": "completed",
-        "started_at": "2025-11-14T09:02:00.977729",
-        "completed_at": "2025-11-14T09:01:50.668280"
+        "started_at": "2025-11-14T13:33:06.081131",
+        "completed_at": "2025-11-14T13:32:56.709036"
       },
       {
         "name": "routing",
         "status": "processing",
-        "started_at": "2025-11-14T09:02:13.328942",
-        "completed_at": "2025-11-14T09:01:50.668283"
+        "started_at": "2025-11-14T13:33:18.130307",
+        "completed_at": "2025-11-14T13:32:56.709039"
       }
     ],
-    "upload_time": "2025-11-14T09:01:24.493615",
-    "estimated_completion": 1763139744.493616,
+    "upload_time": "2025-11-14T13:32:29.567053",
+    "estimated_completion": 1763156009.567053,
     "processing_results": {
       "preprocessing": {
         "document_type": "pdf",
