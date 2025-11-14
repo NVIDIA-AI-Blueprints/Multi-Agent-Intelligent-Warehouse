@@ -16,20 +16,20 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from chain_server.services.mcp.server import MCPServer, MCPTool, MCPToolType
-from chain_server.services.mcp.client import MCPClient, MCPConnectionType
-from chain_server.services.mcp.tool_discovery import ToolDiscoveryService, ToolDiscoveryConfig
-from chain_server.services.mcp.tool_binding import ToolBindingService, BindingStrategy, ExecutionMode
-from chain_server.services.mcp.tool_routing import ToolRoutingService, RoutingStrategy
-from chain_server.services.mcp.tool_validation import ToolValidationService, ValidationLevel
-from chain_server.services.mcp.service_discovery import ServiceDiscoveryRegistry, ServiceType
-from chain_server.services.mcp.monitoring import MCPMonitoringService, MonitoringConfig
-from chain_server.services.mcp.adapters.erp_adapter import ERPAdapter
-from chain_server.services.mcp.adapters.wms_adapter import WMSAdapter
-from chain_server.services.mcp.adapters.iot_adapter import IoTAdapter
-from chain_server.agents.inventory.mcp_equipment_agent import MCPEquipmentAgent
-from chain_server.agents.operations.mcp_operations_agent import MCPOperationsAgent
-from chain_server.agents.safety.mcp_safety_agent import MCPSafetyAgent
+from src.api.services.mcp.server import MCPServer, MCPTool, MCPToolType
+from src.api.services.mcp.client import MCPClient, MCPConnectionType
+from src.api.services.mcp.tool_discovery import ToolDiscoveryService, ToolDiscoveryConfig
+from src.api.services.mcp.tool_binding import ToolBindingService, BindingStrategy, ExecutionMode
+from src.api.services.mcp.tool_routing import ToolRoutingService, RoutingStrategy
+from src.api.services.mcp.tool_validation import ToolValidationService, ValidationLevel
+from src.api.services.mcp.service_discovery import ServiceDiscoveryRegistry, ServiceType
+from src.api.services.mcp.monitoring import MCPMonitoringService, MonitoringConfig
+from src.api.services.mcp.adapters.erp_adapter import ERPAdapter
+from src.api.services.mcp.adapters.wms_adapter import WMSAdapter
+from src.api.services.mcp.adapters.iot_adapter import IoTAdapter
+from src.api.agents.inventory.mcp_equipment_agent import MCPEquipmentAgent
+from src.api.agents.operations.mcp_operations_agent import MCPOperationsAgent
+from src.api.agents.safety.mcp_safety_agent import MCPSafetyAgent
 
 
 class TestMCPEndToEnd:
@@ -104,7 +104,7 @@ class TestMCPEndToEnd:
     @pytest.fixture
     async def erp_adapter(self):
         """Create ERP adapter for testing."""
-        from chain_server.services.mcp.base import AdapterConfig, AdapterType
+        from src.api.services.mcp.base import AdapterConfig, AdapterType
         
         config = AdapterConfig(
             adapter_id="erp_test_001",
@@ -121,7 +121,7 @@ class TestMCPEndToEnd:
     @pytest.fixture
     async def wms_adapter(self):
         """Create WMS adapter for testing."""
-        from chain_server.services.mcp.base import AdapterConfig, AdapterType
+        from src.api.services.mcp.base import AdapterConfig, AdapterType
         
         config = AdapterConfig(
             adapter_id="wms_test_001",
@@ -138,7 +138,7 @@ class TestMCPEndToEnd:
     @pytest.fixture
     async def iot_adapter(self):
         """Create IoT adapter for testing."""
-        from chain_server.services.mcp.base import AdapterConfig, AdapterType
+        from src.api.services.mcp.base import AdapterConfig, AdapterType
         
         config = AdapterConfig(
             adapter_id="iot_test_001",
@@ -219,7 +219,7 @@ class TestMCPEndToEnd:
         assert len(bindings) > 0, "Should bind tools for query"
         
         # 6. Create execution plan
-        from chain_server.services.mcp.tool_binding import ExecutionContext
+        from src.api.services.mcp.tool_binding import ExecutionContext
         context = ExecutionContext(
             agent_id="test_agent",
             session_id="test_session",
@@ -285,7 +285,7 @@ class TestMCPEndToEnd:
     async def test_service_discovery_integration(self, service_registry, erp_adapter, wms_adapter, iot_adapter):
         """Test service discovery and registry integration."""
         
-        from chain_server.services.mcp.service_discovery import ServiceInfo
+        from src.api.services.mcp.service_discovery import ServiceInfo
         
         # Register services
         erp_service = ServiceInfo(

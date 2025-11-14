@@ -13,8 +13,8 @@ from pathlib import Path
 from datetime import datetime
 import yaml
 
-from chain_server.services.migration import migrator
-from chain_server.services.version import version_service
+from src.api.services.migration import migrator
+from src.api.services.version import version_service
 
 
 @pytest.fixture(scope="session")

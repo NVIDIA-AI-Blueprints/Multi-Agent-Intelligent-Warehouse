@@ -76,7 +76,7 @@ def test_nvidia_config(api_key):
         
         # Test imports
         print("📦 Testing imports...")
-        from chain_server.services.llm.nim_client import NIMClient, NIMConfig
+        from src.api.services.llm.nim_client import NIMClient, NIMConfig
         
         # Create client
         print("🔧 Creating NIM client...")

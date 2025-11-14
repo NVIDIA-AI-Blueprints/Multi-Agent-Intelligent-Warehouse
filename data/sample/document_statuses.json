@@ -1,0 +1,48 @@
+{
+  "5b41d4ff-90fe-4184-93de-4c38f05f8c87": {
+    "status": "completed",
+    "current_stage": "Completed",
+    "progress": 100.0,
+    "file_path": "/tmp/document_uploads_ym7aykha/5b41d4ff-90fe-4184-93de-4c38f05f8c87_sample.pdf",
+    "filename": "5b41d4ff-90fe-4184-93de-4c38f05f8c87_sample.pdf",
+    "document_type": "invoice",
+    "stages": [
+      {
+        "name": "preprocessing",
+        "status": "completed",
+        "started_at": "2025-10-31T13:25:26.073345",
+        "completed_at": "2025-10-31T13:25:54.954400"
+      },
+      {
+        "name": "ocr_extraction",
+        "status": "completed",
+        "started_at": "2025-10-31T13:25:38.406303",
+        "completed_at": "2025-10-31T13:25:54.954404"
+      },
+      {
+        "name": "llm_processing",
+        "status": "completed",
+        "started_at": "2025-10-31T13:25:50.443195",
+        "completed_at": "2025-10-31T13:25:54.954407"
+      },
+      {
+        "name": "validation",
+        "status": "completed",
+        "started_at": "2025-10-31T13:26:02.486658",
+        "completed_at": "2025-10-31T13:25:54.954410"
+      },
+      {
+        "name": "routing",
+        "status": "processing",
+        "started_at": "2025-10-31T13:26:14.528354",
+        "completed_at": "2025-10-31T13:25:54.954412"
+      }
+    ],
+    "upload_time": "2025-10-31T13:25:26.073352",
+    "estimated_completion": 1761942386.073352,
+    "processing_results": {
+      "preprocessing": {
+        "document_type": "pdf",
+        "total_pages": 1,
+        "images": [
+          

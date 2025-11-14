@@ -20,14 +20,14 @@ from typing import List, Dict, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 import statistics
 
-from chain_server.services.mcp.server import MCPServer, MCPTool, MCPToolType
-from chain_server.services.mcp.client import MCPClient, MCPConnectionType
-from chain_server.services.mcp.tool_discovery import ToolDiscoveryService, ToolDiscoveryConfig
-from chain_server.services.mcp.tool_binding import ToolBindingService, BindingStrategy, ExecutionMode
-from chain_server.services.mcp.tool_routing import ToolRoutingService, RoutingStrategy
-from chain_server.services.mcp.tool_validation import ToolValidationService, ValidationLevel
-from chain_server.services.mcp.service_discovery import ServiceDiscoveryRegistry, ServiceType
-from chain_server.services.mcp.monitoring import MCPMonitoringService, MonitoringConfig
+from src.api.services.mcp.server import MCPServer, MCPTool, MCPToolType
+from src.api.services.mcp.client import MCPClient, MCPConnectionType
+from src.api.services.mcp.tool_discovery import ToolDiscoveryService, ToolDiscoveryConfig
+from src.api.services.mcp.tool_binding import ToolBindingService, BindingStrategy, ExecutionMode
+from src.api.services.mcp.tool_routing import ToolRoutingService, RoutingStrategy
+from src.api.services.mcp.tool_validation import ToolValidationService, ValidationLevel
+from src.api.services.mcp.service_discovery import ServiceDiscoveryRegistry, ServiceType
+from src.api.services.mcp.monitoring import MCPMonitoringService, MonitoringConfig
 
 
 class TestMCPLoadPerformance:
@@ -329,7 +329,7 @@ class TestMCPLoadPerformance:
         # Test routing performance
         routing_times = []
         for i in range(100):
-            from chain_server.services.mcp.tool_routing import RoutingContext
+            from src.api.services.mcp.tool_routing import RoutingContext
             
             context = RoutingContext(
                 query=f"Test query {i}",
@@ -407,7 +407,7 @@ class TestMCPLoadPerformance:
     async def test_service_discovery_performance(self, service_registry):
         """Test service discovery performance."""
         
-        from chain_server.services.mcp.service_discovery import ServiceInfo
+        from src.api.services.mcp.service_discovery import ServiceInfo
         
         # Register many services
         services = []
@@ -517,7 +517,7 @@ class TestMCPLoadPerformance:
             )
             
             # 3. Route tools
-            from chain_server.services.mcp.tool_routing import RoutingContext
+            from src.api.services.mcp.tool_routing import RoutingContext
             context = RoutingContext(
                 query=f"Test query {i}",
                 intent="test_intent",

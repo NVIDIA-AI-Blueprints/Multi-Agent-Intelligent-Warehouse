@@ -219,11 +219,11 @@ The system features **complete AI-powered demand forecasting** with multi-model 
 - `/api/v1/inventory/forecast/summary` - Summary of all available forecasts
 
 **Key Forecasting Components:**
-- `scripts/phase1_phase2_forecasting_agent.py` - Basic forecasting with CPU fallback
-- `scripts/phase3_advanced_forecasting.py` - Advanced models with hyperparameter optimization
-- `chain_server/routers/advanced_forecasting.py` - FastAPI endpoints for forecasting
-- `ui/web/src/pages/Forecasting.tsx` - React dashboard for forecasting analytics
-- `ui/web/src/services/forecastingAPI.ts` - Frontend API service for forecasting data
+- `scripts/forecasting/phase1_phase2_forecasting_agent.py` - Basic forecasting with CPU fallback
+- `scripts/forecasting/phase3_advanced_forecasting.py` - Advanced models with hyperparameter optimization
+- `src/api/routers/advanced_forecasting.py` - FastAPI endpoints for forecasting
+- `src/ui/web/src/pages/Forecasting.tsx` - React dashboard for forecasting analytics
+- `src/ui/web/src/services/forecastingAPI.ts` - Frontend API service for forecasting data
 
 ## Quick Start
 
@@ -297,10 +297,10 @@ Start all required services (TimescaleDB, Redis, Kafka, Milvus) using Docker:
 
 ```bash
 # Make script executable if needed
-chmod +x scripts/dev_up.sh
+chmod +x scripts/setup/dev_up.sh
 
 # Start infrastructure services
-./scripts/dev_up.sh
+./scripts/setup/dev_up.sh
 ```
 
 This script will:
@@ -333,7 +333,7 @@ PGPASSWORD=warehousepw psql -h localhost -p 5435 -U warehouse -d warehouse -f da
 PGPASSWORD=warehousepw psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/004_inventory_movements_schema.sql
 
 # Create model tracking tables (required for forecasting features)
-PGPASSWORD=warehousepw psql -h localhost -p 5435 -U warehouse -d warehouse -f scripts/create_model_tracking_tables.sql
+PGPASSWORD=warehousepw psql -h localhost -p 5435 -U warehouse -d warehouse -f scripts/setup/create_model_tracking_tables.sql
 ```
 
 **Alternative:** If `psql` is not available, you can use the Python migration script:
@@ -343,7 +343,7 @@ PGPASSWORD=warehousepw psql -h localhost -p 5435 -U warehouse -d warehouse -f sc
 source env/bin/activate  # Linux/macOS
 
 # Run Python migration script
-python scripts/simple_migrate.py
+python scripts/tools/simple_migrate.py
 ```
 
 **Note:** The Python migration script may not include all schema files. Using `psql` directly is recommended for complete setup.
@@ -357,7 +357,7 @@ Create default admin and operator users for testing:
 source env/bin/activate  # Linux/macOS
 
 # Create default users
-python scripts/create_default_users.py
+python scripts/setup/create_default_users.py
 ```
 
 This creates:
@@ -395,7 +395,7 @@ In a new terminal window, start the React frontend:
 
 ```bash
 # Navigate to frontend directory
-cd ui/web
+cd src/ui/web
 
 # Install dependencies (first time only)
 npm install
@@ -433,10 +433,10 @@ For production-like monitoring with Prometheus and Grafana:
 
 ```bash
 # Make script executable if needed
-chmod +x scripts/setup_monitoring.sh
+chmod +x deploy/scripts/setup_monitoring.sh
 
 # Start monitoring stack
-./scripts/setup_monitoring.sh
+./deploy/scripts/setup_monitoring.sh
 ```
 
 **Access URLs:**
@@ -464,7 +464,7 @@ chmod +x scripts/setup_monitoring.sh
 
 **Authentication Fails:**
 - Ensure database migrations ran successfully
-- Verify default users were created: `python scripts/create_default_users.py`
+- Verify default users were created: `python scripts/setup/create_default_users.py`
 - Check database connection in `.env` file
 
 **For more help:** See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) or open an issue on GitHub.
@@ -1123,11 +1123,20 @@ Agent Actions:
 ├─ docs/       # architecture docs & ADRs
 │ └─ architecture/    # Architecture documentation
 │   └─ mcp-integration.md  # MCP system documentation
-├─ ui/        # React web dashboard + mobile shells
-├─ scripts/      # helper scripts (compose up, etc.)
+├─ src/        # All source code
+│   ├─ api/     # FastAPI application
+│   ├─ retrieval/  # Retrieval services
+│   ├─ memory/     # Memory services
+│   ├─ adapters/   # External system adapters
+│   └─ ui/         # React web dashboard
+├─ deploy/     # Deployment configurations
+│   ├─ compose/    # Docker Compose files
+│   ├─ helm/      # Helm charts
+│   └─ scripts/    # Deployment scripts
+├─ scripts/      # Utility scripts (setup, data, forecasting, etc.)
 ├─ tests/      # Comprehensive test suite
 │ └─ test_mcp_system.py  # MCP system tests
-├─ docker-compose.dev.yaml   # dev infra (Timescale, Redis, Kafka, Milvus, MinIO, etcd)
+├─ deploy/compose/docker-compose.dev.yaml   # dev infra (Timescale, Redis, Kafka, Milvus, MinIO, etcd)
 ├─ .env       # dev env vars
 ├─ RUN_LOCAL.sh     # run API locally (auto-picks free port)
 └─ requirements.txt

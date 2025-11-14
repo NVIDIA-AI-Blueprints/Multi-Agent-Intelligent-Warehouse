@@ -6,16 +6,16 @@
 # =============================================================================
 FROM node:18-alpine AS frontend-builder
 
-WORKDIR /app/ui/web
+WORKDIR /app/src/ui/web
 
 # Copy package files
-COPY ui/web/package*.json ./
+COPY src/ui/web/package*.json ./
 
 # Install dependencies
 RUN npm ci --only=production
 
 # Copy frontend source
-COPY ui/web/ ./
+COPY src/ui/web/ ./
 
 # Build arguments for version injection
 ARG VERSION=0.0.0
@@ -83,7 +83,7 @@ ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
 # Copy frontend build from frontend-builder stage
-COPY --from=frontend-builder /app/ui/web/build ./ui/web/build
+COPY --from=frontend-builder /app/src/ui/web/build ./src/ui/web/build
 
 # Create non-root user for security
 RUN groupadd -r appuser && useradd -r -g appuser appuser
@@ -98,4 +98,4 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
 EXPOSE 8001
 
 # Start command
-CMD ["uvicorn", "chain_server.app:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["uvicorn", "src.api.app:app", "--host", "0.0.0.0", "--port", "8001"]

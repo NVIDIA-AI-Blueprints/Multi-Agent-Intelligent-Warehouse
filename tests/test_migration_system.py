@@ -14,8 +14,8 @@ from unittest.mock import Mock, patch, AsyncMock
 import yaml
 from datetime import datetime
 
-from chain_server.services.migration import migrator, MigrationService
-from chain_server.services.version import version_service
+from src.api.services.migration import migrator, MigrationService
+from src.api.services.version import version_service
 
 
 class TestMigrationService:
@@ -256,7 +256,7 @@ class TestMigrationCLI:
     @pytest.mark.asyncio
     async def test_cli_status_command(self, mock_migrator):
         """Test CLI status command."""
-        from chain_server.cli.migrate import cli
+        from src.api.cli.migrate import cli
         
         with patch('chain_server.cli.migrate.migrator', mock_migrator):
             # This would test the CLI command execution
@@ -266,7 +266,7 @@ class TestMigrationCLI:
     @pytest.mark.asyncio
     async def test_cli_migrate_command(self, mock_migrator):
         """Test CLI migrate command."""
-        from chain_server.cli.migrate import cli
+        from src.api.cli.migrate import cli
         
         with patch('chain_server.cli.migrate.migrator', mock_migrator):
             # This would test the CLI command execution

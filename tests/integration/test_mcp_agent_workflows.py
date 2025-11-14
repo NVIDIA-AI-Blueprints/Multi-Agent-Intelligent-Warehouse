@@ -16,15 +16,15 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from chain_server.services.mcp.tool_discovery import ToolDiscoveryService, ToolDiscoveryConfig
-from chain_server.services.mcp.tool_binding import ToolBindingService, BindingStrategy, ExecutionMode
-from chain_server.services.mcp.tool_routing import ToolRoutingService, RoutingStrategy
-from chain_server.services.mcp.tool_validation import ToolValidationService, ValidationLevel
-from chain_server.services.mcp.service_discovery import ServiceDiscoveryRegistry, ServiceType
-from chain_server.services.mcp.monitoring import MCPMonitoringService, MonitoringConfig
-from chain_server.agents.inventory.mcp_equipment_agent import MCPEquipmentAgent
-from chain_server.agents.operations.mcp_operations_agent import MCPOperationsAgent
-from chain_server.agents.safety.mcp_safety_agent import MCPSafetyAgent
+from src.api.services.mcp.tool_discovery import ToolDiscoveryService, ToolDiscoveryConfig
+from src.api.services.mcp.tool_binding import ToolBindingService, BindingStrategy, ExecutionMode
+from src.api.services.mcp.tool_routing import ToolRoutingService, RoutingStrategy
+from src.api.services.mcp.tool_validation import ToolValidationService, ValidationLevel
+from src.api.services.mcp.service_discovery import ServiceDiscoveryRegistry, ServiceType
+from src.api.services.mcp.monitoring import MCPMonitoringService, MonitoringConfig
+from src.api.agents.inventory.mcp_equipment_agent import MCPEquipmentAgent
+from src.api.agents.operations.mcp_operations_agent import MCPOperationsAgent
+from src.api.agents.safety.mcp_safety_agent import MCPSafetyAgent
 
 
 class TestEquipmentAgentWorkflows:
@@ -71,7 +71,7 @@ class TestEquipmentAgentWorkflows:
     @pytest.fixture
     async def mock_equipment_tools(self, setup_mcp_services):
         """Create mock equipment tools for testing."""
-        from chain_server.services.mcp.server import MCPTool, MCPToolType
+        from src.api.services.mcp.server import MCPTool, MCPToolType
         
         services = await setup_mcp_services
         discovery = services['discovery']
@@ -359,7 +359,7 @@ class TestOperationsAgentWorkflows:
     @pytest.fixture
     async def mock_operations_tools(self, setup_mcp_services):
         """Create mock operations tools for testing."""
-        from chain_server.services.mcp.server import MCPTool, MCPToolType
+        from src.api.services.mcp.server import MCPTool, MCPToolType
         
         services = await setup_mcp_services
         discovery = services['discovery']
@@ -553,7 +553,7 @@ class TestSafetyAgentWorkflows:
     @pytest.fixture
     async def mock_safety_tools(self, setup_mcp_services):
         """Create mock safety tools for testing."""
-        from chain_server.services.mcp.server import MCPTool, MCPToolType
+        from src.api.services.mcp.server import MCPTool, MCPToolType
         
         services = await setup_mcp_services
         discovery = services['discovery']

@@ -17,13 +17,13 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from chain_server.services.mcp.rollback import (
+from src.api.services.mcp.rollback import (
     MCPRollbackManager, MCPToolFallback, MCPAgentFallback, MCPSystemFallback,
     RollbackConfig, FallbackConfig, RollbackLevel, FallbackMode, RollbackMetrics
 )
-from chain_server.services.mcp.base import MCPError
-from chain_server.services.mcp.client import MCPClient, MCPConnectionType
-from chain_server.services.mcp.server import MCPServer, MCPTool, MCPToolType
+from src.api.services.mcp.base import MCPError
+from src.api.services.mcp.client import MCPClient, MCPConnectionType
+from src.api.services.mcp.server import MCPServer, MCPTool, MCPToolType
 
 
 class TestMCPRollbackManager:

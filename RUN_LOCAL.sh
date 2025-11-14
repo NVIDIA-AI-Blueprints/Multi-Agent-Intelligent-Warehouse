@@ -36,4 +36,4 @@ echo "Press Ctrl+C to stop the server"
 echo ""
 
 # Start the FastAPI application
-uvicorn chain_server.app:app --host 0.0.0.0 --port $PORT --reload
+uvicorn src.api.app:app --host 0.0.0.0 --port $PORT --reload

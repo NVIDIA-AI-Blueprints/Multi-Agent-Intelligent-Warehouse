@@ -10,10 +10,10 @@ import json
 from unittest.mock import Mock, patch, AsyncMock
 from datetime import datetime
 
-from chain_server.services.mcp.server import MCPServer, MCPTool, MCPToolType
-from chain_server.services.mcp.client import MCPClient, MCPConnectionType
-from chain_server.services.mcp.base import MCPAdapter, AdapterConfig, AdapterType, ToolConfig, ToolCategory
-from chain_server.services.mcp.adapters.erp_adapter import MCPERPAdapter
+from src.api.services.mcp.server import MCPServer, MCPTool, MCPToolType
+from src.api.services.mcp.client import MCPClient, MCPConnectionType
+from src.api.services.mcp.base import MCPAdapter, AdapterConfig, AdapterType, ToolConfig, ToolCategory
+from src.api.services.mcp.adapters.erp_adapter import MCPERPAdapter
 
 
 class TestMCPServer:
