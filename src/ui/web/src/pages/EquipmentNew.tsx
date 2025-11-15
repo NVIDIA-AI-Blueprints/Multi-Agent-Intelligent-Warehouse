@@ -21,6 +21,7 @@ import {
   ListItemText,
   IconButton,
   Tooltip,
+  CircularProgress,
 } from '@mui/material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import {
@@ -60,7 +61,7 @@ const EquipmentNew: React.FC = () => {
     { enabled: activeTab === 2 }
   );
 
-  const { data: telemetryData } = useQuery(
+  const { data: telemetryData, isLoading: telemetryLoading } = useQuery(
     ['equipment-telemetry', selectedAssetId],
     () => selectedAssetId ? equipmentAPI.getTelemetry(selectedAssetId, undefined, 168) : [],
     { enabled: !!selectedAssetId && activeTab === 3 }
@@ -260,7 +261,13 @@ const EquipmentNew: React.FC = () => {
       <Paper sx={{ mb: 3 }}>
         <Tabs
           value={activeTab}
-          onChange={(_, newValue) => setActiveTab(newValue)}
+          onChange={(_, newValue) => {
+            setActiveTab(newValue);
+            // Auto-select first asset when switching to Telemetry tab if none selected
+            if (newValue === 3 && !selectedAssetId && equipmentAssets && equipmentAssets.length > 0) {
+              setSelectedAssetId(equipmentAssets[0].asset_id);
+            }
+          }}
           sx={{ borderBottom: 1, borderColor: 'divider' }}
         >
           <Tab label="Assets" icon={<BuildIcon />} />
@@ -382,31 +389,63 @@ const EquipmentNew: React.FC = () => {
               <Typography variant="h6" gutterBottom>
                 Equipment Telemetry
               </Typography>
-              {selectedAssetId ? (
+              {equipmentAssets && equipmentAssets.length > 0 ? (
                 <Box>
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
-                    Asset: {selectedAssetId}
-                  </Typography>
-                  {telemetryData && telemetryData.length > 0 ? (
-                    <List>
-                      {telemetryData.map((data: any, index: number) => (
-                        <ListItem key={index}>
-                          <ListItemText
-                            primary={`${data.metric}: ${data.value} ${data.unit}`}
-                            secondary={`${new Date(data.timestamp).toLocaleString()} (Quality: ${(data.quality_score * 100).toFixed(1)}%)`}
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  ) : (
-                    <Typography variant="body2" color="text.secondary">
-                      No telemetry data available
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Select an asset to view telemetry data:
                     </Typography>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
+                      {equipmentAssets.map((asset) => (
+                        <Chip
+                          key={asset.asset_id}
+                          label={`${asset.asset_id} (${asset.type})`}
+                          onClick={() => setSelectedAssetId(asset.asset_id)}
+                          color={selectedAssetId === asset.asset_id ? 'primary' : 'default'}
+                          variant={selectedAssetId === asset.asset_id ? 'filled' : 'outlined'}
+                          sx={{ cursor: 'pointer' }}
+                        />
+                      ))}
+                    </Box>
+                  </Box>
+                  {selectedAssetId ? (
+                    <Box>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        Asset: {selectedAssetId}
+                      </Typography>
+                      {telemetryLoading ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                          <CircularProgress />
+                        </Box>
+                      ) : telemetryData && telemetryData.length > 0 ? (
+                        <List>
+                          {telemetryData.map((data: any, index: number) => (
+                            <ListItem key={index}>
+                              <ListItemText
+                                primary={`${data.metric}: ${data.value} ${data.unit || ''}`}
+                                secondary={`${new Date(data.timestamp).toLocaleString()}${data.quality_score ? ` (Quality: ${(data.quality_score * 100).toFixed(1)}%)` : ''}`}
+                              />
+                            </ListItem>
+                          ))}
+                        </List>
+                      ) : (
+                        <Alert severity="info" sx={{ mt: 2 }}>
+                          No telemetry data available for {selectedAssetId} in the last 7 days.
+                          <Typography variant="body2" sx={{ mt: 1 }}>
+                            Telemetry data may not have been generated yet, or the asset may not have any recent telemetry records.
+                          </Typography>
+                        </Alert>
+                      )}
+                    </Box>
+                  ) : (
+                    <Alert severity="info">
+                      Please select an asset from the list above to view telemetry data.
+                    </Alert>
                   )}
                 </Box>
               ) : (
                 <Typography variant="body2" color="text.secondary">
-                  Select an asset to view telemetry data
+                  No equipment assets available
                 </Typography>
               )}
             </Box>
