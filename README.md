@@ -291,6 +291,16 @@ cp .env.example .env
 
 **Note:** The application will work without NVIDIA API keys, but AI features (chat, document processing) will be limited. See [docs/secrets.md](docs/secrets.md) for development credentials and default values.
 
+**Quick Setup for NVIDIA API Keys:**
+```bash
+# Use the interactive setup script to configure NVIDIA API keys
+python setup_nvidia_api.py
+```
+This script will:
+- Guide you through obtaining an NVIDIA API key from https://build.nvidia.com/
+- Update your `.env` file with the API key
+- Test the configuration to ensure it works correctly
+
 ### Step 4: Start Development Infrastructure
 
 Start all required services (TimescaleDB, Redis, Kafka, Milvus) using Docker:
@@ -606,7 +616,20 @@ The system now features **production-grade vector search** powered by NVIDIA's N
 
 #### **Environment Variables Setup**
 
-The system requires NVIDIA API keys for full functionality. Copy `.env.example` to `.env` and configure the following variables:
+The system requires NVIDIA API keys for full functionality. You can configure them in two ways:
+
+**Option 1: Interactive Setup Script (Recommended)**
+```bash
+# Use the interactive setup script
+python setup_nvidia_api.py
+```
+This script will:
+- Guide you through obtaining an NVIDIA API key from https://build.nvidia.com/
+- Update your `.env` file with the API key
+- Test the configuration to ensure it works correctly
+
+**Option 2: Manual Configuration**
+Copy `.env.example` to `.env` and configure the following variables:
 
 ```bash
 # NVIDIA NGC API Keys (same key for all services)
