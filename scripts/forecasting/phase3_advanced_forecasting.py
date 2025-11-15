@@ -460,13 +460,24 @@ class AdvancedRAPIDSForecastingAgent:
                     # Calculate accuracy score from R² (R² is a good proxy for accuracy)
                     accuracy_score = max(0.0, min(1.0, r2))  # Clamp between 0 and 1
                     
+                    # Map model names to display names (matching what performance metrics expect)
+                    model_name_map = {
+                        'random_forest': 'Random Forest',
+                        'gradient_boosting': 'Gradient Boosting',
+                        'xgboost': 'XGBoost',
+                        'linear_regression': 'Linear Regression',
+                        'ridge_regression': 'Ridge Regression',
+                        'svr': 'Support Vector Regression'
+                    }
+                    display_model_name = model_name_map.get(model_name, model_name.title())
+                    
                     await self.pg_conn.execute("""
                         INSERT INTO model_training_history 
                         (model_name, training_date, training_type, accuracy_score, mape_score, 
                          training_duration_minutes, models_trained, status)
                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                     """, 
-                        model_name,
+                        display_model_name,
                         datetime.now(),
                         'advanced',
                         float(accuracy_score),
@@ -475,7 +486,7 @@ class AdvancedRAPIDSForecastingAgent:
                         1,  # One model per training
                         'completed'
                     )
-                    logger.info(f"💾 Saved {model_name} training to database")
+                    logger.info(f"💾 Saved {display_model_name} training to database")
             except Exception as e:
                 logger.warning(f"⚠️  Failed to save {model_name} training to database: {e}")
             
@@ -613,7 +624,18 @@ class AdvancedRAPIDSForecastingAgent:
                             predictions = forecast['predictions']
                             # Save first prediction (day 1) for each model
                             if 'model_performance' in forecast:
-                                for model_name in forecast['model_performance'].keys():
+                                for model_key in forecast['model_performance'].keys():
+                                    # Map model keys to display names
+                                    model_name_map = {
+                                        'random_forest': 'Random Forest',
+                                        'gradient_boosting': 'Gradient Boosting',
+                                        'xgboost': 'XGBoost',
+                                        'linear_regression': 'Linear Regression',
+                                        'ridge_regression': 'Ridge Regression',
+                                        'svr': 'Support Vector Regression'
+                                    }
+                                    display_model_name = model_name_map.get(model_key, model_key.title())
+                                    
                                     if predictions and len(predictions) > 0:
                                         predicted_value = float(predictions[0])
                                         await self.pg_conn.execute("""
@@ -621,7 +643,7 @@ class AdvancedRAPIDSForecastingAgent:
                                             (model_name, sku, predicted_value, prediction_date, forecast_horizon_days)
                                             VALUES ($1, $2, $3, $4, $5)
                                         """,
-                                            model_name,
+                                            display_model_name,
                                             sku,
                                             predicted_value,
                                             datetime.now(),
