@@ -2,7 +2,7 @@
 *NVIDIA Blueprint–aligned multi-agent assistant for warehouse operations.*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-18+-61dafb.svg)](https://reactjs.org/)
 [![NVIDIA NIMs](https://img.shields.io/badge/NVIDIA-NIMs-76B900.svg)](https://www.nvidia.com/en-us/ai-data-science/nim/)
@@ -230,6 +230,8 @@ The system features **complete AI-powered demand forecasting** with multi-model 
 ## Quick Start
 
 This guide will help you get the Warehouse Operational Assistant running from a fresh clone of the repository.
+
+**For the fastest setup, see [QUICK_START.md](QUICK_START.md). For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).**
 
 ### Prerequisites
 
