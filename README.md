@@ -382,21 +382,31 @@ This creates:
 
 Start the FastAPI backend server:
 
+**Option 1: Using the startup script (Recommended)**
+```bash
+# Start the server (automatically activates virtual environment)
+./scripts/start_server.sh
+```
+
+**Option 2: Manual startup**
 ```bash
 # Ensure virtual environment is activated
 source env/bin/activate  # Linux/macOS
 
-# Make script executable if needed
-chmod +x RUN_LOCAL.sh
-
-# Start API server on http://localhost:8002
-./RUN_LOCAL.sh
+# Start API server on http://localhost:8001
+python -m uvicorn src.api.app:app --reload --port 8001 --host 0.0.0.0
 ```
 
 The API will be available at:
-- **API**: http://localhost:8002
-- **API Documentation (Swagger)**: http://localhost:8002/docs
-- **OpenAPI Schema**: http://localhost:8002/openapi.json
+- **API**: http://localhost:8001
+- **API Documentation (Swagger)**: http://localhost:8001/docs
+- **OpenAPI Schema**: http://localhost:8001/openapi.json
+
+**Default Login Credentials:**
+- **Username:** `admin`
+- **Password:** `changeme` (or value of `DEFAULT_ADMIN_PASSWORD` env var)
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions.
 - **Health Check**: http://localhost:8002/api/v1/health
 
 ### Step 8: Start the Frontend
@@ -416,7 +426,10 @@ npm start
 
 The frontend will be available at:
 - **Web UI**: http://localhost:3001
-- **Login**: Use `admin` / `${DEFAULT_ADMIN_PASSWORD:-changeme}` (see [docs/secrets.md](docs/secrets.md))
+- **Login**: 
+  - **Username:** `admin`
+  - **Password:** `changeme` (default, or value of `DEFAULT_ADMIN_PASSWORD` env var)
+  - See [docs/secrets.md](docs/secrets.md) for all credentials
 
 ### Step 9: Verify Installation
 
