@@ -1,8 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 import jwt
-from passlib.context import CryptContext
-from passlib.hash import bcrypt
+import bcrypt
 import os
 import logging
 
@@ -13,9 +12,6 @@ SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 REFRESH_TOKEN_EXPIRE_DAYS = 7
-
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 class JWTHandler:
@@ -81,25 +77,28 @@ class JWTHandler:
 
     def hash_password(self, password: str) -> str:
         """Hash a password using bcrypt."""
+        # Use bcrypt directly to avoid passlib compatibility issues
         # Bcrypt has a 72-byte limit, so truncate if necessary
         password_bytes = password.encode('utf-8')
         if len(password_bytes) > 72:
             password_bytes = password_bytes[:72]
-            password = password_bytes.decode('utf-8', errors='ignore')
-        return pwd_context.hash(password)
+        
+        salt = bcrypt.gensalt()
+        hashed = bcrypt.hashpw(password_bytes, salt)
+        return hashed.decode('utf-8')
 
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         """Verify a password against its hash."""
         try:
+            # Use bcrypt directly to avoid passlib compatibility issues
             # Bcrypt has a 72-byte limit, so truncate if necessary
-            # Convert to bytes, truncate to 72 bytes, then back to string
             password_bytes = plain_password.encode('utf-8')
             if len(password_bytes) > 72:
                 password_bytes = password_bytes[:72]
-                plain_password = password_bytes.decode('utf-8', errors='ignore')
             
-            return pwd_context.verify(plain_password, hashed_password)
-        except (ValueError, TypeError) as e:
+            hash_bytes = hashed_password.encode('utf-8')
+            return bcrypt.checkpw(password_bytes, hash_bytes)
+        except (ValueError, TypeError, Exception) as e:
             logger.warning(f"Password verification error: {e}")
             return False
 
