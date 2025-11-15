@@ -403,29 +403,49 @@ class AdvancedForecastingService:
         """Get list of active model names from training history or model registry"""
         try:
             # Query training history to get recently trained models
+            # Use subquery to get distinct model names ordered by most recent training
             query = """
-            SELECT DISTINCT model_name 
+            SELECT DISTINCT ON (model_name) model_name
             FROM model_training_history 
             WHERE training_date >= NOW() - INTERVAL '30 days'
-            ORDER BY training_date DESC
+            ORDER BY model_name, training_date DESC
             """
             
             result = await self.db_pool.fetch(query)
-            if result:
-                return [row['model_name'] for row in result]
+            if result and len(result) > 0:
+                model_names = [row['model_name'] for row in result]
+                logger.info(f"📊 Found {len(model_names)} active models in database: {model_names}")
+                return model_names
             
             # Fallback to default models if no training history
+            logger.warning("No active models found in database, using fallback list")
             return ["Random Forest", "XGBoost", "Gradient Boosting", "Linear Regression", "Ridge Regression", "Support Vector Regression"]
             
         except Exception as e:
             logger.warning(f"Could not get active model names: {e}")
+            import traceback
+            logger.warning(traceback.format_exc())
             return ["Random Forest", "XGBoost", "Gradient Boosting", "Linear Regression", "Ridge Regression", "Support Vector Regression"]
     
     async def _calculate_model_accuracy(self, model_name: str) -> float:
-        """Calculate actual model accuracy from recent predictions"""
+        """Calculate actual model accuracy from training history or predictions"""
         try:
-            # Query recent predictions and actual values to calculate accuracy
-            query = """
+            # First, try to get accuracy from most recent training
+            training_query = """
+            SELECT accuracy_score
+            FROM model_training_history 
+            WHERE model_name = $1 
+            AND training_date >= NOW() - INTERVAL '30 days'
+            ORDER BY training_date DESC
+            LIMIT 1
+            """
+            
+            result = await self.db_pool.fetchval(training_query, model_name)
+            if result is not None:
+                return float(result)
+            
+            # Fallback: try to calculate from predictions with actual values
+            prediction_query = """
             SELECT 
                 AVG(CASE 
                     WHEN ABS(predicted_value - actual_value) / NULLIF(actual_value, 0) <= 0.1 THEN 1.0 
@@ -437,7 +457,7 @@ class AdvancedForecastingService:
             AND actual_value IS NOT NULL
             """
             
-            result = await self.db_pool.fetchval(query, model_name)
+            result = await self.db_pool.fetchval(prediction_query, model_name)
             return float(result) if result is not None else 0.75
                 
         except Exception as e:
@@ -445,9 +465,24 @@ class AdvancedForecastingService:
             return 0.75  # Default accuracy
     
     async def _calculate_model_mape(self, model_name: str) -> float:
-        """Calculate Mean Absolute Percentage Error"""
+        """Calculate Mean Absolute Percentage Error from training history or predictions"""
         try:
-            query = """
+            # First, try to get MAPE from most recent training
+            training_query = """
+            SELECT mape_score
+            FROM model_training_history 
+            WHERE model_name = $1 
+            AND training_date >= NOW() - INTERVAL '30 days'
+            ORDER BY training_date DESC
+            LIMIT 1
+            """
+            
+            result = await self.db_pool.fetchval(training_query, model_name)
+            if result is not None:
+                return float(result)
+            
+            # Fallback: try to calculate from predictions with actual values
+            prediction_query = """
             SELECT 
                 AVG(ABS(predicted_value - actual_value) / NULLIF(actual_value, 0)) * 100 as mape
             FROM model_predictions 
@@ -456,7 +491,7 @@ class AdvancedForecastingService:
             AND actual_value IS NOT NULL AND actual_value > 0
             """
             
-            result = await self.db_pool.fetchval(query, model_name)
+            result = await self.db_pool.fetchval(prediction_query, model_name)
             return float(result) if result is not None else 15.0
                 
         except Exception as e:
