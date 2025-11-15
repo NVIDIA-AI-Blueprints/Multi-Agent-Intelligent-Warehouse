@@ -33,3 +33,6 @@ pyserial>=3.5
 tiktoken
 redis>=5.0.0
 python-multipart
+scikit-learn>=1.0.0
+pandas>=1.2.4
+xgboost>=1.6.0

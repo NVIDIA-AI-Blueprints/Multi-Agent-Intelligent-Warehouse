@@ -593,7 +593,17 @@ class AdvancedForecastingService:
     
     def _determine_model_status(self, accuracy: float, drift_score: float, last_training: datetime) -> str:
         """Determine model status based on performance metrics"""
-        days_since_training = (datetime.now() - last_training).days
+        # Handle timezone-aware vs timezone-naive datetime comparison
+        now = datetime.now()
+        if last_training.tzinfo is not None:
+            # If last_training is timezone-aware, make now timezone-aware too
+            from datetime import timezone
+            now = datetime.now(timezone.utc)
+        elif now.tzinfo is not None:
+            # If now is timezone-aware but last_training is not, make last_training naive
+            last_training = last_training.replace(tzinfo=None)
+        
+        days_since_training = (now - last_training).days
         
         # Use hardcoded thresholds temporarily
         accuracy_threshold_warning = 0.7
