@@ -90,6 +90,9 @@ temp/
 # Runtime-generated files
 document_statuses.json
 
+# Build artifacts
+build-info.json
+
 # Coverage reports
 htmlcov/
 .coverage
