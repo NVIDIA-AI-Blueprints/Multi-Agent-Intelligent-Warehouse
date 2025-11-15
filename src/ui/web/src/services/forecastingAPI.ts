@@ -90,7 +90,8 @@ export const forecastingAPI = {
   async getReorderRecommendations(): Promise<any[]> {
     try {
       const response = await api.get(`${API_BASE_URL}/forecasting/reorder-recommendations`);
-      return response.data;
+      // Backend returns {recommendations: [...], ...}, extract the array
+      return response.data.recommendations || response.data || [];
     } catch (error) {
       throw error;
     }
@@ -99,7 +100,8 @@ export const forecastingAPI = {
   async getModelPerformance(): Promise<any[]> {
     try {
       const response = await api.get(`${API_BASE_URL}/forecasting/model-performance`);
-      return response.data;
+      // Backend returns {model_metrics: [...], ...}, extract the array
+      return response.data.model_metrics || response.data || [];
     } catch (error) {
       throw error;
     }

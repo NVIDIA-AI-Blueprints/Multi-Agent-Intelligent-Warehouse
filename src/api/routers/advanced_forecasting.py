@@ -33,6 +33,10 @@ class ForecastRequest(BaseModel):
     include_confidence_intervals: bool = True
     include_feature_importance: bool = True
 
+class BatchForecastRequest(BaseModel):
+    skus: List[str]
+    horizon_days: int = 30
+
 class ReorderRecommendation(BaseModel):
     sku: str
     current_stock: int
@@ -990,26 +994,31 @@ async def get_forecasting_dashboard():
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/batch-forecast")
-async def batch_forecast(skus: List[str], horizon_days: int = 30):
+async def batch_forecast(request: BatchForecastRequest):
     """Generate forecasts for multiple SKUs in batch"""
     try:
+        if not request.skus or len(request.skus) == 0:
+            raise HTTPException(status_code=400, detail="SKU list cannot be empty")
+        
         await forecasting_service.initialize()
         
         forecasts = {}
-        for sku in skus:
+        for sku in request.skus:
             try:
-                forecasts[sku] = await forecasting_service.get_real_time_forecast(sku, horizon_days)
+                forecasts[sku] = await forecasting_service.get_real_time_forecast(sku, request.horizon_days)
             except Exception as e:
                 logger.error(f"Failed to forecast {sku}: {e}")
                 forecasts[sku] = {"error": str(e)}
         
         return {
             "forecasts": forecasts,
-            "total_skus": len(skus),
+            "total_skus": len(request.skus),
             "successful_forecasts": len([f for f in forecasts.values() if "error" not in f]),
             "generated_at": datetime.now().isoformat()
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error in batch forecast: {e}")
         raise HTTPException(status_code=500, detail=str(e))
