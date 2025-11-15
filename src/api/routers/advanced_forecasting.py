@@ -370,34 +370,56 @@ class AdvancedForecastingService:
         """Calculate real model performance metrics from actual data"""
         metrics = []
         
-        # Get model names from actual training history or model registry
-        model_names = await self._get_active_model_names()
-        
-        for model_name in model_names:
-            try:
-                # Calculate actual performance metrics
-                accuracy = await self._calculate_model_accuracy(model_name)
-                mape = await self._calculate_model_mape(model_name)
-                prediction_count = await self._get_prediction_count(model_name)
-                drift_score = await self._calculate_drift_score(model_name)
-                last_training = await self._get_last_training_date(model_name)
-                status = self._determine_model_status(accuracy, drift_score, last_training)
-                
-                metrics.append(ModelPerformanceMetrics(
-                    model_name=model_name,
-                    accuracy_score=accuracy,
-                    mape=mape,
-                    last_training_date=last_training.isoformat(),
-                    prediction_count=prediction_count,
-                    drift_score=drift_score,
-                    status=status
-                ))
-                
-            except Exception as e:
-                logger.warning(f"Could not calculate metrics for {model_name}: {e}")
-                continue
-        
-        return metrics
+        try:
+            # Get model names from actual training history or model registry
+            model_names = await self._get_active_model_names()
+            
+            if not model_names:
+                logger.warning("No active model names found, returning empty list")
+                return []
+            
+            logger.info(f"📊 Calculating metrics for {len(model_names)} models: {model_names}")
+            
+            for model_name in model_names:
+                try:
+                    # Calculate actual performance metrics
+                    accuracy = await self._calculate_model_accuracy(model_name)
+                    mape = await self._calculate_model_mape(model_name)
+                    prediction_count = await self._get_prediction_count(model_name)
+                    drift_score = await self._calculate_drift_score(model_name)
+                    last_training = await self._get_last_training_date(model_name)
+                    status = self._determine_model_status(accuracy, drift_score, last_training)
+                    
+                    metrics.append(ModelPerformanceMetrics(
+                        model_name=model_name,
+                        accuracy_score=accuracy,
+                        mape=mape,
+                        last_training_date=last_training.isoformat(),
+                        prediction_count=prediction_count,
+                        drift_score=drift_score,
+                        status=status
+                    ))
+                    
+                    logger.info(f"✅ Calculated metrics for {model_name}: accuracy={accuracy:.3f}, MAPE={mape:.1f}")
+                    
+                except Exception as e:
+                    logger.warning(f"Could not calculate metrics for {model_name}: {e}")
+                    import traceback
+                    logger.warning(traceback.format_exc())
+                    continue
+            
+            if metrics:
+                logger.info(f"✅ Successfully calculated metrics for {len(metrics)} models")
+            else:
+                logger.warning("⚠️  No metrics calculated, returning empty list")
+            
+            return metrics
+            
+        except Exception as e:
+            logger.error(f"❌ Error in _calculate_real_model_metrics: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return []
     
     async def _get_active_model_names(self) -> List[str]:
         """Get list of active model names from training history or model registry"""
