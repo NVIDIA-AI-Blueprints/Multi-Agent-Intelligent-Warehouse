@@ -2,12 +2,34 @@
 
 ## 🚀 Fastest Way to Get Started
 
+### Prerequisites
+
+- Python 3.9+ installed
+- Docker and Docker Compose installed
+- Node.js 18+ and npm (for frontend)
+
 ### 1. Setup (One-time)
 
 ```bash
 # Setup virtual environment and install dependencies
 ./scripts/setup/setup_environment.sh
+
+# Start database services
+./scripts/setup/dev_up.sh
+
+# Run database migrations
+source env/bin/activate
+PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/000_schema.sql
+PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/001_equipment_schema.sql
+PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/002_document_schema.sql
+PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/004_inventory_movements_schema.sql
+PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f scripts/setup/create_model_tracking_tables.sql
+
+# Create default users
+python scripts/setup/create_default_users.py
 ```
+
+**Note:** For detailed setup instructions, see [DEPLOYMENT.md](DEPLOYMENT.md)
 
 ### 2. Start Server
 

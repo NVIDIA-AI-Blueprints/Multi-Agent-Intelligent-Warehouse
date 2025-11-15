@@ -31,9 +31,18 @@ nano .env  # or use your preferred editor
 ### 3. Start Database Services
 
 ```bash
-# Using Docker Compose
+# Using the setup script (recommended)
+./scripts/setup/dev_up.sh
+
+# Or manually using Docker Compose
 docker-compose -f deploy/compose/docker-compose.dev.yaml up -d postgres redis milvus
 ```
+
+**Service Endpoints:**
+- **Postgres/Timescale**: `localhost:5435`
+- **Redis**: `localhost:6379`
+- **Milvus**: `localhost:19530`
+- **Kafka**: `localhost:9092`
 
 ### 4. Run Database Migrations
 
@@ -46,6 +55,9 @@ PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse
 PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/001_equipment_schema.sql
 PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/002_document_schema.sql
 PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/004_inventory_movements_schema.sql
+
+# Create model tracking tables (required for forecasting features)
+PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f scripts/setup/create_model_tracking_tables.sql
 ```
 
 ### 5. Create Default Users
@@ -62,7 +74,28 @@ python scripts/setup/create_default_users.py
 - **Username:** `admin`
 - **Password:** `changeme` (or value of `DEFAULT_ADMIN_PASSWORD` env var)
 
-### 6. Start API Server
+### 6. (Optional) Install RAPIDS for GPU-Accelerated Forecasting
+
+For GPU-accelerated demand forecasting (10-100x faster), install NVIDIA RAPIDS:
+
+```bash
+# Activate virtual environment
+source env/bin/activate
+
+# Install RAPIDS cuML (requires NVIDIA GPU with CUDA 11.2+ or 12.0+)
+./scripts/setup/install_rapids.sh
+```
+
+**Requirements:**
+- NVIDIA GPU with CUDA Compute Capability 7.0+
+- CUDA 11.2+ or 12.0+
+- 16GB+ GPU memory (recommended)
+
+The system will automatically use GPU acceleration when RAPIDS is available, with CPU fallback otherwise.
+
+See [RAPIDS Setup Guide](docs/forecasting/RAPIDS_SETUP.md) for detailed instructions.
+
+### 7. Start API Server
 
 ```bash
 # Start the server (automatically activates virtual environment)
@@ -73,7 +106,16 @@ source env/bin/activate
 python -m uvicorn src.api.app:app --reload --port 8001 --host 0.0.0.0
 ```
 
-### 7. Start Frontend (Optional)
+**Verify Server is Running:**
+```bash
+# Check health endpoint
+curl http://localhost:8001/health
+
+# Check version endpoint
+curl http://localhost:8001/api/v1/version
+```
+
+### 8. Start Frontend (Optional)
 
 ```bash
 cd src/ui/web
@@ -127,10 +169,21 @@ PORT=8002 ./scripts/start_server.sh
 ```
 
 ### Module Not Found Errors
+
+If you see errors like `ModuleNotFoundError: No module named 'fastapi'` or similar:
+
 ```bash
+# Activate virtual environment
 source env/bin/activate
+
+# Install all dependencies
 pip install -r requirements.txt
+
+# Common missing dependencies that may need explicit installation:
+pip install tiktoken redis python-multipart scikit-learn pandas xgboost
 ```
+
+**Note:** All required dependencies are listed in `requirements.txt`. If you encounter missing modules, ensure the virtual environment is activated and dependencies are installed.
 
 ### Database Connection Errors
 1. Check if PostgreSQL is running: `docker ps | grep postgres`
@@ -141,6 +194,37 @@ pip install -r requirements.txt
 1. Check `DEFAULT_ADMIN_PASSWORD` in `.env` file
 2. Recreate users: `python scripts/setup/create_default_users.py`
 3. Default password is `changeme` if not set
+
+### Server Won't Start
+
+**Check virtual environment:**
+```bash
+# Ensure virtual environment exists and is activated
+./scripts/setup/setup_environment.sh
+source env/bin/activate
+```
+
+**Check port availability:**
+```bash
+# Check if port 8001 is in use
+lsof -i :8001
+
+# Use a different port if needed
+PORT=8002 ./scripts/start_server.sh
+```
+
+**Check dependencies:**
+```bash
+# Verify all dependencies are installed
+source env/bin/activate
+pip list | grep -E "fastapi|uvicorn|pydantic"
+```
+
+**View server logs:**
+```bash
+# If running manually, check terminal output
+# If using startup script, check for error messages
+```
 
 ## Production Deployment
 
