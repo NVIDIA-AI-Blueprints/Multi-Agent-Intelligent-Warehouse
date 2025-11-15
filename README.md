@@ -235,7 +235,7 @@ This guide will help you get the Warehouse Operational Assistant running from a 
 
 Before starting, ensure you have the following installed:
 
-- **Python 3.11+** (check with `python3 --version`)
+- **Python 3.9+** (check with `python3 --version`)
 - **Node.js 18+** and npm (check with `node --version` and `npm --version`)
 - **Docker** and Docker Compose (either `docker compose` plugin or `docker-compose v1`)
 - **Git** (to clone the repository)
@@ -251,7 +251,11 @@ cd warehouse-operational-assistant
 ### Step 2: Set Up Python Virtual Environment
 
 ```bash
-# Create virtual environment (use 'env' directory to match RUN_LOCAL.sh)
+# Using the setup script (recommended)
+./scripts/setup/setup_environment.sh
+
+# Or manually:
+# Create virtual environment (use 'env' directory)
 python3 -m venv env
 
 # Activate virtual environment
@@ -430,7 +434,8 @@ The API will be available at:
 - **Password:** `changeme` (or value of `DEFAULT_ADMIN_PASSWORD` env var)
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions.
-- **Health Check**: http://localhost:8002/api/v1/health
+
+**Health Check**: http://localhost:8001/health
 
 ### Step 9: Start the Frontend
 
@@ -454,26 +459,29 @@ The frontend will be available at:
   - **Password:** `changeme` (default, or value of `DEFAULT_ADMIN_PASSWORD` env var)
   - See [docs/secrets.md](docs/secrets.md) for all credentials
 
-### Step 9: Verify Installation
+### Step 10: Verify Installation
 
 Test that everything is working:
 
 ```bash
 # Test API health endpoint
-curl http://localhost:8002/api/v1/health
+curl http://localhost:8001/health
+
+# Test version endpoint
+curl http://localhost:8001/api/v1/version
 
 # Test authentication (should return JWT tokens)
-curl -X POST http://localhost:8002/api/v1/auth/login \
+curl -X POST http://localhost:8001/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"${DEFAULT_ADMIN_PASSWORD:-changeme}"}'
+  -d '{"username":"admin","password":"changeme"}'
 
 # Test chat endpoint (if NVIDIA API keys are configured)
-curl -X POST http://localhost:8002/api/v1/chat \
+curl -X POST http://localhost:8001/api/v1/chat \
   -H "Content-Type: application/json" \
   -d '{"message": "What equipment is available?"}'
 ```
 
-### Step 10: (Optional) Start Monitoring Stack
+### Step 11: (Optional) Start Monitoring Stack
 
 For production-like monitoring with Prometheus and Grafana:
 
@@ -498,10 +506,12 @@ chmod +x deploy/scripts/setup_monitoring.sh
 - Verify port 5435 is not in use: `lsof -i :5435` or `netstat -an | grep 5435`
 
 **API Server Won't Start:**
-- Ensure virtual environment is activated
-- Check Python version: `python3 --version` (must be 3.11+)
-- Verify all dependencies installed: `pip list`
-- Check for port conflicts: `lsof -i :8002`
+- Ensure virtual environment is activated: `source env/bin/activate`
+- Check Python version: `python3 --version` (must be 3.9+)
+- Verify all dependencies installed: `pip list | grep -E "fastapi|uvicorn|pydantic"`
+- Check for port conflicts: `lsof -i :8001`
+- Use the startup script: `./scripts/start_server.sh`
+- See [DEPLOYMENT.md](DEPLOYMENT.md) troubleshooting section for more details
 
 **Frontend Won't Start:**
 - Ensure Node.js 18+ is installed: `node --version`
@@ -1232,11 +1242,11 @@ cd scripts
 
 ### API Testing Examples
 
-[![API Documentation](https://img.shields.io/badge/API-Documentation%20%2F%20Swagger-FF6B35.svg)](http://localhost:8002/docs)
-[![OpenAPI Spec](https://img.shields.io/badge/OpenAPI-3.0%20Spec-85EA2D.svg)](http://localhost:8002/openapi.json)
+[![API Documentation](https://img.shields.io/badge/API-Documentation%20%2F%20Swagger-FF6B35.svg)](http://localhost:8001/docs)
+[![OpenAPI Spec](https://img.shields.io/badge/OpenAPI-3.0%20Spec-85EA2D.svg)](http://localhost:8001/openapi.json)
 
 ```bash
-PORT=8002 # API runs on port 8002
+PORT=8001 # API runs on port 8001 (default)
 
 # Health check
 curl -s http://localhost:$PORT/api/v1/health
@@ -1308,7 +1318,7 @@ curl -s http://localhost:$PORT/api/v1/attendance/health | jq
 - **Mobile App** - React Native app for handheld devices and field operations
 
 ### **System Health**
-- **API Server**: Running on port 8002 with all endpoints working
+- **API Server**: Running on port 8001 with all endpoints working
 - **Frontend**: Running on port 3001 with working chat interface and system status
 - **Database**: PostgreSQL/TimescaleDB on port 5435 with connection pooling
 - **NVIDIA NIMs**: Llama 3.1 70B + NV-EmbedQA-E5-v5 fully operational
@@ -1384,7 +1394,7 @@ docker exec -it wosa-timescaledb psql -U warehouse -d warehouse -c \
 
 ## API (current)
 
-Base path: `http://localhost:8002/api/v1`
+Base path: `http://localhost:8001/api/v1`
 
 ### Health
 ```
@@ -1601,7 +1611,7 @@ The system supports integration with external WMS systems for seamless warehouse
 ### Quick Start
 ```bash
 # Add SAP EWM connection
-curl -X POST "http://localhost:8002/api/v1/wms/connections" \
+curl -X POST "http://localhost:8001/api/v1/wms/connections" \
  -H "Content-Type: application/json" \
  -d '{
  "connection_id": "sap_ewm_main",
@@ -1615,10 +1625,10 @@ curl -X POST "http://localhost:8002/api/v1/wms/connections" \
  }'
 
 # Get inventory from WMS
-curl "http://localhost:8002/api/v1/wms/connections/sap_ewm_main/inventory"
+curl "http://localhost:8001/api/v1/wms/connections/sap_ewm_main/inventory"
 
 # Create a pick task
-curl -X POST "http://localhost:8002/api/v1/wms/connections/sap_ewm_main/tasks" \
+curl -X POST "http://localhost:8001/api/v1/wms/connections/sap_ewm_main/tasks" \
  -H "Content-Type: application/json" \
  -d '{
  "task_type": "pick",
@@ -1657,7 +1667,7 @@ The system supports comprehensive IoT integration for real-time equipment monito
 ### Quick Start
 ```bash
 # Add Equipment Monitor connection
-curl -X POST "http://localhost:8002/api/v1/iot/connections/equipment_monitor_main" \
+curl -X POST "http://localhost:8001/api/v1/iot/connections/equipment_monitor_main" \
  -H "Content-Type: application/json" \
  -d '{
  "iot_type": "equipment_monitor",
@@ -1670,7 +1680,7 @@ curl -X POST "http://localhost:8002/api/v1/iot/connections/equipment_monitor_mai
  }'
 
 # Add Environmental Sensor connection
-curl -X POST "http://localhost:8002/api/v1/iot/connections/environmental_main" \
+curl -X POST "http://localhost:8001/api/v1/iot/connections/environmental_main" \
  -H "Content-Type: application/json" \
  -d '{
  "iot_type": "environmental",
@@ -1684,13 +1694,13 @@ curl -X POST "http://localhost:8002/api/v1/iot/connections/environmental_main" \
  }'
 
 # Get sensor readings
-curl "http://localhost:8002/api/v1/iot/connections/equipment_monitor_main/sensor-readings"
+curl "http://localhost:8001/api/v1/iot/connections/equipment_monitor_main/sensor-readings"
 
 # Get equipment health summary
-curl "http://localhost:8002/api/v1/iot/equipment/health-summary"
+curl "http://localhost:8001/api/v1/iot/equipment/health-summary"
 
 # Get aggregated sensor data
-curl "http://localhost:8002/api/v1/iot/sensor-readings/aggregated"
+curl "http://localhost:8001/api/v1/iot/sensor-readings/aggregated"
 ```
 
 ### Key Features
