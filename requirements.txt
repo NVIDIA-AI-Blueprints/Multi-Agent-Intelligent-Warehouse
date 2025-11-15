@@ -31,3 +31,4 @@ pyserial>=3.5
 # Time Attendance
 # pybluez>=0.23  # Disabled: incompatible with Python 3.11+ (use_2to3 deprecated)
 tiktoken
+redis>=5.0.0
