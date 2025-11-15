@@ -9,6 +9,10 @@ import logging
 import os
 from datetime import datetime
 from passlib.context import CryptContext
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -21,11 +25,11 @@ async def create_default_admin():
     try:
         # Connect to database
         conn = await asyncpg.connect(
-            host="localhost",
-            port=5435,
-            user="warehouse",
-            password=os.getenv("POSTGRES_PASSWORD", ""),
-            database="warehouse"
+            host=os.getenv("PGHOST", "localhost"),
+            port=int(os.getenv("PGPORT", "5435")),
+            user=os.getenv("POSTGRES_USER", "warehouse"),
+            password=os.getenv("POSTGRES_PASSWORD", "changeme"),
+            database=os.getenv("POSTGRES_DB", "warehouse")
         )
         
         logger.info("Connected to database")
