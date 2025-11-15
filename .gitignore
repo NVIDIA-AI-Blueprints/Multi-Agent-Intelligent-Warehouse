@@ -90,6 +90,7 @@ temp/
 # Runtime-generated files
 document_statuses.json
 phase1_phase2_forecasts.json
+rapids_gpu_forecasts.json
 
 # Build artifacts
 build-info.json
