@@ -583,12 +583,20 @@ class AdvancedForecastingService:
             
             result = await self.db_pool.fetchval(query, model_name)
             if result:
-                return result
+                # PostgreSQL returns timezone-aware datetime if column is TIMESTAMP WITH TIME ZONE
+                # or timezone-naive if TIMESTAMP WITHOUT TIME ZONE
+                # Convert to timezone-naive for consistency
+                if isinstance(result, datetime):
+                    if result.tzinfo is not None:
+                        # Convert to UTC and remove timezone info
+                        from datetime import timezone
+                        result = result.astimezone(timezone.utc).replace(tzinfo=None)
+                    return result
                     
         except Exception as e:
             logger.warning(f"Could not get last training date for {model_name}: {e}")
         
-        # Fallback to recent date
+        # Fallback to recent date (timezone-naive)
         return datetime.now() - timedelta(days=1)
     
     def _determine_model_status(self, accuracy: float, drift_score: float, last_training: datetime) -> str:
