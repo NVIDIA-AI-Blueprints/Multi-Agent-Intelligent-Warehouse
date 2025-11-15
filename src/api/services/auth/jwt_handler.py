@@ -81,11 +81,27 @@ class JWTHandler:
 
     def hash_password(self, password: str) -> str:
         """Hash a password using bcrypt."""
+        # Bcrypt has a 72-byte limit, so truncate if necessary
+        password_bytes = password.encode('utf-8')
+        if len(password_bytes) > 72:
+            password_bytes = password_bytes[:72]
+            password = password_bytes.decode('utf-8', errors='ignore')
         return pwd_context.hash(password)
 
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         """Verify a password against its hash."""
-        return pwd_context.verify(plain_password, hashed_password)
+        try:
+            # Bcrypt has a 72-byte limit, so truncate if necessary
+            # Convert to bytes, truncate to 72 bytes, then back to string
+            password_bytes = plain_password.encode('utf-8')
+            if len(password_bytes) > 72:
+                password_bytes = password_bytes[:72]
+                plain_password = password_bytes.decode('utf-8', errors='ignore')
+            
+            return pwd_context.verify(plain_password, hashed_password)
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Password verification error: {e}")
+            return False
 
     def create_token_pair(self, user_data: Dict[str, Any]) -> Dict[str, str]:
         """Create both access and refresh tokens for a user."""
