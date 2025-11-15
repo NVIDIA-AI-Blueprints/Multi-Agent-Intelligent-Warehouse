@@ -6,6 +6,7 @@ Create default admin user for warehouse operational assistant
 import asyncio
 import asyncpg
 import logging
+import os
 from datetime import datetime
 from passlib.context import CryptContext
 
