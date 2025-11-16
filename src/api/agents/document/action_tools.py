@@ -1309,22 +1309,65 @@ class DocumentActionTools:
                         # Get quality score from processing results
                         if "processing_results" in doc_status:
                             results = doc_status["processing_results"]
+                            quality = 0.0
+                            
+                            # Try to extract quality score from validation results
                             if "validation" in results and results["validation"]:
                                 validation = results["validation"]
-                                if isinstance(validation, dict):
-                                    quality = validation.get("overall_score", 0.0)
-                                elif hasattr(validation, "overall_score"):
-                                    quality = validation.overall_score
-                                else:
-                                    quality = 0.0
                                 
-                                if quality > 0:
-                                    quality_scores.append(quality)
-                                    total_quality += quality
+                                # Handle different validation result structures
+                                if isinstance(validation, dict):
+                                    # Check for overall_score directly
+                                    quality = validation.get("overall_score", 0.0)
                                     
-                                    # Count auto-approved (quality >= 4.0)
-                                    if quality >= 4.0:
-                                        auto_approved_count += 1
+                                    # If not found, check for quality_score field
+                                    if quality == 0.0:
+                                        quality = validation.get("quality_score", 0.0)
+                                    
+                                    # If still not found, check nested structures
+                                    if quality == 0.0 and "quality_score" in validation:
+                                        qs = validation["quality_score"]
+                                        if isinstance(qs, dict):
+                                            quality = qs.get("overall_score", 0.0)
+                                    
+                                    # Check if validation contains a QualityScore object (after serialization)
+                                    if quality == 0.0:
+                                        # Try to find any score field
+                                        for key in ["overall_score", "quality_score", "score"]:
+                                            if key in validation:
+                                                val = validation[key]
+                                                if isinstance(val, (int, float)) and val > 0:
+                                                    quality = float(val)
+                                                    break
+                                    
+                                elif hasattr(validation, "overall_score"):
+                                    # It's an object with overall_score attribute
+                                    quality = getattr(validation, "overall_score", 0.0)
+                                elif hasattr(validation, "quality_score"):
+                                    # It's an object with quality_score attribute
+                                    quality = getattr(validation, "quality_score", 0.0)
+                            
+                            # If still no quality score found, try to get it from extraction data
+                            if quality == 0.0:
+                                try:
+                                    extraction_data = await self._get_extraction_data(doc_id)
+                                    if extraction_data and "quality_score" in extraction_data:
+                                        qs = extraction_data["quality_score"]
+                                        if hasattr(qs, "overall_score"):
+                                            quality = qs.overall_score
+                                        elif isinstance(qs, dict):
+                                            quality = qs.get("overall_score", 0.0)
+                                except Exception as e:
+                                    logger.debug(f"Could not extract quality score from extraction data for {doc_id}: {e}")
+                            
+                            # Add quality score if found
+                            if quality > 0:
+                                quality_scores.append(quality)
+                                total_quality += quality
+                                
+                                # Count auto-approved (quality >= 4.0)
+                                if quality >= 4.0:
+                                    auto_approved_count += 1
                     
                     # Count failed documents
                     elif doc_status.get("status") == ProcessingStage.FAILED:
