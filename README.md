@@ -49,7 +49,7 @@ The architecture consists of:
 
 1. **User/External Interaction Layer** - Entry point for users and external systems
 2. **Warehouse Operational Assistant** - Central orchestrator managing specialized AI agents
-3. **NVIDIA NeMo Agent Toolkit** - Framework for building and managing AI agents
+3. **Agent Orchestration Framework** - LangGraph for workflow orchestration + MCP (Model Context Protocol) for tool discovery
 4. **Multi-Agent System** - Five specialized agents:
    - **Equipment & Asset Operations Agent** - Equipment assets, assignments, maintenance, and telemetry
    - **Operations Coordination Agent** - Task planning and workflow management  
