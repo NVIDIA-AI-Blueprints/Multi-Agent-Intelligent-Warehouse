@@ -696,16 +696,17 @@ async def process_document_background(
         logger.info(f"Document file preserved at: {file_path} (for re-processing if needed)")
 
     except Exception as e:
+        error_message = f"{type(e).__name__}: {str(e)}"
         logger.error(
-            f"NVIDIA NeMo processing failed for document {document_id}: {e}",
+            f"NVIDIA NeMo processing failed for document {document_id}: {error_message}",
             exc_info=True,
         )
-        # Update status to failed
+        # Update status to failed with detailed error message
         try:
             tools = await get_document_tools()
-            await tools._update_document_status(document_id, "failed", str(e))
+            await tools._update_document_status(document_id, "failed", error_message)
         except Exception as status_error:
-            logger.error(f"Failed to update document status: {status_error}")
+            logger.error(f"Failed to update document status: {status_error}", exc_info=True)
 
 
 @router.get("/health")
