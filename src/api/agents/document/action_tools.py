@@ -1260,21 +1260,149 @@ class DocumentActionTools:
     async def _get_analytics_data(
         self, time_range: str, metrics: List[str]
     ) -> Dict[str, Any]:
-        """Get analytics data (mock implementation)."""
-        return {
-            "metrics": {
-                "total_documents": 1250,
-                "processed_today": 45,
-                "average_quality": 4.2,
-                "auto_approved": 78,
-                "success_rate": 96.5,
-            },
-            "trends": {
-                "daily_processing": [40, 45, 52, 38, 45],
-                "quality_trends": [4.1, 4.2, 4.3, 4.2, 4.2],
-            },
-            "summary": "Document processing performance is stable with high quality scores",
-        }
+        """Get analytics data from actual document processing results."""
+        try:
+            # Calculate metrics from actual document_statuses
+            total_documents = len(self.document_statuses)
+            
+            # Filter documents by time range
+            now = datetime.now()
+            today_start = datetime(now.year, now.month, now.day)
+            
+            if time_range == "today":
+                time_threshold = today_start
+            elif time_range == "week":
+                from datetime import timedelta
+                time_threshold = now - timedelta(days=7)
+            elif time_range == "month":
+                from datetime import timedelta
+                time_threshold = now - timedelta(days=30)
+            else:
+                time_threshold = datetime.min  # All time
+            
+            # Calculate metrics from actual documents
+            processed_today = 0
+            completed_documents = 0
+            total_quality = 0.0
+            auto_approved_count = 0
+            failed_count = 0
+            quality_scores = []
+            daily_processing = {}  # Track documents by day
+            
+            for doc_id, doc_status in self.document_statuses.items():
+                upload_time = doc_status.get("upload_time", datetime.min)
+                
+                # Count documents in time range
+                if upload_time >= time_threshold:
+                    # Count processed today
+                    if upload_time >= today_start:
+                        processed_today += 1
+                    
+                    # Track daily processing
+                    day_key = upload_time.strftime("%Y-%m-%d")
+                    daily_processing[day_key] = daily_processing.get(day_key, 0) + 1
+                    
+                    # Count completed documents
+                    if doc_status.get("status") == ProcessingStage.COMPLETED:
+                        completed_documents += 1
+                        
+                        # Get quality score from processing results
+                        if "processing_results" in doc_status:
+                            results = doc_status["processing_results"]
+                            if "validation" in results and results["validation"]:
+                                validation = results["validation"]
+                                if isinstance(validation, dict):
+                                    quality = validation.get("overall_score", 0.0)
+                                elif hasattr(validation, "overall_score"):
+                                    quality = validation.overall_score
+                                else:
+                                    quality = 0.0
+                                
+                                if quality > 0:
+                                    quality_scores.append(quality)
+                                    total_quality += quality
+                                    
+                                    # Count auto-approved (quality >= 4.0)
+                                    if quality >= 4.0:
+                                        auto_approved_count += 1
+                    
+                    # Count failed documents
+                    elif doc_status.get("status") == ProcessingStage.FAILED:
+                        failed_count += 1
+            
+            # Calculate averages
+            average_quality = (
+                total_quality / len(quality_scores) if quality_scores else 0.0
+            )
+            
+            # Calculate success rate
+            total_processed = completed_documents + failed_count
+            success_rate = (
+                (completed_documents / total_processed * 100) if total_processed > 0 else 0.0
+            )
+            
+            # Calculate auto-approval rate
+            auto_approved_rate = (
+                (auto_approved_count / completed_documents * 100) if completed_documents > 0 else 0.0
+            )
+            
+            # Generate daily processing trend (last 5 days)
+            from datetime import timedelta
+            daily_processing_list = []
+            for i in range(5):
+                day = (now - timedelta(days=4-i)).strftime("%Y-%m-%d")
+                daily_processing_list.append(daily_processing.get(day, 0))
+            
+            # Generate quality trends (last 5 documents with quality scores)
+            quality_trends_list = quality_scores[-5:] if len(quality_scores) >= 5 else quality_scores
+            # Pad with average if less than 5
+            while len(quality_trends_list) < 5:
+                quality_trends_list.insert(0, average_quality if average_quality > 0 else 4.2)
+            
+            # Generate summary
+            if total_documents == 0:
+                summary = "No documents processed yet. Upload documents to see analytics."
+            elif completed_documents == 0:
+                summary = f"{total_documents} document(s) uploaded, processing in progress."
+            else:
+                summary = (
+                    f"Processed {completed_documents} document(s) with "
+                    f"{average_quality:.1f}/5.0 average quality. "
+                    f"Success rate: {success_rate:.1f}%"
+                )
+            
+            return {
+                "metrics": {
+                    "total_documents": total_documents,
+                    "processed_today": processed_today,
+                    "average_quality": round(average_quality, 1),
+                    "auto_approved": round(auto_approved_rate, 1),
+                    "success_rate": round(success_rate, 1),
+                },
+                "trends": {
+                    "daily_processing": daily_processing_list,
+                    "quality_trends": [round(q, 1) for q in quality_trends_list],
+                },
+                "summary": summary,
+            }
+            
+        except Exception as e:
+            logger.error(f"Error calculating analytics from real data: {e}", exc_info=True)
+            # Fallback to mock data if calculation fails
+            return {
+                "metrics": {
+                    "total_documents": len(self.document_statuses),
+                    "processed_today": 0,
+                    "average_quality": 0.0,
+                    "auto_approved": 0.0,
+                    "success_rate": 0.0,
+                },
+                "trends": {
+                    "daily_processing": [0, 0, 0, 0, 0],
+                    "quality_trends": [0.0, 0.0, 0.0, 0.0, 0.0],
+                },
+                "summary": f"Error calculating analytics: {str(e)}",
+            }
 
     async def _approve_document(
         self, document_id: str, approver_id: str, notes: Optional[str]
