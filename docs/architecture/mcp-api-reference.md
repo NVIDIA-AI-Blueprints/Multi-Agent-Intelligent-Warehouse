@@ -34,7 +34,7 @@ Initialize the MCP server.
 
 **Example:**
 ```python
-from chain_server.services.mcp.server import MCPServer, MCPServerConfig
+from src.api.services.mcp.server import MCPServer, MCPServerConfig
 
 config = MCPServerConfig(
     host="localhost",
@@ -196,7 +196,7 @@ Tool definition class.
 #### Example
 
 ```python
-from chain_server.services.mcp.server import MCPTool, MCPToolType
+from src.api.services.mcp.server import MCPTool, MCPToolType
 
 tool = MCPTool(
     name="get_inventory",
@@ -261,7 +261,7 @@ Initialize the MCP client.
 
 **Example:**
 ```python
-from chain_server.services.mcp.client import MCPClient, MCPClientConfig
+from src.api.services.mcp.client import MCPClient, MCPClientConfig
 
 config = MCPClientConfig(
     timeout=30,
@@ -283,7 +283,7 @@ Connect to an MCP server.
 
 **Example:**
 ```python
-from chain_server.services.mcp.client import MCPConnectionType
+from src.api.services.mcp.client import MCPConnectionType
 
 success = await client.connect("http://localhost:8000", MCPConnectionType.HTTP)
 ```
@@ -374,7 +374,7 @@ Initialize the tool discovery service.
 
 **Example:**
 ```python
-from chain_server.services.mcp.tool_discovery import ToolDiscoveryService, ToolDiscoveryConfig
+from src.api.services.mcp.tool_discovery import ToolDiscoveryService, ToolDiscoveryConfig
 
 config = ToolDiscoveryConfig(
     discovery_interval=30,
@@ -465,7 +465,7 @@ Get tools by category.
 
 **Example:**
 ```python
-from chain_server.services.mcp.tool_discovery import ToolCategory
+from src.api.services.mcp.tool_discovery import ToolCategory
 
 inventory_tools = await discovery.get_tools_by_category(ToolCategory.INVENTORY)
 ```
@@ -505,7 +505,7 @@ Initialize the tool binding service.
 
 **Example:**
 ```python
-from chain_server.services.mcp.tool_binding import ToolBindingService, ToolBindingConfig
+from src.api.services.mcp.tool_binding import ToolBindingService, ToolBindingConfig
 
 config = ToolBindingConfig(
     max_tools_per_binding=10,
@@ -532,7 +532,7 @@ Bind tools to an agent based on query and context.
 
 **Example:**
 ```python
-from chain_server.services.mcp.tool_binding import BindingStrategy
+from src.api.services.mcp.tool_binding import BindingStrategy
 
 bindings = await binding.bind_tools(
     agent_id="equipment_agent",
@@ -559,7 +559,7 @@ Create an execution plan for tool bindings.
 
 **Example:**
 ```python
-from chain_server.services.mcp.tool_binding import ExecutionMode
+from src.api.services.mcp.tool_binding import ExecutionMode
 
 plan = await binding.create_execution_plan(
     context,
@@ -617,7 +617,7 @@ Initialize the tool routing service.
 
 **Example:**
 ```python
-from chain_server.services.mcp.tool_routing import ToolRoutingService, ToolRoutingConfig
+from src.api.services.mcp.tool_routing import ToolRoutingService, ToolRoutingConfig
 
 config = ToolRoutingConfig(
     routing_timeout=30,
@@ -640,7 +640,7 @@ Route tools based on context and strategy.
 
 **Example:**
 ```python
-from chain_server.services.mcp.tool_routing import RoutingStrategy, RoutingContext
+from src.api.services.mcp.tool_routing import RoutingStrategy, RoutingContext
 
 context = RoutingContext(
     query="Get equipment status for forklift EQ001",
@@ -690,7 +690,7 @@ Initialize the tool validation service.
 
 **Example:**
 ```python
-from chain_server.services.mcp.tool_validation import ToolValidationService, ToolValidationConfig
+from src.api.services.mcp.tool_validation import ToolValidationService, ToolValidationConfig
 
 config = ToolValidationConfig(
     validation_timeout=30,
@@ -714,7 +714,7 @@ Validate tool execution parameters and context.
 
 **Example:**
 ```python
-from chain_server.services.mcp.tool_validation import ValidationLevel
+from src.api.services.mcp.tool_validation import ValidationLevel
 
 result = await validation.validate_tool_execution(
     tool_id="get_equipment_status",
@@ -766,7 +766,7 @@ Initialize the service discovery registry.
 
 **Example:**
 ```python
-from chain_server.services.mcp.service_discovery import ServiceDiscoveryRegistry, ServiceDiscoveryConfig
+from src.api.services.mcp.service_discovery import ServiceDiscoveryRegistry, ServiceDiscoveryConfig
 
 config = ServiceDiscoveryConfig(
     registry_ttl=300,
@@ -787,7 +787,7 @@ Register a service with the registry.
 
 **Example:**
 ```python
-from chain_server.services.mcp.service_discovery import ServiceInfo, ServiceType
+from src.api.services.mcp.service_discovery import ServiceInfo, ServiceType
 
 service = ServiceInfo(
     service_id="erp_adapter_001",
@@ -829,7 +829,7 @@ Discover services by type and capabilities.
 
 **Example:**
 ```python
-from chain_server.services.mcp.service_discovery import ServiceType
+from src.api.services.mcp.service_discovery import ServiceType
 
 # Discover all adapters
 adapters = await registry.discover_services(ServiceType.ADAPTER)
@@ -874,7 +874,7 @@ Initialize the monitoring service.
 
 **Example:**
 ```python
-from chain_server.services.mcp.monitoring import MCPMonitoringService, MonitoringConfig
+from src.api.services.mcp.monitoring import MCPMonitoringService, MonitoringConfig
 
 config = MonitoringConfig(
     metrics_retention_days=30,
@@ -978,7 +978,7 @@ Initialize the adapter.
 
 **Example:**
 ```python
-from chain_server.services.mcp.base import MCPAdapter, AdapterConfig, AdapterType
+from src.api.services.mcp.base import MCPAdapter, AdapterConfig, AdapterType
 
 config = AdapterConfig(
     adapter_id="erp_adapter_001",
@@ -1051,7 +1051,7 @@ Base exception for MCP errors.
 #### Example
 
 ```python
-from chain_server.services.mcp.base import MCPError
+from src.api.services.mcp.base import MCPError
 
 try:
     result = await client.execute_tool("invalid_tool", {})

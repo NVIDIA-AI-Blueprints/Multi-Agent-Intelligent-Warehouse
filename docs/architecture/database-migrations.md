@@ -187,7 +187,7 @@ GET /api/v1/migrations/health
 ### Programmatic Usage
 
 ```python
-from chain_server.services.migration import migrator
+from src.api.services.migration import migrator
 
 # Get migration status
 status = await migrator.get_migration_status()
