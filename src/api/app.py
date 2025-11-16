@@ -21,7 +21,7 @@ from src.api.routers.reasoning import router as reasoning_router
 from src.api.routers.migration import router as migration_router
 from src.api.routers.mcp import router as mcp_router
 from src.api.routers.document import router as document_router
-from src.api.routers.equipment_old import router as inventory_router
+from src.api.routers.inventory import router as inventory_router
 from src.api.routers.advanced_forecasting import router as forecasting_router
 from src.api.routers.training import router as training_router
 from src.api.services.monitoring.metrics import (
