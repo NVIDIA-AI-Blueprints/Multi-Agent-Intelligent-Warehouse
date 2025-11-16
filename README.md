@@ -41,7 +41,7 @@ This repository implements a production-grade Multi-Agent-Intelligent-Warehouse 
 - **System Integrations** - WMS (SAP EWM, Manhattan, Oracle), ERP (SAP ECC, Oracle), IoT sensors, RFID/Barcode scanners, Time Attendance systems
 - **Advanced Features** - Redis caching, conversation memory, evidence scoring, intelligent query classification, automated reorder recommendations, business intelligence dashboards
 
-## System Architecture
+## System Architecture(Will update with nvidia blue print style)
 
 ![Warehouse Operational Assistant Architecture](docs/architecture/diagrams/warehouse-assistant-architecture.png)
 
