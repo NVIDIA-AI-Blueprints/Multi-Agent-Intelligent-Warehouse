@@ -364,11 +364,29 @@ const DocumentExtraction: React.FC = () => {
         )
       );
       
-      // Flatten extraction results into extracted_data
+      // Flatten extraction results into extracted_data and collect models
+      const allModels: string[] = [];
       if (response.extraction_results && Array.isArray(response.extraction_results)) {
         response.extraction_results.forEach((result: any) => {
+          // Collect model information
+          if (result.model_used) {
+            allModels.push(result.model_used);
+          }
+          
           if (result.processed_data) {
-            Object.assign(transformedResults.extracted_data, result.processed_data);
+            // For LLM processing stage, extract structured_data
+            if (result.stage === 'llm_processing' && result.processed_data.structured_data) {
+              const structuredData = result.processed_data.structured_data;
+              // Extract fields from structured_data
+              if (structuredData.extracted_fields) {
+                Object.assign(transformedResults.extracted_data, structuredData.extracted_fields);
+              }
+              // Also store the full structured_data for reference
+              transformedResults.extracted_data.structured_data = structuredData;
+            } else {
+              // For other stages (OCR, etc.), merge processed_data directly
+              Object.assign(transformedResults.extracted_data, result.processed_data);
+            }
             
             // Map confidence scores to individual fields
             if (result.confidence_score !== undefined) {
@@ -379,7 +397,19 @@ const DocumentExtraction: React.FC = () => {
             }
           }
         });
+        
+        // Store all models used in processing_metadata
+        if (allModels.length > 0) {
+          transformedResults.extracted_data.processing_metadata = {
+            ...transformedResults.extracted_data.processing_metadata,
+            models_used: allModels.join(', '),
+            model_count: allModels.length,
+          };
+        }
       }
+      
+      // Store extraction results for reference
+      transformedResults.extracted_data.extraction_results = response.extraction_results;
       
       setDocumentResults(transformedResults);
       setSelectedDocument(document);
@@ -969,58 +999,78 @@ const DocumentExtraction: React.FC = () => {
               {documentResults.extracted_data && Object.keys(documentResults.extracted_data).length > 0 ? (
                 <>
                   {/* Invoice Details */}
-                  {documentResults.extracted_data.document_type === 'invoice' && (
-                    <Card sx={{ mb: 3 }}>
-                      <CardContent>
-                        <Typography variant="h6" gutterBottom>
-                          💰 Invoice Details
-                        </Typography>
-                        <Grid container spacing={2}>
-                          <Grid item xs={12} sm={6}>
-                            <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                              <Typography variant="subtitle2" color="text.secondary">
-                                Invoice Information
-                              </Typography>
-                              <Typography variant="body2">
-                                <strong>Invoice Number:</strong> {documentResults.extracted_data.extracted_text?.match(/Invoice Number:\s*([A-Z0-9-]+)/i)?.[1] || 'N/A'}
-                              </Typography>
-                              <Typography variant="body2">
-                                <strong>Order Number:</strong> {documentResults.extracted_data.extracted_text?.match(/Order Number:\s*(\d+)/i)?.[1] || 'N/A'}
-                              </Typography>
-                              <Typography variant="body2">
-                                <strong>Invoice Date:</strong> {documentResults.extracted_data.extracted_text?.match(/Invoice Date:\s*([^+]+)/i)?.[1] || 'N/A'}
-                              </Typography>
-                              <Typography variant="body2">
-                                <strong>Due Date:</strong> {documentResults.extracted_data.extracted_text?.match(/Due Date:\s*([^+]+)/i)?.[1] || 'N/A'}
-                              </Typography>
-                            </Box>
+                  {documentResults.extracted_data.document_type === 'invoice' && (() => {
+                    // Extract invoice fields from structured_data or directly from extracted_data
+                    const structuredData = documentResults.extracted_data.structured_data;
+                    const extractedFields = structuredData?.extracted_fields || documentResults.extracted_data.extracted_fields || {};
+                    
+                    // Helper function to get field value with fallback
+                    const getField = (fieldName: string, altNames: string[] = []) => {
+                      const names = [fieldName, ...altNames];
+                      for (const name of names) {
+                        const value = extractedFields[name] || extractedFields[name.toLowerCase()] || 
+                                     extractedFields[name.replace(/_/g, ' ')] ||
+                                     extractedFields[name.replace(/\s+/g, '_')];
+                        if (value && value !== 'N/A' && value !== '') {
+                          return value;
+                        }
+                      }
+                      return 'N/A';
+                    };
+                    
+                    return (
+                      <Card sx={{ mb: 3 }}>
+                        <CardContent>
+                          <Typography variant="h6" gutterBottom>
+                            💰 Invoice Details
+                          </Typography>
+                          <Grid container spacing={2}>
+                            <Grid item xs={12} sm={6}>
+                              <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                                <Typography variant="subtitle2" color="text.secondary">
+                                  Invoice Information
+                                </Typography>
+                                <Typography variant="body2">
+                                  <strong>Invoice Number:</strong> {getField('invoice_number', ['invoiceNumber', 'invoice_no', 'invoice_id'])}
+                                </Typography>
+                                <Typography variant="body2">
+                                  <strong>Order Number:</strong> {getField('order_number', ['orderNumber', 'order_no', 'po_number', 'purchase_order'])}
+                                </Typography>
+                                <Typography variant="body2">
+                                  <strong>Invoice Date:</strong> {getField('invoice_date', ['date', 'invoiceDate', 'issue_date'])}
+                                </Typography>
+                                <Typography variant="body2">
+                                  <strong>Due Date:</strong> {getField('due_date', ['dueDate', 'payment_due_date', 'payment_date'])}
+                                </Typography>
+                              </Box>
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                                <Typography variant="subtitle2" color="text.secondary">
+                                  Financial Information
+                                </Typography>
+                                <Typography variant="body2">
+                                  <strong>Service:</strong> {getField('service', ['service_description', 'description', 'item_description'])}
+                                </Typography>
+                                <Typography variant="body2">
+                                  <strong>Rate/Price:</strong> {getField('rate', ['price', 'unit_price', 'rate_per_unit'])}
+                                </Typography>
+                                <Typography variant="body2">
+                                  <strong>Sub Total:</strong> {getField('subtotal', ['sub_total', 'subtotal_amount', 'amount_before_tax'])}
+                                </Typography>
+                                <Typography variant="body2">
+                                  <strong>Tax:</strong> {getField('tax', ['tax_amount', 'tax_total', 'vat', 'gst'])}
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                                  <strong>Total:</strong> {getField('total', ['total_amount', 'grand_total', 'amount_due', 'total_due'])}
+                                </Typography>
+                              </Box>
+                            </Grid>
                           </Grid>
-                          <Grid item xs={12} sm={6}>
-                            <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                              <Typography variant="subtitle2" color="text.secondary">
-                                Financial Information
-                              </Typography>
-                              <Typography variant="body2">
-                                <strong>Service:</strong> {documentResults.extracted_data.extracted_text?.match(/Service:\s*([^+]+)/i)?.[1] || 'N/A'}
-                              </Typography>
-                              <Typography variant="body2">
-                                <strong>Rate/Price:</strong> {documentResults.extracted_data.extracted_text?.match(/Rate\/Price:\s*([^+]+)/i)?.[1] || 'N/A'}
-                              </Typography>
-                              <Typography variant="body2">
-                                <strong>Sub Total:</strong> {documentResults.extracted_data.extracted_text?.match(/Sub Total:\s*([^+]+)/i)?.[1] || 'N/A'}
-                              </Typography>
-                              <Typography variant="body2">
-                                <strong>Tax:</strong> {documentResults.extracted_data.extracted_text?.match(/Tax:\s*([^+]+)/i)?.[1] || 'N/A'}
-                              </Typography>
-                              <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                                <strong>Total:</strong> {documentResults.extracted_data.extracted_text?.match(/Total:\s*([^+]+)/i)?.[1] || 'N/A'}
-                              </Typography>
-                            </Box>
-                          </Grid>
-                        </Grid>
-                      </CardContent>
-                    </Card>
-                  )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })()}
 
                   {/* Extracted Text */}
                   {documentResults.extracted_data.extracted_text && (
@@ -1099,42 +1149,67 @@ const DocumentExtraction: React.FC = () => {
                     </Card>
                   )}
 
-                  {/* Processing Metadata */}
-                  {documentResults.extracted_data.processing_metadata && (
-                    <Card sx={{ mb: 3 }}>
-                      <CardContent>
-                        <Typography variant="h6" gutterBottom>
-                          ⚙️ Processing Information
-                        </Typography>
-                        <Grid container spacing={2}>
-                          {(() => {
-                            try {
-                              const metadata = typeof documentResults.extracted_data.processing_metadata === 'string' 
-                                ? JSON.parse(documentResults.extracted_data.processing_metadata)
-                                : documentResults.extracted_data.processing_metadata;
-                              
-                              return Object.entries(metadata).map(([key, value]) => (
+                  {/* Processing Information */}
+                  {(() => {
+                    // Collect all models from extraction_results
+                    const allModels: string[] = [];
+                    const processingInfo: Record<string, any> = {};
+                    
+                    if (documentResults.extracted_data.extraction_results && Array.isArray(documentResults.extracted_data.extraction_results)) {
+                      documentResults.extracted_data.extraction_results.forEach((result: any) => {
+                        if (result.model_used && !allModels.includes(result.model_used)) {
+                          allModels.push(result.model_used);
+                        }
+                        if (result.stage && result.processing_time_ms) {
+                          processingInfo[`${result.stage}_time`] = `${(result.processing_time_ms / 1000).toFixed(2)}s`;
+                        }
+                      });
+                    }
+                    
+                    // Also check processing_metadata if available
+                    let metadata: any = {};
+                    if (documentResults.extracted_data.processing_metadata) {
+                      try {
+                        metadata = typeof documentResults.extracted_data.processing_metadata === 'string' 
+                          ? JSON.parse(documentResults.extracted_data.processing_metadata)
+                          : documentResults.extracted_data.processing_metadata;
+                      } catch (e) {
+                        console.error('Error parsing processing metadata:', e);
+                      }
+                    }
+                    
+                    // Combine all processing information
+                    const combinedInfo = {
+                      ...metadata,
+                      models_used: allModels.length > 0 ? allModels.join(', ') : metadata.model_used || 'N/A',
+                      model_count: allModels.length || 1,
+                      timestamp: metadata.timestamp || new Date().toISOString(),
+                      multimodal: metadata.multimodal !== undefined ? String(metadata.multimodal) : 'false',
+                      ...processingInfo,
+                    };
+                    
+                    if (Object.keys(combinedInfo).length > 0) {
+                      return (
+                        <Card sx={{ mb: 3 }}>
+                          <CardContent>
+                            <Typography variant="h6" gutterBottom>
+                              ⚙️ Processing Information
+                            </Typography>
+                            <Grid container spacing={2}>
+                              {Object.entries(combinedInfo).map(([key, value]) => (
                                 <Grid item xs={12} sm={6} key={key}>
                                   <Typography variant="body2">
                                     <strong>{key.replace(/_/g, ' ').toUpperCase()}:</strong> {String(value)}
                                   </Typography>
                                 </Grid>
-                              ));
-                            } catch (error) {
-                              console.error('Error parsing processing metadata:', error);
-                              return (
-                                <Grid item xs={12}>
-                                  <Typography variant="body2" color="error">
-                                    Error displaying processing metadata
-                                  </Typography>
-                                </Grid>
-                              );
-                            }
-                          })()}
-                        </Grid>
-                      </CardContent>
-                    </Card>
-                  )}
+                              ))}
+                            </Grid>
+                          </CardContent>
+                        </Card>
+                      );
+                    }
+                    return null;
+                  })()}
 
                   {/* Raw Data Table */}
                   <Card sx={{ mb: 3 }}>
