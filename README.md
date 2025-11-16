@@ -133,8 +133,8 @@ The architecture consists of:
 ### Step 1: Clone and Navigate to Repository
 
 ```bash
-git clone https://github.com/T-DevH/warehouse-operational-assistant.git
-cd warehouse-operational-assistant
+git clone https://github.com/T-DevH/Multi-Agent-Intelligent-Warehouse.git
+cd Multi-Agent-Intelligent-Warehouse
 ```
 
 ### Step 2: Set Up Python Virtual Environment
