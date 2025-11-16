@@ -21,6 +21,7 @@
 - [Multi-Agent System](#multi-agent-system)
 - [API Reference](#api-reference)
 - [Monitoring & Observability](#monitoring--observability)
+- [NeMo Guardrails](#nemo-guardrails)
 - [Development Guide](#development-guide)
 - [Contributing](#contributing)
 - [License](#license)
@@ -117,7 +118,7 @@ The architecture consists of:
 - **Real-Time Monitoring** - Prometheus metrics + Grafana dashboards
 - **Equipment Telemetry** - Battery, temperature, charging analytics
 - **System Health** - Comprehensive observability and alerting
-- **Guardrails** - NeMo Guardrails for content safety and compliance
+- **NeMo Guardrails** - Content safety and compliance protection (see [NeMo Guardrails](#nemo-guardrails) section below)
 
 ## Quick Start
 
@@ -447,6 +448,190 @@ The system includes comprehensive monitoring with Prometheus metrics collection 
 - Equipment telemetry and status
 - Agent performance and response times
 - Database query performance
+
+## NeMo Guardrails
+
+The system implements **NVIDIA NeMo Guardrails** for content safety, security, and compliance protection. All user inputs and AI responses are validated through a comprehensive guardrails system to ensure safe and compliant interactions.
+
+### Overview
+
+NeMo Guardrails provides multi-layer protection for the warehouse operational assistant:
+
+- **Input Safety Validation** - Checks user queries before processing
+- **Output Safety Validation** - Validates AI responses before returning to users
+- **Pattern-Based Detection** - Identifies violations using keyword and phrase matching
+- **Timeout Protection** - Prevents hanging requests with configurable timeouts
+- **Graceful Degradation** - Continues operation even if guardrails fail
+
+### Protection Categories
+
+The guardrails system protects against:
+
+#### 1. Jailbreak Attempts
+Detects attempts to override system instructions:
+- "ignore previous instructions"
+- "forget everything"
+- "pretend to be"
+- "roleplay as"
+- "bypass"
+- "jailbreak"
+
+#### 2. Safety Violations
+Prevents guidance that could endanger workers or equipment:
+- Operating equipment without training
+- Bypassing safety protocols
+- Working without personal protective equipment (PPE)
+- Unsafe equipment operation
+
+#### 3. Security Violations
+Blocks requests for sensitive security information:
+- Security codes and access codes
+- Restricted area access
+- Alarm codes
+- System bypass instructions
+
+#### 4. Compliance Violations
+Ensures adherence to regulations and policies:
+- Avoiding safety inspections
+- Skipping compliance requirements
+- Ignoring regulations
+- Working around safety rules
+
+#### 5. Off-Topic Queries
+Redirects non-warehouse related queries:
+- Weather, jokes, cooking recipes
+- Sports, politics, entertainment
+- General knowledge questions
+
+### Configuration
+
+Guardrails configuration is defined in `data/config/guardrails/rails.yaml`:
+
+```yaml
+# Safety and compliance rules
+safety_rules:
+  - name: "jailbreak_detection"
+    patterns:
+      - "ignore previous instructions"
+      - "forget everything"
+      # ... more patterns
+    response: "I cannot ignore my instructions..."
+
+  - name: "safety_violations"
+    patterns:
+      - "operate forklift without training"
+      - "bypass safety protocols"
+      # ... more patterns
+    response: "Safety is our top priority..."
+```
+
+**Configuration Features:**
+- Pattern-based rule definitions
+- Custom response messages for each violation type
+- Monitoring and logging configuration
+- Conversation limits and constraints
+
+### Integration
+
+Guardrails are integrated into the chat endpoint at two critical points:
+
+1. **Input Safety Check** (before processing):
+   ```python
+   input_safety = await guardrails_service.check_input_safety(req.message)
+   if not input_safety.is_safe:
+       return safety_response
+   ```
+
+2. **Output Safety Check** (after AI response):
+   ```python
+   output_safety = await guardrails_service.check_output_safety(ai_response)
+   if not output_safety.is_safe:
+       return safety_response
+   ```
+
+**Timeout Protection:**
+- Input check: 3-second timeout
+- Output check: 5-second timeout
+- Graceful degradation on timeout
+
+### Testing
+
+Comprehensive test suite available in `tests/unit/test_guardrails.py`:
+
+```bash
+# Run guardrails tests
+python tests/unit/test_guardrails.py
+```
+
+**Test Coverage:**
+- 18 test scenarios covering all violation categories
+- Legitimate query validation
+- Performance testing with concurrent requests
+- Response time measurement
+
+**Test Categories:**
+- Jailbreak attempts (2 tests)
+- Safety violations (3 tests)
+- Security violations (3 tests)
+- Compliance violations (2 tests)
+- Off-topic queries (3 tests)
+- Legitimate warehouse queries (4 tests)
+
+### Service Implementation
+
+The guardrails service (`src/api/services/guardrails/guardrails_service.py`) provides:
+
+- **GuardrailsService** class with async methods
+- **Pattern matching** for violation detection
+- **Safety response generation** based on violation types
+- **Configuration loading** from YAML files
+- **Error handling** with graceful degradation
+
+### Response Format
+
+When a violation is detected, the system returns:
+
+```json
+{
+  "reply": "Safety is our top priority. I cannot provide guidance...",
+  "route": "guardrails",
+  "intent": "safety_violation",
+  "context": {
+    "safety_violations": ["Safety violation: 'operate forklift without training'"]
+  },
+  "confidence": 0.9
+}
+```
+
+### Monitoring
+
+Guardrails activity is logged and monitored:
+
+- **Log Level**: INFO
+- **Conversation Logging**: Enabled
+- **Rail Hits Logging**: Enabled
+- **Metrics Tracked**:
+  - Conversation length
+  - Rail hits (violations detected)
+  - Response time
+  - Safety violations
+  - Compliance issues
+
+### Best Practices
+
+1. **Regular Updates**: Review and update patterns in `rails.yaml` based on new threats
+2. **Monitoring**: Monitor guardrails logs for patterns and trends
+3. **Testing**: Run test suite after configuration changes
+4. **Customization**: Adjust timeout values based on your infrastructure
+5. **Response Messages**: Keep safety responses professional and helpful
+
+### Future Enhancements
+
+Planned improvements:
+- Integration with full NeMo Guardrails SDK
+- LLM-based violation detection (beyond pattern matching)
+- Machine learning for adaptive threat detection
+- Enhanced monitoring dashboards
 - Vector search performance
 - Cache hit rates and memory usage
 
