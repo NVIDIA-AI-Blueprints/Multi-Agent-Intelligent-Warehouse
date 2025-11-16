@@ -448,6 +448,10 @@ The system includes comprehensive monitoring with Prometheus metrics collection 
 - Equipment telemetry and status
 - Agent performance and response times
 - Database query performance
+- Vector search performance
+- Cache hit rates and memory usage
+
+See [monitoring/](monitoring/) for dashboard configurations and alerting rules.
 
 ## NeMo Guardrails
 
@@ -632,10 +636,11 @@ Planned improvements:
 - LLM-based violation detection (beyond pattern matching)
 - Machine learning for adaptive threat detection
 - Enhanced monitoring dashboards
-- Vector search performance
-- Cache hit rates and memory usage
 
-See [monitoring/](monitoring/) for dashboard configurations and alerting rules.
+**Related Documentation:**
+- Configuration file: `data/config/guardrails/rails.yaml`
+- Service implementation: `src/api/services/guardrails/guardrails_service.py`
+- Test suite: `tests/unit/test_guardrails.py`
 
 ## Development Guide
 
