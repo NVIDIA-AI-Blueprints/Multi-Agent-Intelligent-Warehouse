@@ -31,7 +31,9 @@ async def test_forecasting_agent():
         test_skus = ["LAY001", "LAY002", "DOR001"]
         logger.info(f"📊 Testing batch forecast for {len(test_skus)} SKUs")
         
-        result = await agent.run_batch_forecast(skus=test_skus)
+        # Note: run_batch_forecast() doesn't take skus parameter, it gets all SKUs from DB
+        # For testing, we'll just run it and check if it works
+        result = await agent.run_batch_forecast()
         
         # Validate results
         assert 'forecasts' in result, "Result should contain forecasts"

@@ -155,7 +155,7 @@ The Forecasting page displays 4 summary cards at the top. This assessment evalua
 
 ### Tables Exist But Are Empty
 
-The tables are created by `scripts/create_model_tracking_tables.sql` but are not being populated when models are trained.
+The tables are created by `scripts/setup/create_model_tracking_tables.sql` but are not being populated when models are trained.
 
 ---
 
