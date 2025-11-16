@@ -357,7 +357,7 @@ class TestMCPERPAdapter:
     @pytest.fixture
     def mock_erp_adapter(self, erp_config):
         """Create a mock ERP adapter for testing."""
-        with patch('chain_server.services.mcp.adapters.erp_adapter.ERPIntegrationService') as mock_base:
+        with patch('src.api.services.mcp.adapters.erp_adapter.ERPIntegrationService') as mock_base:
             mock_instance = AsyncMock()
             mock_instance.initialize.return_value = True
             mock_instance.connect.return_value = True
