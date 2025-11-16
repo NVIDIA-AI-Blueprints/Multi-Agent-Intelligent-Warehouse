@@ -76,6 +76,7 @@ safety_rules:
       - "avoid safety inspections"
       - "skip compliance requirements"
       - "ignore regulations"
+      - "ignore safety regulations"
       - "work around safety rules"
     response: "Compliance with safety regulations and company policies is mandatory. I cannot provide guidance that circumvents compliance requirements. Please follow all established procedures and consult with your supervisor if you have questions."
 
