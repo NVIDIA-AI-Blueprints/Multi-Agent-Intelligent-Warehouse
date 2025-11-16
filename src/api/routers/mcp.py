@@ -91,6 +91,27 @@ async def _register_mcp_adapters(tool_discovery: ToolDiscoveryService):
         )
         logger.info("Registered Safety MCP Adapter")
 
+        # Register Forecasting MCP Adapter
+        try:
+            from src.api.services.mcp.adapters.forecasting_adapter import (
+                get_forecasting_adapter,
+            )
+
+            forecasting_adapter = await get_forecasting_adapter()
+            await tool_discovery.register_discovery_source(
+                "forecasting_action_tools", forecasting_adapter, "mcp_adapter"
+            )
+            logger.info("Registered Forecasting MCP Adapter")
+        except Exception as e:
+            logger.warning(f"Forecasting adapter not available: {e}")
+
+        # Register Document MCP Adapter (if available)
+        try:
+            # Document adapter may be registered differently - check if needed
+            logger.info("Document processing uses direct API endpoints, not MCP adapter")
+        except Exception as e:
+            logger.warning(f"Document adapter check failed: {e}")
+
         logger.info("All MCP adapters registered successfully")
 
     except Exception as e:
@@ -227,22 +248,50 @@ async def test_mcp_workflow(message: str, session_id: str = "test"):
 async def get_mcp_agents():
     """Get MCP agent status."""
     try:
+        services = await get_mcp_services()
+        tool_discovery = services["tool_discovery"]
+        
+        # Get tools by category to determine agent availability
+        tools = await tool_discovery.get_available_tools()
+        
+        # Count tools by category/source
+        equipment_tools = [t for t in tools if 'equipment' in t.get('source', '').lower() or t.get('category') == 'INVENTORY']
+        operations_tools = [t for t in tools if 'operations' in t.get('source', '').lower() or t.get('category') == 'OPERATIONS']
+        safety_tools = [t for t in tools if 'safety' in t.get('source', '').lower() or t.get('category') == 'SAFETY']
+        forecasting_tools = [t for t in tools if 'forecasting' in t.get('source', '').lower() or t.get('category') == 'FORECASTING']
+        
         return {
             "agents": {
                 "equipment": {
                     "status": "operational",
                     "mcp_enabled": True,
-                    "tools_available": True,
+                    "tools_available": len(equipment_tools) > 0,
+                    "tool_count": len(equipment_tools),
                 },
                 "operations": {
                     "status": "operational",
                     "mcp_enabled": True,
-                    "tools_available": True,
+                    "tools_available": len(operations_tools) > 0,
+                    "tool_count": len(operations_tools),
                 },
                 "safety": {
                     "status": "operational",
                     "mcp_enabled": True,
+                    "tools_available": len(safety_tools) > 0,
+                    "tool_count": len(safety_tools),
+                },
+                "forecasting": {
+                    "status": "operational",
+                    "mcp_enabled": True,
+                    "tools_available": len(forecasting_tools) > 0,
+                    "tool_count": len(forecasting_tools),
+                },
+                "document": {
+                    "status": "operational",
+                    "mcp_enabled": False,  # Document uses direct API, not MCP adapter
                     "tools_available": True,
+                    "tool_count": 5,  # Document has 5 tools via API
+                    "note": "Document processing uses direct API endpoints"
                 },
             }
         }

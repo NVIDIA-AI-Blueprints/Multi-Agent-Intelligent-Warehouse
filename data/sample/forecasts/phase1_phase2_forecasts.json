@@ -187,7 +187,7 @@
       "quarter_encoded": 0.0015338823208635099,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:21.128530",
+    "forecast_date": "2025-11-16T12:49:33.414387",
     "horizon_days": 30
   },
   "CHE002": {
@@ -378,7 +378,7 @@
       "quarter_encoded": 0.0017685356742951266,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:21.731762",
+    "forecast_date": "2025-11-16T12:49:34.406938",
     "horizon_days": 30
   },
   "CHE003": {
@@ -569,7 +569,7 @@
       "quarter_encoded": 0.00034413454982231827,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:24.266501",
+    "forecast_date": "2025-11-16T12:49:35.316922",
     "horizon_days": 30
   },
   "CHE004": {
@@ -760,7 +760,7 @@
       "quarter_encoded": 0.0010952893623071287,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:25.007544",
+    "forecast_date": "2025-11-16T12:49:36.419747",
     "horizon_days": 30
   },
   "CHE005": {
@@ -951,7 +951,7 @@
       "quarter_encoded": 0.000718696576207298,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:25.420458",
+    "forecast_date": "2025-11-16T12:49:37.299244",
     "horizon_days": 30
   },
   "DOR001": {
@@ -1142,7 +1142,7 @@
       "quarter_encoded": 0.0002099529360473655,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:25.879213",
+    "forecast_date": "2025-11-16T12:49:37.790360",
     "horizon_days": 30
   },
   "DOR002": {
@@ -1333,7 +1333,7 @@
       "quarter_encoded": 0.0001452577108332049,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:26.450623",
+    "forecast_date": "2025-11-16T12:49:38.293204",
     "horizon_days": 30
   },
   "DOR003": {
@@ -1524,7 +1524,7 @@
       "quarter_encoded": 0.00016202502565069407,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:26.866265",
+    "forecast_date": "2025-11-16T12:49:38.759721",
     "horizon_days": 30
   },
   "DOR004": {
@@ -1715,7 +1715,7 @@
       "quarter_encoded": 0.0002733199563436188,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:27.276844",
+    "forecast_date": "2025-11-16T12:49:39.319502",
     "horizon_days": 30
   },
   "DOR005": {
@@ -1906,7 +1906,7 @@
       "quarter_encoded": 0.0003065557706850985,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:27.691379",
+    "forecast_date": "2025-11-16T12:49:39.785341",
     "horizon_days": 30
   },
   "FRI001": {
@@ -2097,7 +2097,7 @@
       "quarter_encoded": 0.0007037560160441874,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:28.094697",
+    "forecast_date": "2025-11-16T12:49:40.315672",
     "horizon_days": 30
   },
   "FRI002": {
@@ -2288,7 +2288,7 @@
       "quarter_encoded": 0.0005165139874644308,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:28.497498",
+    "forecast_date": "2025-11-16T12:49:40.803021",
     "horizon_days": 30
   },
   "FRI003": {
@@ -2479,7 +2479,7 @@
       "quarter_encoded": 0.0017488758315125858,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:28.913611",
+    "forecast_date": "2025-11-16T12:49:41.284052",
     "horizon_days": 30
   },
   "FRI004": {
@@ -2670,7 +2670,7 @@
       "quarter_encoded": 0.001803387042884779,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:29.321235",
+    "forecast_date": "2025-11-16T12:49:41.756481",
     "horizon_days": 30
   },
   "FUN001": {
@@ -2861,7 +2861,7 @@
       "quarter_encoded": 0.00022183920300762207,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:29.721460",
+    "forecast_date": "2025-11-16T12:49:42.220451",
     "horizon_days": 30
   },
   "FUN002": {
@@ -3052,7 +3052,7 @@
       "quarter_encoded": 0.0006495781295529367,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:30.190699",
+    "forecast_date": "2025-11-16T12:49:42.726872",
     "horizon_days": 30
   },
   "LAY001": {
@@ -3243,7 +3243,7 @@
       "quarter_encoded": 0.0004936132803524014,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:30.607508",
+    "forecast_date": "2025-11-16T12:49:43.202014",
     "horizon_days": 30
   },
   "LAY002": {
@@ -3434,7 +3434,7 @@
       "quarter_encoded": 0.0007762106794144333,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:31.020202",
+    "forecast_date": "2025-11-16T12:49:43.682120",
     "horizon_days": 30
   },
   "LAY003": {
@@ -3625,7 +3625,7 @@
       "quarter_encoded": 0.0010024457250120777,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:31.424541",
+    "forecast_date": "2025-11-16T12:49:44.248172",
     "horizon_days": 30
   },
   "LAY004": {
@@ -3816,7 +3816,7 @@
       "quarter_encoded": 0.0007631170635741264,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:31.838228",
+    "forecast_date": "2025-11-16T12:49:44.737792",
     "horizon_days": 30
   },
   "LAY005": {
@@ -4007,7 +4007,7 @@
       "quarter_encoded": 0.0018286585263635104,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:32.280192",
+    "forecast_date": "2025-11-16T12:49:45.238923",
     "horizon_days": 30
   },
   "LAY006": {
@@ -4198,7 +4198,7 @@
       "quarter_encoded": 0.000365600326095725,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:32.696537",
+    "forecast_date": "2025-11-16T12:49:45.715796",
     "horizon_days": 30
   },
   "POP001": {
@@ -4389,7 +4389,7 @@
       "quarter_encoded": 0.0018168741302640587,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:33.107182",
+    "forecast_date": "2025-11-16T12:49:46.325359",
     "horizon_days": 30
   },
   "POP002": {
@@ -4580,7 +4580,7 @@
       "quarter_encoded": 0.00019741184657235048,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:33.503471",
+    "forecast_date": "2025-11-16T12:49:46.761943",
     "horizon_days": 30
   },
   "POP003": {
@@ -4771,7 +4771,7 @@
       "quarter_encoded": 0.0014633295965776876,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:33.901199",
+    "forecast_date": "2025-11-16T12:49:47.206875",
     "horizon_days": 30
   },
   "RUF001": {
@@ -4962,7 +4962,7 @@
       "quarter_encoded": 0.00043693965323825484,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:34.338917",
+    "forecast_date": "2025-11-16T12:49:47.672554",
     "horizon_days": 30
   },
   "RUF002": {
@@ -5153,7 +5153,7 @@
       "quarter_encoded": 0.000605754315513959,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:34.743578",
+    "forecast_date": "2025-11-16T12:49:48.247788",
     "horizon_days": 30
   },
   "RUF003": {
@@ -5344,7 +5344,7 @@
       "quarter_encoded": 0.00029035607988183934,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:35.189516",
+    "forecast_date": "2025-11-16T12:49:48.707508",
     "horizon_days": 30
   },
   "SMA001": {
@@ -5535,7 +5535,7 @@
       "quarter_encoded": 0.0014494108913581938,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:35.606816",
+    "forecast_date": "2025-11-16T12:49:49.163952",
     "horizon_days": 30
   },
   "SMA002": {
@@ -5726,7 +5726,7 @@
       "quarter_encoded": 0.0009660621714595687,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:36.003152",
+    "forecast_date": "2025-11-16T12:49:49.630434",
     "horizon_days": 30
   },
   "SUN001": {
@@ -5917,7 +5917,7 @@
       "quarter_encoded": 0.0005414867905071105,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:36.529869",
+    "forecast_date": "2025-11-16T12:49:50.114474",
     "horizon_days": 30
   },
   "SUN002": {
@@ -6108,7 +6108,7 @@
       "quarter_encoded": 0.0013329645217316868,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:36.943387",
+    "forecast_date": "2025-11-16T12:49:50.573511",
     "horizon_days": 30
   },
   "SUN003": {
@@ -6299,7 +6299,7 @@
       "quarter_encoded": 0.00037523193205271426,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:37.347337",
+    "forecast_date": "2025-11-16T12:49:51.017607",
     "horizon_days": 30
   },
   "TOS001": {
@@ -6490,7 +6490,7 @@
       "quarter_encoded": 5.75918753478032e-05,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:37.749431",
+    "forecast_date": "2025-11-16T12:49:51.524497",
     "horizon_days": 30
   },
   "TOS002": {
@@ -6681,7 +6681,7 @@
       "quarter_encoded": 0.0003714109165822844,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:38.209782",
+    "forecast_date": "2025-11-16T12:49:52.011128",
     "horizon_days": 30
   },
   "TOS003": {
@@ -6872,7 +6872,7 @@
       "quarter_encoded": 0.00035016404594240963,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:38.640291",
+    "forecast_date": "2025-11-16T12:49:52.486557",
     "horizon_days": 30
   },
   "TOS004": {
@@ -7063,7 +7063,7 @@
       "quarter_encoded": 0.0001231130566185967,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:39.057903",
+    "forecast_date": "2025-11-16T12:49:52.957538",
     "horizon_days": 30
   },
   "TOS005": {
@@ -7254,7 +7254,7 @@
       "quarter_encoded": 0.00012142892759066621,
       "year_encoded": 0.0
     },
-    "forecast_date": "2025-11-16T10:18:39.480480",
+    "forecast_date": "2025-11-16T12:49:53.426291",
     "horizon_days": 30
   }
 }

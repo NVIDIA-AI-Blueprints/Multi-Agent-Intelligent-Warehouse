@@ -584,6 +584,7 @@ class ToolDiscoveryService:
                         "source": tool.source,
                         "capabilities": tool.capabilities,
                         "metadata": tool.metadata,
+                        "parameters": tool.parameters,  # Include parameters for UI
                     }
                 )
 

@@ -57,6 +57,7 @@ interface MCPTool {
   source: string;
   capabilities: string[];
   metadata: any;
+  parameters?: any;  // Tool parameter schema
   relevance_score?: number;
 }
 
@@ -121,6 +122,11 @@ const EnhancedMCPTestingPanel: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
   const [executionHistory, setExecutionHistory] = useState<ExecutionHistory[]>([]);
   const [showToolDetails, setShowToolDetails] = useState<string | null>(null);
+  const [toolParameters, setToolParameters] = useState<{ [key: string]: any }>({});
+  const [selectedToolForExecution, setSelectedToolForExecution] = useState<MCPTool | null>(null);
+  const [showParameterDialog, setShowParameterDialog] = useState(false);
+  const [agentsStatus, setAgentsStatus] = useState<any>(null);
+  const [selectedHistoryEntry, setSelectedHistoryEntry] = useState<ExecutionHistory | null>(null);
   const [performanceMetrics, setPerformanceMetrics] = useState({
     totalExecutions: 0,
     successRate: 0,
@@ -132,7 +138,17 @@ const EnhancedMCPTestingPanel: React.FC = () => {
   useEffect(() => {
     loadMcpData();
     loadExecutionHistory();
+    loadAgentsStatus();
   }, []);
+
+  const loadAgentsStatus = async () => {
+    try {
+      const status = await mcpAPI.getAgents();
+      setAgentsStatus(status);
+    } catch (err: any) {
+      console.warn(`Failed to load agents status: ${err.message}`);
+    }
+  };
 
   const loadMcpData = async () => {
     try {
@@ -271,13 +287,14 @@ const EnhancedMCPTestingPanel: React.FC = () => {
     }
   };
 
-  const handleExecuteTool = async (toolId: string, toolName: string) => {
+  const handleExecuteTool = async (toolId: string, toolName: string, parameters?: any) => {
     try {
       setLoading(true);
       setError(null);
       
       const startTime = Date.now();
-      const result = await mcpAPI.executeTool(toolId, { test: true });
+      const execParams = parameters || toolParameters[toolId] || { test: true };
+      const result = await mcpAPI.executeTool(toolId, execParams);
       const executionTime = Date.now() - startTime;
       
       // Add to execution history
@@ -332,8 +349,23 @@ const EnhancedMCPTestingPanel: React.FC = () => {
           <strong>Source:</strong> {tool.source}
         </Typography>
         <Typography variant="body2" sx={{ mb: 1 }}>
+          <strong>Category:</strong> {tool.category}
+        </Typography>
+        <Typography variant="body2" sx={{ mb: 1 }}>
           <strong>Capabilities:</strong> {tool.capabilities?.join(', ') || 'None'}
         </Typography>
+        {tool.parameters && (
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ mb: 1 }}>
+              <strong>Parameters:</strong>
+            </Typography>
+            <Paper sx={{ p: 1, bgcolor: 'white', maxHeight: 200, overflow: 'auto' }}>
+              <pre style={{ fontSize: '0.75rem', margin: 0 }}>
+                {JSON.stringify(tool.parameters, null, 2)}
+              </pre>
+            </Paper>
+          </Box>
+        )}
         {tool.metadata && (
           <Typography variant="body2" sx={{ mb: 1 }}>
             <strong>Metadata:</strong>
@@ -431,6 +463,47 @@ const EnhancedMCPTestingPanel: React.FC = () => {
 
       <TabPanel value={tabValue} index={0}>
         <Grid container spacing={2}>
+          {/* Agent Status Section */}
+          {agentsStatus && (
+            <Grid item xs={12}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>
+                    Agent Status
+                  </Typography>
+                  <Grid container spacing={2}>
+                    {Object.entries(agentsStatus.agents || {}).map(([agentName, agentInfo]: [string, any]) => (
+                      <Grid item xs={12} sm={6} md={4} key={agentName}>
+                        <Paper sx={{ p: 2, bgcolor: agentInfo.status === 'operational' ? 'success.light' : 'error.light' }}>
+                          <Typography variant="subtitle1" fontWeight="bold" sx={{ textTransform: 'capitalize' }}>
+                            {agentName}
+                          </Typography>
+                          <Chip 
+                            label={agentInfo.status} 
+                            color={agentInfo.status === 'operational' ? 'success' : 'error'}
+                            size="small"
+                            sx={{ mt: 1, mb: 1 }}
+                          />
+                          <Typography variant="body2">
+                            MCP Enabled: {agentInfo.mcp_enabled ? 'Yes' : 'No'}
+                          </Typography>
+                          <Typography variant="body2">
+                            Tools Available: {agentInfo.tool_count || 0}
+                          </Typography>
+                          {agentInfo.note && (
+                            <Typography variant="caption" color="text.secondary">
+                              {agentInfo.note}
+                            </Typography>
+                          )}
+                        </Paper>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </CardContent>
+              </Card>
+            </Grid>
+          )}
+
           <Grid item xs={12} md={6}>
             <Card>
               <CardContent>
@@ -541,7 +614,14 @@ const EnhancedMCPTestingPanel: React.FC = () => {
                                 <Tooltip title="Execute Tool">
                                   <IconButton
                                     edge="end"
-                                    onClick={() => handleExecuteTool(tool.tool_id, tool.name)}
+                                    onClick={() => {
+                                      if (tool.parameters && Object.keys(tool.parameters).length > 0) {
+                                        setSelectedToolForExecution(tool);
+                                        setShowParameterDialog(true);
+                                      } else {
+                                        handleExecuteTool(tool.tool_id, tool.name);
+                                      }
+                                    }}
                                     disabled={loading}
                                     sx={{ ml: 1 }}
                                   >
@@ -662,6 +742,27 @@ const EnhancedMCPTestingPanel: React.FC = () => {
               >
                 Available Equipment
               </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setTestMessage("Generate a demand forecast for SKU-12345")}
+              >
+                Forecasting
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setTestMessage("Show me reorder recommendations")}
+              >
+                Reorder Recommendations
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setTestMessage("Upload and process a document")}
+              >
+                Document Processing
+              </Button>
             </Box>
             
             <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
@@ -742,7 +843,10 @@ const EnhancedMCPTestingPanel: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           <Tooltip title="View Details">
-                            <IconButton size="small">
+                            <IconButton 
+                              size="small"
+                              onClick={() => setSelectedHistoryEntry(entry)}
+                            >
                               <InfoIcon />
                             </IconButton>
                           </Tooltip>
@@ -760,6 +864,133 @@ const EnhancedMCPTestingPanel: React.FC = () => {
           </CardContent>
         </Card>
       </TabPanel>
+
+      {/* Parameter Input Dialog */}
+      {showParameterDialog && selectedToolForExecution && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            bgcolor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1300,
+          }}
+          onClick={() => setShowParameterDialog(false)}
+        >
+          <Paper
+            sx={{ p: 3, maxWidth: 600, maxHeight: '80vh', overflow: 'auto' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Typography variant="h6" gutterBottom>
+              Execute Tool: {selectedToolForExecution.name}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              {selectedToolForExecution.description}
+            </Typography>
+            <Typography variant="subtitle2" gutterBottom>
+              Parameters:
+            </Typography>
+            <TextField
+              fullWidth
+              multiline
+              rows={8}
+              value={JSON.stringify(toolParameters[selectedToolForExecution.tool_id] || {}, null, 2)}
+              onChange={(e) => {
+                try {
+                  const params = JSON.parse(e.target.value);
+                  setToolParameters({
+                    ...toolParameters,
+                    [selectedToolForExecution.tool_id]: params,
+                  });
+                } catch (err) {
+                  // Invalid JSON, keep as is
+                }
+              }}
+              placeholder='{"param1": "value1", "param2": "value2"}'
+              sx={{ mb: 2, fontFamily: 'monospace' }}
+            />
+            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+              <Button onClick={() => setShowParameterDialog(false)}>Cancel</Button>
+              <Button
+                variant="contained"
+                onClick={() => {
+                  handleExecuteTool(
+                    selectedToolForExecution.tool_id,
+                    selectedToolForExecution.name,
+                    toolParameters[selectedToolForExecution.tool_id]
+                  );
+                  setShowParameterDialog(false);
+                }}
+              >
+                Execute
+              </Button>
+            </Box>
+          </Paper>
+        </Box>
+      )}
+
+      {/* Execution History Details Dialog */}
+      {selectedHistoryEntry && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            bgcolor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1300,
+          }}
+          onClick={() => setSelectedHistoryEntry(null)}
+        >
+          <Paper
+            sx={{ p: 3, maxWidth: 800, maxHeight: '80vh', overflow: 'auto' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Typography variant="h6" gutterBottom>
+              Execution Details: {selectedHistoryEntry.tool_name}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              {selectedHistoryEntry.timestamp.toLocaleString()}
+            </Typography>
+            <Divider sx={{ my: 2 }} />
+            <Typography variant="subtitle2" gutterBottom>
+              Status: {selectedHistoryEntry.success ? 'Success' : 'Failed'}
+            </Typography>
+            <Typography variant="body2" sx={{ mb: 2 }}>
+              Execution Time: {selectedHistoryEntry.execution_time}ms
+            </Typography>
+            {selectedHistoryEntry.error && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {selectedHistoryEntry.error}
+              </Alert>
+            )}
+            {selectedHistoryEntry.result && (
+              <Box>
+                <Typography variant="subtitle2" gutterBottom>
+                  Result:
+                </Typography>
+                <Paper sx={{ p: 2, bgcolor: 'grey.50', maxHeight: 400, overflow: 'auto' }}>
+                  <pre style={{ fontSize: '0.75rem', margin: 0 }}>
+                    {JSON.stringify(selectedHistoryEntry.result, null, 2)}
+                  </pre>
+                </Paper>
+              </Box>
+            )}
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+              <Button onClick={() => setSelectedHistoryEntry(null)}>Close</Button>
+            </Box>
+          </Paper>
+        </Box>
+      )}
     </Box>
   );
 };
