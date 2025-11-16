@@ -503,14 +503,24 @@ class RAPIDSForecastingAgent:
                 logger.error(f"❌ Failed to forecast {sku}: {e}")
                 continue
         
-        # Save forecasts
+        # Save forecasts to both root (for runtime) and data/sample/forecasts/ (for reference)
+        from pathlib import Path
+        
+        # Save to root for runtime use
         output_file = "rapids_gpu_forecasts.json"
         with open(output_file, 'w') as f:
             json.dump(forecasts, f, indent=2)
         
+        # Also save to data/sample/forecasts/ for reference
+        sample_dir = Path("data/sample/forecasts")
+        sample_dir.mkdir(parents=True, exist_ok=True)
+        sample_file = sample_dir / "rapids_gpu_forecasts.json"
+        with open(sample_file, 'w') as f:
+            json.dump(forecasts, f, indent=2)
+        
         logger.info(f"🎉 RAPIDS GPU forecasting complete!")
         logger.info(f"📊 Generated forecasts for {successful_forecasts}/{len(skus)} SKUs")
-        logger.info(f"💾 Forecasts saved to {output_file}")
+        logger.info(f"💾 Forecasts saved to {output_file} (runtime) and {sample_file} (reference)")
         
         return {
             'forecasts': forecasts,

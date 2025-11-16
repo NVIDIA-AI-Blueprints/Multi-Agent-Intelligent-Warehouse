@@ -14,8 +14,7 @@ services:
     volumes:
       - ./scripts:/app/scripts
       - ./data:/app/data
-      - ./phase1_phase2_forecasts.json:/app/phase1_phase2_forecasts.json
-      - ./rapids_gpu_forecasts.json:/app/rapids_gpu_forecasts.json
+      # Forecast files are generated at runtime and saved to data/sample/forecasts/
     networks:
       - warehouse-network
     depends_on:
