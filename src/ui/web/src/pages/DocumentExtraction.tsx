@@ -123,6 +123,7 @@ const DocumentExtraction: React.FC = () => {
   const [selectedDocument, setSelectedDocument] = useState<DocumentItem | null>(null);
   const [resultsDialogOpen, setResultsDialogOpen] = useState(false);
   const [documentResults, setDocumentResults] = useState<DocumentResults | null>(null);
+  const [loadingResults, setLoadingResults] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -330,6 +331,13 @@ const DocumentExtraction: React.FC = () => {
 
   const handleViewResults = async (document: DocumentItem) => {
     try {
+      // Clear previous results and set selected document first
+      setDocumentResults(null);
+      setSelectedDocument(document);
+      setResultsDialogOpen(true);
+      setLoadingResults(true);
+      
+      // Fetch fresh results for this specific document (add timestamp to prevent caching)
       const response = await documentAPI.getDocumentResults(document.id);
       
       // Check if this is mock data
@@ -412,10 +420,10 @@ const DocumentExtraction: React.FC = () => {
       transformedResults.extracted_data.extraction_results = response.extraction_results;
       
       setDocumentResults(transformedResults);
-      setSelectedDocument(document);
-      setResultsDialogOpen(true);
+      setLoadingResults(false);
     } catch (error) {
       console.error('Failed to get document results:', error);
+      setLoadingResults(false);
       setSnackbarMessage('Failed to load document results');
       setSnackbarOpen(true);
     }
@@ -995,8 +1003,13 @@ const DocumentExtraction: React.FC = () => {
                 </CardContent>
               </Card>
 
-              {/* Show extracted data if available */}
-              {documentResults.extracted_data && Object.keys(documentResults.extracted_data).length > 0 ? (
+              {/* Show loading state */}
+              {loadingResults ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
+                  <CircularProgress />
+                  <Typography variant="body2" sx={{ ml: 2 }}>Loading document results...</Typography>
+                </Box>
+              ) : documentResults && documentResults.extracted_data && Object.keys(documentResults.extracted_data).length > 0 ? (
                 <>
                   {/* Invoice Details */}
                   {documentResults.extracted_data.document_type === 'invoice' && (() => {
