@@ -475,6 +475,143 @@ const Documentation: React.FC = () => {
         </AccordionDetails>
       </Accordion>
 
+      {/* NeMo Guardrails */}
+      <Accordion expanded={expandedSection === 'guardrails'} onChange={handleChange('guardrails')}>
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <SecurityIcon color="primary" />
+            NeMo Guardrails
+          </Typography>
+        </AccordionSummary>
+        <AccordionDetails>
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="h5" gutterBottom>
+              🛡️ Content Safety & Compliance Protection
+            </Typography>
+            <Typography variant="body1" sx={{ mb: 2 }}>
+              The system implements <strong>NVIDIA NeMo Guardrails</strong> to ensure content safety, security, and compliance 
+              for all LLM inputs and outputs. This provides enterprise-grade protection against harmful content, policy violations, 
+              and security threats.
+            </Typography>
+            <Alert severity="success" sx={{ mb: 3 }}>
+              <AlertTitle>✅ Production Ready</AlertTitle>
+              <Typography variant="body2">
+                • Pattern-based content filtering<br/>
+                • Security threat detection<br/>
+                • Compliance violation prevention<br/>
+                • Real-time input/output validation<br/>
+                • Configurable policy enforcement
+              </Typography>
+            </Alert>
+          </Box>
+
+          <Typography variant="h6" gutterBottom>
+            🔒 Protection Categories
+          </Typography>
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid item xs={12} md={6}>
+              <Card variant="outlined">
+                <CardContent>
+                  <Typography variant="h6" gutterBottom color="primary">
+                    Content Safety
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Filters harmful, toxic, or inappropriate content from user inputs and AI responses. 
+                    Protects against profanity, hate speech, and offensive language.
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Card variant="outlined">
+                <CardContent>
+                  <Typography variant="h6" gutterBottom color="primary">
+                    Security Protection
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Detects and prevents security threats including injection attacks, prompt manipulation, 
+                    and unauthorized access attempts.
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Card variant="outlined">
+                <CardContent>
+                  <Typography variant="h6" gutterBottom color="primary">
+                    Compliance Enforcement
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Ensures compliance with warehouse safety regulations, operational policies, and 
+                    industry standards. Prevents violations of safety protocols.
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <Card variant="outlined">
+                <CardContent>
+                  <Typography variant="h6" gutterBottom color="primary">
+                    Policy Management
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Configurable policy rules defined in YAML format. Easy to customize for different 
+                    warehouse environments and compliance requirements.
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+
+          <Typography variant="h6" gutterBottom>
+            🔧 Implementation Details
+          </Typography>
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid item xs={12} md={4}>
+              <Card variant="outlined">
+                <CardContent>
+                  <Typography variant="subtitle1" gutterBottom>Configuration</Typography>
+                  <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>
+                    data/config/guardrails/<br/>
+                    rails.yaml
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Card variant="outlined">
+                <CardContent>
+                  <Typography variant="subtitle1" gutterBottom>Service</Typography>
+                  <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>
+                    src/api/services/<br/>
+                    guardrails/
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Card variant="outlined">
+                <CardContent>
+                  <Typography variant="subtitle1" gutterBottom>Integration</Typography>
+                  <Typography variant="body2">
+                    Automatically applied to all chat endpoints and agent responses. 
+                    Transparent to end users with graceful error handling.
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <AlertTitle>Configuration Example</AlertTitle>
+            <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.875rem', mt: 1 }}>
+              Guardrails are configured via YAML files in <code>data/config/guardrails/</code>. 
+              Policies can be customized for specific warehouse requirements and compliance needs.
+            </Typography>
+          </Alert>
+        </AccordionDetails>
+      </Accordion>
+
       {/* Demand Forecasting System */}
       <Accordion expanded={expandedSection === 'forecasting'} onChange={handleChange('forecasting')}>
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
