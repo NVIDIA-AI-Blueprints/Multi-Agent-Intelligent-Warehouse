@@ -102,7 +102,7 @@ class SmallLLMProcessor:
                         result = await self._mock_llm_processing(document_type)
 
             # Post-process results
-            structured_data = await self._post_process_results(result, document_type)
+            structured_data = await self._post_process_results(result, document_type, ocr_text)
 
             return {
                 "structured_data": structured_data,
@@ -376,7 +376,7 @@ class SmallLLMProcessor:
             raise
 
     async def _post_process_results(
-        self, result: Dict[str, Any], document_type: str
+        self, result: Dict[str, Any], document_type: str, ocr_text: str = ""
     ) -> Dict[str, Any]:
         """Post-process LLM results for consistency."""
         try:
@@ -391,10 +391,25 @@ class SmallLLMProcessor:
                 # Fallback: use the entire result
                 content = result
 
+            # Get extracted fields from LLM response
+            extracted_fields = content.get("extracted_fields", {})
+            
+            # Fallback: If LLM didn't extract fields, parse from OCR text
+            if not extracted_fields or len(extracted_fields) == 0:
+                if ocr_text:
+                    logger.info(f"LLM returned empty extracted_fields, parsing from OCR text for {document_type}")
+                    extracted_fields = await self._parse_fields_from_text(ocr_text, document_type)
+                else:
+                    # Try to get text from raw_response
+                    raw_text = result.get("raw_response", "")
+                    if raw_text and not raw_text.startswith("{"):
+                        # LLM returned plain text instead of JSON, try to parse it
+                        extracted_fields = await self._parse_fields_from_text(raw_text, document_type)
+
             # Ensure required fields are present
             structured_data = {
                 "document_type": document_type,
-                "extracted_fields": content.get("extracted_fields", {}),
+                "extracted_fields": extracted_fields,
                 "line_items": content.get("line_items", []),
                 "quality_assessment": content.get(
                     "quality_assessment",
@@ -546,6 +561,117 @@ class SmallLLMProcessor:
         buffer = io.BytesIO()
         image.save(buffer, format="PNG")
         return base64.b64encode(buffer.getvalue()).decode()
+
+    async def _parse_fields_from_text(self, text: str, document_type: str) -> Dict[str, Any]:
+        """Parse invoice fields from text using regex patterns when LLM extraction fails."""
+        import re
+        
+        parsed_fields = {}
+        
+        if document_type.lower() != "invoice":
+            return parsed_fields
+        
+        try:
+            # Invoice Number patterns
+            invoice_num_match = re.search(r'Invoice Number:\s*([A-Z0-9-]+)', text, re.IGNORECASE) or \
+                              re.search(r'Invoice #:\s*([A-Z0-9-]+)', text, re.IGNORECASE) or \
+                              re.search(r'INV[-\s]*([A-Z0-9-]+)', text, re.IGNORECASE)
+            if invoice_num_match:
+                parsed_fields["invoice_number"] = {
+                    "value": invoice_num_match.group(1),
+                    "confidence": 0.85,
+                    "source": "ocr"
+                }
+            
+            # Order Number patterns
+            order_num_match = re.search(r'Order Number:\s*(\d+)', text, re.IGNORECASE) or \
+                            re.search(r'Order #:\s*(\d+)', text, re.IGNORECASE) or \
+                            re.search(r'PO[-\s]*(\d+)', text, re.IGNORECASE)
+            if order_num_match:
+                parsed_fields["order_number"] = {
+                    "value": order_num_match.group(1),
+                    "confidence": 0.85,
+                    "source": "ocr"
+                }
+            
+            # Invoice Date patterns
+            invoice_date_match = re.search(r'Invoice Date:\s*([^\n+]+?)(?:\n|$)', text, re.IGNORECASE) or \
+                               re.search(r'Date:\s*([^\n+]+?)(?:\n|$)', text, re.IGNORECASE)
+            if invoice_date_match:
+                parsed_fields["invoice_date"] = {
+                    "value": invoice_date_match.group(1).strip(),
+                    "confidence": 0.80,
+                    "source": "ocr"
+                }
+            
+            # Due Date patterns
+            due_date_match = re.search(r'Due Date:\s*([^\n+]+?)(?:\n|$)', text, re.IGNORECASE) or \
+                           re.search(r'Payment Due:\s*([^\n+]+?)(?:\n|$)', text, re.IGNORECASE)
+            if due_date_match:
+                parsed_fields["due_date"] = {
+                    "value": due_date_match.group(1).strip(),
+                    "confidence": 0.80,
+                    "source": "ocr"
+                }
+            
+            # Service/Description patterns
+            service_match = re.search(r'Service:\s*([^\n+]+?)(?:\n|$)', text, re.IGNORECASE) or \
+                          re.search(r'Description:\s*([^\n+]+?)(?:\n|$)', text, re.IGNORECASE)
+            if service_match:
+                parsed_fields["service"] = {
+                    "value": service_match.group(1).strip(),
+                    "confidence": 0.80,
+                    "source": "ocr"
+                }
+            
+            # Rate/Price patterns
+            rate_match = re.search(r'Rate/Price:\s*\$?([0-9,]+\.?\d*)', text, re.IGNORECASE) or \
+                        re.search(r'Price:\s*\$?([0-9,]+\.?\d*)', text, re.IGNORECASE) or \
+                        re.search(r'Rate:\s*\$?([0-9,]+\.?\d*)', text, re.IGNORECASE)
+            if rate_match:
+                parsed_fields["rate"] = {
+                    "value": f"${rate_match.group(1)}",
+                    "confidence": 0.85,
+                    "source": "ocr"
+                }
+            
+            # Sub Total patterns
+            subtotal_match = re.search(r'Sub Total:\s*\$?([0-9,]+\.?\d*)', text, re.IGNORECASE) or \
+                           re.search(r'Subtotal:\s*\$?([0-9,]+\.?\d*)', text, re.IGNORECASE)
+            if subtotal_match:
+                parsed_fields["subtotal"] = {
+                    "value": f"${subtotal_match.group(1)}",
+                    "confidence": 0.85,
+                    "source": "ocr"
+                }
+            
+            # Tax patterns
+            tax_match = re.search(r'Tax:\s*\$?([0-9,]+\.?\d*)', text, re.IGNORECASE) or \
+                       re.search(r'Tax Amount:\s*\$?([0-9,]+\.?\d*)', text, re.IGNORECASE)
+            if tax_match:
+                parsed_fields["tax"] = {
+                    "value": f"${tax_match.group(1)}",
+                    "confidence": 0.85,
+                    "source": "ocr"
+                }
+            
+            # Total patterns
+            total_match = re.search(r'Total:\s*\$?([0-9,]+\.?\d*)', text, re.IGNORECASE) or \
+                         re.search(r'Total Due:\s*\$?([0-9,]+\.?\d*)', text, re.IGNORECASE) or \
+                         re.search(r'Amount Due:\s*\$?([0-9,]+\.?\d*)', text, re.IGNORECASE)
+            if total_match:
+                parsed_fields["total"] = {
+                    "value": f"${total_match.group(1)}",
+                    "confidence": 0.90,
+                    "source": "ocr"
+                }
+            
+            logger.info(f"Parsed {len(parsed_fields)} fields from OCR text using regex fallback")
+            
+        except Exception as e:
+            logger.error(f"Error parsing fields from text: {e}")
+        
+        return parsed_fields
 
     async def _mock_llm_processing(self, document_type: str) -> Dict[str, Any]:
         """Mock LLM processing for development."""
