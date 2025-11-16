@@ -348,7 +348,7 @@ async def cached_get_customer_info(customer_id: str):
 
 ```python
 import pytest
-from chain_server.services.mcp import MCPServer, MCPTool
+from src.api.services.mcp import MCPServer, MCPTool
 
 @pytest.mark.asyncio
 async def test_tool_execution():

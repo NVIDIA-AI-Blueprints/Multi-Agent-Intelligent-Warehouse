@@ -66,7 +66,7 @@ The MCP server provides tool registration, discovery, and execution capabilities
 
 **Usage Example:**
 ```python
-from chain_server.services.mcp.server import MCPServer, MCPTool, MCPToolType
+from src.api.services.mcp.server import MCPServer, MCPTool, MCPToolType
 
 # Create server
 server = MCPServer()
@@ -102,7 +102,7 @@ The MCP client enables communication with MCP servers and tool execution.
 
 **Usage Example:**
 ```python
-from chain_server.services.mcp.client import MCPClient, MCPConnectionType
+from src.api.services.mcp.client import MCPClient, MCPConnectionType
 
 # Create client
 client = MCPClient()
@@ -132,7 +132,7 @@ Base classes provide the foundation for MCP adapters and tools.
 
 **Usage Example:**
 ```python
-from chain_server.services.mcp.base import MCPAdapter, AdapterConfig, AdapterType
+from src.api.services.mcp.base import MCPAdapter, AdapterConfig, AdapterType
 
 class MyAdapter(MCPAdapter):
     def __init__(self, config: AdapterConfig):
@@ -197,7 +197,7 @@ Dynamic tool discovery and registration system.
 
 **Usage Example:**
 ```python
-from chain_server.services.mcp.tool_discovery import ToolDiscoveryService, ToolCategory
+from src.api.services.mcp.tool_discovery import ToolDiscoveryService, ToolCategory
 
 # Create discovery service
 discovery = ToolDiscoveryService()
@@ -231,7 +231,7 @@ Dynamic tool binding and execution framework.
 
 **Usage Example:**
 ```python
-from chain_server.services.mcp.tool_binding import ToolBindingService, BindingStrategy, ExecutionMode
+from src.api.services.mcp.tool_binding import ToolBindingService, BindingStrategy, ExecutionMode
 
 # Create binding service
 binding = ToolBindingService(discovery)
@@ -271,7 +271,7 @@ Intelligent tool routing and selection.
 
 **Usage Example:**
 ```python
-from chain_server.services.mcp.tool_routing import ToolRoutingService, RoutingStrategy, RoutingContext
+from src.api.services.mcp.tool_routing import ToolRoutingService, RoutingStrategy, RoutingContext
 
 # Create routing service
 routing = ToolRoutingService(discovery, binding)
@@ -311,7 +311,7 @@ Comprehensive validation and error handling.
 
 **Usage Example:**
 ```python
-from chain_server.services.mcp.tool_validation import ToolValidationService, ValidationLevel
+from src.api.services.mcp.tool_validation import ToolValidationService, ValidationLevel
 
 # Create validation service
 validation = ToolValidationService(discovery)
@@ -566,7 +566,7 @@ for service in services:
 1. **Enable Debug Logging:**
 ```python
 import logging
-logging.getLogger("chain_server.services.mcp").setLevel(logging.DEBUG)
+logging.getLogger("src.api.services.mcp").setLevel(logging.DEBUG)
 ```
 
 2. **Check Service Status:**
