@@ -197,12 +197,12 @@ async def get_document_status(
             elif not isinstance(status_value, str):
                 status_value = str(status_value)
             
-            return DocumentProcessingResponse(
-                document_id=document_id,
-                status=status_value,
-                progress=result["progress"],
-                current_stage=result["current_stage"],
-                stages=[
+            response_data = {
+                "document_id": document_id,
+                "status": status_value,
+                "progress": result["progress"],
+                "current_stage": result["current_stage"],
+                "stages": [
                     {
                         "stage_name": stage["name"].lower().replace(" ", "_"),
                         "status": stage["status"] if isinstance(stage["status"], str) else str(stage["status"]),
@@ -214,12 +214,18 @@ async def get_document_status(
                     }
                     for stage in result["stages"]
                 ],
-                estimated_completion=(
+                "estimated_completion": (
                     datetime.fromtimestamp(result.get("estimated_completion", 0))
                     if result.get("estimated_completion")
                     else None
                 ),
-            )
+            }
+            
+            # Add error_message to response if status is failed
+            if status_value == "failed" and result.get("error_message"):
+                response_data["error_message"] = result["error_message"]
+            
+            return DocumentProcessingResponse(**response_data)
         else:
             raise HTTPException(status_code=404, detail=result["message"])
 
@@ -532,8 +538,16 @@ async def process_document_background(
     """Background task for document processing using NVIDIA NeMo pipeline."""
     try:
         logger.info(
-            f"Starting NVIDIA NeMo processing pipeline for document: {document_id}"
+            f"🚀 Starting NVIDIA NeMo processing pipeline for document: {document_id}"
         )
+        logger.info(f"   File path: {file_path}")
+        logger.info(f"   Document type: {document_type}")
+        
+        # Verify file exists
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"File not found: {file_path}")
+        
+        logger.info(f"✅ File exists: {file_path} ({os.path.getsize(file_path)} bytes)")
 
         # Import the actual pipeline components
         from src.api.agents.document.preprocessing.nemo_retriever import (

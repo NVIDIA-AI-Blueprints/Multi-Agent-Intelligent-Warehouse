@@ -201,13 +201,14 @@ class DocumentProcessingResponse(BaseModel):
     """Document processing response model."""
 
     document_id: str = Field(..., description="Document ID")
-    status: ProcessingStage = Field(..., description="Current status")
+    status: str = Field(..., description="Current status")  # Accept string for frontend compatibility
     progress: float = Field(..., ge=0, le=100, description="Progress percentage")
     current_stage: str = Field(..., description="Current processing stage")
     stages: List[ProcessingStageInfo] = Field(..., description="All processing stages")
     estimated_completion: Optional[datetime] = Field(
         None, description="Estimated completion time"
     )
+    error_message: Optional[str] = Field(None, description="Error message if failed")
 
 
 class DocumentResultsResponse(BaseModel):
