@@ -574,12 +574,13 @@ async def process_document_background(
         # Get tools instance for status updates
         tools = await get_document_tools()
         
-        # Update status to PROCESSING
+        # Update status to PROCESSING (use PREPROCESSING as PROCESSING doesn't exist in enum)
         if document_id in tools.document_statuses:
-            tools.document_statuses[document_id]["status"] = ProcessingStage.PROCESSING
+            tools.document_statuses[document_id]["status"] = ProcessingStage.PREPROCESSING
             tools.document_statuses[document_id]["current_stage"] = "Preprocessing"
             tools.document_statuses[document_id]["progress"] = 10
             tools._save_status_data()
+            logger.info(f"✅ Updated document {document_id} status to PREPROCESSING (10% progress)")
         
         # Stage 1: Document Preprocessing
         logger.info(f"Stage 1: Document preprocessing for {document_id}")

@@ -552,10 +552,10 @@ class DocumentActionTools:
         # This prevents race conditions where status shows COMPLETED but results aren't stored yet
         if overall_status_str == "completed" or overall_status == ProcessingStage.COMPLETED:
             if "processing_results" not in status_info:
-                logger.warning(f"Document {document_id} status is COMPLETED but no processing_results found. Setting to PROCESSING.")
-                overall_status = ProcessingStage.PROCESSING
-                overall_status_str = "processing"
-                status_info["status"] = ProcessingStage.PROCESSING
+                logger.warning(f"Document {document_id} status is COMPLETED but no processing_results found. Setting to ROUTING.")
+                overall_status = ProcessingStage.ROUTING
+                overall_status_str = "routing"
+                status_info["status"] = ProcessingStage.ROUTING
                 current_stage_name = "Finalizing"
                 progress = 95
                 self._save_status_data()
@@ -916,7 +916,16 @@ class DocumentActionTools:
                 current_status = doc_status.get("status", "")
                 
                 # Check if processing is still in progress
-                if current_status in [ProcessingStage.UPLOADED, ProcessingStage.PROCESSING]:
+                # Note: PROCESSING doesn't exist in enum, use PREPROCESSING, OCR_EXTRACTION, etc.
+                processing_stages = [
+                    ProcessingStage.UPLOADED, 
+                    ProcessingStage.PREPROCESSING,
+                    ProcessingStage.OCR_EXTRACTION,
+                    ProcessingStage.LLM_PROCESSING,
+                    ProcessingStage.VALIDATION,
+                    ProcessingStage.ROUTING
+                ]
+                if current_status in processing_stages:
                     logger.info(f"Document {document_id} is still being processed by NeMo pipeline. Status: {current_status}")
                     # Return a message indicating processing is in progress
                     return {
