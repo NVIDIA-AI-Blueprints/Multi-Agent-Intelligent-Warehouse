@@ -1,39 +1,151 @@
-# Changelog
+## [1.0.0](https://github.com/T-DevH/warehouse-operational-assistant/compare/v0.1.0...v1.0.0) (2025-11-16)
 
-All notable changes to this project will be documented in this file.
+### Features
 
-## Warehouse Operational Assistant 0.1.0 (16 Nov 2025)
-
-### New Features
-
-- **NVIDIA NeMo Pipeline Integration**: Full 5-stage document processing pipeline
-  - Stage 1: Document Preprocessing with NeMo Retriever
-  - Stage 2: OCR Extraction with NeMoRetriever-OCR-v1
-  - Stage 3: Small LLM Processing with Llama Nemotron Nano VL 8B
-  - Stage 4: Large LLM Judge validation with Llama 3.1 Nemotron 70B
-  - Stage 5: Intelligent Routing based on quality scores
-- **Forecasting Agent**: MCP-enabled forecasting agent with demand prediction, reorder recommendations, and model performance monitoring
-- **MCP Forecasting Adapter**: Adapter system for integrating forecasting tools into MCP framework
-- **Persistent File Storage**: Document uploads stored in `data/uploads/` directory for re-processing capability
-- **Test Scripts**: Comprehensive test scripts for document processing, equipment endpoints, and chat functionality
-
-### Improvements
-
-- **Document Processing**: Removed local processing fallback, now exclusively uses NVIDIA NeMo pipeline
-- **Error Handling**: Enhanced error messages indicating NeMo pipeline status (processing, completed, failed)
-- **JSON Serialization**: Automatic conversion of PIL Images to metadata for proper storage
-- **File Management**: Files preserved after processing for potential re-processing and debugging
-- **UI Feedback**: Added mock data warnings in document results dialog
-- **Dependency Management**: Added Pillow and PyMuPDF to requirements.txt for document processing
-- **Git Configuration**: Updated .gitignore to exclude uploaded files and cache directories
-- **NeMo Guardrails**: Enhanced compliance violation detection with additional pattern matching (100% test coverage)
+* add complete demand forecasting system with AI-powered predictions ([340abc0](https://github.com/T-DevH/warehouse-operational-assistant/commit/340abc0720f278c678f65c29dc01b6be75f3a186))
+* add comprehensive Documentation page to UI ([392b206](https://github.com/T-DevH/warehouse-operational-assistant/commit/392b206914e575465a447936a1329bd348e6f857))
+* add comprehensive documentation pages with navigation ([7739cc0](https://github.com/T-DevH/warehouse-operational-assistant/commit/7739cc0a37a11b42d4a8212c5cf26a5487ecd8fc))
+* add deployment scripts and clear documentation ([6da08c4](https://github.com/T-DevH/warehouse-operational-assistant/commit/6da08c4d15d16b6b0e464a6987df6e3e5da4d586))
+* add environment variables template for document extraction agent ([60f43a1](https://github.com/T-DevH/warehouse-operational-assistant/commit/60f43a1a72579df7c45e27d6bbe4a6878ea4b61e))
+* add frito-lay inventory management system ([91c59d9](https://github.com/T-DevH/warehouse-operational-assistant/commit/91c59d94d637241c51cc0348fba889a4ecdc3cfd))
+* add GPU-accelerated vector search with NVIDIA cuVS integration ([c9496f7](https://github.com/T-DevH/warehouse-operational-assistant/commit/c9496f7aa3656362ece89242dac82628d56b2180))
+* add MCP adapter for Forecasting Agent and fix Business Intelligence analytics ([95523b1](https://github.com/T-DevH/warehouse-operational-assistant/commit/95523b10b63b6513ec27144daa2f2991917c9c0c))
+* add MCP Testing navigation link to left sidebar ([2f36b03](https://github.com/T-DevH/warehouse-operational-assistant/commit/2f36b03af2b2224a62a18c5d2261c23ad61c0a98))
+* add RAPIDS GPU setup for accelerated forecasting ([d9abdff](https://github.com/T-DevH/warehouse-operational-assistant/commit/d9abdff8212cacd70e530b868f17c0527626d9cb))
+* add root endpoint and API assessment ([e9bd813](https://github.com/T-DevH/warehouse-operational-assistant/commit/e9bd8138c8cd5d7c859fdef6aeaf53ff13f35d77))
+* complete MCP Phase 3 implementation with comprehensive testing and documentation ([9d10e81](https://github.com/T-DevH/warehouse-operational-assistant/commit/9d10e819ef31135f2c882631874febffcde4c67a))
+* complete mcp system optimization and chat interface improvements ([7208a78](https://github.com/T-DevH/warehouse-operational-assistant/commit/7208a7856e044a722c5c0837db8307f414f8e30f))
+* complete nvidia nemo document processing pipeline ([bae400f](https://github.com/T-DevH/warehouse-operational-assistant/commit/bae400f5389ca84aa013173f225ab01a3f1f60d1))
+* comprehensive review and fix of hardcoded/mock data across all pages ([a5d4ee5](https://github.com/T-DevH/warehouse-operational-assistant/commit/a5d4ee5691453d6792a69e2c2901550d14f41f46))
+* comprehensive system updates and enhancements ([7155256](https://github.com/T-DevH/warehouse-operational-assistant/commit/71552569e85dc2274a44ddf157674492c5e1840c))
+* enable automatic CHANGELOG.md generation with semantic-release ([f19a4cc](https://github.com/T-DevH/warehouse-operational-assistant/commit/f19a4cce15796f6f8ecc81aa8b9f07d3166dac84))
+* enhance business intelligence dashboard with comprehensive analytics ([c892966](https://github.com/T-DevH/warehouse-operational-assistant/commit/c89296630065c2cd618d51d590bfc44f17b06753))
+* enhance Dependabot configuration with auto-merge and smart filtering ([bd38422](https://github.com/T-DevH/warehouse-operational-assistant/commit/bd3842283dd60780dc9f1ed35542c0b5d12ba630))
+* enhance dispatch command handling in MCP Equipment Agent ([e9cac38](https://github.com/T-DevH/warehouse-operational-assistant/commit/e9cac38345fb49f6d1e8d5101e24a371f5117933))
+* enhance document results display with structured, user-friendly interface ([12f4fc4](https://github.com/T-DevH/warehouse-operational-assistant/commit/12f4fc46a2b7ac3e5cc92f745e4969d1ae125dc5))
+* enhance mcp testing page with advanced features ([4984750](https://github.com/T-DevH/warehouse-operational-assistant/commit/4984750e641fa73b94f8be9c08e33659eadce147))
+* enhance README with architectural diagram and fix equipment endpoints ([6f0cd0f](https://github.com/T-DevH/warehouse-operational-assistant/commit/6f0cd0f804bc2df2e3955e22c96b4b5e46356223))
+* expand forecasting system to cover all 38 SKUs ([8e7beeb](https://github.com/T-DevH/warehouse-operational-assistant/commit/8e7beeb3db3aed20bd394104e1a467aece6f4679))
+* fix document extraction UI issues ([4167d7f](https://github.com/T-DevH/warehouse-operational-assistant/commit/4167d7fd0e2703ce251920e23fecfa7af9b78ea8))
+* implement complete nvidia nemo document extraction pipeline ([0a40555](https://github.com/T-DevH/warehouse-operational-assistant/commit/0a40555bcf50744fe77e130a9abd4c664f0b33bf))
+* implement document extraction agent with nvidia nemo pipeline ([34faeb9](https://github.com/T-DevH/warehouse-operational-assistant/commit/34faeb903e223cc76fe3bed0c1706e663d88032d))
+* implement dynamic forecasting system with real database integration ([d2c2f12](https://github.com/T-DevH/warehouse-operational-assistant/commit/d2c2f12cd6d03d408183b4ec9beefa92cba22922))
+* implement MCP framework integration - Phase 2 Step 1 ([384fc9e](https://github.com/T-DevH/warehouse-operational-assistant/commit/384fc9e002a115b0adc38ebd7a35072e7693536e))
+* implement MCP testing UI for dynamic tool discovery ([c72d544](https://github.com/T-DevH/warehouse-operational-assistant/commit/c72d544083388a3d94f8b84bd058ab3c0ecc22aa))
+* implement MCP-enabled agents for equipment, operations, and safety ([3ed695b](https://github.com/T-DevH/warehouse-operational-assistant/commit/3ed695bcd162a25f4445e244e193c61bbf58e84e))
+* implement MCP-integrated planner graph for complete workflow ([64538b4](https://github.com/T-DevH/warehouse-operational-assistant/commit/64538b49940fe3c9ed3c4fb12c4bbb3be7057ad0))
+* implement persistent document status tracking ([4fd7412](https://github.com/T-DevH/warehouse-operational-assistant/commit/4fd7412425c1ab65af17a6c3505b84ae9fc5d205))
+* implement Phase 1 critical fixes for chat interface ([ed25f75](https://github.com/T-DevH/warehouse-operational-assistant/commit/ed25f757f56477912ca7c3b68177440ca47c4951))
+* implement progressive document processing status ([2a004d7](https://github.com/T-DevH/warehouse-operational-assistant/commit/2a004d7df367040de787f4bf2b90280873ced082))
+* implement Quality Score Trends and Processing Volume charts in Document Analytics ([e7dd1af](https://github.com/T-DevH/warehouse-operational-assistant/commit/e7dd1af7e55d2300591cd82a96dfc75a326d21df))
+* implement RAPIDS GPU training with real-time progress tracking ([1bff9a1](https://github.com/T-DevH/warehouse-operational-assistant/commit/1bff9a11e8eb138b4c95e98cfe32b0a6afb473dc))
+* improve multi-intent query routing and operations agent ([6997763](https://github.com/T-DevH/warehouse-operational-assistant/commit/69977639b331dc3576f55e3168ead2d431254cf6))
+* integrate document agent into mcp planner graph ([39bc878](https://github.com/T-DevH/warehouse-operational-assistant/commit/39bc8780a67752e2d5eb21bb45b0a0dfc728a3ff))
+* update architecture diagram with latest additions ([10ea52e](https://github.com/T-DevH/warehouse-operational-assistant/commit/10ea52ec73794f41f661f01d22d5c947b997579b))
+* update GitHub repository links in all documentation pages ([cf10d2a](https://github.com/T-DevH/warehouse-operational-assistant/commit/cf10d2a265280f32f055cae2b8f5793b41c31742))
+* update UI components with latest improvements ([b599f73](https://github.com/T-DevH/warehouse-operational-assistant/commit/b599f737b63251eb3d5e05a397a34a3005f9b90c))
 
 ### Bug Fixes
 
-- **File Persistence**: Fixed issue where uploaded files were deleted from temporary directories
-- **JSON Serialization Error**: Fixed "Object of type PngImageFile is not JSON serializable" error
-- **Mock Data Fallback**: Removed incorrect local processing fallback that returned mock data
-- **Document Results**: Fixed issue where document results showed default/mock data instead of actual NeMo pipeline results
-- **Missing Dependencies**: Added PyMuPDF (fitz) for PDF processing in local processor
-- **Status Tracking**: Improved document status tracking to properly indicate NeMo pipeline progress
+* add 'ignore safety regulations' pattern to compliance violations ([8692d9e](https://github.com/T-DevH/warehouse-operational-assistant/commit/8692d9eb8c8620637bad89d9d713eca13b1f01c1))
+* add comprehensive logging to auth login flow ([b6ecf11](https://github.com/T-DevH/warehouse-operational-assistant/commit/b6ecf11fe9f1bc5526fe9a5b92f9fe94b1eaeac0))
+* add connection timeout to database pool creation ([1eae31c](https://github.com/T-DevH/warehouse-operational-assistant/commit/1eae31ccabeb9bf93bf18b273811b6a2f58aaf58))
+* add database writes for model training and predictions ([090f79e](https://github.com/T-DevH/warehouse-operational-assistant/commit/090f79ed3b73aaae154898019fb59c5aa5daa4ca))
+* add database writes to RAPIDS training script and fix SQL queries ([f9fb70a](https://github.com/T-DevH/warehouse-operational-assistant/commit/f9fb70a1e045279adc37c7891a54abc46b3827e8))
+* add debug endpoint and enhanced logging for auth issues ([e5df61b](https://github.com/T-DevH/warehouse-operational-assistant/commit/e5df61b5c9c65243d3108bc8c11ee001b465412f))
+* add debugging and improve document results display robustness ([2e5a19f](https://github.com/T-DevH/warehouse-operational-assistant/commit/2e5a19f5c000ce129b46db566320249c84d806b4))
+* add defensive checks for result data and better error handling ([8af1855](https://github.com/T-DevH/warehouse-operational-assistant/commit/8af1855ba78c5350a108bd3d0793fd13bc8d9409))
+* add error handling for JSON parsing in document results ([0b910a4](https://github.com/T-DevH/warehouse-operational-assistant/commit/0b910a478f14b02be5c819865812e2f236f8d22f))
+* add fallback response method and timeout for graph execution ([60e9759](https://github.com/T-DevH/warehouse-operational-assistant/commit/60e975912d3043b346a661e7831ec5317318f784))
+* add missing os import in create_default_users.py ([4ffee02](https://github.com/T-DevH/warehouse-operational-assistant/commit/4ffee029d72f499e5e00ee1902f2411f61f936eb))
+* add missing python-multipart dependency ([c850d3e](https://github.com/T-DevH/warehouse-operational-assistant/commit/c850d3efdb14f53595f6a9048bfcbc08c314969f))
+* add missing redis dependency to requirements.txt ([9978423](https://github.com/T-DevH/warehouse-operational-assistant/commit/9978423506a4b05f185718cbf9130322a0ac4493))
+* add missing tiktoken dependency to requirements.txt ([da6046a](https://github.com/T-DevH/warehouse-operational-assistant/commit/da6046abb6445a33d27918592c40df9ee25dddf0))
+* add null safety checks for result data access ([bc34b2a](https://github.com/T-DevH/warehouse-operational-assistant/commit/bc34b2aa91b380a26f935051a938bc09cb2ccab5))
+* add scikit-learn dependency and fix datetime timezone issue ([6a05e56](https://github.com/T-DevH/warehouse-operational-assistant/commit/6a05e5614ac03dc99ebc2bd676ba10e79e358b37))
+* add simple fallback response and timeout for tool discovery ([a7006e0](https://github.com/T-DevH/warehouse-operational-assistant/commit/a7006e0d058bc5b612933e222a96a9854688afc6))
+* add timeout for input safety check and handle empty results ([8aafab4](https://github.com/T-DevH/warehouse-operational-assistant/commit/8aafab488a591f572daccd3f24f23230d936a109))
+* add timeout protection and better error handling for chat endpoint ([441fed2](https://github.com/T-DevH/warehouse-operational-assistant/commit/441fed20231a7dce4d976c46476e1f95cd73978a))
+* add timeout protection for MCP planner initialization ([4c176d5](https://github.com/T-DevH/warehouse-operational-assistant/commit/4c176d5b8fb819da5950e6b59a2c572b601b5a51))
+* add timeout protection to login endpoint ([e73a476](https://github.com/T-DevH/warehouse-operational-assistant/commit/e73a47668510bdc5084cbed321853be3ca0c7031))
+* add timeout protection to version endpoints ([5763aae](https://github.com/T-DevH/warehouse-operational-assistant/commit/5763aae73c7d29d79ded0ab089798501563000e6))
+* add timeout to graph execution and initialization retry logic ([241eaf6](https://github.com/T-DevH/warehouse-operational-assistant/commit/241eaf6649a9ec8e936c9c794c7bfdfbb5246cbe))
+* authentication login now working after server restart ([b552553](https://github.com/T-DevH/warehouse-operational-assistant/commit/b552553cb2e330495fde6b8fbd9276f90d11ebbc))
+* correct agent framework description - using LangGraph + MCP, not NeMo Agent Toolkit ([7e2e565](https://github.com/T-DevH/warehouse-operational-assistant/commit/7e2e5657a21e59c168b4d17e566a8ef1bed9c0ac))
+* correct Dependabot configuration syntax ([57d94c7](https://github.com/T-DevH/warehouse-operational-assistant/commit/57d94c77bf616e879e307f741478e8632df172db))
+* correct document upload response parsing ([e72cc8b](https://github.com/T-DevH/warehouse-operational-assistant/commit/e72cc8bbee40917db9342c6d1029f4020f153569))
+* correct field names to match actual data structure (lowercase) ([7029a38](https://github.com/T-DevH/warehouse-operational-assistant/commit/7029a38d320ae277e526c29b4d7c258b4c6ad537))
+* correct health check URL in README ([744e1ba](https://github.com/T-DevH/warehouse-operational-assistant/commit/744e1bac13808937fd4ed65be6bb00d9b46875ae))
+* correct mcp tool execute api parameter handling ([0b5eab4](https://github.com/T-DevH/warehouse-operational-assistant/commit/0b5eab4ffd47690afd578ab0e922749725b9796f))
+* correct NVIDIA LLM API calls in MCP Equipment Agent ([eeea369](https://github.com/T-DevH/warehouse-operational-assistant/commit/eeea3691bdca537b3fb5954a440b400e7c037b28))
+* correct NVIDIA LLM API calls in MCP Operations Agent ([99d088b](https://github.com/T-DevH/warehouse-operational-assistant/commit/99d088b775db18e805b2bb32bdf5a659447e8eaa))
+* correct nvidia nemo api endpoint urls to eliminate double /v1/ path ([2490f9a](https://github.com/T-DevH/warehouse-operational-assistant/commit/2490f9ad3d0f52e57c5872abdf81f94c8d30ab6c))
+* correct ProcessingStage enum usage in progressive status ([01660d4](https://github.com/T-DevH/warehouse-operational-assistant/commit/01660d4bfc4eda3fa909d0587c7b37cf3d2b38d5))
+* debug document status tracking and router response format ([6133acf](https://github.com/T-DevH/warehouse-operational-assistant/commit/6133acfe969456cc4511a004e480a060086ee06c))
+* display chat response immediately instead of waiting for streaming ([c6b8b23](https://github.com/T-DevH/warehouse-operational-assistant/commit/c6b8b2367647272c6353d066cd84ac5c651fcc38))
+* enable Evidence/Active Context panel in chat UI ([e4355b4](https://github.com/T-DevH/warehouse-operational-assistant/commit/e4355b4ac44579e9ba9e3a45e23c63ce5b660361))
+* extract confidence from multiple sources with sensible defaults ([7e12437](https://github.com/T-DevH/warehouse-operational-assistant/commit/7e12437cc42abbd9f20a0cecf921348b369fac85))
+* handle bcrypt 72-byte password limit in verification ([0c75c3c](https://github.com/T-DevH/warehouse-operational-assistant/commit/0c75c3c490ce7618bbfdec6606da1bf9c7f85d30))
+* implement NeMo pipeline for document processing and fix file persistence ([a9ebbb6](https://github.com/T-DevH/warehouse-operational-assistant/commit/a9ebbb66c1383897e4a32890884bbfdcb705efdb))
+* implement robust fallback mechanism for document processing ([b8175e0](https://github.com/T-DevH/warehouse-operational-assistant/commit/b8175e0f972f2567183067b03bd72b71756830a8))
+* implement text-only processing fallback for nvidia api 400 errors ([2adafb1](https://github.com/T-DevH/warehouse-operational-assistant/commit/2adafb1a1f9eabfb0d0b6d9b2ca2ae91c32ad05f))
+* implement working nvidia api integration for document extraction ([083ea6b](https://github.com/T-DevH/warehouse-operational-assistant/commit/083ea6bc1fa4df34b0af3e4a2172b9d58a2bd312))
+* improve create_default_users.py to load .env and use proper env vars ([d48edd1](https://github.com/T-DevH/warehouse-operational-assistant/commit/d48edd1fe2f8bc900cefa522d8e2de91956407c6))
+* improve equipment agent response generation for dispatch commands ([9122c96](https://github.com/T-DevH/warehouse-operational-assistant/commit/9122c963cecb4f2d2f9f0b9c5171ec75ab9d15dd))
+* improve error handling and timeout protection in chat endpoint ([ff913bb](https://github.com/T-DevH/warehouse-operational-assistant/commit/ff913bb1ecdf5786210e1109f0aec49691777b2b))
+* improve LLM JSON response format for equipment agent ([c1ed43a](https://github.com/T-DevH/warehouse-operational-assistant/commit/c1ed43a0136a3cc8d68659f58a0c25471be898a6))
+* improve operations agent response generation for wave creation ([07b8cf9](https://github.com/T-DevH/warehouse-operational-assistant/commit/07b8cf9bd9db342b73a07730e3a88a01db0c0c32))
+* improve safety agent response generation and LLM API calls ([c624e94](https://github.com/T-DevH/warehouse-operational-assistant/commit/c624e944f65c8edbd1da04b041489524954ce4b3))
+* improve telemetry tab UX and add data generation script ([2269720](https://github.com/T-DevH/warehouse-operational-assistant/commit/22697209ba90e418e30e4e54b0157f3b94aba6ea))
+* improve timeout handling and provide faster fallback responses ([59c105a](https://github.com/T-DevH/warehouse-operational-assistant/commit/59c105aaf091125f5d184ae56c47d9d50bf21ddb))
+* make forecast summary dynamic instead of reading static file ([4c350cd](https://github.com/T-DevH/warehouse-operational-assistant/commit/4c350cdf480ef978aea6751269f53a6d4c22cbda))
+* map model names to display format for database consistency ([4a9a9a4](https://github.com/T-DevH/warehouse-operational-assistant/commit/4a9a9a49394e1a10354886e25c005aaa3dfa3a24))
+* map task statuses to match LeftRail component type requirements ([ca22c7e](https://github.com/T-DevH/warehouse-operational-assistant/commit/ca22c7e89b97772e54f2b5ea6315d014c3d0c443))
+* normalize datetime timezone in _get_last_training_date ([dae6fda](https://github.com/T-DevH/warehouse-operational-assistant/commit/dae6fdad8d4a90debc903cdd21f527d05b522af9))
+* prevent 'event is undefined' error in ChatInterfaceNew streaming events ([fff22eb](https://github.com/T-DevH/warehouse-operational-assistant/commit/fff22eb66cf1936105b3436076513cb53a855503))
+* prevent redirect to login on Operations page for permission errors ([ec04d2f](https://github.com/T-DevH/warehouse-operational-assistant/commit/ec04d2ff8838da4329b80dce3781f7c08c584b57))
+* reduce timeouts for faster login response ([1014889](https://github.com/T-DevH/warehouse-operational-assistant/commit/10148891c9fc808813f4b6fc7d4c68f37433afc7))
+* refine intent classification priority for equipment vs operations ([4aff1ca](https://github.com/T-DevH/warehouse-operational-assistant/commit/4aff1ca76ecc84d19deb819e5231759973e767ec))
+* remove .env.bak file containing secrets from git tracking ([e17de81](https://github.com/T-DevH/warehouse-operational-assistant/commit/e17de81da8e32716219976480162c94287899014))
+* remove duplicate _create_simple_fallback_response function ([f082779](https://github.com/T-DevH/warehouse-operational-assistant/commit/f082779d36b0918e568e5a45afa6f64c6115347b))
+* remove hardcoded secrets and use environment variables ([d3e9ade](https://github.com/T-DevH/warehouse-operational-assistant/commit/d3e9ade5a6c269b068f9261593974e6363d64806))
+* remove invalid connect_timeout from PostgreSQL server_settings ([097a0b0](https://github.com/T-DevH/warehouse-operational-assistant/commit/097a0b0f07631b3b73a8cf3d27041cef8c5308cb))
+* remove non-existent 'content' property from ChatResponse ([073a3fb](https://github.com/T-DevH/warehouse-operational-assistant/commit/073a3fb827c1a2aedf77da4b5a4a3b795f9ddaac))
+* remove unused imports from MCP agents ([b5436d2](https://github.com/T-DevH/warehouse-operational-assistant/commit/b5436d265532ff2c44450a58b068a8770eef68eb))
+* resolve 'event is undefined' error in ChatInterfaceNew ([fa7cb7f](https://github.com/T-DevH/warehouse-operational-assistant/commit/fa7cb7f5a367c9fd456addf393b7ace54d8cd488))
+* resolve 'event is undefined' runtime error in ChatInterfaceNew ([c641603](https://github.com/T-DevH/warehouse-operational-assistant/commit/c6416032785ad7dbad828db7f1009874ba6c2377))
+* resolve ChatResponse import error and CORS configuration ([598b74a](https://github.com/T-DevH/warehouse-operational-assistant/commit/598b74aa7c51d4ffaa794bd2df1ce033b3f03a63))
+* resolve CI/CD pipeline issues and add comprehensive testing ([520418c](https://github.com/T-DevH/warehouse-operational-assistant/commit/520418c1d942c3b2ef9dc5766597ab18a6af2071))
+* resolve CORS and proxy issues for frontend API requests ([ed091c1](https://github.com/T-DevH/warehouse-operational-assistant/commit/ed091c18c2b9b270dc6986a1e15377a02482aeb1))
+* resolve JSX parsing errors with unescaped angle brackets ([1176f02](https://github.com/T-DevH/warehouse-operational-assistant/commit/1176f0274ce918e3cb1c5ee1f0c6220c8c536518))
+* resolve Material-UI icon import errors in DeploymentGuide ([43faac3](https://github.com/T-DevH/warehouse-operational-assistant/commit/43faac3f60676f28b31fc895c8be2153572914da))
+* resolve MCP adapter import errors ([de1266b](https://github.com/T-DevH/warehouse-operational-assistant/commit/de1266b207585c1d104e6e2dd2d5f5ab08ee9fb1))
+* resolve MCP adapter tools discovery errors ([692976a](https://github.com/T-DevH/warehouse-operational-assistant/commit/692976ac81fad8b7ea0571fa2f72aaaf1cafb8d3))
+* resolve persistent status tracking errors ([d586d96](https://github.com/T-DevH/warehouse-operational-assistant/commit/d586d96c699d629b6b09d7105698b28635cb0be4))
+* resolve Prometheus-Grafana networking issue ([c290d24](https://github.com/T-DevH/warehouse-operational-assistant/commit/c290d241de7285f602085001dae41a47036b71a4))
+* resolve SQL bugs in equipment asset tools ([201df98](https://github.com/T-DevH/warehouse-operational-assistant/commit/201df98a5b720ca57ab99648966881e1ccfa04c3))
+* resolve syntax error in MessageBubble component ([5536284](https://github.com/T-DevH/warehouse-operational-assistant/commit/5536284de1f5c0123eb329d953d4c7c2fd82f458))
+* restore missing chatAPI export and clean up ESLint warnings ([76ab95e](https://github.com/T-DevH/warehouse-operational-assistant/commit/76ab95ee024e84df2e0399fcbdf1a419da8bbc66))
+* strip username whitespace in login endpoint ([f155508](https://github.com/T-DevH/warehouse-operational-assistant/commit/f1555087d00631da1b0d81226be4ab2f04382c87))
+* sync rails.yaml with guardrails service patterns ([de89935](https://github.com/T-DevH/warehouse-operational-assistant/commit/de89935380b0287bdedded90985ab506ef93826b))
+* update admin password hash in database to match 'changeme' ([8b75b3c](https://github.com/T-DevH/warehouse-operational-assistant/commit/8b75b3c49fb8e3cbc0845bb04c10d0f82af0b197))
+* update API base URL to port 8002 ([1f252e3](https://github.com/T-DevH/warehouse-operational-assistant/commit/1f252e399463c1332cf4fcc46e1ebbdcbc520046))
+* update API service to use direct API URL instead of proxy ([b331a01](https://github.com/T-DevH/warehouse-operational-assistant/commit/b331a01c127c8a6dba238badf48caf4536e56aee))
+* update changelog script to use npx ([97d6f6b](https://github.com/T-DevH/warehouse-operational-assistant/commit/97d6f6bec5a313dd879878b7d94f615c98a8583a))
+* update CORS configuration to explicitly allow localhost origins ([f29b070](https://github.com/T-DevH/warehouse-operational-assistant/commit/f29b070885cbce04ae97399e972b58088b50b2a3))
+* update create_default_users.py to use bcrypt directly ([9c6cadc](https://github.com/T-DevH/warehouse-operational-assistant/commit/9c6cadc44e049d287e21127d69db6765c37158db))
+* update database schema to match actual structure ([6187a8e](https://github.com/T-DevH/warehouse-operational-assistant/commit/6187a8ec6250fb26e05dc59067c3872d47a102e7))
+* update equipment router with latest improvements ([b9f41be](https://github.com/T-DevH/warehouse-operational-assistant/commit/b9f41be5934fe4e90be68f8e64b2422c78c7b228))
+* update MCP Framework status to reflect full integration ([fb54021](https://github.com/T-DevH/warehouse-operational-assistant/commit/fb54021609e6d0581c07d290be6215dc079e6ae3))
+* update monitoring and frontend configurations ([673d223](https://github.com/T-DevH/warehouse-operational-assistant/commit/673d22323c688e760d4707ca177af377cfe3640a))
+* update README to reflect MCP Phase 3 completion ([d65817c](https://github.com/T-DevH/warehouse-operational-assistant/commit/d65817cea1210cdac0222cfd090b0afffa0bbfd4))
+* update README.md demo information for accuracy ([fa9d9e6](https://github.com/T-DevH/warehouse-operational-assistant/commit/fa9d9e62715d0f06bb90e56595778e8839117435))
+* update remaining docker-compose files to use environment variables ([bf3b1bc](https://github.com/T-DevH/warehouse-operational-assistant/commit/bf3b1bc05f2ff12085d89f34e2da6650eef698ce))
+* update timeout error messages to match actual values ([a026642](https://github.com/T-DevH/warehouse-operational-assistant/commit/a0266420e264dfebcebcccbdfd71dda6eef16691))
+* update training scripts to process all 38 SKUs ([775d9b4](https://github.com/T-DevH/warehouse-operational-assistant/commit/775d9b496f984becb94f47b49673bb77a9e8e5f0))
+* use bcrypt directly instead of passlib to avoid compatibility issues ([f7b645a](https://github.com/T-DevH/warehouse-operational-assistant/commit/f7b645aac680f44456c41a26e0f9ef698d1548cb))
+* use PostgreSQL connect_timeout setting instead of invalid asyncpg parameter ([b0a7efd](https://github.com/T-DevH/warehouse-operational-assistant/commit/b0a7efd3a347d17409d9932e11d37fd672ef56b7))
 
+### Performance Improvements
+
+* optimize chat endpoint performance with parallelization ([f98f22c](https://github.com/T-DevH/warehouse-operational-assistant/commit/f98f22c48e84bb16fbe64e962a35de894a1b6e61))
