@@ -31,23 +31,21 @@ These are backup files that should not be in version control:
 
 ### ⚠️ Files Still Referenced (Review Before Removing)
 
-**`src/api/routers/equipment_old.py`**
-- **Status:** ⚠️ **STILL IMPORTED** in `src/api/app.py` (line 24)
-- **Reason:** Marked as "old" but still actively used as `inventory_router`
-- **Action:** 
-  - Either rename to remove "_old" suffix if still needed
-  - OR migrate functionality to proper equipment router and remove
-  - Check if `/api/v1/inventory` endpoints are still needed
+**`src/api/routers/equipment_old.py`** ✅ **RESOLVED**
+- **Status:** ✅ **RENAMED** to `inventory.py`
+- **Reason:** File was misnamed - it provides inventory endpoints, not equipment endpoints
+- **Action Taken:** Renamed to `src/api/routers/inventory.py` and updated import in `app.py`
+- **Note:** This router provides `/api/v1/inventory` endpoints and is actively used by the frontend Inventory page
 
-**`src/api/agents/inventory/equipment_agent_old.py`**
-- **Status:** ⚠️ **NEEDS VERIFICATION** - Check if imported anywhere
-- **Action:** Search for imports, if unused, can be removed
+**`src/api/agents/inventory/equipment_agent_old.py`** ✅ **REMOVED**
+- **Status:** ✅ **DELETED**
+- **Reason:** Not imported or used anywhere in the codebase
+- **Action Taken:** File has been removed
 
-**Action Required:**
+**Action Required:** ✅ **COMPLETED**
 ```bash
-# Check if equipment_old.py is still needed
-grep -r "equipment_old\|inventory_router" src/
-# If still needed, consider renaming or migrating
+# ✅ RESOLVED: equipment_old.py renamed to inventory.py
+# ✅ RESOLVED: equipment_agent_old.py removed (unused)
 ```
 
 ---
