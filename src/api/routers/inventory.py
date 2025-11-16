@@ -402,80 +402,9 @@ async def get_monthly_demand(
         raise HTTPException(status_code=500, detail="Failed to retrieve monthly demand")
 
 
-@router.get("/forecast/demand")
-async def get_demand_forecast(
-    sku: str,
-    horizon_days: int = 30
-):
-    """Get demand forecast for a specific SKU."""
-    try:
-        # Load forecast results from file
-        import json
-        import os
-        
-        forecast_file = "phase1_phase2_forecasts.json"
-        if not os.path.exists(forecast_file):
-            raise HTTPException(status_code=404, detail="Forecast data not found. Run forecasting agent first.")
-        
-        with open(forecast_file, 'r') as f:
-            forecasts = json.load(f)
-        
-        if sku not in forecasts:
-            raise HTTPException(status_code=404, detail=f"No forecast found for SKU {sku}")
-        
-        forecast_data = forecasts[sku]
-        
-        return {
-            "sku": sku,
-            "forecast": {
-                "predictions": forecast_data['predictions'][:horizon_days],
-                "confidence_intervals": forecast_data['confidence_intervals'][:horizon_days],
-                "feature_importance": forecast_data['feature_importance'],
-                "forecast_date": forecast_data['forecast_date'],
-                "horizon_days": horizon_days
-            }
-        }
-        
-    except Exception as e:
-        logger.error(f"Error getting forecast for {sku}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve forecast for {sku}")
-
-
-@router.get("/forecast/summary")
-async def get_forecast_summary():
-    """Get summary of all available forecasts."""
-    try:
-        import json
-        import os
-        
-        forecast_file = "phase1_phase2_forecasts.json"
-        if not os.path.exists(forecast_file):
-            raise HTTPException(status_code=404, detail="Forecast data not found. Run forecasting agent first.")
-        
-        with open(forecast_file, 'r') as f:
-            forecasts = json.load(f)
-        
-        summary = {}
-        for sku, forecast_data in forecasts.items():
-            predictions = forecast_data['predictions']
-            avg_demand = sum(predictions) / len(predictions)
-            min_demand = min(predictions)
-            max_demand = max(predictions)
-            
-            summary[sku] = {
-                "average_daily_demand": round(avg_demand, 1),
-                "min_demand": round(min_demand, 1),
-                "max_demand": round(max_demand, 1),
-                "trend": "increasing" if predictions[0] < predictions[-1] else "decreasing" if predictions[0] > predictions[-1] else "stable",
-                "forecast_date": forecast_data['forecast_date']
-            }
-        
-        return {
-            "forecast_summary": summary,
-            "total_skus": len(summary),
-            "generated_at": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"Error getting forecast summary: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve forecast summary")
+# NOTE: Forecast endpoints have been moved to /api/v1/forecasting
+# Use the advanced forecasting router for real-time forecasts:
+# - POST /api/v1/forecasting/real-time - Get real-time forecast for a SKU
+# - GET /api/v1/forecasting/dashboard - Get forecasting dashboard
+# - GET /api/v1/forecasting/reorder-recommendations - Get reorder recommendations
+# - GET /api/v1/forecasting/business-intelligence/enhanced - Get business intelligence

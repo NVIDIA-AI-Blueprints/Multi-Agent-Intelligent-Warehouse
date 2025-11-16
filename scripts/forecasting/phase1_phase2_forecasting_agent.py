@@ -423,12 +423,24 @@ class RAPIDSForecastingAgent:
                     'horizon_days': forecast.horizon_days
                 }
             
-            # Save to file
-            with open('phase1_phase2_forecasts.json', 'w') as f:
+            # Save to both root (for runtime) and data/sample/forecasts/ (for reference)
+            from pathlib import Path
+            
+            # Save to root for runtime use
+            output_file = 'phase1_phase2_forecasts.json'
+            with open(output_file, 'w') as f:
+                json.dump(results_summary, f, indent=2, default=str)
+            
+            # Also save to data/sample/forecasts/ for reference
+            sample_dir = Path("data/sample/forecasts")
+            sample_dir.mkdir(parents=True, exist_ok=True)
+            sample_file = sample_dir / "phase1_phase2_forecasts.json"
+            with open(sample_file, 'w') as f:
                 json.dump(results_summary, f, indent=2, default=str)
             
             logger.info("🎉 Phase 1 & 2 completed successfully!")
             logger.info(f"📊 Generated forecasts for {len(forecasts)} SKUs")
+            logger.info(f"💾 Forecasts saved to {output_file} (runtime) and {sample_file} (reference)")
             
             # Show sample results
             if forecasts:
