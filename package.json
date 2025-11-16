@@ -13,7 +13,7 @@
     "commit": "git-cz",
     "prepare": "husky install",
     "release": "semantic-release",
-    "changelog": "conventional-changelog -p conventionalcommits -i CHANGELOG.md -s",
+    "changelog": "npx conventional-changelog-cli -p conventionalcommits -i CHANGELOG.md -s",
     "version": "echo 'Version script removed - use semantic-release for versioning'"
   },
   "repository": {
