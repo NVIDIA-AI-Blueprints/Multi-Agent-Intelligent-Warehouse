@@ -944,12 +944,12 @@ const Documentation: React.FC = () => {
                   <CardContent>
                     <Typography variant="subtitle1" gutterBottom>Backend Components</Typography>
                     <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>
-                      • chain_server/routers/advanced_forecasting.py<br/>
-                      • chain_server/routers/training.py<br/>
-                      • scripts/phase1_phase2_forecasting_agent.py<br/>
-                      • scripts/phase3_advanced_forecasting.py<br/>
-                      • scripts/rapids_gpu_forecasting.py<br/>
-                      • scripts/create_model_tracking_tables.sql
+                      • src/api/routers/advanced_forecasting.py<br/>
+                      • src/api/routers/training.py<br/>
+                      • scripts/forecasting/phase1_phase2_forecasting_agent.py<br/>
+                      • scripts/forecasting/phase3_advanced_forecasting.py<br/>
+                      • scripts/forecasting/rapids_gpu_forecasting.py<br/>
+                      • scripts/setup/create_model_tracking_tables.sql
                     </Typography>
                   </CardContent>
                 </Card>
@@ -959,9 +959,9 @@ const Documentation: React.FC = () => {
                   <CardContent>
                     <Typography variant="subtitle1" gutterBottom>Frontend Components</Typography>
                     <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>
-                      • ui/web/src/pages/Forecasting.tsx<br/>
-                      • ui/web/src/services/forecastingAPI.ts<br/>
-                      • ui/web/src/services/trainingAPI.ts<br/>
+                      • src/ui/web/src/pages/Forecasting.tsx<br/>
+                      • src/ui/web/src/services/forecastingAPI.ts<br/>
+                      • src/ui/web/src/services/trainingAPI.ts<br/>
                       • Real-time progress tracking<br/>
                       • Model performance visualization<br/>
                       • Training management interface
