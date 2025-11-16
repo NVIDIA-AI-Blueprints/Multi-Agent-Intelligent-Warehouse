@@ -661,9 +661,18 @@ class DocumentActionTools:
     def _serialize_processing_result(self, result: Dict[str, Any]) -> Dict[str, Any]:
         """Serialize processing result, converting PIL Images to metadata."""
         from PIL import Image
+        from dataclasses import asdict, is_dataclass
+        
+        # Handle dataclass objects (like JudgeEvaluation)
+        if is_dataclass(result):
+            result = asdict(result)
         
         if not isinstance(result, dict):
-            return result
+            # Try to convert to dict if it has __dict__ attribute
+            if hasattr(result, "__dict__"):
+                result = result.__dict__
+            else:
+                return result
         
         serialized = {}
         for key, value in result.items():
@@ -1320,7 +1329,7 @@ class DocumentActionTools:
                                 
                                 # Handle different validation result structures
                                 if isinstance(validation, dict):
-                                    # Check for overall_score directly
+                                    # Check for overall_score directly (this is the main field from JudgeEvaluation)
                                     quality = validation.get("overall_score", 0.0)
                                     
                                     # If not found, check for quality_score field
@@ -1343,12 +1352,18 @@ class DocumentActionTools:
                                                     quality = float(val)
                                                     break
                                     
+                                    logger.debug(f"Extracted quality score from validation dict: {quality} for doc {doc_id}")
+                                    
                                 elif hasattr(validation, "overall_score"):
-                                    # It's an object with overall_score attribute
+                                    # It's an object with overall_score attribute (JudgeEvaluation dataclass)
                                     quality = getattr(validation, "overall_score", 0.0)
+                                    logger.debug(f"Extracted quality score from validation object: {quality} for doc {doc_id}")
                                 elif hasattr(validation, "quality_score"):
                                     # It's an object with quality_score attribute
                                     quality = getattr(validation, "quality_score", 0.0)
+                                    logger.debug(f"Extracted quality score from validation object (quality_score): {quality} for doc {doc_id}")
+                                else:
+                                    logger.debug(f"Validation result for doc {doc_id} is not a dict or object with score attributes. Type: {type(validation)}")
                             
                             # If still no quality score found, try to get it from extraction data
                             if quality == 0.0:
