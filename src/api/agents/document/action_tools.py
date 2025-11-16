@@ -304,8 +304,18 @@ class DocumentActionTools:
         """Extract structured data from processed document."""
         try:
             logger.info(f"Extracting data from document: {document_id}")
+            
+            # Verify document exists in status tracking
+            if document_id not in self.document_statuses:
+                logger.error(f"Document {document_id} not found in status tracking")
+                return {
+                    "success": False,
+                    "message": f"Document {document_id} not found",
+                    "extracted_data": {},
+                }
 
             # In real implementation, this would query extraction results
+            # Always fetch fresh data for this specific document_id
             extraction_data = await self._get_extraction_data(document_id)
 
             return {
