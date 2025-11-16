@@ -1005,14 +1005,30 @@ const DocumentExtraction: React.FC = () => {
                     const extractedFields = structuredData?.extracted_fields || documentResults.extracted_data.extracted_fields || {};
                     
                     // Helper function to get field value with fallback
+                    // Handles both nested structure {field: {value: "...", confidence: 0.9}} and flat structure {field: "..."}
                     const getField = (fieldName: string, altNames: string[] = []) => {
                       const names = [fieldName, ...altNames];
                       for (const name of names) {
-                        const value = extractedFields[name] || extractedFields[name.toLowerCase()] || 
-                                     extractedFields[name.replace(/_/g, ' ')] ||
-                                     extractedFields[name.replace(/\s+/g, '_')];
-                        if (value && value !== 'N/A' && value !== '') {
-                          return value;
+                        // Try exact match first
+                        let fieldData = extractedFields[name] || 
+                                      extractedFields[name.toLowerCase()] || 
+                                      extractedFields[name.replace(/_/g, ' ')] ||
+                                      extractedFields[name.replace(/\s+/g, '_')];
+                        
+                        if (fieldData) {
+                          // If it's a nested object with 'value' key, extract the value
+                          if (typeof fieldData === 'object' && fieldData !== null && 'value' in fieldData) {
+                            const value = fieldData.value;
+                            if (value && value !== 'N/A' && value !== '') {
+                              return value;
+                            }
+                          }
+                          // If it's a string or number directly
+                          else if (typeof fieldData === 'string' || typeof fieldData === 'number') {
+                            if (fieldData !== 'N/A' && fieldData !== '') {
+                              return String(fieldData);
+                            }
+                          }
                         }
                       }
                       return 'N/A';
