@@ -669,10 +669,17 @@ class DocumentActionTools:
             if document_id in self.document_statuses:
                 self.document_statuses[document_id]["status"] = ProcessingStage.FAILED
                 self.document_statuses[document_id]["progress"] = 0
+                self.document_statuses[document_id]["current_stage"] = "Failed"
                 if error_message:
                     self.document_statuses[document_id]["error_message"] = error_message
+                # Mark all stages as failed
+                if "stages" in self.document_statuses[document_id]:
+                    for stage in self.document_statuses[document_id]["stages"]:
+                        if stage["status"] not in ["completed", "failed"]:
+                            stage["status"] = "failed"
+                            stage["error_message"] = error_message
                 self._save_status_data()
-                logger.info(f"Updated document {document_id} status to {status}")
+                logger.info(f"Updated document {document_id} status to FAILED: {error_message}")
             else:
                 logger.error(f"Document {document_id} not found for status update")
         except Exception as e:
