@@ -26,6 +26,7 @@ All notable changes to this project will be documented in this file.
 - **UI Feedback**: Added mock data warnings in document results dialog
 - **Dependency Management**: Added Pillow and PyMuPDF to requirements.txt for document processing
 - **Git Configuration**: Updated .gitignore to exclude uploaded files and cache directories
+- **NeMo Guardrails**: Enhanced compliance violation detection with additional pattern matching (100% test coverage)
 
 ### Bug Fixes
 
