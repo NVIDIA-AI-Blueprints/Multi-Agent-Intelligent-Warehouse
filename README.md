@@ -1,4 +1,4 @@
-# Warehouse Operational Assistant
+# Multi-Agent-Intelligent-Warehouse 
 *NVIDIA Blueprint–aligned multi-agent assistant for warehouse operations.*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -31,20 +31,22 @@
 
 ## Overview
 
-This repository implements a production-grade warehouse operational assistant patterned on NVIDIA's AI Blueprints, featuring:
+This repository implements a production-grade Multi-Agent-Intelligent-Warehouse patterned on NVIDIA's AI Blueprints, featuring:
 
-- **Multi-Agent AI System** - Planner/Router + Specialized Agents (Equipment, Operations, Safety)
-- **NVIDIA NeMo Integration** - Complete document processing pipeline with OCR and structured data extraction
-- **MCP Framework** - Model Context Protocol with dynamic tool discovery and execution
-- **Hybrid RAG Stack** - PostgreSQL/TimescaleDB + Milvus vector database
-- **Production-Grade Vector Search** - NV-EmbedQA-E5-v5 embeddings with GPU acceleration
-- **Real-Time Monitoring** - Equipment status, telemetry, and system health
-- **Enterprise Security** - JWT/OAuth2 + RBAC with comprehensive user management
-- **System Integrations** - WMS, ERP, IoT, RFID/Barcode, Time Attendance
+- **Multi-Agent AI System** - LangGraph-orchestrated Planner/Router + 5 Specialized Agents (Equipment, Operations, Safety, Forecasting, Document)
+- **NVIDIA NeMo Integration** - Complete document processing pipeline with OCR, structured data extraction, and vision models
+- **MCP Framework** - Model Context Protocol with dynamic tool discovery, execution, and adapter system
+- **Hybrid RAG Stack** - PostgreSQL/TimescaleDB + Milvus vector database with intelligent query routing (90%+ accuracy)
+- **Production-Grade Vector Search** - NV-EmbedQA-E5-v5 embeddings (1024-dim) with NVIDIA cuVS GPU acceleration (19x performance)
+- **AI-Powered Demand Forecasting** - Multi-model ensemble (XGBoost, Random Forest, Gradient Boosting, Ridge, SVR) with NVIDIA RAPIDS GPU acceleration
+- **Real-Time Monitoring** - Equipment status, telemetry, Prometheus metrics, Grafana dashboards, and system health
+- **Enterprise Security** - JWT/OAuth2 + RBAC with 5 user roles, NeMo Guardrails for content safety, and comprehensive user management
+- **System Integrations** - WMS (SAP EWM, Manhattan, Oracle), ERP (SAP ECC, Oracle), IoT sensors, RFID/Barcode scanners, Time Attendance systems
+- **Advanced Features** - Redis caching, conversation memory, evidence scoring, intelligent query classification, automated reorder recommendations, business intelligence dashboards
 
 ## System Architecture
 
-The Warehouse Operational Assistant follows a comprehensive multi-agent architecture designed for scalability, reliability, and intelligent decision-making. The system is structured into several logical layers that work together to provide real-time warehouse operations support.
+ Multi-Agent-Intelligent-Warehouse follows a comprehensive multi-agent architecture designed for scalability, reliability, and intelligent decision-making. The system is structured into several logical layers that work together to provide real-time warehouse operations support.
 
 ### **High-Level Architecture Overview**
 
@@ -55,10 +57,12 @@ The architecture consists of:
 1. **User/External Interaction Layer** - Entry point for users and external systems
 2. **Warehouse Operational Assistant** - Central orchestrator managing specialized AI agents
 3. **NVIDIA NeMo Agent Toolkit** - Framework for building and managing AI agents
-4. **Multi-Agent System** - Three specialized agents:
-   - **Inventory Agent** - Equipment assets, assignments, maintenance, and telemetry
-   - **Operations Agent** - Task planning and workflow management  
-   - **Safety Agent** - Safety monitoring and incident response
+4. **Multi-Agent System** - Five specialized agents:
+   - **Equipment & Asset Operations Agent** - Equipment assets, assignments, maintenance, and telemetry
+   - **Operations Coordination Agent** - Task planning and workflow management  
+   - **Safety & Compliance Agent** - Safety monitoring, incident response, and compliance tracking
+   - **Forecasting Agent** - Demand forecasting, reorder recommendations, and model performance monitoring
+   - **Document Processing Agent** - OCR, structured data extraction, and document management
 5. **API Services Layer** - Standardized interfaces for business logic and data access
 6. **Data Retrieval & Processing** - SQL, Vector, and Knowledge Graph retrievers
 7. **LLM Integration & Orchestration** - NVIDIA NIMs with LangGraph orchestration
@@ -131,7 +135,7 @@ The system emphasizes modular design, clear separation of concerns, and enterpri
 
 **Fully Working Features:**
 
-- Multi-agent AI system with 3 specialized agents (Equipment, Operations, Safety)
+- Multi-agent AI system with 5 specialized agents (Equipment, Operations, Safety, Forecasting, Document)
 - Equipment asset management and telemetry monitoring
 - Equipment assignments endpoint
 - Maintenance schedule tracking and management
