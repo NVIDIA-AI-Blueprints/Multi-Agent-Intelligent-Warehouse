@@ -270,7 +270,8 @@ After cleanup, verify:
 - ✅ scripts/tools/simple_migrate.py
 
 **Files Kept (Still Referenced):**
-- ⚠️ scripts/forecasting/rapids_forecasting_agent.py - Still referenced in Dockerfile.rapids and docs. Consider updating references to use rapids_gpu_forecasting.py
+- ⚠️ scripts/forecasting/rapids_forecasting_agent.py - Still referenced in some docs. Consider updating references to use rapids_gpu_forecasting.py
+- ✅ Dockerfile.rapids - Updated to use rapids_gpu_forecasting.py
 
 **Files Moved:** 1 file
 - ✅ scripts/create_model_tracking_tables.sql → scripts/setup/
@@ -279,9 +280,12 @@ After cleanup, verify:
 - ✅ scripts/tools/migrate.py - Duplicate of src/api/cli/migrate.py, removed
 - ✅ scripts/tools/simple_migrate.py - Not referenced, removed
 
-**Documentation to Update:** 4 files
-- README.md
-- DEPLOYMENT.md
-- docs/deployment/README.md
-- src/ui/web/src/pages/Documentation.tsx
+**Documentation Status:**
+- ✅ README.md - Already references correct paths
+- ✅ DEPLOYMENT.md - Already references correct paths
+- ✅ docs/deployment/README.md - Already references correct paths
+- ✅ src/ui/web/src/pages/Documentation.tsx - Already references correct paths
+- ✅ tests/FORECASTING_SUMMARY_CARDS_ASSESSMENT.md - Updated
+
+**Note:** All documentation already uses `scripts/setup/create_model_tracking_tables.sql` path, so no updates needed.
 

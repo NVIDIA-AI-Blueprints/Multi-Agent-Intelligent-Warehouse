@@ -10,7 +10,7 @@ WORKDIR /app
 RUN pip install asyncpg psycopg2-binary xgboost
 
 # Copy application files
-COPY scripts/rapids_forecasting_agent.py /app/
+COPY scripts/forecasting/rapids_gpu_forecasting.py /app/rapids_forecasting_agent.py
 COPY requirements.txt /app/
 
 # Install Python dependencies

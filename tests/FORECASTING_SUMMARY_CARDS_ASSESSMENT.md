@@ -186,7 +186,7 @@ The tables are created by `scripts/setup/create_model_tracking_tables.sql` but a
 4. **Training Integration**
    - Modify training scripts to write to database
    - Update `scripts/forecasting/phase3_advanced_forecasting.py`
-   - Update `scripts/forecasting/rapids_forecasting_agent.py`
+   - Update `scripts/forecasting/rapids_gpu_forecasting.py`
 
 ### Code Changes Needed
 

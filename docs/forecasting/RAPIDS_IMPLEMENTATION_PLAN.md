@@ -176,7 +176,7 @@ docker run --gpus all -it \
 pip install asyncpg psycopg2-binary xgboost
 ``` ### 3. Run Forecasting Agent
 ```bash
-python scripts/rapids_forecasting_agent.py
+python scripts/forecasting/rapids_gpu_forecasting.py
 ``` ### 4. Test API Endpoints
 ```bash
 # Test single SKU forecast

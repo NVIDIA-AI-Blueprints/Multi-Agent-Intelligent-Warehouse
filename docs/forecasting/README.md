@@ -70,7 +70,7 @@ pip install asyncpg psycopg2-binary xgboost
 python scripts/test_rapids_forecasting.py
 ``` ### 5. Run Forecasting Agent
 ```bash
-python scripts/rapids_forecasting_agent.py
+python scripts/forecasting/rapids_gpu_forecasting.py
 ```
 
 ## Configuration
@@ -96,7 +96,7 @@ class ForecastingConfig:
 
 ### Single SKU Forecast
 ```python
-from scripts.rapids_forecasting_agent import RAPIDSForecastingAgent
+from scripts.forecasting.rapids_gpu_forecasting import RAPIDSForecastingAgent
 
 agent = RAPIDSForecastingAgent()
 forecast = await agent.forecast_demand("LAY001", horizon_days=30)
@@ -131,7 +131,7 @@ python scripts/test_rapids_forecasting.py
 # Test with sample data
 python -c "
 import asyncio
-from scripts.rapids_forecasting_agent import RAPIDSForecastingAgent
+from scripts.forecasting.rapids_gpu_forecasting import RAPIDSForecastingAgent
 agent = RAPIDSForecastingAgent()
 asyncio.run(agent.run(['LAY001'], 7))
 "
@@ -186,7 +186,7 @@ python scripts/benchmark_forecasting.py
 ### Project Structure
 ```
 scripts/
-├── rapids_forecasting_agent.py    # Main forecasting agent
+├── rapids_gpu_forecasting.py      # Main GPU-accelerated forecasting agent
 ├── test_rapids_forecasting.py     # Test suite
 └── benchmark_forecasting.py       # Performance benchmarks
 
