@@ -435,7 +435,7 @@ The API will be available at:
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions.
 
-**Health Check**: http://localhost:8001/health
+**Health Check**: http://localhost:8001/api/v1/health
 
 ### Step 9: Start the Frontend
 
@@ -465,7 +465,7 @@ Test that everything is working:
 
 ```bash
 # Test API health endpoint
-curl http://localhost:8001/health
+curl http://localhost:8001/api/v1/health
 
 # Test version endpoint
 curl http://localhost:8001/api/v1/version
