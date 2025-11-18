@@ -380,6 +380,8 @@ class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = "default"
     context: Optional[Dict[str, Any]] = None
+    enable_reasoning: bool = False  # Enable advanced reasoning capability
+    reasoning_types: Optional[List[str]] = None  # Specific reasoning types to use
 
 
 class ChatResponse(BaseModel):
@@ -412,6 +414,9 @@ class ChatResponse(BaseModel):
     # MCP tool execution fields
     mcp_tools_used: Optional[List[str]] = None
     tool_execution_results: Optional[Dict[str, Any]] = None
+    # Reasoning fields
+    reasoning_chain: Optional[Dict[str, Any]] = None  # Complete reasoning chain
+    reasoning_steps: Optional[List[Dict[str, Any]]] = None  # Individual reasoning steps
 
 
 def _create_simple_fallback_response(message: str, session_id: str) -> ChatResponse:
@@ -530,11 +535,17 @@ async def chat(req: ChatRequest):
                 return _create_simple_fallback_response(req.message, req.session_id)
             
             # Create task with timeout protection
+            # Pass reasoning parameters to planner graph
+            planner_context = req.context or {}
+            planner_context["enable_reasoning"] = req.enable_reasoning
+            if req.reasoning_types:
+                planner_context["reasoning_types"] = req.reasoning_types
+            
             query_task = asyncio.create_task(
                 mcp_planner.process_warehouse_query(
                     message=req.message,
                     session_id=req.session_id or "default",
-                    context=req.context,
+                    context=planner_context,
                 )
             )
             
@@ -834,6 +845,20 @@ async def chat(req: ChatRequest):
         tool_execution_results = {}
         if result and result.get("context"):
             tool_execution_results = result.get("context", {}).get("tool_execution_results", {})
+        
+        # Extract reasoning chain if available
+        reasoning_chain = None
+        reasoning_steps = None
+        if result and result.get("context"):
+            context = result.get("context", {})
+            reasoning_chain = context.get("reasoning_chain")
+            reasoning_steps = context.get("reasoning_steps")
+            # Also check structured_response for reasoning data
+            if structured_response:
+                if "reasoning_chain" in structured_response:
+                    reasoning_chain = structured_response.get("reasoning_chain")
+                if "reasoning_steps" in structured_response:
+                    reasoning_steps = structured_response.get("reasoning_steps")
 
         # Extract confidence from multiple possible sources with sensible defaults
         # Priority: result.confidence > structured_response.confidence > agent_responses > default (0.75)
@@ -985,6 +1010,9 @@ async def chat(req: ChatRequest):
                 # MCP tool execution fields
                 mcp_tools_used=mcp_tools_used,
                 tool_execution_results=tool_execution_results,
+                # Reasoning fields
+                reasoning_chain=reasoning_chain,
+                reasoning_steps=reasoning_steps,
             )
         except Exception as response_error:
             logger.error(f"Error creating ChatResponse: {response_error}")

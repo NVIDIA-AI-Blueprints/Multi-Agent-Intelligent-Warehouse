@@ -20,6 +20,11 @@ from src.api.services.mcp.tool_discovery import (
     ToolCategory,
 )
 from src.api.services.mcp.base import MCPManager
+from src.api.services.reasoning import (
+    get_reasoning_engine,
+    ReasoningType,
+    ReasoningChain,
+)
 from .forecasting_action_tools import get_forecasting_action_tools
 
 logger = logging.getLogger(__name__)
@@ -49,6 +54,8 @@ class MCPForecastingResponse:
     actions_taken: List[Dict[str, Any]]
     mcp_tools_used: List[str] = None
     tool_execution_results: Dict[str, Any] = None
+    reasoning_chain: Optional[ReasoningChain] = None  # Advanced reasoning chain
+    reasoning_steps: Optional[List[Dict[str, Any]]] = None  # Individual reasoning steps
 
 
 class ForecastingAgent:
@@ -68,6 +75,7 @@ class ForecastingAgent:
         self.forecasting_tools = None
         self.mcp_manager = None
         self.tool_discovery = None
+        self.reasoning_engine = None
         self.conversation_context = {}
         self.mcp_tools_cache = {}
         self.tool_execution_history = []
@@ -85,6 +93,9 @@ class ForecastingAgent:
 
             # Start tool discovery
             await self.tool_discovery.start_discovery()
+
+            # Initialize reasoning engine
+            self.reasoning_engine = await get_reasoning_engine()
 
             # Register MCP sources
             await self._register_mcp_sources()
@@ -120,6 +131,8 @@ class ForecastingAgent:
         session_id: str = "default",
         context: Optional[Dict[str, Any]] = None,
         mcp_results: Optional[Any] = None,
+        enable_reasoning: bool = False,
+        reasoning_types: Optional[List[str]] = None,
     ) -> MCPForecastingResponse:
         """
         Process a forecasting query with MCP integration.
@@ -142,6 +155,37 @@ class ForecastingAgent:
             ):
                 await self.initialize()
 
+            # Step 1: Advanced Reasoning Analysis (if enabled and query is complex)
+            reasoning_chain = None
+            if enable_reasoning and self.reasoning_engine and self._is_complex_query(query):
+                try:
+                    # Convert string reasoning types to ReasoningType enum if provided
+                    reasoning_type_enums = None
+                    if reasoning_types:
+                        reasoning_type_enums = []
+                        for rt_str in reasoning_types:
+                            try:
+                                rt_enum = ReasoningType(rt_str)
+                                reasoning_type_enums.append(rt_enum)
+                            except ValueError:
+                                logger.warning(f"Invalid reasoning type: {rt_str}, skipping")
+                    
+                    # Determine reasoning types if not provided
+                    if reasoning_type_enums is None:
+                        reasoning_type_enums = self._determine_reasoning_types(query, context)
+
+                    reasoning_chain = await self.reasoning_engine.process_with_reasoning(
+                        query=query,
+                        context=context or {},
+                        reasoning_types=reasoning_type_enums,
+                        session_id=session_id,
+                    )
+                    logger.info(f"Advanced reasoning completed: {len(reasoning_chain.steps)} steps")
+                except Exception as e:
+                    logger.warning(f"Advanced reasoning failed, continuing with standard processing: {e}")
+            else:
+                logger.info("Skipping advanced reasoning for simple query or reasoning disabled")
+
             # Parse query to extract intent and entities
             parsed_query = await self._parse_query(query, context)
 
@@ -153,9 +197,9 @@ class ForecastingAgent:
                 parsed_query, available_tools
             )
 
-            # Generate natural language response
+            # Generate natural language response (include reasoning chain)
             response = await self._generate_response(
-                query, parsed_query, tool_results, context
+                query, parsed_query, tool_results, context, reasoning_chain
             )
 
             return response
@@ -393,6 +437,7 @@ Return only valid JSON.""",
         parsed_query: MCPForecastingQuery,
         tool_results: Dict[str, Any],
         context: Optional[Dict[str, Any]],
+        reasoning_chain: Optional[ReasoningChain] = None,
     ) -> MCPForecastingResponse:
         """Generate natural language response from tool results."""
         try:
@@ -438,6 +483,20 @@ Generate a natural language response:""",
             # Calculate confidence based on data availability
             confidence = 0.8 if tool_results and "error" not in tool_results else 0.3
 
+            # Convert reasoning chain to dict for response
+            reasoning_steps = None
+            if reasoning_chain:
+                reasoning_steps = [
+                    {
+                        "step_id": step.step_id,
+                        "step_type": step.step_type,
+                        "description": step.description,
+                        "reasoning": step.reasoning,
+                        "confidence": step.confidence,
+                    }
+                    for step in reasoning_chain.steps
+                ]
+
             return MCPForecastingResponse(
                 response_type=parsed_query.intent,
                 data=tool_results,
@@ -447,6 +506,8 @@ Generate a natural language response:""",
                 actions_taken=parsed_query.tool_execution_plan or [],
                 mcp_tools_used=[tool.name for tool in await self._discover_tools(parsed_query)],
                 tool_execution_results=tool_results,
+                reasoning_chain=reasoning_chain,
+                reasoning_steps=reasoning_steps,
             )
 
         except Exception as e:
@@ -458,7 +519,126 @@ Generate a natural language response:""",
                 recommendations=[],
                 confidence=0.0,
                 actions_taken=[],
+                mcp_tools_used=[],
+                tool_execution_results={},
+                reasoning_chain=None,
+                reasoning_steps=None,
             )
+
+
+    def _is_complex_query(self, query: str) -> bool:
+        """Determine if a query is complex enough to require reasoning."""
+        query_lower = query.lower()
+        complex_keywords = [
+            "analyze",
+            "compare",
+            "relationship",
+            "why",
+            "how",
+            "explain",
+            "investigate",
+            "evaluate",
+            "optimize",
+            "improve",
+            "what if",
+            "scenario",
+            "pattern",
+            "trend",
+            "cause",
+            "effect",
+            "because",
+            "result",
+            "consequence",
+            "due to",
+            "leads to",
+            "recommendation",
+            "suggestion",
+            "strategy",
+            "plan",
+            "alternative",
+            "option",
+        ]
+        return any(keyword in query_lower for keyword in complex_keywords)
+    
+    def _determine_reasoning_types(
+        self, query: str, context: Optional[Dict[str, Any]]
+    ) -> List[ReasoningType]:
+        """Determine appropriate reasoning types based on query complexity and context."""
+        reasoning_types = [ReasoningType.CHAIN_OF_THOUGHT]  # Always include chain-of-thought
+        
+        query_lower = query.lower()
+        
+        # Multi-hop reasoning for complex queries
+        if any(
+            keyword in query_lower
+            for keyword in [
+                "analyze",
+                "compare",
+                "relationship",
+                "connection",
+                "across",
+                "multiple",
+            ]
+        ):
+            reasoning_types.append(ReasoningType.MULTI_HOP)
+        
+        # Scenario analysis for what-if questions (very important for forecasting)
+        if any(
+            keyword in query_lower
+            for keyword in [
+                "what if",
+                "scenario",
+                "alternative",
+                "option",
+                "if",
+                "when",
+                "suppose",
+            ]
+        ):
+            reasoning_types.append(ReasoningType.SCENARIO_ANALYSIS)
+        
+        # Causal reasoning for cause-effect questions
+        if any(
+            keyword in query_lower
+            for keyword in [
+                "why",
+                "cause",
+                "effect",
+                "because",
+                "result",
+                "consequence",
+                "due to",
+                "leads to",
+            ]
+        ):
+            reasoning_types.append(ReasoningType.CAUSAL)
+        
+        # Pattern recognition for learning queries (very important for forecasting)
+        if any(
+            keyword in query_lower
+            for keyword in [
+                "pattern",
+                "trend",
+                "learn",
+                "insight",
+                "recommendation",
+                "optimize",
+                "improve",
+            ]
+        ):
+            reasoning_types.append(ReasoningType.PATTERN_RECOGNITION)
+        
+        # For forecasting queries, always include scenario analysis and pattern recognition
+        if any(
+            keyword in query_lower
+            for keyword in ["forecast", "prediction", "trend", "demand", "sales"]
+        ):
+            if ReasoningType.SCENARIO_ANALYSIS not in reasoning_types:
+                reasoning_types.append(ReasoningType.SCENARIO_ANALYSIS)
+            if ReasoningType.PATTERN_RECOGNITION not in reasoning_types:
+                reasoning_types.append(ReasoningType.PATTERN_RECOGNITION)
+        
+        return reasoning_types
 
 
 # Global instance

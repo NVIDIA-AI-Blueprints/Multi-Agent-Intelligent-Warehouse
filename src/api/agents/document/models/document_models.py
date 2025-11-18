@@ -294,6 +294,8 @@ class DocumentResponse(BaseModel):
     processing_status: Optional[DocumentStatus] = Field(
         None, description="Processing status if applicable"
     )
+    reasoning_chain: Optional[Dict[str, Any]] = Field(None, description="Advanced reasoning chain")
+    reasoning_steps: Optional[List[Dict[str, Any]]] = Field(None, description="Individual reasoning steps")
 
 
 # Error Models

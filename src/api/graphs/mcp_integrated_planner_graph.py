@@ -14,6 +14,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langchain_core.tools import tool
+from dataclasses import asdict
 import logging
 import asyncio
 import threading
@@ -40,6 +41,9 @@ class MCPWarehouseState(TypedDict):
     mcp_results: Optional[Any]  # MCP execution results
     tool_execution_plan: Optional[List[Dict[str, Any]]]  # Planned tool executions
     available_tools: Optional[List[Dict[str, Any]]]  # Available MCP tools
+    enable_reasoning: bool  # Enable advanced reasoning
+    reasoning_types: Optional[List[str]]  # Specific reasoning types to use
+    reasoning_chain: Optional[Dict[str, Any]]  # Reasoning chain from agents
 
 
 class MCPIntentClassifier:
@@ -697,12 +701,18 @@ class MCPPlannerGraph:
             # Get MCP equipment agent
             mcp_equipment_agent = await get_mcp_equipment_agent()
 
+            # Extract reasoning parameters from state
+            enable_reasoning = state.get("enable_reasoning", False)
+            reasoning_types = state.get("reasoning_types")
+            
             # Process with MCP equipment agent
             response = await mcp_equipment_agent.process_query(
                 query=message_text,
                 session_id=session_id,
                 context=state.get("context", {}),
                 mcp_results=state.get("mcp_results"),
+                enable_reasoning=enable_reasoning,
+                reasoning_types=reasoning_types,
             )
 
             # Store the response
@@ -715,6 +725,8 @@ class MCPPlannerGraph:
                 "mcp_tools_used": response.mcp_tools_used or [],
                 "tool_execution_results": response.tool_execution_results or {},
                 "actions_taken": response.actions_taken or [],
+                "reasoning_chain": response.reasoning_chain,
+                "reasoning_steps": response.reasoning_steps,
             }
 
             logger.info(
@@ -761,16 +773,37 @@ class MCPPlannerGraph:
             # Get MCP operations agent
             mcp_operations_agent = await get_mcp_operations_agent()
 
+            # Extract reasoning parameters from state
+            enable_reasoning = state.get("enable_reasoning", False)
+            reasoning_types = state.get("reasoning_types")
+            
             # Process with MCP operations agent
             response = await mcp_operations_agent.process_query(
                 query=message_text,
                 session_id=session_id,
                 context=state.get("context", {}),
                 mcp_results=state.get("mcp_results"),
+                enable_reasoning=enable_reasoning,
+                reasoning_types=reasoning_types,
             )
 
-            # Store the response
-            state["agent_responses"]["operations"] = response
+            # Store the response (handle both dict and object responses)
+            if isinstance(response, dict):
+                state["agent_responses"]["operations"] = response
+            else:
+                # Convert response object to dict
+                state["agent_responses"]["operations"] = {
+                    "natural_language": response.natural_language if hasattr(response, "natural_language") else str(response),
+                    "data": response.data if hasattr(response, "data") else {},
+                    "recommendations": response.recommendations if hasattr(response, "recommendations") else [],
+                    "confidence": response.confidence if hasattr(response, "confidence") else 0.0,
+                    "response_type": response.response_type if hasattr(response, "response_type") else "operations_info",
+                    "mcp_tools_used": response.mcp_tools_used or [] if hasattr(response, "mcp_tools_used") else [],
+                    "tool_execution_results": response.tool_execution_results or {} if hasattr(response, "tool_execution_results") else {},
+                    "actions_taken": response.actions_taken or [] if hasattr(response, "actions_taken") else [],
+                    "reasoning_chain": response.reasoning_chain if hasattr(response, "reasoning_chain") else None,
+                    "reasoning_steps": response.reasoning_steps if hasattr(response, "reasoning_steps") else None,
+                }
 
             logger.info(
                 f"MCP Operations agent processed request with confidence: {response.confidence}"
@@ -812,16 +845,37 @@ class MCPPlannerGraph:
             # Get MCP safety agent
             mcp_safety_agent = await get_mcp_safety_agent()
 
+            # Extract reasoning parameters from state
+            enable_reasoning = state.get("enable_reasoning", False)
+            reasoning_types = state.get("reasoning_types")
+            
             # Process with MCP safety agent
             response = await mcp_safety_agent.process_query(
                 query=message_text,
                 session_id=session_id,
                 context=state.get("context", {}),
                 mcp_results=state.get("mcp_results"),
+                enable_reasoning=enable_reasoning,
+                reasoning_types=reasoning_types,
             )
 
-            # Store the response
-            state["agent_responses"]["safety"] = response
+            # Store the response (handle both dict and object responses)
+            if isinstance(response, dict):
+                state["agent_responses"]["safety"] = response
+            else:
+                # Convert response object to dict
+                state["agent_responses"]["safety"] = {
+                    "natural_language": response.natural_language if hasattr(response, "natural_language") else str(response),
+                    "data": response.data if hasattr(response, "data") else {},
+                    "recommendations": response.recommendations if hasattr(response, "recommendations") else [],
+                    "confidence": response.confidence if hasattr(response, "confidence") else 0.0,
+                    "response_type": response.response_type if hasattr(response, "response_type") else "safety_info",
+                    "mcp_tools_used": response.mcp_tools_used or [] if hasattr(response, "mcp_tools_used") else [],
+                    "tool_execution_results": response.tool_execution_results or {} if hasattr(response, "tool_execution_results") else {},
+                    "actions_taken": response.actions_taken or [] if hasattr(response, "actions_taken") else [],
+                    "reasoning_chain": response.reasoning_chain if hasattr(response, "reasoning_chain") else None,
+                    "reasoning_steps": response.reasoning_steps if hasattr(response, "reasoning_steps") else None,
+                }
 
             logger.info(
                 f"MCP Safety agent processed request with confidence: {response.confidence}"
@@ -865,12 +919,18 @@ class MCPPlannerGraph:
             # Get MCP forecasting agent
             forecasting_agent = await get_forecasting_agent()
 
+            # Extract reasoning parameters from state
+            enable_reasoning = state.get("enable_reasoning", False)
+            reasoning_types = state.get("reasoning_types")
+            
             # Process with MCP forecasting agent
             response = await forecasting_agent.process_query(
                 query=message_text,
                 session_id=session_id,
                 context=state.get("context", {}),
                 mcp_results=state.get("mcp_results"),
+                enable_reasoning=enable_reasoning,
+                reasoning_types=reasoning_types,
             )
 
             # Store the response
@@ -883,6 +943,8 @@ class MCPPlannerGraph:
                 "mcp_tools_used": response.mcp_tools_used or [],
                 "tool_execution_results": response.tool_execution_results or {},
                 "actions_taken": response.actions_taken or [],
+                "reasoning_chain": response.reasoning_chain,
+                "reasoning_steps": response.reasoning_steps,
             }
 
             logger.info(
@@ -926,23 +988,37 @@ class MCPPlannerGraph:
                 # Get document agent
                 document_agent = await get_mcp_document_agent()
 
+                # Extract reasoning parameters from state
+                enable_reasoning = state.get("enable_reasoning", False)
+                reasoning_types = state.get("reasoning_types")
+                
                 # Process query
                 response = await document_agent.process_query(
                     query=message_text,
                     session_id=state.get("session_id", "default"),
                     context=state.get("context", {}),
                     mcp_results=state.get("mcp_results"),
+                    enable_reasoning=enable_reasoning,
+                    reasoning_types=reasoning_types,
                 )
 
-                # Convert response to string
+                # Store response with reasoning chain
                 if hasattr(response, "natural_language"):
                     response_text = response.natural_language
+                    # Store as dict with reasoning chain
+                    state["agent_responses"]["document"] = {
+                        "natural_language": response.natural_language,
+                        "data": response.data if hasattr(response, "data") else {},
+                        "recommendations": response.recommendations if hasattr(response, "recommendations") else [],
+                        "confidence": response.confidence if hasattr(response, "confidence") else 0.0,
+                        "response_type": response.response_type if hasattr(response, "response_type") else "document_info",
+                        "actions_taken": response.actions_taken if hasattr(response, "actions_taken") else [],
+                        "reasoning_chain": response.reasoning_chain if hasattr(response, "reasoning_chain") else None,
+                        "reasoning_steps": response.reasoning_steps if hasattr(response, "reasoning_steps") else None,
+                    }
                 else:
                     response_text = str(response)
-
-                state["agent_responses"][
-                    "document"
-                ] = f"[MCP DOCUMENT AGENT] {response_text}"
+                    state["agent_responses"]["document"] = f"[MCP DOCUMENT AGENT] {response_text}"
                 logger.info("MCP Document agent processed request")
 
             except Exception as e:
@@ -1042,6 +1118,18 @@ class MCPPlannerGraph:
                         state["context"]["tool_execution_results"] = (
                             agent_response_dict["tool_execution_results"]
                         )
+                    
+                    # Add reasoning chain to context if available
+                    if "reasoning_chain" in agent_response_dict:
+                        reasoning_chain = agent_response_dict["reasoning_chain"]
+                        state["context"]["reasoning_chain"] = reasoning_chain
+                        state["reasoning_chain"] = reasoning_chain
+                        # Convert ReasoningChain to dict if needed
+                        if hasattr(reasoning_chain, "__dict__"):
+                            state["context"]["reasoning_chain"] = asdict(reasoning_chain) if hasattr(reasoning_chain, "__dict__") else reasoning_chain
+                    if "reasoning_steps" in agent_response_dict:
+                        reasoning_steps = agent_response_dict["reasoning_steps"]
+                        state["context"]["reasoning_steps"] = reasoning_steps
 
                 elif (
                     isinstance(agent_response, dict)
@@ -1060,6 +1148,15 @@ class MCPPlannerGraph:
                         state["context"]["tool_execution_results"] = agent_response[
                             "tool_execution_results"
                         ]
+                    
+                    # Add reasoning chain to context if available
+                    if "reasoning_chain" in agent_response:
+                        reasoning_chain = agent_response["reasoning_chain"]
+                        state["context"]["reasoning_chain"] = reasoning_chain
+                        state["reasoning_chain"] = reasoning_chain
+                    if "reasoning_steps" in agent_response:
+                        reasoning_steps = agent_response["reasoning_steps"]
+                        state["context"]["reasoning_steps"] = reasoning_steps
                 else:
                     # Handle legacy string response format
                     final_response = str(agent_response)
@@ -1121,6 +1218,10 @@ class MCPPlannerGraph:
                 return self._create_fallback_response(message, session_id)
 
             # Initialize state
+            # Extract reasoning parameters from context
+            enable_reasoning = context.get("enable_reasoning", False) if context else False
+            reasoning_types = context.get("reasoning_types") if context else None
+            
             initial_state = MCPWarehouseState(
                 messages=[HumanMessage(content=message)],
                 user_intent=None,
@@ -1132,6 +1233,9 @@ class MCPPlannerGraph:
                 mcp_results=None,
                 tool_execution_plan=None,
                 available_tools=None,
+                enable_reasoning=enable_reasoning,
+                reasoning_types=reasoning_types,
+                reasoning_chain=None,
             )
 
             # Run the graph asynchronously with timeout

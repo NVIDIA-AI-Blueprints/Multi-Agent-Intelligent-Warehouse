@@ -21,6 +21,11 @@ from src.api.services.mcp.tool_discovery import (
     ToolCategory,
 )
 from src.api.services.mcp.base import MCPManager
+from src.api.services.reasoning import (
+    get_reasoning_engine,
+    ReasoningType,
+    ReasoningChain,
+)
 from .action_tools import get_safety_action_tools
 
 logger = logging.getLogger(__name__)
@@ -50,6 +55,8 @@ class MCPSafetyResponse:
     actions_taken: List[Dict[str, Any]]
     mcp_tools_used: List[str] = None
     tool_execution_results: Dict[str, Any] = None
+    reasoning_chain: Optional[ReasoningChain] = None  # Advanced reasoning chain
+    reasoning_steps: Optional[List[Dict[str, Any]]] = None  # Individual reasoning steps
 
 
 class MCPSafetyComplianceAgent:
@@ -69,6 +76,7 @@ class MCPSafetyComplianceAgent:
         self.safety_tools = None
         self.mcp_manager = None
         self.tool_discovery = None
+        self.reasoning_engine = None
         self.conversation_context = {}
         self.mcp_tools_cache = {}
         self.tool_execution_history = []
@@ -86,6 +94,9 @@ class MCPSafetyComplianceAgent:
 
             # Start tool discovery
             await self.tool_discovery.start_discovery()
+
+            # Initialize reasoning engine
+            self.reasoning_engine = await get_reasoning_engine()
 
             # Register MCP sources
             await self._register_mcp_sources()
@@ -121,6 +132,8 @@ class MCPSafetyComplianceAgent:
         session_id: str = "default",
         context: Optional[Dict[str, Any]] = None,
         mcp_results: Optional[Any] = None,
+        enable_reasoning: bool = False,
+        reasoning_types: Optional[List[str]] = None,
     ) -> MCPSafetyResponse:
         """
         Process a safety and compliance query with MCP integration.
@@ -151,6 +164,37 @@ class MCPSafetyComplianceAgent:
                     "context": {},
                 }
 
+            # Step 1: Advanced Reasoning Analysis (if enabled and query is complex)
+            reasoning_chain = None
+            if enable_reasoning and self.reasoning_engine and self._is_complex_query(query):
+                try:
+                    # Convert string reasoning types to ReasoningType enum if provided
+                    reasoning_type_enums = None
+                    if reasoning_types:
+                        reasoning_type_enums = []
+                        for rt_str in reasoning_types:
+                            try:
+                                rt_enum = ReasoningType(rt_str)
+                                reasoning_type_enums.append(rt_enum)
+                            except ValueError:
+                                logger.warning(f"Invalid reasoning type: {rt_str}, skipping")
+                    
+                    # Determine reasoning types if not provided
+                    if reasoning_type_enums is None:
+                        reasoning_type_enums = self._determine_reasoning_types(query, context)
+
+                    reasoning_chain = await self.reasoning_engine.process_with_reasoning(
+                        query=query,
+                        context=context or {},
+                        reasoning_types=reasoning_type_enums,
+                        session_id=session_id,
+                    )
+                    logger.info(f"Advanced reasoning completed: {len(reasoning_chain.steps)} steps")
+                except Exception as e:
+                    logger.warning(f"Advanced reasoning failed, continuing with standard processing: {e}")
+            else:
+                logger.info("Skipping advanced reasoning for simple query or reasoning disabled")
+
             # Parse query and identify intent
             parsed_query = await self._parse_safety_query(query, context)
 
@@ -176,9 +220,9 @@ class MCPSafetyComplianceAgent:
                 # Execute tools and gather results
                 tool_results = await self._execute_tool_plan(execution_plan)
 
-            # Generate response using LLM with tool results
+            # Generate response using LLM with tool results (include reasoning chain)
             response = await self._generate_response_with_tools(
-                parsed_query, tool_results
+                parsed_query, tool_results, reasoning_chain
             )
 
             # Update conversation context
@@ -200,6 +244,8 @@ class MCPSafetyComplianceAgent:
                 actions_taken=[],
                 mcp_tools_used=[],
                 tool_execution_results={},
+                reasoning_chain=None,
+                reasoning_steps=None,
             )
 
     async def _parse_safety_query(
@@ -477,7 +523,7 @@ Return only valid JSON.""",
         return results
 
     async def _generate_response_with_tools(
-        self, query: MCPSafetyQuery, tool_results: Dict[str, Any]
+        self, query: MCPSafetyQuery, tool_results: Dict[str, Any], reasoning_chain: Optional[ReasoningChain] = None
     ) -> MCPSafetyResponse:
         """Generate response using LLM with tool execution results."""
         try:
@@ -564,6 +610,20 @@ Failed Tool Executions:
                     ],
                 }
 
+            # Convert reasoning chain to dict for response
+            reasoning_steps = None
+            if reasoning_chain:
+                reasoning_steps = [
+                    {
+                        "step_id": step.step_id,
+                        "step_type": step.step_type,
+                        "description": step.description,
+                        "reasoning": step.reasoning,
+                        "confidence": step.confidence,
+                    }
+                    for step in reasoning_chain.steps
+                ]
+            
             return MCPSafetyResponse(
                 response_type=response_data.get("response_type", "safety_info"),
                 data=response_data.get("data", {}),
@@ -573,6 +633,8 @@ Failed Tool Executions:
                 actions_taken=response_data.get("actions_taken", []),
                 mcp_tools_used=list(successful_results.keys()),
                 tool_execution_results=tool_results,
+                reasoning_chain=reasoning_chain,
+                reasoning_steps=reasoning_steps,
             )
 
         except Exception as e:
@@ -586,6 +648,8 @@ Failed Tool Executions:
                 actions_taken=[],
                 mcp_tools_used=[],
                 tool_execution_results=tool_results,
+                reasoning_chain=None,
+                reasoning_steps=None,
             )
 
     async def get_available_tools(self) -> List[DiscoveredTool]:
@@ -626,6 +690,118 @@ Failed Tool Executions:
                 else None
             ),
         }
+    
+    def _is_complex_query(self, query: str) -> bool:
+        """Determine if a query is complex enough to require reasoning."""
+        query_lower = query.lower()
+        complex_keywords = [
+            "analyze",
+            "compare",
+            "relationship",
+            "why",
+            "how",
+            "explain",
+            "investigate",
+            "evaluate",
+            "optimize",
+            "improve",
+            "what if",
+            "scenario",
+            "pattern",
+            "trend",
+            "cause",
+            "effect",
+            "because",
+            "result",
+            "consequence",
+            "due to",
+            "leads to",
+            "recommendation",
+            "suggestion",
+            "strategy",
+            "plan",
+            "alternative",
+            "option",
+        ]
+        return any(keyword in query_lower for keyword in complex_keywords)
+    
+    def _determine_reasoning_types(
+        self, query: str, context: Optional[Dict[str, Any]]
+    ) -> List[ReasoningType]:
+        """Determine appropriate reasoning types based on query complexity and context."""
+        reasoning_types = [ReasoningType.CHAIN_OF_THOUGHT]  # Always include chain-of-thought
+        
+        query_lower = query.lower()
+        
+        # Multi-hop reasoning for complex queries
+        if any(
+            keyword in query_lower
+            for keyword in [
+                "analyze",
+                "compare",
+                "relationship",
+                "connection",
+                "across",
+                "multiple",
+            ]
+        ):
+            reasoning_types.append(ReasoningType.MULTI_HOP)
+        
+        # Scenario analysis for what-if questions
+        if any(
+            keyword in query_lower
+            for keyword in [
+                "what if",
+                "scenario",
+                "alternative",
+                "option",
+                "if",
+                "when",
+                "suppose",
+            ]
+        ):
+            reasoning_types.append(ReasoningType.SCENARIO_ANALYSIS)
+        
+        # Causal reasoning for cause-effect questions (very important for safety)
+        if any(
+            keyword in query_lower
+            for keyword in [
+                "why",
+                "cause",
+                "effect",
+                "because",
+                "result",
+                "consequence",
+                "due to",
+                "leads to",
+            ]
+        ):
+            reasoning_types.append(ReasoningType.CAUSAL)
+        
+        # Pattern recognition for learning queries
+        if any(
+            keyword in query_lower
+            for keyword in [
+                "pattern",
+                "trend",
+                "learn",
+                "insight",
+                "recommendation",
+                "optimize",
+                "improve",
+            ]
+        ):
+            reasoning_types.append(ReasoningType.PATTERN_RECOGNITION)
+        
+        # For safety queries, always include causal reasoning
+        if any(
+            keyword in query_lower
+            for keyword in ["safety", "incident", "hazard", "risk", "compliance", "accident"]
+        ):
+            if ReasoningType.CAUSAL not in reasoning_types:
+                reasoning_types.append(ReasoningType.CAUSAL)
+        
+        return reasoning_types
 
 
 # Global MCP safety agent instance

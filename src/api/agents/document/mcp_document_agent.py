@@ -18,6 +18,11 @@ from src.api.services.mcp.tool_discovery import (
     ToolCategory,
 )
 from src.api.services.mcp.base import MCPManager
+from src.api.services.reasoning import (
+    get_reasoning_engine,
+    ReasoningType,
+    ReasoningChain,
+)
 from src.api.agents.document.models.document_models import (
     DocumentResponse,
     DocumentUpload,
@@ -67,6 +72,7 @@ class MCPDocumentExtractionAgent:
         self.document_tools = None
         self.mcp_manager = None
         self.tool_discovery = None
+        self.reasoning_engine = None
         self.conversation_context = {}
         self.mcp_tools_cache = {}
         self.tool_execution_history = []
@@ -119,6 +125,9 @@ class MCPDocumentExtractionAgent:
             # Start tool discovery
             await self.tool_discovery.start_discovery()
 
+            # Initialize reasoning engine
+            self.reasoning_engine = await get_reasoning_engine()
+
             # Register MCP sources
             await self._register_mcp_sources()
 
@@ -145,28 +154,87 @@ class MCPDocumentExtractionAgent:
         session_id: str,
         context: Optional[Dict] = None,
         mcp_results: Optional[Any] = None,
+        enable_reasoning: bool = False,
+        reasoning_types: Optional[List[str]] = None,
     ) -> DocumentResponse:
         """Process document-related queries through MCP framework."""
         try:
             logger.info(f"Processing document query: {query[:100]}...")
 
+            # Step 1: Advanced Reasoning Analysis (if enabled and query is complex)
+            reasoning_chain = None
+            if enable_reasoning and self.reasoning_engine and self._is_complex_query(query):
+                try:
+                    # Convert string reasoning types to ReasoningType enum if provided
+                    reasoning_type_enums = None
+                    if reasoning_types:
+                        reasoning_type_enums = []
+                        for rt_str in reasoning_types:
+                            try:
+                                rt_enum = ReasoningType(rt_str)
+                                reasoning_type_enums.append(rt_enum)
+                            except ValueError:
+                                logger.warning(f"Invalid reasoning type: {rt_str}, skipping")
+                    
+                    # Determine reasoning types if not provided
+                    if reasoning_type_enums is None:
+                        reasoning_type_enums = self._determine_reasoning_types(query, context)
+
+                    reasoning_chain = await self.reasoning_engine.process_with_reasoning(
+                        query=query,
+                        context=context or {},
+                        reasoning_types=reasoning_type_enums,
+                        session_id=session_id,
+                    )
+                    logger.info(f"Advanced reasoning completed: {len(reasoning_chain.steps)} steps")
+                except Exception as e:
+                    logger.warning(f"Advanced reasoning failed, continuing with standard processing: {e}")
+            else:
+                logger.info("Skipping advanced reasoning for simple query or reasoning disabled")
+
             # Intent classification for document queries
             intent = await self._classify_document_intent(query)
             logger.info(f"Document intent classified as: {intent}")
 
-            # Route to appropriate document processing
+            # Route to appropriate document processing (pass reasoning_chain)
             if intent == "document_upload":
-                return await self._handle_document_upload(query, context)
+                response = await self._handle_document_upload(query, context)
             elif intent == "document_status":
-                return await self._handle_document_status(query, context)
+                response = await self._handle_document_status(query, context)
             elif intent == "document_search":
-                return await self._handle_document_search(query, context)
+                response = await self._handle_document_search(query, context)
             elif intent == "document_validation":
-                return await self._handle_document_validation(query, context)
+                response = await self._handle_document_validation(query, context)
             elif intent == "document_analytics":
-                return await self._handle_document_analytics(query, context)
+                response = await self._handle_document_analytics(query, context)
             else:
-                return await self._handle_general_document_query(query, context)
+                response = await self._handle_general_document_query(query, context)
+            
+            # Add reasoning chain to response if available
+            if reasoning_chain:
+                # Convert ReasoningChain to dict for response
+                from dataclasses import asdict
+                reasoning_steps = [
+                    {
+                        "step_id": step.step_id,
+                        "step_type": step.step_type,
+                        "description": step.description,
+                        "reasoning": step.reasoning,
+                        "confidence": step.confidence,
+                    }
+                    for step in reasoning_chain.steps
+                ]
+                # Update response with reasoning data
+                if hasattr(response, "dict"):
+                    response_dict = response.dict()
+                else:
+                    response_dict = response.__dict__ if hasattr(response, "__dict__") else {}
+                response_dict["reasoning_chain"] = asdict(reasoning_chain) if hasattr(reasoning_chain, "__dict__") else reasoning_chain
+                response_dict["reasoning_steps"] = reasoning_steps
+                # Create new response with reasoning data
+                response = DocumentResponse(**response_dict)
+            
+            return response
 
         except Exception as e:
             logger.error(f"Document agent processing failed: {e}")
@@ -179,6 +247,8 @@ class MCPDocumentExtractionAgent:
                 ],
                 confidence=0.0,
                 actions_taken=[],
+                reasoning_chain=None,
+                reasoning_steps=None,
             )
 
     async def _classify_document_intent(self, query: str) -> str:
@@ -575,6 +645,118 @@ class MCPDocumentExtractionAgent:
             document_type = "purchase_order"
 
         return {"document_type": document_type, "query": query}
+
+    def _is_complex_query(self, query: str) -> bool:
+        """Determine if a query is complex enough to require reasoning."""
+        query_lower = query.lower()
+        complex_keywords = [
+            "analyze",
+            "compare",
+            "relationship",
+            "why",
+            "how",
+            "explain",
+            "investigate",
+            "evaluate",
+            "optimize",
+            "improve",
+            "what if",
+            "scenario",
+            "pattern",
+            "trend",
+            "cause",
+            "effect",
+            "because",
+            "result",
+            "consequence",
+            "due to",
+            "leads to",
+            "recommendation",
+            "suggestion",
+            "strategy",
+            "plan",
+            "alternative",
+            "option",
+        ]
+        return any(keyword in query_lower for keyword in complex_keywords)
+    
+    def _determine_reasoning_types(
+        self, query: str, context: Optional[Dict[str, Any]]
+    ) -> List[ReasoningType]:
+        """Determine appropriate reasoning types based on query complexity and context."""
+        reasoning_types = [ReasoningType.CHAIN_OF_THOUGHT]  # Always include chain-of-thought
+        
+        query_lower = query.lower()
+        
+        # Multi-hop reasoning for complex queries
+        if any(
+            keyword in query_lower
+            for keyword in [
+                "analyze",
+                "compare",
+                "relationship",
+                "connection",
+                "across",
+                "multiple",
+            ]
+        ):
+            reasoning_types.append(ReasoningType.MULTI_HOP)
+        
+        # Scenario analysis for what-if questions
+        if any(
+            keyword in query_lower
+            for keyword in [
+                "what if",
+                "scenario",
+                "alternative",
+                "option",
+                "if",
+                "when",
+                "suppose",
+            ]
+        ):
+            reasoning_types.append(ReasoningType.SCENARIO_ANALYSIS)
+        
+        # Causal reasoning for cause-effect questions (important for document analysis)
+        if any(
+            keyword in query_lower
+            for keyword in [
+                "why",
+                "cause",
+                "effect",
+                "because",
+                "result",
+                "consequence",
+                "due to",
+                "leads to",
+            ]
+        ):
+            reasoning_types.append(ReasoningType.CAUSAL)
+        
+        # Pattern recognition for learning queries
+        if any(
+            keyword in query_lower
+            for keyword in [
+                "pattern",
+                "trend",
+                "learn",
+                "insight",
+                "recommendation",
+                "optimize",
+                "improve",
+            ]
+        ):
+            reasoning_types.append(ReasoningType.PATTERN_RECOGNITION)
+        
+        # For document queries, always include causal reasoning for quality analysis
+        if any(
+            keyword in query_lower
+            for keyword in ["quality", "validation", "approve", "reject", "error", "issue"]
+        ):
+            if ReasoningType.CAUSAL not in reasoning_types:
+                reasoning_types.append(ReasoningType.CAUSAL)
+        
+        return reasoning_types
 
     async def _extract_document_id_from_query(self, query: str) -> Optional[str]:
         """Extract document ID from query."""
