@@ -172,20 +172,20 @@ const DemoScript: React.FC<DemoScriptProps> = ({ onScenarioSelect }) => {
   };
 
   return (
-    <Box sx={{ p: 2, backgroundColor: '#111111', height: '100%', overflow: 'auto' }}>
-      <Typography variant="h6" sx={{ color: '#ffffff', mb: 3, textAlign: 'center' }}>
+    <Box sx={{ p: 2, backgroundColor: '#ffffff', height: '100%', overflow: 'auto' }}>
+      <Typography variant="h6" sx={{ color: '#333333', mb: 3, textAlign: 'center', fontWeight: 500 }}>
         Demo Scripts
       </Typography>
 
       {demoFlows.map((flow, flowIndex) => (
-        <Card key={flow.id} sx={{ mb: 3, backgroundColor: '#1a1a1a', border: '1px solid #333333' }}>
+        <Card key={flow.id} sx={{ mb: 3, backgroundColor: '#fafafa', border: '1px solid #e0e0e0', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
           <CardContent>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
               <Box sx={{ color: '#76B900', mr: 2 }}>
                 {flow.icon}
               </Box>
               <Box sx={{ flex: 1 }}>
-                <Typography variant="h6" sx={{ color: '#ffffff', fontSize: '16px' }}>
+                <Typography variant="h6" sx={{ color: '#333333', fontSize: '16px', fontWeight: 500 }}>
                   {flow.title}
                 </Typography>
                 <Typography variant="body2" sx={{ color: '#666666' }}>
@@ -193,10 +193,10 @@ const DemoScript: React.FC<DemoScriptProps> = ({ onScenarioSelect }) => {
                 </Typography>
                 {currentFlow === flow.id && (
                   <Box sx={{ mt: 1 }}>
-                    <Typography variant="caption" sx={{ color: '#76B900' }}>
+                    <Typography variant="caption" sx={{ color: '#76B900', fontWeight: 500 }}>
                       Progress: {completedSteps.length} / {flow.steps.length} steps completed
                     </Typography>
-                    <Box sx={{ width: '100%', height: 4, backgroundColor: '#333333', borderRadius: 2, mt: 0.5 }}>
+                    <Box sx={{ width: '100%', height: 4, backgroundColor: '#e0e0e0', borderRadius: 2, mt: 0.5 }}>
                       <Box 
                         sx={{ 
                           width: `${(completedSteps.length / flow.steps.length) * 100}%`, 
@@ -222,9 +222,9 @@ const DemoScript: React.FC<DemoScriptProps> = ({ onScenarioSelect }) => {
                     }}
                     sx={{
                       color: '#666666',
-                      borderColor: '#666666',
+                      borderColor: '#e0e0e0',
                       '&:hover': { 
-                        backgroundColor: '#333333',
+                        backgroundColor: '#f5f5f5',
                         borderColor: '#666666'
                       },
                     }}
@@ -238,6 +238,7 @@ const DemoScript: React.FC<DemoScriptProps> = ({ onScenarioSelect }) => {
                   onClick={() => handleFlowStart(flow.id)}
                   sx={{
                     backgroundColor: '#76B900',
+                    color: '#ffffff',
                     '&:hover': { backgroundColor: '#5a8f00' },
                   }}
                 >
@@ -260,7 +261,7 @@ const DemoScript: React.FC<DemoScriptProps> = ({ onScenarioSelect }) => {
                       sx={{
                         cursor: isClickable ? 'pointer' : 'default',
                         '& .MuiStepLabel-label': {
-                          color: isActive ? '#76B900' : isCompleted ? '#76B900' : '#ffffff',
+                          color: isActive ? '#76B900' : isCompleted ? '#76B900' : '#333333',
                           fontSize: '14px',
                           fontWeight: isActive ? 'bold' : 'normal',
                         },
@@ -275,15 +276,15 @@ const DemoScript: React.FC<DemoScriptProps> = ({ onScenarioSelect }) => {
                     </StepLabel>
                     <StepContent>
                       <Box sx={{ mb: 2 }}>
-                        <Typography variant="body2" sx={{ color: '#cccccc', mb: 1 }}>
+                        <Typography variant="body2" sx={{ color: '#666666', mb: 1 }}>
                           {step.description}
                         </Typography>
                         <Chip
                           label={step.expected}
                           size="small"
                           sx={{
-                            backgroundColor: isCompleted ? '#76B900' : '#333333',
-                            color: isCompleted ? '#000000' : '#76B900',
+                            backgroundColor: isCompleted ? '#76B900' : '#e0e0e0',
+                            color: isCompleted ? '#ffffff' : '#333333',
                             fontSize: '10px',
                           }}
                         />
@@ -321,9 +322,9 @@ const DemoScript: React.FC<DemoScriptProps> = ({ onScenarioSelect }) => {
         </Card>
       ))}
 
-      <Card sx={{ backgroundColor: '#1a1a1a', border: '1px solid #333333' }}>
+      <Card sx={{ backgroundColor: '#fafafa', border: '1px solid #e0e0e0', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
         <CardContent>
-          <Typography variant="h6" sx={{ color: '#ffffff', mb: 2, fontSize: '16px' }}>
+          <Typography variant="h6" sx={{ color: '#333333', mb: 2, fontSize: '16px', fontWeight: 500 }}>
             Demo Tips
           </Typography>
           <List dense>
@@ -333,7 +334,7 @@ const DemoScript: React.FC<DemoScriptProps> = ({ onScenarioSelect }) => {
               </ListItemIcon>
               <ListItemText
                 primary="Choose WH-01, Role Manager"
-                primaryTypographyProps={{ fontSize: '12px', color: '#ffffff' }}
+                primaryTypographyProps={{ fontSize: '12px', color: '#333333' }}
               />
             </ListItem>
             <ListItem>
@@ -342,7 +343,7 @@ const DemoScript: React.FC<DemoScriptProps> = ({ onScenarioSelect }) => {
               </ListItemIcon>
               <ListItemText
                 primary="Toggle Show Internals for detailed view"
-                primaryTypographyProps={{ fontSize: '12px', color: '#ffffff' }}
+                primaryTypographyProps={{ fontSize: '12px', color: '#333333' }}
               />
             </ListItem>
             <ListItem>
@@ -351,7 +352,7 @@ const DemoScript: React.FC<DemoScriptProps> = ({ onScenarioSelect }) => {
               </ListItemIcon>
               <ListItemText
                 primary="Check Evidence & Tool timeline in right panel"
-                primaryTypographyProps={{ fontSize: '12px', color: '#ffffff' }}
+                primaryTypographyProps={{ fontSize: '12px', color: '#333333' }}
               />
             </ListItem>
             <ListItem>
@@ -360,7 +361,7 @@ const DemoScript: React.FC<DemoScriptProps> = ({ onScenarioSelect }) => {
               </ListItemIcon>
               <ListItemText
                 primary="Use quick replies for clarifying questions"
-                primaryTypographyProps={{ fontSize: '12px', color: '#ffffff' }}
+                primaryTypographyProps={{ fontSize: '12px', color: '#333333' }}
               />
             </ListItem>
           </List>

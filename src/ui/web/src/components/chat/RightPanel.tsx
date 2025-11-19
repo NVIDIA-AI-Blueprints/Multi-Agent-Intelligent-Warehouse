@@ -22,7 +22,10 @@ import {
   Security as SecurityIcon,
   Close as CloseIcon,
   Settings as SettingsIcon,
+  Psychology as PsychologyIcon,
 } from '@mui/icons-material';
+import { ReasoningChain, ReasoningStep } from '../../services/api';
+import ReasoningChainVisualization from './ReasoningChainVisualization';
 
 interface RightPanelProps {
   isOpen: boolean;
@@ -63,6 +66,8 @@ interface RightPanelProps {
     audit_id: string;
     result?: any;
   }>;
+  reasoningChain?: ReasoningChain;
+  reasoningSteps?: ReasoningStep[];
 }
 
 const RightPanel: React.FC<RightPanelProps> = ({
@@ -73,8 +78,10 @@ const RightPanel: React.FC<RightPanelProps> = ({
   plannerDecision,
   activeContext,
   toolTimeline,
+  reasoningChain,
+  reasoningSteps,
 }) => {
-  const [expandedSections, setExpandedSections] = useState<string[]>(['evidence']);
+  const [expandedSections, setExpandedSections] = useState<string[]>(['reasoning', 'evidence']);
 
   const handleSectionToggle = (section: string) => {
     setExpandedSections(prev =>
@@ -138,6 +145,54 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
       {/* Content */}
       <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+        {/* Reasoning Chain - Show first if available */}
+        {(reasoningChain || reasoningSteps) && (
+          <Accordion
+            expanded={expandedSections.includes('reasoning')}
+            onChange={() => handleSectionToggle('reasoning')}
+            sx={{
+              backgroundColor: '#1a1a1a',
+              border: '1px solid #333333',
+              mb: 2,
+              '&:before': { display: 'none' },
+            }}
+          >
+            <AccordionSummary
+              expandIcon={<ExpandMoreIcon sx={{ color: '#76B900' }} />}
+              sx={{
+                backgroundColor: '#0a0a0a',
+                '&:hover': { backgroundColor: '#151515' },
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <PsychologyIcon sx={{ color: '#76B900', fontSize: 20 }} />
+                <Typography variant="body2" sx={{ color: '#ffffff', fontWeight: 'bold' }}>
+                  Reasoning Chain
+                </Typography>
+                {reasoningChain && (
+                  <Chip
+                    label={`${reasoningChain.steps?.length || 0} steps`}
+                    size="small"
+                    sx={{
+                      backgroundColor: '#76B900',
+                      color: '#000000',
+                      fontSize: '10px',
+                      height: '18px',
+                    }}
+                  />
+                )}
+              </Box>
+            </AccordionSummary>
+            <AccordionDetails sx={{ p: 2 }}>
+              <ReasoningChainVisualization
+                reasoningChain={reasoningChain}
+                reasoningSteps={reasoningSteps}
+                compact={false}
+              />
+            </AccordionDetails>
+          </Accordion>
+        )}
+
         {/* Evidence List */}
         <Accordion
           expanded={expandedSections.includes('evidence')}

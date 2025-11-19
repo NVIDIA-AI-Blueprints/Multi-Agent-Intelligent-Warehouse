@@ -19,6 +19,8 @@ import {
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
+import ReasoningChainVisualization from './ReasoningChainVisualization';
+import { ReasoningChain, ReasoningStep } from '../../services/api';
 
 interface MessageBubbleProps {
   message: {
@@ -48,6 +50,8 @@ interface MessageBubbleProps {
       id?: string;
       score?: number;
     }>;
+    reasoning_chain?: ReasoningChain;
+    reasoning_steps?: ReasoningStep[];
   };
   onActionApprove: (auditId: string, action: string) => void;
   onActionReject: (auditId: string, action: string) => void;
@@ -100,12 +104,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     // Handle the actual API response structure
     if (message.structured_data.response_type === 'equipment_info') {
       return (
-        <Card sx={{ mt: 1, backgroundColor: '#1a1a1a', border: '1px solid #333333' }}>
+        <Card sx={{ mt: 1, backgroundColor: '#fafafa', border: '1px solid #e0e0e0', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
           <CardContent>
-            <Typography variant="h6" sx={{ color: '#ffffff', mb: 1 }}>
+            <Typography variant="h6" sx={{ color: '#333333', mb: 1, fontWeight: 500 }}>
               Equipment Information
             </Typography>
-            <Typography variant="body2" sx={{ color: '#cccccc', mb: 2 }}>
+            <Typography variant="body2" sx={{ color: '#666666', mb: 2 }}>
               {typeof message.structured_data.natural_language === 'string' 
                 ? message.structured_data.natural_language 
                 : 'No description available'}
@@ -113,11 +117,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             
             {message.structured_data.data && (
               <Box sx={{ mb: 2 }}>
-                <Typography variant="body2" sx={{ color: '#ffffff', mb: 1 }}>
+                <Typography variant="body2" sx={{ color: '#333333', mb: 1, fontWeight: 500 }}>
                   Data Summary:
                 </Typography>
-                <Box sx={{ backgroundColor: '#000000', p: 1, borderRadius: 1, fontFamily: 'monospace', fontSize: '10px' }}>
-                  <pre style={{ color: '#ffffff', margin: 0, whiteSpace: 'pre-wrap' }}>
+                <Box sx={{ backgroundColor: '#ffffff', p: 1, borderRadius: 1, fontFamily: 'monospace', fontSize: '10px', border: '1px solid #e0e0e0' }}>
+                  <pre style={{ color: '#333333', margin: 0, whiteSpace: 'pre-wrap' }}>
                     {JSON.stringify(message.structured_data.data, null, 2)}
                   </pre>
                 </Box>
@@ -126,7 +130,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 
             {message.structured_data.recommendations && message.structured_data.recommendations.length > 0 && (
               <Box sx={{ mb: 2 }}>
-                <Typography variant="body2" sx={{ color: '#ffffff', mb: 1 }}>
+                <Typography variant="body2" sx={{ color: '#333333', mb: 1, fontWeight: 500 }}>
                   Recommendations:
                 </Typography>
                 {message.structured_data.recommendations.map((rec: string, index: number) => (
@@ -139,7 +143,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
 
             {message.structured_data.confidence && (
               <Box sx={{ mb: 2 }}>
-                <Typography variant="body2" sx={{ color: '#ffffff', mb: 1 }}>
+                <Typography variant="body2" sx={{ color: '#333333', mb: 1, fontWeight: 500 }}>
                   Confidence: {(message.structured_data.confidence * 100).toFixed(1)}%
                 </Typography>
                 <LinearProgress
@@ -148,7 +152,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                   sx={{
                     height: 4,
                     borderRadius: 2,
-                    backgroundColor: '#333333',
+                    backgroundColor: '#e0e0e0',
                     '& .MuiLinearProgress-bar': {
                       backgroundColor: message.structured_data.confidence >= 0.8 ? '#76B900' : '#FF9800',
                     },
@@ -164,17 +168,17 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     // Handle table structure (legacy)
     if (message.structured_data.type === 'table') {
       return (
-        <Card sx={{ mt: 1, backgroundColor: '#1a1a1a', border: '1px solid #333333' }}>
+        <Card sx={{ mt: 1, backgroundColor: '#fafafa', border: '1px solid #e0e0e0', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
           <CardContent>
-            <Typography variant="h6" sx={{ color: '#ffffff', mb: 1 }}>
+            <Typography variant="h6" sx={{ color: '#333333', mb: 1, fontWeight: 500 }}>
               {message.structured_data.title}
             </Typography>
             <Box sx={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', color: '#ffffff' }}>
+              <table style={{ width: '100%', color: '#333333' }}>
                 <thead>
                   <tr>
                     {message.structured_data.headers.map((header: string, index: number) => (
-                      <th key={index} style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #333333' }}>
+                      <th key={index} style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #e0e0e0', fontWeight: 500 }}>
                         {header}
                       </th>
                     ))}
@@ -184,7 +188,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                   {message.structured_data.rows.map((row: any[], rowIndex: number) => (
                     <tr key={rowIndex}>
                       {row.map((cell: any, cellIndex: number) => (
-                        <td key={cellIndex} style={{ padding: '8px', borderBottom: '1px solid #333333' }}>
+                        <td key={cellIndex} style={{ padding: '8px', borderBottom: '1px solid #e0e0e0' }}>
                           {cell}
                         </td>
                       ))}
@@ -201,13 +205,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     // Fallback: render as JSON if it's an object
     if (typeof message.structured_data === 'object') {
       return (
-        <Card sx={{ mt: 1, backgroundColor: '#1a1a1a', border: '1px solid #333333' }}>
+        <Card sx={{ mt: 1, backgroundColor: '#fafafa', border: '1px solid #e0e0e0', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
           <CardContent>
-            <Typography variant="h6" sx={{ color: '#ffffff', mb: 1 }}>
+            <Typography variant="h6" sx={{ color: '#333333', mb: 1, fontWeight: 500 }}>
               Structured Data
             </Typography>
-            <Box sx={{ backgroundColor: '#000000', p: 1, borderRadius: 1, fontFamily: 'monospace', fontSize: '10px' }}>
-              <pre style={{ color: '#ffffff', margin: 0, whiteSpace: 'pre-wrap' }}>
+            <Box sx={{ backgroundColor: '#ffffff', p: 1, borderRadius: 1, fontFamily: 'monospace', fontSize: '10px', border: '1px solid #e0e0e0' }}>
+              <pre style={{ color: '#333333', margin: 0, whiteSpace: 'pre-wrap' }}>
                 {JSON.stringify(message.structured_data, null, 2)}
               </pre>
             </Box>
@@ -225,10 +229,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     return (
       <Box sx={{ mt: 1 }}>
         {message.proposals.map((proposal, index) => (
-          <Card key={index} sx={{ mt: 1, backgroundColor: '#1a1a1a', border: '1px solid #333333' }}>
+          <Card key={index} sx={{ mt: 1, backgroundColor: '#fafafa', border: '1px solid #e0e0e0', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
             <CardContent>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                <Typography variant="h6" sx={{ color: '#ffffff' }}>
+                <Typography variant="h6" sx={{ color: '#333333', fontWeight: 500 }}>
                   {proposal.action.replace(/_/g, ' ').toUpperCase()}
                 </Typography>
                 <Chip
@@ -241,13 +245,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 />
               </Box>
               
-              <Typography variant="body2" sx={{ color: '#cccccc', mb: 2 }}>
+              <Typography variant="body2" sx={{ color: '#666666', mb: 2 }}>
                 Parameters: {JSON.stringify(proposal.params, null, 2)}
               </Typography>
 
               {proposal.guardrails.notes.length > 0 && (
                 <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2" sx={{ color: '#ffffff', mb: 1 }}>
+                  <Typography variant="body2" sx={{ color: '#333333', mb: 1, fontWeight: 500 }}>
                     Guardrails:
                   </Typography>
                   {proposal.guardrails.notes.map((note, noteIndex) => (
@@ -255,7 +259,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                       key={noteIndex}
                       label={note}
                       size="small"
-                      sx={{ mr: 1, mb: 1, backgroundColor: '#333333', color: '#ffffff' }}
+                      sx={{ mr: 1, mb: 1, backgroundColor: '#e0e0e0', color: '#333333' }}
                     />
                   ))}
                 </Box>
@@ -299,9 +303,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     if (!message.clarifying) return null;
 
     return (
-      <Card sx={{ mt: 1, backgroundColor: '#1a1a1a', border: '1px solid #333333' }}>
+      <Card sx={{ mt: 1, backgroundColor: '#fafafa', border: '1px solid #e0e0e0', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
         <CardContent>
-          <Typography variant="h6" sx={{ color: '#ffffff', mb: 1 }}>
+          <Typography variant="h6" sx={{ color: '#333333', mb: 1, fontWeight: 500 }}>
             {message.clarifying.text}
           </Typography>
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -312,9 +316,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 clickable
                 onClick={() => onQuickReply(option)}
                 sx={{
-                  backgroundColor: '#333333',
-                  color: '#ffffff',
-                  '&:hover': { backgroundColor: '#76B900' },
+                  backgroundColor: '#e0e0e0',
+                  color: '#333333',
+                  '&:hover': { backgroundColor: '#76B900', color: '#ffffff' },
                 }}
               />
             ))}
@@ -344,11 +348,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     };
 
     return (
-      <Card sx={{ mt: 1, backgroundColor: '#1a1a1a', border: `1px solid ${getNoticeColor()}` }}>
+      <Card sx={{ mt: 1, backgroundColor: '#fafafa', border: `1px solid ${getNoticeColor()}`, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
         <CardContent>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             {getNoticeIcon()}
-            <Typography variant="body1" sx={{ color: '#ffffff' }}>
+            <Typography variant="body1" sx={{ color: '#333333' }}>
               {message.content}
             </Typography>
           </Box>
@@ -394,17 +398,18 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         {/* Message Content */}
         <Box
           sx={{
-            backgroundColor: isUser ? '#76B900' : '#1a1a1a',
-            color: '#ffffff',
+            backgroundColor: isUser ? '#76B900' : '#ffffff',
+            color: isUser ? '#ffffff' : '#333333',
             borderRadius: 2,
             p: 2,
-            border: isUser ? 'none' : '1px solid #333333',
+            border: isUser ? 'none' : '1px solid #e0e0e0',
             minWidth: 200,
+            boxShadow: isUser ? 'none' : '0 1px 3px rgba(0,0,0,0.1)',
           }}
         >
           {/* Message Header */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-            <Typography variant="body2" sx={{ color: isUser ? '#ffffff' : '#cccccc' }}>
+            <Typography variant="body2" sx={{ color: isUser ? '#ffffff' : '#666666', fontWeight: 500 }}>
               {isUser ? 'You' : `${message.route || 'Assistant'}`}
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -421,14 +426,14 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                   />
                 </Tooltip>
               )}
-              <Typography variant="caption" sx={{ color: isUser ? '#ffffff' : '#666666' }}>
+              <Typography variant="caption" sx={{ color: isUser ? 'rgba(255,255,255,0.8)' : '#999999' }}>
                 {message.timestamp.toLocaleTimeString()}
               </Typography>
             </Box>
           </Box>
 
           {/* Message Content */}
-          <Typography variant="body1" sx={{ color: isUser ? '#ffffff' : '#ffffff', mb: 1 }}>
+          <Typography variant="body1" sx={{ color: isUser ? '#ffffff' : '#333333', mb: 1 }}>
             {message.content}
           </Typography>
 
@@ -441,7 +446,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 sx={{
                   height: 4,
                   borderRadius: 2,
-                  backgroundColor: '#333333',
+                  backgroundColor: isUser ? 'rgba(255,255,255,0.3)' : '#e0e0e0',
                   '& .MuiLinearProgress-bar': {
                     backgroundColor: getConfidenceColor(message.confidence),
                   },
@@ -450,7 +455,18 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             </Box>
           )}
 
-          {/* Structured Data */}
+          {/* Reasoning Chain - shown BEFORE structured data */}
+          {(message.reasoning_chain || message.reasoning_steps) && (
+            <Box sx={{ mt: 1, mb: 1 }}>
+              <ReasoningChainVisualization
+                reasoningChain={message.reasoning_chain}
+                reasoningSteps={message.reasoning_steps}
+                compact={true}
+              />
+            </Box>
+          )}
+
+          {/* Structured Data - shown AFTER reasoning chain */}
           {renderStructuredData()}
 
           {/* Proposed Actions */}

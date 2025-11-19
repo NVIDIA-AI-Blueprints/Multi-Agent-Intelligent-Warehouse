@@ -12,7 +12,7 @@ module.exports = function(app) {
       changeOrigin: true,
       secure: false,
       logLevel: 'debug',
-      timeout: 60000,
+      timeout: 300000, // 5 minutes - increased for complex reasoning queries
       pathRewrite: (path, req) => {
         // path will be like '/v1/version' (without /api)
         // Add /api back to get '/api/v1/version'

@@ -223,32 +223,30 @@ class MCPIntentClassifier:
             base_intent = self.classify_intent(message)
 
             # If we have MCP tools available, use them to enhance classification
-            if self.tool_discovery and len(self.tool_discovery.discovered_tools) > 0:
+            # Only override if base_intent is "general" (uncertain) - don't override specific classifications
+            if self.tool_discovery and len(self.tool_discovery.discovered_tools) > 0 and base_intent == "general":
                 # Search for tools that might help with intent classification
                 relevant_tools = await self.tool_discovery.search_tools(message)
-
+                
                 # If we found relevant tools, use them to refine the intent
                 if relevant_tools:
-                    # Use tool categories to refine intent
+                    # Use tool categories to refine intent when base classification is uncertain
                     for tool in relevant_tools[:3]:  # Check top 3 most relevant tools
                         if (
                             "equipment" in tool.name.lower()
                             or "equipment" in tool.description.lower()
                         ):
-                            if base_intent in ["general", "operations"]:
-                                return "equipment"
+                            return "equipment"
                         elif (
                             "operations" in tool.name.lower()
                             or "workforce" in tool.description.lower()
                         ):
-                            if base_intent in ["general", "equipment"]:
-                                return "operations"
+                            return "operations"
                         elif (
                             "safety" in tool.name.lower()
                             or "incident" in tool.description.lower()
                         ):
-                            if base_intent in ["general", "equipment", "operations"]:
-                                return "safety"
+                            return "safety"
 
             return base_intent
 
@@ -1098,12 +1096,16 @@ class MCPPlannerGraph:
                 if hasattr(agent_response, "natural_language"):
                     # Convert dataclass to dict
                     if hasattr(agent_response, "__dict__"):
-                        agent_response_dict = agent_response.__dict__
+                        agent_response_dict = agent_response.__dict__.copy()
                     else:
                         # Use asdict for dataclasses
                         from dataclasses import asdict
 
                         agent_response_dict = asdict(agent_response)
+                    
+                    # Log what fields are in the dict
+                    logger.info(f"📋 agent_response_dict keys: {list(agent_response_dict.keys())}")
+                    logger.info(f"📋 Has reasoning_chain: {'reasoning_chain' in agent_response_dict}, value: {agent_response_dict.get('reasoning_chain') is not None}")
 
                     final_response = agent_response_dict["natural_language"]
                     # Store structured data in context for API response
@@ -1122,13 +1124,67 @@ class MCPPlannerGraph:
                     # Add reasoning chain to context if available
                     if "reasoning_chain" in agent_response_dict:
                         reasoning_chain = agent_response_dict["reasoning_chain"]
+                        logger.info(f"🔗 Found reasoning_chain in agent_response_dict: {reasoning_chain is not None}, type: {type(reasoning_chain)}")
                         state["context"]["reasoning_chain"] = reasoning_chain
                         state["reasoning_chain"] = reasoning_chain
-                        # Convert ReasoningChain to dict if needed
-                        if hasattr(reasoning_chain, "__dict__"):
-                            state["context"]["reasoning_chain"] = asdict(reasoning_chain) if hasattr(reasoning_chain, "__dict__") else reasoning_chain
+                        # Convert ReasoningChain to dict if needed (avoid recursion)
+                        from dataclasses import is_dataclass
+                        if is_dataclass(reasoning_chain):
+                            try:
+                                # Manual conversion to avoid recursion
+                                reasoning_chain_dict = {
+                                    "chain_id": getattr(reasoning_chain, "chain_id", ""),
+                                    "query": getattr(reasoning_chain, "query", ""),
+                                    "reasoning_type": getattr(reasoning_chain, "reasoning_type", ""),
+                                    "final_conclusion": getattr(reasoning_chain, "final_conclusion", ""),
+                                    "overall_confidence": float(getattr(reasoning_chain, "overall_confidence", 0.0)),
+                                    "execution_time": float(getattr(reasoning_chain, "execution_time", 0.0)),
+                                }
+                                # Convert enum to string
+                                if hasattr(reasoning_chain_dict["reasoning_type"], "value"):
+                                    reasoning_chain_dict["reasoning_type"] = reasoning_chain_dict["reasoning_type"].value
+                                # Convert datetime
+                                if hasattr(reasoning_chain, "created_at"):
+                                    created_at = getattr(reasoning_chain, "created_at")
+                                    if hasattr(created_at, "isoformat"):
+                                        reasoning_chain_dict["created_at"] = created_at.isoformat()
+                                    else:
+                                        reasoning_chain_dict["created_at"] = str(created_at)
+                                # Convert steps
+                                if hasattr(reasoning_chain, "steps") and reasoning_chain.steps:
+                                    converted_steps = []
+                                    for step in reasoning_chain.steps:
+                                        if is_dataclass(step):
+                                            step_dict = {
+                                                "step_id": getattr(step, "step_id", ""),
+                                                "step_type": getattr(step, "step_type", ""),
+                                                "description": getattr(step, "description", ""),
+                                                "reasoning": getattr(step, "reasoning", ""),
+                                                "confidence": float(getattr(step, "confidence", 0.0)),
+                                            }
+                                            if hasattr(step, "timestamp"):
+                                                timestamp = getattr(step, "timestamp")
+                                                if hasattr(timestamp, "isoformat"):
+                                                    step_dict["timestamp"] = timestamp.isoformat()
+                                                else:
+                                                    step_dict["timestamp"] = str(timestamp)
+                                            step_dict["input_data"] = {}
+                                            step_dict["output_data"] = {}
+                                            step_dict["dependencies"] = []
+                                            converted_steps.append(step_dict)
+                                        else:
+                                            converted_steps.append(step)
+                                    reasoning_chain_dict["steps"] = converted_steps
+                                else:
+                                    reasoning_chain_dict["steps"] = []
+                                state["context"]["reasoning_chain"] = reasoning_chain_dict
+                                logger.info(f"✅ Converted reasoning_chain to dict with {len(reasoning_chain_dict.get('steps', []))} steps")
+                            except Exception as e:
+                                logger.error(f"Error converting reasoning_chain to dict: {e}", exc_info=True)
+                                state["context"]["reasoning_chain"] = reasoning_chain
                     if "reasoning_steps" in agent_response_dict:
                         reasoning_steps = agent_response_dict["reasoning_steps"]
+                        logger.info(f"🔗 Found reasoning_steps in agent_response_dict: {reasoning_steps is not None}, count: {len(reasoning_steps) if reasoning_steps else 0}")
                         state["context"]["reasoning_steps"] = reasoning_steps
 
                 elif (
@@ -1152,14 +1208,93 @@ class MCPPlannerGraph:
                     # Add reasoning chain to context if available
                     if "reasoning_chain" in agent_response:
                         reasoning_chain = agent_response["reasoning_chain"]
-                        state["context"]["reasoning_chain"] = reasoning_chain
-                        state["reasoning_chain"] = reasoning_chain
+                        logger.info(f"🔗 Found reasoning_chain in agent_response dict: {reasoning_chain is not None}, type: {type(reasoning_chain)}")
+                        # Convert if it's a dataclass
+                        from dataclasses import is_dataclass
+                        if is_dataclass(reasoning_chain):
+                            try:
+                                # Manual conversion to avoid recursion
+                                reasoning_chain_dict = {
+                                    "chain_id": getattr(reasoning_chain, "chain_id", ""),
+                                    "query": getattr(reasoning_chain, "query", ""),
+                                    "reasoning_type": getattr(reasoning_chain, "reasoning_type", ""),
+                                    "final_conclusion": getattr(reasoning_chain, "final_conclusion", ""),
+                                    "overall_confidence": float(getattr(reasoning_chain, "overall_confidence", 0.0)),
+                                    "execution_time": float(getattr(reasoning_chain, "execution_time", 0.0)),
+                                }
+                                # Convert enum to string
+                                if hasattr(reasoning_chain_dict["reasoning_type"], "value"):
+                                    reasoning_chain_dict["reasoning_type"] = reasoning_chain_dict["reasoning_type"].value
+                                # Convert datetime
+                                if hasattr(reasoning_chain, "created_at"):
+                                    created_at = getattr(reasoning_chain, "created_at")
+                                    if hasattr(created_at, "isoformat"):
+                                        reasoning_chain_dict["created_at"] = created_at.isoformat()
+                                    else:
+                                        reasoning_chain_dict["created_at"] = str(created_at)
+                                # Convert steps
+                                if hasattr(reasoning_chain, "steps") and reasoning_chain.steps:
+                                    converted_steps = []
+                                    for step in reasoning_chain.steps:
+                                        if is_dataclass(step):
+                                            step_dict = {
+                                                "step_id": getattr(step, "step_id", ""),
+                                                "step_type": getattr(step, "step_type", ""),
+                                                "description": getattr(step, "description", ""),
+                                                "reasoning": getattr(step, "reasoning", ""),
+                                                "confidence": float(getattr(step, "confidence", 0.0)),
+                                            }
+                                            if hasattr(step, "timestamp"):
+                                                timestamp = getattr(step, "timestamp")
+                                                if hasattr(timestamp, "isoformat"):
+                                                    step_dict["timestamp"] = timestamp.isoformat()
+                                                else:
+                                                    step_dict["timestamp"] = str(timestamp)
+                                            step_dict["input_data"] = {}
+                                            step_dict["output_data"] = {}
+                                            step_dict["dependencies"] = []
+                                            converted_steps.append(step_dict)
+                                        else:
+                                            converted_steps.append(step)
+                                    reasoning_chain_dict["steps"] = converted_steps
+                                else:
+                                    reasoning_chain_dict["steps"] = []
+                                state["context"]["reasoning_chain"] = reasoning_chain_dict
+                                state["reasoning_chain"] = reasoning_chain_dict
+                                logger.info(f"✅ Converted reasoning_chain to dict with {len(reasoning_chain_dict.get('steps', []))} steps")
+                            except Exception as e:
+                                logger.error(f"Error converting reasoning_chain to dict: {e}", exc_info=True)
+                                state["context"]["reasoning_chain"] = reasoning_chain
+                                state["reasoning_chain"] = reasoning_chain
+                        else:
+                            # Already a dict, use as-is
+                            state["context"]["reasoning_chain"] = reasoning_chain
+                            state["reasoning_chain"] = reasoning_chain
                     if "reasoning_steps" in agent_response:
                         reasoning_steps = agent_response["reasoning_steps"]
+                        logger.info(f"🔗 Found reasoning_steps in agent_response dict: {reasoning_steps is not None}, count: {len(reasoning_steps) if reasoning_steps else 0}")
                         state["context"]["reasoning_steps"] = reasoning_steps
                 else:
-                    # Handle legacy string response format
-                    final_response = str(agent_response)
+                    # Handle legacy string response format or unexpected types
+                    if isinstance(agent_response, str):
+                        final_response = agent_response
+                    elif isinstance(agent_response, dict):
+                        # Try to extract any text field from the dict
+                        final_response = (
+                            agent_response.get("natural_language") or
+                            agent_response.get("response") or
+                            agent_response.get("text") or
+                            agent_response.get("message") or
+                            "I received your request and processed it successfully."
+                        )
+                        # Store the dict as structured response if it looks like one
+                        if not state["context"].get("structured_response"):
+                            state["context"]["structured_response"] = agent_response
+                    else:
+                        # For other types, try to get a meaningful string representation
+                        # but avoid showing the entire object structure
+                        final_response = "I received your request and processed it successfully."
+                        logger.warning(f"Unexpected agent_response type: {type(agent_response)}, using fallback message")
             else:
                 final_response = "I'm sorry, I couldn't process your request. Please try rephrasing your question."
 
@@ -1239,13 +1374,28 @@ class MCPPlannerGraph:
             )
 
             # Run the graph asynchronously with timeout
+            # Increase timeout when reasoning is enabled (reasoning takes longer)
+            # Detect complex queries that need even more time
+            message_lower = message.lower()
+            is_complex_query = any(keyword in message_lower for keyword in [
+                "analyze", "relationship", "between", "compare", "evaluate", 
+                "optimize", "calculate", "correlation", "impact", "effect"
+            ]) or len(message.split()) > 15
+            
+            if enable_reasoning:
+                # Very complex queries with reasoning need up to 4 minutes
+                # Match the timeout in chat.py: 230s for complex, 115s for regular reasoning
+                graph_timeout = 230.0 if is_complex_query else 115.0  # 230s for complex, 115s for regular reasoning
+            else:
+                # Regular queries: 25s for simple, 60s for complex
+                graph_timeout = 60.0 if is_complex_query else 25.0
             try:
                 result = await asyncio.wait_for(
                     self.graph.ainvoke(initial_state),
-                    timeout=25.0  # 25 second timeout for graph execution
+                    timeout=graph_timeout
                 )
             except asyncio.TimeoutError:
-                logger.warning("Graph execution timed out, using fallback")
+                logger.warning(f"Graph execution timed out after {graph_timeout}s, using fallback")
                 return self._create_fallback_response(message, session_id)
 
             # Ensure structured response is properly included

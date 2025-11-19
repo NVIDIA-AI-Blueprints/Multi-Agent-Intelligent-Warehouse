@@ -221,9 +221,13 @@ class MCPEquipmentAssetOperationsAgent:
                     parsed_query, available_tools
                 )
                 parsed_query.tool_execution_plan = execution_plan
+                
+                logger.info(f"Created tool execution plan with {len(execution_plan)} tools for query: {query[:100]}")
 
                 # Execute tools and gather results
                 tool_results = await self._execute_tool_plan(execution_plan)
+                
+                logger.info(f"Tool execution completed: {len([r for r in tool_results.values() if r.get('success')])} successful, {len([r for r in tool_results.values() if not r.get('success')])} failed")
 
             # Generate response using LLM with tool results (include reasoning chain)
             response = await self._generate_response_with_tools(
@@ -378,7 +382,8 @@ Return only valid JSON.""",
             execution_plan = []
 
             # Create execution steps based on query intent
-            if query.intent == "equipment_lookup":
+            # If no specific intent matches, default to equipment_lookup
+            if query.intent in ["equipment_lookup", "equipment_availability", "equipment_telemetry"]:
                 # Look for equipment tools
                 equipment_tools = [
                     t for t in tools if t.category == ToolCategory.EQUIPMENT
@@ -408,8 +413,37 @@ Return only valid JSON.""",
                         }
                     )
 
-            elif query.intent == "utilization":
-                # Look for analysis tools
+            elif query.intent in ["utilization", "equipment_utilization"]:
+                # Look for equipment utilization tools first, then analysis tools
+                equipment_tools = [
+                    t for t in tools if t.category == ToolCategory.EQUIPMENT
+                ]
+                # Prefer get_equipment_utilization tool if available
+                utilization_tools = [t for t in equipment_tools if "utilization" in t.name.lower()]
+                if utilization_tools:
+                    for tool in utilization_tools[:2]:
+                        execution_plan.append(
+                            {
+                                "tool_id": tool.tool_id,
+                                "tool_name": tool.name,
+                                "arguments": self._prepare_tool_arguments(tool, query),
+                                "priority": 1,
+                                "required": True,
+                            }
+                        )
+                # Also include other equipment tools for context
+                other_equipment_tools = [t for t in equipment_tools if "utilization" not in t.name.lower()]
+                for tool in other_equipment_tools[:2]:
+                    execution_plan.append(
+                        {
+                            "tool_id": tool.tool_id,
+                            "tool_name": tool.name,
+                            "arguments": self._prepare_tool_arguments(tool, query),
+                            "priority": 2,
+                            "required": False,
+                        }
+                    )
+                # Look for analysis tools as fallback
                 analysis_tools = [
                     t for t in tools if t.category == ToolCategory.ANALYSIS
                 ]
@@ -419,8 +453,8 @@ Return only valid JSON.""",
                             "tool_id": tool.tool_id,
                             "tool_name": tool.name,
                             "arguments": self._prepare_tool_arguments(tool, query),
-                            "priority": 1,
-                            "required": True,
+                            "priority": 3,
+                            "required": False,
                         }
                     )
 
@@ -495,6 +529,10 @@ Return only valid JSON.""",
     ) -> Dict[str, Any]:
         """Execute the tool execution plan."""
         results = {}
+        
+        if not execution_plan:
+            logger.warning("Tool execution plan is empty - no tools to execute")
+            return results
 
         for step in execution_plan:
             try:
@@ -537,6 +575,60 @@ Return only valid JSON.""",
                 }
 
         return results
+
+    def _build_user_prompt_content(
+        self,
+        query: MCPEquipmentQuery,
+        successful_results: Dict[str, Any],
+        failed_results: Dict[str, Any],
+        reasoning_chain: Optional[ReasoningChain],
+    ) -> str:
+        """Build the user prompt content for response generation."""
+        # Build reasoning chain section if available
+        reasoning_section = ""
+        if reasoning_chain:
+            try:
+                reasoning_type_str = (
+                    reasoning_chain.reasoning_type.value
+                    if hasattr(reasoning_chain.reasoning_type, "value")
+                    else str(reasoning_chain.reasoning_type)
+                )
+                reasoning_data = {
+                    "reasoning_type": reasoning_type_str,
+                    "final_conclusion": reasoning_chain.final_conclusion,
+                    "steps": [
+                        {
+                            "step_id": step.step_id,
+                            "description": step.description,
+                            "reasoning": step.reasoning,
+                            "confidence": step.confidence,
+                        }
+                        for step in (reasoning_chain.steps or [])
+                    ],
+                }
+                reasoning_section = f"""
+Reasoning Chain Analysis:
+{json.dumps(reasoning_data, indent=2)}
+"""
+            except Exception as e:
+                logger.warning(f"Error building reasoning chain section: {e}")
+                reasoning_section = ""
+
+        # Build the full prompt content
+        content = f"""User Query: "{query.user_query}"
+Intent: {query.intent}
+Entities: {query.entities}
+Context: {query.context}
+
+Tool Execution Results:
+{json.dumps(successful_results, indent=2)}
+
+Failed Tool Executions:
+{json.dumps(failed_results, indent=2)}
+{reasoning_section}
+IMPORTANT: Use the tool execution results to provide a comprehensive answer. The reasoning chain provides analysis context, but the actual data comes from the tool results. Always include structured data from tool results in the response."""
+        
+        return content
 
     async def _generate_response_with_tools(
         self, query: MCPEquipmentQuery, tool_results: Dict[str, Any], reasoning_chain: Optional[ReasoningChain] = None
@@ -604,16 +696,9 @@ ABSOLUTELY CRITICAL: Your response must start with { and end with }. No other te
                 },
                 {
                     "role": "user",
-                    "content": f"""User Query: "{query.user_query}"
-Intent: {query.intent}
-Entities: {query.entities}
-Context: {query.context}
-
-Tool Execution Results:
-{json.dumps(successful_results, indent=2)}
-
-Failed Tool Executions:
-{json.dumps(failed_results, indent=2)}""",
+                    "content": self._build_user_prompt_content(
+                        query, successful_results, failed_results, reasoning_chain
+                    ),
                 },
             ]
 
@@ -753,6 +838,14 @@ Failed Tool Executions:
             "strategy",
             "plan",
             "alternative",
+            "increase",
+            "decrease",
+            "enhance",
+            "productivity",
+            "impact",
+            "if we",
+            "would",
+            "should",
             "option",
         ]
         return any(keyword in query_lower for keyword in complex_keywords)

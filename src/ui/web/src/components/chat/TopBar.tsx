@@ -48,15 +48,15 @@ const TopBar: React.FC<TopBarProps> = ({
     <AppBar 
       position="static" 
       sx={{ 
-        backgroundColor: '#000000',
-        borderBottom: '1px solid #333333',
-        boxShadow: 'none',
+        backgroundColor: '#ffffff',
+        borderBottom: '1px solid #e0e0e0',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
       }}
     >
       <Toolbar sx={{ minHeight: '48px !important', gap: 2 }}>
         {/* Warehouse Selector */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="body2" sx={{ color: '#ffffff', minWidth: '80px' }}>
+          <Typography variant="body2" sx={{ color: '#333333', minWidth: '80px', fontWeight: 500 }}>
             Warehouse:
           </Typography>
           <Select
@@ -64,12 +64,19 @@ const TopBar: React.FC<TopBarProps> = ({
             onChange={(e) => onWarehouseChange(e.target.value)}
             size="small"
             sx={{
-              color: '#ffffff',
+              color: '#333333',
+              backgroundColor: '#ffffff',
               '& .MuiOutlinedInput-notchedOutline': {
+                borderColor: '#e0e0e0',
+              },
+              '&:hover .MuiOutlinedInput-notchedOutline': {
+                borderColor: '#76B900',
+              },
+              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
                 borderColor: '#76B900',
               },
               '& .MuiSvgIcon-root': {
-                color: '#76B900',
+                color: '#333333',
               },
               minWidth: 120,
             }}
@@ -82,7 +89,7 @@ const TopBar: React.FC<TopBarProps> = ({
 
         {/* Role Selector */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="body2" sx={{ color: '#ffffff', minWidth: '50px' }}>
+          <Typography variant="body2" sx={{ color: '#333333', minWidth: '50px', fontWeight: 500 }}>
             Role:
           </Typography>
           <Select
@@ -90,12 +97,19 @@ const TopBar: React.FC<TopBarProps> = ({
             onChange={(e) => onRoleChange(e.target.value)}
             size="small"
             sx={{
-              color: '#ffffff',
+              color: '#333333',
+              backgroundColor: '#ffffff',
               '& .MuiOutlinedInput-notchedOutline': {
+                borderColor: '#e0e0e0',
+              },
+              '&:hover .MuiOutlinedInput-notchedOutline': {
+                borderColor: '#76B900',
+              },
+              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
                 borderColor: '#76B900',
               },
               '& .MuiSvgIcon-root': {
-                color: '#76B900',
+                color: '#333333',
               },
               minWidth: 120,
             }}
@@ -121,34 +135,34 @@ const TopBar: React.FC<TopBarProps> = ({
         {/* Connection Health */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 'auto' }}>
           <Tooltip title="NIM Connection">
-            <IconButton size="small">
+            <IconButton size="small" sx={{ color: connections.nim ? '#76B900' : '#999999' }}>
               {getConnectionIcon(connections.nim)}
             </IconButton>
           </Tooltip>
           <Tooltip title="Database Connection">
-            <IconButton size="small">
+            <IconButton size="small" sx={{ color: connections.db ? '#76B900' : '#999999' }}>
               {getConnectionIcon(connections.db)}
             </IconButton>
           </Tooltip>
           <Tooltip title="Milvus Connection">
-            <IconButton size="small">
+            <IconButton size="small" sx={{ color: connections.milvus ? '#76B900' : '#999999' }}>
               {getConnectionIcon(connections.milvus)}
             </IconButton>
           </Tooltip>
           <Tooltip title="Kafka Connection">
-            <IconButton size="small">
+            <IconButton size="small" sx={{ color: connections.kafka ? '#76B900' : '#999999' }}>
               {getConnectionIcon(connections.kafka)}
             </IconButton>
           </Tooltip>
         </Box>
 
         {/* Time Window */}
-        <Typography variant="body2" sx={{ color: '#ffffff', minWidth: '100px' }}>
+        <Typography variant="body2" sx={{ color: '#666666', minWidth: '100px' }}>
           {new Date().toLocaleTimeString()}
         </Typography>
 
         {/* Settings */}
-        <IconButton size="small" sx={{ color: '#76B900' }}>
+        <IconButton size="small" sx={{ color: '#333333', '&:hover': { color: '#76B900' } }}>
           <SettingsIcon />
         </IconButton>
       </Toolbar>

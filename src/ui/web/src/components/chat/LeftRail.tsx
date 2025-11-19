@@ -56,14 +56,14 @@ const LeftRail: React.FC<LeftRailProps> = ({ onScenarioSelect, recentTasks }) =>
       sx={{
         width: 300,
         height: '100%',
-        backgroundColor: '#111111',
-        borderRight: '1px solid #333333',
+        backgroundColor: '#ffffff',
+        borderRight: '1px solid #e0e0e0',
         display: 'flex',
         flexDirection: 'column',
       }}
     >
       {/* Tabs */}
-      <Box sx={{ borderBottom: '1px solid #333333' }}>
+      <Box sx={{ borderBottom: '1px solid #e0e0e0' }}>
         <Tabs
           value={activeTab}
           onChange={(_, newValue) => setActiveTab(newValue)}
@@ -90,7 +90,7 @@ const LeftRail: React.FC<LeftRailProps> = ({ onScenarioSelect, recentTasks }) =>
       <Box sx={{ flex: 1, overflow: 'hidden' }}>
         {activeTab === 0 && (
           <Box sx={{ p: 2, height: '100%', overflow: 'auto' }}>
-            <Typography variant="h6" sx={{ color: '#ffffff', mb: 2, fontSize: '14px' }}>
+            <Typography variant="h6" sx={{ color: '#333333', mb: 2, fontSize: '14px', fontWeight: 500 }}>
               Quick Actions
             </Typography>
             <List dense>
@@ -102,7 +102,7 @@ const LeftRail: React.FC<LeftRailProps> = ({ onScenarioSelect, recentTasks }) =>
                       borderRadius: 1,
                       mb: 0.5,
                       '&:hover': {
-                        backgroundColor: '#333333',
+                        backgroundColor: '#f5f5f5',
                       },
                     }}
                   >
@@ -113,7 +113,7 @@ const LeftRail: React.FC<LeftRailProps> = ({ onScenarioSelect, recentTasks }) =>
                       primary={scenario.label}
                       primaryTypographyProps={{
                         fontSize: '12px',
-                        color: '#ffffff',
+                        color: '#333333',
                       }}
                     />
                   </ListItemButton>
@@ -121,9 +121,9 @@ const LeftRail: React.FC<LeftRailProps> = ({ onScenarioSelect, recentTasks }) =>
               ))}
             </List>
 
-            <Divider sx={{ borderColor: '#333333', my: 2 }} />
+            <Divider sx={{ borderColor: '#e0e0e0', my: 2 }} />
 
-            <Typography variant="h6" sx={{ color: '#ffffff', mb: 2, fontSize: '14px' }}>
+            <Typography variant="h6" sx={{ color: '#333333', mb: 2, fontSize: '14px', fontWeight: 500 }}>
               Recent Tasks
             </Typography>
             <List dense>
@@ -139,7 +139,7 @@ const LeftRail: React.FC<LeftRailProps> = ({ onScenarioSelect, recentTasks }) =>
                         borderRadius: 1,
                         mb: 0.5,
                         '&:hover': {
-                          backgroundColor: '#333333',
+                          backgroundColor: '#f5f5f5',
                         },
                       }}
                     >
@@ -165,7 +165,7 @@ const LeftRail: React.FC<LeftRailProps> = ({ onScenarioSelect, recentTasks }) =>
                         }
                         primaryTypographyProps={{
                           fontSize: '12px',
-                          color: '#ffffff',
+                          color: '#333333',
                         }}
                       />
                     </ListItemButton>

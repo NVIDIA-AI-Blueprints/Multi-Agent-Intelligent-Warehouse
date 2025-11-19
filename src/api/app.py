@@ -1,7 +1,9 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import Response, JSONResponse
+from fastapi.exceptions import RequestValidationError
 import time
+import logging
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -30,6 +32,39 @@ from src.api.services.monitoring.metrics import (
 )
 
 app = FastAPI(title="Warehouse Operational Assistant", version="0.1.0")
+logger = logging.getLogger(__name__)
+
+# Add exception handler for serialization errors
+@app.exception_handler(ValueError)
+async def value_error_handler(request: Request, exc: ValueError):
+    """Handle ValueError exceptions, including circular reference errors."""
+    error_msg = str(exc)
+    if "circular reference" in error_msg.lower() or "circular" in error_msg.lower():
+        logger.error(f"Circular reference error in {request.url.path}: {error_msg}")
+        # Return a simple, serializable error response
+        try:
+            return JSONResponse(
+                status_code=200,  # Return 200 so frontend doesn't treat it as an error
+                content={
+                    "reply": "I received your request, but there was an issue formatting the response. Please try again with a simpler question.",
+                    "route": "error",
+                    "intent": "error",
+                    "session_id": "default",
+                    "confidence": 0.0,
+                    "error": "Response serialization failed",
+                    "error_type": "circular_reference"
+                }
+            )
+        except Exception as e:
+            logger.error(f"Failed to create error response: {e}")
+            # Last resort - return plain text
+            return Response(
+                status_code=200,
+                content='{"reply": "Error processing request", "route": "error", "intent": "error", "session_id": "default", "confidence": 0.0}',
+                media_type="application/json"
+            )
+    # Re-raise if it's not a circular reference error
+    raise exc
 
 app.add_middleware(
     CORSMiddleware,

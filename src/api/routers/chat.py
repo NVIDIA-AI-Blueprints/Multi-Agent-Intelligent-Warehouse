@@ -175,6 +175,62 @@ def _clean_response_text(response: str) -> str:
 
         # Remove patterns like "structured_response: {...}"
         response = re.sub(r"structured_response: \{[^}]+\}", "", response)
+        
+        # Remove reasoning_chain patterns (can span multiple lines)
+        response = re.sub(r",\s*'reasoning_chain':\s*ReasoningChain\([^)]+\)", "", response, flags=re.DOTALL)
+        response = re.sub(r",\s*'reasoning_chain':\s*\{[^}]+\}", "", response, flags=re.DOTALL)
+        response = re.sub(r",\s*'reasoning_chain':\s*None", "", response, flags=re.IGNORECASE)
+        response = re.sub(r",\s*'reasoning_steps':\s*\[[^\]]+\]", "", response, flags=re.DOTALL)
+        response = re.sub(r",\s*'reasoning_steps':\s*None", "", response, flags=re.IGNORECASE)
+        
+        # Remove any remaining object representations like "ReasoningChain(...)"
+        response = re.sub(r"ReasoningChain\([^)]+\)", "", response, flags=re.DOTALL)
+        
+        # Remove patterns like ", , 'response_type': ..." and similar structured data leaks
+        # More aggressive pattern matching for structured data that leaked into text
+        response = re.sub(r",\s*,\s*'[^']+':\s*[^,}]+", "", response)
+        response = re.sub(r",\s*'response_type':\s*'[^']+'", "", response)
+        response = re.sub(r",\s*'reasoning_chain':\s*None", "", response, flags=re.IGNORECASE)
+        response = re.sub(r",\s*'reasoning_steps':\s*None", "", response, flags=re.IGNORECASE)
+        
+        # Remove patterns like "}, , 'reasoning_chain': None, 'reasoning_steps': None}"
+        response = re.sub(r"\}\s*,\s*,\s*'reasoning_chain':\s*None\s*,\s*'reasoning_steps':\s*None\s*\}", "", response, flags=re.IGNORECASE)
+        response = re.sub(r"\}\s*,\s*,\s*'[^']+':\s*[^,}]+", "", response)
+        
+        # Remove entire patterns like: ", , 'response_type': 'equipment_utilization', , 'reasoning_chain': None, 'reasoning_steps': None}, , 'reasoning_chain': None, 'reasoning_steps': None}"
+        response = re.sub(r",\s*,\s*'response_type':\s*'[^']+',\s*,\s*'reasoning_chain':\s*None\s*,\s*'reasoning_steps':\s*None\s*\}", "", response, flags=re.IGNORECASE)
+        response = re.sub(r"\}\s*,\s*,\s*'reasoning_chain':\s*None\s*,\s*'reasoning_steps':\s*None\s*\}", "", response, flags=re.IGNORECASE)
+        
+        # Remove patterns with multiple occurrences: "}, , 'reasoning_chain': None, 'reasoning_steps': None}, , 'reasoning_chain': None, 'reasoning_steps': None}"
+        response = re.sub(r"\}\s*,\s*,\s*'reasoning_chain':\s*None\s*,\s*'reasoning_steps':\s*None\s*\}", "", response, flags=re.IGNORECASE | re.MULTILINE)
+        response = re.sub(r"\}\s*,\s*,\s*'reasoning_chain':\s*None\s*,\s*'reasoning_steps':\s*None\s*\}", "", response, flags=re.IGNORECASE | re.MULTILINE)
+        
+        # Remove any remaining dictionary-like patterns that leaked (more aggressive)
+        # Match patterns like: ", 'field': value" where value can be None, string, dict, or list
+        response = re.sub(r",\s*'[a-z_]+':\s*(?:None|'[^']*'|\{[^}]*\}|\[[^\]]*\])\s*,?\s*", "", response, flags=re.IGNORECASE)
+        
+        # Remove any remaining closing braces and commas at the end
+        response = re.sub(r"\}\s*,?\s*$", "", response)
+        response = re.sub(r"\}\s*,\s*$", "", response)
+        
+        # Remove any Python dict-like structures that might have leaked (very aggressive)
+        # This catches patterns like: "{'key': 'value', 'key2': None}"
+        response = re.sub(r"\{'[^}]*'\}", "", response)
+        
+        # Remove any remaining key-value pairs that look like Python dict syntax
+        # Pattern: ", 'key': value" or " 'key': value"
+        response = re.sub(r"[, ]\s*'[a-z_]+':\s*(?:None|'[^']*'|True|False|\d+\.?\d*|\{[^}]*\}|\[[^\]]*\])\s*", " ", response, flags=re.IGNORECASE)
+        
+        # Clean up any double commas or trailing commas/spaces
+        response = re.sub(r",\s*,+", ",", response)  # Remove multiple commas
+        response = re.sub(r",\s*$", "", response)  # Remove trailing comma
+        response = re.sub(r"^\s*,\s*", "", response)  # Remove leading comma
+        response = re.sub(r"\s+", " ", response)  # Normalize whitespace
+        response = response.strip()  # Remove leading/trailing whitespace
+        
+        # Final cleanup: remove any remaining isolated commas or braces
+        response = re.sub(r"^\s*[,}]\s*", "", response)
+        response = re.sub(r"\s*[,}]\s*$", "", response)
 
         # Remove patterns like "actions_taken: [, ],"
         response = re.sub(r"actions_taken: \[[^\]]*\],", "", response)
@@ -483,6 +539,8 @@ async def chat(req: ChatRequest):
     
     Includes timeout protection for async operations to prevent hanging requests.
     """
+    # Log immediately when request is received
+    logger.info(f"📥 Received chat request: message='{req.message[:100]}...', reasoning={req.enable_reasoning}, session={req.session_id or 'default'}")
     try:
         # Check input safety with guardrails (with timeout)
         try:
@@ -507,7 +565,26 @@ async def chat(req: ChatRequest):
 
         # Process the query through the MCP planner graph with error handling
         # Add timeout to prevent hanging on slow queries
-        MAIN_QUERY_TIMEOUT = 30  # seconds for main query processing
+        # Increase timeout when reasoning is enabled (reasoning takes longer)
+        # Detect complex queries that need even more time
+        query_lower = req.message.lower()
+        is_complex_query = any(keyword in query_lower for keyword in [
+            "analyze", "relationship", "between", "compare", "evaluate", 
+            "optimize", "calculate", "correlation", "impact", "effect"
+        ]) or len(req.message.split()) > 15
+        
+        if req.enable_reasoning:
+            # Very complex queries with reasoning need up to 4 minutes
+            # Set to 230s (slightly less than frontend 240s) to ensure backend responds before frontend times out
+            # Complex queries like "Analyze the relationship between..." can take longer
+            # For non-complex reasoning queries, set to 115s (slightly less than frontend 120s)
+            MAIN_QUERY_TIMEOUT = 230 if is_complex_query else 115  # 230s for complex, 115s for regular reasoning
+        else:
+            # Regular queries: 30s for simple, 60s for complex
+            MAIN_QUERY_TIMEOUT = 60 if is_complex_query else 30
+        
+        # Initialize result to None to avoid UnboundLocalError
+        result = None
         
         try:
             logger.info(f"Processing chat query: {req.message[:50]}...")
@@ -540,6 +617,12 @@ async def chat(req: ChatRequest):
             planner_context["enable_reasoning"] = req.enable_reasoning
             if req.reasoning_types:
                 planner_context["reasoning_types"] = req.reasoning_types
+            
+            # Log reasoning configuration
+            if req.enable_reasoning:
+                logger.info(f"Reasoning enabled for query. Types: {req.reasoning_types or 'auto'}, Timeout: {MAIN_QUERY_TIMEOUT}s")
+            else:
+                logger.info(f"Reasoning disabled for query. Timeout: {MAIN_QUERY_TIMEOUT}s")
             
             query_task = asyncio.create_task(
                 mcp_planner.process_warehouse_query(
@@ -578,11 +661,13 @@ async def chat(req: ChatRequest):
             
             # Determine if enhancements should be skipped for simple queries
             # Simple queries: short messages, greetings, or basic status checks
+            # Also skip enhancements for complex reasoning queries to avoid timeout
             skip_enhancements = (
                 len(req.message.split()) <= 3 or  # Very short queries
                 req.message.lower().startswith(("hi", "hello", "hey")) or  # Greetings
                 "?" not in req.message or  # Not a question
-                result.get("intent") == "greeting"  # Intent is just greeting
+                result.get("intent") == "greeting" or  # Intent is just greeting
+                req.enable_reasoning  # Skip enhancements when reasoning is enabled to avoid timeout
             )
 
             # Extract entities and intent from result for all enhancements
@@ -608,9 +693,10 @@ async def chat(req: ChatRequest):
                             )
 
             # Parallelize independent enhancement operations for better performance
-            # Skip enhancements for simple queries to improve response time
+            # Skip enhancements for simple queries or when reasoning is enabled to improve response time
             if skip_enhancements:
-                logger.info(f"Skipping enhancements for simple query: {req.message[:50]}")
+                skip_reason = "reasoning enabled" if req.enable_reasoning else "simple query"
+                logger.info(f"Skipping enhancements ({skip_reason}): {req.message[:50]}")
                 # Set default values for simple queries
                 result["quick_actions"] = []
                 result["action_suggestions"] = []
@@ -818,11 +904,15 @@ async def chat(req: ChatRequest):
 
         # Check output safety with guardrails (with timeout protection)
         try:
-            output_safety = await asyncio.wait_for(
-                guardrails_service.check_output_safety(result["response"], req.context),
-                timeout=5.0  # 5 second timeout for safety check
-            )
-            if not output_safety.is_safe:
+            if result and result.get("response"):
+                output_safety = await asyncio.wait_for(
+                    guardrails_service.check_output_safety(result["response"], req.context),
+                    timeout=5.0  # 5 second timeout for safety check
+                )
+            else:
+                # Skip safety check if no result
+                output_safety = None
+            if output_safety and not output_safety.is_safe:
                 logger.warning(f"Output safety violation: {output_safety.violations}")
                 return ChatResponse(
                     reply=guardrails_service.get_safety_response(output_safety.violations),
@@ -853,12 +943,190 @@ async def chat(req: ChatRequest):
             context = result.get("context", {})
             reasoning_chain = context.get("reasoning_chain")
             reasoning_steps = context.get("reasoning_steps")
+            logger.info(f"🔍 Extracted reasoning_chain from context: {reasoning_chain is not None}, type: {type(reasoning_chain)}")
+            logger.info(f"🔍 Extracted reasoning_steps from context: {reasoning_steps is not None}, count: {len(reasoning_steps) if reasoning_steps else 0}")
             # Also check structured_response for reasoning data
             if structured_response:
                 if "reasoning_chain" in structured_response:
                     reasoning_chain = structured_response.get("reasoning_chain")
+                    logger.info(f"🔍 Found reasoning_chain in structured_response: {reasoning_chain is not None}")
                 if "reasoning_steps" in structured_response:
                     reasoning_steps = structured_response.get("reasoning_steps")
+                    logger.info(f"🔍 Found reasoning_steps in structured_response: {reasoning_steps is not None}, count: {len(reasoning_steps) if reasoning_steps else 0}")
+        
+        # Also check result directly for reasoning_chain
+        if result and "reasoning_chain" in result:
+            reasoning_chain = result.get("reasoning_chain")
+            logger.info(f"🔍 Found reasoning_chain in result: {reasoning_chain is not None}")
+        if result and "reasoning_steps" in result:
+            reasoning_steps = result.get("reasoning_steps")
+            logger.info(f"🔍 Found reasoning_steps in result: {reasoning_steps is not None}")
+        
+        # Convert ReasoningChain dataclass to dict if needed (using safe manual conversion with depth limit)
+        if reasoning_chain is not None:
+            from dataclasses import is_dataclass
+            from datetime import datetime
+            from enum import Enum
+            
+            def safe_convert_value(value, depth=0, max_depth=5):
+                """Safely convert a value to JSON-serializable format with depth limit."""
+                if depth > max_depth:
+                    return str(value)
+                    
+                if isinstance(value, datetime):
+                    return value.isoformat()
+                elif isinstance(value, Enum):
+                    return value.value
+                elif isinstance(value, (str, int, float, bool, type(None))):
+                    return value
+                elif isinstance(value, dict):
+                    return {k: safe_convert_value(v, depth + 1, max_depth) for k, v in value.items()}
+                elif isinstance(value, (list, tuple)):
+                    return [safe_convert_value(item, depth + 1, max_depth) for item in value]
+                elif hasattr(value, "__dict__"):
+                    # For objects with __dict__, convert to dict but limit depth
+                    try:
+                        # Only convert simple attributes, skip complex nested objects
+                        result = {}
+                        for k, v in value.__dict__.items():
+                            if isinstance(v, (str, int, float, bool, type(None), datetime, Enum)):
+                                result[k] = safe_convert_value(v, depth + 1, max_depth)
+                            elif isinstance(v, (list, tuple, dict)):
+                                result[k] = safe_convert_value(v, depth + 1, max_depth)
+                            else:
+                                # For complex objects, just convert to string
+                                result[k] = str(v)
+                        return result
+                    except (RecursionError, AttributeError, TypeError) as e:
+                        logger.warning(f"Failed to convert value at depth {depth}: {e}")
+                        return str(value)
+                else:
+                    return str(value)
+            
+            if is_dataclass(reasoning_chain):
+                # Manually construct dict to avoid recursion issues
+                try:
+                    reasoning_chain_dict = {
+                        "chain_id": getattr(reasoning_chain, "chain_id", ""),
+                        "query": getattr(reasoning_chain, "query", ""),
+                        "reasoning_type": getattr(reasoning_chain, "reasoning_type", ""),
+                        "final_conclusion": getattr(reasoning_chain, "final_conclusion", ""),
+                        "overall_confidence": float(getattr(reasoning_chain, "overall_confidence", 0.0)),
+                        "execution_time": float(getattr(reasoning_chain, "execution_time", 0.0)),
+                    }
+                    # Convert enum to string
+                    if hasattr(reasoning_chain_dict["reasoning_type"], "value"):
+                        reasoning_chain_dict["reasoning_type"] = reasoning_chain_dict["reasoning_type"].value
+                    # Convert datetime to ISO string
+                    if hasattr(reasoning_chain, "created_at"):
+                        created_at = getattr(reasoning_chain, "created_at")
+                        if hasattr(created_at, "isoformat"):
+                            reasoning_chain_dict["created_at"] = created_at.isoformat()
+                        else:
+                            reasoning_chain_dict["created_at"] = str(created_at)
+                    
+                    # Convert steps manually - be very careful with nested data
+                    if hasattr(reasoning_chain, "steps") and reasoning_chain.steps:
+                        converted_steps = []
+                        for step in reasoning_chain.steps:
+                            if is_dataclass(step):
+                                step_dict = {
+                                    "step_id": getattr(step, "step_id", ""),
+                                    "step_type": getattr(step, "step_type", ""),
+                                    "description": getattr(step, "description", ""),
+                                    "reasoning": getattr(step, "reasoning", ""),
+                                    "confidence": float(getattr(step, "confidence", 0.0)),
+                                }
+                                # Convert timestamp
+                                if hasattr(step, "timestamp"):
+                                    timestamp = getattr(step, "timestamp")
+                                    if hasattr(timestamp, "isoformat"):
+                                        step_dict["timestamp"] = timestamp.isoformat()
+                                    else:
+                                        step_dict["timestamp"] = str(timestamp)
+                                
+                                # Handle input_data and output_data - skip to avoid circular references
+                                # These fields often contain complex objects that can cause circular references
+                                step_dict["input_data"] = {}
+                                step_dict["output_data"] = {}
+                                    
+                                if hasattr(step, "dependencies"):
+                                    deps = getattr(step, "dependencies")
+                                    step_dict["dependencies"] = list(deps) if deps and isinstance(deps, (list, tuple)) else []
+                                else:
+                                    step_dict["dependencies"] = []
+                                    
+                                converted_steps.append(step_dict)
+                            elif isinstance(step, dict):
+                                # Already a dict, just ensure it's serializable
+                                converted_steps.append({k: v for k, v in step.items() 
+                                                       if isinstance(v, (str, int, float, bool, type(None), list, dict))})
+                            else:
+                                converted_steps.append({"step_id": "unknown", "step_type": "unknown", 
+                                                       "description": str(step), "reasoning": "", "confidence": 0.0})
+                        reasoning_chain_dict["steps"] = converted_steps
+                    else:
+                        reasoning_chain_dict["steps"] = []
+                    reasoning_chain = reasoning_chain_dict
+                except Exception as e:
+                    logger.error(f"Error converting reasoning_chain to dict: {e}", exc_info=True)
+                    reasoning_chain = None
+                else:
+                    logger.info(f"✅ Successfully converted reasoning_chain to dict with {len(reasoning_chain.get('steps', []))} steps")
+            elif not isinstance(reasoning_chain, dict):
+                # If it's not a dict and not a dataclass, try to convert it safely
+                try:
+                    reasoning_chain = safe_convert_value(reasoning_chain)
+                except (RecursionError, AttributeError, TypeError) as e:
+                    logger.warning(f"Failed to convert reasoning_chain to dict: {e}")
+                    reasoning_chain = None
+        
+        # Convert reasoning_steps to list of dicts if needed (simplified to avoid recursion)
+        if reasoning_steps is not None and isinstance(reasoning_steps, list):
+            from dataclasses import is_dataclass
+            converted_steps = []
+            for step in reasoning_steps:
+                if is_dataclass(step):
+                    try:
+                        step_dict = {
+                            "step_id": getattr(step, "step_id", ""),
+                            "step_type": getattr(step, "step_type", ""),
+                            "description": getattr(step, "description", ""),
+                            "reasoning": getattr(step, "reasoning", ""),
+                            "confidence": float(getattr(step, "confidence", 0.0)),
+                        }
+                        # Convert timestamp
+                        if hasattr(step, "timestamp"):
+                            timestamp = getattr(step, "timestamp")
+                            if hasattr(timestamp, "isoformat"):
+                                step_dict["timestamp"] = timestamp.isoformat()
+                            else:
+                                step_dict["timestamp"] = str(timestamp)
+                        
+                            # Handle input_data and output_data - skip to avoid circular references
+                            # These fields often contain complex objects that can cause circular references
+                            step_dict["input_data"] = {}
+                            step_dict["output_data"] = {}
+                            
+                        if hasattr(step, "dependencies"):
+                            deps = getattr(step, "dependencies")
+                            step_dict["dependencies"] = list(deps) if deps and isinstance(deps, (list, tuple)) else []
+                        else:
+                            step_dict["dependencies"] = []
+                            
+                        converted_steps.append(step_dict)
+                    except Exception as e:
+                        logger.warning(f"Error converting reasoning step: {e}")
+                        converted_steps.append({"step_id": "error", "step_type": "error", 
+                                               "description": "Error converting step", "reasoning": "", "confidence": 0.0})
+                elif isinstance(step, dict):
+                    # Already a dict, just ensure it's serializable
+                    converted_steps.append({k: v for k, v in step.items() 
+                                           if isinstance(v, (str, int, float, bool, type(None), list, dict))})
+                else:
+                    converted_steps.append({"step_id": "unknown", "step_type": "unknown", 
+                                           "description": str(step), "reasoning": "", "confidence": 0.0})
+            reasoning_steps = converted_steps
 
         # Extract confidence from multiple possible sources with sensible defaults
         # Priority: result.confidence > structured_response.confidence > agent_responses > default (0.75)
@@ -885,6 +1153,23 @@ async def chat(req: ChatRequest):
         # Format the response to be more user-friendly
         # Ensure we have a valid response before formatting
         base_response = result.get("response") if result else None
+        
+        # If base_response looks like it contains structured data (dict representation), extract just the text
+        if base_response and isinstance(base_response, str):
+            # Check if it looks like a dict string representation
+            if ("'response_type'" in base_response or "'natural_language'" in base_response or 
+                "'reasoning_chain'" in base_response or "'reasoning_steps'" in base_response):
+                # Try to extract just the natural_language field if it exists
+                import re
+                natural_lang_match = re.search(r"'natural_language':\s*'([^']+)'", base_response)
+                if natural_lang_match:
+                    base_response = natural_lang_match.group(1)
+                    logger.info("Extracted natural_language from response string")
+                else:
+                    # If we can't extract, clean it aggressively
+                    base_response = _clean_response_text(base_response)
+                    logger.info("Cleaned response string that contained structured data")
+        
         if not base_response:
             logger.warning(f"No response in result: {result}")
             base_response = f"I received your message: '{req.message}'. Processing your request..."
@@ -977,43 +1262,190 @@ async def chat(req: ChatRequest):
             enhancement_applied = False
             enhancement_summary = None
 
+        # Helper function to clean reasoning data for serialization
+        def clean_reasoning_data(data):
+            """Clean reasoning data to ensure it's JSON-serializable."""
+            if data is None:
+                return None
+            if isinstance(data, dict):
+                # Recursively clean dict, but limit depth to avoid issues
+                cleaned = {}
+                for k, v in data.items():
+                    if isinstance(v, (str, int, float, bool, type(None))):
+                        cleaned[k] = v
+                    elif isinstance(v, list):
+                        # Clean list items
+                        cleaned_list = []
+                        for item in v:
+                            if isinstance(item, (str, int, float, bool, type(None))):
+                                cleaned_list.append(item)
+                            elif isinstance(item, dict):
+                                cleaned_list.append(clean_reasoning_data(item))
+                            else:
+                                cleaned_list.append(str(item))
+                        cleaned[k] = cleaned_list
+                    elif isinstance(v, dict):
+                        cleaned[k] = clean_reasoning_data(v)
+                    else:
+                        cleaned[k] = str(v)
+                return cleaned
+            elif isinstance(data, list):
+                return [clean_reasoning_data(item) for item in data]
+            else:
+                return str(data)
+        
+        # Clean reasoning data before adding to response
+        cleaned_reasoning_chain = clean_reasoning_data(reasoning_chain) if reasoning_chain else None
+        cleaned_reasoning_steps = clean_reasoning_data(reasoning_steps) if reasoning_steps else None
+        
+        # Clean context to remove potential circular references
+        # Simply remove reasoning_chain and reasoning_steps from context as they're passed separately
+        # Also remove any complex objects that might cause circular references
+        cleaned_context = {}
+        if result and result.get("context"):
+            context = result.get("context", {})
+            if isinstance(context, dict):
+                # Only keep simple, serializable values
+                for k, v in context.items():
+                    if k not in ['reasoning_chain', 'reasoning_steps', 'structured_response', 'tool_execution_results']:
+                        # Only keep primitive types
+                        if isinstance(v, (str, int, float, bool, type(None))):
+                            cleaned_context[k] = v
+                        elif isinstance(v, list):
+                            # Only keep lists of primitives
+                            if all(isinstance(item, (str, int, float, bool, type(None))) for item in v):
+                                cleaned_context[k] = v
+        
+        # Clean tool_execution_results - keep only simple serializable values
+        cleaned_tool_results = None
+        if tool_execution_results and isinstance(tool_execution_results, dict):
+            cleaned_tool_results = {}
+            for k, v in tool_execution_results.items():
+                if isinstance(v, dict):
+                    # Only keep simple, serializable fields
+                    cleaned_result = {}
+                    for field, value in v.items():
+                        # Only keep primitive types and simple structures
+                        if isinstance(value, (str, int, float, bool, type(None))):
+                            cleaned_result[field] = value
+                        elif isinstance(value, list):
+                            # Only keep lists of primitives
+                            if all(isinstance(item, (str, int, float, bool, type(None))) for item in value):
+                                cleaned_result[field] = value
+                    if cleaned_result:  # Only add if we have at least one field
+                        cleaned_tool_results[k] = cleaned_result
+        
         try:
-            return ChatResponse(
+            logger.info(f"📤 Creating response with reasoning_chain: {reasoning_chain is not None}, reasoning_steps: {reasoning_steps is not None}")
+            # Clean all complex fields to avoid circular references
+            # Only keep simple, serializable data
+            cleaned_structured_data = None
+            if structured_response and structured_response.get("data"):
+                data = structured_response.get("data")
+                if isinstance(data, dict):
+                    cleaned_structured_data = {}
+                    for k, v in data.items():
+                        if isinstance(v, (str, int, float, bool, type(None))):
+                            cleaned_structured_data[k] = v
+                        elif isinstance(v, list):
+                            # Only keep lists of primitives
+                            if all(isinstance(item, (str, int, float, bool, type(None))) for item in v):
+                                cleaned_structured_data[k] = v
+            
+            # Clean evidence_summary and key_findings
+            cleaned_evidence_summary = None
+            cleaned_key_findings = None
+            if result:
+                if result.get("evidence_summary") and isinstance(result.get("evidence_summary"), dict):
+                    evidence = result.get("evidence_summary")
+                    cleaned_evidence_summary = {k: v for k, v in evidence.items() 
+                                              if isinstance(v, (str, int, float, bool, type(None), list))}
+                if result.get("key_findings") and isinstance(result.get("key_findings"), list):
+                    findings = result.get("key_findings")
+                    cleaned_key_findings = [f for f in findings 
+                                          if isinstance(f, (str, int, float, bool, type(None), dict))]
+                    # Further clean dict items in key_findings
+                    if cleaned_key_findings:
+                        cleaned_key_findings = [
+                            {k: v for k, v in f.items() if isinstance(v, (str, int, float, bool, type(None)))}
+                            if isinstance(f, dict) else f
+                            for f in cleaned_key_findings
+                        ]
+            
+            # Try to create response with cleaned data
+            response = ChatResponse(
                 reply=formatted_reply,
                 route=result.get("route", "general") if result else "general",
                 intent=result.get("intent", "unknown") if result else "unknown",
                 session_id=result.get("session_id", req.session_id or "default") if result else (req.session_id or "default"),
-                context=result.get("context") if result else {},
-                structured_data=structured_response.get("data") if structured_response else None,
+                context=cleaned_context if cleaned_context else {},
+                structured_data=cleaned_structured_data,
                 recommendations=result.get(
                     "recommendations", structured_response.get("recommendations") if structured_response else []
                 ) if result else [],
                 confidence=confidence,  # Use the confidence we calculated above
-                actions_taken=structured_response.get("actions_taken") if structured_response else None,
-                # Evidence enhancement fields
-                evidence_summary=result.get("evidence_summary") if result else None,
-                source_attributions=result.get("source_attributions") if result else None,
+                actions_taken=None,  # Disable to avoid circular references
+                # Evidence enhancement fields - use cleaned versions
+                evidence_summary=cleaned_evidence_summary,
+                source_attributions=result.get("source_attributions") if result and isinstance(result.get("source_attributions"), list) else None,
                 evidence_count=result.get("evidence_count") if result else None,
-                key_findings=result.get("key_findings") if result else None,
+                key_findings=cleaned_key_findings,
                 # Quick actions fields
-                quick_actions=result.get("quick_actions") if result else None,
-                action_suggestions=result.get("action_suggestions") if result else None,
+                quick_actions=None,  # Disable to avoid circular references
+                action_suggestions=result.get("action_suggestions") if result and isinstance(result.get("action_suggestions"), list) else None,
                 # Conversation memory fields
-                context_info=result.get("context_info") if result else None,
-                conversation_enhanced=result.get("context_info") is not None if result else False,
+                context_info=None,  # Disable to avoid circular references
+                conversation_enhanced=False,
                 # Response validation fields
                 validation_score=validation_score,
                 validation_passed=validation_passed,
-                validation_issues=validation_issues,
+                validation_issues=None,  # Disable to avoid circular references
                 enhancement_applied=enhancement_applied,
                 enhancement_summary=enhancement_summary,
                 # MCP tool execution fields
-                mcp_tools_used=mcp_tools_used,
-                tool_execution_results=tool_execution_results,
-                # Reasoning fields
-                reasoning_chain=reasoning_chain,
-                reasoning_steps=reasoning_steps,
+                mcp_tools_used=mcp_tools_used if isinstance(mcp_tools_used, list) else [],
+                tool_execution_results=None,  # Disable to avoid circular references
+                # Reasoning fields - use cleaned versions
+                reasoning_chain=cleaned_reasoning_chain,
+                reasoning_steps=cleaned_reasoning_steps,
             )
+            logger.info("✅ Response created successfully")
+            return response
+        except (ValueError, TypeError) as circular_error:
+            if "Circular reference" in str(circular_error) or "circular" in str(circular_error).lower():
+                logger.error(f"Circular reference detected in response serialization: {circular_error}")
+                # Create a minimal response without any complex data structures
+                logger.warning("Creating minimal response due to circular reference")
+                return ChatResponse(
+                    reply=formatted_reply if formatted_reply else (base_response if base_response else f"I received your message: '{req.message}'. However, there was an issue formatting the response."),
+                    route=result.get("route", "general") if result else "general",
+                    intent=result.get("intent", "unknown") if result else "unknown",
+                    session_id=req.session_id or "default",
+                    context={},  # Empty context to avoid circular references
+                    structured_data=None,  # Remove structured data
+                    recommendations=[],
+                    confidence=confidence if confidence else 0.5,
+                    actions_taken=None,
+                    evidence_summary=None,
+                    source_attributions=None,
+                    evidence_count=None,
+                    key_findings=None,
+                    quick_actions=None,
+                    action_suggestions=None,
+                    context_info=None,
+                    conversation_enhanced=False,
+                    validation_score=None,
+                    validation_passed=None,
+                    validation_issues=None,
+                    enhancement_applied=False,
+                    enhancement_summary=None,
+                    mcp_tools_used=[],
+                    tool_execution_results=None,
+                    reasoning_chain=None,
+                    reasoning_steps=None,
+                )
+            else:
+                raise
         except Exception as response_error:
             logger.error(f"Error creating ChatResponse: {response_error}")
             logger.error(f"Result data: {result if result else 'None'}")

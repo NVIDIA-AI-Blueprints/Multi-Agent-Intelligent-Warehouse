@@ -170,9 +170,17 @@ async def login(user_login: UserLogin):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Login failed: {e}", exc_info=True)
+        error_type = type(e).__name__
+        error_msg = str(e)
+        logger.error(f"Login failed: {error_type}: {error_msg}", exc_info=True)
+        # Include error type in response for debugging (in development only)
+        import os
+        if os.getenv("ENVIRONMENT", "development") == "development":
+            detail = f"Login failed: {error_type}: {error_msg}"
+        else:
+            detail = "Login failed"
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Login failed"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=detail
         )
 
 

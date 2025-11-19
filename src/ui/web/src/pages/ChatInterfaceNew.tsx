@@ -9,6 +9,13 @@ import {
   Skeleton,
   Alert,
   Snackbar,
+  Switch,
+  FormControlLabel,
+  FormGroup,
+  Checkbox,
+  Collapse,
+  Chip,
+  Tooltip,
 } from '@mui/material';
 import {
   Send as SendIcon,
@@ -16,9 +23,12 @@ import {
   Close as CloseIcon,
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
+  Psychology as PsychologyIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
 import { useMutation, useQuery } from 'react-query';
-import { chatAPI, healthAPI, operationsAPI } from '../services/api';
+import { chatAPI, healthAPI, operationsAPI, ReasoningChain, ReasoningStep } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import TopBar from '../components/chat/TopBar';
 import LeftRail from '../components/chat/LeftRail';
@@ -52,6 +62,8 @@ interface Message {
     id?: string;
     score?: number;
   }>;
+  reasoning_chain?: ReasoningChain;
+  reasoning_steps?: ReasoningStep[];
 }
 
 interface StreamingEvent {
@@ -94,11 +106,26 @@ const ChatInterfaceNew: React.FC = () => {
   const [currentPlannerDecision, setCurrentPlannerDecision] = useState<any>(null);
   const [currentActiveContext, setCurrentActiveContext] = useState<any>(null);
   const [currentToolTimeline, setCurrentToolTimeline] = useState<any[]>([]);
+  const [currentReasoningChain, setCurrentReasoningChain] = useState<ReasoningChain | undefined>(undefined);
+  const [currentReasoningSteps, setCurrentReasoningSteps] = useState<ReasoningStep[] | undefined>(undefined);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' }>({
     open: false,
     message: '',
     severity: 'info',
   });
+  
+  // Reasoning state
+  const [enableReasoning, setEnableReasoning] = useState(false);
+  const [showReasoningTypes, setShowReasoningTypes] = useState(false);
+  const [selectedReasoningTypes, setSelectedReasoningTypes] = useState<string[]>([]);
+  
+  const availableReasoningTypes = [
+    { value: 'chain_of_thought', label: 'Chain of Thought', description: 'Step-by-step logical reasoning' },
+    { value: 'multi_hop', label: 'Multi-Hop', description: 'Reasoning across multiple data points' },
+    { value: 'scenario_analysis', label: 'Scenario Analysis', description: 'What-if analysis and alternatives' },
+    { value: 'causal', label: 'Causal Reasoning', description: 'Cause-effect relationships' },
+    { value: 'pattern_recognition', label: 'Pattern Recognition', description: 'Identify trends and patterns' },
+  ];
 
   // Top bar state - use environment/config values
   const [warehouse, setWarehouse] = useState(process.env.REACT_APP_WAREHOUSE_ID || 'WH-01');
@@ -235,6 +262,8 @@ const ChatInterfaceNew: React.FC = () => {
       proposals: response.proposals,
       clarifying: response.clarifying,
       evidence: response.evidence,
+      reasoning_chain: response.reasoning_chain,
+      reasoning_steps: response.reasoning_steps,
     };
 
     setMessages(prev => [...prev, assistantMessage]);
@@ -347,10 +376,22 @@ const ChatInterfaceNew: React.FC = () => {
           role,
           environment,
         },
+        enable_reasoning: enableReasoning,
+        reasoning_types: enableReasoning && selectedReasoningTypes.length > 0 ? selectedReasoningTypes : undefined,
       });
     } catch (error: any) {
       console.error('Error sending message:', error);
     }
+  };
+  
+  const handleReasoningTypeToggle = (type: string) => {
+    setSelectedReasoningTypes(prev => {
+      if (prev.includes(type)) {
+        return prev.filter(t => t !== type);
+      } else {
+        return [...prev, type];
+      }
+    });
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -450,7 +491,7 @@ const ChatInterfaceNew: React.FC = () => {
   }
 
   return (
-    <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#000000' }}>
+    <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff' }}>
       {/* Top Bar */}
       <TopBar
         warehouse={warehouse}
@@ -471,14 +512,14 @@ const ChatInterfaceNew: React.FC = () => {
         />
 
         {/* Chat Area */}
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#000000' }}>
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#f5f5f5' }}>
           {/* Chat Messages */}
           <Box
             sx={{
               flex: 1,
               overflow: 'auto',
               p: 0,
-              backgroundColor: '#000000',
+              backgroundColor: '#f5f5f5',
             }}
           >
             {messages.map((message) => (
@@ -494,8 +535,8 @@ const ChatInterfaceNew: React.FC = () => {
             {/* Streaming Events */}
             {streamingEvents.length > 0 && (
               <Box sx={{ px: 2, mb: 2 }}>
-                <Paper sx={{ backgroundColor: '#1a1a1a', p: 2, border: '1px solid #333333' }}>
-                  <Typography variant="body2" sx={{ color: '#76B900', mb: 1 }}>
+                <Paper sx={{ backgroundColor: '#ffffff', p: 2, border: '1px solid #e0e0e0', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                  <Typography variant="body2" sx={{ color: '#76B900', mb: 1, fontWeight: 500 }}>
                     Processing...
                   </Typography>
                   {streamingEvents
@@ -505,7 +546,7 @@ const ChatInterfaceNew: React.FC = () => {
                         <Typography variant="caption" sx={{ color: '#666666', minWidth: '100px' }}>
                           {event?.stage || 'unknown'}:
                         </Typography>
-                        <Typography variant="caption" sx={{ color: '#ffffff' }}>
+                        <Typography variant="caption" sx={{ color: '#333333' }}>
                           {event?.agent && `Agent: ${event.agent}`}
                           {event?.confidence && ` (${(event.confidence * 100).toFixed(1)}%)`}
                           {event?.k !== undefined && ` K=${event.k}→${event.reranked}`}
@@ -523,9 +564,9 @@ const ChatInterfaceNew: React.FC = () => {
             {isLoading && (
               <Box sx={{ px: 2, mb: 2 }}>
                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-                  <Skeleton variant="circular" width={32} height={32} sx={{ backgroundColor: '#333333' }} />
+                  <Skeleton variant="circular" width={32} height={32} sx={{ backgroundColor: '#e0e0e0' }} />
                   <Box sx={{ flex: 1 }}>
-                    <Skeleton variant="rectangular" width="70%" height={60} sx={{ backgroundColor: '#1a1a1a', borderRadius: 2 }} />
+                    <Skeleton variant="rectangular" width="70%" height={60} sx={{ backgroundColor: '#ffffff', borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }} />
                   </Box>
                 </Box>
               </Box>
@@ -538,10 +579,132 @@ const ChatInterfaceNew: React.FC = () => {
           <Box
             sx={{
               p: 2,
-              borderTop: '1px solid #333333',
-              backgroundColor: '#111111',
+              borderTop: '1px solid #e0e0e0',
+              backgroundColor: '#ffffff',
+              boxShadow: '0 -2px 8px rgba(0,0,0,0.05)',
             }}
           >
+            {/* Reasoning Controls */}
+            <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={enableReasoning}
+                    onChange={(e) => {
+                      setEnableReasoning(e.target.checked);
+                      if (!e.target.checked) {
+                        setSelectedReasoningTypes([]);
+                        setShowReasoningTypes(false);
+                      }
+                    }}
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': {
+                        color: '#76B900',
+                      },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                        backgroundColor: '#76B900',
+                      },
+                    }}
+                  />
+                }
+                label={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <PsychologyIcon sx={{ fontSize: 18, color: enableReasoning ? '#76B900' : '#666666' }} />
+                    <Typography variant="body2" sx={{ color: '#333333' }}>
+                      Enable Reasoning
+                    </Typography>
+                  </Box>
+                }
+              />
+              
+              {enableReasoning && (
+                <>
+                  <Tooltip title="Select specific reasoning types (leave empty for auto-selection)">
+                    <IconButton
+                      size="small"
+                      onClick={() => setShowReasoningTypes(!showReasoningTypes)}
+                      sx={{
+                        color: '#76B900',
+                        '&:hover': { backgroundColor: 'rgba(118, 185, 0, 0.1)' },
+                      }}
+                    >
+                      {showReasoningTypes ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                    </IconButton>
+                  </Tooltip>
+                  
+                  {selectedReasoningTypes.length > 0 && (
+                    <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                      {selectedReasoningTypes.map((type) => {
+                        const typeInfo = availableReasoningTypes.find(t => t.value === type);
+                        return (
+                          <Chip
+                            key={type}
+                            label={typeInfo?.label || type}
+                            size="small"
+                            onDelete={() => handleReasoningTypeToggle(type)}
+                            sx={{
+                              backgroundColor: '#76B900',
+                              color: '#000000',
+                              fontSize: '10px',
+                              '& .MuiChip-deleteIcon': {
+                                color: '#000000',
+                              },
+                            }}
+                          />
+                        );
+                      })}
+                    </Box>
+                  )}
+                </>
+              )}
+            </Box>
+            
+            {/* Reasoning Type Selection */}
+            <Collapse in={showReasoningTypes && enableReasoning}>
+              <Paper
+                sx={{
+                  p: 1.5,
+                  mb: 1,
+                  backgroundColor: '#fafafa',
+                  border: '1px solid #e0e0e0',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                }}
+              >
+                <Typography variant="caption" sx={{ color: '#666666', mb: 1, display: 'block' }}>
+                  Select reasoning types (optional - leave empty for auto-selection):
+                </Typography>
+                <FormGroup>
+                  {availableReasoningTypes.map((type) => (
+                    <FormControlLabel
+                      key={type.value}
+                      control={
+                        <Checkbox
+                          checked={selectedReasoningTypes.includes(type.value)}
+                          onChange={() => handleReasoningTypeToggle(type.value)}
+                          sx={{
+                            color: '#76B900',
+                            '&.Mui-checked': {
+                              color: '#76B900',
+                            },
+                          }}
+                        />
+                      }
+                      label={
+                        <Box>
+                          <Typography variant="body2" sx={{ color: '#333333' }}>
+                            {type.label}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#666666' }}>
+                            {type.description}
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                  ))}
+                </FormGroup>
+              </Paper>
+            </Collapse>
+            
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
               <TextField
                 ref={inputRef}
@@ -555,10 +718,10 @@ const ChatInterfaceNew: React.FC = () => {
                 disabled={isLoading}
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    backgroundColor: '#1a1a1a',
-                    color: '#ffffff',
+                    backgroundColor: '#ffffff',
+                    color: '#333333',
                     '& fieldset': {
-                      borderColor: '#333333',
+                      borderColor: '#e0e0e0',
                     },
                     '&:hover fieldset': {
                       borderColor: '#76B900',
@@ -568,9 +731,9 @@ const ChatInterfaceNew: React.FC = () => {
                     },
                   },
                   '& .MuiInputBase-input': {
-                    color: '#ffffff',
+                    color: '#333333',
                     '&::placeholder': {
-                      color: '#666666',
+                      color: '#999999',
                       opacity: 1,
                     },
                   },
@@ -586,8 +749,8 @@ const ChatInterfaceNew: React.FC = () => {
                     backgroundColor: '#5a8f00',
                   },
                   '&:disabled': {
-                    backgroundColor: '#333333',
-                    color: '#666666',
+                    backgroundColor: '#e0e0e0',
+                    color: '#999999',
                   },
                 }}
               >
@@ -606,6 +769,8 @@ const ChatInterfaceNew: React.FC = () => {
           plannerDecision={currentPlannerDecision}
           activeContext={currentActiveContext}
           toolTimeline={currentToolTimeline}
+          reasoningChain={currentReasoningChain}
+          reasoningSteps={currentReasoningSteps}
         />
       </Box>
 
@@ -615,10 +780,11 @@ const ChatInterfaceNew: React.FC = () => {
           size="small"
           onClick={() => setRightPanelOpen(!rightPanelOpen)}
           sx={{
-            backgroundColor: rightPanelOpen ? '#76B900' : '#333333',
-            color: '#ffffff',
+            backgroundColor: rightPanelOpen ? '#76B900' : '#ffffff',
+            color: rightPanelOpen ? '#ffffff' : '#333333',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
             '&:hover': {
-              backgroundColor: rightPanelOpen ? '#5a8f00' : '#555555',
+              backgroundColor: rightPanelOpen ? '#5a8f00' : '#f5f5f5',
             },
           }}
         >
@@ -629,10 +795,11 @@ const ChatInterfaceNew: React.FC = () => {
           size="small"
           onClick={() => setShowInternals(!showInternals)}
           sx={{
-            backgroundColor: showInternals ? '#9C27B0' : '#333333',
-            color: '#ffffff',
+            backgroundColor: showInternals ? '#9C27B0' : '#ffffff',
+            color: showInternals ? '#ffffff' : '#333333',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
             '&:hover': {
-              backgroundColor: showInternals ? '#7b1fa2' : '#555555',
+              backgroundColor: showInternals ? '#7b1fa2' : '#f5f5f5',
             },
           }}
         >

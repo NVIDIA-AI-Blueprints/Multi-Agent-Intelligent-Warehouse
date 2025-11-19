@@ -84,6 +84,25 @@ export interface ChatRequest {
   message: string;
   session_id?: string;
   context?: Record<string, any>;
+  enable_reasoning?: boolean;
+  reasoning_types?: string[];
+}
+
+export interface ReasoningStep {
+  step_id: string;
+  step_type: string;
+  description: string;
+  reasoning: string;
+  confidence: number;
+}
+
+export interface ReasoningChain {
+  chain_id: string;
+  query: string;
+  reasoning_type: string;
+  steps: ReasoningStep[];
+  final_conclusion: string;
+  overall_confidence: number;
 }
 
 export interface ChatResponse {
@@ -95,6 +114,8 @@ export interface ChatResponse {
   structured_data?: Record<string, any>;
   recommendations?: string[];
   confidence?: number;
+  reasoning_chain?: ReasoningChain;
+  reasoning_steps?: ReasoningStep[];
 }
 
 export interface EquipmentAsset {
@@ -178,7 +199,32 @@ export const mcpAPI = {
 
 export const chatAPI = {
   sendMessage: async (request: ChatRequest): Promise<ChatResponse> => {
-    const response = await api.post('/chat', request);
+    // Use longer timeout when reasoning is enabled (reasoning takes longer)
+    // Also detect complex queries that need even more time
+    const messageLower = request.message.toLowerCase();
+    const isComplexQuery = messageLower.includes('analyze') || 
+                          messageLower.includes('relationship') || 
+                          messageLower.includes('between') ||
+                          messageLower.includes('compare') ||
+                          messageLower.includes('evaluate') ||
+                          messageLower.includes('correlation') ||
+                          messageLower.includes('impact') ||
+                          messageLower.includes('effect') ||
+                          request.message.split(' ').length > 15;
+    
+    let timeout = 60000; // Default 60s
+    if (request.enable_reasoning) {
+      timeout = isComplexQuery ? 240000 : 120000; // 240s (4min) for complex reasoning, 120s for regular reasoning
+    } else if (isComplexQuery) {
+      timeout = 120000; // 120s for complex queries without reasoning
+    }
+    
+    // Log timeout for debugging
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[ChatAPI] Query timeout: ${timeout}ms, Complex: ${isComplexQuery}, Reasoning: ${request.enable_reasoning}`);
+    }
+    
+    const response = await api.post('/chat', request, { timeout });
     return response.data;
   },
 };
