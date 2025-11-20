@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-The Warehouse Operational Assistant implements a comprehensive **Advanced Reasoning Engine** with 5 distinct reasoning types. However, **the reasoning engine is currently only integrated with the Safety Agent** and is **not used by the main chat router or other agents** (Equipment, Operations, Forecasting, Document).
+The Warehouse Operational Assistant implements a comprehensive **Advanced Reasoning Engine** with 5 distinct reasoning types. **The reasoning engine is now fully integrated with ALL agents** (Equipment, Operations, Safety, Forecasting, Document) and the main chat router. Reasoning can be enabled/disabled via the chat API and UI, and reasoning chains are displayed in the chat interface.
 
 ## Implementation Status
 
@@ -19,26 +19,39 @@ The Warehouse Operational Assistant implements a comprehensive **Advanced Reason
    - `/api/v1/reasoning/insights/{session_id}` - Session insights
    - `/api/v1/reasoning/types` - Available reasoning types
 
-3. **Safety Agent Integration** (`src/api/agents/safety/safety_agent.py`)
+3. **Main Chat Router Integration** (`src/api/routers/chat.py`)
    - ✅ Fully integrated with reasoning engine
-   - ✅ Automatic reasoning for complex queries
-   - ✅ Reasoning chain included in responses
+   - ✅ Supports `enable_reasoning` and `reasoning_types` parameters
+   - ✅ Extracts and includes reasoning chains in responses
+   - ✅ Dynamic timeout handling for reasoning-enabled queries
 
-### ❌ Not Integrated
+4. **MCP Planner Graph Integration** (`src/api/graphs/mcp_integrated_planner_graph.py`)
+   - ✅ Fully integrated with reasoning engine
+   - ✅ Passes reasoning parameters to all agents
+   - ✅ Extracts reasoning chains from agent responses
+   - ✅ Includes reasoning in context for response synthesis
 
-1. **Main Chat Router** (`src/api/routers/chat.py`)
-   - ❌ No reasoning integration
-   - Uses MCP planner graph directly
+5. **All Agent Integrations** (Phase 1 Complete)
+   - ✅ **Equipment Agent** (`src/api/agents/inventory/mcp_equipment_agent.py`) - Fully integrated
+   - ✅ **Operations Agent** (`src/api/agents/operations/mcp_operations_agent.py`) - Fully integrated
+   - ✅ **Safety Agent** (`src/api/agents/safety/mcp_safety_agent.py`) - Fully integrated
+   - ✅ **Forecasting Agent** (`src/api/agents/forecasting/forecasting_agent.py`) - Fully integrated
+   - ✅ **Document Agent** (`src/api/agents/document/mcp_document_agent.py`) - Fully integrated
 
-2. **MCP Planner Graph** (`src/api/graphs/mcp_integrated_planner_graph.py`)
-   - ❌ No reasoning integration
-   - Routes to agents without reasoning
+6. **Frontend Integration** (`src/ui/web/src/pages/ChatInterfaceNew.tsx`)
+   - ✅ UI toggle to enable/disable reasoning
+   - ✅ Reasoning type selection
+   - ✅ Reasoning chain visualization in chat messages
+   - ✅ Reasoning steps displayed with expandable UI
 
-3. **Other Agents**
-   - ❌ Equipment Agent - No reasoning
-   - ❌ Operations Agent - No reasoning
-   - ❌ Forecasting Agent - No reasoning
-   - ❌ Document Agent - No reasoning
+### ✅ Phase 1 Complete
+
+All agents now support:
+- `enable_reasoning` parameter in `process_query()`
+- Automatic complex query detection via `_is_complex_query()`
+- Reasoning type selection via `_determine_reasoning_types()`
+- Reasoning chain included in agent responses
+- Graceful fallback when reasoning is disabled or fails
 
 ## Reasoning Types Implemented
 
@@ -56,7 +69,7 @@ The Warehouse Operational Assistant implements a comprehensive **Advanced Reason
 
 **Code Location**: `reasoning_engine.py:234-304`
 
-**Usage**: Always included in Safety Agent reasoning
+**Usage**: Always included in all agents for complex queries when reasoning is enabled
 
 ### 2. Multi-Hop Reasoning (`MULTI_HOP`)
 
@@ -123,14 +136,16 @@ The Warehouse Operational Assistant implements a comprehensive **Advanced Reason
 
 ## How It Works
 
-### Safety Agent Integration
+### Agent Integration Pattern
+
+All agents follow the same pattern for reasoning integration:
 
 ```python
-# In safety_agent.py:process_query()
+# In any agent's process_query() method (e.g., mcp_equipment_agent.py)
 
 # Step 1: Check if reasoning should be enabled
 if enable_reasoning and self.reasoning_engine and self._is_complex_query(query):
-    # Step 2: Determine reasoning types
+    # Step 2: Determine reasoning types based on query content
     reasoning_types = self._determine_reasoning_types(query, context)
     
     # Step 3: Process with reasoning
@@ -142,14 +157,45 @@ if enable_reasoning and self.reasoning_engine and self._is_complex_query(query):
     )
     
     # Step 4: Use reasoning chain in response generation
-    response = await self._generate_safety_response(
-        safety_query, retrieved_data, session_id, actions_taken, reasoning_chain
+    response = await self._generate_response_with_tools(
+        query, tool_results, session_id, reasoning_chain=reasoning_chain
+    )
+```
+
+### Chat Router Integration
+
+The main chat router (`src/api/routers/chat.py`) supports reasoning:
+
+```python
+# Chat request includes reasoning parameters
+@router.post("/chat")
+async def chat(req: ChatRequest):
+    # req.enable_reasoning: bool = False
+    # req.reasoning_types: Optional[List[str]] = None
+    
+    # Pass to MCP planner graph
+    result = await mcp_planner_graph.process(
+        message=req.message,
+        enable_reasoning=req.enable_reasoning,
+        reasoning_types=req.reasoning_types,
+        ...
+    )
+    
+    # Extract reasoning chain from result
+    reasoning_chain = result.get("reasoning_chain")
+    reasoning_steps = result.get("reasoning_steps")
+    
+    # Include in response
+    return ChatResponse(
+        ...,
+        reasoning_chain=reasoning_chain,
+        reasoning_steps=reasoning_steps
     )
 ```
 
 ### Complex Query Detection
 
-The Safety Agent uses `_is_complex_query()` to determine if reasoning should be enabled:
+All agents use `_is_complex_query()` to determine if reasoning should be enabled:
 
 **Complex Query Indicators**:
 - Keywords: "analyze", "compare", "relationship", "scenario", "what if", "cause", "effect", "pattern", "trend", "explain", "investigate", etc.
@@ -158,15 +204,62 @@ The Safety Agent uses `_is_complex_query()` to determine if reasoning should be 
 
 ### Reasoning Type Selection
 
-The Safety Agent automatically selects reasoning types based on query content:
+Each agent automatically selects reasoning types based on query content and agent-specific logic:
 
-- **Always**: Chain-of-Thought
+- **Always**: Chain-of-Thought (for all complex queries)
 - **Multi-Hop**: If query contains "analyze", "compare", "relationship", "connection", "across", "multiple"
 - **Scenario Analysis**: If query contains "what if", "scenario", "alternative", "option", "plan", "strategy"
+  - **Operations Agent**: Always includes scenario analysis for workflow optimization queries
+  - **Forecasting Agent**: Always includes scenario analysis + pattern recognition for forecasting queries
 - **Causal**: If query contains "cause", "effect", "because", "result", "consequence", "due to", "leads to"
+  - **Safety Agent**: Always includes causal reasoning for safety queries
+  - **Document Agent**: Uses causal reasoning for quality analysis
 - **Pattern Recognition**: If query contains "pattern", "trend", "learn", "insight", "recommendation", "optimize", "improve"
+  - **Forecasting Agent**: Always includes pattern recognition for forecasting queries
 
 ## API Usage
+
+### Chat API with Reasoning
+
+The main chat endpoint now supports reasoning:
+
+```bash
+POST /api/v1/chat
+{
+  "message": "What if we optimize the picking route in Zone B and reassign 2 workers to Zone C?",
+  "session_id": "user123",
+  "enable_reasoning": true,
+  "reasoning_types": ["scenario_analysis", "chain_of_thought"]  // Optional
+}
+```
+
+**Response**:
+```json
+{
+  "reply": "Optimizing the picking route in Zone B could result in...",
+  "route": "operations",
+  "intent": "operations",
+  "reasoning_chain": {
+    "chain_id": "REASON_20251117_153549",
+    "query": "...",
+    "reasoning_type": "scenario_analysis",
+    "steps": [...],
+    "final_conclusion": "...",
+    "overall_confidence": 0.8
+  },
+  "reasoning_steps": [
+    {
+      "step_id": "SCENARIO_1",
+      "step_type": "scenario_analysis",
+      "description": "Best case scenario",
+      "reasoning": "...",
+      "confidence": 0.85
+    }
+  ],
+  "structured_data": {...},
+  "confidence": 0.8
+}
+```
 
 ### Direct Reasoning Analysis
 
@@ -239,89 +332,57 @@ GET /api/v1/reasoning/insights/user123
 }
 ```
 
-## Current Limitations
+## Current Status
 
-### 1. Limited Integration
+### ✅ Completed (Phase 1)
 
-- **Only Safety Agent** uses reasoning
-- Main chat router bypasses reasoning
-- Other agents don't have reasoning capabilities
+1. **Full Agent Integration**
+   - ✅ All 5 agents (Equipment, Operations, Safety, Forecasting, Document) support reasoning
+   - ✅ Main chat router supports reasoning
+   - ✅ MCP planner graph passes reasoning parameters to agents
+   - ✅ Reasoning chains included in all agent responses
 
-### 2. Performance Impact
+2. **Frontend Integration**
+   - ✅ UI toggle to enable/disable reasoning
+   - ✅ Reasoning type selection in UI
+   - ✅ Reasoning chain visualization in chat messages
+   - ✅ Reasoning steps displayed with expandable UI components
 
-- Reasoning adds 2-5 seconds to response time
-- Multiple LLM calls per reasoning type
-- Not optimized for simple queries
+3. **Query Complexity Detection**
+   - ✅ All agents detect complex queries automatically
+   - ✅ Reasoning only applied to complex queries (performance optimization)
+   - ✅ Simple queries skip reasoning even when enabled
 
-### 3. No Frontend Integration
+### ⚠️ Current Limitations
 
-- Reasoning results not displayed in UI
-- No visualization of reasoning steps
-- No user control over reasoning types
+1. **Performance Impact**
+   - Reasoning adds 2-5 seconds to response time for complex queries
+   - Multiple LLM calls per reasoning type
+   - Timeout handling implemented (230s for complex reasoning queries)
 
-### 4. No Persistence
+2. **No Persistence**
+   - Reasoning chains stored in memory only
+   - Lost on server restart
+   - No historical analysis of reasoning patterns
 
-- Reasoning chains stored in memory only
-- Lost on server restart
-- No historical analysis
+3. **No Caching**
+   - Similar queries re-run reasoning (no caching)
+   - Could optimize by caching reasoning results for identical queries
 
-## Recommendations
+## Future Enhancements (Phase 2+)
 
-### 1. Integrate with Main Chat Router
-
-**Priority**: High
-
-**Implementation**:
-- Add reasoning to MCP planner graph
-- Enable reasoning for complex queries
-- Pass reasoning chain to synthesis node
-
-**Code Changes**:
-```python
-# In mcp_integrated_planner_graph.py
-async def _route_intent(self, state: MCPWarehouseState) -> str:
-    # ... existing routing logic ...
-    
-    # Check if query is complex
-    if self._is_complex_query(state["messages"][-1].content):
-        # Enable reasoning
-        state["enable_reasoning"] = True
-        state["reasoning_types"] = self._determine_reasoning_types(...)
-    
-    return intent
-```
-
-### 2. Integrate with Other Agents
+### 1. Add Persistence
 
 **Priority**: Medium
-
-**Agents to Integrate**:
-- Equipment Agent - For complex equipment analysis
-- Operations Agent - For workflow optimization
-- Forecasting Agent - For demand analysis scenarios
-- Document Agent - For document understanding
-
-### 3. Add Frontend Visualization
-
-**Priority**: Medium
-
-**Features**:
-- Display reasoning steps in chat UI
-- Show reasoning confidence levels
-- Allow users to see "thinking process"
-- Toggle reasoning on/off
-
-### 4. Add Persistence
-
-**Priority**: Low
 
 **Implementation**:
 - Store reasoning chains in PostgreSQL
 - Create `reasoning_chains` table
 - Enable historical analysis
 - Support reasoning insights dashboard
+- Track reasoning effectiveness over time
 
-### 5. Optimize Performance
+### 2. Optimize Performance
 
 **Priority**: Medium
 
@@ -330,22 +391,56 @@ async def _route_intent(self, state: MCPWarehouseState) -> str:
 - Parallel execution of reasoning types
 - Early termination for simple queries
 - Reduce LLM calls where possible
+- Batch reasoning for multiple queries
+
+### 3. Enhanced Reasoning Visualization
+
+**Priority**: Low
+
+**Features**:
+- Interactive reasoning step exploration
+- Reasoning confidence visualization
+- Comparison of different reasoning approaches
+- Reasoning chain export/import
+
+### 4. Reasoning Analytics
+
+**Priority**: Low
+
+**Features**:
+- Track reasoning usage patterns
+- Measure reasoning effectiveness
+- Identify queries that benefit most from reasoning
+- A/B testing of reasoning strategies
 
 ## Testing
 
 ### Manual Testing
 
-1. **Test Safety Agent with Reasoning**:
+1. **Test Chat API with Reasoning Enabled**:
    ```bash
    curl -X POST http://localhost:8001/api/v1/chat \
      -H "Content-Type: application/json" \
      -d '{
-       "message": "What are the potential causes of equipment failures?",
-       "session_id": "test123"
+       "message": "What if we optimize the picking route in Zone B and reassign 2 workers to Zone C?",
+       "session_id": "test123",
+       "enable_reasoning": true,
+       "reasoning_types": ["scenario_analysis", "chain_of_thought"]
      }'
    ```
 
-2. **Test Direct Reasoning API**:
+2. **Test Equipment Agent with Reasoning**:
+   ```bash
+   curl -X POST http://localhost:8001/api/v1/chat \
+     -H "Content-Type: application/json" \
+     -d '{
+       "message": "Why does dock D2 have higher equipment failure rates compared to other docks?",
+       "session_id": "test123",
+       "enable_reasoning": true
+     }'
+   ```
+
+3. **Test Direct Reasoning API**:
    ```bash
    curl -X POST http://localhost:8001/api/v1/reasoning/analyze \
      -H "Content-Type: application/json" \
@@ -357,26 +452,34 @@ async def _route_intent(self, state: MCPWarehouseState) -> str:
 
 ### Automated Testing
 
-**Test File**: `tests/unit/test_reasoning.py` (to be created)
+**Test File**: `tests/test_reasoning_integration.py`
 
-**Test Cases**:
-- Chain-of-thought reasoning
-- Multi-hop reasoning
-- Scenario analysis
-- Causal reasoning
-- Pattern recognition
-- Complex query detection
-- Reasoning type selection
+**Test Coverage**:
+- ✅ Chain-of-thought reasoning for all agents
+- ✅ Multi-hop reasoning
+- ✅ Scenario analysis
+- ✅ Causal reasoning
+- ✅ Pattern recognition
+- ✅ Complex query detection
+- ✅ Reasoning type selection
+- ✅ Reasoning disabled scenarios
+- ✅ Error handling and graceful fallback
+
+**Test Results**: See `tests/REASONING_INTEGRATION_SUMMARY.md` and `tests/REASONING_EVALUATION_REPORT.md`
 
 ## Conclusion
 
-The Advanced Reasoning Engine is **fully implemented and functional**, but **underutilized**. It's currently only integrated with the Safety Agent, while the main chat router and other agents bypass it entirely. To maximize its value, we should:
+The Advanced Reasoning Engine is **fully implemented, functional, and integrated** across the entire system. **Phase 1 is complete** with:
 
-1. ✅ **Integrate with main chat router** (High Priority)
-2. ✅ **Integrate with other agents** (Medium Priority)
-3. ✅ **Add frontend visualization** (Medium Priority)
-4. ✅ **Add persistence** (Low Priority)
-5. ✅ **Optimize performance** (Medium Priority)
+1. ✅ **Main chat router integration** - Reasoning enabled via API parameters
+2. ✅ **All agent integration** - Equipment, Operations, Safety, Forecasting, and Document agents all support reasoning
+3. ✅ **Frontend visualization** - UI toggle, reasoning type selection, and reasoning chain display
+4. ✅ **MCP planner graph integration** - Reasoning parameters passed through the orchestration layer
+5. ✅ **Complex query detection** - Automatic detection and reasoning application
 
-The reasoning engine provides significant value for complex queries, but needs broader integration to realize its full potential.
+The reasoning engine now provides significant value for complex queries across all domains. **Phase 2 enhancements** (persistence, performance optimization, analytics) will further improve the system's capabilities.
+
+**Status**: ✅ **Production Ready** - All core functionality operational
+
+**Documentation**: See `tests/REASONING_INTEGRATION_SUMMARY.md` for detailed implementation status and `tests/REASONING_EVALUATION_REPORT.md` for evaluation results.
 
