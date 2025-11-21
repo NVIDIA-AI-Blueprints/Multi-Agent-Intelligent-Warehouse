@@ -61,6 +61,13 @@ python scripts/setup/create_default_users.py
 - **Username:** `warehouse`
 - **Password:** `changeme`
 
+### Security Configuration
+
+**JWT Secret Key:**
+- **Development**: Not required - application uses a default with warnings
+- **Production**: **REQUIRED** - Set `JWT_SECRET_KEY` in `.env` file. Application will fail to start if not set.
+- See [docs/secrets.md](docs/secrets.md) for details on JWT configuration and security best practices.
+
 ## 🔧 Troubleshooting
 
 **Server won't start?**

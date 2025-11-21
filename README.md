@@ -163,6 +163,15 @@ The architecture consists of:
 - **System Health** - Comprehensive observability and alerting
 - **NeMo Guardrails** - Content safety and compliance protection (see [NeMo Guardrails](#nemo-guardrails) section below)
 
+#### Security Notes
+
+**JWT Secret Key Configuration:**
+- **Development**: If `JWT_SECRET_KEY` is not set, the application uses a default development key with warnings. This allows for easy local development.
+- **Production**: The application **requires** `JWT_SECRET_KEY` to be set. If not set or using the default placeholder, the application will fail to start. Set `ENVIRONMENT=production` and provide a strong, unique `JWT_SECRET_KEY` in your `.env` file.
+- **Best Practice**: Always set `JWT_SECRET_KEY` explicitly, even in development, using a strong random string (minimum 32 characters).
+
+For more security information, see [docs/secrets.md](docs/secrets.md) and [SECURITY_REVIEW.md](SECURITY_REVIEW.md).
+
 ## Quick Start
 
 **For the fastest setup, see [QUICK_START.md](QUICK_START.md). For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).**
@@ -208,7 +217,7 @@ cp .env.example .env
 - Database connection settings (PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE)
 - Redis connection (REDIS_HOST, REDIS_PORT)
 - Milvus connection (MILVUS_HOST, MILVUS_PORT)
-- JWT secret key (JWT_SECRET_KEY)
+- JWT secret key (JWT_SECRET_KEY) - **Required in production**. In development, a default is used with warnings. See [Security Notes](#security-notes) below.
 
 **For AI Features (Optional):**
 - NVIDIA API keys (NVIDIA_API_KEY, NEMO_*_API_KEY, LLAMA_*_API_KEY)

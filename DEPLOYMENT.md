@@ -26,6 +26,9 @@ nano .env  # or use your preferred editor
 - `POSTGRES_PASSWORD` - Database password (default: `changeme`)
 - `DEFAULT_ADMIN_PASSWORD` - Admin user password (default: `changeme`)
 - `JWT_SECRET_KEY` - JWT secret for authentication
+  - **Development**: Optional - application uses a default with warnings if not set
+  - **Production**: **REQUIRED** - Application will fail to start if not set. Set `ENVIRONMENT=production` and provide a strong, unique secret (minimum 32 characters)
+  - See [docs/secrets.md](docs/secrets.md) for security best practices
 - `NIM_API_KEY` - NVIDIA API key (if using NVIDIA NIMs)
 
 ### 3. Start Database Services

@@ -66,14 +66,14 @@ async def value_error_handler(request: Request, exc: ValueError):
     # Re-raise if it's not a circular reference error
     raise exc
 
+# CORS Configuration - environment-based for security
+import os
+cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3001,http://localhost:3000,http://127.0.0.1:3001,http://127.0.0.1:3000")
+cors_origins_list = [origin.strip() for origin in cors_origins.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3001",
-        "http://localhost:3000",
-        "http://127.0.0.1:3001",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=cors_origins_list,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],

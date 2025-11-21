@@ -47,25 +47,6 @@ async def register(
         )
 
 
-@router.get("/auth/debug/user/{username}")
-async def debug_user_lookup(username: str):
-    """Debug endpoint to test user lookup."""
-    try:
-        await user_service.initialize()
-        user = await user_service.get_user_for_auth(username)
-        if user:
-            return {
-                "found": True,
-                "username": user.username,
-                "status": user.status.value,
-                "role": user.role.value,
-            }
-        else:
-            return {"found": False, "username": username}
-    except Exception as e:
-        return {"error": str(e), "type": type(e).__name__}
-
-
 @router.post("/auth/login", response_model=Token)
 async def login(user_login: UserLogin):
     """Authenticate user and return tokens."""
@@ -96,14 +77,14 @@ async def login(user_login: UserLogin):
         # Strip username to handle any whitespace issues
         username_clean = user_login.username.strip()
         logger.info(f"🔍 Starting user lookup for: '{username_clean}' (original: '{user_login.username}', len: {len(user_login.username)})")
-        print(f"[AUTH DEBUG] Starting user lookup for: '{username_clean}'", flush=True)
+        # User lookup initiated
         try:
             user = await asyncio.wait_for(
                 user_service.get_user_for_auth(username_clean),
                 timeout=2.0  # 2 second timeout for user lookup
             )
             logger.info(f"🔍 User lookup completed, user is {'None' if user is None else 'found'}")
-            print(f"[AUTH DEBUG] User lookup completed: user={'None' if user is None else f'found({user.username})'}", flush=True)
+            # User lookup completed
         except asyncio.TimeoutError:
             logger.error(f"User lookup timed out for username: {user_login.username}")
             raise HTTPException(
@@ -112,10 +93,10 @@ async def login(user_login: UserLogin):
             )
         except Exception as user_lookup_err:
             logger.error(f"User lookup failed for {user_login.username}: {user_lookup_err}", exc_info=True)
-            # Return more specific error for debugging, but still 401 for security
+            # Return generic error for security (don't leak error details)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Authentication failed: {type(user_lookup_err).__name__}",
+                detail="Invalid username or password",
             )
         
         if not user:
@@ -137,9 +118,8 @@ async def login(user_login: UserLogin):
 
         # Verify password
         password_valid = jwt_handler.verify_password(user_login.password, user.hashed_password)
-        logger.info(f"Password verification for {user_login.username}: {password_valid}")
         if not password_valid:
-            logger.warning(f"Password verification failed for user: {user_login.username}")
+            logger.warning(f"Authentication failed for user: {user_login.username}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid username or password",

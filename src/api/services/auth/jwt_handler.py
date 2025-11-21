@@ -8,7 +8,22 @@ import logging
 logger = logging.getLogger(__name__)
 
 # JWT Configuration
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
+
+# Security: Require JWT_SECRET_KEY in production, allow default in development with warning
+if not SECRET_KEY or SECRET_KEY == "your-secret-key-change-in-production":
+    if ENVIRONMENT == "production":
+        import sys
+        logger.error("JWT_SECRET_KEY environment variable must be set with a secure value in production")
+        logger.error("Please set JWT_SECRET_KEY in your .env file or environment")
+        sys.exit(1)
+    else:
+        # Development: Use a default but warn
+        SECRET_KEY = "dev-secret-key-change-in-production-not-for-production-use"
+        logger.warning("⚠️  WARNING: Using default JWT_SECRET_KEY for development. This is NOT secure for production!")
+        logger.warning("⚠️  Please set JWT_SECRET_KEY in your .env file for production use")
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 REFRESH_TOKEN_EXPIRE_DAYS = 7

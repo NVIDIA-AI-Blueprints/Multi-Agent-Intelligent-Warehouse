@@ -75,11 +75,56 @@ ERP_API_KEY=your-erp-api-key
 7. **Implement proper access controls**
 8. **Regular security audits**
 
-## JWT Secret Example
+## JWT Secret Configuration
+
+### Development vs Production Behavior
+
+**Development Mode (default):**
+- If `JWT_SECRET_KEY` is not set or uses the placeholder value, the application will:
+  - Use a default development key
+  - Log warnings about using the default key
+  - Continue to run normally
+- This allows for easy local development without requiring secret configuration
+
+**Production Mode:**
+- Set `ENVIRONMENT=production` in your `.env` file
+- The application **requires** `JWT_SECRET_KEY` to be set with a secure value
+- If `JWT_SECRET_KEY` is not set or uses the placeholder, the application will:
+  - Log an error
+  - Exit immediately (fail to start)
+  - Prevent deployment with insecure defaults
+
+### Setting JWT_SECRET_KEY
+
+**For Development:**
+```bash
+# Optional - application will use default if not set
+JWT_SECRET_KEY=dev-secret-key-change-in-production-not-for-production-use
+```
+
+**For Production (REQUIRED):**
+```bash
+# Generate a strong random secret (minimum 32 characters)
+JWT_SECRET_KEY=your-super-secret-jwt-key-here-must-be-at-least-32-characters-long
+ENVIRONMENT=production
+```
+
+**Generating a Secure Secret:**
+```bash
+# Using OpenSSL
+openssl rand -hex 32
+
+# Using Python
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+### JWT Secret Example
 
 **Sample JWT secret (change in production):**
 ```
 your-super-secret-jwt-key-here-must-be-at-least-32-characters-long
 ```
 
-** This is a sample only - change in production!**
+**⚠️ This is a sample only - change in production!**
+
+**Security Note:** The JWT secret key is critical for security. Never commit it to version control, use a secrets management system in production, and rotate it regularly.

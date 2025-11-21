@@ -88,7 +88,7 @@ async def create_default_admin():
         
         logger.info("Login credentials:")
         logger.info("   Username: admin")
-        logger.info(f"   Password: {password}")
+        logger.info("   Password: [REDACTED - check environment variable DEFAULT_ADMIN_PASSWORD]")
         
         # Create a regular user for testing
         user_exists = await conn.fetchval("SELECT EXISTS(SELECT 1 FROM users WHERE username = 'user')")
@@ -121,7 +121,7 @@ async def create_default_admin():
         
         logger.info("User credentials:")
         logger.info("   Username: user")
-        logger.info(f"   Password: {user_password}")
+        logger.info("   Password: [REDACTED - check environment variable DEFAULT_USER_PASSWORD]")
         
         await conn.close()
         logger.info("User setup complete!")
