@@ -308,20 +308,6 @@ class DocumentActionTools:
             # Save status data to persistent storage
             self._save_status_data()
 
-            # Create document record (in real implementation, this would save to database)
-            document_record = {
-                "id": document_id,
-                "filename": os.path.basename(file_path),
-                "file_path": file_path,
-                "file_type": validation_result["file_type"],
-                "file_size": validation_result["file_size"],
-                "document_type": document_type,
-                "user_id": user_id,
-                "status": ProcessingStage.UPLOADED,
-                "metadata": metadata or {},
-                "upload_timestamp": datetime.now(),
-            }
-
             # Start document processing pipeline
             await self._start_document_processing()
 
