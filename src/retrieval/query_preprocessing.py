@@ -141,7 +141,7 @@ class QueryPreprocessor:
         """
         try:
             # Step 1: Normalize the query
-            normalized_query = await self._normalize_query(query)
+            normalized_query = self._normalize_query(query)
             
             # Step 2: Extract entities
             entities = await self._extract_entities(normalized_query)
@@ -191,7 +191,7 @@ class QueryPreprocessor:
                 suggestions=[]
             )
     
-    async def _normalize_query(self, query: str) -> str:
+    def _normalize_query(self, query: str) -> str:
         """Normalize query for consistent processing."""
         # Convert to lowercase
         normalized = query.lower().strip()
