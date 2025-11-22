@@ -40,7 +40,7 @@ interface TabPanelProps {
   value: number;
 }
 
-function TabPanel(props: TabPanelProps) {
+function TabPanel(props: Readonly<TabPanelProps>) {
   const { children, value, index, ...other } = props;
 
   return (
@@ -320,7 +320,7 @@ interface InventoryTableProps {
   items: InventoryItem[];
 }
 
-const InventoryTable: React.FC<InventoryTableProps> = ({ items }) => {
+const InventoryTable: React.FC<Readonly<InventoryTableProps>> = ({ items }) => {
   const getStockStatus = (item: InventoryItem) => {
     if (item.quantity === 0) return { status: 'Out of Stock', color: 'error' as const };
     if (item.quantity < item.reorder_point) return { status: 'Low Stock', color: 'warning' as const };
