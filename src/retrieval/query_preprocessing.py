@@ -365,6 +365,68 @@ class QueryPreprocessor:
         
         return min(1.0, complexity)
     
+    def _generate_lookup_suggestions(self, query: str) -> List[str]:
+        """Generate suggestions for LOOKUP intent queries."""
+        suggestions = []
+        if 'sku' in query and 'location' not in query:
+            suggestions.append("Consider adding location information for more specific results")
+        if 'equipment' in query and 'status' not in query:
+            suggestions.append("Add status information to get more relevant equipment data")
+        return suggestions
+    
+    def _generate_compare_suggestions(self, query: str, entities: Dict[str, Any]) -> List[str]:
+        """Generate suggestions for COMPARE intent queries."""
+        suggestions = []
+        if len(entities.get('skus', [])) < 2:
+            suggestions.append("Specify multiple SKUs or items to compare")
+        if 'criteria' not in query.lower():
+            suggestions.append("Specify comparison criteria (e.g., performance, cost, availability)")
+        return suggestions
+    
+    def _generate_instruct_suggestions(self, query: str) -> List[str]:
+        """Generate suggestions for INSTRUCT intent queries."""
+        suggestions = []
+        query_lower = query.lower()
+        if 'steps' not in query_lower and 'process' not in query_lower:
+            suggestions.append("Ask for step-by-step instructions for better guidance")
+        if 'safety' not in query_lower:
+            suggestions.append("Consider asking about safety procedures")
+        return suggestions
+    
+    def _generate_intent_suggestions(
+        self, 
+        query: str, 
+        intent: QueryIntent, 
+        entities: Dict[str, Any]
+    ) -> List[str]:
+        """Generate intent-based suggestions."""
+        if intent == QueryIntent.LOOKUP:
+            return self._generate_lookup_suggestions(query)
+        elif intent == QueryIntent.COMPARE:
+            return self._generate_compare_suggestions(query, entities)
+        elif intent == QueryIntent.INSTRUCT:
+            return self._generate_instruct_suggestions(query)
+        return []
+    
+    def _generate_entity_suggestions(self, query: str, entities: Dict[str, Any]) -> List[str]:
+        """Generate entity-based suggestions."""
+        suggestions = []
+        if entities.get('skus') and not entities.get('quantities'):
+            suggestions.append("Add quantity information for more specific inventory queries")
+        if 'equipment' in query and not entities.get('equipment_types'):
+            suggestions.append("Specify equipment type (forklift, conveyor, scanner, etc.)")
+        return suggestions
+    
+    def _generate_general_suggestions(self, query: str) -> List[str]:
+        """Generate general suggestions."""
+        suggestions = []
+        if len(query.split()) < 3:
+            suggestions.append("Provide more details for better results")
+        query_lower = query.lower()
+        if 'urgent' in query_lower or 'asap' in query_lower:
+            suggestions.append("Consider adding priority level or deadline information")
+        return suggestions
+    
     def _generate_suggestions(
         self, 
         query: str, 
@@ -375,37 +437,13 @@ class QueryPreprocessor:
         suggestions = []
         
         # Intent-based suggestions
-        if intent == QueryIntent.LOOKUP:
-            if 'sku' in query and 'location' not in query:
-                suggestions.append("Consider adding location information for more specific results")
-            if 'equipment' in query and 'status' not in query:
-                suggestions.append("Add status information to get more relevant equipment data")
-        
-        elif intent == QueryIntent.COMPARE:
-            if len(entities.get('skus', [])) < 2:
-                suggestions.append("Specify multiple SKUs or items to compare")
-            if 'criteria' not in query.lower():
-                suggestions.append("Specify comparison criteria (e.g., performance, cost, availability)")
-        
-        elif intent == QueryIntent.INSTRUCT:
-            if 'steps' not in query.lower() and 'process' not in query.lower():
-                suggestions.append("Ask for step-by-step instructions for better guidance")
-            if 'safety' not in query.lower():
-                suggestions.append("Consider asking about safety procedures")
+        suggestions.extend(self._generate_intent_suggestions(query, intent, entities))
         
         # Entity-based suggestions
-        if entities.get('skus') and not entities.get('quantities'):
-            suggestions.append("Add quantity information for more specific inventory queries")
-        
-        if 'equipment' in query and not entities.get('equipment_types'):
-            suggestions.append("Specify equipment type (forklift, conveyor, scanner, etc.)")
+        suggestions.extend(self._generate_entity_suggestions(query, entities))
         
         # General suggestions
-        if len(query.split()) < 3:
-            suggestions.append("Provide more details for better results")
-        
-        if 'urgent' in query.lower() or 'asap' in query.lower():
-            suggestions.append("Consider adding priority level or deadline information")
+        suggestions.extend(self._generate_general_suggestions(query))
         
         return suggestions[:3]  # Limit to 3 suggestions
     
