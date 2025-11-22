@@ -155,46 +155,59 @@ class DocumentActionTools:
             logger.error(f"Failed to initialize Document Action Tools: {_sanitize_log_data(str(e))}")
             raise
 
+    def _parse_datetime_field(self, value: Any, field_name: str, doc_id: str) -> Optional[datetime]:
+        """Parse a datetime string field, returning None if invalid."""
+        if not isinstance(value, str):
+            return None
+        
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError:
+            logger.warning(
+                f"Invalid datetime format for {field_name} in {_sanitize_log_data(doc_id)}"
+            )
+            return None
+
+    def _restore_datetime_fields(self, status_info: Dict[str, Any], doc_id: str) -> None:
+        """Restore datetime fields from ISO format strings in status_info."""
+        # Restore upload_time
+        if "upload_time" in status_info:
+            parsed_time = self._parse_datetime_field(
+                status_info["upload_time"], "upload_time", doc_id
+            )
+            if parsed_time is not None:
+                status_info["upload_time"] = parsed_time
+        
+        # Restore started_at for each stage
+        for stage in status_info.get("stages", []):
+            if "started_at" in stage:
+                parsed_time = self._parse_datetime_field(
+                    stage["started_at"], "started_at", doc_id
+                )
+                if parsed_time is not None:
+                    stage["started_at"] = parsed_time
+
     def _load_status_data(self):
         """Load document status data from persistent storage."""
+        if not self.status_file.exists():
+            logger.info(
+                "No persistent status file found, starting with empty status tracking"
+            )
+            self.document_statuses = {}
+            return
+        
         try:
-            if self.status_file.exists():
-                with open(self.status_file, "r") as f:
-                    data = json.load(f)
-                    # Convert datetime strings back to datetime objects
-                    for doc_id, status_info in data.items():
-                        if "upload_time" in status_info and isinstance(
-                            status_info["upload_time"], str
-                        ):
-                            try:
-                                status_info["upload_time"] = datetime.fromisoformat(
-                                    status_info["upload_time"]
-                                )
-                            except ValueError:
-                                logger.warning(
-                                    f"Invalid datetime format for upload_time in "
-                                    f"{doc_id}"
-                                )
-                        for stage in status_info.get("stages", []):
-                            if stage.get("started_at") and isinstance(
-                                stage["started_at"], str
-                            ):
-                                try:
-                                    stage["started_at"] = datetime.fromisoformat(
-                                        stage["started_at"]
-                                    )
-                                except ValueError:
-                                    logger.warning(
-                                        f"Invalid datetime format for started_at in {doc_id}"
-                                    )
-                    self.document_statuses = data
-                    logger.info(
-                        f"Loaded {len(self.document_statuses)} document statuses from persistent storage"
-                    )
-            else:
-                logger.info(
-                    "No persistent status file found, starting with empty status tracking"
-                )
+            with open(self.status_file, "r") as f:
+                data = json.load(f)
+            
+            # Convert datetime strings back to datetime objects
+            for doc_id, status_info in data.items():
+                self._restore_datetime_fields(status_info, doc_id)
+            
+            self.document_statuses = data
+            logger.info(
+                f"Loaded {len(self.document_statuses)} document statuses from persistent storage"
+            )
         except Exception as e:
             logger.error(f"Failed to load status data: {_sanitize_log_data(str(e))}")
             self.document_statuses = {}
