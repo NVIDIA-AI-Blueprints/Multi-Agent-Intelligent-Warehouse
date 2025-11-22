@@ -238,7 +238,7 @@ class IntegratedQueryProcessor:
         """Execute hybrid RAG query."""
         try:
             # Enhance query for hybrid RAG routing
-            enhanced_query = await self.query_preprocessor.enhance_query_for_routing(
+            enhanced_query = self.query_preprocessor.enhance_query_for_routing(
                 preprocessed_query,
                 "hybrid_rag"
             )
