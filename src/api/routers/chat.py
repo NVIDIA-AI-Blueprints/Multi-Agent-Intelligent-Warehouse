@@ -67,6 +67,109 @@ def _sanitize_log_data(data: Union[str, Any], max_length: int = 500) -> str:
     return data_str
 
 
+def _get_confidence_indicator(confidence: float) -> str:
+    """Get confidence indicator emoji based on confidence score."""
+    if confidence >= 0.8:
+        return "🟢"
+    elif confidence >= 0.6:
+        return "🟡"
+    else:
+        return "🔴"
+
+
+def _format_equipment_status(equipment_list: List[Dict[str, Any]]) -> str:
+    """Format equipment status information from equipment list."""
+    if not equipment_list:
+        return ""
+    
+    status_info = []
+    for eq in equipment_list[:3]:  # Limit to 3 items
+        if isinstance(eq, dict):
+            asset_id = eq.get("asset_id", "Unknown")
+            status = eq.get("status", "Unknown")
+            zone = eq.get("zone", "Unknown")
+            status_info.append(f"{asset_id} ({status}) in {zone}")
+    
+    if not status_info:
+        return ""
+    
+    return f"\n\n**Equipment Status:**\n" + "\n".join(f"• {info}" for info in status_info)
+
+
+def _get_allocation_status_emoji(allocation_status: str) -> str:
+    """Get emoji for allocation status."""
+    if allocation_status == "completed":
+        return "✅"
+    elif allocation_status == "pending":
+        return "⏳"
+    else:
+        return "❌"
+
+
+def _format_allocation_info(data: Dict[str, Any]) -> str:
+    """Format allocation information from data dictionary."""
+    if "equipment_id" not in data or "zone" not in data:
+        return ""
+    
+    equipment_id = data["equipment_id"]
+    zone = data["zone"]
+    operation_type = data.get("operation_type", "operation")
+    allocation_status = data.get("allocation_status", "completed")
+    
+    status_emoji = _get_allocation_status_emoji(allocation_status)
+    allocation_text = f"\n\n{status_emoji} **Allocation Status:** {equipment_id} allocated to {zone} for {operation_type} operations"
+    
+    if allocation_status == "pending":
+        allocation_text += " (pending confirmation)"
+    
+    return allocation_text
+
+
+def _is_technical_recommendation(recommendation: str) -> bool:
+    """Check if a recommendation is technical and should be filtered out."""
+    technical_terms = [
+        "mcp", "tool", "execution", "api", "endpoint", "system", "technical",
+        "gathering additional evidence", "recent changes", "multiple sources",
+    ]
+    recommendation_lower = recommendation.lower()
+    return any(tech_term in recommendation_lower for tech_term in technical_terms)
+
+
+def _filter_user_recommendations(recommendations: List[str]) -> List[str]:
+    """Filter out technical recommendations, keeping only user-friendly ones."""
+    if not recommendations:
+        return []
+    
+    return [
+        rec for rec in recommendations
+        if not _is_technical_recommendation(rec)
+    ]
+
+
+def _format_recommendations_section(user_recommendations: List[str]) -> str:
+    """Format recommendations section."""
+    if not user_recommendations:
+        return ""
+    
+    recommendations_text = "\n\n**Recommendations:**\n"
+    recommendations_text += "\n".join(f"• {rec}" for rec in user_recommendations[:3])
+    return recommendations_text
+
+
+def _add_response_footer(formatted_response: str, confidence: float) -> str:
+    """Add confidence indicator and timestamp footer to response."""
+    confidence_indicator = _get_confidence_indicator(confidence)
+    confidence_percentage = int(confidence * 100)
+    
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%I:%M:%S %p")
+    
+    formatted_response += f"\n\n{confidence_indicator} {confidence_percentage}%"
+    formatted_response += f"\n{timestamp}"
+    
+    return formatted_response
+
+
 def _format_user_response(
     base_response: str,
     structured_response: Dict[str, Any],
@@ -87,98 +190,29 @@ def _format_user_response(
     """
     try:
         # Clean the base response by removing technical details
-        cleaned_response = _clean_response_text(base_response)
-
-        # Start with the cleaned response
-        formatted_response = cleaned_response
-
-        # Add confidence indicator
-        if confidence >= 0.8:
-            confidence_indicator = "🟢"
-        elif confidence >= 0.6:
-            confidence_indicator = "🟡"
-        else:
-            confidence_indicator = "🔴"
-
-        confidence_percentage = int(confidence * 100)
+        formatted_response = _clean_response_text(base_response)
 
         # Add status information if available
         if structured_response and "data" in structured_response:
             data = structured_response["data"]
-
+            
             # Add equipment status information
             if "equipment" in data and isinstance(data["equipment"], list):
-                equipment_list = data["equipment"]
-                if equipment_list:
-                    status_info = []
-                    for eq in equipment_list[:3]:  # Limit to 3 items
-                        if isinstance(eq, dict):
-                            asset_id = eq.get("asset_id", "Unknown")
-                            status = eq.get("status", "Unknown")
-                            zone = eq.get("zone", "Unknown")
-                            status_info.append(f"{asset_id} ({status}) in {zone}")
-
-                    if status_info:
-                        formatted_response += (
-                            f"\n\n**Equipment Status:**\n"
-                            + "\n".join(f"• {info}" for info in status_info)
-                        )
-
+                equipment_status = _format_equipment_status(data["equipment"])
+                formatted_response += equipment_status
+            
             # Add allocation information
-            if "equipment_id" in data and "zone" in data:
-                equipment_id = data["equipment_id"]
-                zone = data["zone"]
-                operation_type = data.get("operation_type", "operation")
-                allocation_status = data.get("allocation_status", "completed")
+            allocation_info = _format_allocation_info(data)
+            formatted_response += allocation_info
 
-                # Map status to emoji
-                if allocation_status == "completed":
-                    status_emoji = "✅"
-                elif allocation_status == "pending":
-                    status_emoji = "⏳"
-                else:
-                    status_emoji = "❌"
+        # Add recommendations if available
+        if recommendations:
+            user_recommendations = _filter_user_recommendations(recommendations)
+            recommendations_section = _format_recommendations_section(user_recommendations)
+            formatted_response += recommendations_section
 
-                formatted_response += f"\n\n{status_emoji} **Allocation Status:** {equipment_id} allocated to {zone} for {operation_type} operations"
-                if allocation_status == "pending":
-                    formatted_response += " (pending confirmation)"
-
-        # Add recommendations if available and not already included
-        if recommendations and len(recommendations) > 0:
-            # Filter out technical recommendations
-            user_recommendations = [
-                rec
-                for rec in recommendations
-                if not any(
-                    tech_term in rec.lower()
-                    for tech_term in [
-                        "mcp",
-                        "tool",
-                        "execution",
-                        "api",
-                        "endpoint",
-                        "system",
-                        "technical",
-                        "gathering additional evidence",
-                        "recent changes",
-                        "multiple sources",
-                    ]
-                )
-            ]
-
-            if user_recommendations:
-                formatted_response += f"\n\n**Recommendations:**\n" + "\n".join(
-                    f"• {rec}" for rec in user_recommendations[:3]
-                )
-
-        # Add confidence indicator and timestamp at the end
-        formatted_response += f"\n\n{confidence_indicator} {confidence_percentage}%"
-
-        # Add timestamp
-        from datetime import datetime
-
-        timestamp = datetime.now().strftime("%I:%M:%S %p")
-        formatted_response += f"\n{timestamp}"
+        # Add confidence indicator and timestamp footer
+        formatted_response = _add_response_footer(formatted_response, confidence)
 
         return formatted_response
 
