@@ -233,20 +233,7 @@ class MCPOperationsCoordinationAgent:
 
         except Exception as e:
             logger.error(f"Error processing operations query: {e}")
-            return MCPOperationsResponse(
-                response_type="error",
-                data={"error": str(e)},
-                natural_language=f"I encountered an error processing your request: {str(e)}",
-                recommendations=[
-                    "Please try rephrasing your question or contact support if the issue persists."
-                ],
-                confidence=0.0,
-                actions_taken=[],
-                mcp_tools_used=[],
-                tool_execution_results={},
-                reasoning_chain=None,
-                reasoning_steps=None,
-            )
+            return self._create_error_response(str(e), "processing your request")
 
     async def _parse_operations_query(
         self, query: str, context: Optional[Dict[str, Any]]
@@ -364,6 +351,36 @@ Return only valid JSON.""",
             logger.error(f"Error discovering relevant tools: {e}")
             return []
 
+    def _add_tools_to_execution_plan(
+        self,
+        execution_plan: List[Dict[str, Any]],
+        tools: List[DiscoveredTool],
+        category: ToolCategory,
+        limit: int,
+        query: MCPOperationsQuery,
+    ) -> None:
+        """
+        Add tools of a specific category to execution plan.
+        
+        Args:
+            execution_plan: Execution plan list to append to
+            tools: List of available tools
+            category: Tool category to filter
+            limit: Maximum number of tools to add
+            query: Query object for argument preparation
+        """
+        filtered_tools = [t for t in tools if t.category == category]
+        for tool in filtered_tools[:limit]:
+            execution_plan.append(
+                {
+                    "tool_id": tool.tool_id,
+                    "tool_name": tool.name,
+                    "arguments": self._prepare_tool_arguments(tool, query),
+                    "priority": 1,
+                    "required": True,
+                }
+            )
+    
     async def _create_tool_execution_plan(
         self, query: MCPOperationsQuery, tools: List[DiscoveredTool]
     ) -> List[Dict[str, Any]]:
@@ -372,63 +389,19 @@ Return only valid JSON.""",
             execution_plan = []
 
             # Create execution steps based on query intent
-            if query.intent == "workforce_management":
-                # Look for operations tools
-                ops_tools = [t for t in tools if t.category == ToolCategory.OPERATIONS]
-                for tool in ops_tools[:3]:  # Limit to 3 tools
-                    execution_plan.append(
-                        {
-                            "tool_id": tool.tool_id,
-                            "tool_name": tool.name,
-                            "arguments": self._prepare_tool_arguments(tool, query),
-                            "priority": 1,
-                            "required": True,
-                        }
-                    )
-
-            elif query.intent == "task_assignment":
-                # Look for operations tools
-                ops_tools = [t for t in tools if t.category == ToolCategory.OPERATIONS]
-                for tool in ops_tools[:2]:
-                    execution_plan.append(
-                        {
-                            "tool_id": tool.tool_id,
-                            "tool_name": tool.name,
-                            "arguments": self._prepare_tool_arguments(tool, query),
-                            "priority": 1,
-                            "required": True,
-                        }
-                    )
-
-            elif query.intent == "kpi_analysis":
-                # Look for analysis tools
-                analysis_tools = [
-                    t for t in tools if t.category == ToolCategory.ANALYSIS
-                ]
-                for tool in analysis_tools[:2]:
-                    execution_plan.append(
-                        {
-                            "tool_id": tool.tool_id,
-                            "tool_name": tool.name,
-                            "arguments": self._prepare_tool_arguments(tool, query),
-                            "priority": 1,
-                            "required": True,
-                        }
-                    )
-
-            elif query.intent == "shift_planning":
-                # Look for operations tools
-                ops_tools = [t for t in tools if t.category == ToolCategory.OPERATIONS]
-                for tool in ops_tools[:3]:
-                    execution_plan.append(
-                        {
-                            "tool_id": tool.tool_id,
-                            "tool_name": tool.name,
-                            "arguments": self._prepare_tool_arguments(tool, query),
-                            "priority": 1,
-                            "required": True,
-                        }
-                    )
+            intent_config = {
+                "workforce_management": (ToolCategory.OPERATIONS, 3),
+                "task_assignment": (ToolCategory.OPERATIONS, 2),
+                "kpi_analysis": (ToolCategory.ANALYSIS, 2),
+                "shift_planning": (ToolCategory.OPERATIONS, 3),
+            }
+            
+            category, limit = intent_config.get(
+                query.intent, (ToolCategory.OPERATIONS, 2)
+            )
+            self._add_tools_to_execution_plan(
+                execution_plan, tools, category, limit, query
+            )
 
             # Sort by priority
             execution_plan.sort(key=lambda x: x["priority"])
@@ -622,54 +595,78 @@ Failed Tool Executions:
 
         except Exception as e:
             logger.error(f"Error generating response: {e}")
-            return MCPOperationsResponse(
-                response_type="error",
-                data={"error": str(e)},
-                natural_language=f"I encountered an error generating a response: {str(e)}",
-                recommendations=["Please try again or contact support."],
-                confidence=0.0,
-                actions_taken=[],
-                mcp_tools_used=[],
-                tool_execution_results=tool_results,
-                reasoning_chain=None,
-                reasoning_steps=None,
-            )
+            error_response = self._create_error_response(str(e), "generating a response")
+            error_response.tool_execution_results = tool_results
+            return error_response
 
+    def _check_tool_discovery(self) -> bool:
+        """Check if tool discovery is available."""
+        return self.tool_discovery is not None
+    
     async def get_available_tools(self) -> List[DiscoveredTool]:
         """Get all available MCP tools."""
-        if not self.tool_discovery:
+        if not self._check_tool_discovery():
             return []
-
         return list(self.tool_discovery.discovered_tools.values())
 
     async def get_tools_by_category(
         self, category: ToolCategory
     ) -> List[DiscoveredTool]:
         """Get tools by category."""
-        if not self.tool_discovery:
+        if not self._check_tool_discovery():
             return []
-
         return await self.tool_discovery.get_tools_by_category(category)
 
     async def search_tools(self, query: str) -> List[DiscoveredTool]:
         """Search for tools by query."""
-        if not self.tool_discovery:
+        if not self._check_tool_discovery():
             return []
-
         return await self.tool_discovery.search_tools(query)
 
+    def _create_error_response(
+        self, error_message: str, operation: str
+    ) -> MCPOperationsResponse:
+        """
+        Create standardized error response.
+        
+        Args:
+            error_message: Error message
+            operation: Description of the operation that failed
+            
+        Returns:
+            MCPOperationsResponse with error details
+        """
+        recommendations = [
+            "Please try rephrasing your question or contact support if the issue persists."
+        ]
+        if "generating" in operation:
+            recommendations = ["Please try again or contact support."]
+        
+        return MCPOperationsResponse(
+            response_type="error",
+            data={"error": error_message},
+            natural_language=f"I encountered an error {operation}: {error_message}",
+            recommendations=recommendations,
+            confidence=0.0,
+            actions_taken=[],
+            mcp_tools_used=[],
+            tool_execution_results={},
+            reasoning_chain=None,
+            reasoning_steps=None,
+        )
+    
     def get_agent_status(self) -> Dict[str, Any]:
         """Get agent status and statistics."""
         return {
-            "initialized": self.tool_discovery is not None,
+            "initialized": self._check_tool_discovery(),
             "available_tools": (
-                len(self.tool_discovery.discovered_tools) if self.tool_discovery else 0
+                len(self.tool_discovery.discovered_tools) if self._check_tool_discovery() else 0
             ),
             "tool_execution_history": len(self.tool_execution_history),
             "conversation_contexts": len(self.conversation_context),
             "mcp_discovery_status": (
                 self.tool_discovery.get_discovery_status()
-                if self.tool_discovery
+                if self._check_tool_discovery()
                 else None
             ),
         }
@@ -708,79 +705,51 @@ Failed Tool Executions:
         ]
         return any(keyword in query_lower for keyword in complex_keywords)
     
+    def _check_keywords_in_query(self, query_lower: str, keywords: List[str]) -> bool:
+        """
+        Check if any keywords are present in the query.
+        
+        Args:
+            query_lower: Lowercase query string
+            keywords: List of keywords to check
+            
+        Returns:
+            True if any keyword is found, False otherwise
+        """
+        return any(keyword in query_lower for keyword in keywords)
+    
     def _determine_reasoning_types(
         self, query: str, context: Optional[Dict[str, Any]]
     ) -> List[ReasoningType]:
         """Determine appropriate reasoning types based on query complexity and context."""
         reasoning_types = [ReasoningType.CHAIN_OF_THOUGHT]  # Always include chain-of-thought
-        
         query_lower = query.lower()
         
-        # Multi-hop reasoning for complex queries
-        if any(
-            keyword in query_lower
-            for keyword in [
-                "analyze",
-                "compare",
-                "relationship",
-                "connection",
-                "across",
-                "multiple",
-            ]
-        ):
-            reasoning_types.append(ReasoningType.MULTI_HOP)
+        # Define keyword mappings for each reasoning type
+        reasoning_keywords = {
+            ReasoningType.MULTI_HOP: [
+                "analyze", "compare", "relationship", "connection", "across", "multiple"
+            ],
+            ReasoningType.SCENARIO_ANALYSIS: [
+                "what if", "scenario", "alternative", "option", "if", "when", "suppose"
+            ],
+            ReasoningType.CAUSAL: [
+                "why", "cause", "effect", "because", "result", "consequence", "due to", "leads to"
+            ],
+            ReasoningType.PATTERN_RECOGNITION: [
+                "pattern", "trend", "learn", "insight", "recommendation", "optimize", "improve"
+            ],
+        }
         
-        # Scenario analysis for what-if questions
-        if any(
-            keyword in query_lower
-            for keyword in [
-                "what if",
-                "scenario",
-                "alternative",
-                "option",
-                "if",
-                "when",
-                "suppose",
-            ]
-        ):
-            reasoning_types.append(ReasoningType.SCENARIO_ANALYSIS)
-        
-        # Causal reasoning for cause-effect questions
-        if any(
-            keyword in query_lower
-            for keyword in [
-                "why",
-                "cause",
-                "effect",
-                "because",
-                "result",
-                "consequence",
-                "due to",
-                "leads to",
-            ]
-        ):
-            reasoning_types.append(ReasoningType.CAUSAL)
-        
-        # Pattern recognition for learning queries
-        if any(
-            keyword in query_lower
-            for keyword in [
-                "pattern",
-                "trend",
-                "learn",
-                "insight",
-                "recommendation",
-                "optimize",
-                "improve",
-            ]
-        ):
-            reasoning_types.append(ReasoningType.PATTERN_RECOGNITION)
+        # Check each reasoning type
+        for reasoning_type, keywords in reasoning_keywords.items():
+            if self._check_keywords_in_query(query_lower, keywords):
+                if reasoning_type not in reasoning_types:
+                    reasoning_types.append(reasoning_type)
         
         # For operations queries, always include scenario analysis for workflow optimization
-        if any(
-            keyword in query_lower
-            for keyword in ["optimize", "improve", "efficiency", "workflow", "strategy"]
-        ):
+        workflow_keywords = ["optimize", "improve", "efficiency", "workflow", "strategy"]
+        if self._check_keywords_in_query(query_lower, workflow_keywords):
             if ReasoningType.SCENARIO_ANALYSIS not in reasoning_types:
                 reasoning_types.append(ReasoningType.SCENARIO_ANALYSIS)
         
