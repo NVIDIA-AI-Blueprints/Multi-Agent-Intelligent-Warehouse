@@ -17,7 +17,7 @@ import pandas as pd
 from dataclasses import dataclass
 import os
 from fastapi import APIRouter, HTTPException, BackgroundTasks
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 # from src.api.services.forecasting_config import get_config, load_config_from_db
 import redis
 import asyncio
@@ -29,13 +29,52 @@ logger = logging.getLogger(__name__)
 # Pydantic models for API
 class ForecastRequest(BaseModel):
     sku: str
-    horizon_days: int = 30
+    horizon_days: int = Field(default=30, ge=1, le=365, description="Forecast horizon in days (1-365)")
     include_confidence_intervals: bool = True
     include_feature_importance: bool = True
+    
+    @field_validator('horizon_days')
+    @classmethod
+    def validate_horizon_days(cls, v: int) -> int:
+        """Validate and restrict horizon_days to prevent loop boundary injection attacks."""
+        # Enforce maximum limit to prevent DoS attacks
+        MAX_HORIZON_DAYS = 365
+        if v > MAX_HORIZON_DAYS:
+            logger.warning(f"horizon_days {v} exceeds maximum {MAX_HORIZON_DAYS}, restricting to {MAX_HORIZON_DAYS}")
+            return MAX_HORIZON_DAYS
+        if v < 1:
+            raise ValueError("horizon_days must be at least 1")
+        return v
 
 class BatchForecastRequest(BaseModel):
-    skus: List[str]
-    horizon_days: int = 30
+    skus: List[str] = Field(..., min_length=1, max_length=100, description="List of SKUs to forecast (max 100)")
+    horizon_days: int = Field(default=30, ge=1, le=365, description="Forecast horizon in days (1-365)")
+    
+    @field_validator('horizon_days')
+    @classmethod
+    def validate_horizon_days(cls, v: int) -> int:
+        """Validate and restrict horizon_days to prevent loop boundary injection attacks."""
+        # Enforce maximum limit to prevent DoS attacks
+        MAX_HORIZON_DAYS = 365
+        if v > MAX_HORIZON_DAYS:
+            logger.warning(f"horizon_days {v} exceeds maximum {MAX_HORIZON_DAYS}, restricting to {MAX_HORIZON_DAYS}")
+            return MAX_HORIZON_DAYS
+        if v < 1:
+            raise ValueError("horizon_days must be at least 1")
+        return v
+    
+    @field_validator('skus')
+    @classmethod
+    def validate_skus(cls, v: List[str]) -> List[str]:
+        """Validate and restrict SKU list size to prevent DoS attacks."""
+        # Enforce maximum limit to prevent DoS attacks from large batch requests
+        MAX_SKUS = 100
+        if len(v) > MAX_SKUS:
+            logger.warning(f"SKU list size {len(v)} exceeds maximum {MAX_SKUS}, restricting to first {MAX_SKUS} SKUs")
+            return v[:MAX_SKUS]
+        if len(v) == 0:
+            raise ValueError("SKU list cannot be empty")
+        return v
 
 class ReorderRecommendation(BaseModel):
     sku: str
@@ -102,6 +141,14 @@ class AdvancedForecastingService:
 
     async def get_real_time_forecast(self, sku: str, horizon_days: int = 30) -> Dict[str, Any]:
         """Get real-time forecast with caching"""
+        # Security: Validate and restrict horizon_days to prevent loop boundary injection attacks
+        MAX_HORIZON_DAYS = 365
+        if horizon_days > MAX_HORIZON_DAYS:
+            logger.warning(f"horizon_days {horizon_days} exceeds maximum {MAX_HORIZON_DAYS}, restricting to {MAX_HORIZON_DAYS}")
+            horizon_days = MAX_HORIZON_DAYS
+        if horizon_days < 1:
+            raise ValueError("horizon_days must be at least 1")
+        
         cache_key = f"forecast:{sku}:{horizon_days}"
         
         # Check cache first
@@ -1140,6 +1187,12 @@ async def batch_forecast(request: BatchForecastRequest):
     try:
         if not request.skus or len(request.skus) == 0:
             raise HTTPException(status_code=400, detail="SKU list cannot be empty")
+        
+        # Security: Additional validation to prevent DoS attacks from large batch requests
+        MAX_SKUS = 100
+        if len(request.skus) > MAX_SKUS:
+            logger.warning(f"Batch request contains {len(request.skus)} SKUs, restricting to first {MAX_SKUS}")
+            request.skus = request.skus[:MAX_SKUS]
         
         await forecasting_service.initialize()
         
