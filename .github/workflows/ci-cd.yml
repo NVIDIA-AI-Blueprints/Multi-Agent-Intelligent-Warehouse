@@ -40,7 +40,7 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
-        cache-dependency-path: ui/web/package-lock.json
+        cache-dependency-path: src/ui/web/package-lock.json
     
     - name: Install Python dependencies
       run: |
@@ -50,7 +50,7 @@ jobs:
     
     - name: Install Node.js dependencies
       run: |
-        cd ui/web
+        cd src/ui/web
         npm ci
     
     - name: Run Python linting
@@ -102,7 +102,7 @@ jobs:
     
     - name: Run Node.js linting
       run: |
-        cd ui/web
+        cd src/ui/web
         # Create basic ESLint config if it doesn't exist
         if [ ! -f .eslintrc.js ]; then
           cat > .eslintrc.js << EOF
@@ -163,7 +163,7 @@ jobs:
     
     - name: Run Node.js tests
       run: |
-        cd ui/web
+        cd src/ui/web
         # Create a basic test if none exist
         if [ ! -f src/App.test.tsx ]; then
           cat > src/App.test.tsx << EOF
@@ -185,7 +185,7 @@ jobs:
     - name: Upload coverage reports
       uses: codecov/codecov-action@v3
       with:
-        files: ./coverage.xml,./ui/web/coverage/lcov.info
+        files: ./coverage.xml,./src/ui/web/coverage/lcov.info
         flags: unittests
         name: codecov-umbrella
         fail_ci_if_error: false
@@ -196,6 +196,10 @@ jobs:
   security:
     name: Security Scan
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -209,7 +213,7 @@ jobs:
         output: 'trivy-results.sarif'
     
     - name: Upload Trivy scan results
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@v4
       with:
         sarif_file: 'trivy-results.sarif'
 
