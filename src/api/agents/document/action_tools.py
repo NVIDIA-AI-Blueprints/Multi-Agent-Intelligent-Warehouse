@@ -4,7 +4,9 @@ Implements document processing tools for the MCP-enabled Document Extraction Age
 """
 
 import logging
-from typing import Dict, Any, List, Optional
+import base64
+import re
+from typing import Dict, Any, List, Optional, Union
 from datetime import datetime
 import uuid
 import os
@@ -19,6 +21,46 @@ from src.api.agents.document.models.document_models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _sanitize_log_data(data: Union[str, Any], max_length: int = 500) -> str:
+    """
+    Sanitize data for safe logging to prevent log injection attacks.
+    
+    Removes newlines, carriage returns, and other control characters that could
+    be used to forge log entries. For suspicious data, uses base64 encoding.
+    
+    Args:
+        data: Data to sanitize (will be converted to string)
+        max_length: Maximum length of sanitized string (truncates if longer)
+        
+    Returns:
+        Sanitized string safe for logging
+    """
+    if data is None:
+        return "None"
+    
+    # Convert to string
+    data_str = str(data)
+    
+    # Truncate if too long
+    if len(data_str) > max_length:
+        data_str = data_str[:max_length] + "...[truncated]"
+    
+    # Check for newlines, carriage returns, or other control characters
+    if re.search(r'[\r\n\t\x00-\x1f]', data_str):
+        # Contains control characters - base64 encode for safety
+        try:
+            encoded = base64.b64encode(data_str.encode('utf-8')).decode('ascii')
+            return f"[base64:{encoded}]"
+        except Exception:
+            # If encoding fails, remove control characters
+            data_str = re.sub(r'[\r\n\t\x00-\x1f]', '', data_str)
+    
+    # Remove any remaining suspicious characters
+    data_str = re.sub(r'[\r\n]', '', data_str)
+    
+    return data_str
 
 
 class DocumentActionTools:
@@ -89,7 +131,7 @@ class DocumentActionTools:
             self._load_status_data()  # Load persistent status data (not async)
             logger.info("Document Action Tools initialized successfully")
         except Exception as e:
-            logger.error(f"Failed to initialize Document Action Tools: {e}")
+            logger.error(f"Failed to initialize Document Action Tools: {_sanitize_log_data(str(e))}")
             raise
 
     def _load_status_data(self):
@@ -133,7 +175,7 @@ class DocumentActionTools:
                     "No persistent status file found, starting with empty status tracking"
                 )
         except Exception as e:
-            logger.error(f"Failed to load status data: {e}")
+            logger.error(f"Failed to load status data: {_sanitize_log_data(str(e))}")
             self.document_statuses = {}
 
     def _serialize_for_json(self, obj):
@@ -177,7 +219,7 @@ class DocumentActionTools:
                 f"Saved {len(self.document_statuses)} document statuses to persistent storage"
             )
         except Exception as e:
-            logger.error(f"Failed to save status data: {e}", exc_info=True)
+            logger.error(f"Failed to save status data: {_sanitize_log_data(str(e))}", exc_info=True)
 
     async def upload_document(
         self,
@@ -189,7 +231,7 @@ class DocumentActionTools:
     ) -> Dict[str, Any]:
         """Upload and process document through pipeline."""
         try:
-            logger.info(f"Processing document upload: {file_path}")
+            logger.info(f"Processing document upload: {_sanitize_log_data(file_path)}")
 
             # Validate file
             validation_result = await self._validate_document_file(file_path)
@@ -205,7 +247,7 @@ class DocumentActionTools:
                 document_id = str(uuid.uuid4())
 
             # Initialize document status tracking
-            logger.info(f"Initializing document status for {document_id}")
+            logger.info(f"Initializing document status for {_sanitize_log_data(document_id)}")
             self.document_statuses[document_id] = {
                 "status": ProcessingStage.UPLOADED,
                 "current_stage": "Preprocessing",
@@ -265,7 +307,7 @@ class DocumentActionTools:
             }
 
         except Exception as e:
-            logger.error(f"Document upload failed: {e}")
+            logger.error(f"Document upload failed: {_sanitize_log_data(str(e))}")
             return {
                 "success": False,
                 "error": str(e),
@@ -275,7 +317,7 @@ class DocumentActionTools:
     async def get_document_status(self, document_id: str) -> Dict[str, Any]:
         """Get document processing status."""
         try:
-            logger.info(f"Getting status for document: {document_id}")
+            logger.info(f"Getting status for document: {_sanitize_log_data(document_id)}")
 
             # In real implementation, this would query the database
             # For now, return mock status
@@ -293,7 +335,7 @@ class DocumentActionTools:
             }
 
         except Exception as e:
-            logger.error(f"Failed to get document status: {e}")
+            logger.error(f"Failed to get document status: {_sanitize_log_data(str(e))}")
             return {
                 "success": False,
                 "error": str(e),
@@ -303,7 +345,7 @@ class DocumentActionTools:
     async def extract_document_data(self, document_id: str) -> Dict[str, Any]:
         """Extract structured data from processed document."""
         try:
-            logger.info(f"Extracting data from document: {document_id}")
+            logger.info(f"Extracting data from document: {_sanitize_log_data(document_id)}")
             
             # Verify document exists in status tracking
             if document_id not in self.document_statuses:
@@ -329,7 +371,7 @@ class DocumentActionTools:
             }
 
         except Exception as e:
-            logger.error(f"Failed to extract document data: {e}")
+            logger.error(f"Failed to extract document data: {_sanitize_log_data(str(e))}")
             return {
                 "success": False,
                 "error": str(e),
@@ -341,7 +383,7 @@ class DocumentActionTools:
     ) -> Dict[str, Any]:
         """Validate document extraction quality and accuracy."""
         try:
-            logger.info(f"Validating document quality: {document_id}")
+            logger.info(f"Validating document quality: {_sanitize_log_data(document_id)}")
 
             # In real implementation, this would run quality validation
             validation_result = await self._run_quality_validation(
@@ -360,7 +402,7 @@ class DocumentActionTools:
             }
 
         except Exception as e:
-            logger.error(f"Failed to validate document quality: {e}")
+            logger.error(f"Failed to validate document quality: {_sanitize_log_data(str(e))}")
             return {
                 "success": False,
                 "error": str(e),
@@ -372,7 +414,7 @@ class DocumentActionTools:
     ) -> Dict[str, Any]:
         """Search processed documents by content or metadata."""
         try:
-            logger.info(f"Searching documents with query: {search_query}")
+            logger.info(f"Searching documents with query: {_sanitize_log_data(search_query)}")
 
             # In real implementation, this would use vector search and metadata filtering
             search_results = await self._search_documents(search_query, filters or {})
@@ -387,7 +429,7 @@ class DocumentActionTools:
             }
 
         except Exception as e:
-            logger.error(f"Failed to search documents: {e}")
+            logger.error(f"Failed to search documents: {_sanitize_log_data(str(e))}")
             return {
                 "success": False,
                 "error": str(e),
@@ -399,7 +441,7 @@ class DocumentActionTools:
     ) -> Dict[str, Any]:
         """Get analytics and metrics for document processing."""
         try:
-            logger.info(f"Getting document analytics for time range: {time_range}")
+            logger.info(f"Getting document analytics for time range: {_sanitize_log_data(time_range)}")
 
             # In real implementation, this would query analytics from database
             analytics_data = await self._get_analytics_data(time_range, metrics or [])
@@ -414,7 +456,7 @@ class DocumentActionTools:
             }
 
         except Exception as e:
-            logger.error(f"Failed to get document analytics: {e}")
+            logger.error(f"Failed to get document analytics: {_sanitize_log_data(str(e))}")
             return {
                 "success": False,
                 "error": str(e),
@@ -426,7 +468,7 @@ class DocumentActionTools:
     ) -> Dict[str, Any]:
         """Approve document for WMS integration."""
         try:
-            logger.info(f"Approving document: {document_id}")
+            logger.info(f"Approving document: {_sanitize_log_data(document_id)}")
 
             # In real implementation, this would update database and trigger WMS integration
             approval_result = await self._approve_document(
@@ -444,7 +486,7 @@ class DocumentActionTools:
             }
 
         except Exception as e:
-            logger.error(f"Failed to approve document: {e}")
+            logger.error(f"Failed to approve document: {_sanitize_log_data(str(e))}")
             return {
                 "success": False,
                 "error": str(e),
@@ -460,7 +502,7 @@ class DocumentActionTools:
     ) -> Dict[str, Any]:
         """Reject document and provide feedback."""
         try:
-            logger.info(f"Rejecting document: {document_id}")
+            logger.info(f"Rejecting document: {_sanitize_log_data(document_id)}")
 
             # In real implementation, this would update database and notify user
             await self._reject_document(
@@ -478,7 +520,7 @@ class DocumentActionTools:
             }
 
         except Exception as e:
-            logger.error(f"Failed to reject document: {e}")
+            logger.error(f"Failed to reject document: {_sanitize_log_data(str(e))}")
             return {
                 "success": False,
                 "error": str(e),
@@ -518,10 +560,10 @@ class DocumentActionTools:
 
     async def _get_processing_status(self, document_id: str) -> Dict[str, Any]:
         """Get processing status - use actual status from document_statuses, not simulation."""
-        logger.info(f"Getting processing status for document: {document_id}")
+        logger.info(f"Getting processing status for document: {_sanitize_log_data(document_id)}")
 
         if document_id not in self.document_statuses:
-            logger.warning(f"Document {document_id} not found in status tracking")
+            logger.warning(f"Document {_sanitize_log_data(document_id)} not found in status tracking")
             return {
                 "status": ProcessingStage.FAILED,
                 "current_stage": "Unknown",
@@ -552,7 +594,7 @@ class DocumentActionTools:
         # This prevents race conditions where status shows COMPLETED but results aren't stored yet
         if overall_status_str == "completed" or overall_status == ProcessingStage.COMPLETED:
             if "processing_results" not in status_info:
-                logger.warning(f"Document {document_id} status is COMPLETED but no processing_results found. Setting to ROUTING.")
+                logger.warning(f"Document {_sanitize_log_data(document_id)} status is COMPLETED but no processing_results found. Setting to ROUTING.")
                 overall_status = ProcessingStage.ROUTING
                 overall_status_str = "routing"
                 status_info["status"] = ProcessingStage.ROUTING
@@ -580,7 +622,7 @@ class DocumentActionTools:
     ) -> None:
         """Store actual processing results from NVIDIA NeMo pipeline."""
         try:
-            logger.info(f"Storing processing results for document: {document_id}")
+            logger.info(f"Storing processing results for document: {_sanitize_log_data(document_id)}")
 
             # Serialize results to remove PIL Images and other non-JSON-serializable objects
             # Convert PIL Images to metadata (file paths, dimensions) instead of storing the image objects
@@ -689,11 +731,11 @@ class DocumentActionTools:
                             stage["status"] = "failed"
                             stage["error_message"] = error_message
                 self._save_status_data()
-                logger.info(f"Updated document {document_id} status to FAILED: {error_message}")
+                logger.info(f"Updated document {_sanitize_log_data(document_id)} status to FAILED: {_sanitize_log_data(error_message)}")
             else:
-                logger.error(f"Document {document_id} not found for status update")
+                logger.error(f"Document {_sanitize_log_data(document_id)} not found for status update")
         except Exception as e:
-            logger.error(f"Failed to update document status: {e}", exc_info=True)
+            logger.error(f"Failed to update document status: {_sanitize_log_data(str(e))}", exc_info=True)
 
     async def _get_extraction_data(self, document_id: str) -> Dict[str, Any]:
         """Get extraction data from actual processing results."""
@@ -926,7 +968,7 @@ class DocumentActionTools:
                     ProcessingStage.ROUTING
                 ]
                 if current_status in processing_stages:
-                    logger.info(f"Document {document_id} is still being processed by NeMo pipeline. Status: {current_status}")
+                    logger.info(f"Document {_sanitize_log_data(document_id)} is still being processed by NeMo pipeline. Status: {_sanitize_log_data(str(current_status))}")
                     # Return a message indicating processing is in progress
                     return {
                         "extraction_results": [],
@@ -941,7 +983,7 @@ class DocumentActionTools:
                 elif current_status == ProcessingStage.COMPLETED:
                     # Status says COMPLETED but no processing_results - this shouldn't happen
                     # but if it does, wait a bit and check again (race condition)
-                    logger.warning(f"Document {document_id} status is COMPLETED but no processing_results found. This may be a race condition.")
+                    logger.warning(f"Document {_sanitize_log_data(document_id)} status is COMPLETED but no processing_results found. This may be a race condition.")
                     return {
                         "extraction_results": [],
                         "confidence_scores": {},
@@ -955,7 +997,7 @@ class DocumentActionTools:
                 elif current_status == ProcessingStage.FAILED:
                     # Processing failed
                     error_msg = doc_status.get("error_message", "Unknown error")
-                    logger.warning(f"Document {document_id} processing failed: {error_msg}")
+                    logger.warning(f"Document {_sanitize_log_data(document_id)} processing failed: {_sanitize_log_data(error_msg)}")
                     return {
                         "extraction_results": [],
                         "confidence_scores": {},
@@ -967,7 +1009,7 @@ class DocumentActionTools:
                         "message": f"Document processing failed: {error_msg}"
                     }
                 else:
-                    logger.warning(f"Document {document_id} has no processing results and status is {current_status}. NeMo pipeline may have failed.")
+                    logger.warning(f"Document {_sanitize_log_data(document_id)} has no processing results and status is {_sanitize_log_data(str(current_status))}. NeMo pipeline may have failed.")
                     # Return mock data with clear indication that NeMo pipeline didn't complete
                     mock_data = self._get_mock_extraction_data()
                     mock_data["is_mock"] = True
@@ -999,8 +1041,8 @@ class DocumentActionTools:
             file_path = doc_status.get("file_path")
             
             if not file_path or not os.path.exists(file_path):
-                logger.warning(f"File not found for document {document_id}: {file_path}")
-                logger.info(f"Attempting to use document filename: {doc_status.get('filename', 'N/A')}")
+                logger.warning(f"File not found for document {_sanitize_log_data(document_id)}: {_sanitize_log_data(file_path)}")
+                logger.info(f"Attempting to use document filename: {_sanitize_log_data(doc_status.get('filename', 'N/A'))}")
                 # Return mock data but mark it as such
                 return {**self._get_mock_extraction_data(), "is_mock": True, "reason": "file_not_found"}
             
@@ -1010,20 +1052,20 @@ class DocumentActionTools:
                 result = await local_processor.process_document(file_path, doc_status.get("document_type", "invoice"))
                 
                 if not result["success"]:
-                    logger.error(f"Local processing failed for {document_id}: {result.get('error')}")
+                    logger.error(f"Local processing failed for {_sanitize_log_data(document_id)}: {_sanitize_log_data(str(result.get('error', 'Unknown error')))}")
                     return {**self._get_mock_extraction_data(), "is_mock": True, "reason": "processing_failed"}
             except ImportError as e:
-                logger.warning(f"Local processor not available (missing dependencies): {e}")
+                logger.warning(f"Local processor not available (missing dependencies): {_sanitize_log_data(str(e))}")
                 missing_module = str(e).replace("No module named ", "").strip("'\"")
                 if "fitz" in missing_module.lower() or "pymupdf" in missing_module.lower():
                     logger.info("Install PyMuPDF for PDF processing: pip install PyMuPDF")
                 elif "PIL" in missing_module or "Pillow" in missing_module:
                     logger.info("Install Pillow (PIL) for image processing: pip install Pillow")
                 else:
-                    logger.info(f"Install missing dependency: pip install {missing_module}")
+                    logger.info(f"Install missing dependency: pip install {_sanitize_log_data(missing_module)}")
                 return {**self._get_mock_extraction_data(), "is_mock": True, "reason": "dependencies_missing"}
             except Exception as e:
-                logger.error(f"Local processing error for {document_id}: {e}")
+                logger.error(f"Local processing error for {_sanitize_log_data(document_id)}: {_sanitize_log_data(str(e))}")
                 return {**self._get_mock_extraction_data(), "is_mock": True, "reason": "processing_error"}
             
             # Convert local processing result to expected format
@@ -1095,7 +1137,7 @@ class DocumentActionTools:
             }
             
         except Exception as e:
-            logger.error(f"Failed to process document locally: {e}", exc_info=True)
+            logger.error(f"Failed to process document locally: {_sanitize_log_data(str(e))}", exc_info=True)
             return {**self._get_mock_extraction_data(), "is_mock": True, "reason": "exception"}
 
     def _get_mock_extraction_data(self) -> Dict[str, Any]:
@@ -1363,18 +1405,18 @@ class DocumentActionTools:
                                                     quality = float(val)
                                                     break
                                     
-                                    logger.debug(f"Extracted quality score from validation dict: {quality} for doc {doc_id}")
+                                    logger.debug(f"Extracted quality score from validation dict: {quality} for doc {_sanitize_log_data(doc_id)}")
                                     
                                 elif hasattr(validation, "overall_score"):
                                     # It's an object with overall_score attribute (JudgeEvaluation dataclass)
                                     quality = getattr(validation, "overall_score", 0.0)
-                                    logger.debug(f"Extracted quality score from validation object: {quality} for doc {doc_id}")
+                                    logger.debug(f"Extracted quality score from validation object: {quality} for doc {_sanitize_log_data(doc_id)}")
                                 elif hasattr(validation, "quality_score"):
                                     # It's an object with quality_score attribute
                                     quality = getattr(validation, "quality_score", 0.0)
-                                    logger.debug(f"Extracted quality score from validation object (quality_score): {quality} for doc {doc_id}")
+                                    logger.debug(f"Extracted quality score from validation object (quality_score): {quality} for doc {_sanitize_log_data(doc_id)}")
                                 else:
-                                    logger.debug(f"Validation result for doc {doc_id} is not a dict or object with score attributes. Type: {type(validation)}")
+                                    logger.debug(f"Validation result for doc {_sanitize_log_data(doc_id)} is not a dict or object with score attributes. Type: {type(validation)}")
                             
                             # If still no quality score found, try to get it from extraction data
                             if quality == 0.0:
@@ -1387,7 +1429,7 @@ class DocumentActionTools:
                                         elif isinstance(qs, dict):
                                             quality = qs.get("overall_score", 0.0)
                                 except Exception as e:
-                                    logger.debug(f"Could not extract quality score from extraction data for {doc_id}: {e}")
+                                    logger.debug(f"Could not extract quality score from extraction data for {_sanitize_log_data(doc_id)}: {_sanitize_log_data(str(e))}")
                             
                             # Add quality score if found
                             if quality > 0:
@@ -1398,14 +1440,14 @@ class DocumentActionTools:
                                 if quality >= 4.0:
                                     auto_approved_count += 1
                             else:
-                                logger.debug(f"Document {doc_id} completed but no quality score found. Validation keys: {list(results.get('validation', {}).keys()) if isinstance(results.get('validation'), dict) else 'N/A'}")
+                                logger.debug(f"Document {_sanitize_log_data(doc_id)} completed but no quality score found. Validation keys: {list(results.get('validation', {}).keys()) if isinstance(results.get('validation'), dict) else 'N/A'}")
                         else:
-                            logger.debug(f"Document {doc_id} completed but no processing_results found")
+                            logger.debug(f"Document {_sanitize_log_data(doc_id)} completed but no processing_results found")
                     elif doc_status_value == ProcessingStage.FAILED:
                         # Count failed documents
                         failed_count += 1
                     else:
-                        logger.debug(f"Document {doc_id} status: {doc_status_value} (not COMPLETED or FAILED)")
+                        logger.debug(f"Document {_sanitize_log_data(doc_id)} status: {_sanitize_log_data(str(doc_status_value))} (not COMPLETED or FAILED)")
             
             # Calculate averages
             average_quality = (
@@ -1466,7 +1508,7 @@ class DocumentActionTools:
             }
             
         except Exception as e:
-            logger.error(f"Error calculating analytics from real data: {e}", exc_info=True)
+            logger.error(f"Error calculating analytics from real data: {_sanitize_log_data(str(e))}", exc_info=True)
             # Fallback to mock data if calculation fails
             return {
                 "metrics": {

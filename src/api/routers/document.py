@@ -4,7 +4,9 @@ Provides endpoints for document upload, processing, status, and results
 """
 
 import logging
-from typing import Dict, Any, List, Optional
+import base64
+import re
+from typing import Dict, Any, List, Optional, Union
 from fastapi import (
     APIRouter,
     HTTPException,
@@ -37,6 +39,46 @@ from src.api.agents.document.action_tools import DocumentActionTools
 
 logger = logging.getLogger(__name__)
 
+
+def _sanitize_log_data(data: Union[str, Any], max_length: int = 500) -> str:
+    """
+    Sanitize data for safe logging to prevent log injection attacks.
+    
+    Removes newlines, carriage returns, and other control characters that could
+    be used to forge log entries. For suspicious data, uses base64 encoding.
+    
+    Args:
+        data: Data to sanitize (will be converted to string)
+        max_length: Maximum length of sanitized string (truncates if longer)
+        
+    Returns:
+        Sanitized string safe for logging
+    """
+    if data is None:
+        return "None"
+    
+    # Convert to string
+    data_str = str(data)
+    
+    # Truncate if too long
+    if len(data_str) > max_length:
+        data_str = data_str[:max_length] + "...[truncated]"
+    
+    # Check for newlines, carriage returns, or other control characters
+    if re.search(r'[\r\n\t\x00-\x1f]', data_str):
+        # Contains control characters - base64 encode for safety
+        try:
+            encoded = base64.b64encode(data_str.encode('utf-8')).decode('ascii')
+            return f"[base64:{encoded}]"
+        except Exception:
+            # If encoding fails, remove control characters
+            data_str = re.sub(r'[\r\n\t\x00-\x1f]', '', data_str)
+    
+    # Remove any remaining suspicious characters
+    data_str = re.sub(r'[\r\n]', '', data_str)
+    
+    return data_str
+
 # Create router
 router = APIRouter(prefix="/api/v1/document", tags=["document"])
 
@@ -56,11 +98,11 @@ class DocumentToolsSingleton:
             cls._initialized = True
             logger.info(
                 f"DocumentActionTools initialized with {len(cls._instance.document_statuses)} documents"
-            )
+            )  # Safe: len() returns int, not user input
         else:
             logger.info(
                 f"Using existing DocumentActionTools instance with {len(cls._instance.document_statuses)} documents"
-            )
+            )  # Safe: len() returns int, not user input
 
         return cls._instance
 
@@ -93,7 +135,7 @@ async def upload_document(
         DocumentUploadResponse with document ID and processing status
     """
     try:
-        logger.info(f"Document upload request: {file.filename}, type: {document_type}")
+        logger.info(f"Document upload request: {_sanitize_log_data(file.filename)}, type: {_sanitize_log_data(document_type)}")
 
         # Validate file type
         allowed_extensions = {".pdf", ".png", ".jpg", ".jpeg", ".tiff", ".bmp"}
@@ -120,7 +162,7 @@ async def upload_document(
             content = await file.read()
             buffer.write(content)
         
-        logger.info(f"Document saved to persistent storage: {persistent_file_path}")
+        logger.info(f"Document saved to persistent storage: {_sanitize_log_data(str(persistent_file_path))}")
 
         # Parse metadata
         parsed_metadata = {}
@@ -130,7 +172,7 @@ async def upload_document(
 
                 parsed_metadata = json.loads(metadata)
             except json.JSONDecodeError:
-                logger.warning(f"Invalid metadata JSON: {metadata}")
+                logger.warning(f"Invalid metadata JSON: {_sanitize_log_data(metadata)}")
 
         # Start document processing
         result = await tools.upload_document(
@@ -141,7 +183,7 @@ async def upload_document(
             document_id=document_id,  # Pass the document ID from router
         )
 
-        logger.info(f"Upload result: {result}")
+        logger.info(f"Upload result: {_sanitize_log_data(str(result))}")
 
         if result["success"]:
             # Schedule background processing
@@ -166,7 +208,7 @@ async def upload_document(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Document upload failed: {e}")
+        logger.error(f"Document upload failed: {_sanitize_log_data(str(e))}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 
@@ -185,7 +227,7 @@ async def get_document_status(
         DocumentProcessingResponse with current status and progress
     """
     try:
-        logger.info(f"Getting status for document: {document_id}")
+        logger.info(f"Getting status for document: {_sanitize_log_data(document_id)}")
 
         result = await tools.get_document_status(document_id)
 
@@ -232,7 +274,7 @@ async def get_document_status(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get document status: {e}")
+        logger.error(f"Failed to get document status: {_sanitize_log_data(str(e))}")
         raise HTTPException(status_code=500, detail=f"Status check failed: {str(e)}")
 
 
@@ -251,7 +293,7 @@ async def get_document_results(
         DocumentResultsResponse with extraction results and quality scores
     """
     try:
-        logger.info(f"Getting results for document: {document_id}")
+        logger.info(f"Getting results for document: {_sanitize_log_data(document_id)}")
 
         result = await tools.extract_document_data(document_id)
 
@@ -289,7 +331,7 @@ async def get_document_results(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get document results: {e}")
+        logger.error(f"Failed to get document results: {_sanitize_log_data(str(e))}")
         raise HTTPException(
             status_code=500, detail=f"Results retrieval failed: {str(e)}"
         )
@@ -311,7 +353,7 @@ async def search_documents(
         DocumentSearchResponse with matching documents
     """
     try:
-        logger.info(f"Searching documents with query: {request.query}")
+        logger.info(f"Searching documents with query: {_sanitize_log_data(request.query)}")
 
         result = await tools.search_documents(
             search_query=request.query, filters=request.filters or {}
@@ -330,7 +372,7 @@ async def search_documents(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Document search failed: {e}")
+        logger.error(f"Document search failed: {_sanitize_log_data(str(e))}")
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
 
@@ -352,7 +394,7 @@ async def validate_document(
         DocumentValidationResponse with validation results
     """
     try:
-        logger.info(f"Validating document: {document_id}")
+        logger.info(f"Validating document: {_sanitize_log_data(document_id)}")
 
         result = await tools.validate_document_quality(
             document_id=document_id, validation_type=request.validation_type
@@ -377,7 +419,7 @@ async def validate_document(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Document validation failed: {e}")
+        logger.error(f"Document validation failed: {_sanitize_log_data(str(e))}")
         raise HTTPException(status_code=500, detail=f"Validation failed: {str(e)}")
 
 
@@ -443,7 +485,7 @@ async def approve_document(
         Approval confirmation
     """
     try:
-        logger.info(f"Approving document: {document_id}")
+        logger.info(f"Approving document: {_sanitize_log_data(document_id)}")
 
         result = await tools.approve_document(
             document_id=document_id,
@@ -465,7 +507,7 @@ async def approve_document(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Document approval failed: {e}")
+        logger.error(f"Document approval failed: {_sanitize_log_data(str(e))}")
         raise HTTPException(status_code=500, detail=f"Approval failed: {str(e)}")
 
 
@@ -491,7 +533,7 @@ async def reject_document(
         Rejection confirmation
     """
     try:
-        logger.info(f"Rejecting document: {document_id}")
+        logger.info(f"Rejecting document: {_sanitize_log_data(document_id)}")
 
         suggestions_list = []
         if suggestions:
@@ -524,7 +566,7 @@ async def reject_document(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Document rejection failed: {e}")
+        logger.error(f"Document rejection failed: {_sanitize_log_data(str(e))}")
         raise HTTPException(status_code=500, detail=f"Rejection failed: {str(e)}")
 
 
@@ -538,10 +580,10 @@ async def process_document_background(
     """Background task for document processing using NVIDIA NeMo pipeline."""
     try:
         logger.info(
-            f"🚀 Starting NVIDIA NeMo processing pipeline for document: {document_id}"
+            f"🚀 Starting NVIDIA NeMo processing pipeline for document: {_sanitize_log_data(document_id)}"
         )
-        logger.info(f"   File path: {file_path}")
-        logger.info(f"   Document type: {document_type}")
+        logger.info(f"   File path: {_sanitize_log_data(file_path)}")
+        logger.info(f"   Document type: {_sanitize_log_data(document_type)}")
         
         # Verify file exists
         if not os.path.exists(file_path):
@@ -580,10 +622,10 @@ async def process_document_background(
             tools.document_statuses[document_id]["current_stage"] = "Preprocessing"
             tools.document_statuses[document_id]["progress"] = 10
             tools._save_status_data()
-            logger.info(f"✅ Updated document {document_id} status to PREPROCESSING (10% progress)")
+            logger.info(f"✅ Updated document {_sanitize_log_data(document_id)} status to PREPROCESSING (10% progress)")
         
         # Stage 1: Document Preprocessing
-        logger.info(f"Stage 1: Document preprocessing for {document_id}")
+        logger.info(f"Stage 1: Document preprocessing for {_sanitize_log_data(document_id)}")
         try:
             preprocessing_result = await preprocessor.process_document(file_path)
             # Update status after preprocessing
@@ -597,12 +639,12 @@ async def process_document_background(
                             stage["completed_at"] = datetime.now().isoformat()
                 tools._save_status_data()
         except Exception as e:
-            logger.error(f"Preprocessing failed for {document_id}: {e}")
+            logger.error(f"Preprocessing failed for {_sanitize_log_data(document_id)}: {_sanitize_log_data(str(e))}")
             await tools._update_document_status(document_id, "failed", f"Preprocessing failed: {str(e)}")
             raise
 
         # Stage 2: OCR Extraction
-        logger.info(f"Stage 2: OCR extraction for {document_id}")
+        logger.info(f"Stage 2: OCR extraction for {_sanitize_log_data(document_id)}")
         try:
             ocr_result = await ocr_processor.extract_text(
                 preprocessing_result.get("images", []),
@@ -619,12 +661,12 @@ async def process_document_background(
                             stage["completed_at"] = datetime.now().isoformat()
                 tools._save_status_data()
         except Exception as e:
-            logger.error(f"OCR extraction failed for {document_id}: {e}")
+            logger.error(f"OCR extraction failed for {_sanitize_log_data(document_id)}: {_sanitize_log_data(str(e))}")
             await tools._update_document_status(document_id, "failed", f"OCR extraction failed: {str(e)}")
             raise
 
         # Stage 3: Small LLM Processing
-        logger.info(f"Stage 3: Small LLM processing for {document_id}")
+        logger.info(f"Stage 3: Small LLM processing for {_sanitize_log_data(document_id)}")
         try:
             llm_result = await llm_processor.process_document(
                 preprocessing_result.get("images", []),
@@ -642,12 +684,12 @@ async def process_document_background(
                             stage["completed_at"] = datetime.now().isoformat()
                 tools._save_status_data()
         except Exception as e:
-            logger.error(f"LLM processing failed for {document_id}: {e}")
+            logger.error(f"LLM processing failed for {_sanitize_log_data(document_id)}: {_sanitize_log_data(str(e))}")
             await tools._update_document_status(document_id, "failed", f"LLM processing failed: {str(e)}")
             raise
 
         # Stage 4: Large LLM Judge & Validation
-        logger.info(f"Stage 4: Large LLM judge validation for {document_id}")
+        logger.info(f"Stage 4: Large LLM judge validation for {_sanitize_log_data(document_id)}")
         try:
             validation_result = await judge.evaluate_document(
                 llm_result.get("structured_data", {}),
@@ -665,12 +707,12 @@ async def process_document_background(
                             stage["completed_at"] = datetime.now().isoformat()
                 tools._save_status_data()
         except Exception as e:
-            logger.error(f"Validation failed for {document_id}: {e}")
+            logger.error(f"Validation failed for {_sanitize_log_data(document_id)}: {_sanitize_log_data(str(e))}")
             await tools._update_document_status(document_id, "failed", f"Validation failed: {str(e)}")
             raise
 
         # Stage 5: Intelligent Routing
-        logger.info(f"Stage 5: Intelligent routing for {document_id}")
+        logger.info(f"Stage 5: Intelligent routing for {_sanitize_log_data(document_id)}")
         try:
             routing_result = await router.route_document(
                 llm_result, validation_result, document_type
@@ -686,7 +728,7 @@ async def process_document_background(
                             stage["completed_at"] = datetime.now().isoformat()
                 tools._save_status_data()
         except Exception as e:
-            logger.error(f"Routing failed for {document_id}: {e}")
+            logger.error(f"Routing failed for {_sanitize_log_data(document_id)}: {_sanitize_log_data(str(e))}")
             await tools._update_document_status(document_id, "failed", f"Routing failed: {str(e)}")
             raise
 
@@ -709,18 +751,18 @@ async def process_document_background(
         )
 
         logger.info(
-            f"NVIDIA NeMo processing pipeline completed for document: {document_id}"
+            f"NVIDIA NeMo processing pipeline completed for document: {_sanitize_log_data(document_id)}"
         )
 
         # Only delete file after successful processing and results storage
         # Keep file for potential re-processing or debugging
         # Files can be cleaned up later via a cleanup job if needed
-        logger.info(f"Document file preserved at: {file_path} (for re-processing if needed)")
+        logger.info(f"Document file preserved at: {_sanitize_log_data(file_path)} (for re-processing if needed)")
 
     except Exception as e:
         error_message = f"{type(e).__name__}: {str(e)}"
         logger.error(
-            f"NVIDIA NeMo processing failed for document {document_id}: {error_message}",
+            f"NVIDIA NeMo processing failed for document {_sanitize_log_data(document_id)}: {_sanitize_log_data(error_message)}",
             exc_info=True,
         )
         # Update status to failed with detailed error message
@@ -728,7 +770,7 @@ async def process_document_background(
             tools = await get_document_tools()
             await tools._update_document_status(document_id, "failed", error_message)
         except Exception as status_error:
-            logger.error(f"Failed to update document status: {status_error}", exc_info=True)
+            logger.error(f"Failed to update document status: {_sanitize_log_data(str(status_error))}", exc_info=True)
 
 
 @router.get("/health")
