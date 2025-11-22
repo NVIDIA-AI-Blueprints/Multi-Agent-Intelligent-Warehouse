@@ -33,14 +33,25 @@ CREATE TABLE IF NOT EXISTS equipment_telemetry (
   value DOUBLE PRECISION NOT NULL
 );
 
+-- User role and status ENUM types
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
+    CREATE TYPE user_role AS ENUM ('admin', 'manager', 'supervisor', 'operator', 'viewer');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_status') THEN
+    CREATE TYPE user_status AS ENUM ('active', 'inactive', 'suspended', 'pending');
+  END IF;
+END $$;
+
 -- User authentication and authorization tables
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   username TEXT UNIQUE NOT NULL,
   email TEXT UNIQUE NOT NULL,
   full_name TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('admin', 'manager', 'supervisor', 'operator', 'viewer')),
-  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'suspended', 'pending')),
+  role user_role NOT NULL,
+  status user_status NOT NULL DEFAULT 'active',
   hashed_password TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now(),
@@ -109,16 +120,15 @@ ON CONFLICT (sku) DO UPDATE SET
   reorder_point = EXCLUDED.reorder_point,
   updated_at = now();
 
--- Sample users (passwords set via DEFAULT_ADMIN_PASSWORD env var, hashed with bcrypt)
-INSERT INTO users (username, email, full_name, role, status, hashed_password) VALUES
-  ('admin', 'admin@warehouse.com', 'System Administrator', 'admin', 'active', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj4J/8KzqK2a'),
-  ('manager1', 'manager1@warehouse.com', 'John Manager', 'manager', 'active', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj4J/8KzqK2a'),
-  ('supervisor1', 'supervisor1@warehouse.com', 'Jane Supervisor', 'supervisor', 'active', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj4J/8KzqK2a'),
-  ('operator1', 'operator1@warehouse.com', 'Bob Operator', 'operator', 'active', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj4J/8KzqK2a'),
-  ('viewer1', 'viewer1@warehouse.com', 'Alice Viewer', 'viewer', 'active', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj4J/8KzqK2a')
-ON CONFLICT (username) DO UPDATE SET
-  email = EXCLUDED.email,
-  full_name = EXCLUDED.full_name,
-  role = EXCLUDED.role,
-  status = EXCLUDED.status,
-  updated_at = now();
+-- Sample users should be created using the setup script: scripts/setup/create_default_users.py
+-- This script properly generates password hashes from environment variables and does not expose
+-- sensitive credentials in source code. Never hardcode password hashes in SQL files.
+--
+-- To create default users, run:
+--   python scripts/setup/create_default_users.py
+--
+-- The script uses the following environment variables:
+--   - DEFAULT_ADMIN_PASSWORD: Password for the admin user (default: 'changeme')
+--   - DEFAULT_USER_PASSWORD: Password for regular users (default: 'changeme')
+--
+-- For production deployments, always set strong passwords via environment variables.

@@ -258,14 +258,24 @@ PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse
 
 ### Step 6: Create Default Users
 
+**⚠️ Security Note:** The SQL schema (`data/postgres/000_schema.sql`) does not contain hardcoded password hashes. Users must be created using the setup script, which generates secure password hashes from environment variables.
+
 ```bash
+# Set password via environment variable (optional, defaults to 'changeme' for development)
+export DEFAULT_ADMIN_PASSWORD=your-secure-password-here
+
 # Create default admin and operator users
 python scripts/setup/create_default_users.py
 ```
 
 **Default Credentials:**
-- **Admin user**: `admin` / `changeme` (role: admin)
-- **Operator user**: `user` / `changeme` (role: operator)
+- **Admin user**: `admin` / Value of `DEFAULT_ADMIN_PASSWORD` env var (default: `changeme` for development only)
+- **Operator user**: `user` / Value of `DEFAULT_USER_PASSWORD` env var (default: `changeme` for development only)
+
+**⚠️ Production Security:**
+- Always set strong, unique passwords via environment variables
+- Never use default passwords in production
+- The setup script generates unique bcrypt hashes with random salts - no credentials are exposed in source code
 
 ### Step 7: Install RAPIDS for GPU-Accelerated Forecasting
 

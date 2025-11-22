@@ -65,9 +65,14 @@ PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse
 
 ### 5. Create Default Users
 
+**⚠️ Security Note:** The SQL schema does not contain hardcoded password hashes. Users must be created using the setup script, which generates secure password hashes from environment variables.
+
 ```bash
 # Activate virtual environment
 source env/bin/activate
+
+# Set password via environment variable (optional, defaults to 'changeme' for development)
+export DEFAULT_ADMIN_PASSWORD=your-secure-password-here
 
 # Create default admin and user accounts
 python scripts/setup/create_default_users.py
@@ -75,7 +80,12 @@ python scripts/setup/create_default_users.py
 
 **Default Login Credentials:**
 - **Username:** `admin`
-- **Password:** `changeme` (or value of `DEFAULT_ADMIN_PASSWORD` env var)
+- **Password:** Value of `DEFAULT_ADMIN_PASSWORD` environment variable (default: `changeme` for development only)
+
+**⚠️ Production Security:**
+- Always set strong, unique passwords via environment variables
+- Never use default passwords in production
+- The setup script generates unique bcrypt hashes with random salts - no credentials are exposed in source code
 
 ### 6. (Optional) Install RAPIDS for GPU-Accelerated Forecasting
 

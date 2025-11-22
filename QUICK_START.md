@@ -25,9 +25,11 @@ PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse
 PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/004_inventory_movements_schema.sql
 PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f scripts/setup/create_model_tracking_tables.sql
 
-# Create default users
+# Create default users (generates secure password hashes from environment variables)
 python scripts/setup/create_default_users.py
 ```
+
+**⚠️ Security Note:** The SQL schema does not contain hardcoded password hashes. Users are created securely via the setup script using environment variables.
 
 **Note:** For detailed setup instructions, see [DEPLOYMENT.md](DEPLOYMENT.md)
 
@@ -80,9 +82,10 @@ python scripts/setup/create_default_users.py
 ```
 
 **Password not working?**
-- Default password is `changeme`
-- Check your `.env` file for `DEFAULT_ADMIN_PASSWORD`
+- Default password is `changeme` (development only)
+- Check your `.env` file for `DEFAULT_ADMIN_PASSWORD` environment variable
 - Recreate users: `python scripts/setup/create_default_users.py`
+- **Note:** The SQL schema does not create users - they must be created via the setup script
 
 **Port already in use?**
 ```bash

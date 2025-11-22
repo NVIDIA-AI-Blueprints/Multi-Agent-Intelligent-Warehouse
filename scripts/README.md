@@ -226,12 +226,26 @@ Starts all development infrastructure services (PostgreSQL, Redis, Kafka, Milvus
 
 **Script:** `scripts/setup/create_default_users.py`
 
-Creates default users with proper password hashing.
+Creates default users with proper password hashing. This script:
+- Generates unique bcrypt password hashes with random salts
+- Reads passwords from environment variables (never hardcoded)
+- Does not expose credentials in source code
+- **Security:** The SQL schema does not contain hardcoded password hashes - users must be created via this script
 
 **Usage:**
 ```bash
+# Set password via environment variable (optional, defaults to 'changeme' for development)
+export DEFAULT_ADMIN_PASSWORD=your-secure-password-here
+
+# Create default users
 python scripts/setup/create_default_users.py
 ```
+
+**Environment Variables:**
+- `DEFAULT_ADMIN_PASSWORD` - Password for admin user (default: `changeme` for development only)
+- `DEFAULT_USER_PASSWORD` - Password for regular users (default: `changeme` for development only)
+
+**⚠️ Production:** Always set strong, unique passwords via environment variables. Never use default passwords in production.
 
 **SQL Script:** `scripts/setup/create_model_tracking_tables.sql`
 

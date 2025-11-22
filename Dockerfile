@@ -39,8 +39,8 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    gcc \
     g++ \
+    gcc \
     git \
     && rm -rf /var/lib/apt/lists/*
 
@@ -58,8 +58,8 @@ WORKDIR /app
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
-    git \
     curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Python dependencies from backend-deps stage
@@ -86,8 +86,9 @@ ENV PYTHONUNBUFFERED=1
 COPY --from=frontend-builder /app/src/ui/web/build ./src/ui/web/build
 
 # Create non-root user for security
-RUN groupadd -r appuser && useradd -r -g appuser appuser
-RUN chown -R appuser:appuser /app
+RUN groupadd -r appuser && \
+    useradd -r -g appuser appuser && \
+    chown -R appuser:appuser /app
 USER appuser
 
 # Health check

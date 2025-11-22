@@ -67,13 +67,48 @@ ERP_API_KEY=your-erp-api-key
 ## Security Best Practices
 
 1. **Never commit secrets to version control**
-2. **Use secrets management systems in production**
-3. **Rotate credentials regularly**
-4. **Use least privilege principle**
-5. **Enable audit logging**
-6. **Use secure communication protocols**
-7. **Implement proper access controls**
-8. **Regular security audits**
+2. **Never hardcode password hashes in SQL files or source code**
+   - Password hashes should be generated dynamically from environment variables
+   - Use the setup script (`scripts/setup/create_default_users.py`) to create users securely
+   - The SQL schema (`data/postgres/000_schema.sql`) does not contain hardcoded credentials
+3. **Use secrets management systems in production**
+4. **Rotate credentials regularly**
+5. **Use least privilege principle**
+6. **Enable audit logging**
+7. **Use secure communication protocols**
+8. **Implement proper access controls**
+9. **Regular security audits**
+
+## User Creation Security
+
+### ⚠️ Important: Never Hardcode Password Hashes
+
+**The SQL schema file (`data/postgres/000_schema.sql`) does NOT contain hardcoded password hashes or sample user data.** This is a security best practice to prevent credential exposure in source code.
+
+### Creating Users Securely
+
+Users must be created using the setup script, which:
+- Generates unique bcrypt hashes with random salts
+- Reads passwords from environment variables (never hardcoded)
+- Does not expose credentials in source code
+
+**To create default users:**
+```bash
+# Set password via environment variable
+export DEFAULT_ADMIN_PASSWORD=your-secure-password-here
+
+# Run the setup script
+python scripts/setup/create_default_users.py
+```
+
+**Environment Variables:**
+- `DEFAULT_ADMIN_PASSWORD` - Password for the admin user (default: `changeme` for development only)
+- `DEFAULT_USER_PASSWORD` - Password for regular users (default: `changeme` for development only)
+
+**For Production:**
+- Always set strong, unique passwords via environment variables
+- Never use default passwords in production
+- Consider using a secrets management system (AWS Secrets Manager, HashiCorp Vault, etc.)
 
 ## JWT Secret Configuration
 
