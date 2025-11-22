@@ -80,6 +80,107 @@ def _sanitize_log_data(data: Union[str, Any], max_length: int = 500) -> str:
     
     return data_str
 
+
+def _parse_json_form_data(json_str: Optional[str], default: Any = None) -> Any:
+    """
+    Parse JSON string from form data with error handling.
+    
+    Args:
+        json_str: JSON string to parse
+        default: Default value if parsing fails
+        
+    Returns:
+        Parsed JSON object or default value
+    """
+    if not json_str:
+        return default
+    
+    try:
+        import json
+        return json.loads(json_str)
+    except json.JSONDecodeError:
+        logger.warning(f"Invalid JSON in form data: {_sanitize_log_data(json_str)}")
+        return default
+
+
+def _handle_endpoint_error(operation: str, error: Exception) -> HTTPException:
+    """
+    Create standardized HTTPException for endpoint errors.
+    
+    Args:
+        operation: Description of the operation that failed
+        error: Exception that occurred
+        
+    Returns:
+        HTTPException with appropriate status code and message
+    """
+    logger.error(f"{operation} failed: {_sanitize_log_data(str(error))}")
+    return HTTPException(status_code=500, detail=f"{operation} failed: {str(error)}")
+
+
+def _check_result_success(result: Dict[str, Any], operation: str) -> None:
+    """
+    Check if result indicates success, raise HTTPException if not.
+    
+    Args:
+        result: Result dictionary with 'success' key
+        operation: Description of operation for error message
+        
+    Raises:
+        HTTPException: If result indicates failure
+    """
+    if not result.get("success"):
+        status_code = 404 if "not found" in result.get("message", "").lower() else 500
+        raise HTTPException(status_code=status_code, detail=result.get("message", f"{operation} failed"))
+
+
+async def _update_stage_completion(
+    tools: DocumentActionTools,
+    document_id: str,
+    stage_name: str,
+    current_stage: str,
+    progress: int,
+) -> None:
+    """
+    Update document status after stage completion.
+    
+    Args:
+        tools: Document action tools instance
+        document_id: Document ID
+        stage_name: Name of the completed stage (e.g., "preprocessing")
+        current_stage: Name of the next stage
+        progress: Progress percentage
+    """
+    if document_id in tools.document_statuses:
+        tools.document_statuses[document_id]["current_stage"] = current_stage
+        tools.document_statuses[document_id]["progress"] = progress
+        if "stages" in tools.document_statuses[document_id]:
+            for stage in tools.document_statuses[document_id]["stages"]:
+                if stage["name"] == stage_name:
+                    stage["status"] = "completed"
+                    stage["completed_at"] = datetime.now().isoformat()
+        tools._save_status_data()
+
+
+async def _handle_stage_error(
+    tools: DocumentActionTools,
+    document_id: str,
+    stage_name: str,
+    error: Exception,
+) -> None:
+    """
+    Handle error during document processing stage.
+    
+    Args:
+        tools: Document action tools instance
+        document_id: Document ID
+        stage_name: Name of the stage that failed
+        error: Exception that occurred
+    """
+    error_msg = f"{stage_name} failed: {str(error)}"
+    logger.error(f"{stage_name} failed for {_sanitize_log_data(document_id)}: {_sanitize_log_data(str(error))}")
+    await tools._update_document_status(document_id, "failed", error_msg)
+
 # Create router
 router = APIRouter(prefix="/api/v1/document", tags=["document"])
 
@@ -166,14 +267,7 @@ async def upload_document(
         logger.info(f"Document saved to persistent storage: {_sanitize_log_data(str(persistent_file_path))}")
 
         # Parse metadata
-        parsed_metadata = {}
-        if metadata:
-            try:
-                import json
-
-                parsed_metadata = json.loads(metadata)
-            except json.JSONDecodeError:
-                logger.warning(f"Invalid metadata JSON: {_sanitize_log_data(metadata)}")
+        parsed_metadata = _parse_json_form_data(metadata, {})
 
         # Start document processing
         result = await tools.upload_document(
@@ -184,31 +278,29 @@ async def upload_document(
 
         logger.info(f"Upload result: {_sanitize_log_data(str(result))}")
 
-        if result["success"]:
-            # Schedule background processing
-            background_tasks.add_task(
-                process_document_background,
-                document_id,
-                str(persistent_file_path),
-                document_type,
-                user_id,
-                parsed_metadata,
-            )
+        _check_result_success(result, "Document upload")
 
-            return DocumentUploadResponse(
-                document_id=document_id,
-                status="uploaded",
-                message="Document uploaded successfully and processing started",
-                estimated_processing_time=60,
-            )
-        else:
-            raise HTTPException(status_code=500, detail=result["message"])
+        # Schedule background processing
+        background_tasks.add_task(
+            process_document_background,
+            document_id,
+            str(persistent_file_path),
+            document_type,
+            user_id,
+            parsed_metadata,
+        )
+
+        return DocumentUploadResponse(
+            document_id=document_id,
+            status="uploaded",
+            message="Document uploaded successfully and processing started",
+            estimated_processing_time=60,
+        )
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Document upload failed: {_sanitize_log_data(str(e))}")
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+        raise _handle_endpoint_error("Document upload", e)
 
 
 @router.get("/status/{document_id}", response_model=DocumentProcessingResponse)
@@ -229,52 +321,49 @@ async def get_document_status(
         logger.info(f"Getting status for document: {_sanitize_log_data(document_id)}")
 
         result = await tools.get_document_status(document_id)
+        _check_result_success(result, "Status check")
 
-        if result["success"]:
-            # Convert ProcessingStage enum to string for frontend compatibility
-            status_value = result["status"]
-            if hasattr(status_value, "value"):
-                status_value = status_value.value
-            elif not isinstance(status_value, str):
-                status_value = str(status_value)
-            
-            response_data = {
-                "document_id": document_id,
-                "status": status_value,
-                "progress": result["progress"],
-                "current_stage": result["current_stage"],
-                "stages": [
-                    {
-                        "stage_name": stage["name"].lower().replace(" ", "_"),
-                        "status": stage["status"] if isinstance(stage["status"], str) else str(stage["status"]),
-                        "started_at": stage.get("started_at"),
-                        "completed_at": stage.get("completed_at"),
-                        "processing_time_ms": stage.get("processing_time_ms"),
-                        "error_message": stage.get("error_message"),
-                        "metadata": stage.get("metadata", {}),
-                    }
-                    for stage in result["stages"]
-                ],
-                "estimated_completion": (
-                    datetime.fromtimestamp(result.get("estimated_completion", 0))
-                    if result.get("estimated_completion")
-                    else None
-                ),
-            }
-            
-            # Add error_message to response if status is failed
-            if status_value == "failed" and result.get("error_message"):
-                response_data["error_message"] = result["error_message"]
-            
-            return DocumentProcessingResponse(**response_data)
-        else:
-            raise HTTPException(status_code=404, detail=result["message"])
+        # Convert ProcessingStage enum to string for frontend compatibility
+        status_value = result["status"]
+        if hasattr(status_value, "value"):
+            status_value = status_value.value
+        elif not isinstance(status_value, str):
+            status_value = str(status_value)
+        
+        response_data = {
+            "document_id": document_id,
+            "status": status_value,
+            "progress": result["progress"],
+            "current_stage": result["current_stage"],
+            "stages": [
+                {
+                    "stage_name": stage["name"].lower().replace(" ", "_"),
+                    "status": stage["status"] if isinstance(stage["status"], str) else str(stage["status"]),
+                    "started_at": stage.get("started_at"),
+                    "completed_at": stage.get("completed_at"),
+                    "processing_time_ms": stage.get("processing_time_ms"),
+                    "error_message": stage.get("error_message"),
+                    "metadata": stage.get("metadata", {}),
+                }
+                for stage in result["stages"]
+            ],
+            "estimated_completion": (
+                datetime.fromtimestamp(result.get("estimated_completion", 0))
+                if result.get("estimated_completion")
+                else None
+            ),
+        }
+        
+        # Add error_message to response if status is failed
+        if status_value == "failed" and result.get("error_message"):
+            response_data["error_message"] = result["error_message"]
+        
+        return DocumentProcessingResponse(**response_data)
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get document status: {_sanitize_log_data(str(e))}")
-        raise HTTPException(status_code=500, detail=f"Status check failed: {str(e)}")
+        raise _handle_endpoint_error("Status check", e)
 
 
 @router.get("/results/{document_id}", response_model=DocumentResultsResponse)
@@ -295,45 +384,40 @@ async def get_document_results(
         logger.info(f"Getting results for document: {_sanitize_log_data(document_id)}")
 
         result = await tools.extract_document_data(document_id)
+        _check_result_success(result, "Results retrieval")
 
-        if result["success"]:
-            # Get actual filename from document status if available
-            doc_status = await tools.get_document_status(document_id)
-            filename = f"document_{document_id}.pdf"  # Default
-            document_type = "invoice"  # Default
-            
-            if doc_status.get("success"):
-                # Try to get filename from status tracking
-                if hasattr(tools, 'document_statuses') and document_id in tools.document_statuses:
-                    status_info = tools.document_statuses[document_id]
-                    filename = status_info.get("filename", filename)
-                    document_type = status_info.get("document_type", document_type)
-            
-            return DocumentResultsResponse(
-                document_id=document_id,
-                filename=filename,
-                document_type=document_type,
-                extraction_results=result["extracted_data"],
-                quality_score=result.get("quality_score"),
-                routing_decision=result.get("routing_decision"),
-                search_metadata=None,
-                processing_summary={
-                    "total_processing_time": result.get("processing_time_ms", 0),
-                    "stages_completed": result.get("stages", []),
-                    "confidence_scores": result.get("confidence_scores", {}),
-                    "is_mock_data": result.get("is_mock", False),  # Indicate if this is mock data
-                },
-            )
-        else:
-            raise HTTPException(status_code=404, detail=result["message"])
+        # Get actual filename from document status if available
+        doc_status = await tools.get_document_status(document_id)
+        filename = f"document_{document_id}.pdf"  # Default
+        document_type = "invoice"  # Default
+        
+        if doc_status.get("success"):
+            # Try to get filename from status tracking
+            if hasattr(tools, 'document_statuses') and document_id in tools.document_statuses:
+                status_info = tools.document_statuses[document_id]
+                filename = status_info.get("filename", filename)
+                document_type = status_info.get("document_type", document_type)
+        
+        return DocumentResultsResponse(
+            document_id=document_id,
+            filename=filename,
+            document_type=document_type,
+            extraction_results=result["extracted_data"],
+            quality_score=result.get("quality_score"),
+            routing_decision=result.get("routing_decision"),
+            search_metadata=None,
+            processing_summary={
+                "total_processing_time": result.get("processing_time_ms", 0),
+                "stages_completed": result.get("stages", []),
+                "confidence_scores": result.get("confidence_scores", {}),
+                "is_mock_data": result.get("is_mock", False),  # Indicate if this is mock data
+            },
+        )
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get document results: {_sanitize_log_data(str(e))}")
-        raise HTTPException(
-            status_code=500, detail=f"Results retrieval failed: {str(e)}"
-        )
+        raise _handle_endpoint_error("Results retrieval", e)
 
 
 @router.post("/search", response_model=DocumentSearchResponse)
@@ -357,22 +441,19 @@ async def search_documents(
         result = await tools.search_documents(
             search_query=request.query, filters=request.filters or {}
         )
+        _check_result_success(result, "Document search")
 
-        if result["success"]:
-            return DocumentSearchResponse(
-                results=result["results"],
-                total_count=result["total_count"],
-                query=request.query,
-                search_time_ms=result["search_time_ms"],
-            )
-        else:
-            raise HTTPException(status_code=500, detail=result["message"])
+        return DocumentSearchResponse(
+            results=result["results"],
+            total_count=result["total_count"],
+            query=request.query,
+            search_time_ms=result["search_time_ms"],
+        )
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Document search failed: {_sanitize_log_data(str(e))}")
-        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+        raise _handle_endpoint_error("Document search", e)
 
 
 @router.post("/validate/{document_id}", response_model=DocumentValidationResponse)
@@ -398,28 +479,25 @@ async def validate_document(
         result = await tools.validate_document_quality(
             document_id=document_id, validation_type=request.validation_type
         )
+        _check_result_success(result, "Document validation")
 
-        if result["success"]:
-            return DocumentValidationResponse(
-                document_id=document_id,
-                validation_status="completed",
-                quality_score=result["quality_score"],
-                validation_notes=(
-                    request.validation_rules.get("notes")
-                    if request.validation_rules
-                    else None
-                ),
-                validated_by=request.reviewer_id or "system",
-                validation_timestamp=datetime.now(),
-            )
-        else:
-            raise HTTPException(status_code=500, detail=result["message"])
+        return DocumentValidationResponse(
+            document_id=document_id,
+            validation_status="completed",
+            quality_score=result["quality_score"],
+            validation_notes=(
+                request.validation_rules.get("notes")
+                if request.validation_rules
+                else None
+            ),
+            validated_by=request.reviewer_id or "system",
+            validation_timestamp=datetime.now(),
+        )
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Document validation failed: {_sanitize_log_data(str(e))}")
-        raise HTTPException(status_code=500, detail=f"Validation failed: {str(e)}")
+        raise _handle_endpoint_error("Document validation", e)
 
 
 @router.get("/analytics")
@@ -445,23 +523,20 @@ async def get_document_analytics(
         result = await tools.get_document_analytics(
             time_range=time_range, metrics=metrics or []
         )
+        _check_result_success(result, "Analytics retrieval")
 
-        if result["success"]:
-            return {
-                "time_range": time_range,
-                "metrics": result["metrics"],
-                "trends": result["trends"],
-                "summary": result["summary"],
-                "generated_at": datetime.now(),
-            }
-        else:
-            raise HTTPException(status_code=500, detail=result["message"])
+        return {
+            "time_range": time_range,
+            "metrics": result["metrics"],
+            "trends": result["trends"],
+            "summary": result["summary"],
+            "generated_at": datetime.now(),
+        }
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Analytics retrieval failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Analytics failed: {str(e)}")
+        raise _handle_endpoint_error("Analytics retrieval", e)
 
 
 @router.post("/approve/{document_id}")
@@ -491,23 +566,20 @@ async def approve_document(
             approver_id=approver_id,
             approval_notes=approval_notes,
         )
+        _check_result_success(result, "Document approval")
 
-        if result["success"]:
-            return {
-                "document_id": document_id,
-                "approval_status": "approved",
-                "approver_id": approver_id,
-                "approval_timestamp": datetime.now(),
-                "approval_notes": approval_notes,
-            }
-        else:
-            raise HTTPException(status_code=500, detail=result["message"])
+        return {
+            "document_id": document_id,
+            "approval_status": "approved",
+            "approver_id": approver_id,
+            "approval_timestamp": datetime.now(),
+            "approval_notes": approval_notes,
+        }
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Document approval failed: {_sanitize_log_data(str(e))}")
-        raise HTTPException(status_code=500, detail=f"Approval failed: {str(e)}")
+        raise _handle_endpoint_error("Document approval", e)
 
 
 @router.post("/reject/{document_id}")
@@ -534,14 +606,10 @@ async def reject_document(
     try:
         logger.info(f"Rejecting document: {_sanitize_log_data(document_id)}")
 
-        suggestions_list = []
-        if suggestions:
-            try:
-                import json
-
-                suggestions_list = json.loads(suggestions)
-            except json.JSONDecodeError:
-                suggestions_list = [suggestions]
+        suggestions_list = _parse_json_form_data(suggestions, [])
+        if suggestions and not suggestions_list:
+            # If parsing failed, treat as single string
+            suggestions_list = [suggestions]
 
         result = await tools.reject_document(
             document_id=document_id,
@@ -549,24 +617,21 @@ async def reject_document(
             rejection_reason=rejection_reason,
             suggestions=suggestions_list,
         )
+        _check_result_success(result, "Document rejection")
 
-        if result["success"]:
-            return {
-                "document_id": document_id,
-                "rejection_status": "rejected",
-                "rejector_id": rejector_id,
-                "rejection_reason": rejection_reason,
-                "suggestions": suggestions_list,
-                "rejection_timestamp": datetime.now(),
-            }
-        else:
-            raise HTTPException(status_code=500, detail=result["message"])
+        return {
+            "document_id": document_id,
+            "rejection_status": "rejected",
+            "rejector_id": rejector_id,
+            "rejection_reason": rejection_reason,
+            "suggestions": suggestions_list,
+            "rejection_timestamp": datetime.now(),
+        }
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Document rejection failed: {_sanitize_log_data(str(e))}")
-        raise HTTPException(status_code=500, detail=f"Rejection failed: {str(e)}")
+        raise _handle_endpoint_error("Document rejection", e)
 
 
 async def process_document_background(
@@ -628,18 +693,9 @@ async def process_document_background(
         try:
             preprocessing_result = await preprocessor.process_document(file_path)
             # Update status after preprocessing
-            if document_id in tools.document_statuses:
-                tools.document_statuses[document_id]["current_stage"] = "OCR Extraction"
-                tools.document_statuses[document_id]["progress"] = 20
-                if "stages" in tools.document_statuses[document_id]:
-                    for stage in tools.document_statuses[document_id]["stages"]:
-                        if stage["name"] == "preprocessing":
-                            stage["status"] = "completed"
-                            stage["completed_at"] = datetime.now().isoformat()
-                tools._save_status_data()
+            await _update_stage_completion(tools, document_id, "preprocessing", "OCR Extraction", 20)
         except Exception as e:
-            logger.error(f"Preprocessing failed for {_sanitize_log_data(document_id)}: {_sanitize_log_data(str(e))}")
-            await tools._update_document_status(document_id, "failed", f"Preprocessing failed: {str(e)}")
+            await _handle_stage_error(tools, document_id, "Preprocessing", e)
             raise
 
         # Stage 2: OCR Extraction
@@ -650,18 +706,9 @@ async def process_document_background(
                 preprocessing_result.get("metadata", {}),
             )
             # Update status after OCR
-            if document_id in tools.document_statuses:
-                tools.document_statuses[document_id]["current_stage"] = "LLM Processing"
-                tools.document_statuses[document_id]["progress"] = 40
-                if "stages" in tools.document_statuses[document_id]:
-                    for stage in tools.document_statuses[document_id]["stages"]:
-                        if stage["name"] == "ocr_extraction":
-                            stage["status"] = "completed"
-                            stage["completed_at"] = datetime.now().isoformat()
-                tools._save_status_data()
+            await _update_stage_completion(tools, document_id, "ocr_extraction", "LLM Processing", 40)
         except Exception as e:
-            logger.error(f"OCR extraction failed for {_sanitize_log_data(document_id)}: {_sanitize_log_data(str(e))}")
-            await tools._update_document_status(document_id, "failed", f"OCR extraction failed: {str(e)}")
+            await _handle_stage_error(tools, document_id, "OCR extraction", e)
             raise
 
         # Stage 3: Small LLM Processing
@@ -673,18 +720,9 @@ async def process_document_background(
                 document_type,
             )
             # Update status after LLM processing
-            if document_id in tools.document_statuses:
-                tools.document_statuses[document_id]["current_stage"] = "Validation"
-                tools.document_statuses[document_id]["progress"] = 60
-                if "stages" in tools.document_statuses[document_id]:
-                    for stage in tools.document_statuses[document_id]["stages"]:
-                        if stage["name"] == "llm_processing":
-                            stage["status"] = "completed"
-                            stage["completed_at"] = datetime.now().isoformat()
-                tools._save_status_data()
+            await _update_stage_completion(tools, document_id, "llm_processing", "Validation", 60)
         except Exception as e:
-            logger.error(f"LLM processing failed for {_sanitize_log_data(document_id)}: {_sanitize_log_data(str(e))}")
-            await tools._update_document_status(document_id, "failed", f"LLM processing failed: {str(e)}")
+            await _handle_stage_error(tools, document_id, "LLM processing", e)
             raise
 
         # Stage 4: Large LLM Judge & Validation
@@ -696,18 +734,9 @@ async def process_document_background(
                 document_type,
             )
             # Update status after validation
-            if document_id in tools.document_statuses:
-                tools.document_statuses[document_id]["current_stage"] = "Routing"
-                tools.document_statuses[document_id]["progress"] = 80
-                if "stages" in tools.document_statuses[document_id]:
-                    for stage in tools.document_statuses[document_id]["stages"]:
-                        if stage["name"] == "validation":
-                            stage["status"] = "completed"
-                            stage["completed_at"] = datetime.now().isoformat()
-                tools._save_status_data()
+            await _update_stage_completion(tools, document_id, "validation", "Routing", 80)
         except Exception as e:
-            logger.error(f"Validation failed for {_sanitize_log_data(document_id)}: {_sanitize_log_data(str(e))}")
-            await tools._update_document_status(document_id, "failed", f"Validation failed: {str(e)}")
+            await _handle_stage_error(tools, document_id, "Validation", e)
             raise
 
         # Stage 5: Intelligent Routing
@@ -717,18 +746,9 @@ async def process_document_background(
                 llm_result, validation_result, document_type
             )
             # Update status after routing
-            if document_id in tools.document_statuses:
-                tools.document_statuses[document_id]["current_stage"] = "Finalizing"
-                tools.document_statuses[document_id]["progress"] = 90
-                if "stages" in tools.document_statuses[document_id]:
-                    for stage in tools.document_statuses[document_id]["stages"]:
-                        if stage["name"] == "routing":
-                            stage["status"] = "completed"
-                            stage["completed_at"] = datetime.now().isoformat()
-                tools._save_status_data()
+            await _update_stage_completion(tools, document_id, "routing", "Finalizing", 90)
         except Exception as e:
-            logger.error(f"Routing failed for {_sanitize_log_data(document_id)}: {_sanitize_log_data(str(e))}")
-            await tools._update_document_status(document_id, "failed", f"Routing failed: {str(e)}")
+            await _handle_stage_error(tools, document_id, "Routing", e)
             raise
 
         # Store results in the document tools
