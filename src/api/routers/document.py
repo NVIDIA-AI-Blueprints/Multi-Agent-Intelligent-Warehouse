@@ -6,7 +6,8 @@ Provides endpoints for document upload, processing, status, and results
 import logging
 import base64
 import re
-from typing import Dict, Any, List, Optional, Union
+from functools import wraps
+from typing import Dict, Any, List, Optional, Union, Callable, TypeVar
 from fastapi import (
     APIRouter,
     HTTPException,
@@ -22,6 +23,8 @@ from datetime import datetime
 import os
 from pathlib import Path
 import asyncio
+
+T = TypeVar('T')
 
 from src.api.agents.document.models.document_models import (
     DocumentUploadResponse,
@@ -134,6 +137,29 @@ def _check_result_success(result: Dict[str, Any], operation: str) -> None:
         raise HTTPException(status_code=status_code, detail=result.get("message", f"{operation} failed"))
 
 
+def _handle_endpoint_errors(operation: str) -> Callable:
+    """
+    Decorator to handle endpoint errors consistently.
+    
+    Args:
+        operation: Description of the operation for error messages
+        
+    Returns:
+        Decorated function with error handling
+    """
+    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+        @wraps(func)
+        async def wrapper(*args, **kwargs) -> T:
+            try:
+                return await func(*args, **kwargs)
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise _handle_endpoint_error(operation, e)
+        return wrapper
+    return decorator
+
+
 async def _update_stage_completion(
     tools: DocumentActionTools,
     document_id: str,
@@ -180,6 +206,91 @@ async def _handle_stage_error(
     error_msg = f"{stage_name} failed: {str(error)}"
     logger.error(f"{stage_name} failed for {_sanitize_log_data(document_id)}: {_sanitize_log_data(str(error))}")
     await tools._update_document_status(document_id, "failed", error_msg)
+
+
+def _convert_status_enum_to_string(status_value: Any) -> str:
+    """
+    Convert ProcessingStage enum to string for frontend compatibility.
+    
+    Args:
+        status_value: Status value (enum, string, or other)
+        
+    Returns:
+        String representation of status
+    """
+    if hasattr(status_value, "value"):
+        return status_value.value
+    elif isinstance(status_value, str):
+        return status_value
+    else:
+        return str(status_value)
+
+
+def _extract_document_metadata(
+    tools: DocumentActionTools,
+    document_id: str,
+) -> tuple:
+    """
+    Extract filename and document_type from document status.
+    
+    Args:
+        tools: Document action tools instance
+        document_id: Document ID
+        
+    Returns:
+        Tuple of (filename, document_type)
+    """
+    default_filename = f"document_{document_id}.pdf"
+    default_document_type = "invoice"
+    
+    if hasattr(tools, 'document_statuses') and document_id in tools.document_statuses:
+        status_info = tools.document_statuses[document_id]
+        filename = status_info.get("filename", default_filename)
+        document_type = status_info.get("document_type", default_document_type)
+        return filename, document_type
+    
+    return default_filename, default_document_type
+
+
+async def _execute_processing_stage(
+    tools: DocumentActionTools,
+    document_id: str,
+    stage_number: int,
+    stage_name: str,
+    next_stage: str,
+    progress: int,
+    processor_func: callable,
+    *args,
+    **kwargs,
+) -> Any:
+    """
+    Execute a processing stage with standardized error handling and status updates.
+    
+    Args:
+        tools: Document action tools instance
+        document_id: Document ID
+        stage_number: Stage number (1-5)
+        stage_name: Name of the stage (e.g., "preprocessing")
+        next_stage: Name of the next stage
+        progress: Progress percentage after this stage
+        processor_func: Async function to execute for this stage
+        *args: Positional arguments for processor_func
+        **kwargs: Keyword arguments for processor_func
+        
+    Returns:
+        Result from processor_func
+        
+    Raises:
+        Exception: Re-raises any exception from processor_func after handling
+    """
+    logger.info(f"Stage {stage_number}: {stage_name} for {_sanitize_log_data(document_id)}")
+    try:
+        result = await processor_func(*args, **kwargs)
+        await _update_stage_completion(tools, document_id, stage_name, next_stage, progress)
+        return result
+    except Exception as e:
+        await _handle_stage_error(tools, document_id, stage_name, e)
+        raise
 
 # Create router
 router = APIRouter(prefix="/api/v1/document", tags=["document"])
@@ -324,11 +435,7 @@ async def get_document_status(
         _check_result_success(result, "Status check")
 
         # Convert ProcessingStage enum to string for frontend compatibility
-        status_value = result["status"]
-        if hasattr(status_value, "value"):
-            status_value = status_value.value
-        elif not isinstance(status_value, str):
-            status_value = str(status_value)
+        status_value = _convert_status_enum_to_string(result["status"])
         
         response_data = {
             "document_id": document_id,
@@ -387,16 +494,7 @@ async def get_document_results(
         _check_result_success(result, "Results retrieval")
 
         # Get actual filename from document status if available
-        doc_status = await tools.get_document_status(document_id)
-        filename = f"document_{document_id}.pdf"  # Default
-        document_type = "invoice"  # Default
-        
-        if doc_status.get("success"):
-            # Try to get filename from status tracking
-            if hasattr(tools, 'document_statuses') and document_id in tools.document_statuses:
-                status_info = tools.document_statuses[document_id]
-                filename = status_info.get("filename", filename)
-                document_type = status_info.get("document_type", document_type)
+        filename, document_type = _extract_document_metadata(tools, document_id)
         
         return DocumentResultsResponse(
             document_id=document_id,
@@ -689,67 +787,43 @@ async def process_document_background(
             logger.info(f"✅ Updated document {_sanitize_log_data(document_id)} status to PREPROCESSING (10% progress)")
         
         # Stage 1: Document Preprocessing
-        logger.info(f"Stage 1: Document preprocessing for {_sanitize_log_data(document_id)}")
-        try:
-            preprocessing_result = await preprocessor.process_document(file_path)
-            # Update status after preprocessing
-            await _update_stage_completion(tools, document_id, "preprocessing", "OCR Extraction", 20)
-        except Exception as e:
-            await _handle_stage_error(tools, document_id, "Preprocessing", e)
-            raise
+        preprocessing_result = await _execute_processing_stage(
+            tools, document_id, 1, "preprocessing", "OCR Extraction", 20,
+            preprocessor.process_document, file_path
+        )
 
         # Stage 2: OCR Extraction
-        logger.info(f"Stage 2: OCR extraction for {_sanitize_log_data(document_id)}")
-        try:
-            ocr_result = await ocr_processor.extract_text(
-                preprocessing_result.get("images", []),
-                preprocessing_result.get("metadata", {}),
-            )
-            # Update status after OCR
-            await _update_stage_completion(tools, document_id, "ocr_extraction", "LLM Processing", 40)
-        except Exception as e:
-            await _handle_stage_error(tools, document_id, "OCR extraction", e)
-            raise
+        ocr_result = await _execute_processing_stage(
+            tools, document_id, 2, "ocr_extraction", "LLM Processing", 40,
+            ocr_processor.extract_text,
+            preprocessing_result.get("images", []),
+            preprocessing_result.get("metadata", {}),
+        )
 
         # Stage 3: Small LLM Processing
-        logger.info(f"Stage 3: Small LLM processing for {_sanitize_log_data(document_id)}")
-        try:
-            llm_result = await llm_processor.process_document(
-                preprocessing_result.get("images", []),
-                ocr_result.get("text", ""),
-                document_type,
-            )
-            # Update status after LLM processing
-            await _update_stage_completion(tools, document_id, "llm_processing", "Validation", 60)
-        except Exception as e:
-            await _handle_stage_error(tools, document_id, "LLM processing", e)
-            raise
+        llm_result = await _execute_processing_stage(
+            tools, document_id, 3, "llm_processing", "Validation", 60,
+            llm_processor.process_document,
+            preprocessing_result.get("images", []),
+            ocr_result.get("text", ""),
+            document_type,
+        )
 
         # Stage 4: Large LLM Judge & Validation
-        logger.info(f"Stage 4: Large LLM judge validation for {_sanitize_log_data(document_id)}")
-        try:
-            validation_result = await judge.evaluate_document(
-                llm_result.get("structured_data", {}),
-                llm_result.get("entities", {}),
-                document_type,
-            )
-            # Update status after validation
-            await _update_stage_completion(tools, document_id, "validation", "Routing", 80)
-        except Exception as e:
-            await _handle_stage_error(tools, document_id, "Validation", e)
-            raise
+        validation_result = await _execute_processing_stage(
+            tools, document_id, 4, "validation", "Routing", 80,
+            judge.evaluate_document,
+            llm_result.get("structured_data", {}),
+            llm_result.get("entities", {}),
+            document_type,
+        )
 
         # Stage 5: Intelligent Routing
-        logger.info(f"Stage 5: Intelligent routing for {_sanitize_log_data(document_id)}")
-        try:
-            routing_result = await router.route_document(
-                llm_result, validation_result, document_type
-            )
-            # Update status after routing
-            await _update_stage_completion(tools, document_id, "routing", "Finalizing", 90)
-        except Exception as e:
-            await _handle_stage_error(tools, document_id, "Routing", e)
-            raise
+        routing_result = await _execute_processing_stage(
+            tools, document_id, 5, "routing", "Finalizing", 90,
+            router.route_document,
+            llm_result, validation_result, document_type
+        )
 
         # Store results in the document tools
         # Include OCR text in LLM result for fallback parsing
