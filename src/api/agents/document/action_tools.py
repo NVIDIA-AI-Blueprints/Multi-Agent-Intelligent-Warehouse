@@ -84,6 +84,15 @@ class DocumentActionTools:
         else:
             return default
 
+    def _create_error_response(self, operation: str, error: Exception) -> Dict[str, Any]:
+        """Create standardized error response for failed operations."""
+        logger.error(f"Failed to {operation}: {_sanitize_log_data(str(error))}")
+        return {
+            "success": False,
+            "error": str(error),
+            "message": f"Failed to {operation}",
+        }
+
     def _parse_hours_range(self, time_str: str) -> Optional[int]:
         """Parse hours range format (e.g., '4-8 hours') and return average in seconds."""
         parts = time_str.split("-")
@@ -326,12 +335,7 @@ class DocumentActionTools:
             }
 
         except Exception as e:
-            logger.error(f"Document upload failed: {_sanitize_log_data(str(e))}")
-            return {
-                "success": False,
-                "error": str(e),
-                "message": "Failed to upload document",
-            }
+            return self._create_error_response("upload document", e)
 
     async def get_document_status(self, document_id: str) -> Dict[str, Any]:
         """Get document processing status."""
@@ -354,12 +358,7 @@ class DocumentActionTools:
             }
 
         except Exception as e:
-            logger.error(f"Failed to get document status: {_sanitize_log_data(str(e))}")
-            return {
-                "success": False,
-                "error": str(e),
-                "message": "Failed to get document status",
-            }
+            return self._create_error_response("get document status", e)
 
     async def extract_document_data(self, document_id: str) -> Dict[str, Any]:
         """Extract structured data from processed document."""
@@ -390,12 +389,7 @@ class DocumentActionTools:
             }
 
         except Exception as e:
-            logger.error(f"Failed to extract document data: {_sanitize_log_data(str(e))}")
-            return {
-                "success": False,
-                "error": str(e),
-                "message": "Failed to extract document data",
-            }
+            return self._create_error_response("extract document data", e)
 
     async def validate_document_quality(
         self, document_id: str, validation_type: str = "automated"
@@ -421,12 +415,7 @@ class DocumentActionTools:
             }
 
         except Exception as e:
-            logger.error(f"Failed to validate document quality: {_sanitize_log_data(str(e))}")
-            return {
-                "success": False,
-                "error": str(e),
-                "message": "Failed to validate document quality",
-            }
+            return self._create_error_response("validate document quality", e)
 
     async def search_documents(
         self, search_query: str, filters: Optional[Dict[str, Any]] = None
@@ -448,12 +437,7 @@ class DocumentActionTools:
             }
 
         except Exception as e:
-            logger.error(f"Failed to search documents: {_sanitize_log_data(str(e))}")
-            return {
-                "success": False,
-                "error": str(e),
-                "message": "Failed to search documents",
-            }
+            return self._create_error_response("search documents", e)
 
     async def get_document_analytics(
         self, time_range: str = "week", metrics: Optional[List[str]] = None
@@ -475,12 +459,7 @@ class DocumentActionTools:
             }
 
         except Exception as e:
-            logger.error(f"Failed to get document analytics: {_sanitize_log_data(str(e))}")
-            return {
-                "success": False,
-                "error": str(e),
-                "message": "Failed to get document analytics",
-            }
+            return self._create_error_response("get document analytics", e)
 
     async def approve_document(
         self, document_id: str, approver_id: str, approval_notes: Optional[str] = None
@@ -505,12 +484,7 @@ class DocumentActionTools:
             }
 
         except Exception as e:
-            logger.error(f"Failed to approve document: {_sanitize_log_data(str(e))}")
-            return {
-                "success": False,
-                "error": str(e),
-                "message": "Failed to approve document",
-            }
+            return self._create_error_response("approve document", e)
 
     async def reject_document(
         self,
@@ -539,12 +513,7 @@ class DocumentActionTools:
             }
 
         except Exception as e:
-            logger.error(f"Failed to reject document: {_sanitize_log_data(str(e))}")
-            return {
-                "success": False,
-                "error": str(e),
-                "message": "Failed to reject document",
-            }
+            return self._create_error_response("reject document", e)
 
     # Helper methods (mock implementations for now)
     async def _validate_document_file(self, file_path: str) -> Dict[str, Any]:
@@ -689,6 +658,17 @@ class DocumentActionTools:
                 exc_info=True,
             )
     
+    def _convert_pil_image_to_metadata(self, image) -> Dict[str, Any]:
+        """Convert PIL Image to metadata dictionary for JSON serialization."""
+        from PIL import Image
+        return {
+            "_type": "PIL_Image_Reference",
+            "size": image.size,
+            "mode": image.mode,
+            "format": getattr(image, "format", "PNG"),
+            "note": "Image object converted to metadata for JSON serialization"
+        }
+
     def _serialize_processing_result(self, result: Dict[str, Any]) -> Dict[str, Any]:
         """Serialize processing result, converting PIL Images to metadata."""
         from PIL import Image
@@ -709,23 +689,11 @@ class DocumentActionTools:
         for key, value in result.items():
             if isinstance(value, Image.Image):
                 # Convert PIL Image to metadata (dimensions, format) instead of storing the image
-                serialized[key] = {
-                    "_type": "PIL_Image_Reference",
-                    "size": value.size,
-                    "mode": value.mode,
-                    "format": getattr(value, "format", "PNG"),
-                    "note": "Image object converted to metadata for JSON serialization"
-                }
+                serialized[key] = self._convert_pil_image_to_metadata(value)
             elif isinstance(value, list):
                 # Handle lists that might contain PIL Images
                 serialized[key] = [
-                    {
-                        "_type": "PIL_Image_Reference",
-                        "size": item.size,
-                        "mode": item.mode,
-                        "format": getattr(item, "format", "PNG"),
-                        "note": "Image object converted to metadata for JSON serialization"
-                    } if isinstance(item, Image.Image) else item
+                    self._convert_pil_image_to_metadata(item) if isinstance(item, Image.Image) else item
                     for item in value
                 ]
             elif isinstance(value, dict):
