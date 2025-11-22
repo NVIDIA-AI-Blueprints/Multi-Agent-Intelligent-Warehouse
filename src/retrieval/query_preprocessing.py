@@ -147,22 +147,22 @@ class QueryPreprocessor:
             entities = self._extract_entities(normalized_query)
             
             # Step 3: Extract keywords
-            keywords = await self._extract_keywords(normalized_query)
+            keywords = self._extract_keywords(normalized_query)
             
             # Step 4: Classify intent
-            intent = await self._classify_intent(normalized_query)
+            intent = self._classify_intent(normalized_query)
             
             # Step 5: Extract context hints
-            context_hints = await self._extract_context_hints(normalized_query)
+            context_hints = self._extract_context_hints(normalized_query)
             
             # Step 6: Calculate complexity
-            complexity_score = await self._calculate_complexity(normalized_query, entities)
+            complexity_score = self._calculate_complexity(normalized_query, entities)
             
             # Step 7: Generate suggestions
-            suggestions = await self._generate_suggestions(normalized_query, intent, entities)
+            suggestions = self._generate_suggestions(normalized_query, intent, entities)
             
             # Step 8: Calculate confidence
-            confidence = await self._calculate_confidence(normalized_query, intent, entities)
+            confidence = self._calculate_confidence(normalized_query, intent, entities)
             
             return PreprocessedQuery(
                 original_query=query,
@@ -287,7 +287,7 @@ class QueryPreprocessor:
         
         return entities
     
-    async def _extract_keywords(self, query: str) -> List[str]:
+    def _extract_keywords(self, query: str) -> List[str]:
         """Extract important keywords from query."""
         # Remove common stop words
         stop_words = {
@@ -311,7 +311,7 @@ class QueryPreprocessor:
         
         return unique_keywords[:15]  # Limit to top 15 keywords
     
-    async def _classify_intent(self, query: str) -> QueryIntent:
+    def _classify_intent(self, query: str) -> QueryIntent:
         """Classify query intent."""
         best_intent = QueryIntent.UNKNOWN
         best_confidence = 0.0
@@ -329,7 +329,7 @@ class QueryPreprocessor:
         
         return best_intent
     
-    async def _extract_context_hints(self, query: str) -> List[str]:
+    def _extract_context_hints(self, query: str) -> List[str]:
         """Extract context hints from query."""
         hints = []
         
@@ -341,7 +341,7 @@ class QueryPreprocessor:
         
         return hints
     
-    async def _calculate_complexity(self, query: str, entities: Dict[str, Any]) -> float:
+    def _calculate_complexity(self, query: str, entities: Dict[str, Any]) -> float:
         """Calculate query complexity score (0.0 to 1.0)."""
         complexity = 0.0
         
@@ -365,7 +365,7 @@ class QueryPreprocessor:
         
         return min(1.0, complexity)
     
-    async def _generate_suggestions(
+    def _generate_suggestions(
         self, 
         query: str, 
         intent: QueryIntent, 
@@ -409,7 +409,7 @@ class QueryPreprocessor:
         
         return suggestions[:3]  # Limit to 3 suggestions
     
-    async def _calculate_confidence(
+    def _calculate_confidence(
         self, 
         query: str, 
         intent: QueryIntent, 
@@ -437,7 +437,7 @@ class QueryPreprocessor:
         
         return min(1.0, confidence)
     
-    async def enhance_query_for_routing(
+    def enhance_query_for_routing(
         self, 
         preprocessed_query: PreprocessedQuery,
         target_route: str
