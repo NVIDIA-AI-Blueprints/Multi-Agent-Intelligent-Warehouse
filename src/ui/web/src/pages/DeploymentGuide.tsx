@@ -242,7 +242,7 @@ const DeploymentGuide: React.FC = () => {
           Production Deployment Instructions
         </Typography>
         <Typography variant="body1" sx={{ mb: 2 }}>
-          Comprehensive guide for deploying the Warehouse Operational Assistant across different environments. 
+          Comprehensive guide for deploying the Multi-Agent-Intelligent-Warehouse across different environments. 
           This guide covers Docker Compose, Kubernetes, and Helm deployments with monitoring and security configurations.
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 3 }}>
@@ -625,7 +625,7 @@ const DeploymentGuide: React.FC = () => {
       {/* Footer */}
       <Box sx={{ mt: 4, pt: 3, borderTop: 1, borderColor: 'divider' }}>
         <Typography variant="body2" color="text.secondary" align="center">
-          Deployment Guide - Warehouse Operational Assistant
+          Deployment Guide - Multi-Agent-Intelligent-Warehouse
         </Typography>
         <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 2 }}>
           <Button 

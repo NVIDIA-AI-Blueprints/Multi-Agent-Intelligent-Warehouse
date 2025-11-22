@@ -258,7 +258,7 @@ const ArchitectureDiagrams: React.FC = () => {
 
   const systemArchitecture = {
     title: "System Architecture Overview",
-    description: "High-level view of the Warehouse Operational Assistant architecture showing all major components and their relationships",
+    description: "High-level view of the Multi-Agent-Intelligent-Warehouse architecture showing all major components and their relationships",
     components: [
       { name: "Frontend", type: "UI Layer", color: "#1976d2" },
       { name: "API Gateway", type: "Gateway Layer", color: "#388e3c" },
@@ -310,7 +310,7 @@ const ArchitectureDiagrams: React.FC = () => {
           System Architecture and Flow Diagrams
         </Typography>
         <Typography variant="body1" sx={{ mb: 2 }}>
-          Comprehensive visual documentation of the Warehouse Operational Assistant architecture, 
+          Comprehensive visual documentation of the Multi-Agent-Intelligent-Warehouse architecture, 
           including system components, data flow, agent interactions, and MCP framework design.
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 3 }}>
@@ -743,7 +743,7 @@ const ArchitectureDiagrams: React.FC = () => {
       {/* Footer */}
       <Box sx={{ mt: 4, pt: 3, borderTop: 1, borderColor: 'divider' }}>
         <Typography variant="body2" color="text.secondary" align="center">
-          Architecture Diagrams - Warehouse Operational Assistant
+          Architecture Diagrams - Multi-Agent-Intelligent-Warehouse
         </Typography>
         <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 2 }}>
           <Button 

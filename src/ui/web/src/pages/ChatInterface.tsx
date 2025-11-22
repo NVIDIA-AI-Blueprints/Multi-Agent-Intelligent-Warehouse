@@ -35,7 +35,7 @@ const ChatInterface: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: 'Hello! I\'m your Warehouse Operational Assistant. How can I help you today?',
+      content: 'Hello! I\'m your Multi-Agent-Intelligent-Warehouse assistant. How can I help you today?',
       sender: 'assistant',
       timestamp: new Date(),
     },

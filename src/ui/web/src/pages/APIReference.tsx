@@ -256,7 +256,7 @@ const APIReference: React.FC = () => {
           Comprehensive API Documentation
         </Typography>
         <Typography variant="body1" sx={{ mb: 2 }}>
-          Complete reference for all API endpoints in the Warehouse Operational Assistant. 
+          Complete reference for all API endpoints in the Multi-Agent-Intelligent-Warehouse. 
           This documentation covers authentication, agent operations, MCP framework, reasoning engine, and monitoring APIs.
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 3 }}>
@@ -557,7 +557,7 @@ curl -H "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
       {/* Footer */}
       <Box sx={{ mt: 4, pt: 3, borderTop: 1, borderColor: 'divider' }}>
         <Typography variant="body2" color="text.secondary" align="center">
-          API Reference - Warehouse Operational Assistant
+          API Reference - Multi-Agent-Intelligent-Warehouse
         </Typography>
         <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 2 }}>
           <Button 

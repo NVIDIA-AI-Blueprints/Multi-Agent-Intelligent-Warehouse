@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Warehouse Operational Assistant - Frontend Startup Script
+# Multi-Agent-Intelligent-Warehouse - Frontend Startup Script
 
-echo "🚀 Starting Warehouse Operational Assistant Frontend..."
+echo "🚀 Starting Multi-Agent-Intelligent-Warehouse Frontend..."
 echo "📡 Frontend will be available at: http://localhost:3001"
 echo "🔗 Backend API should be running at: http://localhost:8002"
 echo ""

@@ -1,6 +1,6 @@
-# Warehouse Operational Assistant - React Frontend
+# Multi-Agent-Intelligent-Warehouse - React Frontend
 
-A modern React-based web interface for the Warehouse Operational Assistant, built with Material-UI and TypeScript.
+A modern React-based web interface for the Multi-Agent-Intelligent-Warehouse, built with Material-UI and TypeScript.
 
 ##  Current Status - All Issues Fixed + MCP Integration Complete
 
@@ -66,7 +66,7 @@ npm run build
 
 ## API Integration
 
-The frontend connects to the Warehouse Operational Assistant API running on port 8001. Make sure the backend is running before starting the frontend.
+The frontend connects to the Multi-Agent-Intelligent-Warehouse API running on port 8001. Make sure the backend is running before starting the frontend.
 
 ### Environment Variables
 

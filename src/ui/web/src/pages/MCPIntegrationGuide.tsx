@@ -176,7 +176,7 @@ const MCPIntegrationGuide: React.FC = () => {
           Complete Model Context Protocol Framework Documentation
         </Typography>
         <Typography variant="body1" sx={{ mb: 2 }}>
-          Comprehensive guide to the Model Context Protocol (MCP) implementation in the Warehouse Operational Assistant. 
+          Comprehensive guide to the Model Context Protocol (MCP) implementation in the Multi-Agent-Intelligent-Warehouse. 
           This framework enables seamless communication between AI agents and external systems through dynamic tool discovery and execution.
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 3 }}>
@@ -505,7 +505,7 @@ POST /api/v1/mcp/execute
       {/* Footer */}
       <Box sx={{ mt: 4, pt: 3, borderTop: 1, borderColor: 'divider' }}>
         <Typography variant="body2" color="text.secondary" align="center">
-          MCP Integration Guide - Warehouse Operational Assistant
+          MCP Integration Guide - Multi-Agent-Intelligent-Warehouse
         </Typography>
         <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 2 }}>
           <Button 

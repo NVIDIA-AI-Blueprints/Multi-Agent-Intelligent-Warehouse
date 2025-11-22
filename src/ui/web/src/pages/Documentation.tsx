@@ -225,13 +225,13 @@ const Documentation: React.FC = () => {
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-          Warehouse Operational Assistant
+          Multi-Agent-Intelligent-Warehouse
         </Typography>
         <Typography variant="h5" component="h2" gutterBottom color="text.secondary">
           Developer Guide & Implementation Documentation
         </Typography>
         <Typography variant="body1" sx={{ mb: 2 }}>
-          A comprehensive guide for developers taking this NVIDIA Blueprint-aligned multi-agent warehouse assistant to the next level.
+          A comprehensive guide for developers taking this NVIDIA Blueprint-aligned Multi-Agent-Intelligent-Warehouse to the next level.
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 3 }}>
           <Chip label="Production Ready" color="success" />
@@ -626,7 +626,7 @@ const Documentation: React.FC = () => {
               📈 AI-Powered Demand Forecasting
             </Typography>
             <Typography variant="body1" sx={{ mb: 2 }}>
-              The Warehouse Operational Assistant features a <strong>complete AI-powered demand forecasting system</strong> 
+              The Multi-Agent-Intelligent-Warehouse features a <strong>complete AI-powered demand forecasting system</strong> 
               with multi-model ensemble, advanced analytics, and real-time predictions. This system provides accurate 
               demand forecasts to optimize inventory management and reduce stockouts.
             </Typography>
@@ -1075,7 +1075,7 @@ const Documentation: React.FC = () => {
               🎯 Current State: Production-Ready Foundation
             </Typography>
             <Typography variant="body1" sx={{ mb: 2 }}>
-              This Warehouse Operational Assistant represents a <strong>production-grade implementation</strong> of NVIDIA's AI Blueprint architecture. 
+              This Multi-Agent-Intelligent-Warehouse represents a <strong>production-grade implementation</strong> of NVIDIA's AI Blueprint architecture. 
               We've successfully built a multi-agent system with comprehensive tooling, advanced reasoning capabilities, and enterprise-grade security.
             </Typography>
             <Alert severity="success" sx={{ mb: 3 }}>
