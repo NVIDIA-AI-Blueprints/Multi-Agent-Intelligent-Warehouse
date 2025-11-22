@@ -34,7 +34,7 @@ except ImportError:
 
 # CPU fallback imports
 if not RAPIDS_AVAILABLE:
-    from sklearn.ensemble import RandomForestRegressor
+    from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
     from sklearn.linear_model import LinearRegression, Ridge
     from sklearn.svm import SVR
     from sklearn.preprocessing import StandardScaler
@@ -321,6 +321,57 @@ class RAPIDSForecastingAgent:
                 'mae': mean_absolute_error(y_test, xgb_pred)
             }
         
+        # 4. Gradient Boosting
+        logger.info("🌳 Training Gradient Boosting...")
+        gb_model = GradientBoostingRegressor(
+            n_estimators=100,
+            max_depth=5,
+            learning_rate=0.1,
+            random_state=self.config['random_state']
+        )
+        gb_model.fit(X_train_scaled, y_train)
+        gb_pred = gb_model.predict(X_test_scaled)
+        
+        models['gradient_boosting'] = gb_model
+        metrics['gradient_boosting'] = {
+            'mse': mean_squared_error(y_test, gb_pred),
+            'mae': mean_absolute_error(y_test, gb_pred)
+        }
+        
+        # 5. Ridge Regression
+        logger.info("📊 Training Ridge Regression...")
+        ridge_model = Ridge(alpha=1.0, random_state=self.config['random_state'])
+        ridge_model.fit(X_train_scaled, y_train)
+        ridge_pred = ridge_model.predict(X_test_scaled)
+        
+        models['ridge_regression'] = ridge_model
+        metrics['ridge_regression'] = {
+            'mse': mean_squared_error(y_test, ridge_pred),
+            'mae': mean_absolute_error(y_test, ridge_pred)
+        }
+        
+        # 6. Support Vector Regression (SVR)
+        logger.info("🔮 Training Support Vector Regression...")
+        if self.use_gpu:
+            svr_model = cuSVR(C=1.0, epsilon=0.1)
+        else:
+            svr_model = SVR(C=1.0, epsilon=0.1, kernel='rbf')
+        
+        svr_model.fit(X_train_scaled, y_train)
+        svr_pred = svr_model.predict(X_test_scaled)
+        
+        models['svr'] = svr_model
+        if self.use_gpu:
+            metrics['svr'] = {
+                'mse': cu_mean_squared_error(y_test, svr_pred),
+                'mae': cu_mean_absolute_error(y_test, svr_pred)
+            }
+        else:
+            metrics['svr'] = {
+                'mse': mean_squared_error(y_test, svr_pred),
+                'mae': mean_absolute_error(y_test, svr_pred)
+            }
+        
         self.models = models
         
         # Log metrics
@@ -334,7 +385,10 @@ class RAPIDSForecastingAgent:
                 model_name_map = {
                     'random_forest': 'Random Forest',
                     'linear_regression': 'Linear Regression',
-                    'xgboost': 'XGBoost'
+                    'xgboost': 'XGBoost',
+                    'gradient_boosting': 'Gradient Boosting',
+                    'ridge_regression': 'Ridge Regression',
+                    'svr': 'Support Vector Regression'
                 }
                 
                 for model_key, model_metrics in metrics.items():
