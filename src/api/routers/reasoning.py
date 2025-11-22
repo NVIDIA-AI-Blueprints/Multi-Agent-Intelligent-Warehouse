@@ -265,6 +265,14 @@ async def chat_with_reasoning(request: ReasoningRequest):
         )
 
         # Generate enhanced response with reasoning
+        # Determine confidence level (extracted from nested conditional for readability)
+        if reasoning_chain.overall_confidence > 0.8:
+            confidence_level = "High"
+        elif reasoning_chain.overall_confidence > 0.6:
+            confidence_level = "Medium"
+        else:
+            confidence_level = "Low"
+        
         enhanced_response = {
             "query": request.query,
             "reasoning_chain": {
@@ -278,11 +286,7 @@ async def chat_with_reasoning(request: ReasoningRequest):
             "insights": {
                 "total_steps": len(reasoning_chain.steps),
                 "reasoning_types_used": [rt.value for rt in reasoning_types],
-                "confidence_level": (
-                    "High"
-                    if reasoning_chain.overall_confidence > 0.8
-                    else "Medium" if reasoning_chain.overall_confidence > 0.6 else "Low"
-                ),
+                "confidence_level": confidence_level,
             },
         }
 
