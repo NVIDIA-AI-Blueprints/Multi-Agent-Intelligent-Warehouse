@@ -26,6 +26,9 @@ from enum import Enum
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Error message constants
+ERROR_HORIZON_DAYS_MIN = "horizon_days must be at least 1"
+
 # Pydantic models for API
 class ForecastRequest(BaseModel):
     sku: str
@@ -43,7 +46,7 @@ class ForecastRequest(BaseModel):
             logger.warning(f"horizon_days {v} exceeds maximum {MAX_HORIZON_DAYS}, restricting to {MAX_HORIZON_DAYS}")
             return MAX_HORIZON_DAYS
         if v < 1:
-            raise ValueError("horizon_days must be at least 1")
+            raise ValueError(ERROR_HORIZON_DAYS_MIN)
         return v
 
 class BatchForecastRequest(BaseModel):
@@ -60,7 +63,7 @@ class BatchForecastRequest(BaseModel):
             logger.warning(f"horizon_days {v} exceeds maximum {MAX_HORIZON_DAYS}, restricting to {MAX_HORIZON_DAYS}")
             return MAX_HORIZON_DAYS
         if v < 1:
-            raise ValueError("horizon_days must be at least 1")
+            raise ValueError(ERROR_HORIZON_DAYS_MIN)
         return v
     
     @field_validator('skus')
@@ -147,7 +150,7 @@ class AdvancedForecastingService:
             logger.warning(f"horizon_days {horizon_days} exceeds maximum {MAX_HORIZON_DAYS}, restricting to {MAX_HORIZON_DAYS}")
             horizon_days = MAX_HORIZON_DAYS
         if horizon_days < 1:
-            raise ValueError("horizon_days must be at least 1")
+            raise ValueError(ERROR_HORIZON_DAYS_MIN)
         
         cache_key = f"forecast:{sku}:{horizon_days}"
         
