@@ -82,11 +82,12 @@ DO $$
 DECLARE
   STATUS_AVAILABLE CONSTANT TEXT := 'available';
   ZONE_A CONSTANT TEXT := 'Zone A';
+  EQUIPMENT_TYPE_FORKLIFT CONSTANT TEXT := 'forklift';
 BEGIN
   INSERT INTO equipment_assets (asset_id, type, model, zone, status, owner_user, next_pm_due) VALUES
-    ('FL-01', 'forklift', 'Toyota 8FGU25', ZONE_A, STATUS_AVAILABLE, NULL, now() + interval '30 days'),
-    ('FL-02', 'forklift', 'Toyota 8FGU25', 'Zone B', 'assigned', 'operator1', now() + interval '15 days'),
-    ('FL-03', 'forklift', 'Hyster H2.5XM', 'Loading Dock', 'maintenance', NULL, now() + interval '7 days'),
+    ('FL-01', EQUIPMENT_TYPE_FORKLIFT, 'Toyota 8FGU25', ZONE_A, STATUS_AVAILABLE, NULL, now() + interval '30 days'),
+    ('FL-02', EQUIPMENT_TYPE_FORKLIFT, 'Toyota 8FGU25', 'Zone B', 'assigned', 'operator1', now() + interval '15 days'),
+    ('FL-03', EQUIPMENT_TYPE_FORKLIFT, 'Hyster H2.5XM', 'Loading Dock', 'maintenance', NULL, now() + interval '7 days'),
     ('AMR-001', 'amr', 'MiR-250', ZONE_A, STATUS_AVAILABLE, NULL, now() + interval '45 days'),
     ('AMR-002', 'amr', 'MiR-250', 'Zone B', 'charging', NULL, now() + interval '30 days'),
     ('AGV-01', 'agv', 'Kiva Systems', 'Assembly Line', 'assigned', 'operator2', now() + interval '60 days'),
