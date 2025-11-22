@@ -1,8 +1,10 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
 import logging
 import asyncio
+import base64
+import re
 from src.api.graphs.mcp_integrated_planner_graph import get_mcp_planner_graph
 from src.api.services.guardrails.guardrails_service import guardrails_service
 from src.api.services.evidence.evidence_integration import (
@@ -22,6 +24,46 @@ from src.api.services.validation import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1", tags=["Chat"])
+
+
+def _sanitize_log_data(data: Union[str, Any], max_length: int = 500) -> str:
+    """
+    Sanitize data for safe logging to prevent log injection attacks.
+    
+    Removes newlines, carriage returns, and other control characters that could
+    be used to forge log entries. For suspicious data, uses base64 encoding.
+    
+    Args:
+        data: Data to sanitize (will be converted to string)
+        max_length: Maximum length of sanitized string (truncates if longer)
+        
+    Returns:
+        Sanitized string safe for logging
+    """
+    if data is None:
+        return "None"
+    
+    # Convert to string
+    data_str = str(data)
+    
+    # Truncate if too long
+    if len(data_str) > max_length:
+        data_str = data_str[:max_length] + "...[truncated]"
+    
+    # Check for newlines, carriage returns, or other control characters
+    if re.search(r'[\r\n\t\x00-\x1f]', data_str):
+        # Contains control characters - base64 encode for safety
+        try:
+            encoded = base64.b64encode(data_str.encode('utf-8')).decode('ascii')
+            return f"[base64:{encoded}]"
+        except Exception:
+            # If encoding fails, remove control characters
+            data_str = re.sub(r'[\r\n\t\x00-\x1f]', '', data_str)
+    
+    # Remove any remaining suspicious characters
+    data_str = re.sub(r'[\r\n]', '', data_str)
+    
+    return data_str
 
 
 def _format_user_response(
@@ -140,7 +182,7 @@ def _format_user_response(
         return formatted_response
 
     except Exception as e:
-        logger.error(f"Error formatting user response: {e}")
+        logger.error(f"Error formatting user response: {_sanitize_log_data(str(e))}")
         # Return base response with basic formatting if formatting fails
         return f"{base_response}\n\n🟢 {int(confidence * 100)}%"
 
@@ -428,7 +470,7 @@ def _clean_response_text(response: str) -> str:
         return response
 
     except Exception as e:
-        logger.error(f"Error cleaning response text: {e}")
+        logger.error(f"Error cleaning response text: {_sanitize_log_data(str(e))}")
         return response
 
 
@@ -540,7 +582,7 @@ async def chat(req: ChatRequest):
     Includes timeout protection for async operations to prevent hanging requests.
     """
     # Log immediately when request is received
-    logger.info(f"📥 Received chat request: message='{req.message[:100]}...', reasoning={req.enable_reasoning}, session={req.session_id or 'default'}")
+    logger.info(f"📥 Received chat request: message='{_sanitize_log_data(req.message[:100])}...', reasoning={req.enable_reasoning}, session={_sanitize_log_data(req.session_id or 'default')}")
     try:
         # Check input safety with guardrails (with timeout)
         try:
@@ -549,7 +591,7 @@ async def chat(req: ChatRequest):
                 timeout=3.0  # 3 second timeout for safety check
             )
             if not input_safety.is_safe:
-                logger.warning(f"Input safety violation: {input_safety.violations}")
+                logger.warning(f"Input safety violation: {_sanitize_log_data(str(input_safety.violations))}")
                 return ChatResponse(
                     reply=guardrails_service.get_safety_response(input_safety.violations),
                     route="guardrails",
@@ -561,7 +603,7 @@ async def chat(req: ChatRequest):
         except asyncio.TimeoutError:
             logger.warning("Input safety check timed out, proceeding")
         except Exception as safety_error:
-            logger.warning(f"Input safety check failed: {safety_error}, proceeding")
+            logger.warning(f"Input safety check failed: {_sanitize_log_data(str(safety_error))}, proceeding")
 
         # Process the query through the MCP planner graph with error handling
         # Add timeout to prevent hanging on slow queries
@@ -587,7 +629,7 @@ async def chat(req: ChatRequest):
         result = None
         
         try:
-            logger.info(f"Processing chat query: {req.message[:50]}...")
+            logger.info(f"Processing chat query: {_sanitize_log_data(req.message[:50])}...")
             
             # Get planner with timeout protection (initialization might hang)
             # If initialization is slow, provide immediate response
@@ -603,7 +645,7 @@ async def chat(req: ChatRequest):
                 # Use simple response pattern matching for basic queries
                 return _create_simple_fallback_response(req.message, req.session_id)
             except Exception as init_error:
-                logger.error(f"MCP planner initialization failed: {init_error}")
+                logger.error(f"MCP planner initialization failed: {_sanitize_log_data(str(init_error))}")
                 # Use simple fallback response
                 return _create_simple_fallback_response(req.message, req.session_id)
             
@@ -620,7 +662,7 @@ async def chat(req: ChatRequest):
             
             # Log reasoning configuration
             if req.enable_reasoning:
-                logger.info(f"Reasoning enabled for query. Types: {req.reasoning_types or 'auto'}, Timeout: {MAIN_QUERY_TIMEOUT}s")
+                logger.info(f"Reasoning enabled for query. Types: {_sanitize_log_data(str(req.reasoning_types) if req.reasoning_types else 'auto')}, Timeout: {MAIN_QUERY_TIMEOUT}s")
             else:
                 logger.info(f"Reasoning disabled for query. Timeout: {MAIN_QUERY_TIMEOUT}s")
             
@@ -634,9 +676,9 @@ async def chat(req: ChatRequest):
             
             try:
                 result = await asyncio.wait_for(query_task, timeout=MAIN_QUERY_TIMEOUT)
-                logger.info(f"Query processing completed in time: route={result.get('route', 'unknown')}")
+                logger.info(f"Query processing completed in time: route={_sanitize_log_data(result.get('route', 'unknown'))}")
             except asyncio.TimeoutError:
-                logger.error(f"Query processing timed out after {MAIN_QUERY_TIMEOUT}s")
+                logger.error(f"Query processing timed out after {MAIN_QUERY_TIMEOUT}s")  # Safe: MAIN_QUERY_TIMEOUT is int
                 # Cancel the task
                 query_task.cancel()
                 try:
@@ -696,7 +738,7 @@ async def chat(req: ChatRequest):
             # Skip enhancements for simple queries or when reasoning is enabled to improve response time
             if skip_enhancements:
                 skip_reason = "reasoning enabled" if req.enable_reasoning else "simple query"
-                logger.info(f"Skipping enhancements ({skip_reason}): {req.message[:50]}")
+                logger.info(f"Skipping enhancements ({_sanitize_log_data(skip_reason)}): {_sanitize_log_data(req.message[:50])}")
                 # Set default values for simple queries
                 result["quick_actions"] = []
                 result["action_suggestions"] = []
@@ -716,7 +758,7 @@ async def chat(req: ChatRequest):
                         )
                         return enhanced_response
                     except Exception as e:
-                        logger.warning(f"Evidence enhancement failed: {e}")
+                        logger.warning(f"Evidence enhancement failed: {_sanitize_log_data(str(e))}")
                         return None
 
                 async def generate_quick_actions():
@@ -738,7 +780,7 @@ async def chat(req: ChatRequest):
                         quick_actions = await quick_actions_service.generate_quick_actions(action_context)
                         return quick_actions
                     except Exception as e:
-                        logger.warning(f"Quick actions generation failed: {e}")
+                        logger.warning(f"Quick actions generation failed: {_sanitize_log_data(str(e))}")
                         return []
 
                 async def enhance_with_context():
@@ -758,7 +800,7 @@ async def chat(req: ChatRequest):
                         )
                         return context_enhanced
                     except Exception as e:
-                        logger.warning(f"Context enhancement failed: {e}")
+                        logger.warning(f"Context enhancement failed: {_sanitize_log_data(str(e))}")
                         return None
 
                 # Run evidence and quick actions in parallel (context enhancement needs base response)
@@ -776,7 +818,7 @@ async def chat(req: ChatRequest):
                         logger.warning("Evidence enhancement timed out")
                         enhanced_response = None
                     except Exception as e:
-                        logger.error(f"Evidence enhancement error: {e}")
+                        logger.error(f"Evidence enhancement error: {_sanitize_log_data(str(e))}")
                         enhanced_response = None
                     
                     # Update result with evidence if available
@@ -809,7 +851,7 @@ async def chat(req: ChatRequest):
                         logger.warning("Quick actions generation timed out")
                         quick_actions = []
                     except Exception as e:
-                        logger.error(f"Quick actions generation error: {e}")
+                        logger.error(f"Quick actions generation error: {_sanitize_log_data(str(e))}")
                         quick_actions = []
                     
                     if quick_actions:
@@ -847,11 +889,11 @@ async def chat(req: ChatRequest):
                     except asyncio.TimeoutError:
                         logger.warning("Context enhancement timed out")
                     except Exception as e:
-                        logger.error(f"Context enhancement error: {e}")
+                        logger.error(f"Context enhancement error: {_sanitize_log_data(str(e))}")
                         
                 except Exception as enhancement_error:
                     # Catch any unexpected errors in enhancement orchestration
-                    logger.error(f"Enhancement orchestration error: {enhancement_error}")
+                    logger.error(f"Enhancement orchestration error: {_sanitize_log_data(str(enhancement_error))}")
                     # Continue with base result if enhancements fail
                     
         except asyncio.TimeoutError:
@@ -863,7 +905,7 @@ async def chat(req: ChatRequest):
             error_type = "TimeoutError"
             error_message = "Main query processing timed out after 30 seconds"
         except Exception as query_error:
-            logger.error(f"Query processing error: {query_error}")
+            logger.error(f"Query processing error: {_sanitize_log_data(str(query_error))}")
             # Return a more helpful fallback response
             error_type = type(query_error).__name__
             error_message = str(query_error)
@@ -913,7 +955,7 @@ async def chat(req: ChatRequest):
                 # Skip safety check if no result
                 output_safety = None
             if output_safety and not output_safety.is_safe:
-                logger.warning(f"Output safety violation: {output_safety.violations}")
+                logger.warning(f"Output safety violation: {_sanitize_log_data(str(output_safety.violations))}")
                 return ChatResponse(
                     reply=guardrails_service.get_safety_response(output_safety.violations),
                     route="guardrails",
@@ -925,7 +967,7 @@ async def chat(req: ChatRequest):
         except asyncio.TimeoutError:
             logger.warning("Output safety check timed out, proceeding with response")
         except Exception as safety_error:
-            logger.warning(f"Output safety check failed: {safety_error}, proceeding with response")
+            logger.warning(f"Output safety check failed: {_sanitize_log_data(str(safety_error))}, proceeding with response")
 
         # Extract structured response if available
         structured_response = result.get("structured_response", {}) if result else {}
@@ -1011,7 +1053,7 @@ async def chat(req: ChatRequest):
                                 result[k] = str(v)
                         return result
                     except (RecursionError, AttributeError, TypeError) as e:
-                        logger.warning(f"Failed to convert value at depth {depth}: {e}")
+                        logger.warning(f"Failed to convert value at depth {depth}: {_sanitize_log_data(str(e))}")  # Safe: depth is int
                         return str(value)
                 else:
                     return str(value)
@@ -1082,7 +1124,7 @@ async def chat(req: ChatRequest):
                         reasoning_chain_dict["steps"] = []
                     reasoning_chain = reasoning_chain_dict
                 except Exception as e:
-                    logger.error(f"Error converting reasoning_chain to dict: {e}", exc_info=True)
+                    logger.error(f"Error converting reasoning_chain to dict: {_sanitize_log_data(str(e))}", exc_info=True)
                     reasoning_chain = None
                 else:
                     logger.info(f"✅ Successfully converted reasoning_chain to dict with {len(reasoning_chain.get('steps', []))} steps")
@@ -1091,7 +1133,7 @@ async def chat(req: ChatRequest):
                 try:
                     reasoning_chain = safe_convert_value(reasoning_chain)
                 except (RecursionError, AttributeError, TypeError) as e:
-                    logger.warning(f"Failed to convert reasoning_chain to dict: {e}")
+                    logger.warning(f"Failed to convert reasoning_chain to dict: {_sanitize_log_data(str(e))}")
                     reasoning_chain = None
         
         # Convert reasoning_steps to list of dicts if needed (simplified to avoid recursion)
@@ -1129,7 +1171,7 @@ async def chat(req: ChatRequest):
                             
                         converted_steps.append(step_dict)
                     except Exception as e:
-                        logger.warning(f"Error converting reasoning step: {e}")
+                        logger.warning(f"Error converting reasoning step: {_sanitize_log_data(str(e))}")
                         converted_steps.append({"step_id": "error", "step_type": "error", 
                                                "description": "Error converting step", "reasoning": "", "confidence": 0.0})
                 elif isinstance(step, dict):
@@ -1184,7 +1226,7 @@ async def chat(req: ChatRequest):
                     logger.info("Cleaned response string that contained structured data")
         
         if not base_response:
-            logger.warning(f"No response in result: {result}")
+            logger.warning(f"No response in result: {_sanitize_log_data(str(result))}")
             base_response = f"I received your message: '{req.message}'. Processing your request..."
         
         try:
@@ -1195,7 +1237,7 @@ async def chat(req: ChatRequest):
                 result.get("recommendations", []) if result else [],
             )
         except Exception as format_error:
-            logger.error(f"Error formatting response: {format_error}")
+            logger.error(f"Error formatting response: {_sanitize_log_data(str(format_error))}")
             formatted_reply = base_response if base_response else f"I received your message: '{req.message}'."
 
         # Validate and enhance the response
@@ -1268,7 +1310,7 @@ async def chat(req: ChatRequest):
                 enhancement_summary = None
 
         except Exception as validation_error:
-            logger.warning(f"Response validation failed: {validation_error}")
+            logger.warning(f"Response validation failed: {_sanitize_log_data(str(validation_error))}")
             validation_score = 0.8  # Default score
             validation_passed = True
             validation_issues = []
@@ -1384,7 +1426,7 @@ async def chat(req: ChatRequest):
                         # For other types, convert to string
                         return str(obj)
                 except Exception as e:
-                    logger.warning(f"Error cleaning structured data at depth {depth}: {e}")
+                    logger.warning(f"Error cleaning structured data at depth {depth}: {_sanitize_log_data(str(e))}")  # Safe: depth is int
                     return str(obj)
             
             cleaned_structured_data = None
@@ -1394,7 +1436,7 @@ async def chat(req: ChatRequest):
                     cleaned_structured_data = clean_structured_data_recursive(data, max_depth=5)
                     logger.info(f"📊 Cleaned structured_data: {type(cleaned_structured_data)}, keys: {list(cleaned_structured_data.keys()) if isinstance(cleaned_structured_data, dict) else 'not a dict'}")
                 except Exception as e:
-                    logger.error(f"Error cleaning structured_data: {e}")
+                    logger.error(f"Error cleaning structured_data: {_sanitize_log_data(str(e))}")
                     # Fallback to simple cleaning
                     if isinstance(data, dict):
                         cleaned_structured_data = {k: v for k, v in data.items() 
@@ -1463,7 +1505,7 @@ async def chat(req: ChatRequest):
             return response
         except (ValueError, TypeError) as circular_error:
             if "Circular reference" in str(circular_error) or "circular" in str(circular_error).lower():
-                logger.error(f"Circular reference detected in response serialization: {circular_error}")
+                logger.error(f"Circular reference detected in response serialization: {_sanitize_log_data(str(circular_error))}")
                 # Create a minimal response without any complex data structures
                 logger.warning("Creating minimal response due to circular reference")
                 return ChatResponse(
@@ -1497,9 +1539,9 @@ async def chat(req: ChatRequest):
             else:
                 raise
         except Exception as response_error:
-            logger.error(f"Error creating ChatResponse: {response_error}")
-            logger.error(f"Result data: {result if result else 'None'}")
-            logger.error(f"Structured response: {structured_response if structured_response else 'None'}")
+            logger.error(f"Error creating ChatResponse: {_sanitize_log_data(str(response_error))}")
+            logger.error(f"Result data: {_sanitize_log_data(str(result) if result else 'None')}")
+            logger.error(f"Structured response: {_sanitize_log_data(str(structured_response) if structured_response else 'None')}")
             # Return a minimal response
             return ChatResponse(
                 reply=formatted_reply if formatted_reply else f"I received your message: '{req.message}'. However, there was an issue formatting the response.",
@@ -1535,8 +1577,8 @@ async def chat(req: ChatRequest):
         )
     except Exception as e:
         import traceback
-        logger.error(f"Error in chat endpoint: {e}")
-        logger.error(f"Traceback: {traceback.format_exc()}")
+        logger.error(f"Error in chat endpoint: {_sanitize_log_data(str(e))}")
+        logger.error(f"Traceback: {_sanitize_log_data(traceback.format_exc())}")
         # Return a user-friendly error response with helpful suggestions
         try:
             return ChatResponse(
@@ -1562,7 +1604,7 @@ async def chat(req: ChatRequest):
             )
         except Exception as fallback_error:
             # If even ChatResponse creation fails, log and return minimal error
-            logger.critical(f"Failed to create error response: {fallback_error}")
+            logger.critical(f"Failed to create error response: {_sanitize_log_data(str(fallback_error))}")
             # Return a minimal response that FastAPI can handle
             from fastapi.responses import JSONResponse
             return JSONResponse(
@@ -1592,7 +1634,7 @@ async def get_conversation_summary(req: ConversationSummaryRequest):
         return {"success": True, "summary": summary}
 
     except Exception as e:
-        logger.error(f"Error getting conversation summary: {e}")
+        logger.error(f"Error getting conversation summary: {_sanitize_log_data(str(e))}")
         return {"success": False, "error": str(e)}
 
 
@@ -1613,7 +1655,7 @@ async def search_conversation_history(req: ConversationSearchRequest):
         return {"success": True, "results": results}
 
     except Exception as e:
-        logger.error(f"Error searching conversation history: {e}")
+        logger.error(f"Error searching conversation history: {_sanitize_log_data(str(e))}")
         return {"success": False, "error": str(e)}
 
 
@@ -1635,7 +1677,7 @@ async def clear_conversation(session_id: str):
         }
 
     except Exception as e:
-        logger.error(f"Error clearing conversation: {e}")
+        logger.error(f"Error clearing conversation: {_sanitize_log_data(str(e))}")
         return {"success": False, "error": str(e)}
 
 
@@ -1687,7 +1729,7 @@ async def validate_response(req: ChatRequest):
         }
 
     except Exception as e:
-        logger.error(f"Error in validation endpoint: {e}")
+        logger.error(f"Error in validation endpoint: {_sanitize_log_data(str(e))}")
         return {"error": str(e), "validation_score": 0.0, "validation_passed": False}
 
 
@@ -1706,5 +1748,5 @@ async def get_conversation_stats():
         return {"success": True, "stats": stats}
 
     except Exception as e:
-        logger.error(f"Error getting conversation stats: {e}")
+        logger.error(f"Error getting conversation stats: {_sanitize_log_data(str(e))}")
         return {"success": False, "error": str(e)}

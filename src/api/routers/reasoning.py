@@ -10,7 +10,9 @@ Provides endpoints for:
 """
 
 import logging
-from typing import Dict, List, Optional, Any
+import base64
+import re
+from typing import Dict, List, Optional, Any, Union
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -21,6 +23,46 @@ from src.api.services.reasoning import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _sanitize_log_data(data: Union[str, Any], max_length: int = 500) -> str:
+    """
+    Sanitize data for safe logging to prevent log injection attacks.
+    
+    Removes newlines, carriage returns, and other control characters that could
+    be used to forge log entries. For suspicious data, uses base64 encoding.
+    
+    Args:
+        data: Data to sanitize (will be converted to string)
+        max_length: Maximum length of sanitized string (truncates if longer)
+        
+    Returns:
+        Sanitized string safe for logging
+    """
+    if data is None:
+        return "None"
+    
+    # Convert to string
+    data_str = str(data)
+    
+    # Truncate if too long
+    if len(data_str) > max_length:
+        data_str = data_str[:max_length] + "...[truncated]"
+    
+    # Check for newlines, carriage returns, or other control characters
+    if re.search(r'[\r\n\t\x00-\x1f]', data_str):
+        # Contains control characters - base64 encode for safety
+        try:
+            encoded = base64.b64encode(data_str.encode('utf-8')).decode('ascii')
+            return f"[base64:{encoded}]"
+        except Exception:
+            # If encoding fails, remove control characters
+            data_str = re.sub(r'[\r\n\t\x00-\x1f]', '', data_str)
+    
+    # Remove any remaining suspicious characters
+    data_str = re.sub(r'[\r\n]', '', data_str)
+    
+    return data_str
 
 router = APIRouter(prefix="/api/v1/reasoning", tags=["reasoning"])
 
@@ -83,7 +125,7 @@ async def analyze_with_reasoning(request: ReasoningRequest):
                 try:
                     reasoning_types.append(ReasoningType(rt))
                 except ValueError:
-                    logger.warning(f"Invalid reasoning type: {rt}")
+                    logger.warning(f"Invalid reasoning type: {_sanitize_log_data(rt)}")
         else:
             # Use all reasoning types if none specified
             reasoning_types = list(ReasoningType)
@@ -125,7 +167,7 @@ async def analyze_with_reasoning(request: ReasoningRequest):
         )
 
     except Exception as e:
-        logger.error(f"Reasoning analysis failed: {e}")
+        logger.error(f"Reasoning analysis failed: {_sanitize_log_data(str(e))}")
         raise HTTPException(
             status_code=500, detail=f"Reasoning analysis failed: {str(e)}"
         )
@@ -149,7 +191,7 @@ async def get_reasoning_insights(session_id: str):
         )
 
     except Exception as e:
-        logger.error(f"Failed to get reasoning insights: {e}")
+        logger.error(f"Failed to get reasoning insights: {_sanitize_log_data(str(e))}")
         raise HTTPException(
             status_code=500, detail=f"Failed to get reasoning insights: {str(e)}"
         )
@@ -208,7 +250,7 @@ async def chat_with_reasoning(request: ReasoningRequest):
                 try:
                     reasoning_types.append(ReasoningType(rt))
                 except ValueError:
-                    logger.warning(f"Invalid reasoning type: {rt}")
+                    logger.warning(f"Invalid reasoning type: {_sanitize_log_data(rt)}")
         else:
             # Use all reasoning types if none specified
             reasoning_types = list(ReasoningType)
@@ -259,7 +301,7 @@ async def chat_with_reasoning(request: ReasoningRequest):
         return enhanced_response
 
     except Exception as e:
-        logger.error(f"Chat with reasoning failed: {e}")
+        logger.error(f"Chat with reasoning failed: {_sanitize_log_data(str(e))}")
         raise HTTPException(
             status_code=500, detail=f"Chat with reasoning failed: {str(e)}"
         )
