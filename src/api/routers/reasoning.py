@@ -152,6 +152,98 @@ def _get_confidence_level(confidence: float) -> str:
         return "Low"
 
 
+async def _get_reasoning_engine_instance():
+    """
+    Get reasoning engine instance (helper to reduce duplication).
+    
+    Returns:
+        Reasoning engine instance
+    """
+    return await get_reasoning_engine()
+
+
+async def _process_reasoning_request(
+    reasoning_engine: Any,
+    query: str,
+    context: Dict[str, Any],
+    reasoning_types: List[ReasoningType],
+    session_id: str,
+) -> ReasoningChain:
+    """
+    Process a reasoning request with the engine.
+    
+    Args:
+        reasoning_engine: Reasoning engine instance
+        query: Query string
+        context: Context dictionary
+        reasoning_types: List of reasoning types
+        session_id: Session ID
+        
+    Returns:
+        ReasoningChain result
+    """
+    return await reasoning_engine.process_with_reasoning(
+        query=query,
+        context=context or {},
+        reasoning_types=reasoning_types,
+        session_id=session_id,
+    )
+
+
+def _build_reasoning_chain_dict(reasoning_chain: ReasoningChain) -> Dict[str, Any]:
+    """
+    Build reasoning chain dictionary from ReasoningChain object.
+    
+    Args:
+        reasoning_chain: ReasoningChain object
+        
+    Returns:
+        Dictionary with chain_id, reasoning_type, overall_confidence, execution_time
+    """
+    return {
+        "chain_id": reasoning_chain.chain_id,
+        "reasoning_type": reasoning_chain.reasoning_type.value,
+        "overall_confidence": reasoning_chain.overall_confidence,
+        "execution_time": reasoning_chain.execution_time,
+    }
+
+
+def _get_reasoning_types_list() -> List[Dict[str, str]]:
+    """
+    Get list of available reasoning types with metadata.
+    
+    Returns:
+        List of dictionaries with type, name, and description
+    """
+    return [
+        {
+            "type": "chain_of_thought",
+            "name": "Chain-of-Thought Reasoning",
+            "description": "Step-by-step thinking process with clear reasoning steps",
+        },
+        {
+            "type": "multi_hop",
+            "name": "Multi-Hop Reasoning",
+            "description": "Connect information across different data sources",
+        },
+        {
+            "type": "scenario_analysis",
+            "name": "Scenario Analysis",
+            "description": "What-if reasoning and alternative scenario analysis",
+        },
+        {
+            "type": "causal",
+            "name": "Causal Reasoning",
+            "description": "Cause-and-effect analysis and relationship identification",
+        },
+        {
+            "type": "pattern_recognition",
+            "name": "Pattern Recognition",
+            "description": "Learn from query patterns and user behavior",
+        },
+    ]
+
+
 class ReasoningRequest(BaseModel):
     """Request for reasoning analysis."""
 
@@ -201,13 +293,14 @@ async def analyze_with_reasoning(request: ReasoningRequest):
     """
     try:
         # Get reasoning engine
-        reasoning_engine = await get_reasoning_engine()
+        reasoning_engine = await _get_reasoning_engine_instance()
 
         # Convert string reasoning types to enum
         reasoning_types = _convert_reasoning_types(request.reasoning_types)
 
         # Process with reasoning
-        reasoning_chain = await reasoning_engine.process_with_reasoning(
+        reasoning_chain = await _process_reasoning_request(
+            reasoning_engine=reasoning_engine,
             query=request.query,
             context=request.context or {},
             reasoning_types=reasoning_types,
@@ -239,7 +332,7 @@ async def analyze_with_reasoning(request: ReasoningRequest):
 async def get_reasoning_insights(session_id: str):
     """Get reasoning insights for a session."""
     try:
-        reasoning_engine = await get_reasoning_engine()
+        reasoning_engine = await _get_reasoning_engine_instance()
         insights = await reasoning_engine.get_reasoning_insights(session_id)
 
         return ReasoningInsightsResponse(
@@ -260,33 +353,7 @@ async def get_reasoning_insights(session_id: str):
 async def get_reasoning_types():
     """Get available reasoning types."""
     return {
-        "reasoning_types": [
-            {
-                "type": "chain_of_thought",
-                "name": "Chain-of-Thought Reasoning",
-                "description": "Step-by-step thinking process with clear reasoning steps",
-            },
-            {
-                "type": "multi_hop",
-                "name": "Multi-Hop Reasoning",
-                "description": "Connect information across different data sources",
-            },
-            {
-                "type": "scenario_analysis",
-                "name": "Scenario Analysis",
-                "description": "What-if reasoning and alternative scenario analysis",
-            },
-            {
-                "type": "causal",
-                "name": "Causal Reasoning",
-                "description": "Cause-and-effect analysis and relationship identification",
-            },
-            {
-                "type": "pattern_recognition",
-                "name": "Pattern Recognition",
-                "description": "Learn from query patterns and user behavior",
-            },
-        ]
+        "reasoning_types": _get_reasoning_types_list()
     }
 
 
@@ -300,13 +367,14 @@ async def chat_with_reasoning(request: ReasoningRequest):
     """
     try:
         # Get reasoning engine
-        reasoning_engine = await get_reasoning_engine()
+        reasoning_engine = await _get_reasoning_engine_instance()
 
         # Convert string reasoning types to enum
         reasoning_types = _convert_reasoning_types(request.reasoning_types)
 
         # Process with reasoning
-        reasoning_chain = await reasoning_engine.process_with_reasoning(
+        reasoning_chain = await _process_reasoning_request(
+            reasoning_engine=reasoning_engine,
             query=request.query,
             context=request.context or {},
             reasoning_types=reasoning_types,
@@ -318,12 +386,7 @@ async def chat_with_reasoning(request: ReasoningRequest):
         
         enhanced_response = {
             "query": request.query,
-            "reasoning_chain": {
-                "chain_id": reasoning_chain.chain_id,
-                "reasoning_type": reasoning_chain.reasoning_type.value,
-                "overall_confidence": reasoning_chain.overall_confidence,
-                "execution_time": reasoning_chain.execution_time,
-            },
+            "reasoning_chain": _build_reasoning_chain_dict(reasoning_chain),
             "reasoning_steps": [
                 _convert_reasoning_step_to_dict(step, include_full_data=False)
                 for step in reasoning_chain.steps
