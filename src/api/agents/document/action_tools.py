@@ -83,6 +83,36 @@ class DocumentActionTools:
         else:
             return default
 
+    def _parse_hours_range(self, time_str: str) -> Optional[int]:
+        """Parse hours range format (e.g., '4-8 hours') and return average in seconds."""
+        parts = time_str.split("-")
+        if len(parts) != 2:
+            return None
+        
+        try:
+            min_hours = int(parts[0].strip())
+            max_hours = int(parts[1].strip().split()[0])
+            avg_hours = (min_hours + max_hours) / 2
+            return int(avg_hours * 3600)  # Convert to seconds
+        except (ValueError, IndexError):
+            return None
+
+    def _parse_single_hours(self, time_str: str) -> Optional[int]:
+        """Parse single hours format (e.g., '4 hours') and return in seconds."""
+        try:
+            hours = int(time_str.split()[0])
+            return hours * 3600  # Convert to seconds
+        except (ValueError, IndexError):
+            return None
+
+    def _parse_minutes(self, time_str: str) -> Optional[int]:
+        """Parse minutes format (e.g., '30 minutes') and return in seconds."""
+        try:
+            minutes = int(time_str.split()[0])
+            return minutes * 60  # Convert to seconds
+        except (ValueError, IndexError):
+            return None
+
     def _parse_processing_time(self, time_str: str) -> Optional[int]:
         """Parse processing time string to seconds."""
         if not time_str:
@@ -94,33 +124,23 @@ class DocumentActionTools:
 
         time_str = str(time_str).lower()
 
-        # Parse "4-8 hours" format
+        # Parse hours format
         if "hours" in time_str:
+            # Try range format first (e.g., "4-8 hours")
             if "-" in time_str:
-                # Take the average of the range
-                parts = time_str.split("-")
-                if len(parts) == 2:
-                    try:
-                        min_hours = int(parts[0].strip())
-                        max_hours = int(parts[1].strip().split()[0])
-                        avg_hours = (min_hours + max_hours) / 2
-                        return int(avg_hours * 3600)  # Convert to seconds
-                    except (ValueError, IndexError):
-                        pass
-            else:
-                try:
-                    hours = int(time_str.split()[0])
-                    return hours * 3600  # Convert to seconds
-                except (ValueError, IndexError):
-                    pass
+                result = self._parse_hours_range(time_str)
+                if result is not None:
+                    return result
+            # Try single hours format (e.g., "4 hours")
+            result = self._parse_single_hours(time_str)
+            if result is not None:
+                return result
 
-        # Parse "30 minutes" format
-        elif "minutes" in time_str:
-            try:
-                minutes = int(time_str.split()[0])
-                return minutes * 60  # Convert to seconds
-            except (ValueError, IndexError):
-                pass
+        # Parse minutes format
+        if "minutes" in time_str:
+            result = self._parse_minutes(time_str)
+            if result is not None:
+                return result
 
         # Default fallback
         return 3600  # 1 hour default
