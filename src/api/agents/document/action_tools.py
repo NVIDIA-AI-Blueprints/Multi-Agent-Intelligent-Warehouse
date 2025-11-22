@@ -122,6 +122,54 @@ class DocumentActionTools:
             "message": message,
         }
 
+    def _extract_quality_score_from_validation_dict(
+        self, validation: Dict[str, Any], doc_id: str
+    ) -> float:
+        """Extract quality score from validation dictionary with multiple fallback strategies."""
+        # Check for overall_score directly (this is the main field from JudgeEvaluation)
+        quality = validation.get("overall_score", 0.0)
+        
+        # If not found, check for quality_score field
+        if quality == 0.0:
+            quality = validation.get("quality_score", 0.0)
+        
+        # If still not found, check nested structures
+        if quality == 0.0 and "quality_score" in validation:
+            qs = validation["quality_score"]
+            if isinstance(qs, dict):
+                quality = qs.get("overall_score", 0.0)
+        
+        # Check if validation contains a QualityScore object (after serialization)
+        if quality == 0.0:
+            # Try to find any score field
+            for key in ["overall_score", "quality_score", "score"]:
+                if key in validation:
+                    val = validation[key]
+                    if isinstance(val, (int, float)) and val > 0:
+                        quality = float(val)
+                        break
+        
+        if quality > 0:
+            logger.debug(f"Extracted quality score from validation dict: {quality} for doc {_sanitize_log_data(doc_id)}")
+        
+        return quality
+
+    def _extract_quality_score_from_validation_object(
+        self, validation: Any, doc_id: str
+    ) -> float:
+        """Extract quality score from validation object (with attributes)."""
+        if hasattr(validation, "overall_score"):
+            quality = getattr(validation, "overall_score", 0.0)
+            logger.debug(f"Extracted quality score from validation object: {quality} for doc {_sanitize_log_data(doc_id)}")
+            return quality
+        elif hasattr(validation, "quality_score"):
+            quality = getattr(validation, "quality_score", 0.0)
+            logger.debug(f"Extracted quality score from validation object (quality_score): {quality} for doc {_sanitize_log_data(doc_id)}")
+            return quality
+        else:
+            logger.debug(f"Validation result for doc {_sanitize_log_data(doc_id)} is not a dict or object with score attributes. Type: {type(validation)}")
+            return 0.0
+
     def _create_quality_score_from_validation(
         self, validation_data: Union[Dict[str, Any], Any]
     ) -> Any:
@@ -1155,7 +1203,7 @@ class DocumentActionTools:
         # Generate line items
         line_items = []
         num_items = random.randint(2, 8)
-        for i in range(num_items):
+        for _ in range(num_items):
             item_names = ["Widget A", "Component B", "Part C", "Module D", "Assembly E"]
             item_name = random.choice(item_names)
             quantity = random.randint(1, 50)
@@ -1365,41 +1413,9 @@ class DocumentActionTools:
                                 
                                 # Handle different validation result structures
                                 if isinstance(validation, dict):
-                                    # Check for overall_score directly (this is the main field from JudgeEvaluation)
-                                    quality = validation.get("overall_score", 0.0)
-                                    
-                                    # If not found, check for quality_score field
-                                    if quality == 0.0:
-                                        quality = validation.get("quality_score", 0.0)
-                                    
-                                    # If still not found, check nested structures
-                                    if quality == 0.0 and "quality_score" in validation:
-                                        qs = validation["quality_score"]
-                                        if isinstance(qs, dict):
-                                            quality = qs.get("overall_score", 0.0)
-                                    
-                                    # Check if validation contains a QualityScore object (after serialization)
-                                    if quality == 0.0:
-                                        # Try to find any score field
-                                        for key in ["overall_score", "quality_score", "score"]:
-                                            if key in validation:
-                                                val = validation[key]
-                                                if isinstance(val, (int, float)) and val > 0:
-                                                    quality = float(val)
-                                                    break
-                                    
-                                    logger.debug(f"Extracted quality score from validation dict: {quality} for doc {_sanitize_log_data(doc_id)}")
-                                    
-                                elif hasattr(validation, "overall_score"):
-                                    # It's an object with overall_score attribute (JudgeEvaluation dataclass)
-                                    quality = getattr(validation, "overall_score", 0.0)
-                                    logger.debug(f"Extracted quality score from validation object: {quality} for doc {_sanitize_log_data(doc_id)}")
-                                elif hasattr(validation, "quality_score"):
-                                    # It's an object with quality_score attribute
-                                    quality = getattr(validation, "quality_score", 0.0)
-                                    logger.debug(f"Extracted quality score from validation object (quality_score): {quality} for doc {_sanitize_log_data(doc_id)}")
+                                    quality = self._extract_quality_score_from_validation_dict(validation, doc_id)
                                 else:
-                                    logger.debug(f"Validation result for doc {_sanitize_log_data(doc_id)} is not a dict or object with score attributes. Type: {type(validation)}")
+                                    quality = self._extract_quality_score_from_validation_object(validation, doc_id)
                             
                             # If still no quality score found, try to get it from extraction data
                             if quality == 0.0:
