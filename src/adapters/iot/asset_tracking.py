@@ -330,7 +330,18 @@ class AssetTrackingAdapter(BaseIoTAdapter):
         return alerts
     
     async def acknowledge_alert(self, alert_id: str) -> bool:
-        """Acknowledge an asset tracking alert."""
+        """Acknowledge an asset tracking alert.
+        
+        Args:
+            alert_id: ID of the alert to acknowledge
+            
+        Returns:
+            True if acknowledgment was successful, False otherwise
+            
+        Raises:
+            IoTConnectionError: If not connected to the system
+            IoTDataError: If acknowledgment fails
+        """
         try:
             if not self.connected:
                 raise IoTConnectionError("Not connected to asset tracking system")
@@ -338,16 +349,33 @@ class AssetTrackingAdapter(BaseIoTAdapter):
             if self.protocol == 'http':
                 response = await self.session.post(f"{self.endpoints['alerts']}/{alert_id}/acknowledge")
                 response.raise_for_status()
-                return True
+                # Check response content to verify acknowledgment
+                response_data = response.json() if response.content else {}
+                acknowledged = response_data.get('acknowledged', False)
+                if acknowledged:
+                    self.logger.info(f"Successfully acknowledged alert {alert_id}")
+                    return True
+                else:
+                    self.logger.warning(f"Alert {alert_id} acknowledgment request completed but not confirmed")
+                    return False
             else:
                 # For WebSocket, send acknowledgment
-                if self.websocket:
-                    ack_message = {"type": "acknowledge_alert", "alert_id": alert_id}
-                    await self.websocket.send(json.dumps(ack_message))
+                if not self.websocket:
+                    self.logger.error("WebSocket connection not available for acknowledgment")
+                    return False
+                
+                ack_message = {"type": "acknowledge_alert", "alert_id": alert_id}
+                await self.websocket.send(json.dumps(ack_message))
+                self.logger.info(f"Sent acknowledgment request for alert {alert_id} via WebSocket")
+                # For WebSocket, we assume success if message was sent
+                # In a real implementation, you might wait for a confirmation message
                 return True
                 
+        except httpx.HTTPStatusError as e:
+            self.logger.error(f"HTTP error acknowledging alert {alert_id}: {e.response.status_code}")
+            return False
         except Exception as e:
-            self.logger.error(f"Failed to acknowledge asset tracking alert: {e}")
+            self.logger.error(f"Failed to acknowledge asset tracking alert {alert_id}: {e}")
             raise IoTDataError(f"Asset tracking alert acknowledgment failed: {e}")
     
     async def get_asset_location_history(self, asset_id: str, 
