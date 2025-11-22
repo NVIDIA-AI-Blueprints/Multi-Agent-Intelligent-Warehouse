@@ -178,9 +178,14 @@ def _is_confidence_missing_or_zero(confidence: Optional[float]) -> bool:
         confidence: Confidence value to check
         
     Returns:
-        True if confidence is None or 0.0, False otherwise
+        True if confidence is None or effectively 0.0, False otherwise
     """
-    return confidence is None or confidence == 0.0
+    import math
+    if confidence is None:
+        return True
+    # Use math.isclose with absolute tolerance for comparing to 0.0
+    # abs_tol=1e-9 is appropriate for confidence values (0.0 to 1.0 range)
+    return math.isclose(confidence, 0.0, abs_tol=1e-9)
 
 
 def _extract_confidence_from_sources(
