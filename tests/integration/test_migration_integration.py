@@ -75,6 +75,9 @@ INSERT INTO warehouse (name, location) VALUES ('Test Warehouse', 'Test Location'
 """)
         
         # Create migration config
+        # NOTE: This is a test fixture with mock credentials. The password is a placeholder
+        # and should be replaced with environment variables or test-specific credentials
+        # when used with actual test databases.
         config = {
             'migration_system': {
                 'version': '1.0.0',
@@ -88,7 +91,8 @@ INSERT INTO warehouse (name, location) VALUES ('Test Warehouse', 'Test Location'
                     'port': 5435,
                     'name': 'test_warehouse',
                     'user': 'test',
-                    'password': 'test',
+                    # Test-only placeholder password - replace with TEST_DB_PASSWORD env var for real tests
+                    'password': '<TEST_PASSWORD_PLACEHOLDER>',
                     'ssl_mode': 'disable'
                 },
                 'execution': {
@@ -219,14 +223,21 @@ async def test_migration_backup_restore(test_database_url, temp_migration_dir):
 # Test configuration for integration tests
 @pytest.fixture(scope="session")
 def integration_test_config():
-    """Configuration for integration tests."""
+    """
+    Configuration for integration tests.
+    
+    NOTE: Uses environment variables for database credentials. The password fallback
+    is a placeholder that should be replaced with actual test database credentials
+    via the TEST_DB_PASSWORD environment variable.
+    """
     return {
         'database': {
             'host': os.getenv('TEST_DB_HOST', 'localhost'),
             'port': int(os.getenv('TEST_DB_PORT', '5435')),
             'name': os.getenv('TEST_DB_NAME', 'test_warehouse'),
             'user': os.getenv('TEST_DB_USER', 'test'),
-            'password': os.getenv('TEST_DB_PASSWORD', 'test'),
+            # Use environment variable for password, with explicit placeholder as fallback
+            'password': os.getenv('TEST_DB_PASSWORD', '<TEST_PASSWORD_PLACEHOLDER>'),
             'ssl_mode': os.getenv('TEST_DB_SSL_MODE', 'disable')
         },
         'migration': {
