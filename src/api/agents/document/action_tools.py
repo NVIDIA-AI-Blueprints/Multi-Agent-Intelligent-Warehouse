@@ -323,7 +323,7 @@ class DocumentActionTools:
             }
 
             # Start document processing pipeline
-            await self._start_document_processing(document_record)
+            await self._start_document_processing()
 
             return {
                 "success": True,
@@ -584,11 +584,11 @@ class DocumentActionTools:
 
         return {"valid": True, "file_type": file_ext, "file_size": file_size}
 
-    async def _start_document_processing(
-        self, document_record: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def _start_document_processing(self) -> Dict[str, Any]:
         """Start document processing pipeline."""
         # Mock implementation - in real implementation, this would start the actual pipeline
+        # Use async sleep to make this truly async (minimal overhead)
+        await asyncio.sleep(0)
         return {
             "processing_started": True,
             "pipeline_id": str(uuid.uuid4()),
@@ -638,7 +638,8 @@ class DocumentActionTools:
                 status_info["status"] = ProcessingStage.ROUTING
                 current_stage_name = "Finalizing"
                 progress = 95
-                self._save_status_data()
+                # Run synchronous save operation in thread pool to make it async
+                await asyncio.to_thread(self._save_status_data)
 
         return {
             "status": overall_status_str,  # Return string, not enum
