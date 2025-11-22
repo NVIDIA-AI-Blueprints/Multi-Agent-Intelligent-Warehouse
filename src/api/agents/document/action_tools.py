@@ -67,6 +67,11 @@ def _sanitize_log_data(data: Union[str, Any], max_length: int = 500) -> str:
 
 class DocumentActionTools:
     """Document processing action tools for MCP framework."""
+    
+    # Model name constants
+    MODEL_SMALL_LLM = "Llama Nemotron Nano VL 8B"
+    MODEL_LARGE_JUDGE = "Llama 3.1 Nemotron 70B"
+    MODEL_OCR = "NeMoRetriever-OCR-v1"
 
     def __init__(self):
         self.nim_client = None
@@ -92,6 +97,82 @@ class DocumentActionTools:
             "error": str(error),
             "message": f"Failed to {operation}",
         }
+
+    def _create_mock_data_response(self, reason: Optional[str] = None, message: Optional[str] = None) -> Dict[str, Any]:
+        """Create standardized mock data response with optional reason and message."""
+        response = {**self._get_mock_extraction_data(), "is_mock": True}
+        if reason:
+            response["reason"] = reason
+        if message:
+            response["message"] = message
+        return response
+
+    def _create_empty_extraction_response(
+        self, reason: str, message: str
+    ) -> Dict[str, Any]:
+        """Create empty extraction response structure for error/in-progress cases."""
+        return {
+            "extraction_results": [],
+            "confidence_scores": {},
+            "stages": [],
+            "quality_score": None,
+            "routing_decision": None,
+            "is_mock": True,
+            "reason": reason,
+            "message": message,
+        }
+
+    def _create_quality_score_from_validation(
+        self, validation_data: Union[Dict[str, Any], Any]
+    ) -> Any:
+        """Create QualityScore from validation data (handles both dict and object)."""
+        from .models.document_models import QualityScore, QualityDecision
+        
+        # Handle object with attributes
+        if hasattr(validation_data, "overall_score"):
+            reasoning_text = getattr(validation_data, "reasoning", "")
+            if isinstance(reasoning_text, str):
+                reasoning_data = {"summary": reasoning_text, "details": reasoning_text}
+            else:
+                reasoning_data = reasoning_text if isinstance(reasoning_text, dict) else {}
+            
+            return QualityScore(
+                overall_score=getattr(validation_data, "overall_score", 0.0),
+                completeness_score=getattr(validation_data, "completeness_score", 0.0),
+                accuracy_score=getattr(validation_data, "accuracy_score", 0.0),
+                compliance_score=getattr(validation_data, "compliance_score", 0.0),
+                quality_score=getattr(
+                    validation_data,
+                    "quality_score",
+                    getattr(validation_data, "overall_score", 0.0),
+                ),
+                decision=QualityDecision(getattr(validation_data, "decision", "REVIEW")),
+                reasoning=reasoning_data,
+                issues_found=getattr(validation_data, "issues_found", []),
+                confidence=getattr(validation_data, "confidence", 0.0),
+                judge_model=self.MODEL_LARGE_JUDGE,
+            )
+        
+        # Handle dictionary
+        reasoning_data = validation_data.get("reasoning", {})
+        if isinstance(reasoning_data, str):
+            reasoning_data = {"summary": reasoning_data, "details": reasoning_data}
+        
+        return QualityScore(
+            overall_score=validation_data.get("overall_score", 0.0),
+            completeness_score=validation_data.get("completeness_score", 0.0),
+            accuracy_score=validation_data.get("accuracy_score", 0.0),
+            compliance_score=validation_data.get("compliance_score", 0.0),
+            quality_score=validation_data.get(
+                "quality_score",
+                validation_data.get("overall_score", 0.0),
+            ),
+            decision=QualityDecision(validation_data.get("decision", "REVIEW")),
+            reasoning=reasoning_data,
+            issues_found=validation_data.get("issues_found", []),
+            confidence=validation_data.get("confidence", 0.0),
+            judge_model=self.MODEL_LARGE_JUDGE,
+        )
 
     def _parse_hours_range(self, time_str: str) -> Optional[int]:
         """Parse hours range format (e.g., '4-8 hours') and return average in seconds."""
@@ -765,9 +846,7 @@ class DocumentActionTools:
                                 },
                                 confidence_score=ocr_data.get("confidence", 0.0),
                                 processing_time_ms=0,  # OCR doesn't track processing time yet
-                                model_used=ocr_data.get(
-                                    "model_used", "NeMoRetriever-OCR-v1"
-                                ),
+                                model_used=ocr_data.get("model_used", self.MODEL_OCR),
                                 metadata={
                                     "layout_enhanced": ocr_data.get(
                                         "layout_enhanced", False
@@ -809,7 +888,7 @@ class DocumentActionTools:
                                 processing_time_ms=llm_data.get(
                                     "processing_time_ms", 0
                                 ),
-                                model_used="Llama Nemotron Nano VL 8B",
+                                model_used=self.MODEL_SMALL_LLM,
                                 metadata=llm_data.get("metadata", {}),
                             )
                         )
@@ -820,72 +899,7 @@ class DocumentActionTools:
                         validation_data = results["validation"]
 
                         # Handle both JudgeEvaluation object and dictionary
-                        if hasattr(validation_data, "overall_score"):
-                            # It's a JudgeEvaluation object
-                            reasoning_text = getattr(validation_data, "reasoning", "")
-                            quality_score = QualityScore(
-                                overall_score=getattr(
-                                    validation_data, "overall_score", 0.0
-                                ),
-                                completeness_score=getattr(
-                                    validation_data, "completeness_score", 0.0
-                                ),
-                                accuracy_score=getattr(
-                                    validation_data, "accuracy_score", 0.0
-                                ),
-                                compliance_score=getattr(
-                                    validation_data, "compliance_score", 0.0
-                                ),
-                                quality_score=getattr(
-                                    validation_data,
-                                    "quality_score",
-                                    getattr(validation_data, "overall_score", 0.0),
-                                ),
-                                decision=QualityDecision(
-                                    getattr(validation_data, "decision", "REVIEW")
-                                ),
-                                reasoning={
-                                    "summary": reasoning_text,
-                                    "details": reasoning_text,
-                                },
-                                issues_found=getattr(
-                                    validation_data, "issues_found", []
-                                ),
-                                confidence=getattr(validation_data, "confidence", 0.0),
-                                judge_model="Llama 3.1 Nemotron 70B",
-                            )
-                        else:
-                            # It's a dictionary
-                            reasoning_data = validation_data.get("reasoning", {})
-                            if isinstance(reasoning_data, str):
-                                reasoning_data = {
-                                    "summary": reasoning_data,
-                                    "details": reasoning_data,
-                                }
-
-                            quality_score = QualityScore(
-                                overall_score=validation_data.get("overall_score", 0.0),
-                                completeness_score=validation_data.get(
-                                    "completeness_score", 0.0
-                                ),
-                                accuracy_score=validation_data.get(
-                                    "accuracy_score", 0.0
-                                ),
-                                compliance_score=validation_data.get(
-                                    "compliance_score", 0.0
-                                ),
-                                quality_score=validation_data.get(
-                                    "quality_score",
-                                    validation_data.get("overall_score", 0.0),
-                                ),
-                                decision=QualityDecision(
-                                    validation_data.get("decision", "REVIEW")
-                                ),
-                                reasoning=reasoning_data,
-                                issues_found=validation_data.get("issues_found", []),
-                                confidence=validation_data.get("confidence", 0.0),
-                                judge_model="Llama 3.1 Nemotron 70B",
-                            )
+                        quality_score = self._create_quality_score_from_validation(validation_data)
 
                     # Routing Decision
                     routing_decision = None
@@ -961,58 +975,36 @@ class DocumentActionTools:
                 if current_status in processing_stages:
                     logger.info(f"Document {_sanitize_log_data(document_id)} is still being processed by NeMo pipeline. Status: {_sanitize_log_data(str(current_status))}")
                     # Return a message indicating processing is in progress
-                    return {
-                        "extraction_results": [],
-                        "confidence_scores": {},
-                        "stages": [],
-                        "quality_score": None,
-                        "routing_decision": None,
-                        "is_mock": True,
-                        "reason": "processing_in_progress",
-                        "message": "Document is still being processed by NVIDIA NeMo pipeline. Please check again in a moment."
-                    }
+                    return self._create_empty_extraction_response(
+                        "processing_in_progress",
+                        "Document is still being processed by NVIDIA NeMo pipeline. Please check again in a moment."
+                    )
                 elif current_status == ProcessingStage.COMPLETED:
                     # Status says COMPLETED but no processing_results - this shouldn't happen
                     # but if it does, wait a bit and check again (race condition)
                     logger.warning(f"Document {_sanitize_log_data(document_id)} status is COMPLETED but no processing_results found. This may be a race condition.")
-                    return {
-                        "extraction_results": [],
-                        "confidence_scores": {},
-                        "stages": [],
-                        "quality_score": None,
-                        "routing_decision": None,
-                        "is_mock": True,
-                        "reason": "results_not_ready",
-                        "message": "Processing completed but results are not ready yet. Please check again in a moment."
-                    }
+                    return self._create_empty_extraction_response(
+                        "results_not_ready",
+                        "Processing completed but results are not ready yet. Please check again in a moment."
+                    )
                 elif current_status == ProcessingStage.FAILED:
                     # Processing failed
                     error_msg = doc_status.get("error_message", "Unknown error")
                     logger.warning(f"Document {_sanitize_log_data(document_id)} processing failed: {_sanitize_log_data(error_msg)}")
-                    return {
-                        "extraction_results": [],
-                        "confidence_scores": {},
-                        "stages": [],
-                        "quality_score": None,
-                        "routing_decision": None,
-                        "is_mock": True,
-                        "reason": "processing_failed",
-                        "message": f"Document processing failed: {error_msg}"
-                    }
+                    return self._create_empty_extraction_response(
+                        "processing_failed",
+                        f"Document processing failed: {error_msg}"
+                    )
                 else:
                     logger.warning(f"Document {_sanitize_log_data(document_id)} has no processing results and status is {_sanitize_log_data(str(current_status))}. NeMo pipeline may have failed.")
                     # Return mock data with clear indication that NeMo pipeline didn't complete
-                    mock_data = self._get_mock_extraction_data()
-                    mock_data["is_mock"] = True
-                    mock_data["reason"] = "nemo_pipeline_incomplete"
-                    mock_data["message"] = "NVIDIA NeMo pipeline did not complete processing. Please check server logs for errors."
-                    return mock_data
+                    return self._create_mock_data_response(
+                        "nemo_pipeline_incomplete",
+                        "NVIDIA NeMo pipeline did not complete processing. Please check server logs for errors."
+                    )
             else:
                 logger.error(f"Document {document_id} not found in status tracking")
-                mock_data = self._get_mock_extraction_data()
-                mock_data["is_mock"] = True
-                mock_data["reason"] = "document_not_found"
-                return mock_data
+                return self._create_mock_data_response("document_not_found")
 
         except Exception as e:
             logger.error(
@@ -1026,7 +1018,7 @@ class DocumentActionTools:
             # Get document info from status
             if document_id not in self.document_statuses:
                 logger.error(f"Document {document_id} not found in status tracking")
-                return {**self._get_mock_extraction_data(), "is_mock": True}
+                return self._create_mock_data_response()
             
             doc_status = self.document_statuses[document_id]
             file_path = doc_status.get("file_path")
@@ -1035,7 +1027,7 @@ class DocumentActionTools:
                 logger.warning(f"File not found for document {_sanitize_log_data(document_id)}: {_sanitize_log_data(file_path)}")
                 logger.info(f"Attempting to use document filename: {_sanitize_log_data(doc_status.get('filename', 'N/A'))}")
                 # Return mock data but mark it as such
-                return {**self._get_mock_extraction_data(), "is_mock": True, "reason": "file_not_found"}
+                return self._create_mock_data_response("file_not_found")
             
             # Try to process the document locally
             try:
@@ -1044,7 +1036,7 @@ class DocumentActionTools:
                 
                 if not result["success"]:
                     logger.error(f"Local processing failed for {_sanitize_log_data(document_id)}: {_sanitize_log_data(str(result.get('error', 'Unknown error')))}")
-                    return {**self._get_mock_extraction_data(), "is_mock": True, "reason": "processing_failed"}
+                    return self._create_mock_data_response("processing_failed")
             except ImportError as e:
                 logger.warning(f"Local processor not available (missing dependencies): {_sanitize_log_data(str(e))}")
                 missing_module = str(e).replace("No module named ", "").strip("'\"")
@@ -1054,10 +1046,10 @@ class DocumentActionTools:
                     logger.info("Install Pillow (PIL) for image processing: pip install Pillow")
                 else:
                     logger.info(f"Install missing dependency: pip install {_sanitize_log_data(missing_module)}")
-                return {**self._get_mock_extraction_data(), "is_mock": True, "reason": "dependencies_missing"}
+                return self._create_mock_data_response("dependencies_missing")
             except Exception as e:
                 logger.error(f"Local processing error for {_sanitize_log_data(document_id)}: {_sanitize_log_data(str(e))}")
-                return {**self._get_mock_extraction_data(), "is_mock": True, "reason": "processing_error"}
+                return self._create_mock_data_response("processing_error")
             
             # Convert local processing result to expected format
             from .models.document_models import ExtractionResult, QualityScore, RoutingDecision, QualityDecision
@@ -1129,7 +1121,7 @@ class DocumentActionTools:
             
         except Exception as e:
             logger.error(f"Failed to process document locally: {_sanitize_log_data(str(e))}", exc_info=True)
-            return {**self._get_mock_extraction_data(), "is_mock": True, "reason": "exception"}
+            return self._create_mock_data_response("exception")
 
     def _get_mock_extraction_data(self) -> Dict[str, Any]:
         """Fallback mock extraction data that matches the expected API response format."""
@@ -1196,7 +1188,7 @@ class DocumentActionTools:
                     },
                     confidence_score=0.96,
                     processing_time_ms=1200,
-                    model_used="NeMoRetriever-OCR-v1",
+                    model_used=self.MODEL_OCR,
                     metadata={"page_count": 1, "language": "en", "field_count": 8},
                 ),
                 ExtractionResult(
@@ -1217,7 +1209,7 @@ class DocumentActionTools:
                     },
                     confidence_score=0.94,
                     processing_time_ms=800,
-                    model_used="Llama Nemotron Nano VL 8B",
+                    model_used=self.MODEL_SMALL_LLM,
                     metadata={"entity_count": 4, "validation_passed": True},
                 ),
             ],
@@ -1248,7 +1240,7 @@ class DocumentActionTools:
                 },
                 issues_found=["Minor formatting inconsistencies"],
                 confidence=0.91,
-                judge_model="Llama 3.1 Nemotron 70B",
+                judge_model=self.MODEL_LARGE_JUDGE,
             ),
             "routing_decision": RoutingDecision(
                 routing_action=RoutingAction.AUTO_APPROVE,
