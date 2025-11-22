@@ -6,6 +6,7 @@ Implements document processing tools for the MCP-enabled Document Extraction Age
 import logging
 import base64
 import re
+import asyncio
 from typing import Dict, Any, List, Optional, Union
 from datetime import datetime
 import uuid
@@ -563,17 +564,20 @@ class DocumentActionTools:
 
     # Helper methods (mock implementations for now)
     async def _validate_document_file(self, file_path: str) -> Dict[str, Any]:
-        """Validate document file."""
-        if not os.path.exists(file_path):
+        """Validate document file using async file operations."""
+        # Run synchronous file operations in thread pool to avoid blocking
+        file_exists = await asyncio.to_thread(os.path.exists, file_path)
+        if not file_exists:
             return {"valid": False, "error": "File does not exist"}
 
-        file_size = os.path.getsize(file_path)
+        file_size = await asyncio.to_thread(os.path.getsize, file_path)
         if file_size > self.max_file_size:
             return {
                 "valid": False,
                 "error": f"File size exceeds {self.max_file_size} bytes",
             }
 
+        # String operations are fast and don't need threading
         file_ext = os.path.splitext(file_path)[1].lower().lstrip(".")
         if file_ext not in self.supported_file_types:
             return {"valid": False, "error": f"Unsupported file type: {file_ext}"}
