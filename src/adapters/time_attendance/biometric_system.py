@@ -33,6 +33,68 @@ class BiometricSystemAdapter(BaseTimeAttendanceAdapter):
         self.reader_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self.biometric_templates: Dict[str, BiometricData] = {}
+    
+    def _check_connection(self, default_return: Any = False) -> Any:
+        """
+        Check if connected, return default value if not.
+        
+        Args:
+            default_return: Value to return if not connected
+            
+        Returns:
+            default_return if not connected, None if connected
+        """
+        if not self.connected:
+            return default_return
+        return None
+    
+    def _send_command_and_receive(
+        self, 
+        command_data: Dict[str, Any], 
+        buffer_size: int = 1024
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Send command to socket and receive response.
+        
+        Args:
+            command_data: Command dictionary to send
+            buffer_size: Buffer size for receiving data
+            
+        Returns:
+            Parsed JSON response or None if failed
+        """
+        if not self.socket:
+            return None
+        
+        try:
+            self.socket.send(json.dumps(command_data).encode('utf-8'))
+            data = self.socket.recv(buffer_size)
+            if data:
+                return json.loads(data.decode('utf-8'))
+        except Exception as e:
+            logger.error(f"Error sending command: {e}")
+        
+        return None
+    
+    def _send_command_for_success(
+        self, 
+        command_data: Dict[str, Any], 
+        operation_name: str
+    ) -> bool:
+        """
+        Send command and return success status.
+        
+        Args:
+            command_data: Command dictionary to send
+            operation_name: Name of operation for error logging
+            
+        Returns:
+            True if operation succeeded, False otherwise
+        """
+        response = self._send_command_and_receive(command_data)
+        if response:
+            return response.get("success", False)
+        return False
         
     async def connect(self) -> bool:
         """Connect to biometric system."""
@@ -50,13 +112,26 @@ class BiometricSystemAdapter(BaseTimeAttendanceAdapter):
             logger.error(f"Failed to connect to biometric system: {e}")
             return False
             
+    def _parse_connection_string(self, prefix: str, default_port: int = 8080) -> tuple:
+        """
+        Parse connection string into host/port or port/baudrate.
+        
+        Args:
+            prefix: Connection string prefix to remove (e.g., "tcp://", "serial://")
+            default_port: Default port/baudrate value
+            
+        Returns:
+            Tuple of (host/port, port/baudrate)
+        """
+        parts = self.config.connection_string.replace(prefix, "").split(":")
+        first_part = parts[0]
+        second_part = int(parts[1]) if len(parts) > 1 else default_port
+        return first_part, second_part
+    
     async def _connect_tcp(self) -> bool:
         """Connect via TCP/IP."""
         try:
-            # Parse TCP connection string
-            parts = self.config.connection_string.replace("tcp://", "").split(":")
-            host = parts[0]
-            port = int(parts[1]) if len(parts) > 1 else 8080
+            host, port = self._parse_connection_string("tcp://", 8080)
             
             # Create socket connection
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -80,10 +155,7 @@ class BiometricSystemAdapter(BaseTimeAttendanceAdapter):
     async def _connect_serial(self) -> bool:
         """Connect via serial port."""
         try:
-            # Parse serial connection string
-            parts = self.config.connection_string.replace("serial://", "").split(":")
-            port = parts[0]
-            baudrate = int(parts[1]) if len(parts) > 1 else 9600
+            port, baudrate = self._parse_connection_string("serial://", 9600)
             
             # For serial connection, we would use pyserial
             # This is a simplified implementation
@@ -168,6 +240,28 @@ class BiometricSystemAdapter(BaseTimeAttendanceAdapter):
             logger.error(f"Error disconnecting from biometric system: {e}")
             return False
             
+    def _parse_attendance_record(self, record_data: Dict[str, Any]) -> AttendanceRecord:
+        """
+        Parse attendance record from dictionary.
+        
+        Args:
+            record_data: Dictionary containing record data
+            
+        Returns:
+            AttendanceRecord object
+        """
+        return AttendanceRecord(
+            record_id=record_data["record_id"],
+            employee_id=record_data["employee_id"],
+            attendance_type=AttendanceType(record_data["attendance_type"]),
+            timestamp=datetime.fromisoformat(record_data["timestamp"]),
+            location=record_data.get("location"),
+            device_id=record_data.get("device_id"),
+            status=AttendanceStatus(record_data.get("status", "pending")),
+            notes=record_data.get("notes"),
+            metadata=record_data.get("metadata", {})
+        )
+    
     async def get_attendance_records(
         self, 
         employee_id: Optional[str] = None,
@@ -176,10 +270,9 @@ class BiometricSystemAdapter(BaseTimeAttendanceAdapter):
     ) -> List[AttendanceRecord]:
         """Get attendance records from biometric system."""
         try:
-            if not self.connected:
+            if self._check_connection([]) is not None:
                 return []
                 
-            # Send query command
             query_data = {
                 "command": "get_attendance_records",
                 "employee_id": employee_id,
@@ -187,30 +280,12 @@ class BiometricSystemAdapter(BaseTimeAttendanceAdapter):
                 "end_date": end_date.isoformat() if end_date else None
             }
             
-            if self.socket:
-                self.socket.send(json.dumps(query_data).encode('utf-8'))
-                
-                # Wait for response
-                data = self.socket.recv(4096)
-                if data:
-                    response = json.loads(data.decode('utf-8'))
-                    records = []
-                    
-                    for record_data in response.get("records", []):
-                        record = AttendanceRecord(
-                            record_id=record_data["record_id"],
-                            employee_id=record_data["employee_id"],
-                            attendance_type=AttendanceType(record_data["attendance_type"]),
-                            timestamp=datetime.fromisoformat(record_data["timestamp"]),
-                            location=record_data.get("location"),
-                            device_id=record_data.get("device_id"),
-                            status=AttendanceStatus(record_data.get("status", "pending")),
-                            notes=record_data.get("notes"),
-                            metadata=record_data.get("metadata", {})
-                        )
-                        records.append(record)
-                        
-                    return records
+            response = self._send_command_and_receive(query_data, buffer_size=4096)
+            if response:
+                records = []
+                for record_data in response.get("records", []):
+                    records.append(self._parse_attendance_record(record_data))
+                return records
                     
             return []
             
@@ -221,25 +296,15 @@ class BiometricSystemAdapter(BaseTimeAttendanceAdapter):
     async def create_attendance_record(self, record: AttendanceRecord) -> bool:
         """Create a new attendance record."""
         try:
-            if not self.connected:
+            if self._check_connection(False) is not None:
                 return False
                 
-            # Send create command
-            record_data = {
+            command_data = {
                 "command": "create_attendance_record",
                 "record": record.to_dict()
             }
             
-            if self.socket:
-                self.socket.send(json.dumps(record_data).encode('utf-8'))
-                
-                # Wait for response
-                data = self.socket.recv(1024)
-                if data:
-                    response = json.loads(data.decode('utf-8'))
-                    return response.get("success", False)
-                    
-            return False
+            return self._send_command_for_success(command_data, "create attendance record")
             
         except Exception as e:
             logger.error(f"Failed to create attendance record: {e}")
@@ -248,25 +313,15 @@ class BiometricSystemAdapter(BaseTimeAttendanceAdapter):
     async def update_attendance_record(self, record: AttendanceRecord) -> bool:
         """Update an existing attendance record."""
         try:
-            if not self.connected:
+            if self._check_connection(False) is not None:
                 return False
                 
-            # Send update command
-            record_data = {
+            command_data = {
                 "command": "update_attendance_record",
                 "record": record.to_dict()
             }
             
-            if self.socket:
-                self.socket.send(json.dumps(record_data).encode('utf-8'))
-                
-                # Wait for response
-                data = self.socket.recv(1024)
-                if data:
-                    response = json.loads(data.decode('utf-8'))
-                    return response.get("success", False)
-                    
-            return False
+            return self._send_command_for_success(command_data, "update attendance record")
             
         except Exception as e:
             logger.error(f"Failed to update attendance record: {e}")
@@ -275,25 +330,15 @@ class BiometricSystemAdapter(BaseTimeAttendanceAdapter):
     async def delete_attendance_record(self, record_id: str) -> bool:
         """Delete an attendance record."""
         try:
-            if not self.connected:
+            if self._check_connection(False) is not None:
                 return False
                 
-            # Send delete command
-            delete_data = {
+            command_data = {
                 "command": "delete_attendance_record",
                 "record_id": record_id
             }
             
-            if self.socket:
-                self.socket.send(json.dumps(delete_data).encode('utf-8'))
-                
-                # Wait for response
-                data = self.socket.recv(1024)
-                if data:
-                    response = json.loads(data.decode('utf-8'))
-                    return response.get("success", False)
-                    
-            return False
+            return self._send_command_for_success(command_data, "delete attendance record")
             
         except Exception as e:
             logger.error(f"Failed to delete attendance record: {e}")
@@ -353,42 +398,45 @@ class BiometricSystemAdapter(BaseTimeAttendanceAdapter):
             logger.error(f"Failed to get employee attendance: {e}")
             return {}
             
+    def _parse_biometric_data(self, bio_data: Dict[str, Any]) -> BiometricData:
+        """
+        Parse biometric data from dictionary.
+        
+        Args:
+            bio_data: Dictionary containing biometric data
+            
+        Returns:
+            BiometricData object
+        """
+        return BiometricData(
+            employee_id=bio_data["employee_id"],
+            biometric_type=BiometricType(bio_data["biometric_type"]),
+            template_data=bio_data["template_data"],
+            quality_score=bio_data.get("quality_score"),
+            created_at=datetime.fromisoformat(bio_data.get("created_at", datetime.utcnow().isoformat())),
+            metadata=bio_data.get("metadata", {})
+        )
+    
     async def get_biometric_data(
         self, 
         employee_id: Optional[str] = None
     ) -> List[BiometricData]:
         """Get biometric data from the system."""
         try:
-            if not self.connected:
+            if self._check_connection([]) is not None:
                 return []
                 
-            # Send query command
             query_data = {
                 "command": "get_biometric_data",
                 "employee_id": employee_id
             }
             
-            if self.socket:
-                self.socket.send(json.dumps(query_data).encode('utf-8'))
-                
-                # Wait for response
-                data = self.socket.recv(4096)
-                if data:
-                    response = json.loads(data.decode('utf-8'))
-                    biometric_data = []
-                    
-                    for bio_data in response.get("biometric_data", []):
-                        bio = BiometricData(
-                            employee_id=bio_data["employee_id"],
-                            biometric_type=BiometricType(bio_data["biometric_type"]),
-                            template_data=bio_data["template_data"],
-                            quality_score=bio_data.get("quality_score"),
-                            created_at=datetime.fromisoformat(bio_data.get("created_at", datetime.utcnow().isoformat())),
-                            metadata=bio_data.get("metadata", {})
-                        )
-                        biometric_data.append(bio)
-                        
-                    return biometric_data
+            response = self._send_command_and_receive(query_data, buffer_size=4096)
+            if response:
+                biometric_data = []
+                for bio_data in response.get("biometric_data", []):
+                    biometric_data.append(self._parse_biometric_data(bio_data))
+                return biometric_data
                     
             return []
             
@@ -396,35 +444,37 @@ class BiometricSystemAdapter(BaseTimeAttendanceAdapter):
             logger.error(f"Failed to get biometric data: {e}")
             return []
             
+    def _biometric_data_to_dict(self, biometric_data: BiometricData) -> Dict[str, Any]:
+        """
+        Convert BiometricData to dictionary for transmission.
+        
+        Args:
+            biometric_data: BiometricData object
+            
+        Returns:
+            Dictionary representation
+        """
+        return {
+            "employee_id": biometric_data.employee_id,
+            "biometric_type": biometric_data.biometric_type.value,
+            "template_data": biometric_data.template_data,
+            "quality_score": biometric_data.quality_score,
+            "created_at": biometric_data.created_at.isoformat(),
+            "metadata": biometric_data.metadata or {}
+        }
+    
     async def enroll_biometric_data(self, biometric_data: BiometricData) -> bool:
         """Enroll new biometric data for an employee."""
         try:
-            if not self.connected:
+            if self._check_connection(False) is not None:
                 return False
                 
-            # Send enroll command
-            enroll_data = {
+            command_data = {
                 "command": "enroll_biometric_data",
-                "biometric_data": {
-                    "employee_id": biometric_data.employee_id,
-                    "biometric_type": biometric_data.biometric_type.value,
-                    "template_data": biometric_data.template_data,
-                    "quality_score": biometric_data.quality_score,
-                    "created_at": biometric_data.created_at.isoformat(),
-                    "metadata": biometric_data.metadata or {}
-                }
+                "biometric_data": self._biometric_data_to_dict(biometric_data)
             }
             
-            if self.socket:
-                self.socket.send(json.dumps(enroll_data).encode('utf-8'))
-                
-                # Wait for response
-                data = self.socket.recv(1024)
-                if data:
-                    response = json.loads(data.decode('utf-8'))
-                    return response.get("success", False)
-                    
-            return False
+            return self._send_command_for_success(command_data, "enroll biometric data")
             
         except Exception as e:
             logger.error(f"Failed to enroll biometric data: {e}")
@@ -437,25 +487,18 @@ class BiometricSystemAdapter(BaseTimeAttendanceAdapter):
     ) -> Optional[str]:
         """Verify biometric data and return employee ID if match found."""
         try:
-            if not self.connected:
+            if self._check_connection(None) is not None:
                 return None
                 
-            # Send verify command
-            verify_data = {
+            command_data = {
                 "command": "verify_biometric",
                 "biometric_type": biometric_type.value,
                 "template_data": template_data
             }
             
-            if self.socket:
-                self.socket.send(json.dumps(verify_data).encode('utf-8'))
-                
-                # Wait for response
-                data = self.socket.recv(1024)
-                if data:
-                    response = json.loads(data.decode('utf-8'))
-                    if response.get("success", False):
-                        return response.get("employee_id")
+            response = self._send_command_and_receive(command_data)
+            if response and response.get("success", False):
+                return response.get("employee_id")
                         
             return None
             
