@@ -170,6 +170,59 @@ def _add_response_footer(formatted_response: str, confidence: float) -> str:
     return formatted_response
 
 
+def _is_confidence_missing_or_zero(confidence: Optional[float]) -> bool:
+    """
+    Check if confidence is None or zero.
+    
+    Args:
+        confidence: Confidence value to check
+        
+    Returns:
+        True if confidence is None or 0.0, False otherwise
+    """
+    return confidence is None or confidence == 0.0
+
+
+def _extract_confidence_from_sources(
+    result: Dict[str, Any],
+    structured_response: Dict[str, Any],
+) -> float:
+    """
+    Extract confidence from multiple possible sources with sensible defaults.
+    
+    Priority: result.confidence > structured_response.confidence > agent_responses > default (0.75)
+    
+    Args:
+        result: Result dictionary
+        structured_response: Structured response dictionary
+        
+    Returns:
+        Confidence value (float)
+    """
+    confidence = result.get("confidence")
+    
+    if _is_confidence_missing_or_zero(confidence):
+        confidence = structured_response.get("confidence")
+    
+    if _is_confidence_missing_or_zero(confidence):
+        # Try to get confidence from agent responses
+        agent_responses = result.get("agent_responses", {})
+        confidences = []
+        for agent_name, agent_response in agent_responses.items():
+            if isinstance(agent_response, dict):
+                agent_conf = agent_response.get("confidence")
+                if agent_conf and agent_conf > 0:
+                    confidences.append(agent_conf)
+        
+        if confidences:
+            confidence = sum(confidences) / len(confidences)  # Average confidence
+        else:
+            # Default to 0.75 for successful queries (not errors)
+            confidence = 0.75 if result.get("route") != "error" else 0.0
+    
+    return confidence
+
+
 def _format_user_response(
     base_response: str,
     structured_response: Dict[str, Any],
@@ -380,8 +433,9 @@ def _clean_response_text(response: str) -> str:
         # Remove patterns like "**Additional Context:** - {...}"
         response = re.sub(r"\*\*Additional Context:\*\*[^}]+}", "", response)
 
-        # Remove patterns like "{'warehouse': 'WH-01', ...}"
-        response = re.sub(r"\{'[^}]+'\}", "", response)
+        # Remove Python dict-like structures (consolidated pattern)
+        # This catches patterns like: "{'warehouse': 'WH-01', ...}" or "{'key': 'value', 'key2': None}"
+        response = re.sub(r"\{'[^}]*'\}", "", response)
 
         # Remove patterns like "mcp_tools_used: [], tool_execution_results: {}"
         response = re.sub(
@@ -433,19 +487,22 @@ def _clean_response_text(response: str) -> str:
         for pattern, replacement in dict_patterns:
             response = re.sub(pattern, replacement, response, flags=re.IGNORECASE)
         
-        # Remove any remaining closing braces and commas at the end
-        response = re.sub(r"\}\s*,?\s*$", "", response)
-        response = re.sub(r"\}\s*,\s*$", "", response)
+        # Remove any remaining closing braces and commas at the end (consolidated)
+        end_cleanup_patterns = [
+            (r"\}\s*,?\s*$", ""),
+            (r"\}\s*,\s*$", ""),
+        ]
+        for pattern, replacement in end_cleanup_patterns:
+            response = re.sub(pattern, replacement, response)
         
-        # Remove any Python dict-like structures that might have leaked (very aggressive)
-        # This catches patterns like: "{'key': 'value', 'key2': None}"
-        # Note: Similar pattern already applied above, but this one is more aggressive with *
-        response = re.sub(r"\{'[^}]*'\}", "", response)
-        
-        # Clean up any double commas or trailing commas/spaces
-        response = re.sub(r",\s*,+", ",", response)  # Remove multiple commas
-        response = re.sub(r",\s*$", "", response)  # Remove trailing comma
-        response = re.sub(r"^\s*,\s*", "", response)  # Remove leading comma
+        # Clean up commas (consolidated)
+        comma_cleanup_patterns = [
+            (r",\s*,+", ","),  # Remove multiple commas
+            (r",\s*$", ""),  # Remove trailing comma
+            (r"^\s*,\s*", ""),  # Remove leading comma
+        ]
+        for pattern, replacement in comma_cleanup_patterns:
+            response = re.sub(pattern, replacement, response)
         response = re.sub(r"\s+", " ", response)  # Normalize whitespace
         response = response.strip()  # Remove leading/trailing whitespace
         
@@ -1127,26 +1184,7 @@ async def chat(req: ChatRequest):
             reasoning_steps = _convert_reasoning_steps_to_list(reasoning_steps)
 
         # Extract confidence from multiple possible sources with sensible defaults
-        # Priority: result.confidence > structured_response.confidence > agent_responses > default (0.75)
-        confidence = result.get("confidence")
-        if confidence is None or confidence == 0.0:
-            confidence = structured_response.get("confidence")
-        
-        if confidence is None or confidence == 0.0:
-            # Try to get confidence from agent responses
-            agent_responses = result.get("agent_responses", {})
-            confidences = []
-            for agent_name, agent_response in agent_responses.items():
-                if isinstance(agent_response, dict):
-                    agent_conf = agent_response.get("confidence")
-                    if agent_conf and agent_conf > 0:
-                        confidences.append(agent_conf)
-            
-            if confidences:
-                confidence = sum(confidences) / len(confidences)  # Average confidence
-            else:
-                # Default to 0.75 for successful queries (not errors)
-                confidence = 0.75 if result.get("route") != "error" else 0.0
+        confidence = _extract_confidence_from_sources(result, structured_response)
 
         # Format the response to be more user-friendly
         # Ensure we have a valid response before formatting
