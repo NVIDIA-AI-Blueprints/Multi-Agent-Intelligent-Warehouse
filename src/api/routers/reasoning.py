@@ -190,6 +190,38 @@ async def _process_reasoning_request(
     )
 
 
+async def _execute_reasoning_workflow(
+    request: "ReasoningRequest",
+) -> tuple[Any, List[ReasoningType], ReasoningChain]:
+    """
+    Execute the common reasoning workflow: get engine, convert types, process request.
+    
+    This helper function extracts the duplicated pattern used in multiple endpoints.
+    
+    Args:
+        request: ReasoningRequest object
+        
+    Returns:
+        Tuple of (reasoning_engine, reasoning_types, reasoning_chain)
+    """
+    # Get reasoning engine
+    reasoning_engine = await _get_reasoning_engine_instance()
+    
+    # Convert string reasoning types to enum
+    reasoning_types = _convert_reasoning_types(request.reasoning_types)
+    
+    # Process with reasoning
+    reasoning_chain = await _process_reasoning_request(
+        reasoning_engine=reasoning_engine,
+        query=request.query,
+        context=request.context or {},
+        reasoning_types=reasoning_types,
+        session_id=request.session_id,
+    )
+    
+    return reasoning_engine, reasoning_types, reasoning_chain
+
+
 def _build_reasoning_chain_dict(reasoning_chain: ReasoningChain) -> Dict[str, Any]:
     """
     Build reasoning chain dictionary from ReasoningChain object.
@@ -292,20 +324,8 @@ async def analyze_with_reasoning(request: ReasoningRequest):
     - Pattern Recognition
     """
     try:
-        # Get reasoning engine
-        reasoning_engine = await _get_reasoning_engine_instance()
-
-        # Convert string reasoning types to enum
-        reasoning_types = _convert_reasoning_types(request.reasoning_types)
-
-        # Process with reasoning
-        reasoning_chain = await _process_reasoning_request(
-            reasoning_engine=reasoning_engine,
-            query=request.query,
-            context=request.context or {},
-            reasoning_types=reasoning_types,
-            session_id=request.session_id,
-        )
+        # Execute common reasoning workflow
+        _, _, reasoning_chain = await _execute_reasoning_workflow(request)
 
         # Convert to response format
         steps = [
@@ -366,20 +386,8 @@ async def chat_with_reasoning(request: ReasoningRequest):
     to provide more intelligent and transparent responses.
     """
     try:
-        # Get reasoning engine
-        reasoning_engine = await _get_reasoning_engine_instance()
-
-        # Convert string reasoning types to enum
-        reasoning_types = _convert_reasoning_types(request.reasoning_types)
-
-        # Process with reasoning
-        reasoning_chain = await _process_reasoning_request(
-            reasoning_engine=reasoning_engine,
-            query=request.query,
-            context=request.context or {},
-            reasoning_types=reasoning_types,
-            session_id=request.session_id,
-        )
+        # Execute common reasoning workflow
+        _, reasoning_types, reasoning_chain = await _execute_reasoning_workflow(request)
 
         # Generate enhanced response with reasoning
         confidence_level = _get_confidence_level(reasoning_chain.overall_confidence)
