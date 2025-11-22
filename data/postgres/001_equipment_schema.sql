@@ -78,27 +78,32 @@ CREATE TABLE IF NOT EXISTS equipment_performance (
 );
 
 -- Sample equipment data
-INSERT INTO equipment_assets (asset_id, type, model, zone, status, owner_user, next_pm_due) VALUES
-  ('FL-01', 'forklift', 'Toyota 8FGU25', 'Zone A', 'available', NULL, now() + interval '30 days'),
-  ('FL-02', 'forklift', 'Toyota 8FGU25', 'Zone B', 'assigned', 'operator1', now() + interval '15 days'),
-  ('FL-03', 'forklift', 'Hyster H2.5XM', 'Loading Dock', 'maintenance', NULL, now() + interval '7 days'),
-  ('AMR-001', 'amr', 'MiR-250', 'Zone A', 'available', NULL, now() + interval '45 days'),
-  ('AMR-002', 'amr', 'MiR-250', 'Zone B', 'charging', NULL, now() + interval '30 days'),
-  ('AGV-01', 'agv', 'Kiva Systems', 'Assembly Line', 'assigned', 'operator2', now() + interval '60 days'),
-  ('SCN-01', 'scanner', 'Honeywell CT60', 'Zone A', 'assigned', 'operator1', now() + interval '90 days'),
-  ('SCN-02', 'scanner', 'Honeywell CT60', 'Zone B', 'available', NULL, now() + interval '90 days'),
-  ('CHG-01', 'charger', 'Forklift Charger', 'Charging Station', 'available', NULL, now() + interval '180 days'),
-  ('CHG-02', 'charger', 'AMR Charger', 'Charging Station', 'available', NULL, now() + interval '180 days'),
-  ('CONV-01', 'conveyor', 'Belt Conveyor 3m', 'Assembly Line', 'available', NULL, now() + interval '120 days'),
-  ('HUM-01', 'humanoid', 'Boston Dynamics Stretch', 'Zone A', 'maintenance', NULL, now() + interval '14 days')
-ON CONFLICT (asset_id) DO UPDATE SET
-  type = EXCLUDED.type,
-  model = EXCLUDED.model,
-  zone = EXCLUDED.zone,
-  status = EXCLUDED.status,
-  owner_user = EXCLUDED.owner_user,
-  next_pm_due = EXCLUDED.next_pm_due,
-  updated_at = now();
+DO $$
+DECLARE
+  STATUS_AVAILABLE CONSTANT TEXT := 'available';
+BEGIN
+  INSERT INTO equipment_assets (asset_id, type, model, zone, status, owner_user, next_pm_due) VALUES
+    ('FL-01', 'forklift', 'Toyota 8FGU25', 'Zone A', STATUS_AVAILABLE, NULL, now() + interval '30 days'),
+    ('FL-02', 'forklift', 'Toyota 8FGU25', 'Zone B', 'assigned', 'operator1', now() + interval '15 days'),
+    ('FL-03', 'forklift', 'Hyster H2.5XM', 'Loading Dock', 'maintenance', NULL, now() + interval '7 days'),
+    ('AMR-001', 'amr', 'MiR-250', 'Zone A', STATUS_AVAILABLE, NULL, now() + interval '45 days'),
+    ('AMR-002', 'amr', 'MiR-250', 'Zone B', 'charging', NULL, now() + interval '30 days'),
+    ('AGV-01', 'agv', 'Kiva Systems', 'Assembly Line', 'assigned', 'operator2', now() + interval '60 days'),
+    ('SCN-01', 'scanner', 'Honeywell CT60', 'Zone A', 'assigned', 'operator1', now() + interval '90 days'),
+    ('SCN-02', 'scanner', 'Honeywell CT60', 'Zone B', STATUS_AVAILABLE, NULL, now() + interval '90 days'),
+    ('CHG-01', 'charger', 'Forklift Charger', 'Charging Station', STATUS_AVAILABLE, NULL, now() + interval '180 days'),
+    ('CHG-02', 'charger', 'AMR Charger', 'Charging Station', STATUS_AVAILABLE, NULL, now() + interval '180 days'),
+    ('CONV-01', 'conveyor', 'Belt Conveyor 3m', 'Assembly Line', STATUS_AVAILABLE, NULL, now() + interval '120 days'),
+    ('HUM-01', 'humanoid', 'Boston Dynamics Stretch', 'Zone A', 'maintenance', NULL, now() + interval '14 days')
+  ON CONFLICT (asset_id) DO UPDATE SET
+    type = EXCLUDED.type,
+    model = EXCLUDED.model,
+    zone = EXCLUDED.zone,
+    status = EXCLUDED.status,
+    owner_user = EXCLUDED.owner_user,
+    next_pm_due = EXCLUDED.next_pm_due,
+    updated_at = now();
+END $$;
 
 -- Sample telemetry data (last 24 hours)
 INSERT INTO equipment_telemetry (ts, equipment_id, metric, value) VALUES
