@@ -25,6 +25,7 @@ from src.api.services.reasoning import (
     ReasoningType,
     ReasoningChain,
 )
+from src.api.utils.log_utils import sanitize_prompt_input
 from .forecasting_action_tools import get_forecasting_action_tools
 
 logger = logging.getLogger(__name__)
@@ -461,8 +462,8 @@ Your responses should:
                 },
                 {
                     "role": "user",
-                    "content": f"""User Query: {original_query}
-Query Intent: {parsed_query.intent}
+                    "content": f"""User Query: {sanitize_prompt_input(original_query)}
+Query Intent: {sanitize_prompt_input(parsed_query.intent)}
 
 Forecasting Results:
 {results_summary}

@@ -26,6 +26,7 @@ from src.api.services.reasoning import (
     ReasoningType,
     ReasoningChain,
 )
+from src.api.utils.log_utils import sanitize_prompt_input
 from .action_tools import get_safety_action_tools
 
 logger = logging.getLogger(__name__)
@@ -571,10 +572,10 @@ CRITICAL: Return ONLY the JSON object, no other text.""",
                 },
                 {
                     "role": "user",
-                    "content": f"""User Query: "{query.user_query}"
-Intent: {query.intent}
-Entities: {query.entities}
-Context: {query.context}
+                    "content": f"""User Query: "{sanitize_prompt_input(query.user_query)}"
+Intent: {sanitize_prompt_input(query.intent)}
+Entities: {sanitize_prompt_input(query.entities)}
+Context: {sanitize_prompt_input(query.context)}
 
 Tool Execution Results:
 {json.dumps(successful_results, indent=2)}
@@ -597,7 +598,7 @@ Failed Tool Executions:
                 response_data = {
                     "response_type": "safety_info",
                     "data": {"results": successful_results},
-                    "natural_language": f"Based on the available data, here's what I found regarding your safety query: {query.user_query}",
+                    "natural_language": f"Based on the available data, here's what I found regarding your safety query: {sanitize_prompt_input(query.user_query)}",
                     "recommendations": [
                         "Please review the safety status and take appropriate action if needed."
                     ],

@@ -16,6 +16,7 @@ from src.api.services.llm.nim_client import get_nim_client, LLMResponse
 from src.retrieval.hybrid_retriever import get_hybrid_retriever, SearchContext
 from src.retrieval.structured.task_queries import TaskQueries, Task
 from src.retrieval.structured.telemetry_queries import TelemetryQueries
+from src.api.utils.log_utils import sanitize_prompt_input
 from .action_tools import get_operations_action_tools, OperationsActionTools
 
 logger = logging.getLogger(__name__)
@@ -176,12 +177,16 @@ class OperationsCoordinationAgent:
             )
             context_str = self._build_context_string(conversation_history, context)
 
+            # Sanitize user input to prevent template injection
+            safe_query = sanitize_prompt_input(query)
+            safe_context = sanitize_prompt_input(context_str)
+
             prompt = f"""
 You are an operations coordination agent for warehouse operations. Analyze the user query and extract structured information.
 
-User Query: "{query}"
+User Query: "{safe_query}"
 
-Previous Context: {context_str}
+Previous Context: {safe_context}
 
 IMPORTANT: For queries about workers, employees, staff, workforce, shifts, or team members, use intent "workforce".
 IMPORTANT: For queries about tasks, work orders, assignments, job status, or "latest tasks", use intent "task_management".
@@ -677,12 +682,17 @@ Respond in JSON format:
             if actions_taken:
                 actions_str = f"\nActions Taken:\n{json.dumps(actions_taken, indent=2, default=str)}"
 
+            # Sanitize user input to prevent template injection
+            safe_user_query = sanitize_prompt_input(operations_query.user_query)
+            safe_intent = sanitize_prompt_input(operations_query.intent)
+            safe_entities = sanitize_prompt_input(operations_query.entities)
+
             prompt = f"""
 You are an operations coordination agent. Generate a comprehensive response based on the user query and retrieved data.
 
-User Query: "{operations_query.user_query}"
-Intent: {operations_query.intent}
-Entities: {operations_query.entities}
+User Query: "{safe_user_query}"
+Intent: {safe_intent}
+Entities: {safe_entities}
 
 Retrieved Data:
 {context_str}

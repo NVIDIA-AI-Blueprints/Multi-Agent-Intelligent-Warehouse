@@ -20,6 +20,7 @@ from src.api.services.reasoning import (
     ReasoningType,
     ReasoningChain,
 )
+from src.api.utils.log_utils import sanitize_prompt_input
 from .action_tools import get_safety_action_tools, SafetyActionTools
 
 logger = logging.getLogger(__name__)
@@ -825,12 +826,17 @@ Respond in JSON format:
                     )
                 reasoning_str = f"\nAdvanced Reasoning Analysis:\n{chr(10).join(reasoning_steps)}\n\nFinal Conclusion: {reasoning_chain.final_conclusion}"
 
+            # Sanitize user input to prevent template injection
+            safe_user_query = sanitize_prompt_input(safety_query.user_query)
+            safe_intent = sanitize_prompt_input(safety_query.intent)
+            safe_entities = sanitize_prompt_input(safety_query.entities)
+
             prompt = f"""
 You are a safety and compliance agent. Generate a comprehensive response based on the user query, retrieved data, and advanced reasoning analysis.
 
-User Query: "{safety_query.user_query}"
-Intent: {safety_query.intent}
-Entities: {safety_query.entities}
+User Query: "{safe_user_query}"
+Intent: {safe_intent}
+Entities: {safe_entities}
 
 Retrieved Data:
 {context_str}

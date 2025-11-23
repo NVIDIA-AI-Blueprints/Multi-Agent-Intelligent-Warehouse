@@ -20,6 +20,7 @@ from .evidence_collector import (
     EvidenceSource,
     EvidenceQuality,
 )
+from src.api.utils.log_utils import sanitize_prompt_input
 
 logger = logging.getLogger(__name__)
 
@@ -279,8 +280,8 @@ Format your response to be informative and actionable.""",
                 },
                 {
                     "role": "user",
-                    "content": f"""Query: "{query}"
-Intent: {intent}
+                    "content": f"""Query: "{sanitize_prompt_input(query)}"
+Intent: {sanitize_prompt_input(intent)}
 Entities: {json.dumps(entities, indent=2)}
 
 Evidence Findings:

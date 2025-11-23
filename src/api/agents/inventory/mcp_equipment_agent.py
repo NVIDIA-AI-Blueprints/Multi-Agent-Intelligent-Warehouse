@@ -26,6 +26,7 @@ from src.api.services.reasoning import (
     ReasoningType,
     ReasoningChain,
 )
+from src.api.utils.log_utils import sanitize_prompt_input
 from .equipment_asset_tools import get_equipment_asset_tools
 
 logger = logging.getLogger(__name__)
@@ -614,11 +615,17 @@ Reasoning Chain Analysis:
                 logger.warning(f"Error building reasoning chain section: {e}")
                 reasoning_section = ""
 
+        # Sanitize user input to prevent template injection
+        safe_user_query = sanitize_prompt_input(query.user_query)
+        safe_intent = sanitize_prompt_input(query.intent)
+        safe_entities = sanitize_prompt_input(query.entities)
+        safe_context = sanitize_prompt_input(query.context)
+
         # Build the full prompt content
-        content = f"""User Query: "{query.user_query}"
-Intent: {query.intent}
-Entities: {query.entities}
-Context: {query.context}
+        content = f"""User Query: "{safe_user_query}"
+Intent: {safe_intent}
+Entities: {safe_entities}
+Context: {safe_context}
 
 Tool Execution Results:
 {json.dumps(successful_results, indent=2)}
@@ -714,7 +721,7 @@ ABSOLUTELY CRITICAL: Your response must start with { and end with }. No other te
                 response_data = {
                     "response_type": "equipment_info",
                     "data": {"results": successful_results},
-                    "natural_language": f"Based on the available data, here's what I found regarding your equipment query: {query.user_query}",
+                    "natural_language": f"Based on the available data, here's what I found regarding your equipment query: {sanitize_prompt_input(query.user_query)}",
                     "recommendations": [
                         "Please review the equipment status and take appropriate action if needed."
                     ],
