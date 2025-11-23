@@ -1056,18 +1056,21 @@ const DocumentExtraction: React.FC = () => {
                       if (orderNumMatch) parsedFields.order_number = { value: orderNumMatch[1] };
                       
                       // Invoice Date patterns
-                      const invoiceDateMatch = extractedText.match(/Invoice Date:\s*([^+\n]+?)(?:\n|$)/i) ||
-                                             extractedText.match(/Date:\s*([^+\n]+?)(?:\n|$)/i);
+                      // Use positive lookahead (?=\n|$) instead of non-capturing group to prevent ReDoS
+                      const invoiceDateMatch = extractedText.match(/Invoice Date:\s*([^+\n]+?)(?=\n|$)/i) ||
+                                             extractedText.match(/Date:\s*([^+\n]+?)(?=\n|$)/i);
                       if (invoiceDateMatch) parsedFields.invoice_date = { value: invoiceDateMatch[1].trim() };
                       
                       // Due Date patterns
-                      const dueDateMatch = extractedText.match(/Due Date:\s*([^+\n]+?)(?:\n|$)/i) ||
-                                         extractedText.match(/Payment Due:\s*([^+\n]+?)(?:\n|$)/i);
+                      // Use positive lookahead (?=\n|$) instead of non-capturing group to prevent ReDoS
+                      const dueDateMatch = extractedText.match(/Due Date:\s*([^+\n]+?)(?=\n|$)/i) ||
+                                         extractedText.match(/Payment Due:\s*([^+\n]+?)(?=\n|$)/i);
                       if (dueDateMatch) parsedFields.due_date = { value: dueDateMatch[1].trim() };
                       
                       // Service patterns
-                      const serviceMatch = extractedText.match(/Service:\s*([^+\n]+?)(?:\n|$)/i) ||
-                                         extractedText.match(/Description:\s*([^+\n]+?)(?:\n|$)/i);
+                      // Use positive lookahead (?=\n|$) instead of non-capturing group to prevent ReDoS
+                      const serviceMatch = extractedText.match(/Service:\s*([^+\n]+?)(?=\n|$)/i) ||
+                                         extractedText.match(/Description:\s*([^+\n]+?)(?=\n|$)/i);
                       if (serviceMatch) parsedFields.service = { value: serviceMatch[1].trim() };
                       
                       // Rate/Price patterns
