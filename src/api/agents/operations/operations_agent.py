@@ -471,8 +471,11 @@ Respond in JSON format:
                         order_ids = order_matches
                     else:
                         # If no specific order IDs, create a simulated order based on line count and zone
+                        # Use bounded quantifier to prevent ReDoS in regex pattern
+                        # Pattern: digits (1-5) + "-line order"
+                        # Order line counts are unlikely to exceed 5 digits (99999 lines)
                         line_count_match = re.search(
-                            r"(\d+)-line order", operations_query.user_query
+                            r"(\d{1,5})-line order", operations_query.user_query
                         )
                         zone_match = re.search(
                             r"Zone ([A-Z])", operations_query.user_query
