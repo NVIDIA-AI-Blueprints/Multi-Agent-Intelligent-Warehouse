@@ -375,7 +375,9 @@ class QualityScorer:
         """Check if value is a valid financial amount."""
         import re
 
-        return bool(re.match(r"^\$?[\d,]+\.?\d*$", value.strip()))
+        # Use bounded quantifiers and explicit decimal pattern to prevent ReDoS
+        # Pattern: optional $, digits/commas (1-30 chars), optional decimal point with digits (0-10 chars)
+        return bool(re.match(r"^\$?[\d,]{1,30}(\.\d{0,10})?$", value.strip()))
 
     def _is_valid_date(self, value: str) -> bool:
         """Check if value is a valid date."""
