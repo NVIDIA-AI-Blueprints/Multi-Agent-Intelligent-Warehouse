@@ -176,8 +176,11 @@ class EntityExtractor:
             for keyword in ["address", "location", "street", "city", "state", "zip"]
         ):
             return "address"
+        # Use bounded quantifiers to prevent ReDoS in address pattern matching
+        # Pattern matches: street number (1-10 digits), whitespace, street name (1-50 chars), whitespace, street type
+        # Bounded quantifiers prevent quadratic runtime when using re.search() (partial match)
         elif re.search(
-            r"\d+\s+\w+\s+(street|st|avenue|ave|road|rd|boulevard|blvd)", value_lower
+            r"\d{1,10}\s{1,5}\w{1,50}\s{1,5}(street|st|avenue|ave|road|rd|boulevard|blvd)", value_lower
         ):
             return "address"
 
