@@ -270,7 +270,10 @@ Return only valid JSON.""",
                 entities["sku"] = sku_match.group(1)
             
             # Extract horizon days
-            days_match = re.search(r'(\d+)\s*days?', query)
+            # Use bounded quantifiers to prevent ReDoS in regex pattern
+            # Pattern: digits (1-5) + optional whitespace (0-5) + "day" or "days"
+            # Days are unlikely to exceed 5 digits (99999 days = ~274 years)
+            days_match = re.search(r'(\d{1,5})\s{0,5}days?', query)
             if days_match:
                 entities["horizon_days"] = int(days_match.group(1))
             
