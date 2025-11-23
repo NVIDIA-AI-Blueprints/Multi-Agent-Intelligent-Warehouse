@@ -1056,22 +1056,24 @@ const DocumentExtraction: React.FC = () => {
                       if (orderNumMatch) parsedFields.order_number = { value: orderNumMatch[1] };
                       
                       // Invoice Date patterns
-                      // Use greedy quantifier + instead of lazy +? to prevent ReDoS backtracking
-                      // The greedy quantifier matches as much as possible, then lookahead verifies newline/end
-                      const invoiceDateMatch = extractedText.match(/Invoice Date:\s*([^+\n]+)(?=\n|$)/i) ||
-                                             extractedText.match(/Date:\s*([^+\n]+)(?=\n|$)/i);
+                      // Use bounded quantifier {1,200} instead of + to prevent ReDoS
+                      // Bounded quantifier limits maximum match length, preventing quadratic runtime
+                      // Date fields are unlikely to exceed 200 characters
+                      const invoiceDateMatch = extractedText.match(/Invoice Date:\s*([^+\n]{1,200})(?=\n|$)/i) ||
+                                             extractedText.match(/Date:\s*([^+\n]{1,200})(?=\n|$)/i);
                       if (invoiceDateMatch) parsedFields.invoice_date = { value: invoiceDateMatch[1].trim() };
                       
                       // Due Date patterns
-                      // Use greedy quantifier + instead of lazy +? to prevent ReDoS backtracking
-                      const dueDateMatch = extractedText.match(/Due Date:\s*([^+\n]+)(?=\n|$)/i) ||
-                                         extractedText.match(/Payment Due:\s*([^+\n]+)(?=\n|$)/i);
+                      // Use bounded quantifier {1,200} instead of + to prevent ReDoS
+                      const dueDateMatch = extractedText.match(/Due Date:\s*([^+\n]{1,200})(?=\n|$)/i) ||
+                                         extractedText.match(/Payment Due:\s*([^+\n]{1,200})(?=\n|$)/i);
                       if (dueDateMatch) parsedFields.due_date = { value: dueDateMatch[1].trim() };
                       
                       // Service patterns
-                      // Use greedy quantifier + instead of lazy +? to prevent ReDoS backtracking
-                      const serviceMatch = extractedText.match(/Service:\s*([^+\n]+)(?=\n|$)/i) ||
-                                         extractedText.match(/Description:\s*([^+\n]+)(?=\n|$)/i);
+                      // Use bounded quantifier {1,500} instead of + to prevent ReDoS
+                      // Service descriptions may be longer, so allow up to 500 characters
+                      const serviceMatch = extractedText.match(/Service:\s*([^+\n]{1,500})(?=\n|$)/i) ||
+                                         extractedText.match(/Description:\s*([^+\n]{1,500})(?=\n|$)/i);
                       if (serviceMatch) parsedFields.service = { value: serviceMatch[1].trim() };
                       
                       // Rate/Price patterns
