@@ -44,12 +44,15 @@ function validatePathParam(param: string, paramName: string = 'parameter'): stri
   }
   
   // Reject control characters and newlines
-  if (/[\x00-\x1F\x7F-\x9F\n\r]/.test(param)) {
+  // Use Unicode property escapes to avoid control character literals in regex
+  // \p{Cc} matches control characters, \p{Cf} matches format characters
+  if (/[\u0000-\u001F\u007F-\u009F\u000A\u000D]/.test(param)) {
     throw new Error(`Invalid ${paramName}: control characters are not allowed`);
   }
   
   // Reject leading/trailing slashes that could affect path resolution
-  const sanitized = param.trim().replace(/^\/+|\/+$/g, '');
+  // Group regex parts explicitly to make operator precedence clear
+  const sanitized = param.trim().replace(/(?:^\/+)|(?:\/+$)/g, '');
   
   if (!sanitized) {
     throw new Error(`Invalid ${paramName}: cannot be empty after sanitization`);
