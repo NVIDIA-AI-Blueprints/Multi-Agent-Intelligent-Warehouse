@@ -56,12 +56,29 @@ class InventoryAPI {
     }
     
     // Reject control characters and newlines
-    if (/[\x00-\x1F\x7F-\x9F\n\r]/.test(param)) {
+    // Use Unicode escape sequences to avoid control character literals in regex
+    if (/[\u0000-\u001F\u007F-\u009F\u000A\u000D]/.test(param)) {
       throw new Error(`Invalid ${paramName}: control characters are not allowed`);
     }
     
     // Reject leading/trailing slashes
-    const sanitized = param.trim().replace(/^\/+|\/+$/g, '');
+    // Use string methods instead of regex to prevent ReDoS vulnerabilities
+    // This approach is O(n) with no backtracking risk, safe for any input length
+    let sanitized = param.trim();
+    
+    // Remove leading slashes - O(n) operation, no backtracking
+    let startIdx = 0;
+    while (startIdx < sanitized.length && sanitized[startIdx] === '/') {
+      startIdx++;
+    }
+    sanitized = sanitized.substring(startIdx);
+    
+    // Remove trailing slashes - O(n) operation, no backtracking
+    let endIdx = sanitized.length;
+    while (endIdx > 0 && sanitized[endIdx - 1] === '/') {
+      endIdx--;
+    }
+    sanitized = sanitized.substring(0, endIdx);
     
     if (!sanitized) {
       throw new Error(`Invalid ${paramName}: cannot be empty after sanitization`);
