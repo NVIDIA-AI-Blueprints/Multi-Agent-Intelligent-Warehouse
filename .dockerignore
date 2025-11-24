@@ -1,0 +1,222 @@
+# Security: Exclude sensitive files and secrets
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+*.crt
+*.cert
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.token
+*.credential
+*.secret
+
+# Git files (not needed in container)
+.git/
+.gitignore
+.gitattributes
+.gitmodules
+.github/
+
+# Virtual environments (not needed in container)
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Node.js (handled in multi-stage build, but exclude to reduce context size)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.npm/
+.yarn/
+
+# Build artifacts (will be built in container)
+build/
+dist/
+*.egg-info/
+.eggs/
+eggs/
+develop-eggs/
+downloads/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg
+MANIFEST
+
+# Frontend build (will be built in multi-stage)
+src/ui/web/build/
+src/ui/web/.cache/
+src/ui/web/node_modules/
+src/ui/web/.env.local
+src/ui/web/.env.development.local
+src/ui/web/.env.test.local
+src/ui/web/.env.production.local
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Database files (not needed in container)
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+
+# User uploads and runtime data
+data/uploads/
+data/sample/*_results.json
+data/sample/*_demo*.json
+data/sample/pipeline_test_results/
+document_statuses.json
+phase1_phase2_forecasts.json
+rapids_gpu_forecasts.json
+historical_demand_summary.json
+build-info.json
+
+# Test files and coverage
+tests/
+test_*.py
+*_test.py
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+.tox/
+.nox/
+
+# Documentation (not needed at runtime)
+docs/
+*.md
+!README.md
+LICENSE
+CHANGELOG.md
+DEPLOYMENT.md
+QUICK_START.md
+SECURITY.md
+PRD.md
+Functional*.md
+REQUIREMENTS*.md
+USE_CASES*.md
+UNNECESSARY_FILES.md
+
+# Jupyter notebooks
+notebooks/
+.ipynb_checkpoints
+*.ipynb
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+
+# Docker files (not needed in image)
+Dockerfile*
+docker-compose*.yml
+docker-compose*.yaml
+.dockerignore
+
+# CI/CD files
+.github/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+Jenkinsfile
+
+# Deployment configs (not needed in runtime image)
+deploy/
+monitoring/
+nginx.conf
+
+# Scripts (not needed in runtime, only source code)
+scripts/
+
+# Type checking and linting
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+.ruff_cache/
+
+# Other development files
+.python-version
+Pipfile
+Pipfile.lock
+poetry.lock
+pyproject.toml
+setup.py
+setup.cfg
+MANIFEST.in
+requirements*.txt
+!requirements.docker.txt
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Rope
+.ropeproject
+
+# mkdocs
+site/
+
+# Spyder
+.spyderproject
+.spyproject
+
+# PEP 582
+__pypackages__/
+
+# SageMath
+*.sage.py
+
+# Local configuration
+local_settings.py
+local_config.py
+config.local.*
+

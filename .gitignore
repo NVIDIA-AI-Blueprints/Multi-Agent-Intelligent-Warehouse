@@ -74,7 +74,8 @@ ui/mobile/android/app/build/
 ui/mobile/ios/build/
 
 # Docker
-.dockerignore
+# Note: .dockerignore should be committed to repo for Docker builds
+# .dockerignore
 *.bak
 docker-compose*.bak
 
