@@ -10,6 +10,7 @@ import asyncio
 import random
 import json
 import logging
+import os
 from datetime import datetime, timedelta
 import psycopg
 import bcrypt
