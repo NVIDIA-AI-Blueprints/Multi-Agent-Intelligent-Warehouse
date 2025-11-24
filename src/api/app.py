@@ -126,6 +126,36 @@ async def root():
     }
 
 
+@app.get("/health")
+async def health_check_simple():
+    """
+    Simple health check endpoint at root level for convenience.
+    
+    This endpoint provides a quick health check without the /api/v1 prefix.
+    For comprehensive health information, use /api/v1/health instead.
+    """
+    try:
+        # Quick database check
+        import asyncpg
+        import os
+        from dotenv import load_dotenv
+
+        load_dotenv()
+        database_url = os.getenv(
+            "DATABASE_URL",
+            f"postgresql://{os.getenv('POSTGRES_USER', 'warehouse')}:{os.getenv('POSTGRES_PASSWORD', '')}@localhost:5435/{os.getenv('POSTGRES_DB', 'warehouse')}",
+        )
+
+        conn = await asyncpg.connect(database_url)
+        await conn.execute("SELECT 1")
+        await conn.close()
+
+        return {"ok": True, "status": "healthy"}
+    except Exception as e:
+        logger.error(f"Simple health check failed: {e}")
+        return {"ok": False, "status": "unhealthy", "error": str(e)}
+
+
 # Add metrics endpoint
 @app.get("/api/v1/metrics")
 async def metrics():
