@@ -67,6 +67,8 @@ COPY --from=backend-deps /usr/local/lib/python3.11/site-packages /usr/local/lib/
 COPY --from=backend-deps /usr/local/bin /usr/local/bin
 
 # Copy application code
+# Security: .dockerignore ensures sensitive files (.env, secrets, git, etc.) are excluded
+# Only files not in .dockerignore will be copied to the container
 COPY . .
 
 # Build arguments for version injection
