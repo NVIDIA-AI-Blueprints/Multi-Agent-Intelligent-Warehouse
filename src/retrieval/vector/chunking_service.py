@@ -141,8 +141,11 @@ class ChunkingService:
     
     def _split_into_sentences(self, text: str) -> List[str]:
         """Split text into sentences for better chunking boundaries."""
-        # Enhanced sentence splitting regex
-        sentence_pattern = r'(?<=[.!?])\s+(?=[A-Z])|(?<=[.!?])\s*\n\s*(?=[A-Z])'
+        # Enhanced sentence splitting regex with bounded quantifiers to prevent ReDoS
+        # Pattern 1: Sentence ending + whitespace (1-10 spaces) + capital letter
+        # Pattern 2: Sentence ending + optional whitespace (0-10) + newline + optional whitespace (0-10) + capital letter
+        # Bounded quantifiers prevent catastrophic backtracking while maintaining functionality
+        sentence_pattern = r'(?<=[.!?])\s{1,10}(?=[A-Z])|(?<=[.!?])\s{0,10}\n\s{0,10}(?=[A-Z])'
         sentences = re.split(sentence_pattern, text)
         
         # Filter out empty sentences
