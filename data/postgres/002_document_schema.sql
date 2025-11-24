@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS documents (
     file_type VARCHAR(50) NOT NULL,
     file_size BIGINT NOT NULL,
     upload_timestamp TIMESTAMP DEFAULT NOW(),
-    user_id UUID REFERENCES users(id),
+    user_id INTEGER REFERENCES users(id),
     status VARCHAR(50) DEFAULT 'uploaded',
     processing_stage VARCHAR(50),
     document_type VARCHAR(50), -- 'invoice', 'receipt', 'bol', 'purchase_order', etc.
@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS routing_decisions (
     wms_integration_status VARCHAR(50), -- 'pending', 'integrated', 'failed'
     wms_integration_data JSONB,
     human_review_required BOOLEAN DEFAULT FALSE,
-    human_reviewer_id UUID REFERENCES users(id),
+    human_reviewer_id INTEGER REFERENCES users(id),
     human_review_completed_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT NOW()
 );

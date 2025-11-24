@@ -27,24 +27,45 @@ cd Multi-Agent-Intelligent-Warehouse
 # 2. Setup environment
 ./scripts/setup/setup_environment.sh
 
-# 3. Start infrastructure services
+# 3. Configure environment variables (REQUIRED before starting services)
+# Create .env file for Docker Compose (recommended location)
+cp .env.example deploy/compose/.env
+# Or create in project root: cp .env.example .env
+# Edit with your values: nano deploy/compose/.env
+
+# 4. Start infrastructure services
 ./scripts/setup/dev_up.sh
 
-# 4. Run database migrations
+# 5. Run database migrations
 source env/bin/activate
+
+# Option A: Using psql (requires PostgreSQL client installed)
 PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/000_schema.sql
 PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/001_equipment_schema.sql
 PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/002_document_schema.sql
 PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/004_inventory_movements_schema.sql
 PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f scripts/setup/create_model_tracking_tables.sql
 
-# 5. Create default users
+# Option B: Using Docker (if psql is not installed)
+# docker-compose -f deploy/compose/docker-compose.dev.yaml exec -T timescaledb psql -U warehouse -d warehouse < data/postgres/000_schema.sql
+# docker-compose -f deploy/compose/docker-compose.dev.yaml exec -T timescaledb psql -U warehouse -d warehouse < data/postgres/001_equipment_schema.sql
+# docker-compose -f deploy/compose/docker-compose.dev.yaml exec -T timescaledb psql -U warehouse -d warehouse < data/postgres/002_document_schema.sql
+# docker-compose -f deploy/compose/docker-compose.dev.yaml exec -T timescaledb psql -U warehouse -d warehouse < data/postgres/004_inventory_movements_schema.sql
+# docker-compose -f deploy/compose/docker-compose.dev.yaml exec -T timescaledb psql -U warehouse -d warehouse < scripts/setup/create_model_tracking_tables.sql
+
+# 6. Create default users
 python scripts/setup/create_default_users.py
 
-# 6. Start API server
+# 7. Generate demo data (optional but recommended)
+python scripts/data/quick_demo_data.py
+
+# 8. Generate historical demand data for forecasting (optional, required for Forecasting page)
+python scripts/data/generate_historical_demand.py
+
+# 9. Start API server
 ./scripts/start_server.sh
 
-# 7. Start frontend (in another terminal)
+# 10. Start frontend (in another terminal)
 cd src/ui/web
 npm install
 npm start
@@ -74,20 +95,40 @@ npm start
 - Python 3.9+ (for local development)
 - Node.js 18+ and npm (for frontend)
 - Git
+- PostgreSQL client (`psql`) - Required for running database migrations
+  - **Ubuntu/Debian**: `sudo apt-get install postgresql-client`
+  - **macOS**: `brew install postgresql` or `brew install libpq`
+  - **Windows**: Install from [PostgreSQL downloads](https://www.postgresql.org/download/windows/)
+  - **Alternative**: Use Docker (see Docker Deployment section below)
 
 ## Environment Configuration
 
 ### Required Environment Variables
 
-Create a `.env` file in the project root:
+**⚠️ Important:** For Docker Compose deployments, the `.env` file location matters!
+
+Docker Compose looks for `.env` files in this order:
+1. Same directory as the compose file (`deploy/compose/.env`)
+2. Current working directory (project root `.env`)
+
+**Recommended:** Create `.env` in the same directory as your compose file for consistency:
 
 ```bash
-# Copy example file
-cp .env.example .env
+# Option 1: In deploy/compose/ (recommended for Docker Compose)
+cp .env.example deploy/compose/.env
+nano deploy/compose/.env  # or your preferred editor
 
-# Edit with your values
+# Option 2: In project root (works if running commands from project root)
+cp .env.example .env
 nano .env  # or your preferred editor
 ```
+
+**Note:** If you use `docker-compose -f deploy/compose/docker-compose.dev.yaml`, Docker Compose will:
+- First check for `deploy/compose/.env`
+- Then check for `.env` in your current working directory
+- Use the first one it finds
+
+For consistency, we recommend placing `.env` in `deploy/compose/` when using Docker Compose.
 
 **Critical Variables:**
 
@@ -182,6 +223,15 @@ docker-compose -f deploy/compose/docker-compose.dev.yaml up -d --build
 - **prometheus**: Metrics collection (port 9090)
 - **grafana**: Monitoring dashboards (port 3000)
 
+**Manually Start Specific Services:**
+
+If you want to start only specific services (e.g., just the database services):
+
+```bash
+# Start only database and infrastructure services
+docker-compose -f deploy/compose/docker-compose.dev.yaml up -d timescaledb redis milvus
+```
+
 **Production Docker Compose:**
 
 ```bash
@@ -189,17 +239,29 @@ docker-compose -f deploy/compose/docker-compose.dev.yaml up -d --build
 docker-compose -f deploy/compose/docker-compose.yaml up -d
 ```
 
+**Note:** The production `docker-compose.yaml` only contains the `chain_server` service. For full infrastructure, use `docker-compose.dev.yaml` or deploy services separately.
+
 #### Docker Deployment Steps
 
 1. **Configure environment:**
    ```bash
-   cp .env.example .env
-   # Edit .env with production values
+   # For Docker Compose, place .env in deploy/compose/ directory
+   cp .env.example deploy/compose/.env
+   # Edit deploy/compose/.env with production values
+   nano deploy/compose/.env  # or your preferred editor
+   
+   # Alternative: If using project root .env, ensure you run commands from project root
+   # cp .env.example .env
+   # nano .env
    ```
 
 2. **Start infrastructure:**
    ```bash
-   docker-compose -f deploy/compose/docker-compose.yaml up -d postgres redis milvus
+   # For development (uses timescaledb service)
+   docker-compose -f deploy/compose/docker-compose.dev.yaml up -d timescaledb redis milvus
+   
+   # For production, you may need to deploy services separately
+   # or use docker-compose.dev.yaml for local testing
    ```
 
 3. **Run database migrations:**
@@ -207,23 +269,32 @@ docker-compose -f deploy/compose/docker-compose.yaml up -d
    # Wait for services to be ready
    sleep 10
    
-   # Run migrations
-   docker-compose -f deploy/compose/docker-compose.yaml exec postgres psql -U warehouse -d warehouse -f /docker-entrypoint-initdb.d/000_schema.sql
+   # For development (timescaledb service)
+   docker-compose -f deploy/compose/docker-compose.dev.yaml exec timescaledb psql -U warehouse -d warehouse -f /docker-entrypoint-initdb.d/000_schema.sql
    # ... (run other migration files)
+   
+   # Or using psql from host (if installed)
+   PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/000_schema.sql
    ```
 
 4. **Create users:**
    ```bash
-   docker-compose -f deploy/compose/docker-compose.yaml exec api python scripts/setup/create_default_users.py
+   # For development, run from host (requires Python environment)
+   source env/bin/activate
+   python scripts/setup/create_default_users.py
+   
+   # Or if running in a container
+   docker-compose -f deploy/compose/docker-compose.dev.yaml exec chain_server python scripts/setup/create_default_users.py
    ```
 
 5. **Generate demo data (optional):**
    ```bash
-   # Quick demo data
-   docker-compose -f deploy/compose/docker-compose.yaml exec api python scripts/data/quick_demo_data.py
+   # Quick demo data (run from host)
+   source env/bin/activate
+   python scripts/data/quick_demo_data.py
    
    # Historical demand data (required for Forecasting page)
-   docker-compose -f deploy/compose/docker-compose.yaml exec api python scripts/data/generate_historical_demand.py
+   python scripts/data/generate_historical_demand.py
    ```
 
 6. **Start application:**
@@ -347,8 +418,11 @@ service:
 After deployment, run database migrations:
 
 ```bash
-# Docker
-docker-compose exec postgres psql -U warehouse -d warehouse -f /path/to/migrations/000_schema.sql
+# Docker (development - using timescaledb service)
+docker-compose -f deploy/compose/docker-compose.dev.yaml exec timescaledb psql -U warehouse -d warehouse -f /docker-entrypoint-initdb.d/000_schema.sql
+
+# Or from host using psql
+PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/000_schema.sql
 
 # Kubernetes
 kubectl exec -it deployment/postgres -n warehouse-assistant -- psql -U warehouse -d warehouse -f /migrations/000_schema.sql
@@ -364,8 +438,12 @@ kubectl exec -it deployment/postgres -n warehouse-assistant -- psql -U warehouse
 ### Create Default Users
 
 ```bash
-# Docker
-docker-compose exec api python scripts/setup/create_default_users.py
+# Docker (development)
+docker-compose -f deploy/compose/docker-compose.dev.yaml exec chain_server python scripts/setup/create_default_users.py
+
+# Or from host (recommended for development)
+source env/bin/activate
+python scripts/setup/create_default_users.py
 
 # Kubernetes
 kubectl exec -it deployment/warehouse-assistant -n warehouse-assistant -- python scripts/setup/create_default_users.py
@@ -436,11 +514,16 @@ scrape_configs:
 **Regular maintenance tasks:**
 
 ```bash
-# Weekly VACUUM
-docker-compose exec postgres psql -U warehouse -d warehouse -c "VACUUM ANALYZE;"
+# Weekly VACUUM (development)
+docker-compose -f deploy/compose/docker-compose.dev.yaml exec timescaledb psql -U warehouse -d warehouse -c "VACUUM ANALYZE;"
+
+# Or from host
+PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -c "VACUUM ANALYZE;"
 
 # Monthly REINDEX
-docker-compose exec postgres psql -U warehouse -d warehouse -c "REINDEX DATABASE warehouse;"
+docker-compose -f deploy/compose/docker-compose.dev.yaml exec timescaledb psql -U warehouse -d warehouse -c "REINDEX DATABASE warehouse;"
+# Or from host
+PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -c "REINDEX DATABASE warehouse;"
 ```
 
 ### Backup and Recovery
@@ -448,11 +531,16 @@ docker-compose exec postgres psql -U warehouse -d warehouse -c "REINDEX DATABASE
 **Database backup:**
 
 ```bash
-# Create backup
-docker-compose exec postgres pg_dump -U warehouse warehouse > backup_$(date +%Y%m%d).sql
+# Create backup (development)
+docker-compose -f deploy/compose/docker-compose.dev.yaml exec timescaledb pg_dump -U warehouse warehouse > backup_$(date +%Y%m%d).sql
+
+# Or from host
+PGPASSWORD=${POSTGRES_PASSWORD:-changeme} pg_dump -h localhost -p 5435 -U warehouse warehouse > backup_$(date +%Y%m%d).sql
 
 # Restore backup
-docker-compose exec -T postgres psql -U warehouse warehouse < backup_20240101.sql
+docker-compose -f deploy/compose/docker-compose.dev.yaml exec -T timescaledb psql -U warehouse warehouse < backup_20240101.sql
+# Or from host
+PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse warehouse < backup_20240101.sql
 ```
 
 **Kubernetes backup:**
@@ -484,13 +572,15 @@ kubectl get services -n warehouse-assistant
 #### Database Connection Errors
 
 ```bash
-# Check database status
-docker-compose ps postgres
+# Check database status (development)
+docker-compose -f deploy/compose/docker-compose.dev.yaml ps timescaledb
 # Or
 kubectl get pods -n warehouse-assistant | grep postgres
 
 # Test connection
-docker-compose exec postgres psql -U warehouse -d warehouse -c "SELECT 1;"
+docker-compose -f deploy/compose/docker-compose.dev.yaml exec timescaledb psql -U warehouse -d warehouse -c "SELECT 1;"
+# Or from host
+PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -c "SELECT 1;"
 ```
 
 #### Application Won't Start
