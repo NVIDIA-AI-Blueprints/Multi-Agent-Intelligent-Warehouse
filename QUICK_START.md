@@ -1,23 +1,29 @@
 # Quick Start Guide
 
-## 🚀 Fastest Way to Get Started
+**For complete deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md)**
+
+## Fastest Way to Get Started
 
 ### Prerequisites
 
-- Python 3.9+ installed
-- Docker and Docker Compose installed
+- Python 3.9+
+- Docker and Docker Compose
 - Node.js 18+ and npm (for frontend)
 
-### 1. Setup (One-time)
+### Quick Setup
 
 ```bash
-# Setup virtual environment and install dependencies
+# 1. Clone repository
+git clone https://github.com/T-DevH/Multi-Agent-Intelligent-Warehouse.git
+cd Multi-Agent-Intelligent-Warehouse
+
+# 2. Setup environment
 ./scripts/setup/setup_environment.sh
 
-# Start database services
+# 3. Start database services
 ./scripts/setup/dev_up.sh
 
-# Run database migrations
+# 4. Run database migrations
 source env/bin/activate
 PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/000_schema.sql
 PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/001_equipment_schema.sql
@@ -25,77 +31,33 @@ PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse
 PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/004_inventory_movements_schema.sql
 PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f scripts/setup/create_model_tracking_tables.sql
 
-# Create default users (generates secure password hashes from environment variables)
+# 5. Create default users
 python scripts/setup/create_default_users.py
-```
 
-**⚠️ Security Note:** The SQL schema does not contain hardcoded password hashes. Users are created securely via the setup script using environment variables.
-
-**Note:** For detailed setup instructions, see [DEPLOYMENT.md](DEPLOYMENT.md)
-
-### 2. Start Server
-
-```bash
-# Start the API server
+# 6. Start API server
 ./scripts/start_server.sh
+
+# 7. Start frontend (in another terminal)
+cd src/ui/web
+npm install
+npm start
 ```
 
-### 3. Access the Application
+### Access the Application
 
-**Frontend UI:** http://localhost:3001
+- **Frontend UI:** http://localhost:3001
+- **API Server:** http://localhost:8001
+- **API Docs:** http://localhost:8001/docs
 
-**Login Credentials:**
+### Default Login
+
 - **Username:** `admin`
 - **Password:** `changeme`
 
-**API Server:** http://localhost:8001  
-**API Docs:** http://localhost:8001/docs
+⚠️ **Change default passwords before production use!**
 
-## 📝 Default Credentials
+## Next Steps
 
-### UI Login
-- **Username:** `admin`
-- **Password:** `changeme`
-
-### Database
-- **Host:** `localhost:5435`
-- **Database:** `warehouse`
-- **Username:** `warehouse`
-- **Password:** `changeme`
-
-### Security Configuration
-
-**JWT Secret Key:**
-- **Development**: Not required - application uses a default with warnings
-- **Production**: **REQUIRED** - Set `JWT_SECRET_KEY` in `.env` file. Application will fail to start if not set.
-- See [docs/secrets.md](docs/secrets.md) for details on JWT configuration and security best practices.
-
-## 🔧 Troubleshooting
-
-**Server won't start?**
-```bash
-# Make sure virtual environment is set up
-./scripts/setup/setup_environment.sh
-
-# Then start server
-./scripts/start_server.sh
-```
-
-**Password not working?**
-- Default password is `changeme` (development only)
-- Check your `.env` file for `DEFAULT_ADMIN_PASSWORD` environment variable
-- Recreate users: `python scripts/setup/create_default_users.py`
-- **Note:** The SQL schema does not create users - they must be created via the setup script
-
-**Port already in use?**
-```bash
-# Use a different port
-PORT=8002 ./scripts/start_server.sh
-```
-
-## 📚 More Information
-
-- Full deployment guide: [DEPLOYMENT.md](DEPLOYMENT.md)
-- All credentials: [docs/secrets.md](docs/secrets.md)
-- Main README: [README.md](README.md)
-
+- **Full Deployment Guide**: [DEPLOYMENT.md](DEPLOYMENT.md) - Complete instructions for Docker and Kubernetes deployments
+- **Security Configuration**: [docs/secrets.md](docs/secrets.md)
+- **Troubleshooting**: See [DEPLOYMENT.md](DEPLOYMENT.md#troubleshooting)
