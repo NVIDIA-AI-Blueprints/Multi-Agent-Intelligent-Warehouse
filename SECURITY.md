@@ -32,6 +32,8 @@ This project includes additional security documentation:
 
 - **[LangChain Path Traversal Security](docs/security/LANGCHAIN_PATH_TRAVERSAL.md)**: Guidelines for preventing directory traversal attacks in LangChain Hub path loading, including protection against CVE-2024-28088.
 
+- **[Axios SSRF Protection](docs/security/AXIOS_SSRF_PROTECTION.md)**: Guidelines for preventing Server-Side Request Forgery (SSRF) attacks in Axios HTTP client usage, including protection against CVE-2025-27152.
+
 ## Security Tools
 
 ### Dependency Blocklist Checker

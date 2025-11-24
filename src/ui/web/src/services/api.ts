@@ -10,12 +10,64 @@ if (API_BASE_URL.startsWith('http://') || API_BASE_URL.startsWith('https://')) {
   API_BASE_URL = '/api/v1';
 }
 
+/**
+ * Validates and sanitizes path parameters to prevent SSRF attacks.
+ * 
+ * This function ensures that user-controlled path parameters:
+ * - Do not contain absolute URLs (http://, https://)
+ * - Do not contain path traversal sequences (../, ..\\)
+ * - Do not contain control characters or newlines
+ * - Are safe to use in URL paths
+ * 
+ * @param param - The path parameter to validate
+ * @param paramName - Name of the parameter for error messages
+ * @returns Sanitized parameter safe for use in URLs
+ * @throws Error if parameter contains unsafe content
+ * 
+ * @example
+ * const safeId = validatePathParam(userId, 'user_id');
+ * api.get(`/users/${safeId}`);
+ */
+function validatePathParam(param: string, paramName: string = 'parameter'): string {
+  if (!param || typeof param !== 'string') {
+    throw new Error(`Invalid ${paramName}: must be a non-empty string`);
+  }
+  
+  // Reject absolute URLs (SSRF prevention)
+  if (param.startsWith('http://') || param.startsWith('https://') || param.startsWith('//')) {
+    throw new Error(`Invalid ${paramName}: absolute URLs are not allowed`);
+  }
+  
+  // Reject path traversal sequences
+  if (param.includes('../') || param.includes('..\\') || param.includes('..%2F') || param.includes('..%5C')) {
+    throw new Error(`Invalid ${paramName}: path traversal sequences are not allowed`);
+  }
+  
+  // Reject control characters and newlines
+  if (/[\x00-\x1F\x7F-\x9F\n\r]/.test(param)) {
+    throw new Error(`Invalid ${paramName}: control characters are not allowed`);
+  }
+  
+  // Reject leading/trailing slashes that could affect path resolution
+  const sanitized = param.trim().replace(/^\/+|\/+$/g, '');
+  
+  if (!sanitized) {
+    throw new Error(`Invalid ${paramName}: cannot be empty after sanitization`);
+  }
+  
+  return sanitized;
+}
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 60000, // Increased to 60 seconds for complex reasoning
   headers: {
     'Content-Type': 'application/json',
   },
+  // Security: Prevent SSRF attacks by disallowing absolute URLs
+  // This prevents user-controlled URLs from bypassing baseURL and making requests to arbitrary hosts
+  // See CVE-2025-27152: https://github.com/axios/axios/security/advisories/GHSA-4w2v-q235-vp99
+  allowAbsoluteUrls: false,
 });
 
 // Log API configuration in development to help debug proxy issues
@@ -231,7 +283,8 @@ export const chatAPI = {
 
 export const equipmentAPI = {
   getAsset: async (asset_id: string): Promise<EquipmentAsset> => {
-    const response = await api.get(`/equipment/${asset_id}`);
+    const safeId = validatePathParam(asset_id, 'asset_id');
+    const response = await api.get(`/equipment/${safeId}`);
     return response.data;
   },
   
@@ -241,7 +294,8 @@ export const equipmentAPI = {
   },
   
   getAssetStatus: async (asset_id: string): Promise<any> => {
-    const response = await api.get(`/equipment/${asset_id}/status`);
+    const safeId = validatePathParam(asset_id, 'asset_id');
+    const response = await api.get(`/equipment/${safeId}/status`);
     return response.data;
   },
   
@@ -267,11 +321,12 @@ export const equipmentAPI = {
   },
   
   getTelemetry: async (asset_id: string, metric?: string, hours_back?: number): Promise<any[]> => {
+    const safeId = validatePathParam(asset_id, 'asset_id');
     const params = new URLSearchParams();
     if (metric) params.append('metric', metric);
     if (hours_back) params.append('hours_back', hours_back.toString());
     
-    const response = await api.get(`/equipment/${asset_id}/telemetry?${params}`);
+    const response = await api.get(`/equipment/${safeId}/telemetry?${params}`);
     return response.data;
   },
   
@@ -312,7 +367,8 @@ export const equipmentAPI = {
 // Keep old equipmentAPI for inventory items (if needed)
 export const inventoryAPI = {
   getItem: async (sku: string): Promise<InventoryItem> => {
-    const response = await api.get(`/inventory/${sku}`);
+    const safeSku = validatePathParam(sku, 'sku');
+    const response = await api.get(`/inventory/${safeSku}`);
     return response.data;
   },
   
@@ -327,12 +383,14 @@ export const inventoryAPI = {
   },
   
   updateItem: async (sku: string, data: Partial<InventoryItem>): Promise<InventoryItem> => {
-    const response = await api.put(`/inventory/${sku}`, data);
+    const safeSku = validatePathParam(sku, 'sku');
+    const response = await api.put(`/inventory/${safeSku}`, data);
     return response.data;
   },
   
   deleteItem: async (sku: string): Promise<void> => {
-    await api.delete(`/inventory/${sku}`);
+    const safeSku = validatePathParam(sku, 'sku');
+    await api.delete(`/inventory/${safeSku}`);
   },
 };
 
@@ -383,12 +441,14 @@ export const documentAPI = {
   },
   
   getDocumentStatus: async (documentId: string): Promise<any> => {
-    const response = await api.get(`/document/status/${documentId}`);
+    const safeId = validatePathParam(documentId, 'documentId');
+    const response = await api.get(`/document/status/${safeId}`);
     return response.data;
   },
   
   getDocumentResults: async (documentId: string): Promise<any> => {
-    const response = await api.get(`/document/results/${documentId}`);
+    const safeId = validatePathParam(documentId, 'documentId');
+    const response = await api.get(`/document/results/${safeId}`);
     return response.data;
   },
   
@@ -403,7 +463,8 @@ export const documentAPI = {
   },
   
   approveDocument: async (documentId: string, approverId: string, notes?: string): Promise<any> => {
-    const response = await api.post(`/document/approve/${documentId}`, {
+    const safeId = validatePathParam(documentId, 'documentId');
+    const response = await api.post(`/document/approve/${safeId}`, {
       approver_id: approverId,
       approval_notes: notes,
     });
@@ -411,7 +472,8 @@ export const documentAPI = {
   },
   
   rejectDocument: async (documentId: string, rejectorId: string, reason: string, suggestions?: string[]): Promise<any> => {
-    const response = await api.post(`/document/reject/${documentId}`, {
+    const safeId = validatePathParam(documentId, 'documentId');
+    const response = await api.post(`/document/reject/${safeId}`, {
       rejector_id: rejectorId,
       rejection_reason: reason,
       suggestions: suggestions || [],

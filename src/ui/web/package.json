@@ -1,7 +1,7 @@
 {
-  "name": "warehouse-operational-assistant-ui",
+  "name": "Multi-Agent-Intelligent-Warehouse-ui",
   "version": "1.0.0",
-  "description": "React frontend for Warehouse Operational Assistant",
+  "description": "React frontend for Multi-Agent-Intelligent-Warehouse",
   "private": true,
   "dependencies": {
     "@emotion/react": "^11.10.0",
@@ -16,7 +16,7 @@
     "@types/node": "^16.11.56",
     "@types/react": "^18.0.17",
     "@types/react-dom": "^18.0.6",
-    "axios": "^1.6.0",
+    "axios": "^1.8.3",
     "date-fns": "^2.29.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
