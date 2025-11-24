@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 """
 Generate sample equipment telemetry data for testing.
+
+Security Note: This script uses Python's random module (PRNG) for generating
+synthetic test data (sensor readings, telemetry values). This is appropriate
+for data generation purposes. For security-sensitive operations (tokens, keys,
+passwords, session IDs), the secrets module (CSPRNG) should be used instead.
 """
 
 import asyncio
 import asyncpg
 import os
+# Security: Using random module is appropriate here - generating synthetic test data only
+# For security-sensitive values (tokens, keys, passwords), use secrets module instead
 import random
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
@@ -90,6 +97,7 @@ async def generate_telemetry_data():
                         value = random.uniform(min_val, max_val)
                     elif metric_name == "speed":
                         # Speed should be mostly 0 with occasional movement
+                        # Security: random module is appropriate here - generating synthetic telemetry data only
                         value = random.uniform(0, max_val) if random.random() < 0.3 else 0.0
                     else:
                         value = random.uniform(min_val, max_val)
