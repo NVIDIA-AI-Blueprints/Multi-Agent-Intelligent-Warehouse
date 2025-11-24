@@ -66,10 +66,12 @@ RUN apt-get update && apt-get install -y \
 COPY --from=backend-deps /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=backend-deps /usr/local/bin /usr/local/bin
 
-# Copy application code
-# Security: .dockerignore ensures sensitive files (.env, secrets, git, etc.) are excluded
-# Only files not in .dockerignore will be copied to the container
-COPY . .
+# Copy application code (explicitly copy only necessary directories)
+# Security: Explicitly copy only required source code to prevent sensitive data exposure
+# .dockerignore provides additional protection as a defense-in-depth measure
+COPY src/ ./src/
+# Copy guardrails configuration (required for NeMo Guardrails)
+COPY data/config/guardrails/ ./data/config/guardrails/
 
 # Build arguments for version injection
 ARG VERSION=0.0.0
