@@ -118,6 +118,93 @@ BLOCKED_PARAMETER_NAMES: Set[str] = {
     "python_input",
 }
 
+# Blocked path patterns for directory traversal
+PATH_TRAVERSAL_PATTERNS: List[str] = [
+    r"\.\./",  # Directory traversal
+    r"\.\.\\",  # Windows directory traversal
+    r"\.\.",  # Any parent directory reference
+    r"^/",  # Absolute paths (Unix)
+    r"^[A-Za-z]:",  # Absolute paths (Windows drive letters)
+    r"^\\\\",  # UNC paths (Windows network)
+]
+
+
+def validate_chain_path(path: str, allow_lc_hub: bool = False) -> tuple[bool, Optional[str]]:
+    """
+    Validate a LangChain Hub path to prevent directory traversal attacks.
+    
+    This function prevents CVE-2024-28088 (directory traversal in load_chain).
+    
+    Args:
+        path: Path to validate (e.g., "lc://chains/my_chain" or user input)
+        allow_lc_hub: If True, only allow lc:// hub paths
+        
+    Returns:
+        Tuple of (is_valid: bool, reason: Optional[str])
+    """
+    if not path or not isinstance(path, str):
+        return False, "Path must be a non-empty string"
+    
+    # Check for path traversal patterns
+    for pattern in PATH_TRAVERSAL_PATTERNS:
+        if re.search(pattern, path):
+            return False, f"Path contains directory traversal pattern: {pattern}"
+    
+    # If allowing only LangChain Hub paths, validate format
+    if allow_lc_hub:
+        if not path.startswith("lc://"):
+            return False, "Only lc:// hub paths are allowed"
+        
+        # Extract path after lc://
+        hub_path = path[5:]  # Remove "lc://" prefix
+        
+        # Validate hub path format (should be like "chains/name" or "prompts/name")
+        if not re.match(r"^[a-zA-Z0-9_-]+/[a-zA-Z0-9_/-]+$", hub_path):
+            return False, "Invalid hub path format"
+        
+        # Additional check: no double slashes or traversal
+        if "//" in hub_path or ".." in hub_path:
+            return False, "Path contains invalid sequences"
+    
+    return True, None
+
+
+def safe_load_chain_path(user_input: str, allowed_chains: Optional[Dict[str, str]] = None) -> str:
+    """
+    Safely convert user input to a LangChain Hub chain path using allowlist.
+    
+    This function implements defense-in-depth for CVE-2024-28088 by using
+    an allowlist mapping instead of directly using user input.
+    
+    Args:
+        user_input: User-provided chain name
+        allowed_chains: Dictionary mapping user-friendly names to hub paths
+        
+    Returns:
+        Validated hub path
+        
+    Raises:
+        SecurityViolationError: If user_input is not in allowlist or path is invalid
+    """
+    if allowed_chains is None:
+        allowed_chains = {}
+    
+    # Check allowlist first
+    if user_input not in allowed_chains:
+        raise SecurityViolationError(
+            f"Chain '{user_input}' is not in the allowed list. "
+            f"Allowed chains: {list(allowed_chains.keys())}"
+        )
+    
+    hub_path = allowed_chains[user_input]
+    
+    # Validate the hub path
+    is_valid, reason = validate_chain_path(hub_path, allow_lc_hub=True)
+    if not is_valid:
+        raise SecurityViolationError(f"Invalid hub path: {reason}")
+    
+    return hub_path
+
 
 def is_tool_blocked(
     tool_name: str,
