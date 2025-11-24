@@ -24,6 +24,15 @@ ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 # Create data directory
 RUN mkdir -p /app/data
 
+# Create non-root user for security
+# Security: Run container as non-privileged user to prevent privilege escalation
+RUN groupadd -r rapidsuser && \
+    useradd -r -g rapidsuser -u 1000 rapidsuser && \
+    chown -R rapidsuser:rapidsuser /app
+
+# Switch to non-root user
+USER rapidsuser
+
 # Expose port for API (if needed)
 EXPOSE 8002
 
