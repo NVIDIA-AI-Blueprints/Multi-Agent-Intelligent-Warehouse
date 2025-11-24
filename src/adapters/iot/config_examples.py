@@ -3,24 +3,40 @@ IoT Configuration Examples.
 
 Provides example configurations for different IoT systems
 to help with setup and integration.
+
+⚠️  SECURITY WARNING: These are example configurations only.
+    Never commit actual credentials or API keys to version control.
+    Always use environment variables or secure configuration management
+    for production deployments.
+
+Example usage:
+    import os
+    config = {
+        "host": "equipment-monitor.company.com",
+        "port": 8080,
+        "api_key": os.getenv("IOT_EQUIPMENT_API_KEY")  # Load from environment
+    }
 """
 
+import os
+
 # Equipment Monitor Configuration Examples
+# NOTE: In production, load sensitive values from environment variables
 EQUIPMENT_MONITOR_HTTP_CONFIG = {
     "host": "equipment-monitor.company.com",
     "port": 8080,
     "protocol": "http",
-    "username": "iot_user",
-    "password": "secure_password",
-    "api_key": "your_api_key_here"
+    "username": os.getenv("IOT_EQUIPMENT_USERNAME", "iot_user"),  # Example: use env var
+    "password": os.getenv("IOT_EQUIPMENT_PASSWORD", ""),  # Example: use env var
+    "api_key": os.getenv("IOT_EQUIPMENT_API_KEY", "")  # Example: use env var
 }
 
 EQUIPMENT_MONITOR_MQTT_CONFIG = {
     "host": "mqtt-broker.company.com",
     "port": 1883,
     "protocol": "mqtt",
-    "username": "mqtt_user",
-    "password": "mqtt_password",
+    "username": os.getenv("IOT_MQTT_USERNAME", "mqtt_user"),  # Example: use env var
+    "password": os.getenv("IOT_MQTT_PASSWORD", ""),  # Example: use env var
     "client_id": "warehouse_equipment_monitor",
     "topics": [
         "equipment/+/status",
@@ -33,8 +49,8 @@ EQUIPMENT_MONITOR_WEBSOCKET_CONFIG = {
     "host": "equipment-monitor.company.com",
     "port": 8080,
     "protocol": "websocket",
-    "username": "ws_user",
-    "password": "ws_password"
+    "username": os.getenv("IOT_WEBSOCKET_USERNAME", "ws_user"),  # Example: use env var
+    "password": os.getenv("IOT_WEBSOCKET_PASSWORD", "")  # Example: use env var
 }
 
 # Environmental Sensor Configuration Examples
@@ -42,9 +58,9 @@ ENVIRONMENTAL_HTTP_CONFIG = {
     "host": "environmental-sensors.company.com",
     "port": 8080,
     "protocol": "http",
-    "username": "env_user",
-    "password": "env_password",
-    "api_key": "env_api_key",
+    "username": os.getenv("IOT_ENVIRONMENTAL_USERNAME", "env_user"),  # Example: use env var
+    "password": os.getenv("IOT_ENVIRONMENTAL_PASSWORD", ""),  # Example: use env var
+    "api_key": os.getenv("IOT_ENVIRONMENTAL_API_KEY", ""),  # Example: use env var
     "zones": ["warehouse", "loading_dock", "office", "maintenance"]
 }
 
@@ -83,15 +99,17 @@ ENVIRONMENTAL_MODBUS_CONFIG = {
     },
     "zones": ["warehouse", "loading_dock", "office"]
 }
+# Note: Modbus typically doesn't require authentication, but if your setup does,
+# use environment variables: os.getenv("MODBUS_USERNAME"), os.getenv("MODBUS_PASSWORD")
 
 # Safety Sensor Configuration Examples
 SAFETY_HTTP_CONFIG = {
     "host": "safety-system.company.com",
     "port": 8080,
     "protocol": "http",
-    "username": "safety_user",
-    "password": "safety_password",
-    "api_key": "safety_api_key",
+    "username": os.getenv("IOT_SAFETY_USERNAME", "safety_user"),  # Example: use env var
+    "password": os.getenv("IOT_SAFETY_PASSWORD", ""),  # Example: use env var
+    "api_key": os.getenv("IOT_SAFETY_API_KEY", ""),  # Example: use env var
     "emergency_contacts": [
         {"name": "Emergency Response Team", "phone": "+1-555-911", "email": "emergency@company.com"},
         {"name": "Safety Manager", "phone": "+1-555-1234", "email": "safety@company.com"}
@@ -103,8 +121,8 @@ SAFETY_BACNET_CONFIG = {
     "host": "bacnet-controller.company.com",
     "port": 47808,
     "protocol": "bacnet",
-    "username": "bacnet_user",
-    "password": "bacnet_password",
+    "username": os.getenv("IOT_BACNET_USERNAME", "bacnet_user"),  # Example: use env var
+    "password": os.getenv("IOT_BACNET_PASSWORD", ""),  # Example: use env var
     "emergency_contacts": [
         {"name": "Emergency Response Team", "phone": "+1-555-911", "email": "emergency@company.com"}
     ],
@@ -116,9 +134,9 @@ ASSET_TRACKING_HTTP_CONFIG = {
     "host": "asset-tracking.company.com",
     "port": 8080,
     "protocol": "http",
-    "username": "tracking_user",
-    "password": "tracking_password",
-    "api_key": "tracking_api_key",
+    "username": os.getenv("IOT_ASSET_TRACKING_USERNAME", "tracking_user"),  # Example: use env var
+    "password": os.getenv("IOT_ASSET_TRACKING_PASSWORD", ""),  # Example: use env var
+    "api_key": os.getenv("IOT_ASSET_TRACKING_API_KEY", ""),  # Example: use env var
     "tracking_zones": ["warehouse", "loading_dock", "office", "maintenance"],
     "asset_types": ["forklift", "pallet", "container", "tool", "equipment"]
 }
@@ -127,8 +145,8 @@ ASSET_TRACKING_WEBSOCKET_CONFIG = {
     "host": "asset-tracking.company.com",
     "port": 8080,
     "protocol": "websocket",
-    "username": "ws_tracking_user",
-    "password": "ws_tracking_password",
+    "username": os.getenv("IOT_ASSET_TRACKING_WS_USERNAME", "ws_tracking_user"),  # Example: use env var
+    "password": os.getenv("IOT_ASSET_TRACKING_WS_PASSWORD", ""),  # Example: use env var
     "tracking_zones": ["warehouse", "loading_dock", "office"],
     "asset_types": ["forklift", "pallet", "container"]
 }
