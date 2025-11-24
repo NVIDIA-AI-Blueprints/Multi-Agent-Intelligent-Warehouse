@@ -24,6 +24,7 @@ services:
   kafka:
     image: apache/kafka:3.7.0
     container_name: wosa-kafka
+    user: root
     environment:
       - KAFKA_NODE_ID=1
       - KAFKA_PROCESS_ROLES=broker,controller
@@ -41,14 +42,16 @@ services:
     ports: ["9092:9092"]
     volumes:
       - kafka_data:/tmp/kraft-combined-logs
-    command: >
-      sh -c "
-      if [ ! -f /tmp/kraft-combined-logs/.formatted ]; then
-        /opt/kafka/bin/kafka-storage.sh format -t $${CLUSTER_ID} -c /opt/kafka/config/kraft/server.properties &&
-        touch /tmp/kraft-combined-logs/.formatted
-      fi &&
-      /opt/kafka/bin/kafka-server-start.sh /opt/kafka/config/kraft/server.properties
-      "
+    command:
+      - sh
+      - -c
+      - |
+        chmod 777 /tmp/kraft-combined-logs || true
+        if [ ! -f /tmp/kraft-combined-logs/.formatted ]; then
+          /opt/kafka/bin/kafka-storage.sh format -t $${CLUSTER_ID} -c /opt/kafka/config/kraft/server.properties
+          touch /tmp/kraft-combined-logs/.formatted
+        fi
+        exec /opt/kafka/bin/kafka-server-start.sh /opt/kafka/config/kraft/server.properties
 
   etcd:
     image: quay.io/coreos/etcd:v3.5.9
