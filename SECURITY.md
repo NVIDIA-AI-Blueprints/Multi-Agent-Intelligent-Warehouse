@@ -30,6 +30,8 @@ This project includes additional security documentation:
 
 - **[Python REPL Security Guidelines](docs/security/PYTHON_REPL_SECURITY.md)**: Guidelines for handling Python REPL and code execution capabilities, including protection against CVE-2024-38459 and related vulnerabilities.
 
+- **[LangChain Path Traversal Security](docs/security/LANGCHAIN_PATH_TRAVERSAL.md)**: Guidelines for preventing directory traversal attacks in LangChain Hub path loading, including protection against CVE-2024-28088.
+
 ## Security Tools
 
 ### Dependency Blocklist Checker

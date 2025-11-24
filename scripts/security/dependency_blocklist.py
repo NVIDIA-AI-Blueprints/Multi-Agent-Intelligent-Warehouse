@@ -31,6 +31,13 @@ BLOCKED_PACKAGES: Dict[str, str] = {
         "Same as langchain-experimental (different package name format). "
         "Contains Python REPL vulnerabilities."
     ),
+    # LangChain (old package) - Contains path traversal vulnerability
+    "langchain": (
+        "CVE-2024-28088: Directory traversal in load_chain/load_prompt/load_agent. "
+        "Affected versions: langchain <= 0.1.10, langchain-core < 0.1.29. "
+        "This codebase uses langchain-core>=0.3.80 (safe). "
+        "Blocking old langchain package to prevent accidental installation."
+    ),
     # Other potentially dangerous packages
     "eval": (
         "Package name suggests code evaluation capabilities. "
@@ -70,7 +77,45 @@ def check_requirements_file(requirements_path: Path) -> List[Dict[str, str]]:
             package_name = line.split("==")[0].split(">=")[0].split("<=")[0].split(">")[0].split("<")[0].split("~=")[0].split("!=")[0].strip()
             package_name = package_name.split("[")[0].strip()  # Remove extras like [dev]
             
-            # Check if package is blocked
+            # Check for version constraints on langchain (old package)
+            # Block langchain package if version is <= 0.1.10 (vulnerable to CVE-2024-28088)
+            if package_name == "langchain":
+                # Extract version if present
+                version_part = None
+                for op in ["==", ">=", "<=", ">", "<", "~=", "!="]:
+                    if op in line:
+                        version_part = line.split(op)[1].split()[0].split("#")[0].strip()
+                        break
+                
+                if version_part:
+                    # Check if version is vulnerable (<= 0.1.10)
+                    try:
+                        from packaging import version
+                        if version.parse(version_part) <= version.parse("0.1.10"):
+                            violations.append({
+                                "package": package_name,
+                                "reason": BLOCKED_PACKAGES.get(package_name, "Vulnerable version (CVE-2024-28088)"),
+                                "file": str(requirements_path),
+                                "line": line_num,
+                                "line_content": line,
+                                "version": version_part,
+                            })
+                            continue  # Skip further checks for this line
+                    except Exception:
+                        # If version parsing fails, warn but don't block (might be >= constraint)
+                        pass
+                else:
+                    # No version specified - warn that it might be vulnerable
+                    violations.append({
+                        "package": package_name,
+                        "reason": f"{BLOCKED_PACKAGES.get(package_name, 'Vulnerable version')} (no version constraint - may install vulnerable version)",
+                        "file": str(requirements_path),
+                        "line": line_num,
+                        "line_content": line,
+                    })
+                    continue  # Skip further checks for this line
+            
+            # Check if package is blocked (exact name match)
             if package_name in BLOCKED_PACKAGES:
                 violations.append({
                     "package": package_name,
