@@ -28,9 +28,9 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "PORT=3001 react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
+    "start": "PORT=3001 craco start",
+    "build": "craco build",
+    "test": "craco test",
     "eject": "react-scripts eject",
     "lint": "eslint src --ext .js,.jsx,.ts,.tsx",
     "lint:fix": "eslint src --ext .js,.jsx,.ts,.tsx --fix",
@@ -55,6 +55,10 @@
     ]
   },
   "devDependencies": {
+    "@craco/craco": "^7.1.0",
     "http-proxy-middleware": "^3.0.5"
+  },
+  "overrides": {
+    "webpack-dev-server": "^5.2.1"
   }
 }
