@@ -63,6 +63,7 @@
     "http-proxy-middleware": "^3.0.5"
   },
   "overrides": {
-    "webpack-dev-server": "^5.2.1"
+    "webpack-dev-server": "^5.2.1",
+    "serialize-javascript": "^6.0.2"
   }
 }
