@@ -179,7 +179,10 @@ For more security information, see [docs/secrets.md](docs/secrets.md) and [SECUR
 ### Prerequisites
 
 - **Python 3.9+** (check with `python3 --version`)
-- **Node.js 18+** and npm (check with `node --version` and `npm --version`)
+- **Node.js 20.0.0+** (LTS recommended) and npm (check with `node --version` and `npm --version`)
+  - **Minimum**: Node.js 18.17.0+ (required for `node:path` protocol support)
+  - **Recommended**: Node.js 20.x LTS for best compatibility
+  - **Note**: Node.js 18.0.0 - 18.16.x will fail with `Cannot find module 'node:path'` error
 - **Docker** and Docker Compose
 - **Git** (to clone the repository)
 - **PostgreSQL client** (`psql`) - Required for running database migrations
@@ -197,19 +200,22 @@ For the fastest local development setup:
 git clone https://github.com/T-DevH/Multi-Agent-Intelligent-Warehouse.git
 cd Multi-Agent-Intelligent-Warehouse
 
-# 2. Setup environment
+# 2. Verify Node.js version (recommended before setup)
+./scripts/setup/check_node_version.sh
+
+# 3. Setup environment
 ./scripts/setup/setup_environment.sh
 
-# 3. Configure environment variables (REQUIRED before starting services)
+# 4. Configure environment variables (REQUIRED before starting services)
 # Create .env file for Docker Compose (recommended location)
 cp .env.example deploy/compose/.env
 # Or create in project root: cp .env.example .env
 # Edit with your values: nano deploy/compose/.env
 
-# 4. Start infrastructure services
+# 5. Start infrastructure services
 ./scripts/setup/dev_up.sh
 
-# 5. Run database migrations
+# 6. Run database migrations
 source env/bin/activate
 
 # Option A: Using psql (requires PostgreSQL client installed)
@@ -223,19 +229,19 @@ PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse
 # docker-compose -f deploy/compose/docker-compose.dev.yaml exec -T timescaledb psql -U warehouse -d warehouse < data/postgres/000_schema.sql
 # (Repeat for other schema files)
 
-# 6. Create default users
+# 7. Create default users
 python scripts/setup/create_default_users.py
 
-# 7. Generate demo data (optional but recommended)
+# 8. Generate demo data (optional but recommended)
 python scripts/data/quick_demo_data.py
 
-# 8. Generate historical demand data for forecasting (optional, required for Forecasting page)
+# 9. Generate historical demand data for forecasting (optional, required for Forecasting page)
 python scripts/data/generate_historical_demand.py
 
-# 9. Start API server
+# 10. Start API server
 ./scripts/start_server.sh
 
-# 10. Start frontend (in another terminal)
+# 11. Start frontend (in another terminal)
 cd src/ui/web
 npm install
 npm start
@@ -289,6 +295,16 @@ python setup_nvidia_api.py
 
 ### Troubleshooting
 
+**Node.js Version Issues:**
+- **Error: "Cannot find module 'node:path'"**: Your Node.js version is too old
+  - Check version: `node --version`
+  - Minimum required: Node.js 18.17.0+
+  - Recommended: Node.js 20.x LTS
+  - Run version check: `./scripts/setup/check_node_version.sh`
+  - Upgrade: `nvm install 20 && nvm use 20` (if using nvm)
+  - Or download from: https://nodejs.org/
+  - After upgrading, clear and reinstall: `cd src/ui/web && rm -rf node_modules package-lock.json && npm install`
+
 **Database Connection Issues:**
 - Ensure Docker containers are running: `docker ps`
 - Check TimescaleDB logs: `docker logs wosa-timescaledb`
@@ -299,6 +315,11 @@ python setup_nvidia_api.py
 - Check Python version: `python3 --version` (must be 3.9+)
 - Use the startup script: `./scripts/start_server.sh`
 - See [DEPLOYMENT.md](DEPLOYMENT.md) troubleshooting section
+
+**Frontend Build Issues:**
+- Verify Node.js version: `./scripts/setup/check_node_version.sh`
+- Clear node_modules: `cd src/ui/web && rm -rf node_modules package-lock.json && npm install`
+- Check for port conflicts: Ensure port 3001 is available
 
 **For more help:** See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed troubleshooting or open an issue on GitHub.
 

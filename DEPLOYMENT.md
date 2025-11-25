@@ -24,19 +24,22 @@ Complete deployment guide for the Warehouse Operational Assistant with Docker an
 git clone https://github.com/T-DevH/Multi-Agent-Intelligent-Warehouse.git
 cd Multi-Agent-Intelligent-Warehouse
 
-# 2. Setup environment
+# 2. Verify Node.js version (recommended before setup)
+./scripts/setup/check_node_version.sh
+
+# 3. Setup environment
 ./scripts/setup/setup_environment.sh
 
-# 3. Configure environment variables (REQUIRED before starting services)
+# 4. Configure environment variables (REQUIRED before starting services)
 # Create .env file for Docker Compose (recommended location)
 cp .env.example deploy/compose/.env
 # Or create in project root: cp .env.example .env
 # Edit with your values: nano deploy/compose/.env
 
-# 4. Start infrastructure services
+# 5. Start infrastructure services
 ./scripts/setup/dev_up.sh
 
-# 5. Run database migrations
+# 6. Run database migrations
 source env/bin/activate
 
 # Option A: Using psql (requires PostgreSQL client installed)
@@ -53,19 +56,19 @@ PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse
 # docker-compose -f deploy/compose/docker-compose.dev.yaml exec -T timescaledb psql -U warehouse -d warehouse < data/postgres/004_inventory_movements_schema.sql
 # docker-compose -f deploy/compose/docker-compose.dev.yaml exec -T timescaledb psql -U warehouse -d warehouse < scripts/setup/create_model_tracking_tables.sql
 
-# 6. Create default users
+# 7. Create default users
 python scripts/setup/create_default_users.py
 
-# 7. Generate demo data (optional but recommended)
+# 8. Generate demo data (optional but recommended)
 python scripts/data/quick_demo_data.py
 
-# 8. Generate historical demand data for forecasting (optional, required for Forecasting page)
+# 9. Generate historical demand data for forecasting (optional, required for Forecasting page)
 python scripts/data/generate_historical_demand.py
 
-# 9. Start API server
+# 10. Start API server
 ./scripts/start_server.sh
 
-# 10. Start frontend (in another terminal)
+# 11. Start frontend (in another terminal)
 cd src/ui/web
 npm install
 npm start
@@ -93,7 +96,10 @@ npm start
 
 ### Common Prerequisites
 - Python 3.9+ (for local development)
-- Node.js 18+ and npm (for frontend)
+- **Node.js 20.0.0+** (LTS recommended) and npm (for frontend)
+  - **Minimum**: Node.js 18.17.0+ (required for `node:path` protocol support)
+  - **Recommended**: Node.js 20.x LTS for best compatibility
+  - **Note**: Node.js 18.0.0 - 18.16.x will fail with `Cannot find module 'node:path'` error during frontend build
 - Git
 - PostgreSQL client (`psql`) - Required for running database migrations
   - **Ubuntu/Debian**: `sudo apt-get install postgresql-client`
@@ -556,6 +562,56 @@ kubectl exec -i -n warehouse-assistant deployment/postgres -- psql -U warehouse 
 ## Troubleshooting
 
 ### Common Issues
+
+#### Node.js Version Error: "Cannot find module 'node:path'"
+
+**Symptom:**
+```
+Error: Cannot find module 'node:path'
+Failed to compile.
+[eslint] Cannot read config file
+```
+
+**Cause:**
+- Node.js version is too old (below 18.17.0)
+- The `node:path` protocol requires Node.js 18.17.0+ or 20.0.0+
+
+**Solution:**
+1. Check your Node.js version:
+   ```bash
+   node --version
+   ```
+
+2. If version is below 18.17.0, upgrade Node.js:
+   ```bash
+   # Using nvm (recommended)
+   nvm install 20
+   nvm use 20
+   
+   # Or download from https://nodejs.org/
+   ```
+
+3. Verify the version:
+   ```bash
+   node --version  # Should show v20.x.x or v18.17.0+
+   ```
+
+4. Clear node_modules and reinstall:
+   ```bash
+   cd src/ui/web
+   rm -rf node_modules package-lock.json
+   npm install
+   ```
+
+5. Run the version check script:
+   ```bash
+   ./scripts/setup/check_node_version.sh
+   ```
+
+**Prevention:**
+- Always check Node.js version before starting: `./scripts/setup/check_node_version.sh`
+- Use `.nvmrc` file: `cd src/ui/web && nvm use`
+- Ensure CI/CD uses Node.js 20+
 
 #### Port Already in Use
 

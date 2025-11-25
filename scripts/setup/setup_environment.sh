@@ -21,6 +21,48 @@ fi
 PYTHON_VERSION=$(python3 --version | cut -d' ' -f2 | cut -d'.' -f1,2)
 echo "✅ Found Python $PYTHON_VERSION"
 
+# Check Node.js version
+if ! command -v node &> /dev/null; then
+    echo "❌ Node.js is not installed. Please install Node.js 20.0.0+ (or minimum 18.17.0+) first."
+    echo "   Recommended: Node.js 20.x LTS"
+    exit 1
+fi
+
+NODE_VERSION=$(node --version | cut -d'v' -f2)
+NODE_MAJOR=$(echo "$NODE_VERSION" | cut -d'.' -f1)
+NODE_MINOR=$(echo "$NODE_VERSION" | cut -d'.' -f2)
+NODE_PATCH=$(echo "$NODE_VERSION" | cut -d'.' -f3)
+
+echo "✅ Found Node.js $NODE_VERSION"
+
+# Check if Node.js version meets requirements
+# Minimum: 18.17.0, Recommended: 20.0.0+
+if [ "$NODE_MAJOR" -lt 18 ]; then
+    echo "❌ Node.js version $NODE_VERSION is too old. Please install Node.js 18.17.0+ (recommended: 20.x LTS)"
+    exit 1
+elif [ "$NODE_MAJOR" -eq 18 ]; then
+    if [ "$NODE_MINOR" -lt 17 ]; then
+        echo "❌ Node.js version $NODE_VERSION is too old. Please install Node.js 18.17.0+ (recommended: 20.x LTS)"
+        echo "   Note: Node.js 18.0.0 - 18.16.x will fail with 'Cannot find module node:path' error"
+        exit 1
+    elif [ "$NODE_MINOR" -eq 17 ] && [ "$NODE_PATCH" -lt 0 ]; then
+        echo "❌ Node.js version $NODE_VERSION is too old. Please install Node.js 18.17.0+ (recommended: 20.x LTS)"
+        exit 1
+    else
+        echo "⚠️  Node.js 18.17.0+ detected. Node.js 20.x LTS is recommended for best compatibility."
+    fi
+elif [ "$NODE_MAJOR" -ge 20 ]; then
+    echo "✅ Node.js version meets requirements (20.x LTS recommended)"
+fi
+
+# Check npm version
+if ! command -v npm &> /dev/null; then
+    echo "⚠️  npm is not installed. Please install npm 9.0.0+"
+else
+    NPM_VERSION=$(npm --version)
+    echo "✅ Found npm $NPM_VERSION"
+fi
+
 # Create virtual environment if it doesn't exist
 if [ ! -d "env" ]; then
     echo "📦 Creating virtual environment..."
