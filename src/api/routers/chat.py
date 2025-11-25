@@ -1071,6 +1071,43 @@ async def chat(req: ChatRequest):
         if result and result.get("context"):
             tool_execution_results = result.get("context", {}).get("tool_execution_results", {})
         
+        # Extract actions_taken from structured_response, context, or result directly
+        actions_taken = None
+        if result and result.get("actions_taken"):
+            actions_taken = result.get("actions_taken")
+        elif structured_response and isinstance(structured_response, dict):
+            actions_taken = structured_response.get("actions_taken")
+        elif result and result.get("context"):
+            actions_taken = result.get("context", {}).get("actions_taken")
+        
+        # Clean actions_taken to avoid circular references but keep the data
+        cleaned_actions_taken = None
+        if actions_taken and isinstance(actions_taken, list):
+            try:
+                cleaned_actions_taken = []
+                for action in actions_taken:
+                    if isinstance(action, dict):
+                        # Only keep simple, serializable fields
+                        cleaned_action = {}
+                        for k, v in action.items():
+                            if isinstance(v, (str, int, float, bool, type(None))):
+                                cleaned_action[k] = v
+                            elif isinstance(v, dict):
+                                # Only keep simple dict values
+                                cleaned_action[k] = {k2: v2 for k2, v2 in v.items() 
+                                                   if isinstance(v2, (str, int, float, bool, type(None), list))}
+                            elif isinstance(v, list):
+                                # Only keep lists of primitives
+                                cleaned_action[k] = [item for item in v 
+                                                   if isinstance(item, (str, int, float, bool, type(None), dict))]
+                        cleaned_actions_taken.append(cleaned_action)
+                    elif isinstance(action, (str, int, float, bool, type(None))):
+                        cleaned_actions_taken.append(action)
+                logger.info(f"✅ Extracted and cleaned {len(cleaned_actions_taken)} actions_taken")
+            except Exception as e:
+                logger.warning(f"Error cleaning actions_taken: {_sanitize_log_data(str(e))}")
+                cleaned_actions_taken = None
+        
         # Extract reasoning chain if available
         reasoning_chain = None
         reasoning_steps = None
@@ -1412,7 +1449,7 @@ async def chat(req: ChatRequest):
                     "recommendations", structured_response.get("recommendations") if structured_response else []
                 ) if result else [],
                 confidence=confidence,  # Use the confidence we calculated above
-                actions_taken=None,  # Disable to avoid circular references
+                actions_taken=cleaned_actions_taken,  # Include cleaned actions_taken
                 # Evidence enhancement fields - use cleaned versions
                 evidence_summary=cleaned_evidence_summary,
                 source_attributions=result.get("source_attributions") if result and isinstance(result.get("source_attributions"), list) else None,

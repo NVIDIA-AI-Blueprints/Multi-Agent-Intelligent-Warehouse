@@ -1401,6 +1401,13 @@ class MCPPlannerGraph:
             # Ensure structured response is properly included
             context = result.get("context", {})
             structured_response = context.get("structured_response", {})
+            
+            # Extract actions_taken from structured_response if available
+            actions_taken = None
+            if structured_response and isinstance(structured_response, dict):
+                actions_taken = structured_response.get("actions_taken")
+            if not actions_taken and context:
+                actions_taken = context.get("actions_taken")
 
             return {
                 "response": result.get("final_response", "No response generated"),
@@ -1409,6 +1416,7 @@ class MCPPlannerGraph:
                 "session_id": session_id,
                 "context": context,
                 "structured_response": structured_response,  # Explicitly include structured response
+                "actions_taken": actions_taken,  # Include actions_taken if available
                 "mcp_tools_used": context.get("mcp_tools_used", []),
                 "tool_execution_results": context.get("tool_execution_results", {}),
                 "available_tools": result.get("available_tools", []),

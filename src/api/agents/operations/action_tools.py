@@ -21,6 +21,7 @@ from src.api.services.llm.nim_client import get_nim_client
 from src.api.services.wms.integration_service import get_wms_service
 from src.api.services.attendance.integration_service import get_attendance_service
 from src.api.services.iot.integration_service import get_iot_service
+from src.retrieval.structured import SQLRetriever
 
 logger = logging.getLogger(__name__)
 
@@ -159,6 +160,7 @@ class OperationsActionTools:
         self.wms_service = None
         self.attendance_service = None
         self.iot_service = None
+        self.sql_retriever = None
 
     async def initialize(self) -> None:
         """Initialize action tools with required services."""
@@ -167,6 +169,8 @@ class OperationsActionTools:
             self.wms_service = await get_wms_service()
             self.attendance_service = await get_attendance_service()
             self.iot_service = await get_iot_service()
+            self.sql_retriever = SQLRetriever()
+            await self.sql_retriever.initialize()
             logger.info("Operations Action Tools initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Operations Action Tools: {e}")
@@ -717,7 +721,73 @@ class OperationsActionTools:
             if not operator:
                 operator = await self._find_available_operator(equipment_id)
 
+            # Create task in database
+            task_created = False
+            task_db_id = None
+            if self.sql_retriever:
+                try:
+                    # Extract zone and task type from context if available
+                    zone = equipment_details.get("current_location", "unknown")
+                    task_type = "equipment_dispatch"
+                    
+                    # Create task payload
+                    task_payload = {
+                        "equipment_id": equipment_id,
+                        "equipment_type": equipment_details.get("type", "unknown"),
+                        "dispatch_id": dispatch_id,
+                        "zone": zone,
+                        "operator": operator,
+                    }
+                    
+                    # Insert task into database
+                    create_task_query = """
+                        INSERT INTO tasks (kind, status, assignee, payload, created_at, updated_at)
+                        VALUES ($1, $2, $3, $4, NOW(), NOW())
+                        RETURNING id
+                    """
+                    task_result = await self.sql_retriever.fetch_one(
+                        create_task_query,
+                        task_type,
+                        "pending",
+                        operator or "system",
+                        json.dumps(task_payload),
+                    )
+                    
+                    if task_result:
+                        task_db_id = task_result["id"]
+                        task_created = True
+                        logger.info(f"Created task {task_db_id} for equipment dispatch {dispatch_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to create task in database: {e}")
+                    # Continue with dispatch even if task creation fails
+
+            # Assign equipment to task using equipment asset tools
+            equipment_assigned = False
+            try:
+                from src.api.agents.inventory.equipment_asset_tools import (
+                    get_equipment_asset_tools,
+                )
+                
+                asset_tools = await get_equipment_asset_tools()
+                assignment_result = await asset_tools.assign_equipment(
+                    asset_id=equipment_id,
+                    assignee=operator or "system",
+                    assignment_type="task",
+                    task_id=task_id,
+                    notes=f"Dispatched for task {task_id}",
+                )
+                
+                if assignment_result.get("success"):
+                    equipment_assigned = True
+                    logger.info(f"Assigned equipment {equipment_id} to task {task_id}")
+                else:
+                    logger.warning(f"Equipment assignment failed: {assignment_result.get('error')}")
+            except Exception as e:
+                logger.warning(f"Failed to assign equipment: {e}")
+                # Continue with dispatch even if assignment fails
+
             # Create dispatch
+            dispatch_status = "dispatched" if (task_created or equipment_assigned) else "pending"
             dispatch = EquipmentDispatch(
                 dispatch_id=dispatch_id,
                 equipment_id=equipment_id,
@@ -725,7 +795,7 @@ class OperationsActionTools:
                 task_id=task_id,
                 assigned_operator=operator,
                 location=equipment_details.get("current_location", "unknown"),
-                status="dispatched",
+                status=dispatch_status,
                 created_at=datetime.now(),
                 estimated_completion=datetime.now() + timedelta(hours=2),
             )

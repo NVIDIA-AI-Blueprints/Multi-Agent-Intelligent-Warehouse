@@ -174,7 +174,7 @@ For more security information, see [docs/secrets.md](docs/secrets.md) and [SECUR
 
 ## Quick Start
 
-**For the fastest setup, see [QUICK_START.md](QUICK_START.md). For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).**
+**For complete deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).**
 
 ### Prerequisites
 
@@ -182,57 +182,69 @@ For more security information, see [docs/secrets.md](docs/secrets.md) and [SECUR
 - **Node.js 18+** and npm (check with `node --version` and `npm --version`)
 - **Docker** and Docker Compose
 - **Git** (to clone the repository)
+- **PostgreSQL client** (`psql`) - Required for running database migrations
+  - **Ubuntu/Debian**: `sudo apt-get install postgresql-client`
+  - **macOS**: `brew install postgresql` or `brew install libpq`
+  - **Windows**: Install from [PostgreSQL downloads](https://www.postgresql.org/download/windows/)
+  - **Alternative**: Use Docker (see [DEPLOYMENT.md](DEPLOYMENT.md))
 
-### Step 1: Clone and Navigate to Repository
+### Local Development Setup
+
+For the fastest local development setup:
 
 ```bash
+# 1. Clone repository
 git clone https://github.com/T-DevH/Multi-Agent-Intelligent-Warehouse.git
 cd Multi-Agent-Intelligent-Warehouse
-```
 
-### Step 2: Set Up Python Virtual Environment
-
-```bash
-# Using the setup script (recommended)
+# 2. Setup environment
 ./scripts/setup/setup_environment.sh
 
-# Or manually:
-python3 -m venv env
-source env/bin/activate  # Linux/macOS
-pip install --upgrade pip
-pip install -r requirements.txt
-```
+# 3. Configure environment variables (REQUIRED before starting services)
+# Create .env file for Docker Compose (recommended location)
+cp .env.example deploy/compose/.env
+# Or create in project root: cp .env.example .env
+# Edit with your values: nano deploy/compose/.env
 
-### Step 3: Configure Environment Variables
-
-```bash
-# Copy the example environment file
-cp .env.example .env
-
-# Edit .env file with your configuration
-# At minimum, ensure database credentials match the Docker setup
-```
-
-**Required Environment Variables:**
-- Database connection settings (PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE)
-- Redis connection (REDIS_HOST, REDIS_PORT)
-- Milvus connection (MILVUS_HOST, MILVUS_PORT)
-- JWT secret key (JWT_SECRET_KEY) - **Required in production**. In development, a default is used with warnings. See [Security Notes](#security-notes) below.
-
-**For AI Features (Optional):**
-- NVIDIA API keys (NVIDIA_API_KEY, NEMO_*_API_KEY, LLAMA_*_API_KEY)
-
-**Quick Setup for NVIDIA API Keys:**
-```bash
-python setup_nvidia_api.py
-```
-
-### Step 4: Start Development Infrastructure
-
-```bash
-# Start infrastructure services (TimescaleDB, Redis, Kafka, Milvus)
+# 4. Start infrastructure services
 ./scripts/setup/dev_up.sh
+
+# 5. Run database migrations
+source env/bin/activate
+
+# Option A: Using psql (requires PostgreSQL client installed)
+PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/000_schema.sql
+PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/001_equipment_schema.sql
+PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/002_document_schema.sql
+PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/004_inventory_movements_schema.sql
+PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f scripts/setup/create_model_tracking_tables.sql
+
+# Option B: Using Docker (if psql is not installed)
+# docker-compose -f deploy/compose/docker-compose.dev.yaml exec -T timescaledb psql -U warehouse -d warehouse < data/postgres/000_schema.sql
+# (Repeat for other schema files)
+
+# 6. Create default users
+python scripts/setup/create_default_users.py
+
+# 7. Generate demo data (optional but recommended)
+python scripts/data/quick_demo_data.py
+
+# 8. Generate historical demand data for forecasting (optional, required for Forecasting page)
+python scripts/data/generate_historical_demand.py
+
+# 9. Start API server
+./scripts/start_server.sh
+
+# 10. Start frontend (in another terminal)
+cd src/ui/web
+npm install
+npm start
 ```
+
+**Access:**
+- Frontend: http://localhost:3001 (login: `admin` / `changeme`)
+- API: http://localhost:8001
+- API Docs: http://localhost:8001/docs
 
 **Service Endpoints:**
 - **Postgres/Timescale**: `postgresql://warehouse:changeme@localhost:5435/warehouse`
@@ -240,121 +252,39 @@ python setup_nvidia_api.py
 - **Milvus gRPC**: `localhost:19530`
 - **Kafka**: `localhost:9092`
 
-### Step 5: Initialize Database Schema
+### Environment Configuration
+
+**⚠️ Important:** For Docker Compose deployments, the `.env` file location matters!
+
+Docker Compose looks for `.env` files in this order:
+1. Same directory as the compose file (`deploy/compose/.env`)
+2. Current working directory (project root `.env`)
+
+**Recommended:** Create `.env` in the same directory as your compose file for consistency:
 
 ```bash
-# Ensure virtual environment is activated
-source env/bin/activate
+# Option 1: In deploy/compose/ (recommended for Docker Compose)
+cp .env.example deploy/compose/.env
+nano deploy/compose/.env  # or your preferred editor
 
-# Run all required schema files in order
-PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/000_schema.sql
-PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/001_equipment_schema.sql
-PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/002_document_schema.sql
-PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/004_inventory_movements_schema.sql
-
-# Create model tracking tables (required for forecasting features)
-PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f scripts/setup/create_model_tracking_tables.sql
+# Option 2: In project root (works if running commands from project root)
+cp .env.example .env
+nano .env  # or your preferred editor
 ```
 
-### Step 6: Create Default Users
+**Critical Variables:**
+- Database connection settings (POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, DB_HOST, DB_PORT)
+- Redis connection (REDIS_HOST, REDIS_PORT)
+- Milvus connection (MILVUS_HOST, MILVUS_PORT)
+- JWT secret key (JWT_SECRET_KEY) - **Required in production**. In development, a default is used with warnings. See [Security Notes](#security-notes) below.
+- Admin password (DEFAULT_ADMIN_PASSWORD)
 
-**⚠️ Security Note:** The SQL schema (`data/postgres/000_schema.sql`) does not contain hardcoded password hashes. Users must be created using the setup script, which generates secure password hashes from environment variables.
+**For AI Features (Optional):**
+- NVIDIA API keys (NVIDIA_API_KEY, NEMO_*_API_KEY, LLAMA_*_API_KEY)
 
+**Quick Setup for NVIDIA API Keys:**
 ```bash
-# Set password via environment variable (optional, defaults to 'changeme' for development)
-export DEFAULT_ADMIN_PASSWORD=your-secure-password-here
-
-# Create default admin and operator users
-python scripts/setup/create_default_users.py
-```
-
-**Default Credentials:**
-- **Admin user**: `admin` / Value of `DEFAULT_ADMIN_PASSWORD` env var (default: `changeme` for development only)
-- **Operator user**: `user` / Value of `DEFAULT_USER_PASSWORD` env var (default: `changeme` for development only)
-
-**⚠️ Production Security:**
-- Always set strong, unique passwords via environment variables
-- Never use default passwords in production
-- The setup script generates unique bcrypt hashes with random salts - no credentials are exposed in source code
-
-### Step 7: Generate Demo Data (Optional)
-
-For testing and demos, generate sample data:
-
-```bash
-source env/bin/activate
-
-# Quick demo data (recommended for quick testing)
-python scripts/data/quick_demo_data.py
-
-# OR comprehensive synthetic data (for extensive testing)
-python scripts/data/generate_synthetic_data.py
-```
-
-**⚠️ Important for Forecasting:** If you want to use the Forecasting page, you must also generate historical demand data:
-
-```bash
-# Generate historical demand data (required for forecasting features)
-python scripts/data/generate_historical_demand.py
-```
-
-This generates 180 days of historical inventory movements needed for demand forecasting. See [Data Generation Scripts](scripts/README.md#-data-generation-scripts) for details.
-
-### Step 8: Install RAPIDS for GPU-Accelerated Forecasting
-
-For GPU-accelerated demand forecasting (10-100x faster), install NVIDIA RAPIDS:
-
-```bash
-source env/bin/activate
-./scripts/setup/install_rapids.sh
-```
-
-**Requirements:**
-- NVIDIA GPU with CUDA Compute Capability 7.0+
-- CUDA 11.2+ or 12.0+
-- 16GB+ GPU memory (recommended)
-
-See [RAPIDS Setup Guide](docs/forecasting/RAPIDS_SETUP.md) for detailed instructions.
-
-### Step 9: Start the API Server
-
-```bash
-# Using the startup script (recommended)
-./scripts/start_server.sh
-
-# Or manually:
-source env/bin/activate
-python -m uvicorn src.api.app:app --reload --port 8001 --host 0.0.0.0
-```
-
-**API Endpoints:**
-- **API**: http://localhost:8001
-- **API Documentation (Swagger)**: http://localhost:8001/docs
-- **OpenAPI Schema**: http://localhost:8001/openapi.json
-- **Health Check**: http://localhost:8001/api/v1/health
-
-### Step 9: Start the Frontend
-
-```bash
-cd src/ui/web
-npm install  # First time only
-npm start
-```
-
-**Frontend:**
-- **Web UI**: http://localhost:3001
-- **Login**: `admin` / `changeme`
-
-### Step 10: Verify Installation
-
-```bash
-# Test API health endpoint
-curl http://localhost:8001/api/v1/health
-
-# Test authentication
-curl -X POST http://localhost:8001/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"changeme"}'
+python setup_nvidia_api.py
 ```
 
 ### Troubleshooting
@@ -370,7 +300,7 @@ curl -X POST http://localhost:8001/api/v1/auth/login \
 - Use the startup script: `./scripts/start_server.sh`
 - See [DEPLOYMENT.md](DEPLOYMENT.md) troubleshooting section
 
-**For more help:** See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) or open an issue on GitHub.
+**For more help:** See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed troubleshooting or open an issue on GitHub.
 
 ## Multi-Agent System
 
@@ -522,6 +452,8 @@ The system includes comprehensive monitoring with Prometheus metrics collection 
 # Start monitoring stack
 ./deploy/scripts/setup_monitoring.sh
 ```
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed monitoring setup instructions.
 
 **Access URLs:**
 - **Grafana**: http://localhost:3000 (admin/changeme)
@@ -789,8 +721,7 @@ pytest tests/integration/
 - **Architecture**: [docs/architecture/](docs/architecture/)
 - **MCP Integration**: [docs/architecture/mcp-integration.md](docs/architecture/mcp-integration.md)
 - **Forecasting**: [docs/forecasting/](docs/forecasting/)
-- **Deployment**: [DEPLOYMENT.md](DEPLOYMENT.md)
-- **Quick Start**: [QUICK_START.md](QUICK_START.md)
+- **Deployment**: [DEPLOYMENT.md](DEPLOYMENT.md) - Complete deployment guide with Docker and Kubernetes options
 
 ## Contributing
 
@@ -816,7 +747,6 @@ TBD (add your organization's license file).
 ---
 
 For detailed documentation, see:
-- [DEPLOYMENT.md](DEPLOYMENT.md) - Complete deployment guide
-- [QUICK_START.md](QUICK_START.md) - Quick start guide
+- [DEPLOYMENT.md](DEPLOYMENT.md) - Complete deployment guide with Docker and Kubernetes options
 - [docs/](docs/) - Architecture and technical documentation
 - [PRD.md](PRD.md) - Product Requirements Document

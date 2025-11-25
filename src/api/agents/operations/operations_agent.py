@@ -687,6 +687,18 @@ Respond in JSON format:
             safe_intent = sanitize_prompt_input(operations_query.intent)
             safe_entities = sanitize_prompt_input(operations_query.entities)
 
+            # Add specific instructions for equipment_dispatch
+            dispatch_instructions = ""
+            if safe_intent == "equipment_dispatch":
+                dispatch_instructions = """
+IMPORTANT FOR EQUIPMENT DISPATCH:
+- If the dispatch status is "dispatched" or "pending", the operation was SUCCESSFUL
+- Only report errors if the dispatch status is "error" AND there's an explicit error message
+- When dispatch is successful, provide a positive confirmation message
+- Include equipment ID, destination zone, and operation type in the response
+- If task was created and equipment assigned, confirm both actions were successful
+"""
+            
             prompt = f"""
 You are an operations coordination agent. Generate a comprehensive response based on the user query and retrieved data.
 
@@ -700,6 +712,8 @@ Retrieved Data:
 
 Conversation History: {conversation_history[-3:] if conversation_history else "None"}
 
+{dispatch_instructions}
+
 Generate a response that includes:
 1. Natural language answer to the user's question
 2. Structured data in JSON format
@@ -707,6 +721,11 @@ Generate a response that includes:
 4. Confidence score (0.0 to 1.0)
 
 IMPORTANT: For workforce queries, always provide the total count of active workers and break down by shifts.
+
+IMPORTANT: For equipment_dispatch queries:
+- If dispatch status is "dispatched" or "pending", report SUCCESS
+- Only report failure if status is "error" with explicit error details
+- Include equipment ID, zone, and operation type in success messages
 
 Respond in JSON format:
 {{
@@ -725,6 +744,25 @@ Respond in JSON format:
         "Consider cross-training employees for flexibility"
     ],
     "confidence": 0.95
+}}
+
+For equipment_dispatch, use this format:
+{{
+    "response_type": "equipment_dispatch",
+    "data": {{
+        "equipment_id": "FL-01",
+        "zone": "Zone A",
+        "operation_type": "pick operations",
+        "status": "dispatched",
+        "task_created": true,
+        "equipment_assigned": true
+    }},
+    "natural_language": "Forklift FL-01 has been successfully dispatched to Zone A for pick operations. The task has been created and the equipment has been assigned.",
+    "recommendations": [
+        "Monitor forklift FL-01 progress in Zone A",
+        "Ensure Zone A is ready for pick operations"
+    ],
+    "confidence": 0.9
 }}
 """
 
@@ -981,6 +1019,74 @@ Respond in JSON format:
                     ]
                     response_data = {"status": "in_progress"}
 
+            elif intent == "equipment_dispatch":
+                # Handle equipment dispatch response
+                natural_language = ""
+                dispatch_data = None
+                
+                # Extract dispatch information from actions_taken
+                for action in actions_taken or []:
+                    if action.get("action") == "dispatch_equipment":
+                        dispatch_data = action.get("result", {})
+                        break
+                
+                if dispatch_data:
+                    equipment_id = dispatch_data.get("equipment_id", "Unknown")
+                    task_id = dispatch_data.get("task_id", "Unknown")
+                    status = dispatch_data.get("status", "unknown")
+                    location = dispatch_data.get("location", "Unknown")
+                    operator = dispatch_data.get("assigned_operator", "Unknown")
+                    
+                    # Determine success based on status
+                    if status in ["dispatched", "pending"]:
+                        natural_language = (
+                            f"Forklift {equipment_id} has been successfully dispatched to {location} for pick operations. "
+                            f"The task has been created (Task ID: {task_id}) and the equipment has been assigned to operator {operator}."
+                        )
+                        recommendations = [
+                            f"Monitor forklift {equipment_id} progress in {location}",
+                            f"Ensure {location} is ready for pick operations",
+                            "Track task completion status",
+                        ]
+                    elif status == "error":
+                        natural_language = (
+                            f"The system attempted to dispatch forklift {equipment_id} to {location}, "
+                            f"but encountered an error. Please check the equipment status and try again."
+                        )
+                        recommendations = [
+                            f"Verify equipment {equipment_id} is available",
+                            f"Check if {location} is accessible",
+                            "Review system logs for error details",
+                        ]
+                    else:
+                        natural_language = (
+                            f"Forklift {equipment_id} dispatch to {location} is being processed. "
+                            f"Task ID: {task_id}, Status: {status}"
+                        )
+                        recommendations = [
+                            f"Monitor dispatch status for {equipment_id}",
+                            "Check task assignment progress",
+                        ]
+                    
+                    response_data = {
+                        "equipment_id": equipment_id,
+                        "task_id": task_id,
+                        "zone": location,
+                        "operation_type": "pick operations",
+                        "status": status,
+                        "operator": operator,
+                    }
+                else:
+                    # No dispatch data found
+                    natural_language = (
+                        "Equipment dispatch request received. Processing dispatch operation..."
+                    )
+                    recommendations = [
+                        "Monitor dispatch progress",
+                        "Verify equipment availability",
+                    ]
+                    response_data = {"status": "processing"}
+                    
             elif intent == "equipment":
                 natural_language = (
                     "Here's the current equipment status and health information."
