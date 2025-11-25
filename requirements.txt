@@ -23,7 +23,7 @@ paho-mqtt>=1.6.0
 pymodbus>=3.0.0
 bacpypes3>=0.0.0
 # ERP Integration
-requests>=2.31.0
+requests>=2.32.4  # Fixed .netrc credentials leak in get_netrc_auth() (CVE-2024-47081)
 # RFID/Barcode Scanning
 pyserial>=3.5
 # Time Attendance
