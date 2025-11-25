@@ -100,6 +100,7 @@ temp/
 document_statuses.json
 phase1_phase2_forecasts.json
 rapids_gpu_forecasts.json
+historical_demand_summary.json
 
 # Test/demo output files (keep sample data but ignore generated results)
 data/sample/*_results.json
