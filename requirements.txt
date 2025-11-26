@@ -9,7 +9,7 @@ asyncpg>=0.29.0
 pymilvus>=2.3.0
 numpy>=1.24.0
 langchain-core>=0.3.80  # Fixed template injection vulnerability (CVE-2024-*)
-aiohttp>=3.8.0  # CVE-2024-52304: Patched in 3.10.11+, CVE-2024-30251: Patched in 3.9.4+. We use 3.13.2. Client-only usage (not server) = no risk
+aiohttp>=3.8.0  # CVE-2024-52304: Patched in 3.10.11+, CVE-2024-30251: Patched in 3.9.4+, CVE-2023-37276: Patched in 3.8.5+. We use 3.13.2. Client-only usage (not server) = no risk (vendor confirms client not affected)
 PyJWT>=2.8.0  # CVE-2025-45768 (disputed): Mitigated via application-level key validation in jwt_handler.py
 passlib[bcrypt]>=1.7.4
 email-validator>=2.0.0
