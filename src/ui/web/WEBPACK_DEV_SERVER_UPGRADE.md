@@ -53,23 +53,39 @@ $ npm list webpack-dev-server
 
 ## Compatibility Fix: CRACO Configuration
 
-After upgrading to webpack-dev-server 5.x, you may encounter a `source-map-loader` error:
-```
-Error: ENOENT: no such file or directory, open 'webpack-dev-server/client/index.js'
-```
+After upgrading to webpack-dev-server 5.x, you may encounter two types of errors:
 
-**Solution**: We've installed and configured CRACO to exclude webpack-dev-server from source-map-loader processing.
+1. **source-map-loader error**:
+   ```
+   Error: ENOENT: no such file or directory, open 'webpack-dev-server/client/index.js'
+   ```
+
+2. **Deprecated options error**:
+   ```
+   Invalid options object. Dev Server has been initialized using an options object that does not match the API schema.
+   - options has an unknown property 'onAfterSetupMiddleware'
+   ```
+
+**Solution**: We've installed and configured CRACO to:
+- Exclude webpack-dev-server from source-map-loader processing
+- Remove deprecated `onAfterSetupMiddleware` and `onBeforeSetupMiddleware` options
 
 ### CRACO Setup
 
 1. **Installed**: `@craco/craco` as a dev dependency
-2. **Created**: `craco.config.js` to exclude webpack-dev-server from source-map-loader
+2. **Created**: `craco.config.js` with two configuration sections:
+   - `webpack.configure`: Excludes webpack-dev-server from source-map-loader
+   - `devServer`: Removes deprecated options from devServer config
 3. **Updated**: Scripts in `package.json` to use `craco` instead of `react-scripts` directly
 
 ### Files Modified
 
 - `package.json`: Added CRACO to devDependencies and updated scripts
-- `craco.config.js`: New file to configure webpack to exclude webpack-dev-server
+- `craco.config.js`: Configuration file with webpack and devServer sections
+
+### How the Fix Works
+
+The CRACO `devServer` configuration function intercepts the devServer config **after** react-scripts sets it up and removes the deprecated options before webpack-dev-server 5.x validates the configuration. This ensures compatibility without modifying react-scripts directly.
 
 ## Testing Recommendations
 
@@ -112,6 +128,18 @@ Error: ENOENT: no such file or directory, open 'webpack-dev-server/client/index.
   - WebSocket connections (should work with new security fixes)
   - Hot Module Replacement (should work as before)
   - Any custom webpack-dev-server configuration
+  - If you see `onAfterSetupMiddleware` or `onBeforeSetupMiddleware` errors, ensure CRACO's `devServer` configuration is working
+
+### Troubleshooting
+
+**Issue**: `Invalid options object. Dev Server has been initialized using an options object that does not match the API schema. - options has an unknown property 'onAfterSetupMiddleware'`
+
+**Solution**: This error occurs when react-scripts sets deprecated options that webpack-dev-server 5.x doesn't support. The CRACO `devServer` configuration should automatically remove these. If the error persists:
+
+1. Verify `craco.config.js` has the `devServer` section
+2. Check that CRACO is being used (scripts should use `craco start`, not `react-scripts start`)
+3. Clear node_modules and reinstall: `rm -rf node_modules package-lock.json && npm install`
+4. Check console output for CRACO messages indicating deprecated options are being removed
 
 ### Rollback Instructions
 

@@ -1,20 +1,13 @@
 /**
  * CRACO configuration to fix webpack-dev-server 5.x compatibility issues
  * 
- * This configuration excludes webpack-dev-server from source-map-loader
- * processing to prevent build errors after upgrading to webpack-dev-server 5.x
- * 
- * Issue: source-map-loader tries to process webpack-dev-server/client/index.js
- * and fails with ENOENT error. This is a known compatibility issue between
- * react-scripts and webpack-dev-server 5.x.
- */
-
-/**
- * CRACO configuration to fix webpack-dev-server 5.x compatibility issues
- * 
  * This configuration:
  * 1. Excludes webpack-dev-server from source-map-loader processing
- * 2. Patches react-scripts to remove deprecated webpack-dev-server options
+ * 2. Removes deprecated webpack-dev-server options (onAfterSetupMiddleware, onBeforeSetupMiddleware)
+ * 
+ * Issues fixed:
+ * - source-map-loader tries to process webpack-dev-server/client/index.js and fails with ENOENT error
+ * - react-scripts sets deprecated options that webpack-dev-server 5.x doesn't support
  */
 
 module.exports = {
@@ -96,8 +89,8 @@ module.exports = {
         processRules(webpackConfig.module.rules);
       }
       
-      // Remove deprecated webpack-dev-server options for webpack-dev-server 5.x compatibility
-      // These are set by react-scripts but not supported in webpack-dev-server 5.x
+      // Remove deprecated webpack-dev-server options from webpack config (if present)
+      // Note: This may not catch all cases since devServer config is set separately
       if (webpackConfig.devServer) {
         delete webpackConfig.devServer.onAfterSetupMiddleware;
         delete webpackConfig.devServer.onBeforeSetupMiddleware;
@@ -105,6 +98,31 @@ module.exports = {
       
       return webpackConfig;
     },
+  },
+  // CRACO devServer configuration - intercepts devServer config from react-scripts
+  // This runs AFTER webpackDevServer.config.js and removes deprecated options
+  devServer: (devServerConfig) => {
+    // Remove deprecated options that react-scripts might set
+    // These options are not supported in webpack-dev-server 5.x
+    if (devServerConfig.onAfterSetupMiddleware !== undefined) {
+      console.log('✅ CRACO: Removing deprecated onAfterSetupMiddleware option');
+      delete devServerConfig.onAfterSetupMiddleware;
+    }
+    
+    if (devServerConfig.onBeforeSetupMiddleware !== undefined) {
+      console.log('✅ CRACO: Removing deprecated onBeforeSetupMiddleware option');
+      delete devServerConfig.onBeforeSetupMiddleware;
+    }
+    
+    // Ensure setupMiddlewares is present (should already be set by patched webpackDevServer.config.js)
+    // If not, we log a warning but don't add it here since it requires specific middleware setup
+    if (!devServerConfig.setupMiddlewares) {
+      console.warn('⚠️  CRACO: setupMiddlewares not found in devServer config. This may cause issues.');
+    } else {
+      console.log('✅ CRACO: setupMiddlewares is present in devServer config');
+    }
+    
+    return devServerConfig;
   },
 };
 
