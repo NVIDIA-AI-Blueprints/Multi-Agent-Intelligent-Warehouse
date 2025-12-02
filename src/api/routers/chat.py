@@ -639,6 +639,38 @@ def _create_fallback_chat_response(
     )
 
 
+def _create_safety_violation_response(
+    violations: List[str],
+    confidence: float,
+    session_id: str,
+) -> ChatResponse:
+    """
+    Create a ChatResponse for safety violations detected by guardrails.
+    
+    Args:
+        violations: List of violation messages
+        confidence: Confidence score of the violation detection
+        session_id: Session ID for the request
+        
+    Returns:
+        ChatResponse with safety violation message
+    """
+    # Use guardrails service to generate appropriate response
+    safety_message = guardrails_service.get_safety_response(violations)
+    
+    return ChatResponse(
+        reply=safety_message,
+        route="safety",
+        intent="safety_violation",
+        session_id=session_id,
+        context={"violations": violations, "violation_type": "input_safety"},
+        structured_data={"violations": violations, "blocked": True},
+        recommendations=[],
+        confidence=confidence,
+        actions_taken=[],
+    )
+
+
 def _create_simple_fallback_response(message: str, session_id: str) -> ChatResponse:
     """
     Create a simple fallback response when MCP planner is unavailable.

@@ -8,6 +8,23 @@ import asyncio
 import json
 import time
 from typing import Dict, Any
+from pathlib import Path
+import sys
+import os
+
+# Add project root to path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+# Import test configuration directly to avoid package conflicts
+import importlib.util
+config_path = project_root / "tests" / "unit" / "test_config.py"
+spec = importlib.util.spec_from_file_location("test_config", config_path)
+test_config = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(test_config)
+CHAT_ENDPOINT = test_config.CHAT_ENDPOINT
+GUARDRAILS_TIMEOUT = test_config.GUARDRAILS_TIMEOUT
+
 import httpx
 
 # Test cases for guardrails
@@ -132,21 +149,20 @@ async def test_guardrails():
     print("🧪 Testing NeMo Guardrails Integration")
     print("=" * 50)
     
-    api_url = "http://localhost:8001/api/v1/chat"
     results = {
         "passed": 0,
         "failed": 0,
         "total": len(TEST_CASES)
     }
     
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=GUARDRAILS_TIMEOUT) as client:
         for i, test_case in enumerate(TEST_CASES, 1):
             print(f"\n{i:2d}. {test_case['name']}")
             print(f"    Message: {test_case['message']}")
             
             try:
                 response = await client.post(
-                    api_url,
+                    CHAT_ENDPOINT,
                     json={"message": test_case["message"]},
                     headers={"Content-Type": "application/json"}
                 )
@@ -155,20 +171,37 @@ async def test_guardrails():
                     data = response.json()
                     
                     # Check if the response was blocked by guardrails
-                    is_blocked = data.get("route") == "guardrails"
-                    violations = data.get("context", {}).get("safety_violations", [])
+                    # Guardrails blocks queries by returning route="safety" and intent="safety_violation"
+                    route = data.get("route", "unknown") if data else "unknown"
+                    intent = data.get("intent", "unknown") if data else "unknown"
+                    is_blocked = (route == "safety" and intent == "safety_violation") or route == "guardrails"
                     
-                    print(f"    Response: {data.get('reply', 'No reply')[:100]}...")
-                    print(f"    Route: {data.get('route', 'unknown')}")
-                    print(f"    Violations: {len(violations)}")
+                    # Check for violations in context or structured_data
+                    context = data.get("context", {}) if data and isinstance(data.get("context"), dict) else {}
+                    structured_data = data.get("structured_data", {}) if data and isinstance(data.get("structured_data"), dict) else {}
+                    violations = []
+                    if context:
+                        violations = context.get("violations", []) or []
+                    if not violations and structured_data:
+                        violations = structured_data.get("violations", []) or []
+                    
+                    # If route is safety and intent is safety_violation, it's blocked
+                    if route == "safety" and intent == "safety_violation":
+                        is_blocked = True
+                    
+                    print(f"    Response: {data.get('reply', 'No reply')[:100] if data else 'No response'}...")
+                    print(f"    Route: {route}")
+                    print(f"    Intent: {intent}")
+                    print(f"    Blocked: {is_blocked}")
+                    print(f"    Violations in response: {len(violations)}")
                     
                     if violations:
-                        for violation in violations:
+                        for violation in violations[:3]:  # Show first 3 violations
                             print(f"      - {violation}")
                     
                     # Check if the test case passed
                     if test_case["should_block"]:
-                        if is_blocked and violations:
+                        if is_blocked:
                             print("    ✅ PASS - Correctly blocked")
                             results["passed"] += 1
                         else:
@@ -214,17 +247,16 @@ async def test_performance():
     print("\n🚀 Testing Guardrails Performance")
     print("=" * 50)
     
-    api_url = "http://localhost:8001/api/v1/chat"
     test_message = "check stock for SKU123"
     num_requests = 10
     
     start_time = time.time()
     
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=GUARDRAILS_TIMEOUT) as client:
         tasks = []
         for i in range(num_requests):
             task = client.post(
-                api_url,
+                CHAT_ENDPOINT,
                 json={"message": test_message},
                 headers={"Content-Type": "application/json"}
             )

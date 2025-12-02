@@ -77,74 +77,116 @@ class GuardrailsService:
             # Basic safety checks
             violations = []
 
-            # Check for jailbreak attempts
+            user_lower = user_input.lower()
+            
+            # Check for jailbreak attempts (expanded patterns)
             jailbreak_phrases = [
                 "ignore previous instructions",
+                "ignore all previous",
                 "forget everything",
+                "forget all previous",
                 "you are now",
+                "you are a",
                 "pretend to be",
                 "act as if",
+                "act as a",
                 "roleplay as",
+                "roleplay",
                 "simulate",
                 "override",
                 "bypass",
                 "jailbreak",
+                "hack the system",
+                "help me hack",
             ]
 
-            user_lower = user_input.lower()
             for phrase in jailbreak_phrases:
                 if phrase in user_lower:
                     violations.append(f"Potential jailbreak attempt: '{phrase}'")
+                    break  # Only need one match
 
-            # Check for safety violations
+            # Check for safety violations (expanded patterns)
             safety_violations = [
                 "operate forklift without training",
+                "forklift without training",
                 "bypass safety protocols",
+                "bypass safety",
                 "ignore safety warnings",
+                "ignore safety",
                 "work without PPE",
+                "work without personal protective equipment",
+                "without personal protective equipment",
+                "without protective equipment",
                 "operate equipment unsafely",
+                "operate without training",
+                "work without safety",
             ]
 
             for violation in safety_violations:
                 if violation in user_lower:
                     violations.append(f"Safety violation: '{violation}'")
+                    break  # Only need one match
 
-            # Check for security violations
+            # Check for security violations (expanded patterns)
             security_violations = [
                 "security codes",
+                "security code",
+                "access codes",
+                "access code",
                 "access restricted areas",
+                "restricted areas without authorization",
+                "restricted areas",
                 "alarm codes",
+                "alarm code",
                 "disable security",
+                "disable the security",
                 "warehouse layout for unauthorized access",
+                "unauthorized access",
+                "hack into",
+                "break into",
             ]
 
             for violation in security_violations:
                 if violation in user_lower:
                     violations.append(f"Security violation: '{violation}'")
+                    break  # Only need one match
 
-            # Check for compliance violations
+            # Check for compliance violations (expanded patterns)
             compliance_violations = [
                 "avoid safety inspections",
+                "avoid inspections",
                 "skip compliance requirements",
+                "skip compliance",
+                "skip inspections",
                 "ignore regulations",
                 "ignore safety regulations",
+                "ignore compliance",
                 "work around safety rules",
+                "work around rules",
+                "circumvent safety",
+                "circumvent regulations",
             ]
 
             for violation in compliance_violations:
                 if violation in user_lower:
                     violations.append(f"Compliance violation: '{violation}'")
+                    break  # Only need one match
 
-            # Check for off-topic queries
+            # Check for off-topic queries (expanded patterns)
             off_topic_phrases = [
                 "weather",
+                "what is the weather",
                 "joke",
+                "tell me a joke",
                 "capital of",
                 "how to cook",
+                "cook pasta",
                 "recipe",
                 "sports",
                 "politics",
                 "entertainment",
+                "movie",
+                "music",
             ]
 
             is_off_topic = any(phrase in user_lower for phrase in off_topic_phrases)
