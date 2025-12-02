@@ -15,6 +15,26 @@ import logging
 import sys
 from datetime import datetime
 from typing import Dict, Any
+from pathlib import Path
+
+# Add project root to path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+# Import test configuration directly to avoid package conflicts
+import importlib.util
+test_config_path = project_root / "tests" / "unit" / "test_config.py"
+spec = importlib.util.spec_from_file_location("test_config", test_config_path)
+test_config = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(test_config)
+CHAT_ENDPOINT = test_config.CHAT_ENDPOINT
+DEFAULT_TIMEOUT = test_config.DEFAULT_TIMEOUT
+
+test_utils_path = project_root / "tests" / "unit" / "test_utils.py"
+spec = importlib.util.spec_from_file_location("test_utils", test_utils_path)
+test_utils = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(test_utils)
+cleanup_async_resource = test_utils.cleanup_async_resource
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -274,7 +294,8 @@ async def test_api_endpoints():
             "Schedule tasks for the afternoon shift"  # Operations
         ]
         
-        async with aiohttp.ClientSession() as session:
+        timeout = aiohttp.ClientTimeout(total=DEFAULT_TIMEOUT)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             for i, query in enumerate(test_queries, 1):
                 logger.info(f"Testing query {i}: {query}")
                 
@@ -285,7 +306,7 @@ async def test_api_endpoints():
                 }
                 
                 async with session.post(
-                    "http://localhost:8001/api/v1/chat",
+                    CHAT_ENDPOINT,
                     json=payload,
                     headers={"Content-Type": "application/json"}
                 ) as response:

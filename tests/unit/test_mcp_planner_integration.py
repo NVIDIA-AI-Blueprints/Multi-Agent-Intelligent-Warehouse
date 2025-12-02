@@ -7,12 +7,13 @@ Tests the MCP-enhanced planner graph functionality.
 import asyncio
 import logging
 import sys
-import os
+from pathlib import Path
 
 # Add project root to path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
 
-from src.api.graphs.mcp_planner_graph import get_mcp_planner_graph, process_mcp_warehouse_query
+from src.api.graphs.mcp_integrated_planner_graph import get_mcp_planner_graph, process_mcp_warehouse_query
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
