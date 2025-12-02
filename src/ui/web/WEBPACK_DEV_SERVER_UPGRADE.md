@@ -141,6 +141,42 @@ The CRACO `devServer` configuration function intercepts the devServer config **a
 3. Clear node_modules and reinstall: `rm -rf node_modules package-lock.json && npm install`
 4. Check console output for CRACO messages indicating deprecated options are being removed
 
+**Issue**: `Invalid options object. Dev Server has been initialized using an options object that does not match the API schema. - options has an unknown property 'https'`
+
+**Solution**: This error occurs because `react-scripts` sets the deprecated `https` option. You need to manually patch `webpackDevServer.config.js` in `node_modules`:
+
+1. **After running `npm install`**, open:
+   ```
+   src/ui/web/node_modules/react-scripts/config/webpackDevServer.config.js
+   ```
+
+2. **Find line ~102-103** (look for `https: getHttpsConfig()` or `server:`)
+
+3. **Replace the `https` option** with the `server` option:
+   ```javascript
+   // OLD (deprecated):
+   https: getHttpsConfig(),
+   
+   // NEW (webpack-dev-server 5.x compatible):
+   // Updated for webpack-dev-server 5.x: https option moved to server.type
+   server: getHttpsConfig() ? { type: 'https', options: getHttpsConfig() } : { type: 'http' },
+   ```
+
+4. **Remove the old `https:` line** if it still exists
+
+5. **Restart the dev server**: `npm start`
+
+**Note**: This patch is in `node_modules` and will be lost if you run `npm install` again. You'll need to reapply it after each `npm install`. The CRACO config also attempts to handle this conversion, but the manual patch is more reliable.
+
+**Alternative**: Consider using `patch-package` to persist this patch automatically:
+```bash
+npm install --save-dev patch-package postinstall-postinstall
+# After applying the patch manually:
+npx patch-package react-scripts
+# Add to package.json scripts:
+"postinstall": "patch-package"
+```
+
 ### Rollback Instructions
 
 If you need to rollback (not recommended due to security):

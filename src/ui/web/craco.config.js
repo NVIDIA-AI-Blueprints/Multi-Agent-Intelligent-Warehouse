@@ -114,10 +114,67 @@ module.exports = {
       delete devServerConfig.onBeforeSetupMiddleware;
     }
     
+    // Fix https option for webpack-dev-server 5.x
+    // webpack-dev-server 5.x requires https to be under server.type and server.options
+    if (devServerConfig.https !== undefined) {
+      console.log('✅ CRACO: Converting deprecated https option to server.type format');
+      const httpsConfig = devServerConfig.https;
+      delete devServerConfig.https;
+      
+      // Convert to new format
+      if (httpsConfig === true || (typeof httpsConfig === 'object' && httpsConfig !== null)) {
+        devServerConfig.server = {
+          type: 'https',
+          options: typeof httpsConfig === 'object' ? httpsConfig : {},
+        };
+      } else {
+        devServerConfig.server = {
+          type: 'http',
+        };
+      }
+    }
+    
     // Ensure setupMiddlewares is present (should already be set by patched webpackDevServer.config.js)
-    // If not, we log a warning but don't add it here since it requires specific middleware setup
+    // If not, we need to set it up to include the proxy middleware
     if (!devServerConfig.setupMiddlewares) {
-      console.warn('⚠️  CRACO: setupMiddlewares not found in devServer config. This may cause issues.');
+      console.warn('⚠️  CRACO: setupMiddlewares not found, setting it up with proxy...');
+      const { createProxyMiddleware } = require('http-proxy-middleware');
+      
+      devServerConfig.setupMiddlewares = (middlewares, devServer) => {
+        // Add proxy middleware FIRST (before other middlewares)
+        devServer.app.use(
+          '/api',
+          createProxyMiddleware({
+            target: 'http://localhost:8001',
+            changeOrigin: true,
+            secure: false,
+            logLevel: 'debug',
+            timeout: 300000,
+            pathRewrite: (path, req) => {
+              // path will be like '/v1/version' (without /api)
+              // Add /api back to get '/api/v1/version'
+              const newPath = '/api' + path;
+              console.log('🔄 CRACO Proxying request:', req.method, req.url, '->', newPath);
+              return newPath;
+            },
+            onError: function (err, req, res) {
+              console.error('❌ CRACO Proxy error:', err.message, 'for', req.url);
+              if (!res.headersSent) {
+                res.status(500).json({ error: 'Proxy error: ' + err.message });
+              }
+            },
+            onProxyReq: function (proxyReq, req, res) {
+              console.log('🔄 CRACO Proxying request:', req.method, req.url);
+            },
+            onProxyRes: function (proxyRes, req, res) {
+              console.log('✅ CRACO Proxy response:', proxyRes.statusCode, 'for', req.url);
+            }
+          })
+        );
+        
+        console.log('✅ CRACO: Proxy middleware configured for /api -> http://localhost:8001');
+        return middlewares;
+      };
     } else {
       console.log('✅ CRACO: setupMiddlewares is present in devServer config');
     }
