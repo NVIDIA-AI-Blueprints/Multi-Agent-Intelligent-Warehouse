@@ -13,8 +13,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 # Add project root to path
-project_root = Path(__file__).parent
-sys.path.append(str(project_root))
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
 
 from src.retrieval.vector.evidence_scoring import (
     EvidenceScoringEngine, EvidenceSource, EvidenceItem, EvidenceScore

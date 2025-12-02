@@ -9,12 +9,11 @@ with 512-token chunks, 64-token overlap, and optimized retrieval.
 import asyncio
 import logging
 import sys
-import os
 from pathlib import Path
 
 # Add project root to path
-project_root = Path(__file__).parent
-sys.path.append(str(project_root))
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
 
 from src.retrieval.vector.chunking_service import ChunkingService, Chunk
 from src.retrieval.vector.enhanced_retriever import EnhancedVectorRetriever, RetrievalConfig
@@ -130,111 +129,145 @@ async def test_enhanced_retrieval():
     """Test the enhanced retrieval system."""
     logger.info("Testing Enhanced Retrieval...")
     
-    # Initialize components
-    embedding_service = EmbeddingService()
-    await embedding_service.initialize()
+    embedding_service = None
+    milvus_retriever = None
+    enhanced_retriever = None
     
-    milvus_config = MilvusConfig()
-    milvus_retriever = MilvusRetriever(milvus_config)
-    
-    # Initialize enhanced retriever
-    retrieval_config = RetrievalConfig(
-        initial_top_k=12,
-        final_top_k=6,
-        min_similarity_threshold=0.3,
-        min_relevance_threshold=0.35,
-        evidence_threshold=0.35,
-        min_sources=2
-    )
-    
-    enhanced_retriever = EnhancedVectorRetriever(
-        milvus_retriever=milvus_retriever,
-        embedding_service=embedding_service,
-        config=retrieval_config
-    )
-    
-    # Test queries
-    test_queries = [
-        "What are the forklift safety procedures?",
-        "How should I maintain warehouse equipment?",
-        "What is the cycle counting process?",
-        "ATPs for SKU123",
-        "equipment status for forklift-001"
-    ]
-    
-    for query in test_queries:
-        logger.info(f"Testing query: '{query}'")
+    try:
+        # Initialize components
+        embedding_service = EmbeddingService()
+        await embedding_service.initialize()
         
-        # Perform search
-        results, metadata = await enhanced_retriever.search(query)
+        milvus_config = MilvusConfig()
+        milvus_retriever = MilvusRetriever(milvus_config)
         
-        logger.info(f"  Results: {len(results)}")
-        logger.info(f"  Evidence Score: {metadata.get('avg_evidence_score', 0):.3f}")
-        logger.info(f"  Confidence: {metadata.get('confidence_level', 'unknown')}")
-        logger.info(f"  Sources: {metadata.get('unique_sources', 0)}")
-        logger.info(f"  Categories: {metadata.get('unique_categories', 0)}")
+        # Initialize enhanced retriever
+        retrieval_config = RetrievalConfig(
+            initial_top_k=12,
+            final_top_k=6,
+            min_similarity_threshold=0.3,
+            min_relevance_threshold=0.35,
+            evidence_threshold=0.35,
+            min_sources=2
+        )
         
-        # Check if clarification is needed
-        if enhanced_retriever.should_ask_clarifying_question(metadata):
-            clarifying_question = enhanced_retriever.generate_clarifying_question(query, metadata)
-            logger.info(f"  Clarifying Question: {clarifying_question}")
+        enhanced_retriever = EnhancedVectorRetriever(
+            milvus_retriever=milvus_retriever,
+            embedding_service=embedding_service,
+            config=retrieval_config
+        )
         
-        logger.info("")
+        # Test queries
+        test_queries = [
+            "What are the forklift safety procedures?",
+            "How should I maintain warehouse equipment?",
+            "What is the cycle counting process?",
+            "ATPs for SKU123",
+            "equipment status for forklift-001"
+        ]
+        
+        for query in test_queries:
+            logger.info(f"Testing query: '{query}'")
+            
+            # Perform search
+            results, metadata = await enhanced_retriever.search(query)
+            
+            logger.info(f"  Results: {len(results)}")
+            logger.info(f"  Evidence Score: {metadata.get('avg_evidence_score', 0):.3f}")
+            logger.info(f"  Confidence: {metadata.get('confidence_level', 'unknown')}")
+            logger.info(f"  Sources: {metadata.get('unique_sources', 0)}")
+            logger.info(f"  Categories: {metadata.get('unique_categories', 0)}")
+            
+            # Check if clarification is needed
+            if enhanced_retriever.should_ask_clarifying_question(metadata):
+                clarifying_question = enhanced_retriever.generate_clarifying_question(query, metadata)
+                logger.info(f"  Clarifying Question: {clarifying_question}")
+            
+            logger.info("")
+    finally:
+        # Cleanup
+        if embedding_service and hasattr(embedding_service, 'close'):
+            try:
+                await embedding_service.close()
+            except Exception as e:
+                logger.warning(f"Error closing embedding service: {e}")
+        if milvus_retriever and hasattr(milvus_retriever, 'close'):
+            try:
+                await milvus_retriever.close()
+            except Exception as e:
+                logger.warning(f"Error closing milvus retriever: {e}")
 
 async def test_hybrid_retrieval():
     """Test the enhanced hybrid retrieval system."""
     logger.info("Testing Enhanced Hybrid Retrieval...")
     
-    # Initialize components
-    embedding_service = EmbeddingService()
-    await embedding_service.initialize()
+    embedding_service = None
+    milvus_retriever = None
+    hybrid_retriever = None
     
-    milvus_config = MilvusConfig()
-    milvus_retriever = MilvusRetriever(milvus_config)
-    
-    # Initialize hybrid retriever
-    hybrid_retriever = EnhancedHybridRetriever(
-        milvus_retriever=milvus_retriever,
-        embedding_service=embedding_service
-    )
-    
-    # Test different query types
-    test_contexts = [
-        SearchContext(
-            query="What are the forklift safety procedures?",
-            search_type="hybrid",
-            limit=6
-        ),
-        SearchContext(
-            query="ATPs for SKU123",
-            search_type="sql",
-            limit=6
-        ),
-        SearchContext(
-            query="How should I maintain warehouse equipment?",
-            search_type="vector",
-            limit=6
+    try:
+        # Initialize components
+        embedding_service = EmbeddingService()
+        await embedding_service.initialize()
+        
+        milvus_config = MilvusConfig()
+        milvus_retriever = MilvusRetriever(milvus_config)
+        
+        # Initialize hybrid retriever
+        hybrid_retriever = EnhancedHybridRetriever(
+            milvus_retriever=milvus_retriever,
+            embedding_service=embedding_service
         )
-    ]
-    
-    for context in test_contexts:
-        logger.info(f"Testing {context.search_type} query: '{context.query}'")
         
-        # Perform search
-        response = await hybrid_retriever.search(context)
+        # Test different query types
+        test_contexts = [
+            SearchContext(
+                query="What are the forklift safety procedures?",
+                search_type="hybrid",
+                limit=6
+            ),
+            SearchContext(
+                query="ATPs for SKU123",
+                search_type="sql",
+                limit=6
+            ),
+            SearchContext(
+                query="How should I maintain warehouse equipment?",
+                search_type="vector",
+                limit=6
+            )
+        ]
         
-        logger.info(f"  Search Type: {response.search_type}")
-        logger.info(f"  Results: {response.total_results}")
-        logger.info(f"  Evidence Score: {response.evidence_score:.3f}")
-        logger.info(f"  Confidence: {response.confidence_level}")
-        logger.info(f"  Sources: {response.sources}")
-        logger.info(f"  Categories: {response.categories}")
-        logger.info(f"  Requires Clarification: {response.requires_clarification}")
-        
-        if response.clarifying_question:
-            logger.info(f"  Clarifying Question: {response.clarifying_question}")
-        
-        logger.info("")
+        for context in test_contexts:
+            logger.info(f"Testing {context.search_type} query: '{context.query}'")
+            
+            # Perform search
+            response = await hybrid_retriever.search(context)
+            
+            logger.info(f"  Search Type: {response.search_type}")
+            logger.info(f"  Results: {response.total_results}")
+            logger.info(f"  Evidence Score: {response.evidence_score:.3f}")
+            logger.info(f"  Confidence: {response.confidence_level}")
+            logger.info(f"  Sources: {response.sources}")
+            logger.info(f"  Categories: {response.categories}")
+            logger.info(f"  Requires Clarification: {response.requires_clarification}")
+            
+            if response.clarifying_question:
+                logger.info(f"  Clarifying Question: {response.clarifying_question}")
+            
+            logger.info("")
+    finally:
+        # Cleanup
+        if embedding_service and hasattr(embedding_service, 'close'):
+            try:
+                await embedding_service.close()
+            except Exception as e:
+                logger.warning(f"Error closing embedding service: {e}")
+        if milvus_retriever and hasattr(milvus_retriever, 'close'):
+            try:
+                await milvus_retriever.close()
+            except Exception as e:
+                logger.warning(f"Error closing milvus retriever: {e}")
 
 async def main():
     """Main test function."""

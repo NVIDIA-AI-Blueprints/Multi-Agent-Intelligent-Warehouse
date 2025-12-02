@@ -10,6 +10,13 @@ import json
 import sys
 from pathlib import Path
 
+# Add project root to path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+# Import test configuration
+from tests.unit.test_config import CHAT_ENDPOINT, DEFAULT_TIMEOUT
+
 async def test_nvidia_integration():
     """Test the full NVIDIA NIM integration."""
     print("🧪 Testing NVIDIA NIM Integration")
@@ -68,13 +75,13 @@ async def test_nvidia_integration():
         print("\n4️⃣ Testing API Endpoint...")
         import httpx
         
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
             try:
                 response = await client.post(
-                    "http://localhost:8001/api/v1/chat",
+                    CHAT_ENDPOINT,
                     json={"message": "What is the stock level for SKU123?"},
                     headers={"Content-Type": "application/json"},
-                    timeout=30.0
+                    timeout=DEFAULT_TIMEOUT
                 )
                 
                 if response.status_code == 200:

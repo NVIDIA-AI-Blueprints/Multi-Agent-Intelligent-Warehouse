@@ -17,8 +17,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Add project root to path
-project_root = Path(__file__).parent
-sys.path.append(str(project_root))
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+# Import test utilities
+from tests.unit.test_utils import get_test_file_path
+from tests.unit.test_config import TEST_INVOICE_CANDIDATES
 
 # Import pipeline components
 from src.api.agents.document.preprocessing.nemo_retriever import NeMoRetrieverPreprocessor
@@ -35,7 +39,13 @@ class DocumentPipelineTester:
     """Test each stage of the document extraction pipeline."""
     
     def __init__(self):
-        self.test_file_path = "test_invoice.png"  # Use existing test file
+        # Find test file in common locations
+        test_file = get_test_file_path("test_invoice.png", TEST_INVOICE_CANDIDATES)
+        if not test_file:
+            raise FileNotFoundError(
+                f"Test file 'test_invoice.png' not found. Tried: {TEST_INVOICE_CANDIDATES}"
+            )
+        self.test_file_path = str(test_file)
         self.results = {}
         
     async def test_stage1_preprocessing(self):
