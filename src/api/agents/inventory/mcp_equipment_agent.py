@@ -27,6 +27,7 @@ from src.api.services.reasoning import (
     ReasoningChain,
 )
 from src.api.utils.log_utils import sanitize_prompt_input
+from src.api.services.agent_config import load_agent_config, AgentConfig
 from .equipment_asset_tools import get_equipment_asset_tools
 
 logger = logging.getLogger(__name__)
@@ -81,10 +82,15 @@ class MCPEquipmentAssetOperationsAgent:
         self.conversation_context = {}
         self.mcp_tools_cache = {}
         self.tool_execution_history = []
+        self.config: Optional[AgentConfig] = None  # Agent configuration
 
     async def initialize(self) -> None:
         """Initialize the agent with required services including MCP."""
         try:
+            # Load agent configuration
+            self.config = load_agent_config("equipment")
+            logger.info(f"Loaded agent configuration: {self.config.name}")
+            
             self.nim_client = await get_nim_client()
             self.hybrid_retriever = await get_hybrid_retriever()
             self.asset_tools = await get_equipment_asset_tools()
@@ -650,62 +656,31 @@ IMPORTANT: Use the tool execution results to provide a comprehensive answer. The
                 k: v for k, v in tool_results.items() if not v.get("success", False)
             }
 
+            # Load response prompt from configuration
+            if self.config is None:
+                self.config = load_agent_config("equipment")
+            
+            response_prompt_template = self.config.persona.response_prompt
+            system_prompt = self.config.persona.system_prompt
+            
+            # Format the response prompt with actual values
+            formatted_response_prompt = response_prompt_template.format(
+                user_query=query.user_query,
+                intent=query.intent,
+                entities=json.dumps(query.entities, default=str),
+                retrieved_data=json.dumps(successful_results, indent=2, default=str),
+                actions_taken=json.dumps(tool_results, indent=2, default=str)
+            )
+            
             # Create response prompt
             response_prompt = [
                 {
                     "role": "system",
-                    "content": """You are an Equipment & Asset Operations Agent. Generate comprehensive responses based on user queries and tool execution results.
-
-CRITICAL INSTRUCTIONS:
-1. Return ONLY the JSON object
-2. Do NOT include any text before the JSON
-3. Do NOT include any text after the JSON
-4. Do NOT include explanatory text like "Here is the response"
-5. Do NOT include markdown formatting like ```
-6. Do NOT include notes or additional explanations
-
-Return JSON format:
-{
-    "response_type": "equipment_info",
-    "data": {"equipment": [], "status": "operational"},
-    "natural_language": "Based on the tool results...",
-    "recommendations": ["Recommendation 1", "Recommendation 2"],
-    "confidence": 0.85,
-    "actions_taken": [{"action": "tool_execution", "tool": "get_equipment_status"}]
-}
-
-Response types based on intent:
-- equipment_lookup: "equipment_info" with equipment details
-- equipment_dispatch: "equipment_dispatch" with dispatch status, location, and equipment details
-- equipment_assignment: "equipment_assignment" with assignment details
-- equipment_maintenance: "equipment_maintenance" with maintenance status
-- equipment_availability: "equipment_availability" with availability status
-
-For equipment_dispatch intent, generate specific dispatch information:
-{
-    "response_type": "equipment_dispatch",
-    "data": {
-        "equipment_id": "FL-02",
-        "equipment_type": "forklift",
-        "destination": "Zone A",
-        "operation": "pick operations",
-        "status": "dispatched",
-        "dispatch_time": "2024-01-15T17:15:00Z",
-        "estimated_arrival": "2024-01-15T17:20:00Z"
-    },
-    "natural_language": "Forklift FL-02 has been successfully dispatched to Zone A for pick operations. Estimated arrival time is 5 minutes.",
-    "recommendations": ["Monitor forklift FL-02 progress to Zone A", "Ensure Zone A is ready for pick operations"],
-    "confidence": 0.9,
-    "actions_taken": [{"action": "dispatch_equipment", "equipment_id": "FL-02", "destination": "Zone A"}]
-}
-
-ABSOLUTELY CRITICAL: Your response must start with { and end with }. No other text.""",
+                    "content": system_prompt + "\n\nCRITICAL INSTRUCTIONS:\n1. Return ONLY the JSON object\n2. Do NOT include any text before or after the JSON\n3. Do NOT include markdown formatting\nABSOLUTELY CRITICAL: Your response must start with { and end with }. No other text.",
                 },
                 {
                     "role": "user",
-                    "content": self._build_user_prompt_content(
-                        query, successful_results, failed_results, reasoning_chain
-                    ),
+                    "content": formatted_response_prompt,
                 },
             ]
 

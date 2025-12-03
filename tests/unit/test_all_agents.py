@@ -206,20 +206,21 @@ async def test_full_integration():
     logger.info("🔗 Testing Full Integration...")
     
     try:
-        from src.api.agents.inventory.inventory_agent import get_inventory_agent
+        from src.api.agents.inventory.equipment_agent import get_equipment_agent
         from src.api.agents.operations.operations_agent import get_operations_agent
         from src.api.agents.safety.safety_agent import get_safety_agent
         from src.memory.memory_manager import get_memory_manager
         
         # Get all agents and memory manager
-        inventory_agent = await get_inventory_agent()
+        equipment_agent = await get_equipment_agent()
         operations_agent = await get_operations_agent()
         safety_agent = await get_safety_agent()
         memory_manager = await get_memory_manager()
         
         # Create test user and session
         user_id = "integration_test_user"
-        session_id = f"integration_test_session_{datetime.now().timestamp()}"
+        # Use shorter session ID to fit database schema (36 char limit)
+        session_id = f"int_test_{int(datetime.now().timestamp())}"
         
         await memory_manager.create_or_update_user_profile(
             user_id=user_id,
@@ -232,14 +233,14 @@ async def test_full_integration():
         # Test multi-agent conversation flow
         logger.info("Testing multi-agent conversation flow...")
         
-        # 1. Inventory query
-        logger.info("1. Testing inventory query...")
-        inventory_response = await inventory_agent.process_query(
+        # 1. Equipment/Inventory query (equipment agent handles inventory queries)
+        logger.info("1. Testing equipment/inventory query...")
+        equipment_response = await equipment_agent.process_query(
             query="Check stock levels for all items in Aisle A",
             session_id=session_id,
             context={"user_id": user_id}
         )
-        logger.info(f"   Inventory Response: {inventory_response.natural_language[:100]}...")
+        logger.info(f"   Equipment/Inventory Response: {equipment_response.natural_language[:100]}...")
         
         # 2. Operations query
         logger.info("2. Testing operations query...")

@@ -27,6 +27,7 @@ from src.api.services.reasoning import (
     ReasoningChain,
 )
 from src.api.utils.log_utils import sanitize_prompt_input
+from src.api.services.agent_config import load_agent_config, AgentConfig
 from .action_tools import get_safety_action_tools
 
 logger = logging.getLogger(__name__)
@@ -81,10 +82,15 @@ class MCPSafetyComplianceAgent:
         self.conversation_context = {}
         self.mcp_tools_cache = {}
         self.tool_execution_history = []
+        self.config: Optional[AgentConfig] = None  # Agent configuration
 
     async def initialize(self) -> None:
         """Initialize the agent with required services including MCP."""
         try:
+            # Load agent configuration
+            self.config = load_agent_config("safety")
+            logger.info(f"Loaded agent configuration: {self.config.name}")
+            
             self.nim_client = await get_nim_client()
             self.hybrid_retriever = await get_hybrid_retriever()
             self.safety_tools = await get_safety_action_tools()
@@ -506,52 +512,33 @@ Return only valid JSON.""",
                 k: v for k, v in tool_results.items() if not v.get("success", False)
             }
 
+            # Load response prompt from configuration
+            if self.config is None:
+                self.config = load_agent_config("safety")
+            
+            response_prompt_template = self.config.persona.response_prompt
+            system_prompt = self.config.persona.system_prompt
+            
+            # Format the response prompt with actual values
+            formatted_response_prompt = response_prompt_template.format(
+                user_query=sanitize_prompt_input(query.user_query),
+                intent=sanitize_prompt_input(query.intent),
+                entities=json.dumps(query.entities, default=str),
+                retrieved_data=json.dumps(successful_results, indent=2, default=str),
+                actions_taken=json.dumps(tool_results, indent=2, default=str),
+                reasoning_analysis="",
+                conversation_history=""
+            )
+            
             # Create response prompt
             response_prompt = [
                 {
                     "role": "system",
-                    "content": """You are a Safety & Compliance Agent. Generate comprehensive responses based on user queries and tool execution results.
-
-IMPORTANT: You MUST return ONLY valid JSON. Do not include any text before or after the JSON.
-
-Return JSON format:
-{
-    "response_type": "safety_info",
-    "data": {"incidents": [], "compliance": {}, "hazards": []},
-    "natural_language": "Based on the tool results...",
-    "recommendations": ["Recommendation 1", "Recommendation 2"],
-    "confidence": 0.85,
-    "actions_taken": [{"action": "tool_execution", "tool": "report_incident"}]
-}
-
-Response types based on intent:
-- incident_reporting: "incident_reporting" with incident details and reporting status
-- compliance_check: "compliance_check" with compliance status and violations
-- safety_audit: "safety_audit" with audit results and findings
-- hazard_identification: "hazard_identification" with identified hazards and risk levels
-- policy_lookup: "policy_lookup" with policy details and requirements
-- training_tracking: "training_tracking" with training status and completion
-
-Include:
-1. Natural language explanation of results
-2. Structured data summary appropriate for the intent
-3. Actionable recommendations
-4. Confidence assessment
-
-CRITICAL: Return ONLY the JSON object, no other text.""",
+                    "content": system_prompt + "\n\nIMPORTANT: You MUST return ONLY valid JSON. Do not include any text before or after the JSON.",
                 },
                 {
                     "role": "user",
-                    "content": f"""User Query: "{sanitize_prompt_input(query.user_query)}"
-Intent: {sanitize_prompt_input(query.intent)}
-Entities: {sanitize_prompt_input(query.entities)}
-Context: {sanitize_prompt_input(query.context)}
-
-Tool Execution Results:
-{json.dumps(successful_results, indent=2)}
-
-Failed Tool Executions:
-{json.dumps(failed_results, indent=2)}""",
+                    "content": formatted_response_prompt,
                 },
             ]
 

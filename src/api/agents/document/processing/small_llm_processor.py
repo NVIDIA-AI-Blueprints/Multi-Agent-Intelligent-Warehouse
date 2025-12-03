@@ -13,6 +13,7 @@ import io
 import json
 from PIL import Image
 from datetime import datetime
+from src.api.services.agent_config import load_agent_config, AgentConfig
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +36,15 @@ class SmallLLMProcessor:
             "LLAMA_NANO_VL_URL", "https://integrate.api.nvidia.com/v1"
         )
         self.timeout = 60
+        self.config: Optional[AgentConfig] = None  # Agent configuration
 
     async def initialize(self):
         """Initialize the Small LLM Processor."""
         try:
+            # Load agent configuration
+            self.config = load_agent_config("document")
+            logger.info(f"Loaded agent configuration: {self.config.name}")
+            
             if not self.api_key:
                 logger.warning(
                     "LLAMA_NANO_VL_API_KEY not found, using mock implementation"
@@ -145,67 +151,18 @@ class SmallLLMProcessor:
 
     def _create_processing_prompt(self, document_type: str, ocr_text: str) -> str:
         """Create a structured prompt for document processing."""
-
-        prompts = {
-            "invoice": """
-            You are an expert document processor specializing in invoice analysis. 
-            Please analyze the provided document image(s) and OCR text to extract the following information:
-            
-            1. Invoice Number
-            2. Vendor/Supplier Information (name, address)
-            3. Invoice Date and Due Date
-            4. Line Items (description, quantity, unit price, total)
-            5. Subtotal, Tax Amount, and Total Amount
-            6. Payment Terms
-            7. Any special notes or conditions
-            
-            Return the information in structured JSON format with confidence scores for each field.
-            """,
-            "receipt": """
-            You are an expert document processor specializing in receipt analysis.
-            Please analyze the provided document image(s) and OCR text to extract:
-            
-            1. Receipt Number/Transaction ID
-            2. Merchant Information (name, address)
-            3. Transaction Date and Time
-            4. Items Purchased (description, quantity, price)
-            5. Subtotal, Tax, and Total Amount
-            6. Payment Method
-            7. Any discounts or promotions
-            
-            Return the information in structured JSON format with confidence scores.
-            """,
-            "bol": """
-            You are an expert document processor specializing in Bill of Lading (BOL) analysis.
-            Please analyze the provided document image(s) and OCR text to extract:
-            
-            1. BOL Number
-            2. Shipper and Consignee Information
-            3. Carrier Information
-            4. Ship Date and Delivery Date
-            5. Items Shipped (description, quantity, weight, dimensions)
-            6. Shipping Terms and Conditions
-            7. Special Instructions
-            
-            Return the information in structured JSON format with confidence scores.
-            """,
-            "purchase_order": """
-            You are an expert document processor specializing in Purchase Order (PO) analysis.
-            Please analyze the provided document image(s) and OCR text to extract:
-            
-            1. PO Number
-            2. Buyer and Supplier Information
-            3. Order Date and Required Delivery Date
-            4. Items Ordered (description, quantity, unit price, total)
-            5. Subtotal, Tax, and Total Amount
-            6. Shipping Address
-            7. Terms and Conditions
-            
-            Return the information in structured JSON format with confidence scores.
-            """,
-        }
-
-        base_prompt = prompts.get(document_type, prompts["invoice"])
+        
+        # Load config if not already loaded
+        if self.config is None:
+            self.config = load_agent_config("document")
+        
+        # Get document type specific prompt from config
+        document_types = self.config.metadata.get("document_types", {})
+        if document_type in document_types:
+            base_prompt = document_types[document_type].get("prompt", "")
+        else:
+            # Fallback to invoice prompt
+            base_prompt = document_types.get("invoice", {}).get("prompt", "")
 
         return f"""
         {base_prompt}

@@ -24,6 +24,7 @@ import asyncio
 from src.api.services.llm.nim_client import get_nim_client, LLMResponse
 from src.retrieval.hybrid_retriever import get_hybrid_retriever, SearchContext
 from src.memory.memory_manager import get_memory_manager
+from src.api.services.agent_config import load_agent_config, AgentConfig
 from .equipment_asset_tools import get_equipment_asset_tools, EquipmentAssetTools
 
 logger = logging.getLogger(__name__)
@@ -70,10 +71,15 @@ class EquipmentAssetOperationsAgent:
         self.hybrid_retriever = None
         self.asset_tools = None
         self.conversation_context = {}  # Maintain conversation context
+        self.config: Optional[AgentConfig] = None  # Agent configuration
 
     async def initialize(self) -> None:
         """Initialize the agent with required services."""
         try:
+            # Load agent configuration
+            self.config = load_agent_config("equipment")
+            logger.info(f"Loaded agent configuration: {self.config.name}")
+            
             self.nim_client = await get_nim_client()
             self.hybrid_retriever = await get_hybrid_retriever()
             self.asset_tools = await get_equipment_asset_tools()
@@ -156,33 +162,17 @@ class EquipmentAssetOperationsAgent:
             )
             context_str = self._build_context_string(conversation_history, context)
 
-            prompt = f"""
-            You are an Equipment & Asset Operations Agent. Analyze the user's query and extract relevant information.
-
-            Query: "{query}"
+            # Load prompt from configuration
+            if self.config is None:
+                self.config = load_agent_config("equipment")
             
-            Context: {context_str}
+            understanding_prompt_template = self.config.persona.understanding_prompt
             
-            Extract the following information:
-            1. Intent: One of [equipment_lookup, assignment, utilization, maintenance, availability, telemetry, release]
-            2. Entities: Extract asset_id (e.g., FL-01, AMR-001, CHG-05), equipment_type (forklift, amr, agv, scanner, charger, etc.), zone, assignee, status, etc.
-            3. Context: Any additional relevant context
-            
-            Respond with a JSON object containing:
-            {{
-                "intent": "equipment_lookup",
-                "entities": {{
-                    "asset_id": "FL-01",
-                    "equipment_type": "forklift",
-                    "zone": "Zone A",
-                    "status": "available"
-                }},
-                "context": {{
-                    "urgency": "normal",
-                    "priority": "medium"
-                }}
-            }}
-            """
+            # Format the understanding prompt with actual values
+            prompt = understanding_prompt_template.format(
+                query=query,
+                context=context_str
+            )
 
             response = await self.nim_client.generate_response(
                 [{"role": "user", "content": prompt}], temperature=0.1
@@ -406,28 +396,20 @@ class EquipmentAssetOperationsAgent:
             # Build context for response generation
             context_str = self._build_retrieved_context(retrieved_data, actions_taken)
 
-            prompt = f"""
-            You are an Equipment & Asset Operations Agent. Generate a comprehensive response based on the query and retrieved data.
-
-            Query: "{equipment_query.user_query}"
-            Intent: {equipment_query.intent}
-            Entities: {equipment_query.entities}
+            # Load response prompt from configuration
+            if self.config is None:
+                self.config = load_agent_config("equipment")
             
-            Retrieved Data:
-            {context_str}
+            response_prompt_template = self.config.persona.response_prompt
             
-            Actions Taken:
-            {json.dumps(actions_taken, indent=2, default=str)}
-            
-            Generate a response that includes:
-            1. Direct answer to the user's question
-            2. Relevant equipment information
-            3. Actionable recommendations
-            4. Next steps if applicable
-            
-            Be specific about asset IDs, equipment types, zones, and status information.
-            Provide clear, actionable recommendations for equipment management.
-            """
+            # Format the response prompt with actual values
+            prompt = response_prompt_template.format(
+                user_query=equipment_query.user_query,
+                intent=equipment_query.intent,
+                entities=equipment_query.entities,
+                retrieved_data=context_str,
+                actions_taken=json.dumps(actions_taken, indent=2, default=str)
+            )
 
             response = await self.nim_client.generate_response(
                 [{"role": "user", "content": prompt}], temperature=0.3

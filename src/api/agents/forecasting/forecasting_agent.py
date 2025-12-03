@@ -26,6 +26,7 @@ from src.api.services.reasoning import (
     ReasoningChain,
 )
 from src.api.utils.log_utils import sanitize_prompt_input
+from src.api.services.agent_config import load_agent_config, AgentConfig
 from .forecasting_action_tools import get_forecasting_action_tools
 
 logger = logging.getLogger(__name__)
@@ -80,10 +81,15 @@ class ForecastingAgent:
         self.conversation_context = {}
         self.mcp_tools_cache = {}
         self.tool_execution_history = []
+        self.config: Optional[AgentConfig] = None  # Agent configuration
 
     async def initialize(self) -> None:
         """Initialize the agent with required services including MCP."""
         try:
+            # Load agent configuration
+            self.config = load_agent_config("forecasting")
+            logger.info(f"Loaded agent configuration: {self.config.name}")
+            
             self.nim_client = await get_nim_client()
             self.hybrid_retriever = await get_hybrid_retriever()
             self.forecasting_tools = await get_forecasting_action_tools()
@@ -221,30 +227,28 @@ class ForecastingAgent:
     ) -> MCPForecastingQuery:
         """Parse the user query to extract intent and entities."""
         try:
+            # Load prompt from configuration
+            if self.config is None:
+                self.config = load_agent_config("forecasting")
+            
+            understanding_prompt_template = self.config.persona.understanding_prompt
+            system_prompt = self.config.persona.system_prompt
+            
+            # Format the understanding prompt with actual values
+            formatted_prompt = understanding_prompt_template.format(
+                query=query,
+                context=context or {}
+            )
+            
             # Use LLM to extract intent and entities
             parse_prompt = [
                 {
                     "role": "system",
-                    "content": """You are a demand forecasting expert. Parse warehouse forecasting queries and extract intent, entities, and context.
-
-Return JSON format:
-{
-    "intent": "forecast",
-    "entities": {"sku": "SKU001", "horizon_days": 30}
-}
-
-Intent options: forecast, reorder_recommendation, model_performance, dashboard, business_intelligence
-
-Examples:
-- "What's the forecast for SKU FRI001?" → {"intent": "forecast", "entities": {"sku": "FRI001"}}
-- "Show me reorder recommendations" → {"intent": "reorder_recommendation", "entities": {}}
-- "What's the model performance?" → {"intent": "model_performance", "entities": {}}
-
-Return only valid JSON.""",
+                    "content": system_prompt,
                 },
                 {
                     "role": "user",
-                    "content": f'Query: "{query}"\nContext: {context or {}}',
+                    "content": formatted_prompt,
                 },
             ]
 
@@ -448,27 +452,32 @@ Return only valid JSON.""",
             # Format tool results for LLM
             results_summary = json.dumps(tool_results, default=str, indent=2)
 
+            # Load response prompt from configuration
+            if self.config is None:
+                self.config = load_agent_config("forecasting")
+            
+            response_prompt_template = self.config.persona.response_prompt
+            system_prompt = self.config.persona.system_prompt
+            
+            # Format the response prompt with actual values
+            formatted_response_prompt = response_prompt_template.format(
+                user_query=sanitize_prompt_input(original_query),
+                intent=sanitize_prompt_input(parsed_query.intent),
+                entities=parsed_query.entities,
+                retrieved_data=results_summary,
+                tool_results=results_summary,
+                reasoning_analysis="",
+                conversation_history=""
+            )
+            
             response_prompt = [
                 {
                     "role": "system",
-                    "content": """You are a demand forecasting assistant. Generate clear, helpful responses based on forecasting data.
-                    
-Your responses should:
-1. Directly answer the user's query
-2. Include key numbers and insights from the data
-3. Provide actionable recommendations if applicable
-4. Be concise but informative
-5. Use natural, conversational language""",
+                    "content": system_prompt,
                 },
                 {
                     "role": "user",
-                    "content": f"""User Query: {sanitize_prompt_input(original_query)}
-Query Intent: {sanitize_prompt_input(parsed_query.intent)}
-
-Forecasting Results:
-{results_summary}
-
-Generate a natural language response:""",
+                    "content": formatted_response_prompt,
                 },
             ]
 

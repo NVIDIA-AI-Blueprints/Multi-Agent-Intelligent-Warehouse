@@ -17,6 +17,7 @@ from src.retrieval.hybrid_retriever import get_hybrid_retriever, SearchContext
 from src.retrieval.structured.task_queries import TaskQueries, Task
 from src.retrieval.structured.telemetry_queries import TelemetryQueries
 from src.api.utils.log_utils import sanitize_prompt_input
+from src.api.services.agent_config import load_agent_config, AgentConfig
 from .action_tools import get_operations_action_tools, OperationsActionTools
 
 logger = logging.getLogger(__name__)
@@ -86,10 +87,15 @@ class OperationsCoordinationAgent:
         self.telemetry_queries = None
         self.action_tools = None
         self.conversation_context = {}  # Maintain conversation context
+        self.config: Optional[AgentConfig] = None  # Agent configuration
 
     async def initialize(self) -> None:
         """Initialize the agent with required services."""
         try:
+            # Load agent configuration
+            self.config = load_agent_config("operations")
+            logger.info(f"Loaded agent configuration: {self.config.name}")
+            
             self.nim_client = await get_nim_client()
             self.hybrid_retriever = await get_hybrid_retriever()
 
@@ -181,67 +187,23 @@ class OperationsCoordinationAgent:
             safe_query = sanitize_prompt_input(query)
             safe_context = sanitize_prompt_input(context_str)
 
-            prompt = f"""
-You are an operations coordination agent for warehouse operations. Analyze the user query and extract structured information.
-
-User Query: "{safe_query}"
-
-Previous Context: {safe_context}
-
-IMPORTANT: For queries about workers, employees, staff, workforce, shifts, or team members, use intent "workforce".
-IMPORTANT: For queries about tasks, work orders, assignments, job status, or "latest tasks", use intent "task_management".
-IMPORTANT: For queries about pick waves, orders, zones, wave creation, or "create a wave", use intent "pick_wave".
-IMPORTANT: For queries about dispatching, assigning, or deploying equipment (forklifts, conveyors, etc.), use intent "equipment_dispatch".
-
-Extract the following information:
-1. Intent: One of ["workforce", "task_management", "equipment", "kpi", "scheduling", "task_assignment", "workload_rebalance", "pick_wave", "optimize_paths", "shift_management", "dock_scheduling", "equipment_dispatch", "publish_kpis", "general"]
-   - "workforce": For queries about workers, employees, staff, shifts, team members, headcount, active workers
-   - "task_management": For queries about tasks, assignments, work orders, job status, latest tasks, pending tasks, in-progress tasks
-   - "pick_wave": For queries about pick waves, order processing, wave creation, zones, order management
-   - "equipment": For queries about machinery, forklifts, conveyors, equipment status
-   - "equipment_dispatch": For queries about dispatching, assigning, or deploying equipment to specific tasks or zones
-   - "kpi": For queries about performance metrics, productivity, efficiency
-2. Entities: Extract the following from the query:
-   - equipment_id: Equipment identifier (e.g., "FL-03", "C-01", "Forklift-001")
-   - task_id: Task identifier if mentioned (e.g., "T-123", "TASK-456")
-   - zone: Zone or location (e.g., "Zone A", "Loading Dock", "Warehouse B")
-   - operator: Operator name if mentioned
-   - task_type: Type of task (e.g., "pick operations", "loading", "maintenance")
-   - shift: Shift time if mentioned
-   - employee: Employee name if mentioned
-3. Context: Any additional relevant context
-
-Examples:
-- "How many active workers we have?" → intent: "workforce"
-- "What are the latest tasks?" → intent: "task_management"
-- "What are the main tasks today?" → intent: "task_management"
-- "We got a 120-line order; create a wave for Zone A" → intent: "pick_wave"
-- "Create a pick wave for orders ORD001, ORD002" → intent: "pick_wave"
-- "Show me equipment status" → intent: "equipment"
-- "Dispatch forklift FL-03 to Zone A for pick operations" → intent: "equipment_dispatch", entities: {"equipment_id": "FL-03", "zone": "Zone A", "task_type": "pick operations"}
-- "Assign conveyor C-01 to task T-123" → intent: "equipment_dispatch", entities: {"equipment_id": "C-01", "task_id": "T-123"}
-- "Deploy forklift FL-05 to loading dock" → intent: "equipment_dispatch", entities: {"equipment_id": "FL-05", "zone": "loading dock"}
-
-Respond in JSON format:
-{{
-    "intent": "workforce",
-    "entities": {{
-        "shift": "morning",
-        "employee": "John Doe",
-        "task_type": "picking",
-        "equipment": "Forklift-001"
-    }},
-    "context": {{
-        "time_period": "today",
-        "urgency": "high"
-    }}
-}}
-"""
+            # Load prompt from configuration
+            if self.config is None:
+                self.config = load_agent_config("operations")
+            
+            understanding_prompt_template = self.config.persona.understanding_prompt
+            system_prompt = self.config.persona.system_prompt
+            
+            # Format the understanding prompt with actual values
+            prompt = understanding_prompt_template.format(
+                query=safe_query,
+                context=safe_context
+            )
 
             messages = [
                 {
                     "role": "system",
-                    "content": "You are an expert operations coordinator. Always respond with valid JSON.",
+                    "content": system_prompt,
                 },
                 {"role": "user", "content": prompt},
             ]
@@ -699,77 +661,28 @@ IMPORTANT FOR EQUIPMENT DISPATCH:
 - If task was created and equipment assigned, confirm both actions were successful
 """
             
-            prompt = f"""
-You are an operations coordination agent. Generate a comprehensive response based on the user query and retrieved data.
-
-User Query: "{safe_user_query}"
-Intent: {safe_intent}
-Entities: {safe_entities}
-
-Retrieved Data:
-{context_str}
-{actions_str}
-
-Conversation History: {conversation_history[-3:] if conversation_history else "None"}
-
-{dispatch_instructions}
-
-Generate a response that includes:
-1. Natural language answer to the user's question
-2. Structured data in JSON format
-3. Actionable recommendations for operations improvement
-4. Confidence score (0.0 to 1.0)
-
-IMPORTANT: For workforce queries, always provide the total count of active workers and break down by shifts.
-
-IMPORTANT: For equipment_dispatch queries:
-- If dispatch status is "dispatched" or "pending", report SUCCESS
-- Only report failure if status is "error" with explicit error details
-- Include equipment ID, zone, and operation type in success messages
-
-Respond in JSON format:
-{{
-    "response_type": "workforce_info",
-    "data": {{
-        "total_active_workers": 6,
-        "shifts": {{
-            "morning": {{"total_count": 3, "employees": [...]}},
-            "afternoon": {{"total_count": 3, "employees": [...]}}
-        }},
-        "productivity_metrics": {{...}}
-    }},
-    "natural_language": "Currently, we have 6 active workers across all shifts: Morning shift: 3 workers, Afternoon shift: 3 workers...",
-    "recommendations": [
-        "Monitor shift productivity metrics",
-        "Consider cross-training employees for flexibility"
-    ],
-    "confidence": 0.95
-}}
-
-For equipment_dispatch, use this format:
-{{
-    "response_type": "equipment_dispatch",
-    "data": {{
-        "equipment_id": "FL-01",
-        "zone": "Zone A",
-        "operation_type": "pick operations",
-        "status": "dispatched",
-        "task_created": true,
-        "equipment_assigned": true
-    }},
-    "natural_language": "Forklift FL-01 has been successfully dispatched to Zone A for pick operations. The task has been created and the equipment has been assigned.",
-    "recommendations": [
-        "Monitor forklift FL-01 progress in Zone A",
-        "Ensure Zone A is ready for pick operations"
-    ],
-    "confidence": 0.9
-}}
-"""
+            # Load response prompt from configuration
+            if self.config is None:
+                self.config = load_agent_config("operations")
+            
+            response_prompt_template = self.config.persona.response_prompt
+            system_prompt = self.config.persona.system_prompt
+            
+            # Format the response prompt with actual values
+            prompt = response_prompt_template.format(
+                user_query=safe_user_query,
+                intent=safe_intent,
+                entities=safe_entities,
+                retrieved_data=context_str,
+                actions_taken=actions_str,
+                conversation_history=conversation_history[-3:] if conversation_history else "None",
+                dispatch_instructions=dispatch_instructions
+            )
 
             messages = [
                 {
                     "role": "system",
-                    "content": "You are an expert operations coordinator. Always respond with valid JSON.",
+                    "content": system_prompt,
                 },
                 {"role": "user", "content": prompt},
             ]

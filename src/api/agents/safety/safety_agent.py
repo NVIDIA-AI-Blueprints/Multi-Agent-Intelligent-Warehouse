@@ -21,6 +21,7 @@ from src.api.services.reasoning import (
     ReasoningChain,
 )
 from src.api.utils.log_utils import sanitize_prompt_input
+from src.api.services.agent_config import load_agent_config, AgentConfig
 from .action_tools import get_safety_action_tools, SafetyActionTools
 
 logger = logging.getLogger(__name__)
@@ -85,10 +86,15 @@ class SafetyComplianceAgent:
         self.action_tools = None
         self.reasoning_engine = None
         self.conversation_context = {}  # Maintain conversation context
+        self.config: Optional[AgentConfig] = None  # Agent configuration
 
     async def initialize(self) -> None:
         """Initialize the agent with required services."""
         try:
+            # Load agent configuration
+            self.config = load_agent_config("safety")
+            logger.info(f"Loaded agent configuration: {self.config.name}")
+            
             self.nim_client = await get_nim_client()
             self.hybrid_retriever = await get_hybrid_retriever()
             self.sql_retriever = await get_sql_retriever()
@@ -209,38 +215,23 @@ class SafetyComplianceAgent:
             )
             context_str = self._build_context_string(conversation_history, context)
 
-            prompt = f"""
-You are a safety and compliance agent for warehouse operations. Analyze the user query and extract structured information.
-
-User Query: "{query}"
-
-Previous Context: {context_str}
-
-Extract the following information:
-1. Intent: One of ["incident_report", "policy_lookup", "compliance_check", "safety_audit", "training", "start_checklist", "broadcast_alert", "lockout_tagout", "corrective_action", "retrieve_sds", "near_miss", "general"]
-2. Entities: Extract incident types, severity levels, locations, policy names, compliance requirements, etc.
-3. Context: Any additional relevant context
-
-Respond in JSON format:
-{{
-    "intent": "incident_report",
-    "entities": {{
-        "incident_type": "slip_and_fall",
-        "severity": "minor",
-        "location": "Aisle A3",
-        "reported_by": "John Smith"
-    }},
-    "context": {{
-        "urgency": "high",
-        "requires_immediate_action": true
-    }}
-}}
-"""
+            # Load prompt from configuration
+            if self.config is None:
+                self.config = load_agent_config("safety")
+            
+            understanding_prompt_template = self.config.persona.understanding_prompt
+            system_prompt = self.config.persona.system_prompt
+            
+            # Format the understanding prompt with actual values
+            prompt = understanding_prompt_template.format(
+                query=query,
+                context=context_str
+            )
 
             messages = [
                 {
                     "role": "system",
-                    "content": "You are an expert safety and compliance officer. Always respond with valid JSON.",
+                    "content": system_prompt,
                 },
                 {"role": "user", "content": prompt},
             ]
@@ -831,47 +822,28 @@ Respond in JSON format:
             safe_intent = sanitize_prompt_input(safety_query.intent)
             safe_entities = sanitize_prompt_input(safety_query.entities)
 
-            prompt = f"""
-You are a safety and compliance agent. Generate a comprehensive response based on the user query, retrieved data, and advanced reasoning analysis.
-
-User Query: "{safe_user_query}"
-Intent: {safe_intent}
-Entities: {safe_entities}
-
-Retrieved Data:
-{context_str}
-{actions_str}
-{reasoning_str}
-
-Conversation History: {conversation_history[-3:] if conversation_history else "None"}
-
-Generate a response that includes:
-1. Natural language answer to the user's question
-2. Structured data in JSON format
-3. Actionable recommendations for safety improvement
-4. Confidence score (0.0 to 1.0)
-5. Reasoning insights if available
-
-Respond in JSON format:
-{{
-    "response_type": "incident_logged",
-    "data": {{
-        "incidents": [...],
-        "policies": [...]
-    }},
-    "natural_language": "Based on your query and analysis, here's the safety information...",
-    "recommendations": [
-        "Recommendation 1",
-        "Recommendation 2"
-    ],
-    "confidence": 0.95
-}}
-"""
+            # Load response prompt from configuration
+            if self.config is None:
+                self.config = load_agent_config("safety")
+            
+            response_prompt_template = self.config.persona.response_prompt
+            system_prompt = self.config.persona.system_prompt
+            
+            # Format the response prompt with actual values
+            prompt = response_prompt_template.format(
+                user_query=safe_user_query,
+                intent=safe_intent,
+                entities=safe_entities,
+                retrieved_data=context_str,
+                actions_taken=actions_str,
+                reasoning_analysis=reasoning_str,
+                conversation_history=conversation_history[-3:] if conversation_history else "None"
+            )
 
             messages = [
                 {
                     "role": "system",
-                    "content": "You are an expert safety and compliance officer. Always respond with valid JSON.",
+                    "content": system_prompt,
                 },
                 {"role": "user", "content": prompt},
             ]
