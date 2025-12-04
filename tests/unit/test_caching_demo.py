@@ -8,6 +8,7 @@ evidence packs, vector searches, and monitoring capabilities.
 import asyncio
 import logging
 import json
+import pytest
 from datetime import datetime
 from typing import Dict, Any
 
@@ -15,6 +16,7 @@ from typing import Dict, Any
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+@pytest.mark.asyncio
 async def test_redis_cache_service():
     """Test the Redis cache service functionality."""
     print("🧪 Testing Redis Cache Service...")
@@ -80,6 +82,7 @@ async def test_redis_cache_service():
         print(f"❌ Redis cache service test failed: {e}")
         return False
 
+@pytest.mark.asyncio
 async def test_cache_manager():
     """Test the cache manager functionality."""
     print("\n🧪 Testing Cache Manager...")
@@ -142,6 +145,7 @@ async def test_cache_manager():
         print(f"❌ Cache manager test failed: {e}")
         return False
 
+@pytest.mark.asyncio
 async def test_cache_integration():
     """Test the cache integration functionality."""
     print("\n🧪 Testing Cache Integration...")
@@ -250,6 +254,7 @@ async def test_cache_integration():
         print(f"❌ Cache integration test failed: {e}")
         return False
 
+@pytest.mark.asyncio
 async def test_cache_monitoring():
     """Test the cache monitoring functionality."""
     print("\n🧪 Testing Cache Monitoring...")

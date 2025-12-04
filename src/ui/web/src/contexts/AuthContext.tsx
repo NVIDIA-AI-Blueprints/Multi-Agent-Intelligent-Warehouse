@@ -58,9 +58,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const login = async (username: string, password: string) => {
+    // Use shorter timeout for login (10 seconds) - login should be fast
     const response = await api.post('/auth/login', {
       username,
       password,
+    }, {
+      timeout: 10000, // 10 second timeout for login
     });
 
     if (response.data.access_token) {

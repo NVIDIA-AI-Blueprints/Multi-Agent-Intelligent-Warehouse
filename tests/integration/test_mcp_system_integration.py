@@ -22,14 +22,14 @@ from src.api.services.mcp.tool_discovery import ToolDiscoveryService, ToolDiscov
 from src.api.services.mcp.tool_binding import ToolBindingService, BindingStrategy, ExecutionMode
 from src.api.services.mcp.tool_routing import ToolRoutingService, RoutingStrategy
 from src.api.services.mcp.tool_validation import ToolValidationService, ValidationLevel
-from src.api.services.mcp.service_discovery import ServiceDiscoveryRegistry, ServiceType
-from src.api.services.mcp.monitoring import MCPMonitoringService, MonitoringConfig
-from src.api.services.mcp.adapters.erp_adapter import ERPAdapter
+from src.api.services.mcp.service_discovery import ServiceRegistry, ServiceType
+from src.api.services.mcp.monitoring import MCPMonitoring
+from src.api.services.mcp.adapters.erp_adapter import MCPERPAdapter
 from src.api.services.mcp.adapters.wms_adapter import WMSAdapter
 from src.api.services.mcp.adapters.iot_adapter import IoTAdapter
-from src.api.agents.inventory.mcp_equipment_agent import MCPEquipmentAgent
-from src.api.agents.operations.mcp_operations_agent import MCPOperationsAgent
-from src.api.agents.safety.mcp_safety_agent import MCPSafetyAgent
+from src.api.agents.inventory.mcp_equipment_agent import MCPEquipmentAssetOperationsAgent
+from src.api.agents.operations.mcp_operations_agent import MCPOperationsCoordinationAgent
+from src.api.agents.safety.mcp_safety_agent import MCPSafetyComplianceAgent
 
 
 class TestMCPSystemIntegration:
@@ -83,23 +83,16 @@ class TestMCPSystemIntegration:
     @pytest.fixture
     async def service_registry(self):
         """Create service discovery registry."""
-        registry = ServiceDiscoveryRegistry()
+        registry = ServiceRegistry()
         yield registry
 
     @pytest.fixture
-    async def monitoring_service(self):
+    async def monitoring_service(self, service_registry, discovery_service):
         """Create monitoring service."""
-        config = MonitoringConfig(
-            metrics_retention_days=1,
-            alert_thresholds={
-                "error_rate": 0.1,
-                "response_time": 5.0
-            }
-        )
-        monitoring = MCPMonitoringService(config)
-        await monitoring.start_monitoring()
+        monitoring = MCPMonitoring(service_registry, discovery_service)
+        await monitoring.start()
         yield monitoring
-        await monitoring.stop_monitoring()
+        await monitoring.stop()
 
     @pytest.fixture
     async def erp_adapter(self):
@@ -107,13 +100,12 @@ class TestMCPSystemIntegration:
         from src.api.services.mcp.base import AdapterConfig, AdapterType
         
         config = AdapterConfig(
-            adapter_id="erp_test_001",
-            adapter_name="Test ERP Adapter",
+            name="Test ERP Adapter",
             adapter_type=AdapterType.ERP,
-            connection_string="postgresql://test:test@localhost:5432/test_erp",
-            capabilities=["inventory", "orders", "customers"]
+            endpoint="postgresql://test:test@localhost:5432/test_erp",
+            metadata={"capabilities": ["inventory", "orders", "customers"]}
         )
-        adapter = ERPAdapter(config)
+        adapter = MCPERPAdapter(config)
         await adapter.connect()
         yield adapter
         await adapter.disconnect()
@@ -124,11 +116,10 @@ class TestMCPSystemIntegration:
         from src.api.services.mcp.base import AdapterConfig, AdapterType
         
         config = AdapterConfig(
-            adapter_id="wms_test_001",
-            adapter_name="Test WMS Adapter",
+            name="Test WMS Adapter",
             adapter_type=AdapterType.WMS,
-            connection_string="postgresql://test:test@localhost:5432/test_wms",
-            capabilities=["inventory", "warehouse_operations", "order_fulfillment"]
+            endpoint="postgresql://test:test@localhost:5432/test_wms",
+            metadata={"capabilities": ["inventory", "warehouse_operations", "order_fulfillment"]}
         )
         adapter = WMSAdapter(config)
         await adapter.connect()
@@ -141,11 +132,10 @@ class TestMCPSystemIntegration:
         from src.api.services.mcp.base import AdapterConfig, AdapterType
         
         config = AdapterConfig(
-            adapter_id="iot_test_001",
-            adapter_name="Test IoT Adapter",
+            name="Test IoT Adapter",
             adapter_type=AdapterType.IOT,
-            connection_string="mqtt://test:test@localhost:1883",
-            capabilities=["equipment_monitoring", "sensor_data", "telemetry"]
+            endpoint="mqtt://test:test@localhost:1883",
+            metadata={"capabilities": ["equipment_monitoring", "sensor_data", "telemetry"]}
         )
         adapter = IoTAdapter(config)
         await adapter.connect()
@@ -155,21 +145,21 @@ class TestMCPSystemIntegration:
     @pytest.fixture
     async def all_agents(self, discovery_service, binding_service, routing_service, validation_service):
         """Create all agents for testing."""
-        equipment_agent = MCPEquipmentAgent(
+        equipment_agent = MCPEquipmentAssetOperationsAgent(
             discovery_service=discovery_service,
             binding_service=binding_service,
             routing_service=routing_service,
             validation_service=validation_service
         )
         
-        operations_agent = MCPOperationsAgent(
+        operations_agent = MCPOperationsCoordinationAgent(
             discovery_service=discovery_service,
             binding_service=binding_service,
             routing_service=routing_service,
             validation_service=validation_service
         )
         
-        safety_agent = MCPSafetyAgent(
+        safety_agent = MCPSafetyComplianceAgent(
             discovery_service=discovery_service,
             binding_service=binding_service,
             routing_service=routing_service,
@@ -374,20 +364,21 @@ class TestMCPSystemIntegration:
     async def test_monitoring_integration(self, monitoring_service, mcp_server, mcp_client, discovery_service):
         """Test monitoring integration."""
         
-        # Record some metrics
-        await monitoring_service.record_metric("tool_executions", 1.0, {"tool_name": "get_inventory"})
-        await monitoring_service.record_metric("tool_execution_time", 0.5, {"tool_name": "get_inventory"})
-        await monitoring_service.record_metric("active_connections", 1.0, {"service": "mcp_server"})
+        # Record some metrics - use metrics_collector.record_metric with MetricType
+        from src.api.services.mcp.monitoring import MetricType
+        await monitoring_service.metrics_collector.record_metric("tool_executions", 1.0, MetricType.GAUGE, {"tool_name": "get_inventory"})
+        await monitoring_service.metrics_collector.record_metric("tool_execution_time", 0.5, MetricType.GAUGE, {"tool_name": "get_inventory"})
+        await monitoring_service.metrics_collector.record_metric("active_connections", 1.0, MetricType.GAUGE, {"service": "mcp_server"})
         
-        # Test metrics retrieval
-        metrics = await monitoring_service.get_metrics("tool_executions")
+        # Test metrics retrieval - use get_metrics_by_name
+        metrics = await monitoring_service.metrics_collector.get_metrics_by_name("tool_executions")
         assert len(metrics) > 0, "Should record and retrieve metrics"
         
         # Test monitoring dashboard
         dashboard = await monitoring_service.get_monitoring_dashboard()
         assert dashboard is not None, "Should get monitoring dashboard"
-        assert "system_health" in dashboard, "Dashboard should include system health"
-        assert "active_services" in dashboard, "Dashboard should include active services"
+        assert "health" in dashboard, "Dashboard should include system health"
+        assert "services_healthy" in dashboard["health"], "Dashboard should include healthy services count"
 
     async def test_error_handling_integration(self, mcp_server, mcp_client, discovery_service):
         """Test error handling integration."""
@@ -469,7 +460,7 @@ class TestMCPSystemIntegration:
         # In a real implementation, this should fail without authentication
         
         # Test with authentication (mock)
-        with patch('chain_server.services.mcp.client.MCPClient._authenticate') as mock_auth:
+        with patch('src.api.services.mcp.client.MCPClient._authenticate') as mock_auth:
             mock_auth.return_value = True
             await mcp_client.connect("http://localhost:8000", MCPConnectionType.HTTP)
             

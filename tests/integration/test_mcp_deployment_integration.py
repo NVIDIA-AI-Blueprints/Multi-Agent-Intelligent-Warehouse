@@ -23,8 +23,8 @@ from src.api.services.mcp.tool_discovery import ToolDiscoveryService, ToolDiscov
 from src.api.services.mcp.tool_binding import ToolBindingService, BindingStrategy, ExecutionMode
 from src.api.services.mcp.tool_routing import ToolRoutingService, RoutingStrategy
 from src.api.services.mcp.tool_validation import ToolValidationService, ValidationLevel
-from src.api.services.mcp.service_discovery import ServiceDiscoveryRegistry, ServiceType
-from src.api.services.mcp.monitoring import MCPMonitoringService, MonitoringConfig
+from src.api.services.mcp.service_discovery import ServiceRegistry, ServiceType
+from src.api.services.mcp.monitoring import MCPMonitoring
 
 
 class TestMCPDockerDeployment:
@@ -85,8 +85,9 @@ class TestMCPDockerDeployment:
         await mcp_client.connect("http://localhost:8000", MCPConnectionType.HTTP)
         
         # Record health metrics
-        await monitoring_service.record_metric("container_health", 1.0, {"container": "mcp_server"})
-        await monitoring_service.record_metric("active_connections", 1.0, {"container": "mcp_server"})
+        from src.api.services.mcp.monitoring import MetricType
+        await monitoring_service.metrics_collector.record_metric("container_health", 1.0, MetricType.GAUGE, {"container": "mcp_server"})
+        await monitoring_service.metrics_collector.record_metric("active_connections", 1.0, MetricType.GAUGE, {"container": "mcp_server"})
         
         # Test health monitoring
         dashboard = await monitoring_service.get_monitoring_dashboard()
@@ -312,8 +313,9 @@ class TestMCPKubernetesDeployment:
         await mcp_client.connect("http://localhost:8000", MCPConnectionType.HTTP)
         
         # Record metrics
-        await monitoring_service.record_metric("pod_health", 1.0, {"pod": "mcp-server-001"})
-        await monitoring_service.record_metric("request_count", 1.0, {"pod": "mcp-server-001"})
+        from src.api.services.mcp.monitoring import MetricType
+        await monitoring_service.metrics_collector.record_metric("pod_health", 1.0, MetricType.GAUGE, {"pod": "mcp-server-001"})
+        await monitoring_service.metrics_collector.record_metric("request_count", 1.0, MetricType.COUNTER, {"pod": "mcp-server-001"})
         
         # Test metrics collection
         metrics = await monitoring_service.get_metrics("pod_health")
@@ -367,9 +369,10 @@ class TestMCPProductionDeployment:
         await mcp_client.connect("http://localhost:8000", MCPConnectionType.HTTP)
         
         # Record production metrics
-        await monitoring_service.record_metric("production_requests", 1.0, {"environment": "production"})
-        await monitoring_service.record_metric("error_rate", 0.01, {"environment": "production"})
-        await monitoring_service.record_metric("response_time", 0.5, {"environment": "production"})
+        from src.api.services.mcp.monitoring import MetricType
+        await monitoring_service.metrics_collector.record_metric("production_requests", 1.0, MetricType.COUNTER, {"environment": "production"})
+        await monitoring_service.metrics_collector.record_metric("error_rate", 0.01, MetricType.GAUGE, {"environment": "production"})
+        await monitoring_service.metrics_collector.record_metric("response_time", 0.5, MetricType.GAUGE, {"environment": "production"})
         
         # Test metrics collection
         metrics = await monitoring_service.get_metrics("production_requests")
@@ -383,7 +386,7 @@ class TestMCPProductionDeployment:
         """Test production security."""
         
         # Test authentication
-        with patch('chain_server.services.mcp.client.MCPClient._authenticate') as mock_auth:
+        with patch('src.api.services.mcp.client.MCPClient._authenticate') as mock_auth:
             mock_auth.return_value = True
             await mcp_client.connect("http://localhost:8000", MCPConnectionType.HTTP)
             
@@ -520,7 +523,8 @@ class TestMCPProductionDeployment:
         await mcp_client.execute_tool("get_inventory", {"item_id": "ITEM002"})
         
         # Record audit events
-        await monitoring_service.record_metric("audit_event", 1.0, {
+        from src.api.services.mcp.monitoring import MetricType
+        await monitoring_service.metrics_collector.record_metric("audit_event", 1.0, MetricType.GAUGE, {
             "event_type": "tool_execution",
             "user_id": "user_001",
             "tool_name": "get_inventory"

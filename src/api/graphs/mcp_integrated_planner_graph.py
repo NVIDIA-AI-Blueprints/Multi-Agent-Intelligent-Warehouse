@@ -290,25 +290,37 @@ class MCPIntentClassifier:
             return "forecasting"
 
         # Check for specific safety-related queries first (highest priority)
+        # Safety queries should take precedence over equipment/operations
         safety_score = sum(
             1 for keyword in cls.SAFETY_KEYWORDS if keyword in message_lower
         )
-        if safety_score > 0:
-            # Only route to safety if it's clearly safety-related, not general equipment
-            safety_context_indicators = [
-                "procedure",
-                "policy",
-                "incident",
-                "compliance",
-                "safety",
-                "ppe",
-                "hazard",
-                "report",
-            ]
-            if any(
-                indicator in message_lower for indicator in safety_context_indicators
-            ):
-                return "safety"
+        
+        # Emergency/urgent safety keywords that should always route to safety
+        emergency_keywords = [
+            "flooding", "flood", "fire", "spill", "leak", "urgent", "critical", 
+            "emergency", "evacuate", "evacuation", "issue", "problem", "malfunction",
+            "failure", "accident", "injury", "hazard", "danger", "unsafe"
+        ]
+        has_emergency = any(keyword in message_lower for keyword in emergency_keywords)
+        
+        # Safety context indicators (broader list)
+        safety_context_indicators = [
+            "procedure", "procedures", "policy", "policies", "incident", "incidents",
+            "compliance", "safety", "ppe", "hazard", "hazards", "report", "reporting",
+            "training", "audit", "checklist", "protocol", "guidelines", "standards",
+            "regulations", "lockout", "tagout", "loto", "corrective", "action",
+            "investigation", "violation", "breach", "concern", "flooding", "flood",
+            "issue", "issues", "problem", "problems", "emergency", "urgent", "critical"
+        ]
+        
+        # Route to safety if:
+        # 1. Has emergency keywords (highest priority)
+        # 2. Has safety keywords AND safety context indicators
+        # 3. Has high safety score (multiple safety keywords)
+        if has_emergency or (safety_score > 0 and any(
+            indicator in message_lower for indicator in safety_context_indicators
+        )) or safety_score >= 2:
+            return "safety"
 
         # Check for document-related keywords (but only if it's clearly document-related)
         document_indicators = [
@@ -350,30 +362,31 @@ class MCPIntentClassifier:
             return "document"
 
         # Check for equipment-specific queries (availability, status, assignment)
-        # But only if it's not a workflow operation
+        # But only if it's not a workflow operation AND not a safety issue
         equipment_indicators = [
-            "available",
-            "status",
-            "utilization",
-            "maintenance",
-            "telemetry",
+            "available", "availability", "status", "utilization", "maintenance",
+            "telemetry", "assignment", "assign", "dispatch", "deploy"
         ]
         equipment_objects = [
-            "forklift",
-            "scanner",
-            "conveyor",
-            "truck",
-            "amr",
-            "agv",
-            "equipment",
+            "forklift", "forklifts", "scanner", "scanners", "conveyor", "conveyors",
+            "truck", "trucks", "amr", "agv", "equipment", "machine", "machines",
+            "asset", "assets"
         ]
 
-        # Only route to equipment if it's a pure equipment query (not workflow-related)
+        # Exclude safety-related equipment queries
+        safety_equipment_terms = [
+            "safety", "incident", "accident", "hazard", "danger", "unsafe",
+            "issue", "problem", "malfunction", "failure", "emergency", "urgent"
+        ]
+        is_safety_equipment_query = any(term in message_lower for term in safety_equipment_terms)
+
+        # Only route to equipment if it's a pure equipment query (not workflow-related, not safety-related)
         workflow_terms = ["wave", "order", "create", "pick", "pack", "task", "workflow"]
         is_workflow_query = any(term in message_lower for term in workflow_terms)
 
         if (
             not is_workflow_query
+            and not is_safety_equipment_query
             and any(indicator in message_lower for indicator in equipment_indicators)
             and any(obj in message_lower for obj in equipment_objects)
         ):
@@ -558,7 +571,12 @@ class MCPPlannerGraph:
                 ]
 
             logger.info(
-                f"MCP Intent classified as: {intent} for message: {message_text[:100]}..."
+                f"🔀 MCP Intent classified as: {intent} for message: {message_text[:100]}..."
+            )
+            logger.debug(
+                f"Routing decision details - Intent: {intent}, Message: {message_text}, "
+                f"Safety keywords found: {sum(1 for kw in MCPIntentClassifier.SAFETY_KEYWORDS if kw in message_text.lower())}, "
+                f"Equipment keywords found: {sum(1 for kw in MCPIntentClassifier.EQUIPMENT_KEYWORDS if kw in message_text.lower())}"
             )
 
             # Handle ambiguous queries with clarifying questions
@@ -566,7 +584,7 @@ class MCPPlannerGraph:
                 return await self._handle_ambiguous_query(state)
 
         except Exception as e:
-            logger.error(f"Error in MCP intent routing: {e}")
+            logger.error(f"❌ Error in MCP intent routing: {e}", exc_info=True)
             state["user_intent"] = "general"
             state["routing_decision"] = "general"
 
@@ -684,7 +702,13 @@ class MCPPlannerGraph:
 
             # Get the latest user message
             if not state["messages"]:
-                state["agent_responses"]["equipment"] = "No message to process"
+                state["agent_responses"]["equipment"] = {
+                    "natural_language": "No message to process",
+                    "data": {},
+                    "recommendations": [],
+                    "confidence": 0.0,
+                    "response_type": "error",
+                }
                 return state
 
             latest_message = state["messages"][-1]
@@ -696,48 +720,84 @@ class MCPPlannerGraph:
             # Get session ID from context
             session_id = state.get("session_id", "default")
 
-            # Get MCP equipment agent
-            mcp_equipment_agent = await get_mcp_equipment_agent()
+            # Get MCP equipment agent with timeout
+            try:
+                mcp_equipment_agent = await asyncio.wait_for(
+                    get_mcp_equipment_agent(),
+                    timeout=5.0  # 5 second timeout for agent initialization
+                )
+            except asyncio.TimeoutError:
+                logger.error("MCP equipment agent initialization timed out")
+                raise
+            except Exception as init_error:
+                logger.error(f"MCP equipment agent initialization failed: {init_error}")
+                raise
 
             # Extract reasoning parameters from state
             enable_reasoning = state.get("enable_reasoning", False)
             reasoning_types = state.get("reasoning_types")
             
-            # Process with MCP equipment agent
-            response = await mcp_equipment_agent.process_query(
-                query=message_text,
-                session_id=session_id,
-                context=state.get("context", {}),
-                mcp_results=state.get("mcp_results"),
-                enable_reasoning=enable_reasoning,
-                reasoning_types=reasoning_types,
-            )
+            # Process with MCP equipment agent with timeout
+            agent_timeout = 45.0 if enable_reasoning else 20.0
+            try:
+                response = await asyncio.wait_for(
+                    mcp_equipment_agent.process_query(
+                        query=message_text,
+                        session_id=session_id,
+                        context=state.get("context", {}),
+                        mcp_results=state.get("mcp_results"),
+                        enable_reasoning=enable_reasoning,
+                        reasoning_types=reasoning_types,
+                    ),
+                    timeout=agent_timeout
+                )
+            except asyncio.TimeoutError:
+                logger.error(f"MCP equipment agent process_query timed out after {agent_timeout}s")
+                raise TimeoutError(f"Equipment agent processing timed out after {agent_timeout}s")
+            except Exception as process_error:
+                logger.error(f"MCP equipment agent process_query failed: {process_error}")
+                raise
 
-            # Store the response
-            state["agent_responses"]["equipment"] = {
-                "natural_language": response.natural_language,
-                "data": response.data,
-                "recommendations": response.recommendations,
-                "confidence": response.confidence,
-                "response_type": response.response_type,
-                "mcp_tools_used": response.mcp_tools_used or [],
-                "tool_execution_results": response.tool_execution_results or {},
-                "actions_taken": response.actions_taken or [],
-                "reasoning_chain": response.reasoning_chain,
-                "reasoning_steps": response.reasoning_steps,
-            }
+            # Store the response (handle both dict and object responses)
+            if isinstance(response, dict):
+                state["agent_responses"]["equipment"] = response
+            else:
+                # Convert response object to dict
+                state["agent_responses"]["equipment"] = {
+                    "natural_language": response.natural_language if hasattr(response, "natural_language") else str(response),
+                    "data": response.data if hasattr(response, "data") else {},
+                    "recommendations": response.recommendations if hasattr(response, "recommendations") else [],
+                    "confidence": response.confidence if hasattr(response, "confidence") else 0.0,
+                    "response_type": response.response_type if hasattr(response, "response_type") else "equipment_info",
+                    "mcp_tools_used": response.mcp_tools_used or [] if hasattr(response, "mcp_tools_used") else [],
+                    "tool_execution_results": response.tool_execution_results or {} if hasattr(response, "tool_execution_results") else {},
+                    "actions_taken": response.actions_taken or [] if hasattr(response, "actions_taken") else [],
+                    "reasoning_chain": response.reasoning_chain if hasattr(response, "reasoning_chain") else None,
+                    "reasoning_steps": response.reasoning_steps if hasattr(response, "reasoning_steps") else None,
+                }
 
             logger.info(
                 f"MCP Equipment agent processed request with confidence: {response.confidence}"
             )
 
-        except Exception as e:
-            logger.error(f"Error in MCP equipment agent: {e}")
+        except asyncio.TimeoutError as e:
+            logger.error(f"Timeout in MCP equipment agent: {e}")
             state["agent_responses"]["equipment"] = {
-                "natural_language": f"Error processing equipment request: {str(e)}",
-                "data": {"error": str(e)},
+                "natural_language": f"I received your equipment query: '{message_text}'. The system is taking longer than expected to process it. Please try again or rephrase your question.",
+                "data": {"error": "timeout", "message": str(e)},
                 "recommendations": [],
-                "confidence": 0.0,
+                "confidence": 0.3,
+                "response_type": "timeout",
+                "mcp_tools_used": [],
+                "tool_execution_results": {},
+            }
+        except Exception as e:
+            logger.error(f"Error in MCP equipment agent: {e}", exc_info=True)
+            state["agent_responses"]["equipment"] = {
+                "natural_language": f"I received your equipment query: '{message_text}'. However, I encountered an error processing it: {str(e)[:100]}. Please try rephrasing your question.",
+                "data": {"error": str(e)[:200]},
+                "recommendations": [],
+                "confidence": 0.3,
                 "response_type": "error",
                 "mcp_tools_used": [],
                 "tool_execution_results": {},
@@ -828,7 +888,13 @@ class MCPPlannerGraph:
 
             # Get the latest user message
             if not state["messages"]:
-                state["agent_responses"]["safety"] = "No message to process"
+                state["agent_responses"]["safety"] = {
+                    "natural_language": "No message to process",
+                    "data": {},
+                    "recommendations": [],
+                    "confidence": 0.0,
+                    "response_type": "error",
+                }
                 return state
 
             latest_message = state["messages"][-1]
@@ -840,22 +906,44 @@ class MCPPlannerGraph:
             # Get session ID from context
             session_id = state.get("session_id", "default")
 
-            # Get MCP safety agent
-            mcp_safety_agent = await get_mcp_safety_agent()
+            # Get MCP safety agent with timeout
+            try:
+                mcp_safety_agent = await asyncio.wait_for(
+                    get_mcp_safety_agent(),
+                    timeout=5.0  # 5 second timeout for agent initialization
+                )
+            except asyncio.TimeoutError:
+                logger.error("MCP safety agent initialization timed out")
+                raise
+            except Exception as init_error:
+                logger.error(f"MCP safety agent initialization failed: {init_error}")
+                raise
 
             # Extract reasoning parameters from state
             enable_reasoning = state.get("enable_reasoning", False)
             reasoning_types = state.get("reasoning_types")
             
-            # Process with MCP safety agent
-            response = await mcp_safety_agent.process_query(
-                query=message_text,
-                session_id=session_id,
-                context=state.get("context", {}),
-                mcp_results=state.get("mcp_results"),
-                enable_reasoning=enable_reasoning,
-                reasoning_types=reasoning_types,
-            )
+            # Process with MCP safety agent with timeout
+            # Use shorter timeout for agent processing (20s for simple queries)
+            agent_timeout = 45.0 if enable_reasoning else 20.0
+            try:
+                response = await asyncio.wait_for(
+                    mcp_safety_agent.process_query(
+                        query=message_text,
+                        session_id=session_id,
+                        context=state.get("context", {}),
+                        mcp_results=state.get("mcp_results"),
+                        enable_reasoning=enable_reasoning,
+                        reasoning_types=reasoning_types,
+                    ),
+                    timeout=agent_timeout
+                )
+            except asyncio.TimeoutError:
+                logger.error(f"MCP safety agent process_query timed out after {agent_timeout}s")
+                raise TimeoutError(f"Safety agent processing timed out after {agent_timeout}s")
+            except Exception as process_error:
+                logger.error(f"MCP safety agent process_query failed: {process_error}")
+                raise
 
             # Store the response (handle both dict and object responses)
             if isinstance(response, dict):
@@ -879,13 +967,24 @@ class MCPPlannerGraph:
                 f"MCP Safety agent processed request with confidence: {response.confidence}"
             )
 
-        except Exception as e:
-            logger.error(f"Error in MCP safety agent: {e}")
+        except asyncio.TimeoutError as e:
+            logger.error(f"Timeout in MCP safety agent: {e}")
             state["agent_responses"]["safety"] = {
-                "natural_language": f"Error processing safety request: {str(e)}",
-                "data": {"error": str(e)},
+                "natural_language": f"I received your safety query: '{message_text}'. The system is taking longer than expected to process it. Please try again or rephrase your question.",
+                "data": {"error": "timeout", "message": str(e)},
                 "recommendations": [],
-                "confidence": 0.0,
+                "confidence": 0.3,
+                "response_type": "timeout",
+                "mcp_tools_used": [],
+                "tool_execution_results": {},
+            }
+        except Exception as e:
+            logger.error(f"Error in MCP safety agent: {e}", exc_info=True)
+            state["agent_responses"]["safety"] = {
+                "natural_language": f"I received your safety query: '{message_text}'. However, I encountered an error processing it: {str(e)[:100]}. Please try rephrasing your question.",
+                "data": {"error": str(e)[:200]},
+                "recommendations": [],
+                "confidence": 0.3,
                 "response_type": "error",
                 "mcp_tools_used": [],
                 "tool_execution_results": {},
@@ -1088,9 +1187,22 @@ class MCPPlannerGraph:
             routing_decision = state.get("routing_decision", "general")
             agent_responses = state.get("agent_responses", {})
 
+            logger.info(f"🔍 Synthesizing response for routing_decision: {routing_decision}")
+            logger.info(f"🔍 Available agent_responses keys: {list(agent_responses.keys())}")
+
             # Get the response from the appropriate agent
             if routing_decision in agent_responses:
                 agent_response = agent_responses[routing_decision]
+                logger.info(f"🔍 Found agent_response for {routing_decision}, type: {type(agent_response)}")
+                
+                # Log response structure for debugging
+                if isinstance(agent_response, dict):
+                    logger.info(f"🔍 agent_response dict keys: {list(agent_response.keys())}")
+                    logger.info(f"🔍 Has natural_language: {'natural_language' in agent_response}")
+                    if "natural_language" in agent_response:
+                        logger.info(f"🔍 natural_language value: {str(agent_response['natural_language'])[:100]}...")
+                elif hasattr(agent_response, "__dict__"):
+                    logger.info(f"🔍 agent_response object attributes: {list(agent_response.__dict__.keys())}")
 
                 # Handle MCP response format
                 if hasattr(agent_response, "natural_language"):
@@ -1107,7 +1219,21 @@ class MCPPlannerGraph:
                     logger.info(f"📋 agent_response_dict keys: {list(agent_response_dict.keys())}")
                     logger.info(f"📋 Has reasoning_chain: {'reasoning_chain' in agent_response_dict}, value: {agent_response_dict.get('reasoning_chain') is not None}")
 
-                    final_response = agent_response_dict["natural_language"]
+                    final_response = agent_response_dict.get("natural_language", "")
+                    # If natural_language is empty, try to construct from other fields
+                    if not final_response or final_response.strip() == "":
+                        # Try to get response from data field
+                        if "data" in agent_response_dict and agent_response_dict["data"]:
+                            if isinstance(agent_response_dict["data"], dict):
+                                # Try common fields in data
+                                for field in ["message", "response", "text", "summary", "result"]:
+                                    if field in agent_response_dict["data"] and agent_response_dict["data"][field]:
+                                        final_response = str(agent_response_dict["data"][field])
+                                        break
+                        # If still empty, use a default message
+                        if not final_response or final_response.strip() == "":
+                            logger.warning(f"natural_language is empty in agent_response_dict, using default message")
+                            final_response = f"I processed your {routing_decision} query, but couldn't generate a detailed response. Please try rephrasing your question."
                     # Store structured data in context for API response
                     state["context"]["structured_response"] = agent_response_dict
 
@@ -1191,7 +1317,18 @@ class MCPPlannerGraph:
                     isinstance(agent_response, dict)
                     and "natural_language" in agent_response
                 ):
-                    final_response = agent_response["natural_language"]
+                    final_response = agent_response.get("natural_language", "")
+                    # Check if natural_language is empty or just whitespace
+                    if not final_response or final_response.strip() == "":
+                        logger.warning(f"natural_language is empty in dict response, trying alternative fields")
+                        # Try alternative fields
+                        for field in ["response", "text", "message", "summary"]:
+                            if field in agent_response and agent_response[field]:
+                                final_response = str(agent_response[field])
+                                break
+                        # If still empty, use fallback
+                        if not final_response or final_response.strip() == "":
+                            final_response = f"I processed your {routing_decision} query, but couldn't generate a detailed response. Please try rephrasing your question."
                     # Store structured data in context for API response
                     state["context"]["structured_response"] = agent_response
 
@@ -1296,9 +1433,29 @@ class MCPPlannerGraph:
                         final_response = "I received your request and processed it successfully."
                         logger.warning(f"Unexpected agent_response type: {type(agent_response)}, using fallback message")
             else:
+                logger.warning(f"⚠️ No agent_response found for routing_decision: {routing_decision}, using fallback")
                 final_response = "I'm sorry, I couldn't process your request. Please try rephrasing your question."
 
+            # Ensure final_response is set and not empty
+            if not final_response or (isinstance(final_response, str) and final_response.strip() == ""):
+                logger.error(f"❌ final_response is empty after synthesis, using fallback")
+                logger.error(f"❌ agent_response type: {type(agent_response)}, keys: {list(agent_response.keys()) if isinstance(agent_response, dict) else 'N/A'}")
+                # Try to extract any meaningful response from agent_response
+                if isinstance(agent_response, dict):
+                    # Try alternative fields
+                    for field in ["response", "text", "message", "data", "result"]:
+                        if field in agent_response and agent_response[field]:
+                            if isinstance(agent_response[field], str):
+                                final_response = agent_response[field]
+                                break
+                            elif isinstance(agent_response[field], dict) and "natural_language" in agent_response[field]:
+                                final_response = agent_response[field]["natural_language"]
+                                break
+                if not final_response or (isinstance(final_response, str) and final_response.strip() == ""):
+                    final_response = "I'm sorry, I couldn't process your request. Please try rephrasing your question."
+
             state["final_response"] = final_response
+            logger.info(f"✅ final_response set: {final_response[:100] if final_response else 'None'}...")
 
             # Add AI message to conversation
             if state["messages"]:
@@ -1306,7 +1463,7 @@ class MCPPlannerGraph:
                 state["messages"].append(ai_message)
 
             logger.info(
-                f"MCP Response synthesized for routing decision: {routing_decision}"
+                f"MCP Response synthesized for routing decision: {routing_decision}, final_response length: {len(final_response) if final_response else 0}"
             )
 
         except Exception as e:
@@ -1387,8 +1544,8 @@ class MCPPlannerGraph:
                 # Match the timeout in chat.py: 230s for complex, 115s for regular reasoning
                 graph_timeout = 230.0 if is_complex_query else 115.0  # 230s for complex, 115s for regular reasoning
             else:
-                # Regular queries: 25s for simple, 60s for complex
-                graph_timeout = 60.0 if is_complex_query else 25.0
+                # Regular queries: 30s for simple, 90s for complex (increased to match chat.py timeout)
+                graph_timeout = 90.0 if is_complex_query else 30.0
             try:
                 result = await asyncio.wait_for(
                     self.graph.ainvoke(initial_state),

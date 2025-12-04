@@ -210,6 +210,29 @@ class MetricsCollector:
                 "last_seen": metrics[-1].timestamp.isoformat(),
             }
 
+    async def get_metrics_by_name(
+        self, name: str, labels: Dict[str, str] = None
+    ) -> List[Metric]:
+        """
+        Get all metrics with a given name, optionally filtered by labels.
+        
+        If labels is None, returns all metrics with the given name regardless of labels.
+        If labels is provided, returns only metrics matching those exact labels.
+        """
+        async with self._lock:
+            if labels is None:
+                # Return all metrics with this name, regardless of labels
+                all_matching = []
+                for metric_key, metrics_list in self.metrics.items():
+                    if metric_key.startswith(f"{name}:"):
+                        all_matching.extend(list(metrics_list))
+                return all_matching
+            else:
+                # Return metrics matching exact labels
+                metric_key = f"{name}:{json.dumps(labels, sort_keys=True)}"
+                metrics = self.metrics.get(metric_key)
+                return list(metrics) if metrics else []
+
     async def get_all_metrics(self) -> Dict[str, List[Metric]]:
         """Get all metrics."""
         async with self._lock:
@@ -688,7 +711,7 @@ class MCPMonitoring:
         healthy_services = sum(1 for s in services if s.status.value == "running")
 
         # Get tool count
-        tools = await self.tool_discovery.get_discovery_status()
+        tools = self.tool_discovery.get_discovery_status()
         tools_available = tools.get("total_tools", 0)
 
         # Get system metrics
@@ -817,7 +840,7 @@ class MCPMonitoring:
             )
 
             # Collect tool metrics
-            tool_stats = await self.tool_discovery.get_tool_statistics()
+            tool_stats = self.tool_discovery.get_tool_statistics()
             await self.metrics_collector.record_metric(
                 "tools_available",
                 tool_stats.get("total_tools", 0),

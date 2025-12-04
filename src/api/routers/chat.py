@@ -195,6 +195,7 @@ def _format_user_response(
     structured_response: Dict[str, Any],
     confidence: float,
     recommendations: List[str],
+    is_error_response: bool = False,
 ) -> str:
     """
     Format the response to be more user-friendly and comprehensive.
@@ -204,6 +205,7 @@ def _format_user_response(
         structured_response: Structured data from the agent
         confidence: Confidence score
         recommendations: List of recommendations
+        is_error_response: If True, don't add confidence footer (for error/fallback responses)
 
     Returns:
         Formatted user-friendly response
@@ -211,6 +213,10 @@ def _format_user_response(
     try:
         # Clean the base response by removing technical details
         formatted_response = _clean_response_text(base_response)
+
+        # Don't add formatting to error/fallback responses
+        if is_error_response:
+            return formatted_response
 
         # Add status information if available
         if structured_response and "data" in structured_response:
@@ -231,15 +237,15 @@ def _format_user_response(
             recommendations_section = _format_recommendations_section(user_recommendations)
             formatted_response += recommendations_section
 
-        # Add confidence indicator and timestamp footer
+        # Add confidence indicator and timestamp footer (only for successful responses)
         formatted_response = _add_response_footer(formatted_response, confidence)
 
         return formatted_response
 
     except Exception as e:
         logger.error(f"Error formatting user response: {_sanitize_log_data(str(e))}")
-        # Return base response with basic formatting if formatting fails
-        return f"{base_response}\n\n🟢 {int(confidence * 100)}%"
+        # Return base response without formatting if formatting fails
+        return base_response
 
 
 def _convert_reasoning_step_to_dict(step: Any) -> Dict[str, Any]:
@@ -501,6 +507,29 @@ def _clean_response_text(response: str) -> str:
             r"}, 'mcp_tools_used': \[\], 'tool_execution_results': \{\}\}",
             r"', 'mcp_tools_used': \[\], 'tool_execution_results': \{\}\}",
             r"'mcp_tools_used': \[\], 'tool_execution_results': \{\}",
+            # More aggressive patterns for tool_execution_results appearing in text
+            r"\]\}'tool_execution_results': \{\}\}'tool_execution_results': \{\}",
+            r"\]\}'tool_execution_results': \{\}",
+            r"'tool_execution_results': \{\}",
+            r"tool_execution_results': \{\}",
+            r"tool_execution_results: \{\}",
+            r"tool_execution_results: \{\}",
+            # Pattern for the specific case: "question. }'tool_execution_results': {"
+            r"\s+\}\}'tool_execution_results':\s*\{",
+            r"\s+\}\}'tool_execution_results':\s*\{\}",
+            r"\s+\}\}'tool_execution_results':\s*\{\}\}",
+            # Pattern for when it appears after a period/question mark: "question. }'tool_execution_results': {"
+            r"[.?!]\s+\}\}'tool_execution_results':\s*\{",
+            r"[.?!]\s+\}\}'tool_execution_results':\s*\{\}",
+            # Pattern for when it appears at the end: "question }'tool_execution_results': {"
+            r"\s+\}\}'tool_execution_results':\s*\{[^}]*$",
+            # Pattern for: "'tool_execution_results': , 'uuid': }}'tool_execution_results':"
+            r"'tool_execution_results':\s*,\s*'[^']+':\s*\}\}'tool_execution_results':",
+            r"'tool_execution_results':\s*,\s*'[^']+':\s*\}\}",
+            r"'tool_execution_results':\s*,\s*'[a-f0-9-]+':\s*\}\}",
+            # Pattern for: "question. 'tool_execution_results': , 'uuid': }}"
+            r"[.?!]\s+'tool_execution_results':\s*,\s*'[^']+':\s*\}\}",
+            r"\s+'tool_execution_results':\s*,\s*'[a-f0-9-]+':\s*\}\}",
         ]
         for pattern in mcp_patterns:
             response = re.sub(pattern, "", response)
@@ -832,16 +861,55 @@ async def chat(req: ChatRequest):
                 raise
             
             # Handle empty or invalid results
-            if not result or not result.get("response"):
-                logger.warning("MCP planner returned empty result, creating fallback response")
+            # Check for empty, None, or "No response generated" responses
+            response_text = result.get("response") if result else None
+            is_empty_response = (
+                not result or 
+                not response_text or 
+                (isinstance(response_text, str) and (
+                    response_text.strip() == "" or 
+                    response_text == "No response generated" or
+                    response_text.strip().lower() == "no response generated"
+                ))
+            )
+            
+            if is_empty_response:
+                logger.warning(f"MCP planner returned empty/invalid result (response: {repr(response_text)}), creating fallback response")
+                
+                # Try to determine route from message content for better fallback
+                message_lower = req.message.lower()
+                fallback_route = "general"
+                fallback_intent = "general"
+                
+                # Pattern matching for better routing in fallback
+                fallback_message = f"I received your message: '{req.message}'. However, I'm having trouble processing it right now. Please try rephrasing your question."
+                
+                if any(word in message_lower for word in ["safety", "incident", "accident", "hazard", "violation", "compliance", "over-temp", "temperature", "event", "dock"]):
+                    fallback_route = "safety"
+                    fallback_intent = "safety"
+                    fallback_message = f"I received your safety query: '{req.message}'. The system is currently processing your request. Please wait a moment or try rephrasing your question."
+                elif any(word in message_lower for word in ["equipment", "forklift", "machine", "asset", "status", "availability", "show", "list"]):
+                    fallback_route = "equipment"
+                    fallback_intent = "equipment"
+                    fallback_message = f"I received your equipment query: '{req.message}'. The system is currently processing your request. Please wait a moment or try rephrasing your question."
+                elif any(word in message_lower for word in ["workforce", "worker", "shift", "schedule", "task", "assignment", "dispatch"]):
+                    fallback_route = "operations"
+                    fallback_intent = "operations"
+                    fallback_message = f"I received your operations query: '{req.message}'. The system is currently processing your request. Please wait a moment or try rephrasing your question."
+                elif any(word in message_lower for word in ["inventory", "stock", "sku", "quantity", "item"]):
+                    fallback_route = "inventory"
+                    fallback_intent = "inventory"
+                    fallback_message = f"I received your inventory query: '{req.message}'. The system is currently processing your request. Please wait a moment or try rephrasing your question."
+                
                 result = {
-                    "response": f"I received your message: '{req.message}'. However, I'm having trouble processing it right now. Please try rephrasing your question.",
-                    "intent": "general",
-                    "route": "general",
+                    "response": fallback_message,
+                    "intent": fallback_intent,
+                    "route": fallback_route,
                     "session_id": req.session_id or "default",
                     "structured_response": {},
                     "mcp_tools_used": [],
                     "tool_execution_results": {},
+                    "is_fallback": True,  # Mark as fallback for formatting
                 }
             
             # Determine if enhancements should be skipped for simple queries
@@ -1250,11 +1318,16 @@ async def chat(req: ChatRequest):
             base_response = f"I received your message: '{req.message}'. Processing your request..."
         
         try:
+            # Check if this is a fallback/error response
+            is_fallback = result.get("is_fallback", False) if result else False
+            is_error_response = is_fallback or "having trouble processing" in base_response.lower()
+            
             formatted_reply = _format_user_response(
                 base_response,
                 structured_response if structured_response else {},
                 confidence if confidence else 0.75,
                 result.get("recommendations", []) if result else [],
+                is_error_response=is_error_response,
             )
         except Exception as format_error:
             logger.error(f"Error formatting response: {_sanitize_log_data(str(format_error))}")
@@ -1355,8 +1428,15 @@ async def chat(req: ChatRequest):
                 return str(data)
         
         # Clean reasoning data before adding to response
-        cleaned_reasoning_chain = clean_reasoning_data(reasoning_chain) if reasoning_chain else None
-        cleaned_reasoning_steps = clean_reasoning_data(reasoning_steps) if reasoning_steps else None
+        # Only include reasoning if enable_reasoning is True
+        if req.enable_reasoning:
+            cleaned_reasoning_chain = clean_reasoning_data(reasoning_chain) if reasoning_chain else None
+            cleaned_reasoning_steps = clean_reasoning_data(reasoning_steps) if reasoning_steps else None
+        else:
+            # Respect enable_reasoning: false - do not include reasoning in response
+            cleaned_reasoning_chain = None
+            cleaned_reasoning_steps = None
+            logger.info("Reasoning disabled - excluding reasoning_chain and reasoning_steps from response")
         
         # Clean context to remove potential circular references
         # Simply remove reasoning_chain and reasoning_steps from context as they're passed separately
@@ -1396,7 +1476,11 @@ async def chat(req: ChatRequest):
                         cleaned_tool_results[k] = cleaned_result
         
         try:
-            logger.info(f"📤 Creating response with reasoning_chain: {reasoning_chain is not None}, reasoning_steps: {reasoning_steps is not None}")
+            # Log reasoning inclusion status based on enable_reasoning flag
+            if req.enable_reasoning:
+                logger.info(f"📤 Creating response with reasoning_chain: {cleaned_reasoning_chain is not None}, reasoning_steps: {cleaned_reasoning_steps is not None}")
+            else:
+                logger.info(f"📤 Creating response without reasoning (enable_reasoning=False)")
             # Clean all complex fields to avoid circular references
             # Allow nested structures for structured_data (it's meant to contain structured information)
             # but prevent circular references by limiting depth

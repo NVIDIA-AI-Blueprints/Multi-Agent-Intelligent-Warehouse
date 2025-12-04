@@ -8,6 +8,7 @@ This script tests the full LLM integration with various inventory queries.
 import asyncio
 import json
 import sys
+import pytest
 from pathlib import Path
 
 # Add project root to path
@@ -17,6 +18,7 @@ sys.path.insert(0, str(project_root))
 # Import test configuration
 from tests.unit.test_config import CHAT_ENDPOINT, DEFAULT_TIMEOUT
 
+@pytest.mark.asyncio
 async def test_nvidia_integration():
     """Test the full NVIDIA NIM integration."""
     print("🧪 Testing NVIDIA NIM Integration")
@@ -106,6 +108,7 @@ async def test_nvidia_integration():
         traceback.print_exc()
         return False
 
+@pytest.mark.asyncio
 async def test_llm_capabilities():
     """Test specific LLM capabilities."""
     print("\n🧠 Testing LLM Capabilities")

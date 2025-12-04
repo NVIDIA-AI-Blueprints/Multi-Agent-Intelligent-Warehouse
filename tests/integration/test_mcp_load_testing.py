@@ -25,8 +25,8 @@ from src.api.services.mcp.tool_discovery import ToolDiscoveryService, ToolDiscov
 from src.api.services.mcp.tool_binding import ToolBindingService, BindingStrategy, ExecutionMode
 from src.api.services.mcp.tool_routing import ToolRoutingService, RoutingStrategy
 from src.api.services.mcp.tool_validation import ToolValidationService, ValidationLevel
-from src.api.services.mcp.service_discovery import ServiceDiscoveryRegistry, ServiceType
-from src.api.services.mcp.monitoring import MCPMonitoringService, MonitoringConfig
+from src.api.services.mcp.service_discovery import ServiceRegistry, ServiceType
+from src.api.services.mcp.monitoring import MCPMonitoring
 
 
 class TestMCPStressTesting:
@@ -602,7 +602,7 @@ class TestMCPScalabilityTesting:
         
         for resources in resource_levels:
             # Simulate resource allocation
-            with patch('chain_server.services.mcp.server.MCPServer._get_available_resources') as mock_resources:
+            with patch('src.api.services.mcp.server.MCPServer._get_available_resources') as mock_resources:
                 mock_resources.return_value = resources
                 
                 start_time = time.time()

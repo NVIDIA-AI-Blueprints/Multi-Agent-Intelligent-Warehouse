@@ -11,6 +11,7 @@ from dataclasses import dataclass, asdict
 import json
 from datetime import datetime, timedelta
 import asyncio
+import re
 
 from src.api.services.llm.nim_client import get_nim_client, LLMResponse
 from src.retrieval.hybrid_retriever import get_hybrid_retriever, SearchContext
@@ -260,7 +261,7 @@ class MCPSafetyComplianceAgent:
     ) -> MCPSafetyQuery:
         """Parse safety query and extract intent and entities."""
         try:
-            # Use LLM to parse the query
+            # Use LLM to parse the query with better entity extraction
             parse_prompt = [
                 {
                     "role": "system",
@@ -269,16 +270,29 @@ class MCPSafetyComplianceAgent:
 Return JSON format:
 {
     "intent": "incident_reporting",
-    "entities": {"incident_type": "safety", "location": "Zone A"},
+    "entities": {
+        "incident_type": "flooding",
+        "location": "Zone A",
+        "severity": "critical",
+        "description": "flooding in Zone A",
+        "reporter": "user"
+    },
     "context": {"priority": "high", "severity": "critical"}
 }
 
 Intent options: incident_reporting, compliance_check, safety_audit, hazard_identification, policy_lookup, training_tracking
 
+CRITICAL: Extract ALL relevant entities from the query:
+- incident_type: flooding, fire, spill, leak, accident, injury, hazard, etc.
+- location: Zone A, Zone B, Dock D2, warehouse, etc.
+- severity: critical, high, medium, low (infer from incident type - flooding/fire/spill = critical)
+- description: full description of the issue
+- reporter: "user" or "system"
+
 Examples:
-- "Report a safety incident in Zone A" → {"intent": "incident_reporting", "entities": {"location": "Zone A"}, "context": {"priority": "high"}}
-- "Check compliance for forklift operations" → {"intent": "compliance_check", "entities": {"equipment": "forklift"}, "context": {"priority": "normal"}}
-- "Identify hazards in warehouse" → {"intent": "hazard_identification", "entities": {"location": "warehouse"}, "context": {"priority": "high"}}
+- "we have an issue with flooding in Zone A" → {"intent": "incident_reporting", "entities": {"incident_type": "flooding", "location": "Zone A", "severity": "critical", "description": "flooding in Zone A"}, "context": {"priority": "high", "severity": "critical"}}
+- "Report a safety incident in Zone A" → {"intent": "incident_reporting", "entities": {"location": "Zone A", "severity": "high"}, "context": {"priority": "high"}}
+- "What are the safety procedures for forklift operations?" → {"intent": "policy_lookup", "entities": {"equipment": "forklift", "query": "safety procedures for forklift operations"}, "context": {"priority": "normal"}}
 
 Return only valid JSON.""",
                 },
@@ -288,22 +302,35 @@ Return only valid JSON.""",
                 },
             ]
 
-            response = await self.nim_client.generate_response(parse_prompt)
+            response = await self.nim_client.generate_response(parse_prompt, temperature=0.0)
 
             # Parse JSON response
             try:
                 parsed_data = json.loads(response.content)
             except json.JSONDecodeError:
-                # Fallback parsing
-                parsed_data = {
-                    "intent": "incident_reporting",
-                    "entities": {},
-                    "context": {},
-                }
+                # Fallback parsing with keyword extraction
+                parsed_data = self._fallback_parse_safety_query(query)
+            
+            # Ensure critical entities are present
+            entities = parsed_data.get("entities", {})
+            if not entities.get("description"):
+                entities["description"] = query
+            if not entities.get("reporter"):
+                entities["reporter"] = "user"
+            
+            # Infer severity from incident type if missing
+            incident_type = entities.get("incident_type", "").lower()
+            if not entities.get("severity"):
+                if incident_type in ["flooding", "flood", "fire", "spill", "leak", "explosion"]:
+                    entities["severity"] = "critical"
+                elif incident_type in ["accident", "injury", "hazard"]:
+                    entities["severity"] = "high"
+                else:
+                    entities["severity"] = "medium"
 
             return MCPSafetyQuery(
                 intent=parsed_data.get("intent", "incident_reporting"),
-                entities=parsed_data.get("entities", {}),
+                entities=entities,
                 context=parsed_data.get("context", {}),
                 user_query=query,
             )
@@ -406,22 +433,79 @@ Return only valid JSON.""",
         try:
             execution_plan = []
 
-            # Create execution steps based on query intent
-            intent_config = {
-                "incident_reporting": ([ToolCategory.SAFETY], 3),
-                "compliance_check": ([ToolCategory.SAFETY, ToolCategory.DATA_ACCESS], 2),
-                "safety_audit": ([ToolCategory.SAFETY], 3),
-                "hazard_identification": ([ToolCategory.SAFETY], 2),
-                "policy_lookup": ([ToolCategory.DATA_ACCESS], 2),
-                "training_tracking": ([ToolCategory.SAFETY], 2),
-            }
-            
-            categories, limit = intent_config.get(
-                query.intent, ([ToolCategory.SAFETY], 2)
-            )
-            self._add_tools_to_execution_plan(
-                execution_plan, tools, categories, limit, query
-            )
+            # For incident reporting (flooding, fire, etc.), prioritize getting safety procedures first
+            if query.intent == "incident_reporting":
+                # First, get safety procedures for the incident type
+                procedures_tool = next((t for t in tools if t.tool_id == "get_safety_procedures"), None)
+                if procedures_tool:
+                    execution_plan.append({
+                        "tool_id": procedures_tool.tool_id,
+                        "tool_name": procedures_tool.name,
+                        "arguments": self._prepare_tool_arguments(procedures_tool, query),
+                        "priority": 1,
+                        "required": True,
+                    })
+                
+                # Then, try to log the incident if we have required entities
+                if query.entities.get("severity") and query.entities.get("description"):
+                    log_incident_tool = next((t for t in tools if t.tool_id == "log_incident"), None)
+                    if log_incident_tool:
+                        execution_plan.append({
+                            "tool_id": log_incident_tool.tool_id,
+                            "tool_name": log_incident_tool.name,
+                            "arguments": self._prepare_tool_arguments(log_incident_tool, query),
+                            "priority": 2,
+                            "required": False,  # Not required if missing entities
+                        })
+                
+                # For critical incidents, also broadcast alert
+                if query.entities.get("severity") == "critical" and query.entities.get("message"):
+                    broadcast_tool = next((t for t in tools if t.tool_id == "broadcast_alert"), None)
+                    if broadcast_tool:
+                        execution_plan.append({
+                            "tool_id": broadcast_tool.tool_id,
+                            "tool_name": broadcast_tool.name,
+                            "arguments": self._prepare_tool_arguments(broadcast_tool, query),
+                            "priority": 3,
+                            "required": False,
+                        })
+            elif query.intent == "policy_lookup":
+                # For policy lookup, use get_safety_procedures
+                procedures_tool = next((t for t in tools if t.tool_id == "get_safety_procedures"), None)
+                if procedures_tool:
+                    execution_plan.append({
+                        "tool_id": procedures_tool.tool_id,
+                        "tool_name": procedures_tool.name,
+                        "arguments": self._prepare_tool_arguments(procedures_tool, query),
+                        "priority": 1,
+                        "required": True,
+                    })
+            else:
+                # For other intents, use the original logic
+                intent_config = {
+                    "compliance_check": ([ToolCategory.SAFETY, ToolCategory.DATA_ACCESS], 2),
+                    "safety_audit": ([ToolCategory.SAFETY], 3),
+                    "hazard_identification": ([ToolCategory.SAFETY], 2),
+                    "training_tracking": ([ToolCategory.SAFETY], 2),
+                }
+                
+                categories, limit = intent_config.get(
+                    query.intent, ([ToolCategory.SAFETY], 2)
+                )
+                self._add_tools_to_execution_plan(
+                    execution_plan, tools, categories, limit, query
+                )
+
+            # If no tools were added, add any available safety tools as fallback
+            if not execution_plan and tools:
+                for tool in tools[:3]:
+                    execution_plan.append({
+                        "tool_id": tool.tool_id,
+                        "tool_name": tool.name,
+                        "arguments": self._prepare_tool_arguments(tool, query),
+                        "priority": 5,
+                        "required": False,
+                    })
 
             # Sort by priority
             execution_plan.sort(key=lambda x: x["priority"])
@@ -448,8 +532,74 @@ Return only valid JSON.""",
                 arguments[param_name] = query.context
             elif param_name == "intent":
                 arguments[param_name] = query.intent
+            # Smart defaults for common tool parameters
+            elif param_name == "severity" and not arguments.get("severity"):
+                arguments[param_name] = query.entities.get("severity", "medium")
+            elif param_name == "description" and not arguments.get("description"):
+                arguments[param_name] = query.entities.get("description", query.user_query)
+            elif param_name == "location" and not arguments.get("location"):
+                arguments[param_name] = query.entities.get("location", "unknown")
+            elif param_name == "incident_type" and not arguments.get("incident_type"):
+                arguments[param_name] = query.entities.get("incident_type", "general")
+            elif param_name == "message" and not arguments.get("message"):
+                # For broadcast_alert, use the query description
+                arguments[param_name] = query.entities.get("description", query.user_query)
+            elif param_name == "checklist_type" and not arguments.get("checklist_type"):
+                # Infer checklist type from incident type
+                incident_type = query.entities.get("incident_type", "").lower()
+                if incident_type in ["flooding", "flood", "water"]:
+                    arguments[param_name] = "emergency_response"
+                elif incident_type in ["fire"]:
+                    arguments[param_name] = "fire_safety"
+                else:
+                    arguments[param_name] = "general_safety"
 
         return arguments
+    
+    def _fallback_parse_safety_query(self, query: str) -> Dict[str, Any]:
+        """Fallback parsing using keyword matching when LLM parsing fails."""
+        query_lower = query.lower()
+        entities = {}
+        
+        # Extract location (re is already imported at module level)
+        zone_match = re.search(r'zone\s+([a-z])', query_lower)
+        if zone_match:
+            entities["location"] = f"Zone {zone_match.group(1).upper()}"
+        
+        dock_match = re.search(r'dock\s+([a-z0-9]+)', query_lower)
+        if dock_match:
+            entities["location"] = f"Dock {dock_match.group(1).upper()}"
+        
+        # Extract incident type
+        if "flooding" in query_lower or "flood" in query_lower:
+            entities["incident_type"] = "flooding"
+            entities["severity"] = "critical"
+        elif "fire" in query_lower:
+            entities["incident_type"] = "fire"
+            entities["severity"] = "critical"
+        elif "spill" in query_lower:
+            entities["incident_type"] = "spill"
+            entities["severity"] = "critical"
+        elif "issue" in query_lower or "problem" in query_lower:
+            entities["incident_type"] = "general"
+            entities["severity"] = "high"
+        
+        # Extract description
+        entities["description"] = query
+        
+        # Determine intent
+        if any(keyword in query_lower for keyword in ["issue", "problem", "flooding", "fire", "spill", "incident", "report"]):
+            intent = "incident_reporting"
+        elif any(keyword in query_lower for keyword in ["procedure", "policy", "guideline"]):
+            intent = "policy_lookup"
+        else:
+            intent = "incident_reporting"
+        
+        return {
+            "intent": intent,
+            "entities": entities,
+            "context": {"priority": "high" if entities.get("severity") == "critical" else "normal"}
+        }
 
     async def _execute_tool_plan(
         self, execution_plan: List[Dict[str, Any]]
@@ -530,32 +680,81 @@ Return only valid JSON.""",
                 conversation_history=""
             )
             
+            # Create response prompt with very explicit instructions
+            enhanced_system_prompt = system_prompt + """
+
+CRITICAL JSON FORMAT REQUIREMENTS:
+1. Return ONLY a valid JSON object - no markdown, no code blocks, no explanations before or after
+2. Your response must start with { and end with }
+3. The 'natural_language' field is MANDATORY and must contain a detailed, informative response
+4. Do NOT put safety data at the top level - all data (policies, hazards, incidents) must be inside the 'data' field
+5. The 'natural_language' field must directly answer the user's question with specific details
+
+REQUIRED JSON STRUCTURE:
+{
+    "response_type": "safety_info",
+    "data": {
+        "policies": [...],
+        "hazards": [...],
+        "incidents": [...]
+    },
+    "natural_language": "Based on your query about [user query], I found the following safety information: [specific details including policy names, hazard types, incident details, etc.]. [Additional context and recommendations].",
+    "recommendations": ["Recommendation 1", "Recommendation 2"],
+    "confidence": 0.85,
+    "actions_taken": [...]
+}
+
+ABSOLUTELY CRITICAL:
+- The 'natural_language' field is REQUIRED and must not be empty
+- Include specific safety details (policy names, hazard types, incident details) in natural_language
+- Return valid JSON only - no other text
+"""
+            
             # Create response prompt
             response_prompt = [
                 {
                     "role": "system",
-                    "content": system_prompt + "\n\nIMPORTANT: You MUST return ONLY valid JSON. Do not include any text before or after the JSON.",
+                    "content": enhanced_system_prompt,
                 },
                 {
                     "role": "user",
-                    "content": formatted_response_prompt,
+                    "content": formatted_response_prompt + "\n\nRemember: Return ONLY the JSON object with the 'natural_language' field populated with a detailed response.",
                 },
             ]
 
-            response = await self.nim_client.generate_response(response_prompt)
+            # Use lower temperature for more deterministic JSON responses
+            response = await self.nim_client.generate_response(
+                response_prompt,
+                temperature=0.0,  # Lower temperature for more consistent JSON format
+                max_tokens=2000  # Allow more tokens for detailed responses
+            )
 
-            # Parse JSON response
+            # Parse JSON response - try to extract JSON from response if it contains extra text
+            response_text = response.content.strip()
+            
+            # Try to extract JSON if response contains extra text
+            json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', response_text, re.DOTALL)
+            if json_match:
+                response_text = json_match.group(0)
+            
             try:
-                response_data = json.loads(response.content)
+                response_data = json.loads(response_text)
                 logger.info(f"Successfully parsed LLM response: {response_data}")
             except json.JSONDecodeError as e:
                 logger.warning(f"Failed to parse LLM response as JSON: {e}")
-                logger.warning(f"Raw LLM response: {response.content}")
-                # Fallback response
+                logger.warning(f"Raw LLM response: {response.content[:500]}")
+                # Fallback response - use the text content but clean it
+                natural_lang = response.content
+                # Remove any JSON-like structures from the text
+                natural_lang = re.sub(r"\{[^{}]*'tool_execution_results'[^{}]*\}", "", natural_lang)
+                natural_lang = re.sub(r"'tool_execution_results':\s*\{\}", "", natural_lang)
+                natural_lang = re.sub(r"tool_execution_results:\s*\{\}", "", natural_lang)
+                natural_lang = natural_lang.strip()
+                
                 response_data = {
                     "response_type": "safety_info",
                     "data": {"results": successful_results},
-                    "natural_language": f"Based on the available data, here's what I found regarding your safety query: {sanitize_prompt_input(query.user_query)}",
+                    "natural_language": natural_lang if natural_lang else f"Based on the available data, here's what I found regarding your safety query: {sanitize_prompt_input(query.user_query)}",
                     "recommendations": [
                         "Please review the safety status and take appropriate action if needed."
                     ],
@@ -582,13 +781,167 @@ Return only valid JSON.""",
                     for step in reasoning_chain.steps
                 ]
             
+            # Ensure natural_language is not empty - if missing, ask LLM to generate it
+            natural_language = response_data.get("natural_language", "")
+            if not natural_language or natural_language.strip() == "":
+                logger.warning("LLM did not return natural_language field. Requesting LLM to generate it from the response data.")
+                
+                # Prepare data for LLM to generate natural_language
+                data_for_generation = response_data.copy()
+                if "data" in data_for_generation and isinstance(data_for_generation["data"], dict):
+                    # Include data field content
+                    pass
+                
+                # Also include tool results in the prompt
+                tool_results_summary = {}
+                for tool_id, result_data in successful_results.items():
+                    result = result_data.get("result", {})
+                    if isinstance(result, dict):
+                        tool_results_summary[tool_id] = {
+                            "tool_name": result_data.get("tool_name", tool_id),
+                            "result_summary": str(result)[:500]  # Limit length
+                        }
+                
+                # Ask LLM to generate natural_language from the response data
+                generation_prompt = [
+                    {
+                        "role": "system",
+                        "content": """You are a certified warehouse safety and compliance expert. 
+Generate a comprehensive, expert-level natural language response based on the provided data.
+Your response must be detailed, informative, and directly answer the user's query.
+Include specific details from the data (policy names, requirements, hazard types, incident details, etc.).
+Provide expert-level analysis and context."""
+                    },
+                    {
+                        "role": "user",
+                        "content": f"""The user asked: "{query.user_query}"
+
+The system retrieved the following data:
+{json.dumps(data_for_generation, indent=2, default=str)[:2000]}
+
+Tool execution results:
+{json.dumps(tool_results_summary, indent=2, default=str)[:1000]}
+
+Generate a comprehensive, expert-level natural language response that:
+1. Directly answers the user's query
+2. Includes specific details from the retrieved data
+3. Provides expert analysis and recommendations
+4. Is written in a professional, informative tone
+
+Return ONLY the natural language response text (no JSON, no formatting, just the response text)."""
+                    }
+                ]
+                
+                try:
+                    generation_response = await self.nim_client.generate_response(
+                        generation_prompt,
+                        temperature=0.3,  # Slightly higher for more natural language
+                        max_tokens=1000
+                    )
+                    natural_language = generation_response.content.strip()
+                    logger.info(f"LLM generated natural_language: {natural_language[:200]}...")
+                except Exception as e:
+                    logger.error(f"Failed to generate natural_language from LLM: {e}", exc_info=True)
+                    # If LLM generation fails, we still need to provide a response
+                    # This is a fallback, but we should log the error for debugging
+                    natural_language = f"I've processed your safety query: {sanitize_prompt_input(query.user_query)}. Please review the structured data for details."
+            
+            # Ensure recommendations are populated - if missing, ask LLM to generate them
+            recommendations = response_data.get("recommendations", [])
+            if not recommendations or (isinstance(recommendations, list) and len(recommendations) == 0):
+                logger.info("LLM did not return recommendations. Requesting LLM to generate expert recommendations.")
+                
+                # Ask LLM to generate recommendations based on the query and data
+                recommendations_prompt = [
+                    {
+                        "role": "system",
+                        "content": """You are a certified warehouse safety and compliance expert. 
+Generate actionable, expert-level recommendations based on the user's query and retrieved data.
+Recommendations should be specific, practical, and based on safety best practices and regulatory requirements."""
+                    },
+                    {
+                        "role": "user",
+                        "content": f"""The user asked: "{query.user_query}"
+Query intent: {query.intent}
+Query entities: {json.dumps(query.entities, default=str)}
+
+Retrieved data:
+{json.dumps(response_data, indent=2, default=str)[:1500]}
+
+Generate 3-5 actionable, expert-level recommendations that:
+1. Are specific to the user's query and the retrieved data
+2. Follow safety best practices and regulatory requirements
+3. Are practical and implementable
+4. Address the specific context (intent, entities, data)
+
+Return ONLY a JSON array of recommendation strings, for example:
+["Recommendation 1", "Recommendation 2", "Recommendation 3"]
+
+Do not include any other text, just the JSON array."""
+                    }
+                ]
+                
+                try:
+                    rec_response = await self.nim_client.generate_response(
+                        recommendations_prompt,
+                        temperature=0.3,
+                        max_tokens=500
+                    )
+                    rec_text = rec_response.content.strip()
+                    # Try to extract JSON array (re is already imported at module level)
+                    json_match = re.search(r'\[.*?\]', rec_text, re.DOTALL)
+                    if json_match:
+                        recommendations = json.loads(json_match.group(0))
+                    else:
+                        # Fallback: split by lines if not JSON
+                        recommendations = [line.strip() for line in rec_text.split('\n') if line.strip() and line.strip().startswith('-') or line.strip().startswith('•')]
+                        if not recommendations:
+                            recommendations = [rec_text]
+                    logger.info(f"LLM generated {len(recommendations)} recommendations")
+                except Exception as e:
+                    logger.error(f"Failed to generate recommendations from LLM: {e}", exc_info=True)
+                    recommendations = []  # Empty rather than hardcoded
+            
+            # Ensure actions_taken are populated
+            actions_taken = response_data.get("actions_taken", [])
+            if not actions_taken or (isinstance(actions_taken, list) and len(actions_taken) == 0):
+                # Generate actions_taken from tool execution
+                actions_taken = []
+                for tool_id, result_data in successful_results.items():
+                    tool_name = result_data.get("tool_name", tool_id)
+                    actions_taken.append({
+                        "action": f"Executed {tool_name}",
+                        "tool_id": tool_id,
+                        "status": "success" if result_data.get("success") else "failed",
+                        "details": f"Retrieved safety information using {tool_name}"
+                    })
+                if not actions_taken and successful_results:
+                    actions_taken.append({
+                        "action": "mcp_tool_execution",
+                        "tools_used": len(successful_results),
+                        "status": "success"
+                    })
+            
+            # Ensure data field is populated
+            data = response_data.get("data", {})
+            if not data or (isinstance(data, dict) and len(data) == 0):
+                # Populate data from tool results
+                data = {"tool_results": successful_results}
+                if query.intent == "incident_reporting":
+                    data["incident"] = {
+                        "type": query.entities.get("incident_type", "unknown"),
+                        "location": query.entities.get("location", "unknown"),
+                        "severity": query.entities.get("severity", "medium"),
+                        "description": query.entities.get("description", query.user_query)
+                    }
+            
             return MCPSafetyResponse(
                 response_type=response_data.get("response_type", "safety_info"),
-                data=response_data.get("data", {}),
-                natural_language=response_data.get("natural_language", ""),
-                recommendations=response_data.get("recommendations", []),
+                data=data,
+                natural_language=natural_language,
+                recommendations=recommendations,
                 confidence=response_data.get("confidence", 0.7),
-                actions_taken=response_data.get("actions_taken", []),
+                actions_taken=actions_taken,
                 mcp_tools_used=list(successful_results.keys()),
                 tool_execution_results=tool_results,
                 reasoning_chain=reasoning_chain,
@@ -596,12 +949,14 @@ Return only valid JSON.""",
             )
 
         except Exception as e:
-            logger.error(f"Error generating response: {e}")
+            logger.error(f"Error generating response: {e}", exc_info=True)
+            # Provide user-friendly error message without exposing internal errors
+            error_message = "I encountered an error while processing your safety query. Please try rephrasing your question or contact support if the issue persists."
             return MCPSafetyResponse(
                 response_type="error",
                 data={"error": str(e)},
-                natural_language=f"I encountered an error generating a response: {str(e)}",
-                recommendations=["Please try again or contact support."],
+                natural_language=error_message,
+                recommendations=["Please try rephrasing your question", "Contact support if the issue persists"],
                 confidence=0.0,
                 actions_taken=[],
                 mcp_tools_used=[],

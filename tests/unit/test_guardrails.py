@@ -7,6 +7,7 @@ Tests various safety, security, and compliance scenarios.
 import asyncio
 import json
 import time
+import pytest
 from typing import Dict, Any
 from pathlib import Path
 import sys
@@ -144,6 +145,7 @@ TEST_CASES = [
     }
 ]
 
+@pytest.mark.asyncio
 async def test_guardrails():
     """Test the guardrails system with various scenarios."""
     print("🧪 Testing NeMo Guardrails Integration")
@@ -242,6 +244,7 @@ async def test_guardrails():
     
     return results
 
+@pytest.mark.asyncio
 async def test_performance():
     """Test guardrails performance with multiple concurrent requests."""
     print("\n🚀 Testing Guardrails Performance")

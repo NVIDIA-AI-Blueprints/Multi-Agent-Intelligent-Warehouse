@@ -112,7 +112,6 @@ def test_template_injection_protection():
     print("\n" + "="*60)
     print("ALL TESTS PASSED! ✓")
     print("="*60)
-    return True
 
 
 if __name__ == "__main__":

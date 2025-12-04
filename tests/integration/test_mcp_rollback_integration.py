@@ -12,6 +12,7 @@ This module tests the comprehensive rollback and fallback functionality includin
 
 import asyncio
 import pytest
+import pytest_asyncio
 import time
 from datetime import datetime, timedelta
 from typing import Dict, Any, List
@@ -29,7 +30,7 @@ from src.api.services.mcp.server import MCPServer, MCPTool, MCPToolType
 class TestMCPRollbackManager:
     """Test MCP rollback manager functionality."""
 
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def rollback_manager(self):
         """Create rollback manager for testing."""
         rollback_config = RollbackConfig(
@@ -52,12 +53,16 @@ class TestMCPRollbackManager:
         await manager.initialize()
         yield manager
 
+    @pytest.mark.asyncio
+
     async def test_rollback_manager_initialization(self, rollback_manager):
         """Test rollback manager initialization."""
         assert rollback_manager.config.enabled is True
         assert rollback_manager.fallback_config.enabled is True
         assert rollback_manager.is_rolling_back is False
         assert rollback_manager.is_fallback_active is False
+
+    @pytest.mark.asyncio
 
     async def test_rollback_trigger_automatic(self, rollback_manager):
         """Test automatic rollback triggering."""
@@ -75,6 +80,8 @@ class TestMCPRollbackManager:
         assert rollback_manager.metrics.rollback_count > 0
         assert rollback_manager.metrics.last_rollback is not None
 
+    @pytest.mark.asyncio
+
     async def test_rollback_trigger_manual(self, rollback_manager):
         """Test manual rollback triggering."""
         # Trigger manual rollback
@@ -84,6 +91,8 @@ class TestMCPRollbackManager:
         assert rollback_manager.metrics.rollback_count > 0
         assert rollback_manager.metrics.last_rollback is not None
         assert len(rollback_manager.rollback_history) > 0
+
+    @pytest.mark.asyncio
 
     async def test_rollback_levels(self, rollback_manager):
         """Test different rollback levels."""
@@ -102,6 +111,8 @@ class TestMCPRollbackManager:
         # Verify all rollbacks were recorded
         assert len(rollback_manager.rollback_history) >= 4
 
+    @pytest.mark.asyncio
+
     async def test_legacy_implementation_registration(self, rollback_manager):
         """Test legacy implementation registration."""
         async def legacy_tool(parameters: dict):
@@ -113,6 +124,8 @@ class TestMCPRollbackManager:
         # Verify registration
         assert "test_tool" in rollback_manager.legacy_implementations
 
+    @pytest.mark.asyncio
+
     async def test_fallback_handler_registration(self, rollback_manager):
         """Test fallback handler registration."""
         async def custom_fallback(operation: str, parameters: dict):
@@ -123,6 +136,8 @@ class TestMCPRollbackManager:
         
         # Verify registration
         assert "custom_operation" in rollback_manager.fallback_handlers
+
+    @pytest.mark.asyncio
 
     async def test_execute_with_fallback_success(self, rollback_manager):
         """Test execute with fallback - success case."""
@@ -138,6 +153,8 @@ class TestMCPRollbackManager:
         # Verify success
         assert result["status"] == "success"
         assert result["operation"] == "test_operation"
+
+    @pytest.mark.asyncio
 
     async def test_execute_with_fallback_failure(self, rollback_manager):
         """Test execute with fallback - failure case."""
@@ -158,6 +175,8 @@ class TestMCPRollbackManager:
         assert result["status"] == "fallback"
         assert result["operation"] == "test_operation"
 
+    @pytest.mark.asyncio
+
     async def test_metrics_update(self, rollback_manager):
         """Test metrics update functionality."""
         # Update metrics
@@ -177,6 +196,8 @@ class TestMCPRollbackManager:
         assert rollback_manager.metrics.tool_failures == 5
         assert rollback_manager.metrics.agent_failures == 2
         assert rollback_manager.metrics.system_failures == 1
+
+    @pytest.mark.asyncio
 
     async def test_rollback_status(self, rollback_manager):
         """Test rollback status reporting."""
@@ -202,7 +223,7 @@ class TestMCPRollbackManager:
 class TestMCPToolFallback:
     """Test MCP tool fallback functionality."""
 
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def rollback_manager(self):
         """Create rollback manager for testing."""
         rollback_config = RollbackConfig(enabled=True)
@@ -216,11 +237,15 @@ class TestMCPToolFallback:
         """Create tool fallback for testing."""
         return MCPToolFallback("test_tool", "Test tool", rollback_manager)
 
+    @pytest.mark.asyncio
+
     async def test_tool_fallback_initialization(self, tool_fallback):
         """Test tool fallback initialization."""
         assert tool_fallback.name == "test_tool"
         assert tool_fallback.description == "Test tool"
         assert tool_fallback.legacy_implementation is None
+
+    @pytest.mark.asyncio
 
     async def test_legacy_implementation_setting(self, tool_fallback):
         """Test setting legacy implementation."""
@@ -229,6 +254,8 @@ class TestMCPToolFallback:
         
         tool_fallback.set_legacy_implementation(legacy_impl)
         assert tool_fallback.legacy_implementation is not None
+
+    @pytest.mark.asyncio
 
     async def test_tool_execution_success(self, tool_fallback):
         """Test tool execution - success case."""
@@ -244,6 +271,8 @@ class TestMCPToolFallback:
         # Verify success
         assert result["status"] == "success"
         assert result["data"] == "mcp_data"
+
+    @pytest.mark.asyncio
 
     async def test_tool_execution_fallback(self, tool_fallback):
         """Test tool execution - fallback case."""
@@ -264,6 +293,8 @@ class TestMCPToolFallback:
         assert result["status"] == "legacy"
         assert result["data"] == "legacy_data"
 
+    @pytest.mark.asyncio
+
     async def test_tool_execution_no_fallback(self, tool_fallback):
         """Test tool execution - no fallback available."""
         async def mcp_execution(parameters: dict):
@@ -280,7 +311,7 @@ class TestMCPToolFallback:
 class TestMCPAgentFallback:
     """Test MCP agent fallback functionality."""
 
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def rollback_manager(self):
         """Create rollback manager for testing."""
         rollback_config = RollbackConfig(enabled=True)
@@ -294,10 +325,14 @@ class TestMCPAgentFallback:
         """Create agent fallback for testing."""
         return MCPAgentFallback("test_agent", rollback_manager)
 
+    @pytest.mark.asyncio
+
     async def test_agent_fallback_initialization(self, agent_fallback):
         """Test agent fallback initialization."""
         assert agent_fallback.name == "test_agent"
         assert agent_fallback.legacy_agent is None
+
+    @pytest.mark.asyncio
 
     async def test_legacy_agent_setting(self, agent_fallback):
         """Test setting legacy agent."""
@@ -308,6 +343,8 @@ class TestMCPAgentFallback:
         legacy_agent = MockLegacyAgent()
         agent_fallback.set_legacy_agent(legacy_agent)
         assert agent_fallback.legacy_agent is not None
+
+    @pytest.mark.asyncio
 
     async def test_agent_processing_success(self, agent_fallback):
         """Test agent processing - success case."""
@@ -323,6 +360,8 @@ class TestMCPAgentFallback:
         # Verify success
         assert result["status"] == "success"
         assert result["agent"] == "mcp_agent"
+
+    @pytest.mark.asyncio
 
     async def test_agent_processing_fallback(self, agent_fallback):
         """Test agent processing - fallback case."""
@@ -344,6 +383,8 @@ class TestMCPAgentFallback:
         assert result["status"] == "legacy"
         assert result["agent"] == "legacy_agent"
 
+    @pytest.mark.asyncio
+
     async def test_agent_processing_no_fallback(self, agent_fallback):
         """Test agent processing - no fallback available."""
         async def mcp_processing(request: dict):
@@ -360,7 +401,7 @@ class TestMCPAgentFallback:
 class TestMCPSystemFallback:
     """Test MCP system fallback functionality."""
 
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def rollback_manager(self):
         """Create rollback manager for testing."""
         rollback_config = RollbackConfig(enabled=True)
@@ -374,10 +415,14 @@ class TestMCPSystemFallback:
         """Create system fallback for testing."""
         return MCPSystemFallback(rollback_manager)
 
+    @pytest.mark.asyncio
+
     async def test_system_fallback_initialization(self, system_fallback):
         """Test system fallback initialization."""
         assert system_fallback.mcp_enabled is True
         assert system_fallback.legacy_system is None
+
+    @pytest.mark.asyncio
 
     async def test_legacy_system_setting(self, system_fallback):
         """Test setting legacy system."""
@@ -392,6 +437,8 @@ class TestMCPSystemFallback:
         system_fallback.set_legacy_system(legacy_system)
         assert system_fallback.legacy_system is not None
 
+    @pytest.mark.asyncio
+
     async def test_system_initialization_success(self, system_fallback):
         """Test system initialization - success case."""
         async def mcp_initialization():
@@ -405,6 +452,8 @@ class TestMCPSystemFallback:
         
         # Verify success
         assert system_fallback.mcp_enabled is True
+
+    @pytest.mark.asyncio
 
     async def test_system_initialization_fallback(self, system_fallback):
         """Test system initialization - fallback case."""
@@ -425,6 +474,8 @@ class TestMCPSystemFallback:
         # Verify fallback
         assert system_fallback.mcp_enabled is False
 
+    @pytest.mark.asyncio
+
     async def test_operation_execution_mcp_success(self, system_fallback):
         """Test operation execution - MCP success case."""
         async def mcp_operation(operation: str, *args, **kwargs):
@@ -439,6 +490,8 @@ class TestMCPSystemFallback:
         # Verify success
         assert result["status"] == "success"
         assert result["operation"] == "test_operation"
+
+    @pytest.mark.asyncio
 
     async def test_operation_execution_fallback(self, system_fallback):
         """Test operation execution - fallback case."""
@@ -459,6 +512,8 @@ class TestMCPSystemFallback:
         # Verify fallback
         assert result["status"] == "legacy"
         assert result["operation"] == "test_operation"
+
+    @pytest.mark.asyncio
 
     async def test_operation_execution_legacy_mode(self, system_fallback):
         """Test operation execution - legacy mode."""
@@ -481,7 +536,7 @@ class TestMCPSystemFallback:
 class TestRollbackIntegration:
     """Test rollback integration scenarios."""
 
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def full_rollback_system(self):
         """Create full rollback system for testing."""
         rollback_config = RollbackConfig(
@@ -514,6 +569,8 @@ class TestRollbackIntegration:
             "agent": agent,
             "system": system
         }
+
+    @pytest.mark.asyncio
 
     async def test_end_to_end_rollback_scenario(self, full_rollback_system):
         """Test end-to-end rollback scenario."""
@@ -552,6 +609,8 @@ class TestRollbackIntegration:
         assert manager.metrics.rollback_count > 0
         assert manager.metrics.last_rollback is not None
 
+    @pytest.mark.asyncio
+
     async def test_gradual_rollback_scenario(self, full_rollback_system):
         """Test gradual rollback scenario."""
         manager = full_rollback_system["manager"]
@@ -568,6 +627,8 @@ class TestRollbackIntegration:
         # Verify all rollbacks were recorded
         assert len(manager.rollback_history) >= 3
 
+    @pytest.mark.asyncio
+
     async def test_emergency_rollback_scenario(self, full_rollback_system):
         """Test emergency rollback scenario."""
         manager = full_rollback_system["manager"]
@@ -578,6 +639,8 @@ class TestRollbackIntegration:
         # Verify emergency rollback was recorded
         assert len(manager.rollback_history) >= 1
         assert manager.rollback_history[-1]["level"] == "emergency"
+
+    @pytest.mark.asyncio
 
     async def test_rollback_recovery_scenario(self, full_rollback_system):
         """Test rollback recovery scenario."""

@@ -35,11 +35,21 @@ export const versionAPI = {
    */
   getVersion: async (): Promise<VersionInfo> => {
     try {
-      const response = await api.get('/version');
+      // Use a short timeout for version endpoint (2 seconds) since it's non-critical
+      const response = await api.get('/version', { timeout: 2000 });
       return response.data;
-    } catch (error) {
-      console.error('Failed to fetch version info:', error);
-      throw new Error('Failed to fetch version information');
+    } catch (error: any) {
+      // Silently handle version endpoint failures - it's non-critical
+      // Don't log errors for version endpoint - it's expected to fail if backend is unavailable or slow
+      // Return fallback version info instead of throwing
+      // This prevents the UI from breaking if the version endpoint is unavailable
+      return {
+        status: 'ok',
+        version: '0.0.0-dev',
+        git_sha: 'unknown',
+        build_time: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development',
+      };
     }
   },
 
@@ -50,9 +60,23 @@ export const versionAPI = {
     try {
       const response = await api.get('/version/detailed');
       return response.data;
-    } catch (error) {
-      console.error('Failed to fetch detailed version info:', error);
-      throw new Error('Failed to fetch detailed version information');
+    } catch (error: any) {
+      // Silently handle version endpoint failures - it's non-critical
+      // Don't log errors for version endpoint - it's expected to fail if backend is unavailable
+      // Return fallback detailed version info instead of throwing
+      return {
+        status: 'ok',
+        version: '0.0.0-dev',
+        git_sha: 'unknown',
+        git_branch: 'unknown',
+        build_time: new Date().toISOString(),
+        commit_count: 0,
+        python_version: 'unknown',
+        environment: process.env.NODE_ENV || 'development',
+        docker_image: 'unknown',
+        build_host: 'unknown',
+        build_user: 'unknown',
+      };
     }
   },
 

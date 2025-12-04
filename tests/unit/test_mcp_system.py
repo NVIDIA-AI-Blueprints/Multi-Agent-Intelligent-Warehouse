@@ -559,6 +559,5 @@ def event_loop():
 
 # Test markers
 pytestmark = [
-    pytest.mark.asyncio,
     pytest.mark.unit,
 ]

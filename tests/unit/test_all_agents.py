@@ -13,6 +13,7 @@ import asyncio
 import json
 import logging
 import sys
+import pytest
 from datetime import datetime
 from typing import Dict, Any
 from pathlib import Path
@@ -40,6 +41,7 @@ cleanup_async_resource = test_utils.cleanup_async_resource
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+@pytest.mark.asyncio
 async def test_operations_agent():
     """Test Operations Coordination Agent."""
     logger.info("🧑‍💼 Testing Operations Coordination Agent...")
@@ -83,6 +85,7 @@ async def test_operations_agent():
         logger.error(f"❌ Operations Agent test failed: {e}")
         return False
 
+@pytest.mark.asyncio
 async def test_safety_agent():
     """Test Safety & Compliance Agent."""
     logger.info("🛡️ Testing Safety & Compliance Agent...")
@@ -126,6 +129,7 @@ async def test_safety_agent():
         logger.error(f"❌ Safety Agent test failed: {e}")
         return False
 
+@pytest.mark.asyncio
 async def test_memory_manager():
     """Test Memory Manager."""
     logger.info("🧠 Testing Memory Manager...")
@@ -201,6 +205,7 @@ async def test_memory_manager():
         logger.error(f"❌ Memory Manager test failed: {e}")
         return False
 
+@pytest.mark.asyncio
 async def test_full_integration():
     """Test full integration with all agents and memory."""
     logger.info("🔗 Testing Full Integration...")
@@ -279,6 +284,7 @@ async def test_full_integration():
         logger.error(f"❌ Full integration test failed: {e}")
         return False
 
+@pytest.mark.asyncio
 async def test_api_endpoints():
     """Test API endpoints with all agents."""
     logger.info("🌐 Testing API Endpoints...")

@@ -120,16 +120,23 @@ api.interceptors.response.use(
     const status = error.response?.status;
     const url = error.config?.url || '';
     
+    // Suppress error logging for version endpoint - it's non-critical
+    // Still reject the promise so calling code can handle it, but don't log
+    const isVersionEndpoint = url.includes('/version');
+    
     // 403 (Forbidden) = authenticated but not authorized - never redirect to login
     if (status === 403) {
       // Let the component handle permission errors gracefully
+      if (!isVersionEndpoint) {
+        console.error('API Error:', error.response?.status, error.response?.data);
+      }
       return Promise.reject(error);
     }
     
     // 401 (Unauthorized) handling - only redirect if token is truly invalid
     if (status === 401) {
       // Don't redirect for endpoints that handle their own auth errors gracefully
-      const isOptionalEndpoint = url.includes('/auth/users') || url.includes('/auth/me');
+      const isOptionalEndpoint = url.includes('/auth/users') || url.includes('/auth/me') || url.includes('/login');
       
       // Check if request had auth token - if yes, token is likely invalid/expired
       const hasAuthHeader = error.config?.headers?.Authorization;
@@ -146,8 +153,28 @@ api.interceptors.response.use(
         localStorage.removeItem('user_info');
         window.location.href = '/login';
       }
-      // For /auth/me and /auth/users, let the calling component handle the error gracefully
+      // For /auth/me, /auth/users, and /login, let the calling component handle the error gracefully
       // For other cases (no token, optional endpoints), let component handle it
+      
+      // Log 401 errors for non-version endpoints (login errors should be handled by login component)
+      if (!isVersionEndpoint && !url.includes('/login')) {
+        console.error('API Error:', error.response?.status, error.response?.data);
+      }
+      return Promise.reject(error);
+    }
+    
+    // For other errors (network errors, etc.), log them normally (but not for version endpoint)
+    if (!isVersionEndpoint) {
+      if (error.response) {
+        // Server responded with error status
+        console.error('API Error:', error.response.status, error.response.data);
+      } else if (error.request) {
+        // Request made but no response received - network error
+        console.error('API Network Error:', error.message);
+      } else {
+        // Something else happened
+        console.error('API Error:', error.message);
+      }
     }
     
     return Promise.reject(error);

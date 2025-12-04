@@ -7,6 +7,7 @@ enhancement, user experience improvements, and analytics.
 
 import asyncio
 import logging
+import pytest
 from datetime import datetime
 from typing import Dict, Any
 
@@ -14,6 +15,7 @@ from typing import Dict, Any
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+@pytest.mark.asyncio
 async def test_response_validator():
     """Test the response validator functionality."""
     print("🧪 Testing Response Validator...")
@@ -94,6 +96,7 @@ async def test_response_validator():
         print(f"❌ Response validator test failed: {e}")
         return False
 
+@pytest.mark.asyncio
 async def test_response_enhancer():
     """Test the response enhancer functionality."""
     print("\n🧪 Testing Response Enhancer...")
@@ -168,6 +171,7 @@ async def test_response_enhancer():
         print(f"❌ Response enhancer test failed: {e}")
         return False
 
+@pytest.mark.asyncio
 async def test_chat_response_enhancement():
     """Test chat response enhancement."""
     print("\n🧪 Testing Chat Response Enhancement...")
@@ -211,6 +215,7 @@ async def test_chat_response_enhancement():
         print(f"❌ Chat response enhancement test failed: {e}")
         return False
 
+@pytest.mark.asyncio
 async def test_ux_analytics():
     """Test UX analytics functionality."""
     print("\n🧪 Testing UX Analytics...")

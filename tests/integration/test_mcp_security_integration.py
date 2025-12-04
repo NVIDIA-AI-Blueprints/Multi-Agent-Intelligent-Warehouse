@@ -24,8 +24,8 @@ from src.api.services.mcp.tool_discovery import ToolDiscoveryService, ToolDiscov
 from src.api.services.mcp.tool_binding import ToolBindingService, BindingStrategy, ExecutionMode
 from src.api.services.mcp.tool_routing import ToolRoutingService, RoutingStrategy
 from src.api.services.mcp.tool_validation import ToolValidationService, ValidationLevel
-from src.api.services.mcp.service_discovery import ServiceDiscoveryRegistry, ServiceType
-from src.api.services.mcp.monitoring import MCPMonitoringService, MonitoringConfig
+from src.api.services.mcp.service_discovery import ServiceRegistry, ServiceType
+from src.api.services.mcp.monitoring import MCPMonitoring, MetricType
 
 
 class TestMCPAuthentication:
@@ -50,7 +50,7 @@ class TestMCPAuthentication:
         """Test JWT-based authentication."""
         
         # Mock JWT authentication
-        with patch('chain_server.services.mcp.client.MCPClient._authenticate') as mock_auth:
+        with patch('src.api.services.mcp.client.MCPClient._authenticate') as mock_auth:
             mock_auth.return_value = True
             
             # Test successful authentication
@@ -65,7 +65,7 @@ class TestMCPAuthentication:
         """Test authentication failure handling."""
         
         # Mock failed authentication
-        with patch('chain_server.services.mcp.client.MCPClient._authenticate') as mock_auth:
+        with patch('src.api.services.mcp.client.MCPClient._authenticate') as mock_auth:
             mock_auth.return_value = False
             
             # Test failed authentication
@@ -76,11 +76,11 @@ class TestMCPAuthentication:
         """Test token expiration handling."""
         
         # Mock token expiration
-        with patch('chain_server.services.mcp.client.MCPClient._is_token_expired') as mock_expired:
+        with patch('src.api.services.mcp.client.MCPClient._is_token_expired') as mock_expired:
             mock_expired.return_value = True
             
             # Test token refresh
-            with patch('chain_server.services.mcp.client.MCPClient._refresh_token') as mock_refresh:
+            with patch('src.api.services.mcp.client.MCPClient._refresh_token') as mock_refresh:
                 mock_refresh.return_value = True
                 
                 success = await mcp_client.connect("http://localhost:8000", MCPConnectionType.HTTP)
@@ -99,7 +99,7 @@ class TestMCPAuthentication:
         
         # Simulate multiple failed authentication attempts
         for i in range(10):
-            with patch('chain_server.services.mcp.client.MCPClient._authenticate') as mock_auth:
+            with patch('src.api.services.mcp.client.MCPClient._authenticate') as mock_auth:
                 mock_auth.return_value = False
                 
                 success = await mcp_client.connect("http://localhost:8000", MCPConnectionType.HTTP)
@@ -143,7 +143,7 @@ class TestMCPAuthorization:
         """Test role-based access control."""
         
         # Mock user roles
-        with patch('chain_server.services.mcp.client.MCPClient._get_user_role') as mock_role:
+        with patch('src.api.services.mcp.client.MCPClient._get_user_role') as mock_role:
             mock_role.return_value = "admin"
             
             # Test admin access
@@ -158,7 +158,7 @@ class TestMCPAuthorization:
         """Test permission denied scenarios."""
         
         # Mock restricted user role
-        with patch('chain_server.services.mcp.client.MCPClient._get_user_role') as mock_role:
+        with patch('src.api.services.mcp.client.MCPClient._get_user_role') as mock_role:
             mock_role.return_value = "viewer"
             
             # Test restricted access
@@ -174,7 +174,7 @@ class TestMCPAuthorization:
         """Test resource-level authorization."""
         
         # Mock resource ownership
-        with patch('chain_server.services.mcp.client.MCPClient._check_resource_access') as mock_access:
+        with patch('src.api.services.mcp.client.MCPClient._check_resource_access') as mock_access:
             mock_access.return_value = True
             
             # Test resource access
@@ -185,7 +185,7 @@ class TestMCPAuthorization:
         """Test prevention of authorization escalation."""
         
         # Mock privilege escalation attempt
-        with patch('chain_server.services.mcp.client.MCPClient._get_user_role') as mock_role:
+        with patch('src.api.services.mcp.client.MCPClient._get_user_role') as mock_role:
             mock_role.return_value = "user"
             
             # Test privilege escalation attempt
@@ -200,7 +200,7 @@ class TestMCPAuthorization:
         await monitoring_service.start_monitoring()
         
         # Mock user authentication
-        with patch('chain_server.services.mcp.client.MCPClient._authenticate') as mock_auth:
+        with patch('src.api.services.mcp.client.MCPClient._authenticate') as mock_auth:
             mock_auth.return_value = True
             
             # Connect and execute tool
@@ -208,7 +208,7 @@ class TestMCPAuthorization:
             await mcp_client.execute_tool("get_inventory", {"item_id": "ITEM001"})
             
             # Record authorization audit event
-            await monitoring_service.record_metric("authorization_audit", 1.0, {
+            await monitoring_service.metrics_collector.record_metric("authorization_audit", 1.0, MetricType.GAUGE, {
                 "user_id": "user_001",
                 "action": "tool_execution",
                 "resource": "inventory",
@@ -242,7 +242,7 @@ class TestMCPDataEncryption:
         """Test data encryption in transit."""
         
         # Mock HTTPS connection
-        with patch('chain_server.services.mcp.client.MCPClient._is_secure_connection') as mock_secure:
+        with patch('src.api.services.mcp.client.MCPClient._is_secure_connection') as mock_secure:
             mock_secure.return_value = True
             
             # Test secure connection
@@ -257,7 +257,7 @@ class TestMCPDataEncryption:
         """Test data encryption at rest."""
         
         # Mock data encryption
-        with patch('chain_server.services.mcp.server.MCPServer._encrypt_data') as mock_encrypt:
+        with patch('src.api.services.mcp.server.MCPServer._encrypt_data') as mock_encrypt:
             mock_encrypt.return_value = "encrypted_data"
             
             # Test data encryption
@@ -275,7 +275,7 @@ class TestMCPDataEncryption:
         }
         
         # Mock sensitive data detection
-        with patch('chain_server.services.mcp.server.MCPServer._detect_sensitive_data') as mock_detect:
+        with patch('src.api.services.mcp.server.MCPServer._detect_sensitive_data') as mock_detect:
             mock_detect.return_value = True
             
             # Test sensitive data handling
@@ -293,7 +293,7 @@ class TestMCPDataEncryption:
         }
         
         # Mock data sanitization
-        with patch('chain_server.services.mcp.server.MCPServer._sanitize_data') as mock_sanitize:
+        with patch('src.api.services.mcp.server.MCPServer._sanitize_data') as mock_sanitize:
             mock_sanitize.return_value = {
                 "item_id": "ITEM001",
                 "script": "alert('xss')",
@@ -308,7 +308,7 @@ class TestMCPDataEncryption:
         """Test encryption key management."""
         
         # Mock key rotation
-        with patch('chain_server.services.mcp.server.MCPServer._rotate_encryption_key') as mock_rotate:
+        with patch('src.api.services.mcp.server.MCPServer._rotate_encryption_key') as mock_rotate:
             mock_rotate.return_value = True
             
             # Test key rotation
@@ -319,7 +319,7 @@ class TestMCPDataEncryption:
         """Test data integrity verification."""
         
         # Mock data integrity check
-        with patch('chain_server.services.mcp.server.MCPServer._verify_data_integrity') as mock_verify:
+        with patch('src.api.services.mcp.server.MCPServer._verify_data_integrity') as mock_verify:
             mock_verify.return_value = True
             
             # Test data integrity
@@ -472,20 +472,30 @@ class TestMCPSecurityMonitoring:
         await client.disconnect()
 
     @pytest.fixture
-    async def monitoring_service(self):
-        """Create monitoring service for security testing."""
-        config = MonitoringConfig(
-            metrics_retention_days=1,
-            alert_thresholds={
-                "error_rate": 0.1,
-                "response_time": 5.0,
-                "security_events": 10
-            }
+    async def service_registry(self):
+        """Create service registry for testing."""
+        registry = ServiceRegistry()
+        yield registry
+
+    @pytest.fixture
+    async def discovery_service(self):
+        """Create tool discovery service for testing."""
+        config = ToolDiscoveryConfig(
+            discovery_interval=1,
+            max_tools_per_source=100
         )
-        monitoring = MCPMonitoringService(config)
-        await monitoring.start_monitoring()
+        discovery = ToolDiscoveryService(config)
+        await discovery.start_discovery()
+        yield discovery
+        await discovery.stop_discovery()
+
+    @pytest.fixture
+    async def monitoring_service(self, service_registry, discovery_service):
+        """Create monitoring service for security testing."""
+        monitoring = MCPMonitoring(service_registry, discovery_service)
+        await monitoring.start()
         yield monitoring
-        await monitoring.stop_monitoring()
+        await monitoring.stop()
 
     async def test_security_event_logging(self, mcp_server, mcp_client, monitoring_service):
         """Test security event logging."""
@@ -494,14 +504,14 @@ class TestMCPSecurityMonitoring:
         await mcp_client.connect("http://localhost:8000", MCPConnectionType.HTTP)
         
         # Record security events
-        await monitoring_service.record_metric("security_event", 1.0, {
+        await monitoring_service.metrics_collector.record_metric("security_event", 1.0, MetricType.GAUGE, {
             "event_type": "authentication_failure",
             "user_id": "user_001",
             "ip_address": "192.168.1.100",
             "timestamp": datetime.utcnow().isoformat()
         })
         
-        await monitoring_service.record_metric("security_event", 1.0, {
+        await monitoring_service.metrics_collector.record_metric("security_event", 1.0, MetricType.GAUGE, {
             "event_type": "authorization_denied",
             "user_id": "user_002",
             "resource": "admin_tool",
@@ -517,7 +527,7 @@ class TestMCPSecurityMonitoring:
         
         # Simulate intrusion attempts
         for i in range(20):  # Simulate multiple failed attempts
-            await monitoring_service.record_metric("intrusion_attempt", 1.0, {
+            await monitoring_service.metrics_collector.record_metric("intrusion_attempt", 1.0, MetricType.GAUGE, {
                 "ip_address": "192.168.1.100",
                 "attempt_type": "brute_force",
                 "timestamp": datetime.utcnow().isoformat()
@@ -532,7 +542,7 @@ class TestMCPSecurityMonitoring:
         
         # Simulate security threshold breach
         for i in range(15):  # Exceed threshold of 10
-            await monitoring_service.record_metric("security_event", 1.0, {
+            await monitoring_service.metrics_collector.record_metric("security_event", 1.0, MetricType.GAUGE, {
                 "event_type": "suspicious_activity",
                 "severity": "high",
                 "timestamp": datetime.utcnow().isoformat()
@@ -553,7 +563,7 @@ class TestMCPSecurityMonitoring:
         await mcp_client.execute_tool("get_inventory", {"item_id": "ITEM002"})
         
         # Record audit events
-        await monitoring_service.record_metric("audit_trail", 1.0, {
+        await monitoring_service.metrics_collector.record_metric("audit_trail", 1.0, MetricType.GAUGE, {
             "user_id": "user_001",
             "action": "tool_execution",
             "tool_name": "get_inventory",
@@ -569,10 +579,10 @@ class TestMCPSecurityMonitoring:
         """Test security metrics collection."""
         
         # Record various security metrics
-        await monitoring_service.record_metric("failed_authentications", 5.0, {"time_window": "1h"})
-        await monitoring_service.record_metric("authorization_denials", 3.0, {"time_window": "1h"})
-        await monitoring_service.record_metric("suspicious_requests", 2.0, {"time_window": "1h"})
-        await monitoring_service.record_metric("data_breach_attempts", 1.0, {"time_window": "1h"})
+        await monitoring_service.metrics_collector.record_metric("failed_authentications", 5.0, MetricType.COUNTER, {"time_window": "1h"})
+        await monitoring_service.metrics_collector.record_metric("authorization_denials", 3.0, MetricType.COUNTER, {"time_window": "1h"})
+        await monitoring_service.metrics_collector.record_metric("suspicious_requests", 2.0, MetricType.COUNTER, {"time_window": "1h"})
+        await monitoring_service.metrics_collector.record_metric("data_breach_attempts", 1.0, MetricType.COUNTER, {"time_window": "1h"})
         
         # Check metrics collection
         metrics = await monitoring_service.get_metrics("failed_authentications")
@@ -582,9 +592,9 @@ class TestMCPSecurityMonitoring:
         """Test security dashboard."""
         
         # Record security metrics
-        await monitoring_service.record_metric("security_health", 0.95, {"overall": True})
-        await monitoring_service.record_metric("threat_level", 0.2, {"current": True})
-        await monitoring_service.record_metric("active_threats", 0.0, {"current": True})
+        await monitoring_service.metrics_collector.record_metric("security_health", 0.95, MetricType.GAUGE, {"overall": "True"})
+        await monitoring_service.metrics_collector.record_metric("threat_level", 0.2, MetricType.GAUGE, {"current": "True"})
+        await monitoring_service.metrics_collector.record_metric("active_threats", 0.0, MetricType.GAUGE, {"current": "True"})
         
         # Check security dashboard
         dashboard = await monitoring_service.get_monitoring_dashboard()
@@ -646,7 +656,7 @@ class TestMCPVulnerabilityTesting:
         """Test session management security."""
         
         # Test session hijacking prevention
-        with patch('chain_server.services.mcp.client.MCPClient._validate_session') as mock_validate:
+        with patch('src.api.services.mcp.client.MCPClient._validate_session') as mock_validate:
             mock_validate.return_value = False
             
             # Test invalid session
@@ -658,7 +668,7 @@ class TestMCPVulnerabilityTesting:
         """Test CSRF protection."""
         
         # Test CSRF token validation
-        with patch('chain_server.services.mcp.client.MCPClient._validate_csrf_token') as mock_csrf:
+        with patch('src.api.services.mcp.client.MCPClient._validate_csrf_token') as mock_csrf:
             mock_csrf.return_value = False
             
             # Test invalid CSRF token
@@ -670,7 +680,7 @@ class TestMCPVulnerabilityTesting:
         """Test clickjacking protection."""
         
         # Test X-Frame-Options header
-        with patch('chain_server.services.mcp.server.MCPServer._set_security_headers') as mock_headers:
+        with patch('src.api.services.mcp.server.MCPServer._set_security_headers') as mock_headers:
             mock_headers.return_value = True
             
             # Test security headers

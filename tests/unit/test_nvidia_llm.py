@@ -6,6 +6,7 @@ Test NVIDIA LLM API endpoint directly
 import asyncio
 import sys
 import os
+import pytest
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -23,6 +24,7 @@ require_env_var = test_utils.require_env_var
 
 load_dotenv()
 
+@pytest.mark.asyncio
 async def test_nvidia_llm():
     """Test NVIDIA LLM API directly."""
     try:
@@ -48,6 +50,7 @@ async def test_nvidia_llm():
         print(f"❌ NVIDIA LLM Test Failed: {e}")
         return False
 
+@pytest.mark.asyncio
 async def test_embedding():
     """Test NVIDIA Embedding API."""
     try:
@@ -67,6 +70,7 @@ async def test_embedding():
         print(f"❌ NVIDIA Embedding Test Failed: {e}")
         return False
 
+@pytest.mark.asyncio
 async def test_nano_vl_8b():
     """Test Llama Nemotron Nano VL 8B (Vision-Language Model) API."""
     try:

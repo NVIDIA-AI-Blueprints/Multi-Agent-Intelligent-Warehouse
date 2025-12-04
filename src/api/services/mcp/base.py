@@ -20,6 +20,11 @@ from .client import MCPClient, MCPConnectionType
 logger = logging.getLogger(__name__)
 
 
+class MCPError(Exception):
+    """Base exception for MCP-related errors."""
+    pass
+
+
 class AdapterType(Enum):
     """Types of adapters."""
 

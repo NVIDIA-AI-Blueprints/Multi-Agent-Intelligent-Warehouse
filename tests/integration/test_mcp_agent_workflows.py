@@ -20,11 +20,11 @@ from src.api.services.mcp.tool_discovery import ToolDiscoveryService, ToolDiscov
 from src.api.services.mcp.tool_binding import ToolBindingService, BindingStrategy, ExecutionMode
 from src.api.services.mcp.tool_routing import ToolRoutingService, RoutingStrategy
 from src.api.services.mcp.tool_validation import ToolValidationService, ValidationLevel
-from src.api.services.mcp.service_discovery import ServiceDiscoveryRegistry, ServiceType
-from src.api.services.mcp.monitoring import MCPMonitoringService, MonitoringConfig
-from src.api.agents.inventory.mcp_equipment_agent import MCPEquipmentAgent
-from src.api.agents.operations.mcp_operations_agent import MCPOperationsAgent
-from src.api.agents.safety.mcp_safety_agent import MCPSafetyAgent
+from src.api.services.mcp.service_discovery import ServiceRegistry, ServiceType
+from src.api.services.mcp.monitoring import MCPMonitoring
+from src.api.agents.inventory.mcp_equipment_agent import MCPEquipmentAssetOperationsAgent
+from src.api.agents.operations.mcp_operations_agent import MCPOperationsCoordinationAgent
+from src.api.agents.safety.mcp_safety_agent import MCPSafetyComplianceAgent
 
 
 class TestEquipmentAgentWorkflows:
@@ -38,29 +38,31 @@ class TestEquipmentAgentWorkflows:
         binding = ToolBindingService(discovery)
         routing = ToolRoutingService(discovery, binding)
         validation = ToolValidationService(discovery)
-        monitoring = MCPMonitoringService(MonitoringConfig())
+        service_registry = ServiceRegistry()
+        monitoring = MCPMonitoring(service_registry, discovery)
         
         # Start services
         await discovery.start_discovery()
-        await monitoring.start_monitoring()
+        await monitoring.start()
         
         yield {
             'discovery': discovery,
             'binding': binding,
             'routing': routing,
             'validation': validation,
-            'monitoring': monitoring
+            'monitoring': monitoring,
+            'service_registry': service_registry
         }
         
         # Cleanup
         await discovery.stop_discovery()
-        await monitoring.stop_monitoring()
+        await monitoring.stop()
 
     @pytest.fixture
     async def equipment_agent(self, setup_mcp_services):
         """Create equipment agent with MCP services."""
         services = await setup_mcp_services
-        agent = MCPEquipmentAgent(
+        agent = MCPEquipmentAssetOperationsAgent(
             discovery_service=services['discovery'],
             binding_service=services['binding'],
             routing_service=services['routing'],
@@ -328,10 +330,11 @@ class TestOperationsAgentWorkflows:
         binding = ToolBindingService(discovery)
         routing = ToolRoutingService(discovery, binding)
         validation = ToolValidationService(discovery)
-        monitoring = MCPMonitoringService(MonitoringConfig())
+        service_registry = ServiceRegistry()
+        monitoring = MCPMonitoring(service_registry, discovery)
         
         await discovery.start_discovery()
-        await monitoring.start_monitoring()
+        await monitoring.start()
         
         yield {
             'discovery': discovery,
@@ -342,13 +345,13 @@ class TestOperationsAgentWorkflows:
         }
         
         await discovery.stop_discovery()
-        await monitoring.stop_monitoring()
+        await monitoring.stop()
 
     @pytest.fixture
     async def operations_agent(self, setup_mcp_services):
         """Create operations agent with MCP services."""
         services = await setup_mcp_services
-        agent = MCPOperationsAgent(
+        agent = MCPOperationsCoordinationAgent(
             discovery_service=services['discovery'],
             binding_service=services['binding'],
             routing_service=services['routing'],
@@ -522,10 +525,11 @@ class TestSafetyAgentWorkflows:
         binding = ToolBindingService(discovery)
         routing = ToolRoutingService(discovery, binding)
         validation = ToolValidationService(discovery)
-        monitoring = MCPMonitoringService(MonitoringConfig())
+        service_registry = ServiceRegistry()
+        monitoring = MCPMonitoring(service_registry, discovery)
         
         await discovery.start_discovery()
-        await monitoring.start_monitoring()
+        await monitoring.start()
         
         yield {
             'discovery': discovery,
@@ -536,13 +540,13 @@ class TestSafetyAgentWorkflows:
         }
         
         await discovery.stop_discovery()
-        await monitoring.stop_monitoring()
+        await monitoring.stop()
 
     @pytest.fixture
     async def safety_agent(self, setup_mcp_services):
         """Create safety agent with MCP services."""
         services = await setup_mcp_services
-        agent = MCPSafetyAgent(
+        agent = MCPSafetyComplianceAgent(
             discovery_service=services['discovery'],
             binding_service=services['binding'],
             routing_service=services['routing'],
@@ -719,10 +723,11 @@ class TestCrossAgentCollaboration:
         binding = ToolBindingService(discovery)
         routing = ToolRoutingService(discovery, binding)
         validation = ToolValidationService(discovery)
-        monitoring = MCPMonitoringService(MonitoringConfig())
+        service_registry = ServiceRegistry()
+        monitoring = MCPMonitoring(service_registry, discovery)
         
         await discovery.start_discovery()
-        await monitoring.start_monitoring()
+        await monitoring.start()
         
         yield {
             'discovery': discovery,
@@ -733,7 +738,7 @@ class TestCrossAgentCollaboration:
         }
         
         await discovery.stop_discovery()
-        await monitoring.stop_monitoring()
+        await monitoring.stop()
 
     @pytest.fixture
     async def all_agents(self, setup_mcp_services):

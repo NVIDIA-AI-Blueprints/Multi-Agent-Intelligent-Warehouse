@@ -5,6 +5,7 @@ Test database connection and authentication
 
 import asyncio
 import sys
+import pytest
 from pathlib import Path
 
 # Add project root to path
@@ -15,6 +16,7 @@ from src.retrieval.structured import SQLRetriever
 from src.api.services.auth.user_service import UserService
 from tests.unit.test_utils import cleanup_async_resource
 
+@pytest.mark.asyncio
 async def test_connection():
     """Test database connection and authentication."""
     print("🔍 Testing database connection...")

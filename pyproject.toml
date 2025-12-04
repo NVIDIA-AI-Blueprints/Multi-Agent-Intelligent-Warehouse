@@ -129,8 +129,13 @@ markers = [
     "integration: marks tests as integration tests",
     "unit: marks tests as unit tests",
     "mcp: marks tests as MCP-related tests",
+    "stress: marks tests as stress tests",
+    "load: marks tests as load tests",
+    "deployment: marks tests as deployment tests",
+    "performance: marks tests as performance tests",
+    "scalability: marks tests as scalability tests",
+    "endurance: marks tests as endurance tests",
 ]
-asyncio_mode = "auto"
 
 [tool.coverage.run]
 source = ["chain_server", "inventory_retriever", "memory_retriever", "guardrails"]

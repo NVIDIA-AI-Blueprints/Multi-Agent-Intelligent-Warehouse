@@ -58,12 +58,24 @@ export const VersionFooter: React.FC<VersionFooterProps> = ({
     const fetchVersionInfo = async () => {
       try {
         setLoading(true);
+        // getVersion() now returns fallback data instead of throwing
         const info = await versionAPI.getVersion();
         setVersionInfo(info);
         setError(null);
-      } catch (err) {
-        console.error('Failed to fetch version info:', err);
-        setError('Failed to load version info');
+      } catch (err: any) {
+        // This catch block should rarely be hit since getVersion() returns fallback data
+        // But handle it gracefully just in case
+        if (process.env.NODE_ENV === 'development') {
+          console.debug('Version info fetch failed, using fallback:', err?.message);
+        }
+        setVersionInfo({
+          status: 'ok',
+          version: '0.0.0-dev',
+          git_sha: 'unknown',
+          build_time: new Date().toISOString(),
+          environment: 'development',
+        });
+        setError(null); // Don't show error, just use fallback
       } finally {
         setLoading(false);
       }

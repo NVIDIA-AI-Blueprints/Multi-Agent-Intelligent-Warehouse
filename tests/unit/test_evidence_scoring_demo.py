@@ -9,6 +9,7 @@ engine work together to provide confidence assessment and intelligent questionin
 import asyncio
 import sys
 import os
+import pytest
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -23,6 +24,7 @@ from src.retrieval.vector.clarifying_questions import (
     ClarifyingQuestionsEngine, QuestionSet, AmbiguityType, QuestionPriority
 )
 
+@pytest.mark.asyncio
 async def test_evidence_scoring():
     """Test the evidence scoring system."""
     print("🔍 Testing Evidence Scoring System")
@@ -111,6 +113,7 @@ async def test_evidence_scoring():
     
     return evidence_score
 
+@pytest.mark.asyncio
 async def test_clarifying_questions():
     """Test the clarifying questions engine."""
     print("\n❓ Testing Clarifying Questions Engine")
@@ -172,6 +175,7 @@ async def test_clarifying_questions():
             if question.follow_up_questions:
                 print(f"        Follow-ups: {', '.join(question.follow_up_questions)}")
 
+@pytest.mark.asyncio
 async def test_integrated_workflow():
     """Test the integrated workflow of evidence scoring and clarifying questions."""
     print("\n🔄 Testing Integrated Workflow")

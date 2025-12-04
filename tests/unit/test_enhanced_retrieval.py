@@ -9,6 +9,7 @@ with 512-token chunks, 64-token overlap, and optimized retrieval.
 import asyncio
 import logging
 import sys
+import pytest
 from pathlib import Path
 
 # Add project root to path
@@ -85,6 +86,7 @@ SAMPLE_DOCUMENTS = [
     }
 ]
 
+@pytest.mark.asyncio
 async def test_chunking_service():
     """Test the enhanced chunking service."""
     logger.info("Testing Chunking Service...")
@@ -125,6 +127,7 @@ async def test_chunking_service():
     
     return all_chunks
 
+@pytest.mark.asyncio
 async def test_enhanced_retrieval():
     """Test the enhanced retrieval system."""
     logger.info("Testing Enhanced Retrieval...")
@@ -197,6 +200,7 @@ async def test_enhanced_retrieval():
             except Exception as e:
                 logger.warning(f"Error closing milvus retriever: {e}")
 
+@pytest.mark.asyncio
 async def test_hybrid_retrieval():
     """Test the enhanced hybrid retrieval system."""
     logger.info("Testing Enhanced Hybrid Retrieval...")
