@@ -538,7 +538,7 @@ class MCPPlannerGraph:
         return workflow.compile()
 
     async def _mcp_route_intent(self, state: MCPWarehouseState) -> MCPWarehouseState:
-        """Route user message using MCP-enhanced intent classification."""
+        """Route user message using MCP-enhanced intent classification with semantic routing."""
         try:
             # Get the latest user message
             if not state["messages"]:
@@ -552,10 +552,27 @@ class MCPPlannerGraph:
             else:
                 message_text = str(latest_message.content)
 
-            # Use MCP-enhanced intent classification
-            intent = await self.intent_classifier.classify_intent_with_mcp(message_text)
+            # Use MCP-enhanced intent classification (keyword-based)
+            keyword_intent = await self.intent_classifier.classify_intent_with_mcp(message_text)
+            
+            # Enhance with semantic routing
+            try:
+                from src.api.services.routing.semantic_router import get_semantic_router
+                semantic_router = await get_semantic_router()
+                intent, confidence = await semantic_router.classify_intent_semantic(
+                    message_text,
+                    keyword_intent,
+                    keyword_confidence=0.7  # Assume medium-high confidence for keyword match
+                )
+                logger.info(f"Semantic routing: keyword={keyword_intent}, semantic={intent}, confidence={confidence:.2f}")
+            except Exception as e:
+                logger.warning(f"Semantic routing failed, using keyword-based: {e}")
+                intent = keyword_intent
+                confidence = 0.7
+            
             state["user_intent"] = intent
             state["routing_decision"] = intent
+            state["routing_confidence"] = confidence
 
             # Discover available tools for this query
             if self.tool_discovery:
@@ -1219,21 +1236,15 @@ class MCPPlannerGraph:
                     logger.info(f"📋 agent_response_dict keys: {list(agent_response_dict.keys())}")
                     logger.info(f"📋 Has reasoning_chain: {'reasoning_chain' in agent_response_dict}, value: {agent_response_dict.get('reasoning_chain') is not None}")
 
-                    final_response = agent_response_dict.get("natural_language", "")
-                    # If natural_language is empty, try to construct from other fields
-                    if not final_response or final_response.strip() == "":
-                        # Try to get response from data field
-                        if "data" in agent_response_dict and agent_response_dict["data"]:
-                            if isinstance(agent_response_dict["data"], dict):
-                                # Try common fields in data
-                                for field in ["message", "response", "text", "summary", "result"]:
-                                    if field in agent_response_dict["data"] and agent_response_dict["data"][field]:
-                                        final_response = str(agent_response_dict["data"][field])
-                                        break
-                        # If still empty, use a default message
-                        if not final_response or final_response.strip() == "":
-                            logger.warning(f"natural_language is empty in agent_response_dict, using default message")
-                            final_response = f"I processed your {routing_decision} query, but couldn't generate a detailed response. Please try rephrasing your question."
+                    # Extract natural_language and ensure it's a string (never a dict/object)
+                    natural_lang = agent_response_dict.get("natural_language")
+                    if isinstance(natural_lang, str) and natural_lang.strip():
+                        final_response = natural_lang
+                    else:
+                        # If natural_language is missing or invalid, use fallback
+                        # DO NOT try to extract from other fields as they may contain structured data
+                        logger.warning(f"natural_language is missing or invalid in agent_response_dict, using fallback")
+                        final_response = f"I processed your {routing_decision} query, but couldn't generate a detailed response. Please try rephrasing your question."
                     # Store structured data in context for API response
                     state["context"]["structured_response"] = agent_response_dict
 
@@ -1317,18 +1328,15 @@ class MCPPlannerGraph:
                     isinstance(agent_response, dict)
                     and "natural_language" in agent_response
                 ):
-                    final_response = agent_response.get("natural_language", "")
-                    # Check if natural_language is empty or just whitespace
-                    if not final_response or final_response.strip() == "":
-                        logger.warning(f"natural_language is empty in dict response, trying alternative fields")
-                        # Try alternative fields
-                        for field in ["response", "text", "message", "summary"]:
-                            if field in agent_response and agent_response[field]:
-                                final_response = str(agent_response[field])
-                                break
-                        # If still empty, use fallback
-                        if not final_response or final_response.strip() == "":
-                            final_response = f"I processed your {routing_decision} query, but couldn't generate a detailed response. Please try rephrasing your question."
+                    # Extract natural_language and ensure it's a string (never a dict/object)
+                    natural_lang = agent_response.get("natural_language")
+                    if isinstance(natural_lang, str) and natural_lang.strip():
+                        final_response = natural_lang
+                    else:
+                        # If natural_language is missing or invalid, use fallback
+                        # DO NOT try to extract from other fields as they may contain structured data
+                        logger.warning(f"natural_language is missing or invalid in dict response, using fallback")
+                        final_response = f"I processed your {routing_decision} query, but couldn't generate a detailed response. Please try rephrasing your question."
                     # Store structured data in context for API response
                     state["context"]["structured_response"] = agent_response
 
@@ -1416,14 +1424,14 @@ class MCPPlannerGraph:
                     if isinstance(agent_response, str):
                         final_response = agent_response
                     elif isinstance(agent_response, dict):
-                        # Try to extract any text field from the dict
-                        final_response = (
-                            agent_response.get("natural_language") or
-                            agent_response.get("response") or
-                            agent_response.get("text") or
-                            agent_response.get("message") or
-                            "I received your request and processed it successfully."
-                        )
+                        # Only extract natural_language if it's a string - never convert dict/object to string
+                        natural_lang = agent_response.get("natural_language")
+                        if isinstance(natural_lang, str) and natural_lang.strip():
+                            final_response = natural_lang
+                        else:
+                            # Use fallback - do not try other fields as they may contain structured data
+                            logger.warning(f"natural_language missing or invalid in unexpected dict format, using fallback")
+                            final_response = "I received your request and processed it successfully."
                         # Store the dict as structured response if it looks like one
                         if not state["context"].get("structured_response"):
                             state["context"]["structured_response"] = agent_response
@@ -1442,15 +1450,10 @@ class MCPPlannerGraph:
                 logger.error(f"❌ agent_response type: {type(agent_response)}, keys: {list(agent_response.keys()) if isinstance(agent_response, dict) else 'N/A'}")
                 # Try to extract any meaningful response from agent_response
                 if isinstance(agent_response, dict):
-                    # Try alternative fields
-                    for field in ["response", "text", "message", "data", "result"]:
-                        if field in agent_response and agent_response[field]:
-                            if isinstance(agent_response[field], str):
-                                final_response = agent_response[field]
-                                break
-                            elif isinstance(agent_response[field], dict) and "natural_language" in agent_response[field]:
-                                final_response = agent_response[field]["natural_language"]
-                                break
+                    # Only try natural_language field - never extract from other fields to avoid data leakage
+                    natural_lang = agent_response.get("natural_language")
+                    if isinstance(natural_lang, str) and natural_lang.strip():
+                        final_response = natural_lang
                 if not final_response or (isinstance(final_response, str) and final_response.strip() == ""):
                     final_response = "I'm sorry, I couldn't process your request. Please try rephrasing your question."
 

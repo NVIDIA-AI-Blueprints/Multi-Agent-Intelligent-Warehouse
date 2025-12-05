@@ -635,12 +635,23 @@ def synthesize_response(state: WarehouseState) -> WarehouseState:
                 isinstance(agent_response, dict)
                 and "natural_language" in agent_response
             ):
-                final_response = agent_response["natural_language"]
+                # Extract natural_language and ensure it's a string
+                natural_lang = agent_response.get("natural_language")
+                if isinstance(natural_lang, str) and natural_lang.strip():
+                    final_response = natural_lang
+                else:
+                    # If natural_language is missing or invalid, use fallback
+                    logger.warning(f"natural_language is missing or invalid in agent_response, using fallback")
+                    final_response = "I processed your request, but couldn't generate a detailed response. Please try rephrasing your question."
                 # Store structured data in context for API response
                 state["context"]["structured_response"] = agent_response
-            else:
+            elif isinstance(agent_response, str):
                 # Handle legacy string response format
-                final_response = str(agent_response)
+                final_response = agent_response
+            else:
+                # For other types (dict without natural_language, objects), use fallback
+                logger.warning(f"Unexpected agent_response type: {type(agent_response)}, using fallback")
+                final_response = "I processed your request, but couldn't generate a detailed response. Please try rephrasing your question."
         else:
             final_response = "I'm sorry, I couldn't process your request. Please try rephrasing your question."
 

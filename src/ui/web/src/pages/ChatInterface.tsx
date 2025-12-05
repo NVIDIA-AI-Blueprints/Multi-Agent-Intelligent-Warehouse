@@ -4,6 +4,7 @@ import {
   Paper,
   TextField,
   IconButton,
+  Button,
   Typography,
   Avatar,
   Chip,
@@ -32,7 +33,8 @@ interface Message {
 
 const ChatInterface: React.FC = () => {
   const { isAuthenticated } = useAuth();
-  const [messages, setMessages] = useState<Message[]>([
+  const MESSAGES_PER_PAGE = 50; // Load 50 messages at a time
+  const [allMessages, setAllMessages] = useState<Message[]>([
     {
       id: '1',
       content: 'Hello! I\'m your Multi-Agent-Intelligent-Warehouse assistant. How can I help you today?',
@@ -40,6 +42,8 @@ const ChatInterface: React.FC = () => {
       timestamp: new Date(),
     },
   ]);
+  const [displayedMessages, setDisplayedMessages] = useState<Message[]>([]);
+  const [messagesToShow, setMessagesToShow] = useState(MESSAGES_PER_PAGE);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -48,9 +52,21 @@ const ChatInterface: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Update displayed messages when allMessages or messagesToShow changes
+  useEffect(() => {
+    const startIndex = Math.max(0, allMessages.length - messagesToShow);
+    setDisplayedMessages(allMessages.slice(startIndex));
+  }, [allMessages, messagesToShow]);
+
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [displayedMessages]);
+
+  const loadMoreMessages = () => {
+    setMessagesToShow(prev => Math.min(prev + MESSAGES_PER_PAGE, allMessages.length));
+  };
+
+  const hasMoreMessages = messagesToShow < allMessages.length;
 
   const sendMessageMutation = useMutation(chatAPI.sendMessage, {
     onSuccess: (response) => {
@@ -65,7 +81,7 @@ const ChatInterface: React.FC = () => {
         recommendations: response.recommendations,
         structured_data: response.structured_data,
       };
-      setMessages(prev => [...prev, assistantMessage]);
+      setAllMessages(prev => [...prev, assistantMessage]);
       setIsLoading(false);
     },
     onError: (error: any) => {
@@ -88,7 +104,7 @@ const ChatInterface: React.FC = () => {
         sender: 'assistant',
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setAllMessages(prev => [...prev, errorMessage]);
       setIsLoading(false);
     },
   });
@@ -103,7 +119,7 @@ const ChatInterface: React.FC = () => {
         sender: 'assistant',
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setAllMessages(prev => [...prev, errorMessage]);
       return;
     }
 
@@ -114,7 +130,7 @@ const ChatInterface: React.FC = () => {
       timestamp: new Date(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    setAllMessages(prev => [...prev, userMessage]);
     setInputValue('');
     setIsLoading(true);
 
@@ -162,7 +178,19 @@ const ChatInterface: React.FC = () => {
             gap: 2,
           }}
         >
-          {messages.map((message) => (
+          {hasMoreMessages && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+              <Button
+                onClick={loadMoreMessages}
+                color="primary"
+                variant="outlined"
+                size="small"
+              >
+                Load More Messages ({allMessages.length - messagesToShow} older)
+              </Button>
+            </Box>
+          )}
+          {displayedMessages.map((message) => (
             <Box
               key={message.id}
               sx={{

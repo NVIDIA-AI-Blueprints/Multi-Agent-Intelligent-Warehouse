@@ -4,6 +4,7 @@ from typing import Optional, Dict, Any, List, Union
 import logging
 import asyncio
 import re
+import time
 from src.api.graphs.mcp_integrated_planner_graph import get_mcp_planner_graph
 from src.api.services.guardrails.guardrails_service import guardrails_service
 from src.api.services.evidence.evidence_integration import (
@@ -21,6 +22,10 @@ from src.api.services.validation import (
     get_response_enhancer,
 )
 from src.api.utils.log_utils import sanitize_log_data
+from src.api.services.cache.query_cache import get_query_cache
+from src.api.services.deduplication.request_deduplicator import get_request_deduplicator
+from src.api.services.monitoring.performance_monitor import get_performance_monitor
+import uuid
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1", tags=["Chat"])
@@ -389,6 +394,9 @@ def _extract_equipment_entities(data: Dict[str, Any]) -> Dict[str, Any]:
 def _clean_response_text(response: str) -> str:
     """
     Clean the response text by removing technical details and context information.
+    
+    OPTIMIZED: Simplified since data leakage is fixed at source.
+    Only handles minimal cleanup for edge cases.
 
     Args:
         response: Raw response text
@@ -397,209 +405,36 @@ def _clean_response_text(response: str) -> str:
         Cleaned response text
     """
     try:
-        # Remove technical context patterns
         import re
-
+        
+        # Since we fixed data leakage at source, we only need minimal cleanup
+        # Remove common technical artifacts that might still slip through
+        
         # Remove patterns like "*Sources: ...*"
         response = re.sub(r"\*Sources?:[^*]+\*", "", response)
-
+        
         # Remove patterns like "**Additional Context:** - {...}"
         response = re.sub(r"\*\*Additional Context:\*\*[^}]+}", "", response)
-
-        # Remove Python dict-like structures (consolidated pattern)
-        # This catches patterns like: "{'warehouse': 'WH-01', ...}" or "{'key': 'value', 'key2': None}"
+        
+        # Remove any remaining Python dict-like structures (shouldn't happen, but just in case)
         response = re.sub(r"\{'[^}]*'\}", "", response)
-
+        
         # Remove patterns like "mcp_tools_used: [], tool_execution_results: {}"
-        response = re.sub(
-            r"mcp_tools_used: \[\], tool_execution_results: \{\}", "", response
-        )
-
+        response = re.sub(r"mcp_tools_used: \[\], tool_execution_results: \{\}", "", response)
+        
         # Remove patterns like "structured_response: {...}"
         response = re.sub(r"structured_response: \{[^}]+\}", "", response)
         
-        # Remove reasoning_chain patterns (can span multiple lines)
-        reasoning_patterns = [
-            (r",\s*'reasoning_chain':\s*ReasoningChain\([^)]+\)", re.DOTALL),
-            (r",\s*'reasoning_chain':\s*\{[^}]+\}", re.DOTALL),
-            (r",\s*'reasoning_chain':\s*None", re.IGNORECASE),
-            (r",\s*'reasoning_steps':\s*\[[^\]]+\]", re.DOTALL),
-            (r",\s*'reasoning_steps':\s*None", re.IGNORECASE),
-        ]
-        for pattern, flags in reasoning_patterns:
-            response = re.sub(pattern, "", response, flags=flags)
-        
-        # Remove any remaining object representations like "ReasoningChain(...)"
+        # Remove any remaining object representations
         response = re.sub(r"ReasoningChain\([^)]+\)", "", response, flags=re.DOTALL)
         
-        # Remove patterns like ", , 'response_type': ..." and similar structured data leaks
-        # More aggressive pattern matching for structured data that leaked into text
-        response = re.sub(r",\s*,\s*'[^']+':\s*[^,}]+", "", response)
-        response = re.sub(r",\s*'response_type':\s*'[^']+'", "", response)
-        # Note: reasoning_chain and reasoning_steps None patterns already removed above
-        
-        # Remove patterns like "}, , 'reasoning_chain': None, 'reasoning_steps': None}"
-        # Apply multiple times to catch nested occurrences
-        reasoning_end_patterns = [
-            (r"\}\s*,\s*,\s*'reasoning_chain':\s*None\s*,\s*'reasoning_steps':\s*None\s*\}", re.IGNORECASE),
-            (r",\s*,\s*'response_type':\s*'[^']+',\s*,\s*'reasoning_chain':\s*None\s*,\s*'reasoning_steps':\s*None\s*\}", re.IGNORECASE),
-        ]
-        # Apply each pattern multiple times to catch nested occurrences
-        for pattern, flags in reasoning_end_patterns:
-            for _ in range(3):  # Apply up to 3 times to catch nested patterns
-                response = re.sub(pattern, "", response, flags=flags)
-        
-        response = re.sub(r"\}\s*,\s*,\s*'[^']+':\s*[^,}]+", "", response)
-        
-        # Remove any remaining dictionary-like patterns that leaked (more aggressive)
-        # Match patterns like: ", 'field': value" where value can be None, string, dict, or list
-        dict_patterns = [
-            (r",\s*'[a-z_]+':\s*(?:None|'[^']*'|\{[^}]*\}|\[[^\]]*\])\s*,?\s*", ""),
-            (r"[, ]\s*'[a-z_]+':\s*(?:None|'[^']*'|True|False|\d+\.?\d*|\{[^}]*\}|\[[^\]]*\])\s*", " "),
-        ]
-        for pattern, replacement in dict_patterns:
-            response = re.sub(pattern, replacement, response, flags=re.IGNORECASE)
-        
-        # Remove any remaining closing braces and commas at the end (consolidated)
-        end_cleanup_patterns = [
-            (r"\}\s*,?\s*$", ""),
-            (r"\}\s*,\s*$", ""),
-        ]
-        for pattern, replacement in end_cleanup_patterns:
-            response = re.sub(pattern, replacement, response)
-        
-        # Clean up commas (consolidated)
-        comma_cleanup_patterns = [
-            (r",\s*,+", ","),  # Remove multiple commas
-            (r",\s*$", ""),  # Remove trailing comma
-            (r"^\s*,\s*", ""),  # Remove leading comma
-        ]
-        for pattern, replacement in comma_cleanup_patterns:
-            response = re.sub(pattern, replacement, response)
-        response = re.sub(r"\s+", " ", response)  # Normalize whitespace
-        response = response.strip()  # Remove leading/trailing whitespace
-        
-        # Final cleanup: remove any remaining isolated commas or braces
-        # Use bounded quantifiers to prevent ReDoS in regex patterns
-        # Pattern 1: start anchor + whitespace (0-10) + comma/brace + whitespace (0-10)
-        # Pattern 2: whitespace (0-10) + comma/brace + whitespace (0-10) + end anchor
-        response = re.sub(r"^\s{0,10}[,}]\s{0,10}", "", response)
-        response = re.sub(r"\s{0,10}[,}]\s{0,10}$", "", response)
-
-        # Remove patterns like "actions_taken: [, ],"
-        response = re.sub(r"actions_taken: \[[^\]]*\],", "", response)
-
-        # Remove patterns like "field: value" or "'field': value"
-        field_patterns = [
-            (r"natural_language: '[^']*',", ""),
-            (r"recommendations: \[[^\]]*\],", ""),
-            (r"confidence: [0-9.]+", ""),
-            (r"'natural_language': '[^']*',", ""),
-            (r"'recommendations': \[[^\]]*\],", ""),
-            (r"'confidence': [0-9.]+", ""),
-            (r"'actions_taken': \[[^\]]*\],", ""),
-        ]
-        for pattern, replacement in field_patterns:
-            response = re.sub(pattern, replacement, response)
-
-        # Remove patterns like "'mcp_tools_used': [], 'tool_execution_results': {}"
-        mcp_patterns = [
-            r"}, 'mcp_tools_used': \[\], 'tool_execution_results': \{\}\}",
-            r"', 'mcp_tools_used': \[\], 'tool_execution_results': \{\}\}",
-            r"'mcp_tools_used': \[\], 'tool_execution_results': \{\}",
-            # More aggressive patterns for tool_execution_results appearing in text
-            r"\]\}'tool_execution_results': \{\}\}'tool_execution_results': \{\}",
-            r"\]\}'tool_execution_results': \{\}",
-            r"'tool_execution_results': \{\}",
-            r"tool_execution_results': \{\}",
-            r"tool_execution_results: \{\}",
-            r"tool_execution_results: \{\}",
-            # Pattern for the specific case: "question. }'tool_execution_results': {"
-            r"\s+\}\}'tool_execution_results':\s*\{",
-            r"\s+\}\}'tool_execution_results':\s*\{\}",
-            r"\s+\}\}'tool_execution_results':\s*\{\}\}",
-            # Pattern for when it appears after a period/question mark: "question. }'tool_execution_results': {"
-            r"[.?!]\s+\}\}'tool_execution_results':\s*\{",
-            r"[.?!]\s+\}\}'tool_execution_results':\s*\{\}",
-            # Pattern for when it appears at the end: "question }'tool_execution_results': {"
-            r"\s+\}\}'tool_execution_results':\s*\{[^}]*$",
-            # Pattern for: "'tool_execution_results': , 'uuid': }}'tool_execution_results':"
-            r"'tool_execution_results':\s*,\s*'[^']+':\s*\}\}'tool_execution_results':",
-            r"'tool_execution_results':\s*,\s*'[^']+':\s*\}\}",
-            r"'tool_execution_results':\s*,\s*'[a-f0-9-]+':\s*\}\}",
-            # Pattern for: "question. 'tool_execution_results': , 'uuid': }}"
-            r"[.?!]\s+'tool_execution_results':\s*,\s*'[^']+':\s*\}\}",
-            r"\s+'tool_execution_results':\s*,\s*'[a-f0-9-]+':\s*\}\}",
-        ]
-        for pattern in mcp_patterns:
-            response = re.sub(pattern, "", response)
-
-        # Remove patterns like "'response_type': '...', , 'actions_taken': []"
-        response_type_patterns = [
-            r"'response_type': '[^']*', , 'actions_taken': \[\]",
-            r", , 'response_type': '[^']*', , 'actions_taken': \[\]",
-            r"equipment damage\. , , 'response_type': '[^']*', , 'actions_taken': \[\]",
-        ]
-        for pattern in response_type_patterns:
-            response = re.sub(pattern, "", response)
-
-        # Remove patterns like "awaiting further processing. , , , , , , , , , ]},"
-        response = re.sub(r"awaiting further processing\. , , , , , , , , , \]\},", "", response)
-
-        # Remove patterns like "Regarding equipment_id FL-01..."
-        response = re.sub(r"Regarding [^.]*\.\.\.", "", response)
-
-        # Remove patterns like "Following up on the previous Action: log_event..."
-        response = re.sub(
-            r"Following up on the previous Action: [^.]*\.\.\.", "", response
-        )
-
-        # Remove patterns like "', , , , , , , , , ]},"
-        comma_patterns = [
-            r"', , , , , , , , , \]\},",
-            r", , , , , , , , , \]\},",
-        ]
-        for pattern in comma_patterns:
-            response = re.sub(pattern, "", response)
-
-        # Remove patterns like "awaiting further processing. ,"
-        response = re.sub(
-            r"awaiting further processing\. ,", "awaiting further processing.", response
-        )
-
-        # Remove patterns like "processing. ,"
-        response = re.sub(r"processing\. ,", "processing.", response)
-
-        # Remove patterns like "processing. , **Recommendations:**"
-        response = re.sub(
-            r"processing\. , \*\*Recommendations:\*\*",
-            "processing.\n\n**Recommendations:**",
-            response,
-        )
-
-        # Remove patterns like "equipment damage. , , 'response_type': 'equipment_telemetry', , 'actions_taken': []"
-        response = re.sub(
-            r"equipment damage\. , , '[^']*', , '[^']*': \[\][^}]*",
-            "equipment damage.",
-            response,
-        )
-
-        # Remove patterns like "word. , , 'response_type':" for common words
-        # Use a loop to avoid duplication
-        common_words = [
-            "damage", "actions", "investigate", "prevent", "equipment", "machine",
-            "event", "detected", "temperature", "over-temperature", "D2", "Dock"
-        ]
-        for word in common_words:
-            response = re.sub(rf"{re.escape(word)}\. , , '[^']*':", f"{word}.", response)
-
         # Clean up multiple spaces and newlines
         response = re.sub(r"\s+", " ", response)
         response = re.sub(r"\n\s*\n", "\n\n", response)
-
+        
         # Remove leading/trailing whitespace
         response = response.strip()
-
+        
         return response
 
     except Exception as e:
@@ -760,9 +595,49 @@ async def chat(req: ChatRequest):
     """
     # Log immediately when request is received
     logger.info(f"📥 Received chat request: message='{_sanitize_log_data(req.message[:100])}...', reasoning={req.enable_reasoning}, session={_sanitize_log_data(req.session_id or 'default')}")
-    try:
-        # Check input safety with guardrails (with timeout)
+    
+    # Generate unique request ID for tracking
+    request_id = str(uuid.uuid4())
+    performance_monitor = get_performance_monitor()
+    await performance_monitor.start_request(request_id)
+    
+    # Check cache first (skip cache for reasoning queries as they may vary)
+    query_cache = get_query_cache()
+    cache_hit = False
+    if not req.enable_reasoning:
+        cached_result = await query_cache.get(
+            req.message,
+            req.session_id or "default",
+            req.context
+        )
+        if cached_result:
+            logger.info(f"Returning cached result for query: {req.message[:50]}...")
+            cache_hit = True
+            await performance_monitor.end_request(
+                request_id,
+                route=cached_result.get("route"),
+                intent=cached_result.get("intent"),
+                cache_hit=True
+            )
+            return ChatResponse(**cached_result)
+    
+    # Request deduplication - prevent duplicate concurrent requests
+    deduplicator = get_request_deduplicator()
+    request_key = deduplicator._generate_request_key(
+        req.message,
+        req.session_id or "default",
+        req.context
+    )
+    
+    async def process_query():
+        """Inner function to process the query (used for deduplication)."""
+        # Track tool execution time for performance monitoring
+        tool_start_time = time.time()
+        tool_count = 0
+        tool_execution_time_ms = 0.0
+        
         try:
+            # Check input safety with guardrails (with timeout)
             input_safety = await asyncio.wait_for(
                 guardrails_service.check_input_safety(req.message, req.context),
                 timeout=3.0  # 3 second timeout for safety check
@@ -1591,6 +1466,33 @@ async def chat(req: ChatRequest):
                 reasoning_steps=cleaned_reasoning_steps,
             )
             logger.info("✅ Response created successfully")
+            
+            # Cache the result (skip cache for reasoning queries)
+            if not req.enable_reasoning:
+                try:
+                    # Convert response to dict for caching
+                    response_dict = response.dict()
+                    await query_cache.set(
+                        req.message,
+                        req.session_id or "default",
+                        response_dict,
+                        req.context,
+                        ttl_seconds=300  # 5 minutes TTL
+                    )
+                except Exception as cache_error:
+                    logger.warning(f"Failed to cache result: {cache_error}")
+            
+            # Record performance metrics
+            await performance_monitor.end_request(
+                request_id,
+                route=response.route,
+                intent=response.intent,
+                cache_hit=False,
+                error=None,
+                tool_count=tool_count,
+                tool_execution_time_ms=tool_execution_time_ms
+            )
+            
             return response
         except (ValueError, TypeError) as circular_error:
             if "Circular reference" in str(circular_error) or "circular" in str(circular_error).lower():
@@ -1632,7 +1534,7 @@ async def chat(req: ChatRequest):
             logger.error(f"Result data: {_sanitize_log_data(str(result) if result else 'None')}")
             logger.error(f"Structured response: {_sanitize_log_data(str(structured_response) if structured_response else 'None')}")
             # Return a minimal response
-            return _create_fallback_chat_response(
+            error_response = _create_fallback_chat_response(
                 req.message,
                 req.session_id or "default",
                 formatted_reply if formatted_reply else f"I received your message: '{req.message}'. However, there was an issue formatting the response.",
@@ -1640,44 +1542,81 @@ async def chat(req: ChatRequest):
                 "general",
                 confidence if confidence else 0.5,
             )
+            # Record performance metrics for error
+            await performance_monitor.end_request(
+                request_id,
+                route=error_response.route,
+                intent=error_response.intent,
+                cache_hit=False,
+                error="response_creation_error",
+                tool_count=tool_count,
+                tool_execution_time_ms=tool_execution_time_ms
+            )
+            return error_response
 
-    except asyncio.TimeoutError:
-        logger.error("Chat endpoint timed out - main query processing exceeded timeout")
-        return _create_error_chat_response(
-            "The request timed out. Please try again with a simpler question or try again in a moment.",
-            "Request timed out",
-            "TimeoutError",
-            req.session_id or "default",
-            0.0,
-        )
-    except Exception as e:
-        import traceback
-        logger.error(f"Error in chat endpoint: {_sanitize_log_data(str(e))}")
-        logger.error(f"Traceback: {_sanitize_log_data(traceback.format_exc())}")
-        # Return a user-friendly error response with helpful suggestions
-        try:
-            return _create_error_chat_response(
-                "I'm sorry, I encountered an unexpected error. Please try again or contact support if the issue persists.",
-                str(e)[:200],  # Limit error message length
-                type(e).__name__,
+        except asyncio.TimeoutError:
+            logger.error("Query processing timed out")
+            error_response = _create_error_chat_response(
+                "The request timed out. Please try again with a simpler question or try again in a moment.",
+                "Request timed out",
+                "TimeoutError",
                 req.session_id or "default",
                 0.0,
             )
-        except Exception as fallback_error:
-            # If even ChatResponse creation fails, log and return minimal error
-            logger.critical(f"Failed to create error response: {_sanitize_log_data(str(fallback_error))}")
-            # Return a minimal response that FastAPI can handle
-            from fastapi.responses import JSONResponse
-            return JSONResponse(
-                status_code=500,
-                content={
-                    "reply": "I encountered a critical error. Please try again.",
-                    "route": "error",
-                    "intent": "error",
-                    "session_id": req.session_id or "default",
-                    "confidence": 0.0,
-                }
+            await performance_monitor.end_request(
+                request_id,
+                route="error",
+                intent="timeout",
+                cache_hit=False,
+                error="timeout",
+                tool_count=tool_count,
+                tool_execution_time_ms=tool_execution_time_ms
             )
+            return error_response
+        except Exception as query_error:
+            logger.error(f"Query processing error: {_sanitize_log_data(str(query_error))}")
+            error_response = _create_error_chat_response(
+                "I'm sorry, I encountered an unexpected error. Please try again or contact support if the issue persists.",
+                str(query_error)[:200],
+                type(query_error).__name__,
+                req.session_id or "default",
+                0.0,
+            )
+            await performance_monitor.end_request(
+                request_id,
+                route="error",
+                intent="error",
+                cache_hit=False,
+                error=type(query_error).__name__,
+                tool_count=tool_count,
+                tool_execution_time_ms=tool_execution_time_ms
+            )
+            return error_response
+    
+    # Use deduplicator to process query (prevents duplicate concurrent requests)
+    try:
+        result = await deduplicator.get_or_create_task(request_key, process_query)
+        return result
+    except Exception as e:
+        logger.error(f"Error in request deduplication: {_sanitize_log_data(str(e))}")
+        # Fall back to direct processing if deduplication fails
+        error_response = _create_error_chat_response(
+            "I'm sorry, I encountered an unexpected error. Please try again.",
+            str(e)[:200],
+            type(e).__name__,
+            req.session_id or "default",
+            0.0,
+        )
+        await performance_monitor.end_request(
+            request_id,
+            route="error",
+            intent="error",
+            cache_hit=False,
+            error="deduplication_error",
+            tool_count=0,
+            tool_execution_time_ms=0.0
+        )
+        return error_response
 
 
 @router.post("/chat/conversation/summary")

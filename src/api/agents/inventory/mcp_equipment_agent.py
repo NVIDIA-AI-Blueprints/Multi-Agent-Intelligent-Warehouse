@@ -581,19 +581,20 @@ Return only valid JSON.""",
     async def _execute_tool_plan(
         self, execution_plan: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
-        """Execute the tool execution plan."""
+        """Execute the tool execution plan in parallel where possible."""
         results = {}
         
         if not execution_plan:
             logger.warning("Tool execution plan is empty - no tools to execute")
             return results
 
-        for step in execution_plan:
+        async def execute_single_tool(step: Dict[str, Any]) -> tuple:
+            """Execute a single tool and return (tool_id, result_dict)."""
+            tool_id = step["tool_id"]
+            tool_name = step["tool_name"]
+            arguments = step["arguments"]
+            
             try:
-                tool_id = step["tool_id"]
-                tool_name = step["tool_name"]
-                arguments = step["arguments"]
-
                 logger.info(
                     f"Executing MCP tool: {tool_name} with arguments: {arguments}"
                 )
@@ -601,7 +602,7 @@ Return only valid JSON.""",
                 # Execute the tool
                 result = await self.tool_discovery.execute_tool(tool_id, arguments)
 
-                results[tool_id] = {
+                result_dict = {
                     "tool_name": tool_name,
                     "success": True,
                     "result": result,
@@ -618,16 +619,33 @@ Return only valid JSON.""",
                         "timestamp": datetime.utcnow().isoformat(),
                     }
                 )
+                
+                return (tool_id, result_dict)
 
             except Exception as e:
-                logger.error(f"Error executing tool {step['tool_name']}: {e}")
-                results[step["tool_id"]] = {
-                    "tool_name": step["tool_name"],
+                logger.error(f"Error executing tool {tool_name}: {e}")
+                result_dict = {
+                    "tool_name": tool_name,
                     "success": False,
                     "error": str(e),
                     "execution_time": datetime.utcnow().isoformat(),
                 }
+                return (tool_id, result_dict)
 
+        # Execute all tools in parallel
+        execution_tasks = [execute_single_tool(step) for step in execution_plan]
+        execution_results = await asyncio.gather(*execution_tasks, return_exceptions=True)
+        
+        # Process results
+        for result in execution_results:
+            if isinstance(result, Exception):
+                logger.error(f"Unexpected error in tool execution: {result}")
+                continue
+            
+            tool_id, result_dict = result
+            results[tool_id] = result_dict
+
+        logger.info(f"Executed {len(execution_plan)} tools in parallel, {len([r for r in results.values() if r.get('success')])} successful")
         return results
 
     def _build_user_prompt_content(
