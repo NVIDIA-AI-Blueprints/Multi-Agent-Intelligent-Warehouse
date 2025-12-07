@@ -27,11 +27,23 @@ class QueryCache:
         # Normalize the message (lowercase, strip whitespace)
         normalized_message = message.lower().strip()
         
+        # Normalize context - only include non-empty values and sort keys for consistency
+        normalized_context = {}
+        if context:
+            # Only include simple, serializable values
+            for k, v in context.items():
+                if isinstance(v, (str, int, float, bool, type(None))):
+                    normalized_context[k] = v
+                elif isinstance(v, dict):
+                    # Only include simple dict values
+                    normalized_context[k] = {k2: v2 for k2, v2 in v.items() 
+                                           if isinstance(v2, (str, int, float, bool, type(None)))}
+        
         # Create a hash of the query
         cache_data = {
             "message": normalized_message,
             "session_id": session_id,
-            "context": context or {},
+            "context": normalized_context,
         }
         cache_string = json.dumps(cache_data, sort_keys=True)
         cache_key = hashlib.sha256(cache_string.encode()).hexdigest()

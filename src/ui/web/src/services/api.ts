@@ -302,15 +302,21 @@ export const chatAPI = {
   sendMessage: async (request: ChatRequest): Promise<ChatResponse> => {
     // Use longer timeout when reasoning is enabled (reasoning takes longer)
     // Also detect complex queries that need even more time
+    // Match backend complex query detection logic
     const messageLower = request.message.toLowerCase();
-    const isComplexQuery = messageLower.includes('analyze') || 
-                          messageLower.includes('relationship') || 
-                          messageLower.includes('between') ||
-                          messageLower.includes('compare') ||
-                          messageLower.includes('evaluate') ||
-                          messageLower.includes('correlation') ||
-                          messageLower.includes('impact') ||
-                          messageLower.includes('effect') ||
+    const complexKeywords = [
+      'optimize', 'optimization', 'optimizing',
+      'analyze', 'analysis', 'analyzing',
+      'relationship', 'between',
+      'compare', 'evaluate', 'correlation',
+      'impact', 'effect',
+      'factors', 'consider', 'considering',
+      'recommend', 'recommendation',
+      'strategy', 'strategies',
+      'improve', 'improvement',
+      'best practices'
+    ];
+    const isComplexQuery = complexKeywords.some(keyword => messageLower.includes(keyword)) || 
                           request.message.split(' ').length > 15;
     
     let timeout = 60000; // Default 60s
@@ -445,7 +451,8 @@ export const inventoryAPI = {
 
 export const operationsAPI = {
   getTasks: async (): Promise<Task[]> => {
-    const response = await api.get('/operations/tasks');
+    // Operations tasks might take time if database is slow
+    const response = await api.get('/operations/tasks', { timeout: 30000 }); // 30 seconds
     return response.data;
   },
   
@@ -533,7 +540,9 @@ export const documentAPI = {
 
 export const healthAPI = {
   check: async (): Promise<{ ok: boolean }> => {
-    const response = await api.get('/health/simple');
+    // Increased timeout for health check to handle slow backend responses
+    // Health check includes database connection, so it may take longer
+    const response = await api.get('/health/simple', { timeout: 30000 }); // 30 seconds (increased from 15s)
     return response.data;
   },
 };

@@ -72,7 +72,7 @@ const ArchitectureDiagrams: React.FC = () => {
     {
       name: "API Gateway",
       description: "FastAPI-based API gateway with authentication and routing",
-      technologies: ["FastAPI", "Python", "JWT", "OAuth2", "OpenAPI"],
+      technologies: ["FastAPI", "Python", "JWT", "OpenAPI"],
       responsibilities: [
         "Request routing and load balancing",
         "Authentication and authorization",
@@ -653,7 +653,7 @@ const ArchitectureDiagrams: React.FC = () => {
                     <ListItem>
                       <ListItemText 
                         primary="NVIDIA NIMs" 
-                        secondary="Llama 3.1 70B + NV-EmbedQA-E5-v5 embeddings"
+                        secondary="Llama 3.3 Nemotron Super 49B + NV-EmbedQA-E5-v5 embeddings"
                       />
                     </ListItem>
                     <ListItem>

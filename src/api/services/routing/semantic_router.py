@@ -37,32 +37,104 @@ class SemanticRouter:
             
             self.embedding_service = await get_embedding_service()
             
-            # Define intent categories with semantic descriptions
+            # Define intent categories with enhanced semantic descriptions and diverse examples
+            # Enhanced descriptions include domain-specific terminology and common query patterns
             self.intent_categories = {
                 "equipment": IntentCategory(
                     name="equipment",
-                    description="Queries about warehouse equipment, assets, machinery, forklifts, scanners, conveyors, availability, status, maintenance, telemetry, and equipment operations",
-                    keywords=["equipment", "forklift", "conveyor", "scanner", "asset", "machine", "availability", "status", "maintenance", "telemetry"]
+                    description=(
+                        "Queries about warehouse equipment, assets, machinery, material handling vehicles, "
+                        "forklifts, pallet jacks, scanners, barcode readers, conveyors, AGVs, AMRs, "
+                        "equipment availability, status checks, maintenance schedules, telemetry data, "
+                        "equipment assignments, utilization rates, battery levels, and equipment operations. "
+                        "Examples: 'What equipment is available?', 'Show me forklift status', "
+                        "'Check equipment condition', 'What machinery needs maintenance?'"
+                    ),
+                    keywords=[
+                        "equipment", "forklift", "conveyor", "scanner", "asset", "machine", "machinery",
+                        "availability", "status", "maintenance", "telemetry", "vehicle", "truck", "pallet jack",
+                        "agv", "amr", "battery", "utilization", "assignment", "condition", "state"
+                    ]
                 ),
                 "operations": IntentCategory(
                     name="operations",
-                    description="Queries about warehouse operations, tasks, workforce, shifts, pick waves, orders, scheduling, assignments, productivity, and operational workflows",
-                    keywords=["task", "wave", "order", "workforce", "shift", "schedule", "assignment", "pick", "pack", "operations"]
+                    description=(
+                        "Queries about warehouse operations, daily tasks, work assignments, job lists, "
+                        "workforce management, employee shifts, pick waves, packing operations, putaway tasks, "
+                        "order fulfillment, scheduling, task assignments, productivity metrics, "
+                        "operational workflows, work queues, pending work, today's jobs, and operational planning. "
+                        "Examples: 'What tasks need to be done today?', 'Show me today's job list', "
+                        "'What work assignments are pending?', 'What operations are scheduled?'"
+                    ),
+                    keywords=[
+                        "task", "tasks", "work", "job", "jobs", "assignment", "assignments", "wave", "order",
+                        "workforce", "worker", "employee", "shift", "schedule", "pick", "pack", "putaway",
+                        "fulfillment", "operations", "pending", "queue", "today", "scheduled", "planning",
+                        "productivity", "workflow", "list", "show", "need", "done"
+                    ]
+                ),
+                "inventory": IntentCategory(
+                    name="inventory",
+                    description=(
+                        "Queries about inventory levels, stock quantities, product availability, "
+                        "SKU information, item counts, stock status, inventory management, "
+                        "warehouse stock, product quantities, available items, stock levels, "
+                        "inventory queries, and stock inquiries. "
+                        "Examples: 'How much stock do we have?', 'What's our inventory level?', "
+                        "'Check product quantities', 'Show me available items', 'What's in stock?'"
+                    ),
+                    keywords=[
+                        "inventory", "stock", "quantity", "quantities", "sku", "item", "items", "product",
+                        "products", "available", "availability", "level", "levels", "count", "counts",
+                        "warehouse", "storage", "have", "show", "check", "what", "how much"
+                    ]
                 ),
                 "safety": IntentCategory(
                     name="safety",
-                    description="Queries about safety incidents, compliance, hazards, accidents, safety procedures, PPE, lockout/tagout, emergency protocols, and safety training",
-                    keywords=["safety", "incident", "hazard", "accident", "compliance", "ppe", "emergency", "protocol", "loto", "lockout"]
+                    description=(
+                        "Queries about safety incidents, workplace accidents, safety violations, "
+                        "hazards, compliance issues, safety procedures, PPE requirements, "
+                        "lockout/tagout procedures, emergency protocols, safety training, "
+                        "incident reporting, safety documentation, and safety compliance. "
+                        "Examples: 'Report a safety incident', 'Log a workplace accident', "
+                        "'Document a safety violation', 'Record a hazard occurrence'"
+                    ),
+                    keywords=[
+                        "safety", "incident", "incidents", "hazard", "hazards", "accident", "accidents",
+                        "compliance", "ppe", "emergency", "protocol", "protocols", "loto", "lockout",
+                        "tagout", "violation", "violations", "report", "log", "document", "record",
+                        "training", "procedure", "procedures"
+                    ]
                 ),
                 "forecasting": IntentCategory(
                     name="forecasting",
-                    description="Queries about demand forecasting, sales predictions, inventory forecasts, reorder recommendations, model performance, and business intelligence",
-                    keywords=["forecast", "prediction", "demand", "sales", "inventory", "reorder", "model", "trend", "projection"]
+                    description=(
+                        "Queries about demand forecasting, sales predictions, inventory forecasts, "
+                        "reorder recommendations, model performance, business intelligence, "
+                        "trend analysis, projections, and predictive analytics. "
+                        "Examples: 'What's the demand forecast?', 'Show sales predictions', "
+                        "'Get reorder recommendations', 'Check model performance'"
+                    ),
+                    keywords=[
+                        "forecast", "forecasting", "prediction", "predictions", "demand", "sales",
+                        "inventory", "reorder", "recommendation", "recommendations", "model", "models",
+                        "trend", "trends", "projection", "projections", "analytics", "intelligence"
+                    ]
                 ),
                 "document": IntentCategory(
                     name="document",
-                    description="Queries about document processing, uploads, scanning, extraction, invoices, receipts, BOL, purchase orders, OCR, and document management",
-                    keywords=["document", "upload", "scan", "extract", "invoice", "receipt", "bol", "po", "ocr", "file"]
+                    description=(
+                        "Queries about document processing, file uploads, document scanning, "
+                        "data extraction, invoices, receipts, bills of lading (BOL), "
+                        "purchase orders (PO), OCR processing, and document management. "
+                        "Examples: 'Upload a document', 'Process an invoice', "
+                        "'Extract data from receipt', 'Scan a BOL'"
+                    ),
+                    keywords=[
+                        "document", "documents", "upload", "scan", "scanning", "extract", "extraction",
+                        "invoice", "invoices", "receipt", "receipts", "bol", "bill of lading",
+                        "po", "purchase order", "ocr", "file", "files", "process", "processing"
+                    ]
                 ),
             }
             
@@ -78,14 +150,20 @@ class SemanticRouter:
             self._initialized = False
 
     async def _precompute_category_embeddings(self) -> None:
-        """Pre-compute embeddings for all intent categories."""
+        """Pre-compute embeddings for all intent categories with enhanced semantic text."""
         if not self.embedding_service:
             return
             
         try:
             for category_name, category in self.intent_categories.items():
-                # Create a rich description combining name, description, and keywords
-                semantic_text = f"{category.description}. Keywords: {', '.join(category.keywords[:10])}"
+                # Create enhanced semantic text with description, keywords, and examples
+                # This provides richer context for better embedding quality
+                keywords_text = ', '.join(category.keywords[:15])  # Use more keywords
+                semantic_text = (
+                    f"Category: {category.name}. "
+                    f"{category.description} "
+                    f"Related terms: {keywords_text}"
+                )
                 category.embedding = await self.embedding_service.generate_embedding(
                     semantic_text,
                     input_type="passage"
@@ -155,24 +233,43 @@ class SemanticRouter:
             best_category = max(similarities.items(), key=lambda x: x[1])
             semantic_intent, semantic_score = best_category
             
-            # Combine keyword and semantic results
+            # Enhanced combination logic with improved thresholds
+            # Adjusted thresholds for better classification accuracy
+            
+            # If semantic score is very high (>0.75), trust it strongly
+            if semantic_score > 0.75:
+                # Very high semantic confidence - use semantic intent
+                if semantic_intent == keyword_intent:
+                    # Both agree - boost confidence
+                    final_confidence = min(0.95, max(keyword_confidence, semantic_score) + 0.05)
+                    return (semantic_intent, final_confidence)
+                else:
+                    # Semantic disagrees but is very confident - trust semantic
+                    return (semantic_intent, semantic_score)
+            
             # If keyword confidence is high (>0.7), trust it more
-            # If semantic score is much higher, use semantic
             if keyword_confidence > 0.7:
                 # High keyword confidence - use keyword but boost if semantic agrees
                 if semantic_intent == keyword_intent:
                     final_confidence = min(0.95, keyword_confidence + 0.1)
                     return (keyword_intent, final_confidence)
                 else:
-                    # Semantic disagrees - use weighted average
-                    final_confidence = (keyword_confidence * 0.6) + (semantic_score * 0.4)
-                    if semantic_score > keyword_confidence + 0.2:
-                        return (semantic_intent, final_confidence)
+                    # Semantic disagrees - use weighted average with adjusted weights
+                    # Give more weight to semantic if it's reasonably confident (>0.65)
+                    if semantic_score > 0.65:
+                        final_confidence = (keyword_confidence * 0.5) + (semantic_score * 0.5)
+                        # If semantic is significantly better, use it
+                        if semantic_score > keyword_confidence + 0.15:
+                            return (semantic_intent, final_confidence)
+                        else:
+                            return (keyword_intent, final_confidence)
                     else:
-                        return (keyword_intent, final_confidence)
+                        # Semantic not confident enough - trust keyword
+                        return (keyword_intent, keyword_confidence)
             else:
                 # Low keyword confidence - trust semantic more
-                if semantic_score > 0.6:
+                # Lowered threshold from 0.6 to 0.55 for better coverage
+                if semantic_score > 0.55:
                     return (semantic_intent, semantic_score)
                 else:
                     # Both low confidence - use keyword as fallback

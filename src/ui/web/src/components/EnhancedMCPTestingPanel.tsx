@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Box,
   Card,
@@ -32,6 +32,22 @@ import {
   Tooltip,
   LinearProgress,
   Collapse,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
+  Checkbox,
+  FormControlLabel,
+  Switch,
+  SelectChangeEvent,
+  Autocomplete,
+  Stack,
+  Skeleton,
+  Fab,
 } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
@@ -46,8 +62,25 @@ import {
   Assessment as AssessmentIcon,
   Code as CodeIcon,
   Visibility as VisibilityIcon,
+  ContentCopy as CopyIcon,
+  Download as DownloadIcon,
+  Delete as DeleteIcon,
+  Save as SaveIcon,
+  Upload as UploadIcon,
+  CompareArrows as CompareIcon,
+  FilterList as FilterIcon,
+  Clear as ClearIcon,
+  Replay as RetryIcon,
+  Wifi as WifiIcon,
+  WifiOff as WifiOffIcon,
 } from '@mui/icons-material';
+import CopyToClipboard from 'react-copy-to-clipboard';
+import JsonView from '@uiw/react-json-view';
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
+import { format as formatDate, subDays, parseISO } from 'date-fns';
+import Papa from 'papaparse';
 import { mcpAPI } from '../services/api';
+import { useSearchParams } from 'react-router-dom';
 
 interface MCPTool {
   tool_id: string;
@@ -57,7 +90,7 @@ interface MCPTool {
   source: string;
   capabilities: string[];
   metadata: any;
-  parameters?: any;  // Tool parameter schema
+  parameters?: any;
   relevance_score?: number;
 }
 
@@ -85,6 +118,40 @@ interface ExecutionHistory {
   execution_time: number;
   result: any;
   error?: string;
+  errorType?: 'network' | 'validation' | 'execution' | 'timeout';
+  parameters?: any;
+}
+
+interface ErrorDetails {
+  type: 'network' | 'validation' | 'execution' | 'timeout';
+  message: string;
+  details?: any;
+  timestamp: Date;
+  retryable: boolean;
+}
+
+interface TestScenario {
+  id: string;
+  name: string;
+  message: string;
+  description?: string;
+  tags?: string[];
+  created: Date;
+  lastUsed?: Date;
+}
+
+interface ToolFilters {
+  category: string;
+  source: string;
+  search: string;
+  status?: 'all' | 'success' | 'failed';
+}
+
+interface HistoryFilters {
+  tool: string;
+  status: 'all' | 'success' | 'failed';
+  dateRange: 'all' | 'today' | 'week' | 'month';
+  search: string;
 }
 
 interface TabPanelProps {
@@ -109,6 +176,9 @@ function TabPanel(props: TabPanelProps) {
 }
 
 const EnhancedMCPTestingPanel: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  // Core state
   const [mcpStatus, setMcpStatus] = useState<MCPStatus | null>(null);
   const [tools, setTools] = useState<MCPTool[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -116,17 +186,51 @@ const EnhancedMCPTestingPanel: React.FC = () => {
   const [testMessage, setTestMessage] = useState('');
   const [testResult, setTestResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorDetails | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [refreshLoading, setRefreshLoading] = useState(false);
-  const [tabValue, setTabValue] = useState(0);
+  const [tabValue, setTabValue] = useState(parseInt(searchParams.get('tab') || '0'));
   const [executionHistory, setExecutionHistory] = useState<ExecutionHistory[]>([]);
   const [showToolDetails, setShowToolDetails] = useState<string | null>(null);
   const [toolParameters, setToolParameters] = useState<{ [key: string]: any }>({});
+  const [parameterErrors, setParameterErrors] = useState<{ [key: string]: string }>({});
   const [selectedToolForExecution, setSelectedToolForExecution] = useState<MCPTool | null>(null);
   const [showParameterDialog, setShowParameterDialog] = useState(false);
   const [agentsStatus, setAgentsStatus] = useState<any>(null);
   const [selectedHistoryEntry, setSelectedHistoryEntry] = useState<ExecutionHistory | null>(null);
+  const [selectedHistoryEntries, setSelectedHistoryEntries] = useState<string[]>([]);
+  const [showComparisonDialog, setShowComparisonDialog] = useState(false);
+  // Real-time updates
+  const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [dataStale, setDataStale] = useState(false);
+  
+  // Filters and sorting
+  const [toolFilters, setToolFilters] = useState<ToolFilters>({
+    category: '',
+    source: '',
+    search: '',
+  });
+  const [historyFilters, setHistoryFilters] = useState<HistoryFilters>({
+    tool: '',
+    status: 'all',
+    dateRange: 'all',
+    search: '',
+  });
+  const [toolSortBy, setToolSortBy] = useState<'name' | 'category' | 'source'>('name');
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // Test scenarios
+  const [testScenarios, setTestScenarios] = useState<TestScenario[]>([]);
+  const [showScenarioDialog, setShowScenarioDialog] = useState(false);
+  const [selectedScenario, setSelectedScenario] = useState<Partial<TestScenario>>({ name: '', description: '', message: testMessage });
+  
+  // Bulk operations
+  const [selectedTools, setSelectedTools] = useState<string[]>([]);
+  const [bulkExecuting, setBulkExecuting] = useState(false);
+  
+  // Performance metrics
   const [performanceMetrics, setPerformanceMetrics] = useState({
     totalExecutions: 0,
     successRate: 0,
@@ -134,12 +238,94 @@ const EnhancedMCPTestingPanel: React.FC = () => {
     lastExecutionTime: 0
   });
 
-  // Load MCP status and tools on component mount
+  // Load initial data
   useEffect(() => {
     loadMcpData();
     loadExecutionHistory();
     loadAgentsStatus();
+    loadTestScenarios();
+    
+    // Load test message from URL
+    const urlMessage = searchParams.get('message');
+    if (urlMessage) {
+      setTestMessage(decodeURIComponent(urlMessage));
+    }
   }, []);
+
+  // Real-time status updates
+  useEffect(() => {
+    if (!autoRefresh) return;
+    
+    const interval = setInterval(() => {
+      loadMcpData(true); // Silent refresh
+      checkConnectionStatus();
+    }, 30000); // 30 seconds
+    
+    return () => clearInterval(interval);
+  }, [autoRefresh]);
+
+  // Check data staleness
+  useEffect(() => {
+    const checkStaleness = setInterval(() => {
+      const now = new Date();
+      const timeSinceUpdate = now.getTime() - lastUpdateTime.getTime();
+      setDataStale(timeSinceUpdate > 60000); // Stale after 1 minute
+    }, 5000);
+    
+    return () => clearInterval(checkStaleness);
+  }, [lastUpdateTime]);
+
+  // Update URL when tab changes
+  useEffect(() => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('tab', tabValue.toString());
+    setSearchParams(newParams, { replace: true });
+  }, [tabValue]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + Enter to execute
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        if (tabValue === 2 && testMessage) {
+          e.preventDefault();
+          handleTestWorkflow();
+        }
+      }
+      // Ctrl/Cmd + K to focus search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        if (tabValue === 1) {
+          const searchInput = document.querySelector('input[placeholder*="Search"]') as HTMLInputElement;
+          searchInput?.focus();
+        }
+      }
+      // Ctrl/Cmd + R to refresh (prevent default browser refresh)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'r' && (tabValue === 0 || tabValue === 1)) {
+        e.preventDefault();
+        handleRefreshDiscovery();
+      }
+      // Esc to close dialogs
+      if (e.key === 'Escape') {
+        setShowParameterDialog(false);
+        setSelectedHistoryEntry(null);
+        setShowComparisonDialog(false);
+        setShowScenarioDialog(false);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [tabValue, testMessage]);
+
+  const checkConnectionStatus = async () => {
+    try {
+      await mcpAPI.getStatus();
+      setConnectionStatus('connected');
+    } catch {
+      setConnectionStatus('disconnected');
+    }
+  };
 
   const loadAgentsStatus = async () => {
     try {
@@ -150,41 +336,118 @@ const EnhancedMCPTestingPanel: React.FC = () => {
     }
   };
 
-  const loadMcpData = async () => {
+  const loadMcpData = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
-      setSuccess(null);
+      if (!silent) setSuccess(null);
       
-      // Load MCP status
       const status = await mcpAPI.getStatus();
       setMcpStatus(status);
+      setConnectionStatus('connected');
       
-      // Load discovered tools
       const toolsData = await mcpAPI.getTools();
       setTools(toolsData.tools || []);
+      setLastUpdateTime(new Date());
+      setDataStale(false);
       
-      if (toolsData.tools && toolsData.tools.length > 0) {
-        setSuccess(`Successfully loaded ${toolsData.tools.length} MCP tools`);
-      } else {
-        setError('No MCP tools discovered. Try refreshing discovery.');
+      if (!silent) {
+        if (toolsData.tools && toolsData.tools.length > 0) {
+          setSuccess(`Successfully loaded ${toolsData.tools.length} MCP tools`);
+        } else {
+          setError({
+            type: 'execution',
+            message: 'No MCP tools discovered. Try refreshing discovery.',
+            timestamp: new Date(),
+            retryable: true,
+          });
+        }
       }
-      
     } catch (err: any) {
-      setError(`Failed to load MCP data: ${err.message}`);
+      const errorDetails: ErrorDetails = {
+        type: 'network',
+        message: `Failed to load MCP data: ${err.message}`,
+        timestamp: new Date(),
+        retryable: true,
+        details: err.response?.data,
+      };
+      setError(errorDetails);
+      setConnectionStatus('disconnected');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   const loadExecutionHistory = () => {
-    const history = JSON.parse(localStorage.getItem('mcp_execution_history') || '[]');
-    setExecutionHistory(history);
-    updatePerformanceMetrics(history);
+    try {
+      const history = JSON.parse(localStorage.getItem('mcp_execution_history') || '[]');
+      // Convert timestamp strings back to Date objects
+      const parsedHistory = history.map((entry: any) => ({
+        ...entry,
+        timestamp: new Date(entry.timestamp),
+      }));
+      setExecutionHistory(parsedHistory);
+      updatePerformanceMetrics(parsedHistory);
+    } catch (err) {
+      console.error('Failed to load execution history:', err);
+    }
+  };
+
+  const loadTestScenarios = () => {
+    try {
+      const scenarios = JSON.parse(localStorage.getItem('mcp_test_scenarios') || '[]');
+      const parsedScenarios = scenarios.map((s: any) => ({
+        ...s,
+        created: new Date(s.created),
+        lastUsed: s.lastUsed ? new Date(s.lastUsed) : undefined,
+      }));
+      setTestScenarios(parsedScenarios);
+    } catch (err) {
+      console.error('Failed to load test scenarios:', err);
+    }
+  };
+
+  const saveTestScenario = (scenario: Omit<TestScenario, 'id' | 'created'>) => {
+    const newScenario: TestScenario = {
+      ...scenario,
+      id: Date.now().toString(),
+      created: new Date(),
+    };
+    const updated = [newScenario, ...testScenarios];
+    setTestScenarios(updated);
+    localStorage.setItem('mcp_test_scenarios', JSON.stringify(updated));
+    setShowScenarioDialog(false);
+    setSuccess('Test scenario saved successfully');
+  };
+
+  const loadTestScenario = (scenario: TestScenario) => {
+    setTestMessage(scenario.message);
+    setTabValue(2);
+    const updated = testScenarios.map(s => 
+      s.id === scenario.id ? { ...s, lastUsed: new Date() } : s
+    );
+    setTestScenarios(updated);
+    localStorage.setItem('mcp_test_scenarios', JSON.stringify(updated));
+  };
+
+  const shareScenario = (scenario: TestScenario) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('message', scenario.message);
+    url.searchParams.set('tab', '2');
+    navigator.clipboard.writeText(url.toString());
+    setSuccess('Scenario URL copied to clipboard!');
   };
 
   const updatePerformanceMetrics = (history: ExecutionHistory[]) => {
-    if (history.length === 0) return;
+    if (history.length === 0) {
+      setPerformanceMetrics({
+        totalExecutions: 0,
+        successRate: 0,
+        averageExecutionTime: 0,
+        lastExecutionTime: 0
+      });
+      return;
+    }
     
     const totalExecutions = history.length;
     const successfulExecutions = history.filter(h => h.success).length;
@@ -209,15 +472,30 @@ const EnhancedMCPTestingPanel: React.FC = () => {
       const result = await mcpAPI.refreshDiscovery();
       setSuccess(`Discovery refreshed: ${result.total_tools} tools found`);
       
-      // Reload data after refresh
       await loadMcpData();
       
     } catch (err: any) {
-      setError(`Failed to refresh discovery: ${err.message}`);
+      setError({
+        type: 'network',
+        message: `Failed to refresh discovery: ${err.message}`,
+        timestamp: new Date(),
+        retryable: true,
+        details: err.response?.data,
+      });
     } finally {
       setRefreshLoading(false);
     }
   };
+
+  const handleRetry = useCallback(() => {
+    if (error?.retryable) {
+      if (error.type === 'network') {
+        loadMcpData();
+      } else if (error.type === 'execution') {
+        handleRefreshDiscovery();
+      }
+    }
+  }, [error]);
 
   const handleSearchTools = async () => {
     if (!searchQuery.trim()) return;
@@ -233,11 +511,22 @@ const EnhancedMCPTestingPanel: React.FC = () => {
       if (results.tools && results.tools.length > 0) {
         setSuccess(`Found ${results.tools.length} tools matching "${searchQuery}"`);
       } else {
-        setError(`No tools found matching "${searchQuery}". Try a different search term.`);
+        setError({
+          type: 'execution',
+          message: `No tools found matching "${searchQuery}". Try a different search term.`,
+          timestamp: new Date(),
+          retryable: false,
+        });
       }
       
     } catch (err: any) {
-      setError(`Search failed: ${err.message}`);
+      setError({
+        type: 'network',
+        message: `Search failed: ${err.message}`,
+        timestamp: new Date(),
+        retryable: true,
+        details: err.response?.data,
+      });
     } finally {
       setLoading(false);
     }
@@ -257,7 +546,6 @@ const EnhancedMCPTestingPanel: React.FC = () => {
       
       setTestResult(result);
       
-      // Add to execution history
       const historyEntry: ExecutionHistory = {
         id: Date.now().toString(),
         timestamp: new Date(),
@@ -266,10 +554,11 @@ const EnhancedMCPTestingPanel: React.FC = () => {
         success: result.status === 'success',
         execution_time: executionTime,
         result: result,
-        error: result.status !== 'success' ? result.error : undefined
+        error: result.status !== 'success' ? result.error : undefined,
+        errorType: result.status !== 'success' ? 'execution' : undefined,
       };
       
-      const newHistory = [historyEntry, ...executionHistory.slice(0, 49)]; // Keep last 50
+      const newHistory = [historyEntry, ...executionHistory.slice(0, 99)]; // Keep last 100
       setExecutionHistory(newHistory);
       localStorage.setItem('mcp_execution_history', JSON.stringify(newHistory));
       updatePerformanceMetrics(newHistory);
@@ -277,27 +566,93 @@ const EnhancedMCPTestingPanel: React.FC = () => {
       if (result.status === 'success') {
         setSuccess(`Workflow test completed successfully in ${executionTime}ms`);
       } else {
-        setError(`Workflow test failed: ${result.error || 'Unknown error'}`);
+        setError({
+          type: 'execution',
+          message: `Workflow test failed: ${result.error || 'Unknown error'}`,
+          timestamp: new Date(),
+          retryable: false,
+          details: result,
+        });
       }
       
     } catch (err: any) {
-      setError(`Workflow test failed: ${err.message}`);
+      const errorDetails: ErrorDetails = {
+        type: err.code === 'ECONNABORTED' ? 'timeout' : 'network',
+        message: `Workflow test failed: ${err.message}`,
+        timestamp: new Date(),
+        retryable: true,
+        details: err.response?.data,
+      };
+      setError(errorDetails);
     } finally {
       setLoading(false);
     }
   };
 
+  const validateParameters = (tool: MCPTool, params: any): string | null => {
+    if (!tool.parameters || typeof tool.parameters !== 'object') return null;
+    
+    try {
+      // Basic validation - check required fields
+      const schema = tool.parameters;
+      if (schema.required && Array.isArray(schema.required)) {
+        for (const field of schema.required) {
+          if (params[field] === undefined || params[field] === null || params[field] === '') {
+            return `Required parameter "${field}" is missing`;
+          }
+        }
+      }
+      
+      // Type validation
+      if (schema.properties) {
+        for (const [key, value] of Object.entries(params)) {
+          const prop = (schema.properties as any)[key];
+          if (prop) {
+            if (prop.type === 'number' && isNaN(Number(value))) {
+              return `Parameter "${key}" must be a number`;
+            }
+            if (prop.type === 'boolean' && typeof value !== 'boolean') {
+              return `Parameter "${key}" must be a boolean`;
+            }
+            if (prop.type === 'array' && !Array.isArray(value)) {
+              return `Parameter "${key}" must be an array`;
+            }
+          }
+        }
+      }
+      
+      return null;
+    } catch (err) {
+      return 'Invalid parameter format';
+    }
+  };
+
   const handleExecuteTool = async (toolId: string, toolName: string, parameters?: any) => {
+    const tool = tools.find(t => t.tool_id === toolId);
+    if (tool && parameters) {
+      const validationError = validateParameters(tool, parameters);
+      if (validationError) {
+        setError({
+          type: 'validation',
+          message: validationError,
+          timestamp: new Date(),
+          retryable: false,
+        });
+        setParameterErrors({ [toolId]: validationError });
+        return;
+      }
+    }
+    
     try {
       setLoading(true);
       setError(null);
+      setParameterErrors({});
       
       const startTime = Date.now();
       const execParams = parameters || toolParameters[toolId] || { test: true };
       const result = await mcpAPI.executeTool(toolId, execParams);
       const executionTime = Date.now() - startTime;
       
-      // Add to execution history
       const historyEntry: ExecutionHistory = {
         id: Date.now().toString(),
         timestamp: new Date(),
@@ -305,10 +660,11 @@ const EnhancedMCPTestingPanel: React.FC = () => {
         tool_name: toolName,
         success: true,
         execution_time: executionTime,
-        result: result
+        result: result,
+        parameters: execParams,
       };
       
-      const newHistory = [historyEntry, ...executionHistory.slice(0, 49)];
+      const newHistory = [historyEntry, ...executionHistory.slice(0, 99)];
       setExecutionHistory(newHistory);
       localStorage.setItem('mcp_execution_history', JSON.stringify(newHistory));
       updatePerformanceMetrics(newHistory);
@@ -324,18 +680,275 @@ const EnhancedMCPTestingPanel: React.FC = () => {
         success: false,
         execution_time: 0,
         result: null,
-        error: err.message
+        error: err.message,
+        errorType: err.code === 'ECONNABORTED' ? 'timeout' : 'network',
+        parameters: parameters || toolParameters[toolId],
       };
       
-      const newHistory = [historyEntry, ...executionHistory.slice(0, 49)];
+      const newHistory = [historyEntry, ...executionHistory.slice(0, 99)];
       setExecutionHistory(newHistory);
       localStorage.setItem('mcp_execution_history', JSON.stringify(newHistory));
       updatePerformanceMetrics(newHistory);
       
-      setError(`Tool execution failed: ${err.message}`);
+      setError({
+        type: err.code === 'ECONNABORTED' ? 'timeout' : 'network',
+        message: `Tool execution failed: ${err.message}`,
+        timestamp: new Date(),
+        retryable: true,
+        details: err.response?.data,
+      });
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleBulkExecute = async () => {
+    if (selectedTools.length === 0) return;
+    
+    setBulkExecuting(true);
+    setError(null);
+    
+    const results = await Promise.allSettled(
+      selectedTools.map(toolId => {
+        const tool = tools.find(t => t.tool_id === toolId);
+        return handleExecuteTool(toolId, tool?.name || toolId);
+      })
+    );
+    
+    const failed = results.filter(r => r.status === 'rejected').length;
+    if (failed > 0) {
+      setError({
+        type: 'execution',
+        message: `${failed} of ${selectedTools.length} tools failed to execute`,
+        timestamp: new Date(),
+        retryable: false,
+      });
+    } else {
+      setSuccess(`All ${selectedTools.length} tools executed successfully`);
+    }
+    
+    setSelectedTools([]);
+    setBulkExecuting(false);
+  };
+
+  // Filtered and sorted tools
+  const filteredTools = useMemo(() => {
+    let filtered = tools;
+    
+    if (toolFilters.category) {
+      filtered = filtered.filter(t => t.category === toolFilters.category);
+    }
+    if (toolFilters.source) {
+      filtered = filtered.filter(t => t.source === toolFilters.source);
+    }
+    if (toolFilters.search) {
+      const searchLower = toolFilters.search.toLowerCase();
+      filtered = filtered.filter(t => 
+        t.name.toLowerCase().includes(searchLower) ||
+        t.description.toLowerCase().includes(searchLower) ||
+        t.tool_id.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    // Sort
+    filtered.sort((a, b) => {
+      if (toolSortBy === 'name') return a.name.localeCompare(b.name);
+      if (toolSortBy === 'category') return a.category.localeCompare(b.category);
+      return a.source.localeCompare(b.source);
+    });
+    
+    return filtered;
+  }, [tools, toolFilters, toolSortBy]);
+
+  // Filtered history
+  const filteredHistory = useMemo(() => {
+    let filtered = executionHistory;
+    
+    if (historyFilters.tool) {
+      filtered = filtered.filter(h => 
+        h.tool_id === historyFilters.tool || h.tool_name.toLowerCase().includes(historyFilters.tool.toLowerCase())
+      );
+    }
+    if (historyFilters.status !== 'all') {
+      filtered = filtered.filter(h => 
+        historyFilters.status === 'success' ? h.success : !h.success
+      );
+    }
+    if (historyFilters.dateRange !== 'all') {
+      const now = new Date();
+      let cutoff: Date;
+      if (historyFilters.dateRange === 'today') {
+        cutoff = new Date(now.setHours(0, 0, 0, 0));
+      } else if (historyFilters.dateRange === 'week') {
+        cutoff = subDays(now, 7);
+      } else {
+        cutoff = subDays(now, 30);
+      }
+      filtered = filtered.filter(h => h.timestamp >= cutoff);
+    }
+    if (historyFilters.search) {
+      const searchLower = historyFilters.search.toLowerCase();
+      filtered = filtered.filter(h =>
+        h.tool_name.toLowerCase().includes(searchLower) ||
+        h.tool_id.toLowerCase().includes(searchLower) ||
+        (h.error && h.error.toLowerCase().includes(searchLower))
+      );
+    }
+    
+    return filtered;
+  }, [executionHistory, historyFilters]);
+
+  // Chart data
+  const chartData = useMemo(() => {
+    const last30Days = executionHistory
+      .filter(h => h.timestamp >= subDays(new Date(), 30))
+      .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    
+    // Group by date
+    const grouped = last30Days.reduce((acc, entry) => {
+      const date = formatDate(entry.timestamp, 'yyyy-MM-dd');
+      if (!acc[date]) {
+        acc[date] = { date, success: 0, failed: 0, avgTime: 0, count: 0 };
+      }
+      if (entry.success) {
+        acc[date].success++;
+      } else {
+        acc[date].failed++;
+      }
+      acc[date].avgTime += entry.execution_time;
+      acc[date].count++;
+      return acc;
+    }, {} as Record<string, { date: string; success: number; failed: number; avgTime: number; count: number }>);
+    
+    return Object.values(grouped).map(d => ({
+      ...d,
+      avgTime: d.count > 0 ? Math.round(d.avgTime / d.count) : 0,
+    }));
+  }, [executionHistory]);
+
+  const toolUsageData = useMemo(() => {
+    const usage = executionHistory.reduce((acc, entry) => {
+      acc[entry.tool_name] = (acc[entry.tool_name] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    return Object.entries(usage)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+  }, [executionHistory]);
+
+  const exportHistory = (format: 'csv' | 'json') => {
+    const data = filteredHistory.map(entry => ({
+      timestamp: entry.timestamp.toISOString(),
+      tool_id: entry.tool_id,
+      tool_name: entry.tool_name,
+      success: entry.success,
+      execution_time: entry.execution_time,
+      error: entry.error || '',
+    }));
+    
+    if (format === 'csv') {
+      const csv = Papa.unparse(data);
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `mcp-execution-history-${formatDate(new Date(), 'yyyy-MM-dd')}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else {
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `mcp-execution-history-${formatDate(new Date(), 'yyyy-MM-dd')}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    
+    setSuccess(`History exported as ${format.toUpperCase()}`);
+  };
+
+  const clearHistory = () => {
+    if (window.confirm('Are you sure you want to clear all execution history?')) {
+      setExecutionHistory([]);
+      localStorage.removeItem('mcp_execution_history');
+      updatePerformanceMetrics([]);
+      setSuccess('Execution history cleared');
+    }
+  };
+
+  const renderParameterForm = (tool: MCPTool) => {
+    if (!tool.parameters || typeof tool.parameters !== 'object') {
+      return (
+        <Alert severity="info">
+          This tool does not require parameters.
+        </Alert>
+      );
+    }
+    
+    const schema = tool.parameters;
+    const properties = schema.properties || {};
+    const required = schema.required || [];
+    const currentParams = toolParameters[tool.tool_id] || {};
+    const error = parameterErrors[tool.tool_id];
+    
+    return (
+      <Box>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+        {Object.entries(properties).map(([key, prop]: [string, any]) => {
+          const isRequired = required.includes(key);
+          const value = currentParams[key] ?? (prop.default !== undefined ? prop.default : '');
+          
+          return (
+            <TextField
+              key={key}
+              fullWidth
+              label={key}
+              required={isRequired}
+              value={value}
+              onChange={(e) => {
+                let newValue: any = e.target.value;
+                if (prop.type === 'number') {
+                  newValue = e.target.value === '' ? '' : Number(e.target.value);
+                } else if (prop.type === 'boolean') {
+                  newValue = e.target.value === 'true';
+                } else if (prop.type === 'array') {
+                  try {
+                    newValue = JSON.parse(e.target.value);
+                  } catch {
+                    newValue = e.target.value;
+                  }
+                }
+                
+                const updated = { ...currentParams, [key]: newValue };
+                setToolParameters({ ...toolParameters, [tool.tool_id]: updated });
+                
+                // Validate
+                const validationError = validateParameters(tool, updated);
+                if (validationError) {
+                  setParameterErrors({ ...parameterErrors, [tool.tool_id]: validationError });
+                } else {
+                  const newErrors = { ...parameterErrors };
+                  delete newErrors[tool.tool_id];
+                  setParameterErrors(newErrors);
+                }
+              }}
+              type={prop.type === 'number' ? 'number' : prop.type === 'boolean' ? 'text' : 'text'}
+              helperText={prop.description || (isRequired ? 'Required' : 'Optional')}
+              error={!!error && isRequired && !value}
+              sx={{ mb: 2 }}
+            />
+          );
+        })}
+      </Box>
+    );
   };
 
   const renderToolDetails = (tool: MCPTool) => (
@@ -360,33 +973,112 @@ const EnhancedMCPTestingPanel: React.FC = () => {
               <strong>Parameters:</strong>
             </Typography>
             <Paper sx={{ p: 1, bgcolor: 'white', maxHeight: 200, overflow: 'auto' }}>
-              <pre style={{ fontSize: '0.75rem', margin: 0 }}>
-                {JSON.stringify(tool.parameters, null, 2)}
-              </pre>
+              <JsonView
+                value={tool.parameters}
+                collapsed={1}
+              />
             </Paper>
           </Box>
         )}
         {tool.metadata && (
-          <Typography variant="body2" sx={{ mb: 1 }}>
-            <strong>Metadata:</strong>
-            <pre style={{ fontSize: '0.75rem', marginTop: 4 }}>
-              {JSON.stringify(tool.metadata, null, 2)}
-            </pre>
-          </Typography>
+          <Box>
+            <Typography variant="body2" sx={{ mb: 1 }}>
+              <strong>Metadata:</strong>
+            </Typography>
+            <Paper sx={{ p: 1, bgcolor: 'white', maxHeight: 200, overflow: 'auto' }}>
+              <JsonView
+                value={tool.metadata}
+                collapsed={1}
+              />
+            </Paper>
+          </Box>
         )}
       </Box>
     </Collapse>
   );
 
   return (
-    <Box sx={{ p: 2 }}>
-      <Typography variant="h5" gutterBottom>
-        Enhanced MCP Testing Dashboard
-      </Typography>
-      
+    <Box sx={{ p: 2, bgcolor: 'background.default', minHeight: '100vh' }}>
+      {/* Header with connection status and controls */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h5" gutterBottom>
+          Enhanced MCP Testing Dashboard
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          {/* Connection Status */}
+          <Tooltip title={connectionStatus === 'connected' ? 'Connected' : 'Disconnected'}>
+            <Chip
+              icon={connectionStatus === 'connected' ? <WifiIcon /> : <WifiOffIcon />}
+              label={connectionStatus === 'connected' ? 'Connected' : 'Disconnected'}
+              color={connectionStatus === 'connected' ? 'success' : 'error'}
+              size="small"
+            />
+          </Tooltip>
+          
+          {/* Auto-refresh toggle */}
+          <FormControlLabel
+            control={
+              <Switch
+                checked={autoRefresh}
+                onChange={(e) => setAutoRefresh(e.target.checked)}
+                size="small"
+              />
+            }
+            label="Auto-refresh"
+          />
+        </Box>
+      </Box>
+
+      {/* Stale data indicator */}
+      {dataStale && (
+        <Alert 
+          severity="warning" 
+          sx={{ mb: 2 }}
+          action={
+            <Button color="inherit" size="small" onClick={() => loadMcpData()}>
+              Refresh Now
+            </Button>
+          }
+        >
+          Data may be stale. Last updated: {formatDate(lastUpdateTime, 'HH:mm:ss')}
+        </Alert>
+      )}
+
+      {/* Enhanced Error Display */}
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
+        <Alert 
+          severity="error" 
+          sx={{ mb: 2 }}
+          onClose={() => setError(null)}
+          action={
+            error.retryable && (
+              <Button color="inherit" size="small" onClick={handleRetry} startIcon={<RetryIcon />}>
+                Retry
+              </Button>
+            )
+          }
+        >
+          <Typography variant="body2" fontWeight="bold">
+            {error.type.toUpperCase()}: {error.message}
+          </Typography>
+          <Collapse in={true}>
+            <Box sx={{ mt: 1 }}>
+              <Typography variant="caption">
+                Timestamp: {formatDate(error.timestamp, 'yyyy-MM-dd HH:mm:ss')}
+              </Typography>
+              {error.details && (
+                <Box sx={{ mt: 1 }}>
+                  <Typography variant="caption" fontWeight="bold">Details:</Typography>
+                  <Paper sx={{ p: 1, mt: 0.5, bgcolor: 'rgba(0,0,0,0.05)', maxHeight: 200, overflow: 'auto' }}>
+                    <JsonView
+                      value={error.details}
+                      collapsed={2}
+                    />
+                  </Paper>
+                </Box>
+              )}
+            </Box>
+          </Collapse>
         </Alert>
       )}
 
@@ -458,12 +1150,13 @@ const EnhancedMCPTestingPanel: React.FC = () => {
           <Tab label="Tool Search" />
           <Tab label="Workflow Testing" />
           <Tab label="Execution History" />
+          <Tab label="Analytics" />
         </Tabs>
       </Box>
 
+      {/* Status & Discovery Tab */}
       <TabPanel value={tabValue} index={0}>
         <Grid container spacing={2}>
-          {/* Agent Status Section */}
           {agentsStatus && (
             <Grid item xs={12}>
               <Card>
@@ -563,7 +1256,7 @@ const EnhancedMCPTestingPanel: React.FC = () => {
                     </Button>
                   </Box>
                 ) : (
-                  <CircularProgress />
+                  <Skeleton variant="rectangular" height={200} />
                 )}
               </CardContent>
             </Card>
@@ -572,73 +1265,164 @@ const EnhancedMCPTestingPanel: React.FC = () => {
           <Grid item xs={12} md={6}>
             <Card>
               <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Discovered Tools ({tools.length})
-                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h6">
+                    Discovered Tools ({filteredTools.length})
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <IconButton size="small" onClick={() => setShowFilters(!showFilters)}>
+                      <FilterIcon />
+                    </IconButton>
+                    <FormControl size="small" sx={{ minWidth: 120 }}>
+                      <InputLabel>Sort By</InputLabel>
+                      <Select
+                        value={toolSortBy}
+                        label="Sort By"
+                        onChange={(e) => setToolSortBy(e.target.value as any)}
+                      >
+                        <MenuItem value="name">Name</MenuItem>
+                        <MenuItem value="category">Category</MenuItem>
+                        <MenuItem value="source">Source</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Box>
+                </Box>
+
+                {/* Filters */}
+                <Collapse in={showFilters}>
+                  <Box sx={{ mb: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} md={4}>
+                        <FormControl fullWidth size="small">
+                          <InputLabel>Category</InputLabel>
+                          <Select
+                            value={toolFilters.category}
+                            label="Category"
+                            onChange={(e) => setToolFilters({ ...toolFilters, category: e.target.value })}
+                          >
+                            <MenuItem value="">All</MenuItem>
+                            {Array.from(new Set(tools.map(t => t.category))).map(cat => (
+                              <MenuItem key={cat} value={cat}>{cat}</MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      </Grid>
+                      <Grid item xs={12} md={4}>
+                        <FormControl fullWidth size="small">
+                          <InputLabel>Source</InputLabel>
+                          <Select
+                            value={toolFilters.source}
+                            label="Source"
+                            onChange={(e) => setToolFilters({ ...toolFilters, source: e.target.value })}
+                          >
+                            <MenuItem value="">All</MenuItem>
+                            {Array.from(new Set(tools.map(t => t.source))).map(src => (
+                              <MenuItem key={src} value={src}>{src}</MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      </Grid>
+                      <Grid item xs={12} md={4}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="Search"
+                          value={toolFilters.search}
+                          onChange={(e) => setToolFilters({ ...toolFilters, search: e.target.value })}
+                        />
+                      </Grid>
+                    </Grid>
+                    <Button
+                      size="small"
+                      startIcon={<ClearIcon />}
+                      onClick={() => setToolFilters({ category: '', source: '', search: '' })}
+                      sx={{ mt: 1 }}
+                    >
+                      Clear Filters
+                    </Button>
+                  </Box>
+                </Collapse>
+
+                {/* Bulk selection */}
+                {selectedTools.length > 0 && (
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    {selectedTools.length} tool(s) selected
+                    <Button size="small" onClick={handleBulkExecute} disabled={bulkExecuting} sx={{ ml: 2 }}>
+                      Execute Selected
+                    </Button>
+                    <Button size="small" onClick={() => setSelectedTools([])} sx={{ ml: 1 }}>
+                      Clear Selection
+                    </Button>
+                  </Alert>
+                )}
                 
-                {tools.length > 0 ? (
-                  <Accordion>
-                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                      <Typography>View All Tools</Typography>
-                    </AccordionSummary>
-                    <AccordionDetails>
-                      <List dense>
-                        {tools.slice(0, 10).map((tool) => (
-                          <React.Fragment key={tool.tool_id}>
-                            <ListItem>
-                              <ListItemText
-                                primary={tool.name}
-                                secondary={
-                                  <Box>
-                                    <Typography variant="body2" color="text.secondary">
-                                      {tool.description}
-                                    </Typography>
-                                    <Box sx={{ mt: 1 }}>
-                                      <Chip label={tool.category} size="small" sx={{ mr: 1 }} />
-                                      <Chip label={tool.source} size="small" />
-                                    </Box>
-                                  </Box>
-                                }
-                              />
-                              <ListItemSecondaryAction>
-                                <Tooltip title="View Details">
-                                  <IconButton
-                                    edge="end"
-                                    onClick={() => setShowToolDetails(
-                                      showToolDetails === tool.tool_id ? null : tool.tool_id
-                                    )}
-                                  >
-                                    <VisibilityIcon />
-                                  </IconButton>
-                                </Tooltip>
-                                <Tooltip title="Execute Tool">
-                                  <IconButton
-                                    edge="end"
-                                    onClick={() => {
-                                      if (tool.parameters && Object.keys(tool.parameters).length > 0) {
-                                        setSelectedToolForExecution(tool);
-                                        setShowParameterDialog(true);
-                                      } else {
-                                        handleExecuteTool(tool.tool_id, tool.name);
-                                      }
-                                    }}
-                                    disabled={loading}
-                                    sx={{ ml: 1 }}
-                                  >
-                                    <PlayIcon />
-                                  </IconButton>
-                                </Tooltip>
-                              </ListItemSecondaryAction>
-                            </ListItem>
-                            {renderToolDetails(tool)}
-                          </React.Fragment>
-                        ))}
-                      </List>
-                    </AccordionDetails>
-                  </Accordion>
+                {filteredTools.length > 0 ? (
+                  <List dense>
+                    {filteredTools.map((tool) => (
+                      <React.Fragment key={tool.tool_id}>
+                        <ListItem>
+                          <Checkbox
+                            checked={selectedTools.includes(tool.tool_id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedTools([...selectedTools, tool.tool_id]);
+                              } else {
+                                setSelectedTools(selectedTools.filter(id => id !== tool.tool_id));
+                              }
+                            }}
+                            sx={{ mr: 1 }}
+                          />
+                          <ListItemText
+                            primary={tool.name}
+                            secondary={
+                              <Box>
+                                <Typography variant="body2" color="text.secondary">
+                                  {tool.description}
+                                </Typography>
+                                <Box sx={{ mt: 1 }}>
+                                  <Chip label={tool.category} size="small" sx={{ mr: 1 }} />
+                                  <Chip label={tool.source} size="small" />
+                                </Box>
+                              </Box>
+                            }
+                          />
+                          <ListItemSecondaryAction>
+                            <Tooltip title="View Details">
+                              <IconButton
+                                edge="end"
+                                onClick={() => setShowToolDetails(
+                                  showToolDetails === tool.tool_id ? null : tool.tool_id
+                                )}
+                              >
+                                <VisibilityIcon />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Execute Tool">
+                              <IconButton
+                                edge="end"
+                                onClick={() => {
+                                  if (tool.parameters && Object.keys(tool.parameters).length > 0) {
+                                    setSelectedToolForExecution(tool);
+                                    setShowParameterDialog(true);
+                                  } else {
+                                    handleExecuteTool(tool.tool_id, tool.name);
+                                  }
+                                }}
+                                disabled={loading}
+                                sx={{ ml: 1 }}
+                              >
+                                <PlayIcon />
+                              </IconButton>
+                            </Tooltip>
+                          </ListItemSecondaryAction>
+                        </ListItem>
+                        {renderToolDetails(tool)}
+                      </React.Fragment>
+                    ))}
+                  </List>
                 ) : (
                   <Typography variant="body2" color="text.secondary">
-                    No tools discovered yet. Try refreshing discovery.
+                    {tools.length === 0 ? 'No tools discovered yet. Try refreshing discovery.' : 'No tools match the current filters.'}
                   </Typography>
                 )}
               </CardContent>
@@ -647,6 +1431,7 @@ const EnhancedMCPTestingPanel: React.FC = () => {
         </Grid>
       </TabPanel>
 
+      {/* Tool Search Tab */}
       <TabPanel value={tabValue} index={1}>
         <Card>
           <CardContent>
@@ -658,6 +1443,7 @@ const EnhancedMCPTestingPanel: React.FC = () => {
               <TextField
                 fullWidth
                 label="Search tools..."
+                placeholder="Press Ctrl/Cmd + K to focus"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSearchTools()}
@@ -702,113 +1488,342 @@ const EnhancedMCPTestingPanel: React.FC = () => {
         </Card>
       </TabPanel>
 
+      {/* Workflow Testing Tab */}
       <TabPanel value={tabValue} index={2}>
-        <Card>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              MCP Workflow Testing
-            </Typography>
-            
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Test the complete MCP workflow with sample messages:
-            </Typography>
-            
-            <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => setTestMessage("Show me the status of forklift FL-001")}
-              >
-                Equipment Status
-              </Button>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => setTestMessage("Create a new picking task for order ORD-123")}
-              >
-                Create Task
-              </Button>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => setTestMessage("Report a safety incident in zone A")}
-              >
-                Safety Report
-              </Button>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => setTestMessage("What equipment is available?")}
-              >
-                Available Equipment
-              </Button>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => setTestMessage("Generate a demand forecast for SKU-12345")}
-              >
-                Forecasting
-              </Button>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => setTestMessage("Show me reorder recommendations")}
-              >
-                Reorder Recommendations
-              </Button>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => setTestMessage("Upload and process a document")}
-              >
-                Document Processing
-              </Button>
-            </Box>
-            
-            <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-              <TextField
-                fullWidth
-                label="Test message..."
-                value={testMessage}
-                onChange={(e) => setTestMessage(e.target.value)}
-                placeholder="e.g., Show me the status of forklift FL-001"
-              />
-              <Button
-                variant="contained"
-                startIcon={loading ? <CircularProgress size={16} /> : <PlayIcon />}
-                onClick={handleTestWorkflow}
-                disabled={loading || !testMessage.trim()}
-              >
-                {loading ? 'Testing...' : 'Test Workflow'}
-              </Button>
-            </Box>
-            
-            {testResult && (
-              <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
-                <Typography variant="subtitle2" gutterBottom>
-                  Workflow Test Result:
+        <Grid container spacing={2}>
+          <Grid item xs={12} md={8}>
+            <Card>
+              <CardContent>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h6">
+                    MCP Workflow Testing
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button
+                      size="small"
+                      startIcon={<SaveIcon />}
+                      onClick={() => setShowScenarioDialog(true)}
+                    >
+                      Save Scenario
+                    </Button>
+                    <Button
+                      size="small"
+                      startIcon={<UploadIcon />}
+                      onClick={() => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = '.json';
+                        input.onchange = (e: any) => {
+                          const file = e.target.files[0];
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            try {
+                              const scenario = JSON.parse(event.target?.result as string);
+                              loadTestScenario(scenario);
+                            } catch (err) {
+                              setError({
+                                type: 'validation',
+                                message: 'Invalid scenario file',
+                                timestamp: new Date(),
+                                retryable: false,
+                              });
+                            }
+                          };
+                          reader.readAsText(file);
+                        };
+                        input.click();
+                      }}
+                    >
+                      Load Scenario
+                    </Button>
+                  </Box>
+                </Box>
+                
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Test the complete MCP workflow with sample messages (Press Ctrl/Cmd + Enter to execute):
                 </Typography>
-                <Typography variant="body2" component="pre" sx={{ whiteSpace: 'pre-wrap' }}>
-                  {JSON.stringify(testResult, null, 2)}
+                
+                {/* Test Scenarios */}
+                {testScenarios.length > 0 && (
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" gutterBottom>Saved Scenarios:</Typography>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                      {testScenarios.slice(0, 5).map((scenario) => (
+                        <Chip
+                          key={scenario.id}
+                          label={scenario.name}
+                          onClick={() => loadTestScenario(scenario)}
+                          onDelete={() => {
+                            const updated = testScenarios.filter(s => s.id !== scenario.id);
+                            setTestScenarios(updated);
+                            localStorage.setItem('mcp_test_scenarios', JSON.stringify(updated));
+                          }}
+                          sx={{ mb: 1 }}
+                        />
+                      ))}
+                    </Box>
+                  </Box>
+                )}
+                
+                <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => setTestMessage("Show me the status of forklift FL-001")}
+                  >
+                    Equipment Status
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => setTestMessage("Create a new picking task for order ORD-123")}
+                  >
+                    Create Task
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => setTestMessage("Report a safety incident in zone A")}
+                  >
+                    Safety Report
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => setTestMessage("What equipment is available?")}
+                  >
+                    Available Equipment
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => setTestMessage("Generate a demand forecast for SKU-12345")}
+                  >
+                    Forecasting
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => setTestMessage("Show me reorder recommendations")}
+                  >
+                    Reorder Recommendations
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => setTestMessage("Upload and process a document")}
+                  >
+                    Document Processing
+                  </Button>
+                </Box>
+                
+                <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                  <TextField
+                    fullWidth
+                    label="Test message..."
+                    value={testMessage}
+                    onChange={(e) => setTestMessage(e.target.value)}
+                    placeholder="e.g., Show me the status of forklift FL-001"
+                    multiline
+                    rows={3}
+                  />
+                  <Button
+                    variant="contained"
+                    startIcon={loading ? <CircularProgress size={16} /> : <PlayIcon />}
+                    onClick={handleTestWorkflow}
+                    disabled={loading || !testMessage.trim()}
+                    sx={{ alignSelf: 'flex-start' }}
+                  >
+                    {loading ? 'Testing...' : 'Test Workflow'}
+                  </Button>
+                </Box>
+                
+                {testResult && (
+                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                      <Typography variant="subtitle2">
+                        Workflow Test Result:
+                      </Typography>
+                      <CopyToClipboard text={JSON.stringify(testResult, null, 2)}>
+                        <IconButton size="small">
+                          <CopyIcon />
+                        </IconButton>
+                      </CopyToClipboard>
+                    </Box>
+                    <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
+                      <JsonView
+                        value={testResult}
+                        collapsed={2}
+                      />
+                    </Box>
+                  </Paper>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          <Grid item xs={12} md={4}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Test Scenarios
                 </Typography>
-              </Paper>
-            )}
-          </CardContent>
-        </Card>
+                {testScenarios.length > 0 ? (
+                  <List dense>
+                    {testScenarios.map((scenario) => (
+                      <ListItem key={scenario.id}>
+                        <ListItemText
+                          primary={scenario.name}
+                          secondary={scenario.description || scenario.message.substring(0, 50) + '...'}
+                        />
+                        <ListItemSecondaryAction>
+                          <IconButton size="small" onClick={() => loadTestScenario(scenario)}>
+                            <PlayIcon />
+                          </IconButton>
+                          <IconButton size="small" onClick={() => shareScenario(scenario)}>
+                            <CopyIcon />
+                          </IconButton>
+                        </ListItemSecondaryAction>
+                      </ListItem>
+                    ))}
+                  </List>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    No saved scenarios. Save a test message to create one.
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
       </TabPanel>
 
+      {/* Execution History Tab */}
       <TabPanel value={tabValue} index={3}>
         <Card>
           <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Execution History
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6">
+                Execution History
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                {selectedHistoryEntries.length > 0 && (
+                  <>
+                    <Button
+                      size="small"
+                      startIcon={<CompareIcon />}
+                      onClick={() => setShowComparisonDialog(true)}
+                      disabled={selectedHistoryEntries.length < 2}
+                    >
+                      Compare ({selectedHistoryEntries.length})
+                    </Button>
+                  </>
+                )}
+                <Button
+                  size="small"
+                  startIcon={<DownloadIcon />}
+                  onClick={() => exportHistory('json')}
+                  disabled={filteredHistory.length === 0}
+                >
+                  Export JSON
+                </Button>
+                <Button
+                  size="small"
+                  startIcon={<DownloadIcon />}
+                  onClick={() => exportHistory('csv')}
+                  disabled={filteredHistory.length === 0}
+                >
+                  Export CSV
+                </Button>
+                <Button
+                  size="small"
+                  startIcon={<DeleteIcon />}
+                  onClick={clearHistory}
+                  disabled={executionHistory.length === 0}
+                  color="error"
+                >
+                  Clear
+                </Button>
+              </Box>
+            </Box>
+
+            {/* History Filters */}
+            <Box sx={{ mb: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={3}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Search"
+                    value={historyFilters.search}
+                    onChange={(e) => setHistoryFilters({ ...historyFilters, search: e.target.value })}
+                  />
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Tool</InputLabel>
+                    <Select
+                      value={historyFilters.tool}
+                      label="Tool"
+                      onChange={(e) => setHistoryFilters({ ...historyFilters, tool: e.target.value })}
+                    >
+                      <MenuItem value="">All</MenuItem>
+                      {Array.from(new Set(executionHistory.map(h => h.tool_name))).map(tool => (
+                        <MenuItem key={tool} value={tool}>{tool}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Status</InputLabel>
+                    <Select
+                      value={historyFilters.status}
+                      label="Status"
+                      onChange={(e) => setHistoryFilters({ ...historyFilters, status: e.target.value as any })}
+                    >
+                      <MenuItem value="all">All</MenuItem>
+                      <MenuItem value="success">Success</MenuItem>
+                      <MenuItem value="failed">Failed</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Date Range</InputLabel>
+                    <Select
+                      value={historyFilters.dateRange}
+                      label="Date Range"
+                      onChange={(e) => setHistoryFilters({ ...historyFilters, dateRange: e.target.value as any })}
+                    >
+                      <MenuItem value="all">All</MenuItem>
+                      <MenuItem value="today">Today</MenuItem>
+                      <MenuItem value="week">Last Week</MenuItem>
+                      <MenuItem value="month">Last Month</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+            </Box>
             
-            {executionHistory.length > 0 ? (
+            {filteredHistory.length > 0 ? (
               <TableContainer>
                 <Table>
                   <TableHead>
                     <TableRow>
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          indeterminate={selectedHistoryEntries.length > 0 && selectedHistoryEntries.length < filteredHistory.length}
+                          checked={filteredHistory.length > 0 && selectedHistoryEntries.length === filteredHistory.length}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedHistoryEntries(filteredHistory.map(h => h.id));
+                            } else {
+                              setSelectedHistoryEntries([]);
+                            }
+                          }}
+                        />
+                      </TableCell>
                       <TableCell>Timestamp</TableCell>
                       <TableCell>Tool</TableCell>
                       <TableCell>Status</TableCell>
@@ -817,10 +1832,22 @@ const EnhancedMCPTestingPanel: React.FC = () => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {executionHistory.map((entry) => (
+                    {filteredHistory.map((entry) => (
                       <TableRow key={entry.id}>
+                        <TableCell padding="checkbox">
+                          <Checkbox
+                            checked={selectedHistoryEntries.includes(entry.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedHistoryEntries([...selectedHistoryEntries, entry.id]);
+                              } else {
+                                setSelectedHistoryEntries(selectedHistoryEntries.filter(id => id !== entry.id));
+                              }
+                            }}
+                          />
+                        </TableCell>
                         <TableCell>
-                          {entry.timestamp.toLocaleString()}
+                          {formatDate(entry.timestamp, 'yyyy-MM-dd HH:mm:ss')}
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2" fontWeight="medium">
@@ -858,139 +1885,308 @@ const EnhancedMCPTestingPanel: React.FC = () => {
               </TableContainer>
             ) : (
               <Typography variant="body2" color="text.secondary">
-                No execution history yet. Execute some tools to see history.
+                {executionHistory.length === 0 
+                  ? 'No execution history yet. Execute some tools to see history.'
+                  : 'No history entries match the current filters.'}
               </Typography>
             )}
           </CardContent>
         </Card>
       </TabPanel>
 
+      {/* Analytics Tab */}
+      <TabPanel value={tabValue} index={4}>
+        <Grid container spacing={2}>
+          <Grid item xs={12}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Execution Time Trends
+                </Typography>
+                {chartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" />
+                      <YAxis />
+                      <RechartsTooltip />
+                      <Legend />
+                      <Line type="monotone" dataKey="avgTime" stroke="#8884d8" name="Avg Execution Time (ms)" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    No data available for the last 30 days
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          <Grid item xs={12} md={6}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Success Rate Over Time
+                </Typography>
+                {chartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" />
+                      <YAxis />
+                      <RechartsTooltip />
+                      <Legend />
+                      <Line type="monotone" dataKey="success" stroke="#82ca9d" name="Successful" />
+                      <Line type="monotone" dataKey="failed" stroke="#ff7300" name="Failed" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    No data available
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          <Grid item xs={12} md={6}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Tool Usage Distribution
+                </Typography>
+                {toolUsageData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={toolUsageData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
+                      <YAxis />
+                      <RechartsTooltip />
+                      <Bar dataKey="count" fill="#8884d8" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    No tool usage data available
+                  </Typography>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      </TabPanel>
+
       {/* Parameter Input Dialog */}
-      {showParameterDialog && selectedToolForExecution && (
-        <Box
-          sx={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            bgcolor: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1300,
-          }}
-          onClick={() => setShowParameterDialog(false)}
-        >
-          <Paper
-            sx={{ p: 3, maxWidth: 600, maxHeight: '80vh', overflow: 'auto' }}
-            onClick={(e) => e.stopPropagation()}
+      <Dialog
+        open={showParameterDialog}
+        onClose={() => setShowParameterDialog(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          Execute Tool: {selectedToolForExecution?.name}
+        </DialogTitle>
+        <DialogContent>
+          {selectedToolForExecution && (
+            <>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                {selectedToolForExecution.description}
+              </Typography>
+              {renderParameterForm(selectedToolForExecution)}
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowParameterDialog(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              if (selectedToolForExecution) {
+                handleExecuteTool(
+                  selectedToolForExecution.tool_id,
+                  selectedToolForExecution.name,
+                  toolParameters[selectedToolForExecution.tool_id]
+                );
+                setShowParameterDialog(false);
+              }
+            }}
+            disabled={!!parameterErrors[selectedToolForExecution?.tool_id || '']}
           >
-            <Typography variant="h6" gutterBottom>
-              Execute Tool: {selectedToolForExecution.name}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              {selectedToolForExecution.description}
-            </Typography>
-            <Typography variant="subtitle2" gutterBottom>
-              Parameters:
-            </Typography>
-            <TextField
-              fullWidth
-              multiline
-              rows={8}
-              value={JSON.stringify(toolParameters[selectedToolForExecution.tool_id] || {}, null, 2)}
-              onChange={(e) => {
-                try {
-                  const params = JSON.parse(e.target.value);
-                  setToolParameters({
-                    ...toolParameters,
-                    [selectedToolForExecution.tool_id]: params,
-                  });
-                } catch (err) {
-                  // Invalid JSON, keep as is
-                }
-              }}
-              placeholder='{"param1": "value1", "param2": "value2"}'
-              sx={{ mb: 2, fontFamily: 'monospace' }}
-            />
-            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-              <Button onClick={() => setShowParameterDialog(false)}>Cancel</Button>
-              <Button
-                variant="contained"
-                onClick={() => {
-                  handleExecuteTool(
-                    selectedToolForExecution.tool_id,
-                    selectedToolForExecution.name,
-                    toolParameters[selectedToolForExecution.tool_id]
-                  );
-                  setShowParameterDialog(false);
-                }}
-              >
-                Execute
-              </Button>
-            </Box>
-          </Paper>
-        </Box>
-      )}
+            Execute
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Execution History Details Dialog */}
-      {selectedHistoryEntry && (
-        <Box
-          sx={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            bgcolor: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1300,
-          }}
-          onClick={() => setSelectedHistoryEntry(null)}
-        >
-          <Paper
-            sx={{ p: 3, maxWidth: 800, maxHeight: '80vh', overflow: 'auto' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Typography variant="h6" gutterBottom>
+      <Dialog
+        open={!!selectedHistoryEntry}
+        onClose={() => setSelectedHistoryEntry(null)}
+        maxWidth="md"
+        fullWidth
+      >
+        {selectedHistoryEntry && (
+          <>
+            <DialogTitle>
               Execution Details: {selectedHistoryEntry.tool_name}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              {selectedHistoryEntry.timestamp.toLocaleString()}
-            </Typography>
-            <Divider sx={{ my: 2 }} />
-            <Typography variant="subtitle2" gutterBottom>
-              Status: {selectedHistoryEntry.success ? 'Success' : 'Failed'}
-            </Typography>
-            <Typography variant="body2" sx={{ mb: 2 }}>
-              Execution Time: {selectedHistoryEntry.execution_time}ms
-            </Typography>
-            {selectedHistoryEntry.error && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {selectedHistoryEntry.error}
-              </Alert>
-            )}
-            {selectedHistoryEntry.result && (
-              <Box>
-                <Typography variant="subtitle2" gutterBottom>
-                  Result:
-                </Typography>
-                <Paper sx={{ p: 2, bgcolor: 'grey.50', maxHeight: 400, overflow: 'auto' }}>
-                  <pre style={{ fontSize: '0.75rem', margin: 0 }}>
-                    {JSON.stringify(selectedHistoryEntry.result, null, 2)}
-                  </pre>
-                </Paper>
-              </Box>
-            )}
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+            </DialogTitle>
+            <DialogContent>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                {formatDate(selectedHistoryEntry.timestamp, 'yyyy-MM-dd HH:mm:ss')}
+              </Typography>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="subtitle2" gutterBottom>
+                Status: {selectedHistoryEntry.success ? 'Success' : 'Failed'}
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 2 }}>
+                Execution Time: {selectedHistoryEntry.execution_time}ms
+              </Typography>
+              {selectedHistoryEntry.error && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {selectedHistoryEntry.error}
+                </Alert>
+              )}
+              {selectedHistoryEntry.parameters && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="subtitle2" gutterBottom>Parameters:</Typography>
+                  <Paper sx={{ p: 1, bgcolor: 'grey.50', maxHeight: 200, overflow: 'auto' }}>
+                    <JsonView
+                      value={selectedHistoryEntry.parameters}
+                      collapsed={1}
+                    />
+                  </Paper>
+                </Box>
+              )}
+              {selectedHistoryEntry.result && (
+                <Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Typography variant="subtitle2">Result:</Typography>
+                    <CopyToClipboard text={JSON.stringify(selectedHistoryEntry.result, null, 2)}>
+                      <IconButton size="small">
+                        <CopyIcon />
+                      </IconButton>
+                    </CopyToClipboard>
+                  </Box>
+                  <Paper sx={{ p: 1, bgcolor: 'grey.50', maxHeight: 400, overflow: 'auto' }}>
+                    <JsonView
+                      value={selectedHistoryEntry.result}
+                      collapsed={2}
+                    />
+                  </Paper>
+                </Box>
+              )}
+            </DialogContent>
+            <DialogActions>
               <Button onClick={() => setSelectedHistoryEntry(null)}>Close</Button>
-            </Box>
-          </Paper>
-        </Box>
-      )}
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
+
+      {/* Comparison Dialog */}
+      <Dialog
+        open={showComparisonDialog}
+        onClose={() => setShowComparisonDialog(false)}
+        maxWidth="lg"
+        fullWidth
+      >
+        <DialogTitle>Compare Execution Results</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2}>
+            {selectedHistoryEntries.slice(0, 2).map((id) => {
+              const entry = executionHistory.find(e => e.id === id);
+              if (!entry) return null;
+              return (
+                <Grid item xs={12} md={6} key={id}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6">{entry.tool_name}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {formatDate(entry.timestamp, 'yyyy-MM-dd HH:mm:ss')}
+                      </Typography>
+                      <Chip
+                        label={entry.success ? 'Success' : 'Failed'}
+                        color={entry.success ? 'success' : 'error'}
+                        size="small"
+                        sx={{ ml: 1 }}
+                      />
+                      <Typography variant="body2" sx={{ mt: 1 }}>
+                        Execution Time: {entry.execution_time}ms
+                      </Typography>
+                      {entry.result && (
+                        <Box sx={{ mt: 2, maxHeight: 300, overflow: 'auto' }}>
+                          <JsonView
+                            value={entry.result}
+                            collapsed={2}
+                          />
+                        </Box>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Grid>
+              );
+            })}
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowComparisonDialog(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Save Scenario Dialog */}
+      <Dialog
+        open={showScenarioDialog}
+        onClose={() => {
+          setShowScenarioDialog(false);
+          setSelectedScenario({ name: '', description: '', message: testMessage });
+        }}
+      >
+        <DialogTitle>Save Test Scenario</DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            label="Scenario Name"
+            value={selectedScenario.name || ''}
+            onChange={(e) => setSelectedScenario({ ...selectedScenario, name: e.target.value })}
+            sx={{ mb: 2, mt: 1 }}
+          />
+          <TextField
+            fullWidth
+            label="Description (optional)"
+            value={selectedScenario.description || ''}
+            onChange={(e) => setSelectedScenario({ ...selectedScenario, description: e.target.value })}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            fullWidth
+            label="Test Message"
+            value={testMessage}
+            onChange={(e) => setTestMessage(e.target.value)}
+            multiline
+            rows={3}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowScenarioDialog(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              if (testMessage && selectedScenario.name) {
+                saveTestScenario({
+                  name: selectedScenario.name,
+                  message: testMessage,
+                  description: selectedScenario.description,
+                });
+                setSelectedScenario({ name: '', description: '', message: testMessage });
+                setShowScenarioDialog(false);
+              }
+            }}
+            disabled={!testMessage || !selectedScenario.name}
+          >
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

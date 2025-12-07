@@ -11,7 +11,7 @@ graph TB
     end
 
     subgraph SEC_LAYER["Security Layer"]
-        Auth["JWT OAuth2 Auth<br/>Implemented"]
+        Auth["JWT Authentication<br/>Implemented"]
         RBAC["Role-Based Access Control<br/>5 User Roles"]
         Guardrails["NeMo Guardrails<br/>Content Safety"]
     end
@@ -47,7 +47,7 @@ graph TB
     end
 
     subgraph AI_LAYER["AI Services - NVIDIA NIMs"]
-        NIM_LLM["NVIDIA NIM LLM<br/>Llama 3.1 70B<br/>Fully Integrated"]
+        NIM_LLM["NVIDIA NIM LLM<br/>Llama 3.3 Nemotron Super 49B<br/>Fully Integrated"]
         NIM_EMB["NVIDIA NIM Embeddings<br/>NV-EmbedQA-E5-v5<br/>1024-dim, GPU Accelerated"]
     end
 
@@ -435,7 +435,7 @@ sequenceDiagram
 | **Forecasting Agent** | Complete | Python, async + MCP | - | Demand forecasting, reorder recommendations |
 | **Document Extraction Agent** | Complete | Python, async + NVIDIA NeMo | - | 6-stage document processing pipeline |
 | **Memory Manager** | Complete | PostgreSQL, Redis | - | Session context, conversation history |
-| **NVIDIA NIMs** | Complete | Llama 3.1 70B, NV-EmbedQA-E5-v5 | - | AI-powered responses |
+| **NVIDIA NIMs** | Complete | Llama 3.3 Nemotron Super 49B, NV-EmbedQA-E5-v5 | - | AI-powered responses |
 | **Document Processing Pipeline** | Complete | NVIDIA NeMo Models | - | 6-stage intelligent document processing |
 | **Forecasting Service** | Complete | Python, scikit-learn, XGBoost | - | Multi-model ensemble forecasting |
 | **Forecasting Training** | Complete | Python, RAPIDS cuML (GPU) | - | Phase 1-3 training pipeline |
@@ -607,7 +607,7 @@ The Document Extraction Agent implements a comprehensive **6-stage pipeline** us
 | **API Gateway** | FastAPI | 0.119+ | Complete | REST API with OpenAPI/Swagger |
 | **API Gateway** | Pydantic | v2.7+ | Complete | Data validation & serialization |
 | **Orchestration** | LangGraph | Latest | Complete | Multi-agent coordination |
-| **AI/LLM** | NVIDIA NIM | Latest | Complete | Llama 3.1 70B + Embeddings |
+| **AI/LLM** | NVIDIA NIM | Latest | Complete | Llama 3.3 Nemotron Super 49B + Embeddings |
 | **Database** | PostgreSQL | 15+ | Complete | Structured data storage |
 | **Database** | TimescaleDB | 2.11+ | Complete | Time-series data |
 | **Vector DB** | Milvus | 2.3+ | Complete | Semantic search & embeddings |

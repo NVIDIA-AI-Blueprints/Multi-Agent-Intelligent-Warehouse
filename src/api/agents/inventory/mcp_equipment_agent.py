@@ -22,6 +22,15 @@ from src.api.services.mcp.tool_discovery import (
     ToolCategory,
 )
 from src.api.services.mcp.base import MCPManager
+
+# Import SecurityViolationError if available, otherwise define a placeholder
+try:
+    from src.api.services.mcp.security import SecurityViolationError
+except ImportError:
+    # Define a placeholder if security module doesn't exist
+    class SecurityViolationError(Exception):
+        """Security violation error."""
+        pass
 from src.api.services.reasoning import (
     get_reasoning_engine,
     ReasoningType,
@@ -29,6 +38,7 @@ from src.api.services.reasoning import (
 )
 from src.api.utils.log_utils import sanitize_prompt_input
 from src.api.services.agent_config import load_agent_config, AgentConfig
+from src.api.services.validation import get_response_validator
 from .equipment_asset_tools import get_equipment_asset_tools
 
 logger = logging.getLogger(__name__)
@@ -581,71 +591,198 @@ Return only valid JSON.""",
     async def _execute_tool_plan(
         self, execution_plan: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
-        """Execute the tool execution plan in parallel where possible."""
+        """Execute the tool execution plan in parallel where possible with retry logic."""
         results = {}
         
         if not execution_plan:
             logger.warning("Tool execution plan is empty - no tools to execute")
             return results
 
-        async def execute_single_tool(step: Dict[str, Any]) -> tuple:
-            """Execute a single tool and return (tool_id, result_dict)."""
+        async def execute_single_tool_with_retry(
+            step: Dict[str, Any], max_retries: int = 3
+        ) -> tuple:
+            """Execute a single tool with retry logic and return (tool_id, result_dict)."""
             tool_id = step["tool_id"]
             tool_name = step["tool_name"]
             arguments = step["arguments"]
+            required = step.get("required", False)
             
-            try:
-                logger.info(
-                    f"Executing MCP tool: {tool_name} with arguments: {arguments}"
-                )
+            # Retry configuration
+            retry_delays = [1.0, 2.0, 4.0]  # Exponential backoff: 1s, 2s, 4s
+            last_error = None
+            
+            for attempt in range(max_retries):
+                try:
+                    logger.info(
+                        f"Executing MCP tool: {tool_name} (attempt {attempt + 1}/{max_retries}) with arguments: {arguments}"
+                    )
 
-                # Execute the tool
-                result = await self.tool_discovery.execute_tool(tool_id, arguments)
+                    # Execute the tool with timeout
+                    tool_timeout = 15.0  # 15 second timeout per tool execution
+                    try:
+                        result = await asyncio.wait_for(
+                            self.tool_discovery.execute_tool(tool_id, arguments),
+                            timeout=tool_timeout
+                        )
+                    except asyncio.TimeoutError:
+                        error_msg = f"Tool execution timeout after {tool_timeout}s"
+                        logger.warning(f"{error_msg} for {tool_name} (attempt {attempt + 1}/{max_retries})")
+                        last_error = TimeoutError(error_msg)
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(retry_delays[attempt])
+                            continue
+                        else:
+                            raise last_error
 
-                result_dict = {
-                    "tool_name": tool_name,
-                    "success": True,
-                    "result": result,
-                    "execution_time": datetime.utcnow().isoformat(),
-                }
-
-                # Record in execution history
-                self.tool_execution_history.append(
-                    {
-                        "tool_id": tool_id,
+                    # Success - record result
+                    result_dict = {
                         "tool_name": tool_name,
-                        "arguments": arguments,
+                        "success": True,
                         "result": result,
-                        "timestamp": datetime.utcnow().isoformat(),
+                        "execution_time": datetime.utcnow().isoformat(),
+                        "attempts": attempt + 1,
                     }
-                )
-                
-                return (tool_id, result_dict)
 
-            except Exception as e:
-                logger.error(f"Error executing tool {tool_name}: {e}")
-                result_dict = {
-                    "tool_name": tool_name,
-                    "success": False,
-                    "error": str(e),
-                    "execution_time": datetime.utcnow().isoformat(),
-                }
-                return (tool_id, result_dict)
+                    # Record in execution history
+                    self.tool_execution_history.append(
+                        {
+                            "tool_id": tool_id,
+                            "tool_name": tool_name,
+                            "arguments": arguments,
+                            "result": result,
+                            "timestamp": datetime.utcnow().isoformat(),
+                            "attempts": attempt + 1,
+                        }
+                    )
+                    
+                    logger.info(f"Successfully executed tool {tool_name} after {attempt + 1} attempt(s)")
+                    return (tool_id, result_dict)
+
+                except asyncio.TimeoutError as e:
+                    last_error = e
+                    error_type = "timeout"
+                    if attempt < max_retries - 1:
+                        logger.warning(
+                            f"Tool {tool_name} timed out (attempt {attempt + 1}/{max_retries}), retrying in {retry_delays[attempt]}s..."
+                        )
+                        await asyncio.sleep(retry_delays[attempt])
+                        continue
+                    else:
+                        logger.error(f"Tool {tool_name} timed out after {max_retries} attempts")
+                        
+                except ValueError as e:
+                    # Tool not found or invalid arguments - don't retry
+                    last_error = e
+                    error_type = "validation_error"
+                    logger.error(f"Tool {tool_name} validation error: {e} (not retrying)")
+                    break
+                    
+                except SecurityViolationError as e:
+                    # Security violation - don't retry
+                    last_error = e
+                    error_type = "security_error"
+                    logger.error(f"Tool {tool_name} security violation: {e} (not retrying)")
+                    break
+                    
+                except ConnectionError as e:
+                    # Connection error - retry
+                    last_error = e
+                    error_type = "connection_error"
+                    if attempt < max_retries - 1:
+                        logger.warning(
+                            f"Tool {tool_name} connection error (attempt {attempt + 1}/{max_retries}): {e}, retrying in {retry_delays[attempt]}s..."
+                        )
+                        await asyncio.sleep(retry_delays[attempt])
+                        continue
+                    else:
+                        logger.error(f"Tool {tool_name} connection error after {max_retries} attempts: {e}")
+                        
+                except Exception as e:
+                    # Other errors - retry for transient errors
+                    last_error = e
+                    error_type = type(e).__name__
+                    
+                    # Check if error is retryable (transient errors)
+                    retryable_errors = [
+                        "ConnectionError",
+                        "TimeoutError",
+                        "asyncio.TimeoutError",
+                        "ServiceUnavailable",
+                    ]
+                    is_retryable = any(err in error_type for err in retryable_errors)
+                    
+                    if is_retryable and attempt < max_retries - 1:
+                        logger.warning(
+                            f"Tool {tool_name} transient error (attempt {attempt + 1}/{max_retries}): {e}, retrying in {retry_delays[attempt]}s..."
+                        )
+                        await asyncio.sleep(retry_delays[attempt])
+                        continue
+                    else:
+                        logger.error(f"Tool {tool_name} error after {attempt + 1} attempt(s): {e}")
+                        if not is_retryable:
+                            # Non-retryable error - don't retry
+                            break
+            
+            # All retries exhausted or non-retryable error
+            error_msg = str(last_error) if last_error else "Unknown error"
+            result_dict = {
+                "tool_name": tool_name,
+                "success": False,
+                "error": error_msg,
+                "error_type": error_type if 'error_type' in locals() else "unknown",
+                "execution_time": datetime.utcnow().isoformat(),
+                "attempts": max_retries,
+                "required": required,
+            }
+            
+            # Log detailed error information
+            logger.error(
+                f"Failed to execute tool {tool_name} after {max_retries} attempts. "
+                f"Error: {error_msg}, Type: {error_type if 'error_type' in locals() else 'unknown'}, "
+                f"Required: {required}"
+            )
+            
+            return (tool_id, result_dict)
 
         # Execute all tools in parallel
-        execution_tasks = [execute_single_tool(step) for step in execution_plan]
+        execution_tasks = [
+            execute_single_tool_with_retry(step) for step in execution_plan
+        ]
         execution_results = await asyncio.gather(*execution_tasks, return_exceptions=True)
         
         # Process results
+        successful_count = 0
+        failed_count = 0
+        failed_required = []
+        
         for result in execution_results:
             if isinstance(result, Exception):
                 logger.error(f"Unexpected error in tool execution: {result}")
+                failed_count += 1
                 continue
             
             tool_id, result_dict = result
             results[tool_id] = result_dict
+            
+            if result_dict.get("success"):
+                successful_count += 1
+            else:
+                failed_count += 1
+                if result_dict.get("required", False):
+                    failed_required.append(result_dict.get("tool_name", tool_id))
 
-        logger.info(f"Executed {len(execution_plan)} tools in parallel, {len([r for r in results.values() if r.get('success')])} successful")
+        logger.info(
+            f"Executed {len(execution_plan)} tools in parallel: "
+            f"{successful_count} successful, {failed_count} failed. "
+            f"Failed required tools: {failed_required if failed_required else 'none'}"
+        )
+        
+        # Log warning if required tools failed
+        if failed_required:
+            logger.warning(
+                f"Required tools failed: {failed_required}. This may impact response quality."
+            )
+        
         return results
 
     def _build_user_prompt_content(
@@ -908,8 +1045,26 @@ ABSOLUTELY CRITICAL:
                         "role": "system",
                         "content": """You are a certified equipment and asset operations expert. 
 Generate a comprehensive, expert-level natural language response based on the provided equipment data.
-Your response must be detailed, informative, and directly answer the user's query.
-Include specific equipment details (asset IDs, statuses, zones, models, etc.).
+
+CRITICAL: Write in a clear, natural, conversational tone:
+- Use fluent, natural English that reads like a human expert speaking
+- Avoid robotic or template-like language
+- Be specific and detailed, but keep it readable
+- Use active voice when possible
+- Vary sentence structure for better readability
+- Make it sound like you're explaining to a colleague, not a machine
+- Include context and reasoning, not just facts
+- Write complete, well-formed sentences and paragraphs
+
+CRITICAL ANTI-ECHOING RULES - YOU MUST FOLLOW THESE:
+- NEVER start with phrases like "You asked", "You requested", "I'll", "Let me", "As you requested", "Here's what you asked for"
+- NEVER echo or repeat the user's query - start directly with the information or action result
+- Start with the actual information or what was accomplished (e.g., "I found 3 forklifts..." or "FL-01 is available...")
+- Write as if explaining to a colleague, not referencing the query
+- DO NOT say "Here's the response:" or "Here's what I found:" - just provide the information directly
+
+Your response must be detailed, informative, and directly answer the user's query WITHOUT echoing it.
+Include specific equipment details (asset IDs, statuses, zones, models, etc.) naturally woven into the explanation.
 Provide expert-level analysis of equipment availability, utilization, and recommendations."""
                     },
                     {
@@ -926,20 +1081,24 @@ Tool execution results summary:
 {len(successful_results)} tools executed successfully
 
 Generate a comprehensive, expert-level natural language response that:
-1. Directly answers the user's query about equipment status and availability
-2. Includes specific details from the equipment data (asset IDs, statuses, zones, models)
-3. Provides expert analysis of equipment availability and utilization
-4. Offers actionable recommendations based on the equipment status
-5. Is written in a professional, informative tone
+1. Directly answers the user's query about equipment status and availability WITHOUT echoing the query
+2. Starts immediately with the information (e.g., "I found 3 forklifts..." or "FL-01 is available...")
+3. NEVER starts with "You asked", "You requested", "I'll", "Let me", "Here's the response", etc.
+4. Includes specific details from the equipment data (asset IDs, statuses, zones, models) naturally woven into the explanation
+5. Provides expert analysis of equipment availability and utilization with context
+6. Offers actionable recommendations based on the equipment status
+7. Is written in a clear, natural, conversational tone - like explaining to a colleague
+8. Uses varied sentence structure and flows naturally
+9. Is comprehensive but concise (typically 2-4 well-formed paragraphs)
 
-Return ONLY the natural language response text (no JSON, no formatting, just the response text)."""
+Write in a way that sounds natural and human, not robotic or template-like. Return ONLY the natural language response text (no JSON, no formatting, just the response text)."""
                     }
                 ]
                 
                 try:
                     generation_response = await self.nim_client.generate_response(
                         generation_prompt,
-                        temperature=0.3,  # Slightly higher for more natural language
+                        temperature=0.4,  # Higher temperature for more natural, fluent language
                         max_tokens=1000
                     )
                     natural_language = generation_response.content.strip()
@@ -1028,12 +1187,71 @@ Do not include any other text, just the JSON array."""
                     logger.error(f"Failed to generate recommendations from LLM: {e}", exc_info=True)
                     recommendations = []  # Empty rather than hardcoded
             
+            # Validate response quality
+            try:
+                validator = get_response_validator()
+                validation_result = validator.validate(
+                    response={
+                        "natural_language": natural_language,
+                        "confidence": response_data.get("confidence", 0.7),
+                        "response_type": response_data.get("response_type", "equipment_info"),
+                        "recommendations": recommendations,
+                        "actions_taken": response_data.get("actions_taken", []),
+                        "mcp_tools_used": list(successful_results.keys()),
+                        "tool_execution_results": tool_results,
+                    },
+                    query=query.user_query if hasattr(query, 'user_query') else str(query),
+                    tool_results=tool_results,
+                )
+                
+                if not validation_result.is_valid:
+                    logger.warning(f"Response validation failed: {validation_result.issues}")
+                else:
+                    logger.info(f"Response validation passed (score: {validation_result.score:.2f})")
+            except Exception as e:
+                logger.warning(f"Response validation error: {e}")
+            
+            # Improved confidence calculation based on tool execution results
+            current_confidence = response_data.get("confidence", 0.7)
+            total_tools = len(tool_results)
+            successful_count = len(successful_results)
+            failed_count = len(failed_results)
+            
+            # Calculate confidence based on tool execution success
+            if total_tools == 0:
+                # No tools executed - use LLM confidence or default
+                calculated_confidence = current_confidence if current_confidence > 0.5 else 0.5
+            elif successful_count == total_tools:
+                # All tools succeeded - very high confidence
+                calculated_confidence = 0.95
+                logger.info(f"All {total_tools} tools succeeded - setting confidence to 0.95")
+            elif successful_count > 0:
+                # Some tools succeeded - confidence based on success rate
+                success_rate = successful_count / total_tools
+                # Base confidence: 0.75, plus bonus for success rate (up to 0.2)
+                calculated_confidence = 0.75 + (success_rate * 0.2)  # Range: 0.75 to 0.95
+                logger.info(f"Partial success ({successful_count}/{total_tools}) - setting confidence to {calculated_confidence:.2f}")
+            else:
+                # All tools failed - low confidence
+                calculated_confidence = 0.3
+                logger.info(f"All {total_tools} tools failed - setting confidence to 0.3")
+            
+            # Use the higher of LLM confidence and calculated confidence (but don't go below calculated if tools succeeded)
+            if successful_count > 0:
+                # If tools succeeded, use calculated confidence (which is based on actual results)
+                final_confidence = max(current_confidence, calculated_confidence)
+            else:
+                # If no tools or all failed, use calculated confidence
+                final_confidence = calculated_confidence
+            
+            logger.info(f"Final confidence: {final_confidence:.2f} (LLM: {current_confidence:.2f}, Calculated: {calculated_confidence:.2f})")
+            
             return MCPEquipmentResponse(
                 response_type=response_data.get("response_type", "equipment_info"),
                 data=data if data else response_data.get("data", {}),
                 natural_language=natural_language,
                 recommendations=recommendations,
-                confidence=response_data.get("confidence", 0.7),
+                confidence=final_confidence,
                 actions_taken=response_data.get("actions_taken", []),
                 mcp_tools_used=list(successful_results.keys()),
                 tool_execution_results=tool_results,

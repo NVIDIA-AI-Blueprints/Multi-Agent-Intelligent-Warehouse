@@ -18,11 +18,15 @@
     "@testing-library/user-event": "^13.5.0",
     "@types/jest": "^27.5.2",
     "@types/node": "^16.11.56",
+    "@types/papaparse": "^5.5.1",
     "@types/react": "^18.3.27",
     "@types/react-dom": "^18.3.7",
+    "@uiw/react-json-view": "^2.0.0-alpha.39",
     "axios": "^1.8.3",
     "date-fns": "^2.29.0",
+    "papaparse": "^5.5.3",
     "react": "^18.2.0",
+    "react-copy-to-clipboard": "^5.1.0",
     "react-dom": "^18.2.0",
     "react-query": "^3.39.0",
     "react-router-dom": "^6.8.0",
@@ -60,6 +64,7 @@
   },
   "devDependencies": {
     "@craco/craco": "^7.1.0",
+    "@types/react-copy-to-clipboard": "^5.0.7",
     "http-proxy-middleware": "^3.0.5"
   },
   "overrides": {

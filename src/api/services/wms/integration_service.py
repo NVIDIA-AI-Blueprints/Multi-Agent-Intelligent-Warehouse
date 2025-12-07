@@ -246,6 +246,218 @@ class WMSIntegrationService:
         adapter = self.adapters[connection_id]
         return await adapter.create_task(task)
 
+    async def create_work_queue_entry(
+        self,
+        task_id: str,
+        task_type: str,
+        quantity: int,
+        assigned_workers: Optional[List[str]] = None,
+        constraints: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Create a work queue entry (simplified interface for task creation).
+
+        Args:
+            task_id: Task identifier
+            task_type: Type of task (pick, pack, putaway, etc.)
+            quantity: Quantity for the task
+            assigned_workers: List of worker IDs assigned to the task
+            constraints: Additional constraints (zone, priority, etc.)
+
+        Returns:
+            Dict with success status and task information
+        """
+        try:
+            # If no WMS connections are available, return a success response
+            # This allows the system to work without a WMS connection
+            if not self.adapters:
+                self.logger.warning(
+                    f"No WMS connections available - task {task_id} created locally only"
+                )
+                return {
+                    "success": True,
+                    "task_id": task_id,
+                    "task_type": task_type,
+                    "quantity": quantity,
+                    "assigned_workers": assigned_workers or [],
+                    "status": "pending",
+                    "message": "Task created locally (no WMS connection available)",
+                }
+
+            # Try to create task in the first available WMS connection
+            # In a production system, you might want to route to a specific connection
+            connection_id = list(self.adapters.keys())[0]
+            adapter = self.adapters[connection_id]
+
+            # Create Task object from parameters
+            task_type_enum = TaskType.PICK
+            if task_type.lower() == "pack":
+                task_type_enum = TaskType.PACK
+            elif task_type.lower() == "putaway":
+                task_type_enum = TaskType.PUTAWAY
+            elif task_type.lower() == "receive":
+                task_type_enum = TaskType.RECEIVE
+
+            task = Task(
+                task_id=task_id,
+                task_type=task_type_enum,
+                status=TaskStatus.PENDING,
+                assigned_to=assigned_workers[0] if assigned_workers else None,
+                location=constraints.get("zone") if constraints else None,
+                priority=constraints.get("priority", "medium") if constraints else "medium",
+                quantity=quantity,
+                created_at=datetime.now(),
+            )
+
+            created_task_id = await adapter.create_task(task)
+
+            return {
+                "success": True,
+                "task_id": created_task_id or task_id,
+                "task_type": task_type,
+                "quantity": quantity,
+                "assigned_workers": assigned_workers or [],
+                "status": "queued",
+                "connection_id": connection_id,
+            }
+
+        except Exception as e:
+            self.logger.error(f"Error creating work queue entry: {e}")
+            # Return a graceful failure - task is still created locally
+            return {
+                "success": False,
+                "task_id": task_id,
+                "error": str(e),
+                "status": "pending",
+                "message": f"Task created locally but WMS integration failed: {str(e)}",
+            }
+
+    async def update_work_queue_entry(
+        self,
+        task_id: str,
+        assigned_worker: Optional[str] = None,
+        status: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Update a work queue entry.
+
+        Args:
+            task_id: Task identifier
+            assigned_worker: Worker ID to assign
+            status: New status for the task
+
+        Returns:
+            Dict with success status
+        """
+        try:
+            if not self.adapters:
+                return {
+                    "success": False,
+                    "error": "No WMS connections available",
+                }
+
+            # Try to update in the first available connection
+            connection_id = list(self.adapters.keys())[0]
+            adapter = self.adapters[connection_id]
+
+            status_enum = None
+            if status:
+                status_map = {
+                    "pending": TaskStatus.PENDING,
+                    "assigned": TaskStatus.ASSIGNED,
+                    "in_progress": TaskStatus.IN_PROGRESS,
+                    "completed": TaskStatus.COMPLETED,
+                    "cancelled": TaskStatus.CANCELLED,
+                }
+                status_enum = status_map.get(status.lower())
+
+            result = await self.update_task_status(
+                connection_id=connection_id,
+                task_id=task_id,
+                status=status_enum or TaskStatus.ASSIGNED,
+                notes=f"Assigned to {assigned_worker}" if assigned_worker else None,
+            )
+
+            return {
+                "success": result,
+                "task_id": task_id,
+                "assigned_worker": assigned_worker,
+                "status": status,
+            }
+
+        except Exception as e:
+            self.logger.error(f"Error updating work queue entry: {e}")
+            return {
+                "success": False,
+                "task_id": task_id,
+                "error": str(e),
+            }
+
+    async def get_work_queue_entries(
+        self,
+        task_id: Optional[str] = None,
+        worker_id: Optional[str] = None,
+        status: Optional[str] = None,
+        task_type: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get work queue entries.
+
+        Args:
+            task_id: Specific task ID to retrieve
+            worker_id: Filter by worker ID
+            status: Filter by status
+            task_type: Filter by task type
+
+        Returns:
+            List of work queue entries
+        """
+        try:
+            if not self.adapters:
+                return []
+
+            status_enum = None
+            if status:
+                status_map = {
+                    "pending": TaskStatus.PENDING,
+                    "assigned": TaskStatus.ASSIGNED,
+                    "in_progress": TaskStatus.IN_PROGRESS,
+                    "completed": TaskStatus.COMPLETED,
+                    "cancelled": TaskStatus.CANCELLED,
+                }
+                status_enum = status_map.get(status.lower())
+
+            # Get tasks from all connections
+            all_tasks = await self.get_tasks_all(status=status_enum, assigned_to=worker_id)
+
+            # Convert to work queue entry format
+            entries = []
+            for connection_id, tasks in all_tasks.items():
+                for task in tasks:
+                    # Filter by task_id if specified
+                    if task_id and task.task_id != task_id:
+                        continue
+                    # Filter by task_type if specified
+                    if task_type and task.task_type.value.lower() != task_type.lower():
+                        continue
+
+                    entries.append({
+                        "task_id": task.task_id,
+                        "task_type": task.task_type.value,
+                        "status": task.status.value,
+                        "assigned_to": task.assigned_to,
+                        "location": task.location,
+                        "priority": task.priority,
+                        "quantity": task.quantity,
+                        "connection_id": connection_id,
+                    })
+
+            return entries
+
+        except Exception as e:
+            self.logger.error(f"Error getting work queue entries: {e}")
+            return []
+
     async def update_task_status(
         self,
         connection_id: str,

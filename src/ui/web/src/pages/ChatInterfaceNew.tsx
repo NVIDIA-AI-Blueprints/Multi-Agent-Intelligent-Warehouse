@@ -151,6 +151,16 @@ const ChatInterfaceNew: React.FC = () => {
   const { data: healthStatus } = useQuery('health', healthAPI.check, {
     refetchInterval: 30000, // Check every 30 seconds
     retry: false,
+    // Don't fail the query if health check is slow - it's non-critical
+    refetchOnWindowFocus: false,
+    staleTime: 60000, // Consider health status fresh for 60 seconds
+    onError: (error) => {
+      // Silently handle health check errors - don't spam console
+      // Health check failures are non-critical for UI functionality
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('Health check failed (non-critical):', error);
+      }
+    },
   });
   
   // Update connections based on health status
@@ -186,6 +196,16 @@ const ChatInterfaceNew: React.FC = () => {
     ),
     {
       refetchInterval: 60000, // Refresh every minute
+      retry: 1, // Retry once on failure
+      refetchOnWindowFocus: false, // Don't refetch on window focus
+      staleTime: 60000, // Consider data fresh for 60 seconds
+      onError: (error) => {
+        // Silently handle task fetch errors - don't spam console
+        // Task list failures are non-critical for UI functionality
+        if (process.env.NODE_ENV === 'development') {
+          console.debug('Tasks fetch failed (non-critical):', error);
+        }
+      },
     }
   );
   

@@ -19,7 +19,6 @@ from src.api.services.memory.conversation_memory import (
 )
 from src.api.services.validation import (
     get_response_validator,
-    get_response_enhancer,
 )
 from src.api.utils.log_utils import sanitize_log_data
 from src.api.services.cache.query_cache import get_query_cache
@@ -671,8 +670,10 @@ async def chat(req: ChatRequest):
             # For non-complex reasoning queries, set to 115s (slightly less than frontend 120s)
             MAIN_QUERY_TIMEOUT = 230 if is_complex_query else 115  # 230s for complex, 115s for regular reasoning
         else:
-            # Regular queries: 30s for simple, 60s for complex
-            MAIN_QUERY_TIMEOUT = 60 if is_complex_query else 30
+            # Regular queries: Increased timeouts to prevent premature timeouts
+            # Simple queries: 60s (was 30s) - allows time for LLM processing
+            # Complex queries: 90s (was 60s) - allows time for complex analysis
+            MAIN_QUERY_TIMEOUT = 90 if is_complex_query else 60
         
         # Initialize result to None to avoid UnboundLocalError
         result = None
@@ -723,9 +724,23 @@ async def chat(req: ChatRequest):
             
             try:
                 result = await asyncio.wait_for(query_task, timeout=MAIN_QUERY_TIMEOUT)
-                logger.info(f"Query processing completed in time: route={_sanitize_log_data(result.get('route', 'unknown'))}")
+                logger.info(f"✅ Query processing completed in time: route={_sanitize_log_data(result.get('route', 'unknown'))}, timeout={MAIN_QUERY_TIMEOUT}s")
             except asyncio.TimeoutError:
-                logger.error(f"Query processing timed out after {MAIN_QUERY_TIMEOUT}s")  # Safe: MAIN_QUERY_TIMEOUT is int
+                # Log detailed timeout information for debugging
+                logger.error(
+                    f"⏱️ TIMEOUT: Query processing timed out after {MAIN_QUERY_TIMEOUT}s | "
+                    f"Message: {_sanitize_log_data(req.message[:100])} | "
+                    f"Complex: {is_complex_query} | Reasoning: {req.enable_reasoning} | "
+                    f"Session: {_sanitize_log_data(req.session_id or 'default')}"
+                )
+                # Record timeout in performance monitor
+                await performance_monitor.record_timeout(
+                    request_id=request_id,
+                    timeout_duration=MAIN_QUERY_TIMEOUT,
+                    timeout_location="main_query_processing",
+                    query_type="complex" if is_complex_query else "simple",
+                    reasoning_enabled=req.enable_reasoning
+                )
                 # Cancel the task
                 query_task.cancel()
                 try:
@@ -1208,59 +1223,35 @@ async def chat(req: ChatRequest):
             logger.error(f"Error formatting response: {_sanitize_log_data(str(format_error))}")
             formatted_reply = base_response if base_response else f"I received your message: '{req.message}'."
 
-        # Validate and enhance the response
+        # Validate the response
         try:
-            response_validator = await get_response_validator()
-            response_enhancer = await get_response_enhancer()
+            response_validator = get_response_validator()
+            # Response enhancement is not yet implemented (Phase 2)
+            # response_enhancer = await get_response_enhancer()
 
             # Extract entities for validation
             validation_entities = {}
             if structured_response and structured_response.get("data"):
                 validation_entities = _extract_equipment_entities(structured_response["data"])
 
-            # Enhance the response
-            enhancement_result = await response_enhancer.enhance_response(
-                response=formatted_reply,
-                context=req.context,
-                intent=result.get("intent") if result else "general",
-                entities=validation_entities,
-                auto_fix=True,
+            # Validate the response
+            validation_result = response_validator.validate(
+                response={
+                    "natural_language": formatted_reply,
+                    "confidence": result.get("confidence", 0.7) if result else 0.7,
+                    "response_type": result.get("response_type", "general") if result else "general",
+                    "recommendations": result.get("recommendations", []) if result else [],
+                    "actions_taken": result.get("actions_taken", []) if result else [],
+                },
+                query=req.message,
+                tool_results=None,
             )
 
-            # Use enhanced response if improvements were applied
-            if enhancement_result.is_enhanced:
-                formatted_reply = enhancement_result.enhanced_response
-                validation_score = enhancement_result.enhancement_score
-                validation_passed = enhancement_result.validation_result.is_valid
-                validation_issues = [
-                    {
-                        "category": issue.category.value,
-                        "level": issue.level.value,
-                        "message": issue.message,
-                        "suggestion": issue.suggestion,
-                        "field": issue.field,
-                    }
-                    for issue in enhancement_result.validation_result.issues
-                ]
-                enhancement_applied = True
-                enhancement_summary = await response_enhancer.get_enhancement_summary(
-                    enhancement_result
-                )
-            else:
-                validation_score = enhancement_result.validation_result.score
-                validation_passed = enhancement_result.validation_result.is_valid
-                validation_issues = [
-                    {
-                        "category": issue.category.value,
-                        "level": issue.level.value,
-                        "message": issue.message,
-                        "suggestion": issue.suggestion,
-                        "field": issue.field,
-                    }
-                    for issue in enhancement_result.validation_result.issues
-                ]
-                enhancement_applied = False
-                enhancement_summary = None
+            validation_score = validation_result.score
+            validation_passed = validation_result.is_valid
+            validation_issues = validation_result.issues
+            enhancement_applied = False
+            enhancement_summary = None
 
         except Exception as validation_error:
             logger.warning(f"Response validation failed: {_sanitize_log_data(str(validation_error))}")
@@ -1689,43 +1680,32 @@ async def validate_response(req: ChatRequest):
     This endpoint allows testing the validation system with custom responses.
     """
     try:
-        response_validator = await get_response_validator()
-        response_enhancer = await get_response_enhancer()
+        response_validator = get_response_validator()
+        # Response enhancement is not yet implemented (Phase 2)
+        # response_enhancer = await get_response_enhancer()
 
         # Validate the message as if it were a response
-        validation_result = await response_validator.validate_response(
-            response=req.message, context=req.context, intent="test", entities={}
-        )
-
-        # Enhance the response
-        enhancement_result = await response_enhancer.enhance_response(
-            response=req.message,
-            context=req.context,
-            intent="test",
-            entities={},
-            auto_fix=True,
+        validation_result = response_validator.validate(
+            response={
+                "natural_language": req.message,
+                "confidence": 0.7,
+                "response_type": "test",
+                "recommendations": [],
+                "actions_taken": [],
+            },
+            query=req.message,
+            tool_results=None,
         )
 
         return {
             "original_response": req.message,
-            "enhanced_response": enhancement_result.enhanced_response,
+            "enhanced_response": None,  # Not yet implemented
             "validation_score": validation_result.score,
             "validation_passed": validation_result.is_valid,
-            "validation_issues": [
-                {
-                    "category": issue.category.value,
-                    "level": issue.level.value,
-                    "message": issue.message,
-                    "suggestion": issue.suggestion,
-                    "field": issue.field,
-                }
-                for issue in validation_result.issues
-            ],
-            "enhancement_applied": enhancement_result.is_enhanced,
-            "enhancement_summary": await response_enhancer.get_enhancement_summary(
-                enhancement_result
-            ),
-            "improvements_applied": enhancement_result.improvements_applied,
+            "validation_issues": validation_result.issues,
+            "enhancement_applied": False,  # Not yet implemented
+            "enhancement_summary": None,  # Not yet implemented
+            "improvements_applied": [],  # Not yet implemented
         }
 
     except Exception as e:
@@ -1749,4 +1729,51 @@ async def get_conversation_stats():
 
     except Exception as e:
         logger.error(f"Error getting conversation stats: {_sanitize_log_data(str(e))}")
+        return {"success": False, "error": str(e)}
+
+
+@router.get("/chat/performance/stats")
+async def get_performance_stats(time_window_minutes: int = 60, include_alerts: bool = True):
+    """
+    Get performance statistics for chat requests.
+
+    Returns metrics including latency, cache hits, errors, routing accuracy,
+    and tool execution statistics for the specified time window.
+
+    Args:
+        time_window_minutes: Time window in minutes (default: 60)
+        include_alerts: Whether to include performance alerts (default: True)
+
+    Returns:
+        Dictionary with performance statistics and alerts
+    """
+    try:
+        performance_monitor = get_performance_monitor()
+        stats = await performance_monitor.get_stats(time_window_minutes)
+        
+        # Also get deduplication stats
+        deduplicator = get_request_deduplicator()
+        dedup_stats = await deduplicator.get_stats()
+        
+        # Get cache stats
+        query_cache = get_query_cache()
+        cache_stats = await query_cache.get_stats()
+        
+        result = {
+            "success": True,
+            "performance": stats,
+            "deduplication": dedup_stats,
+            "cache": cache_stats,
+        }
+        
+        # Include alerts if requested
+        if include_alerts:
+            alerts = await performance_monitor.check_alerts()
+            result["alerts"] = alerts
+            result["has_alerts"] = len(alerts) > 0
+        
+        return result
+
+    except Exception as e:
+        logger.error(f"Error getting performance stats: {_sanitize_log_data(str(e))}")
         return {"success": False, "error": str(e)}

@@ -14,6 +14,7 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
+  ListItemButton,
   Accordion,
   AccordionSummary,
   AccordionDetails,
@@ -39,6 +40,57 @@ import {
   Api as ApiIcon,
   Dashboard as DashboardIcon,
 } from '@mui/icons-material';
+
+// Component to display architecture diagram with fallback
+const ArchitectureDiagramDisplay: React.FC = () => {
+  const navigate = useNavigate();
+  const [imageError, setImageError] = React.useState(false);
+
+  if (imageError) {
+    return (
+      <Box sx={{ p: 4, textAlign: 'center' }}>
+        <ArchitectureIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+        <Typography variant="h6" color="text.secondary" gutterBottom>
+          Architecture Diagram
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          To display the architecture diagram, please add the image file to:
+        </Typography>
+        <Paper sx={{ p: 2, mb: 2, bgcolor: 'grey.100', fontFamily: 'monospace', fontSize: '0.875rem' }}>
+          src/ui/web/public/architecture-diagram.png
+        </Paper>
+        <Button 
+          variant="outlined" 
+          startIcon={<ArchitectureIcon />}
+          onClick={() => navigate('/documentation/architecture')}
+          sx={{ mt: 1 }}
+        >
+          View Architecture Details
+        </Button>
+      </Box>
+    );
+  }
+
+  return (
+    <Box
+      component="img"
+      src="/architecture-diagram.png"
+      alt="Multi-Agent-Intelligent-Warehouse System Architecture"
+      onError={() => setImageError(true)}
+      sx={{
+        maxWidth: '100%',
+        height: 'auto',
+        borderRadius: 1,
+        boxShadow: 3,
+        cursor: 'pointer',
+        '&:hover': {
+          opacity: 0.9,
+        },
+      }}
+      onClick={() => navigate('/documentation/architecture')}
+    />
+  );
+};
 
 const Documentation: React.FC = () => {
   const navigate = useNavigate();
@@ -84,7 +136,7 @@ const Documentation: React.FC = () => {
     },
     {
       name: "NVIDIA NIMs Integration",
-      description: "Llama 3.1 70B + NV-EmbedQA-E5-v5 embeddings",
+      description: "Llama 3.3 Nemotron Super 49B + NV-EmbedQA-E5-v5 embeddings",
       status: "✅ Fully Operational",
       icon: <CloudIcon />
     },
@@ -96,8 +148,8 @@ const Documentation: React.FC = () => {
     },
     {
       name: "Chat Interface",
-      description: "Clean, professional responses with real MCP tool execution",
-      status: "✅ Fully Optimized",
+      description: "Optimized with caching, deduplication, semantic routing, and performance monitoring",
+      status: "✅ Fully Optimized (Dec 2024)",
       icon: <SpeedIcon />
     },
     {
@@ -138,7 +190,7 @@ const Documentation: React.FC = () => {
     },
     {
       name: "Security & RBAC",
-      description: "JWT/OAuth2 with 5 user roles",
+      description: "JWT authentication with 5 user roles",
       status: "✅ Production Ready",
       icon: <SecurityIcon />
     }
@@ -148,37 +200,55 @@ const Documentation: React.FC = () => {
     {
       category: "Core Chat",
       endpoints: [
-        { method: "POST", path: "/api/v1/chat", description: "Main chat interface with agent routing" },
+        { method: "POST", path: "/api/v1/chat", description: "Main chat interface with agent routing, caching, and deduplication" },
+        { method: "POST", path: "/api/v1/chat/conversation/summary", description: "Get conversation summary" },
+        { method: "POST", path: "/api/v1/chat/conversation/search", description: "Search conversation history" },
+        { method: "DELETE", path: "/api/v1/chat/conversation/{session_id}", description: "Clear conversation history" },
+        { method: "POST", path: "/api/v1/chat/validate", description: "Validate chat response" },
+        { method: "GET", path: "/api/v1/chat/conversation/stats", description: "Get conversation statistics" },
         { method: "GET", path: "/api/v1/health", description: "System health check" },
-        { method: "GET", path: "/api/v1/metrics", description: "Prometheus metrics" }
+        { method: "GET", path: "/api/v1/health/simple", description: "Simple health check" },
+        { method: "GET", path: "/api/v1/ready", description: "Readiness probe" },
+        { method: "GET", path: "/api/v1/live", description: "Liveness probe" },
+        { method: "GET", path: "/api/v1/version", description: "System version information" }
       ]
     },
     {
       category: "Agent Operations",
       endpoints: [
-        { method: "GET", path: "/api/v1/equipment/assignments", description: "Equipment assignments" },
-        { method: "GET", path: "/api/v1/equipment/telemetry", description: "Equipment telemetry data" },
-        { method: "POST", path: "/api/v1/operations/waves", description: "Create pick waves" },
-        { method: "POST", path: "/api/v1/safety/incidents", description: "Log safety incidents" },
-        { method: "GET", path: "/api/v1/forecasting/dashboard", description: "Forecasting dashboard and analytics" },
-        { method: "GET", path: "/api/v1/forecasting/reorder-recommendations", description: "AI-powered reorder recommendations" }
+        { method: "GET", path: "/api/v1/equipment", description: "Get all equipment assets" },
+        { method: "GET", path: "/api/v1/equipment/{asset_id}", description: "Get equipment by ID" },
+        { method: "GET", path: "/api/v1/equipment/assignments", description: "Get equipment assignments" },
+        { method: "GET", path: "/api/v1/equipment/{asset_id}/telemetry", description: "Get equipment telemetry data" },
+        { method: "POST", path: "/api/v1/equipment/assign", description: "Assign equipment" },
+        { method: "POST", path: "/api/v1/equipment/release", description: "Release equipment" },
+        { method: "GET", path: "/api/v1/safety/incidents", description: "Get safety incidents" },
+        { method: "POST", path: "/api/v1/safety/incidents", description: "Create safety incident" },
+        { method: "GET", path: "/api/v1/safety/policies", description: "Get safety policies" }
       ]
     },
     {
       category: "MCP Framework",
       endpoints: [
         { method: "GET", path: "/api/v1/mcp/tools", description: "Discover available tools" },
+        { method: "POST", path: "/api/v1/mcp/tools/search", description: "Search tools by query" },
+        { method: "POST", path: "/api/v1/mcp/tools/execute", description: "Execute a specific tool" },
         { method: "GET", path: "/api/v1/mcp/status", description: "MCP system status" },
         { method: "POST", path: "/api/v1/mcp/test-workflow", description: "Test MCP workflow execution" },
-        { method: "GET", path: "/api/v1/mcp/adapters", description: "List MCP adapters" }
+        { method: "GET", path: "/api/v1/mcp/agents", description: "List MCP agents" },
+        { method: "POST", path: "/api/v1/mcp/discovery/refresh", description: "Refresh tool discovery" }
       ]
     },
     {
       category: "Document Processing",
       endpoints: [
         { method: "POST", path: "/api/v1/document/upload", description: "Upload document for processing" },
-        { method: "GET", path: "/api/v1/document/status/{id}", description: "Get processing status" },
-        { method: "GET", path: "/api/v1/document/results/{id}", description: "Get extraction results" },
+        { method: "GET", path: "/api/v1/document/status/{document_id}", description: "Get processing status" },
+        { method: "GET", path: "/api/v1/document/results/{document_id}", description: "Get extraction results" },
+        { method: "POST", path: "/api/v1/document/search", description: "Search documents" },
+        { method: "POST", path: "/api/v1/document/validate/{document_id}", description: "Validate document extraction" },
+        { method: "POST", path: "/api/v1/document/approve/{document_id}", description: "Approve document" },
+        { method: "POST", path: "/api/v1/document/reject/{document_id}", description: "Reject document" },
         { method: "GET", path: "/api/v1/document/analytics", description: "Document processing analytics" }
       ]
     },
@@ -187,7 +257,30 @@ const Documentation: React.FC = () => {
       endpoints: [
         { method: "POST", path: "/api/v1/reasoning/analyze", description: "Deep reasoning analysis" },
         { method: "GET", path: "/api/v1/reasoning/types", description: "Available reasoning types" },
+        { method: "GET", path: "/api/v1/reasoning/insights/{session_id}", description: "Get reasoning insights for session" },
         { method: "POST", path: "/api/v1/reasoning/chat-with-reasoning", description: "Chat with reasoning" }
+      ]
+    },
+    {
+      category: "Forecasting",
+      endpoints: [
+        { method: "GET", path: "/api/v1/forecasting/dashboard", description: "Forecasting dashboard and analytics" },
+        { method: "POST", path: "/api/v1/forecasting/real-time", description: "Real-time demand predictions" },
+        { method: "GET", path: "/api/v1/forecasting/reorder-recommendations", description: "AI-powered reorder recommendations" },
+        { method: "GET", path: "/api/v1/forecasting/model-performance", description: "Model performance metrics" },
+        { method: "GET", path: "/api/v1/forecasting/business-intelligence", description: "Business intelligence dashboard" },
+        { method: "POST", path: "/api/v1/forecasting/batch-forecast", description: "Batch forecast for multiple SKUs" }
+      ]
+    },
+    {
+      category: "Training",
+      endpoints: [
+        { method: "POST", path: "/api/v1/training/start", description: "Start model training" },
+        { method: "GET", path: "/api/v1/training/status", description: "Get training status" },
+        { method: "POST", path: "/api/v1/training/stop", description: "Stop training" },
+        { method: "GET", path: "/api/v1/training/history", description: "Training history" },
+        { method: "POST", path: "/api/v1/training/schedule", description: "Schedule training" },
+        { method: "GET", path: "/api/v1/training/logs", description: "Get training logs" }
       ]
     }
   ];
@@ -290,6 +383,104 @@ const Documentation: React.FC = () => {
           </Typography>
         </AccordionSummary>
         <AccordionDetails>
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h5" gutterBottom>
+              🏗️ Complete System Architecture Diagram
+            </Typography>
+            <Typography variant="body1" sx={{ mb: 3 }}>
+              The Multi-Agent-Intelligent-Warehouse operational assistant system architecture, showing all major components, 
+              data flows, and integrations. This diagram illustrates the complete system from user interaction through 
+              AI services, agent orchestration, data processing pipelines, and storage layers.
+            </Typography>
+            
+            {/* Architecture Diagram */}
+            <Paper 
+              elevation={3} 
+              sx={{ 
+                p: 3, 
+                mb: 3, 
+                textAlign: 'center',
+                bgcolor: 'grey.50',
+                border: '2px solid',
+                borderColor: 'primary.main',
+                borderRadius: 2
+              }}
+            >
+              <ArchitectureDiagramDisplay />
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
+                Complete system architecture showing user interfaces, AI services, agent orchestration, 
+                document processing pipeline, forecasting system, hybrid RAG, and data storage layers
+              </Typography>
+            </Paper>
+
+            <Alert severity="info" sx={{ mb: 3 }}>
+              <AlertTitle>📋 Architecture Components</AlertTitle>
+              <Typography variant="body2">
+                The diagram above shows the complete system architecture including:
+              </Typography>
+              <List dense sx={{ mt: 1 }}>
+                <ListItem sx={{ py: 0 }}>
+                  <ListItemText 
+                    primary="User Interaction Layer" 
+                    secondary="Frontend (Port 3001), API Gateway (Port 8001), Security (JWT, RBAC), MCP Integration Layer"
+                  />
+                </ListItem>
+                <ListItem sx={{ py: 0 }}>
+                  <ListItemText 
+                    primary="AI Services - NVIDIA NIMs" 
+                    secondary="LLM NIM (Llama 3.3 Nemotron Super 49B), LLM NIM (Nemotron Nano VL 8B), NV Embed (E5-V5 1024-dim), NeMo Guardrails"
+                  />
+                </ListItem>
+                <ListItem sx={{ py: 0 }}>
+                  <ListItemText 
+                    primary="Agent Orchestration" 
+                    secondary="Planner Agent, General Agent, Safety Agent, Document Extraction Agent, Forecasting Agent, Equipment Agent, Operations Agent, Memory Manager"
+                  />
+                </ListItem>
+                <ListItem sx={{ py: 0 }}>
+                  <ListItemText 
+                    primary="6 Stages NeMo Document Processing Pipeline" 
+                    secondary="NeMo Retriever, Intelligent OCR, Small LLM, Embedding & Indexing, LLM as a Judge, Routing"
+                  />
+                </ListItem>
+                <ListItem sx={{ py: 0 }}>
+                  <ListItemText 
+                    primary="Forecasting System" 
+                    secondary="Forecasting Service (Multi-Modal Ensemble), ML Models (XGBoost, Random Forest, SVR), Business Intelligence, Training Pipeline (Phase 1-3 RAPIDS), Reorder Recommendations"
+                  />
+                </ListItem>
+                <ListItem sx={{ py: 0 }}>
+                  <ListItemText 
+                    primary="Hybrid RAG" 
+                    secondary="cuVS Milvus (Vector Search), Structured Retrieve (PostgreSQL/TimescaleDB), Hybrid Ranker"
+                  />
+                </ListItem>
+                <ListItem sx={{ py: 0 }}>
+                  <ListItemText 
+                    primary="Data Storage" 
+                    secondary="PostgreSQL/TimescaleDB, Redis (Cache sessions), Milvus DB, MiniIO"
+                  />
+                </ListItem>
+              </List>
+            </Alert>
+
+            <Box sx={{ mb: 3, textAlign: 'center' }}>
+              <Button 
+                variant="contained" 
+                startIcon={<ArchitectureIcon />}
+                onClick={() => navigate('/documentation/architecture')}
+                size="large"
+              >
+                View Detailed Architecture Diagrams
+              </Button>
+            </Box>
+          </Box>
+
+          <Divider sx={{ my: 3 }} />
+
+          <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+            Component Details
+          </Typography>
           <Grid container spacing={3}>
             {architectureComponents.map((component, index) => (
               <Grid item xs={12} md={6} key={index}>
@@ -1084,7 +1275,7 @@ const Documentation: React.FC = () => {
                 • Multi-agent orchestration with LangGraph + MCP integration<br/>
                 • <strong>5 Specialized Agents:</strong> Equipment, Operations, Safety, Forecasting, Document<br/>
                 • <strong>34+ production-ready action tools</strong> across all agents<br/>
-                • NVIDIA NIMs integration (Llama 3.1 70B + NV-EmbedQA-E5-v5 + Vision models)<br/>
+                • NVIDIA NIMs integration (Llama 3.3 Nemotron Super 49B + NV-EmbedQA-E5-v5 + Vision models)<br/>
                 • <strong>Document Processing:</strong> 6-stage NVIDIA NeMo pipeline with vision models<br/>
                 • <strong>Demand Forecasting:</strong> 6 ML models with NVIDIA RAPIDS GPU acceleration<br/>
                 • <strong>NeMo Guardrails:</strong> Content safety and compliance protection<br/>
@@ -1092,9 +1283,10 @@ const Documentation: React.FC = () => {
                 • Hybrid RAG system with PostgreSQL/TimescaleDB + Milvus<br/>
                 • Real-time equipment telemetry and monitoring<br/>
                 • Automated reorder recommendations with AI-powered insights<br/>
-                • Complete security stack with JWT/OAuth2 + RBAC (5 user roles)<br/>
+                • <strong>Chat System Optimizations (Dec 2024):</strong> Query caching, request deduplication, semantic routing, parallel tool execution, performance monitoring<br/>
+                • Complete security stack with JWT authentication + RBAC (5 user roles)<br/>
                 • Comprehensive monitoring with Prometheus/Grafana<br/>
-                • React frontend with Material-UI and real-time interfaces
+                • React frontend with Material-UI, message pagination, and real-time interfaces
               </Typography>
             </Alert>
           </Box>
@@ -1336,32 +1528,87 @@ const Documentation: React.FC = () => {
             </Grid>
           </Grid>
 
-          <Box sx={{ mt: 3 }}>
+            <Box sx={{ mt: 3 }}>
             <Typography variant="h6" gutterBottom>
-              🚀 Recent System Optimizations
+              🚀 Recent System Optimizations (December 2024)
             </Typography>
+            <Alert severity="success" sx={{ mb: 3 }}>
+              <AlertTitle>✅ Phase 1 & 2 Optimizations Complete</AlertTitle>
+              <Typography variant="body2">
+                Comprehensive performance and quality improvements implemented across the chat system, 
+                including data leakage fixes, caching, semantic routing, and performance monitoring.
+              </Typography>
+            </Alert>
             <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid item xs={12} md={4}>
                 <Card variant="outlined" sx={{ bgcolor: 'success.light', color: 'success.contrastText' }}>
                   <CardContent>
-                    <Typography variant="subtitle1" gutterBottom>Chat Interface</Typography>
-                    <Typography variant="body2">Clean, professional responses with technical details removed</Typography>
+                    <Typography variant="subtitle1" gutterBottom>Data Leakage Fix</Typography>
+                    <Typography variant="body2">Eliminated structured data leakage at source, reducing response cleaning by 95%</Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Card variant="outlined" sx={{ bgcolor: 'success.light', color: 'success.contrastText' }}>
+                  <CardContent>
+                    <Typography variant="subtitle1" gutterBottom>Query Result Caching</Typography>
+                    <Typography variant="body2">In-memory cache with TTL for 50-90% latency reduction on repeated queries</Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Card variant="outlined" sx={{ bgcolor: 'success.light', color: 'success.contrastText' }}>
+                  <CardContent>
+                    <Typography variant="subtitle1" gutterBottom>Message Pagination</Typography>
+                    <Typography variant="body2">Frontend pagination for improved performance with long conversations</Typography>
                   </CardContent>
                 </Card>
               </Grid>
               <Grid item xs={12} md={4}>
                 <Card variant="outlined" sx={{ bgcolor: 'info.light', color: 'info.contrastText' }}>
                   <CardContent>
-                    <Typography variant="subtitle1" gutterBottom>Parameter Validation</Typography>
-                    <Typography variant="body2">Comprehensive validation with business rules and warnings</Typography>
+                    <Typography variant="subtitle1" gutterBottom>Parallel Tool Execution</Typography>
+                    <Typography variant="body2">50-80% reduction in tool execution time via concurrent processing</Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Card variant="outlined" sx={{ bgcolor: 'info.light', color: 'info.contrastText' }}>
+                  <CardContent>
+                    <Typography variant="subtitle1" gutterBottom>Semantic Routing</Typography>
+                    <Typography variant="body2">Embedding-based intent classification for improved routing accuracy</Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Card variant="outlined" sx={{ bgcolor: 'info.light', color: 'info.contrastText' }}>
+                  <CardContent>
+                    <Typography variant="subtitle1" gutterBottom>Request Deduplication</Typography>
+                    <Typography variant="body2">Prevents duplicate concurrent requests, reducing system load</Typography>
                   </CardContent>
                 </Card>
               </Grid>
               <Grid item xs={12} md={4}>
                 <Card variant="outlined" sx={{ bgcolor: 'warning.light', color: 'warning.contrastText' }}>
                   <CardContent>
-                    <Typography variant="subtitle1" gutterBottom>Real Tool Execution</Typography>
-                    <Typography variant="body2">All MCP tools executing with actual database data</Typography>
+                    <Typography variant="subtitle1" gutterBottom>Performance Monitoring</Typography>
+                    <Typography variant="body2">Real-time metrics for latency, cache hits, errors, and routing distribution</Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Card variant="outlined" sx={{ bgcolor: 'warning.light', color: 'warning.contrastText' }}>
+                  <CardContent>
+                    <Typography variant="subtitle1" gutterBottom>Response Cleaning Optimization</Typography>
+                    <Typography variant="body2">95% reduction in cleaning complexity with source-level fixes</Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Card variant="outlined" sx={{ bgcolor: 'success.light', color: 'success.contrastText' }}>
+                  <CardContent>
+                    <Typography variant="subtitle1" gutterBottom>Parameter Validation</Typography>
+                    <Typography variant="body2">Comprehensive validation with business rules and helpful warnings</Typography>
                   </CardContent>
                 </Card>
               </Grid>

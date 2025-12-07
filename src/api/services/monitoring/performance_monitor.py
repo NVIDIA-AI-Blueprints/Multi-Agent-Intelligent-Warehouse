@@ -120,6 +120,50 @@ class PerformanceMonitor:
                 )
                 del self.request_metrics[oldest_request[0]]
 
+    async def record_timeout(
+        self,
+        request_id: str,
+        timeout_duration: float,
+        timeout_location: str,
+        query_type: Optional[str] = None,
+        reasoning_enabled: bool = False
+    ) -> None:
+        """
+        Record a timeout event with detailed information.
+        
+        Args:
+            request_id: ID of the request that timed out
+            timeout_duration: Duration in seconds when timeout occurred
+            timeout_location: Where the timeout occurred (e.g., "main_query_processing", "graph_execution", "agent_processing", "llm_call")
+            query_type: Type of query ("simple", "complex", "reasoning")
+            reasoning_enabled: Whether reasoning was enabled for this request
+        """
+        async with self._lock:
+            # Record timeout metric
+            await self._record_metric(
+                "timeout_occurred",
+                1.0,
+                {
+                    "timeout_location": timeout_location,
+                    "query_type": query_type or "unknown",
+                    "reasoning_enabled": str(reasoning_enabled),
+                    "timeout_duration": str(timeout_duration)
+                }
+            )
+            
+            # Update request metrics if request exists
+            if request_id in self.request_metrics:
+                request_metric = self.request_metrics[request_id]
+                request_metric.error = f"timeout_{timeout_location}"
+                request_metric.end_time = time.time()
+                request_metric.latency_ms = timeout_duration * 1000  # Convert to ms
+            
+            logger.warning(
+                f"⏱️ Timeout recorded: location={timeout_location}, "
+                f"duration={timeout_duration}s, query_type={query_type}, "
+                f"reasoning={reasoning_enabled}, request_id={request_id}"
+            )
+
     async def _record_metric(
         self,
         name: str,
@@ -216,6 +260,101 @@ class PerformanceMonitor:
         sorted_data = sorted(data)
         index = int(len(sorted_data) * (percentile / 100))
         return sorted_data[min(index, len(sorted_data) - 1)]
+
+    async def check_alerts(self) -> List[Dict[str, Any]]:
+        """
+        Check performance metrics against alert thresholds and return active alerts.
+        
+        Returns:
+            List of active alerts with details
+        """
+        alerts = []
+        stats = await self.get_stats(time_window_minutes=5)  # Check last 5 minutes
+        
+        if stats.get("total_requests", 0) == 0:
+            return alerts  # No requests, no alerts
+        
+        # Check latency alerts (P95 > 30s = 30000ms)
+        latency = stats.get("latency", {})
+        p95_latency = latency.get("p95", 0)
+        if p95_latency > 30000:  # 30 seconds
+            alerts.append({
+                "alert_type": "high_latency",
+                "severity": "warning",
+                "metric": "p95_latency_ms",
+                "value": p95_latency,
+                "threshold": 30000,
+                "message": f"P95 latency is {p95_latency:.2f}ms (threshold: 30000ms)",
+                "timestamp": datetime.utcnow().isoformat()
+            })
+        
+        # Check cache hit rate (should be > 0%)
+        cache_hit_rate = stats.get("cache_hit_rate", 0.0)
+        if cache_hit_rate == 0.0 and stats.get("total_requests", 0) > 10:
+            # Only alert if we have enough requests to expect some cache hits
+            alerts.append({
+                "alert_type": "low_cache_hit_rate",
+                "severity": "info",
+                "metric": "cache_hit_rate",
+                "value": cache_hit_rate,
+                "threshold": 0.0,
+                "message": f"Cache hit rate is {cache_hit_rate:.2%} (no cache hits detected)",
+                "timestamp": datetime.utcnow().isoformat()
+            })
+        
+        # Check error rate (should be < 5%)
+        error_rate = stats.get("error_rate", 0.0)
+        if error_rate > 0.05:  # 5%
+            alerts.append({
+                "alert_type": "high_error_rate",
+                "severity": "warning" if error_rate < 0.10 else "critical",
+                "metric": "error_rate",
+                "value": error_rate,
+                "threshold": 0.05,
+                "message": f"Error rate is {error_rate:.2%} (threshold: 5%)",
+                "timestamp": datetime.utcnow().isoformat()
+            })
+        
+            # Check success rate (should be > 95%)
+            success_rate = stats.get("success_rate", 1.0)
+            if success_rate < 0.95:  # 95%
+                alerts.append({
+                    "alert_type": "low_success_rate",
+                    "severity": "warning" if success_rate > 0.90 else "critical",
+                    "metric": "success_rate",
+                    "value": success_rate,
+                    "threshold": 0.95,
+                    "message": f"Success rate is {success_rate:.2%} (threshold: 95%)",
+                    "timestamp": datetime.utcnow().isoformat()
+                })
+        
+        # Check timeout rate (count timeouts in last 5 minutes)
+        cutoff_time = time.time() - (5 * 60)  # 5 minutes ago
+        timeout_metrics = [
+            m for m in self.metrics
+            if m.name == "timeout_occurred" and m.timestamp.timestamp() >= cutoff_time
+        ]
+        if timeout_metrics and len(recent_requests) > 0:
+            timeout_rate = len(timeout_metrics) / len(recent_requests)
+            if timeout_rate > 0.10:  # 10% timeout rate
+                # Group timeouts by location
+                timeout_locations = defaultdict(int)
+                for m in timeout_metrics:
+                    location = m.labels.get("timeout_location", "unknown")
+                    timeout_locations[location] += 1
+                
+                alerts.append({
+                    "alert_type": "high_timeout_rate",
+                    "severity": "critical" if timeout_rate > 0.20 else "warning",
+                    "metric": "timeout_rate",
+                    "value": timeout_rate,
+                    "threshold": 0.10,
+                    "message": f"Timeout rate is {timeout_rate:.2%} (threshold: 10%). Locations: {dict(timeout_locations)}",
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "timeout_locations": dict(timeout_locations)
+                })
+        
+        return alerts
 
 
 # Global performance monitor instance

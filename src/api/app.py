@@ -30,9 +30,52 @@ from src.api.services.monitoring.metrics import (
     record_request_metrics,
     get_metrics_response,
 )
+from contextlib import asynccontextmanager
 
-app = FastAPI(title="Warehouse Operational Assistant", version="0.1.0")
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan - startup and shutdown."""
+    # Startup
+    logger.info("Starting Warehouse Operational Assistant...")
+    
+    # Start alert checker for performance monitoring
+    try:
+        from src.api.services.monitoring.performance_monitor import get_performance_monitor
+        from src.api.services.monitoring.alert_checker import get_alert_checker
+        
+        performance_monitor = get_performance_monitor()
+        alert_checker = get_alert_checker(performance_monitor)
+        await alert_checker.start()
+        logger.info("✅ Alert checker started")
+    except Exception as e:
+        logger.warning(f"Failed to start alert checker: {e}")
+    
+    yield
+    
+    # Shutdown
+    logger.info("Shutting down Warehouse Operational Assistant...")
+    
+    # Stop alert checker
+    try:
+        from src.api.services.monitoring.alert_checker import get_alert_checker
+        from src.api.services.monitoring.performance_monitor import get_performance_monitor
+        
+        performance_monitor = get_performance_monitor()
+        alert_checker = get_alert_checker(performance_monitor)
+        await alert_checker.stop()
+        logger.info("✅ Alert checker stopped")
+    except Exception as e:
+        logger.warning(f"Failed to stop alert checker: {e}")
+
+
+app = FastAPI(
+    title="Warehouse Operational Assistant",
+    version="0.1.0",
+    lifespan=lifespan
+)
 
 # Add exception handler for serialization errors
 @app.exception_handler(ValueError)

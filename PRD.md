@@ -495,7 +495,7 @@ Functional requirements are organized by application pages:
 - asyncpg (async PostgreSQL)
 
 **AI/ML:**
-- NVIDIA NIMs (Llama 3.1 70B, NV-EmbedQA-E5-v5)
+- NVIDIA NIMs (Llama 3.3 Nemotron Super 49B, NV-EmbedQA-E5-v5)
 - NVIDIA NeMo (document processing)
 - LangGraph (agent orchestration)
 - MCP (Model Context Protocol)
@@ -532,7 +532,7 @@ Functional requirements are organized by application pages:
 - **WMS Integration**: Support for SAP EWM, Manhattan, Oracle WMS
 - **ERP Integration**: Support for SAP ECC, Oracle ERP
 - **IoT Integration**: MQTT, HTTP, WebSocket protocols
-- **Authentication**: JWT, OAuth2 support
+- **Authentication**: JWT authentication with RBAC
 - **Monitoring**: Prometheus metrics, Grafana dashboards
 
 ---

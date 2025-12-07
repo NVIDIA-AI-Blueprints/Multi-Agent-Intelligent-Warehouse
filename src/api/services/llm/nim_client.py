@@ -28,9 +28,15 @@ class NIMConfig:
     embedding_base_url: str = os.getenv(
         "EMBEDDING_NIM_URL", "https://integrate.api.nvidia.com/v1"
     )
-    llm_model: str = "meta/llama-3.1-70b-instruct"
+    llm_model: str = os.getenv("LLM_MODEL", "nvidia/llama-3.3-nemotron-super-49b-v1.5")
     embedding_model: str = "nvidia/nv-embedqa-e5-v5"
-    timeout: int = 60
+    timeout: int = int(os.getenv("LLM_CLIENT_TIMEOUT", "120"))  # Increased from 60s to 120s to prevent premature timeouts
+    # LLM generation parameters (configurable via environment variables)
+    default_temperature: float = float(os.getenv("LLM_TEMPERATURE", "0.1"))
+    default_max_tokens: int = int(os.getenv("LLM_MAX_TOKENS", "2000"))
+    default_top_p: float = float(os.getenv("LLM_TOP_P", "1.0"))
+    default_frequency_penalty: float = float(os.getenv("LLM_FREQUENCY_PENALTY", "0.0"))
+    default_presence_penalty: float = float(os.getenv("LLM_PRESENCE_PENALTY", "0.0"))
 
 
 @dataclass
@@ -87,8 +93,11 @@ class NIMClient:
     async def generate_response(
         self,
         messages: List[Dict[str, str]],
-        temperature: float = 0.1,
-        max_tokens: int = 1000,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        top_p: Optional[float] = None,
+        frequency_penalty: Optional[float] = None,
+        presence_penalty: Optional[float] = None,
         stream: bool = False,
         max_retries: int = 3,
     ) -> LLMResponse:
@@ -97,14 +106,24 @@ class NIMClient:
 
         Args:
             messages: List of message dictionaries with 'role' and 'content'
-            temperature: Sampling temperature (0.0 to 1.0)
-            max_tokens: Maximum tokens to generate
+            temperature: Sampling temperature (0.0 to 2.0). If None, uses config default.
+            max_tokens: Maximum tokens to generate. If None, uses config default.
+            top_p: Nucleus sampling parameter (0.0 to 1.0). If None, uses config default.
+            frequency_penalty: Frequency penalty (-2.0 to 2.0). If None, uses config default.
+            presence_penalty: Presence penalty (-2.0 to 2.0). If None, uses config default.
             stream: Whether to stream the response
             max_retries: Maximum number of retry attempts
 
         Returns:
             LLMResponse with generated content
         """
+        # Use config defaults if parameters are not provided
+        temperature = temperature if temperature is not None else self.config.default_temperature
+        max_tokens = max_tokens if max_tokens is not None else self.config.default_max_tokens
+        top_p = top_p if top_p is not None else self.config.default_top_p
+        frequency_penalty = frequency_penalty if frequency_penalty is not None else self.config.default_frequency_penalty
+        presence_penalty = presence_penalty if presence_penalty is not None else self.config.default_presence_penalty
+        
         payload = {
             "model": self.config.llm_model,
             "messages": messages,
@@ -112,6 +131,14 @@ class NIMClient:
             "max_tokens": max_tokens,
             "stream": stream,
         }
+        
+        # Add optional parameters if they differ from defaults
+        if top_p != 1.0:
+            payload["top_p"] = top_p
+        if frequency_penalty != 0.0:
+            payload["frequency_penalty"] = frequency_penalty
+        if presence_penalty != 0.0:
+            payload["presence_penalty"] = presence_penalty
 
         last_exception = None
 
@@ -130,6 +157,24 @@ class NIMClient:
                     finish_reason=data["choices"][0].get("finish_reason", "stop"),
                 )
 
+            except (httpx.TimeoutException, asyncio.TimeoutError) as e:
+                last_exception = e
+                logger.error(
+                    f"⏱️ LLM TIMEOUT: Generation attempt {attempt + 1}/{max_retries} timed out after {self.config.timeout}s | "
+                    f"Model: {self.config.llm_model} | "
+                    f"Max tokens: {max_tokens} | "
+                    f"Temperature: {temperature}"
+                )
+                if attempt < max_retries - 1:
+                    # Wait before retry (exponential backoff)
+                    wait_time = 2**attempt
+                    logger.info(f"Retrying in {wait_time} seconds...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(
+                        f"LLM generation failed after {max_retries} attempts due to timeout: {e}"
+                    )
+                    raise
             except Exception as e:
                 last_exception = e
                 logger.warning(f"LLM generation attempt {attempt + 1} failed: {e}")

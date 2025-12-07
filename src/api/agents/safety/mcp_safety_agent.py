@@ -29,6 +29,7 @@ from src.api.services.reasoning import (
 )
 from src.api.utils.log_utils import sanitize_prompt_input
 from src.api.services.agent_config import load_agent_config, AgentConfig
+from src.api.services.validation import get_response_validator
 from .action_tools import get_safety_action_tools
 
 logger = logging.getLogger(__name__)
@@ -519,40 +520,152 @@ Return only valid JSON.""",
     def _prepare_tool_arguments(
         self, tool: DiscoveredTool, query: MCPSafetyQuery
     ) -> Dict[str, Any]:
-        """Prepare arguments for tool execution based on query entities."""
+        """Prepare arguments for tool execution based on query entities and intelligent extraction."""
         arguments = {}
+        query_lower = query.user_query.lower()
+
+        # Extract parameter properties - handle both JSON Schema format and flat dict format
+        if isinstance(tool.parameters, dict) and "properties" in tool.parameters:
+            # JSON Schema format: {"type": "object", "properties": {...}, "required": [...]}
+            param_properties = tool.parameters.get("properties", {})
+            required_params = tool.parameters.get("required", [])
+        else:
+            # Flat dict format: {param_name: param_schema, ...}
+            param_properties = tool.parameters
+            required_params = []
 
         # Map query entities to tool parameters
-        for param_name, param_schema in tool.parameters.items():
+        for param_name, param_schema in param_properties.items():
+            # Direct entity mapping
             if param_name in query.entities:
                 arguments[param_name] = query.entities[param_name]
+            # Special parameter mappings
             elif param_name == "query" or param_name == "search_term":
                 arguments[param_name] = query.user_query
             elif param_name == "context":
                 arguments[param_name] = query.context
             elif param_name == "intent":
                 arguments[param_name] = query.intent
-            # Smart defaults for common tool parameters
-            elif param_name == "severity" and not arguments.get("severity"):
-                arguments[param_name] = query.entities.get("severity", "medium")
-            elif param_name == "description" and not arguments.get("description"):
-                arguments[param_name] = query.entities.get("description", query.user_query)
-            elif param_name == "location" and not arguments.get("location"):
-                arguments[param_name] = query.entities.get("location", "unknown")
-            elif param_name == "incident_type" and not arguments.get("incident_type"):
-                arguments[param_name] = query.entities.get("incident_type", "general")
-            elif param_name == "message" and not arguments.get("message"):
-                # For broadcast_alert, use the query description
-                arguments[param_name] = query.entities.get("description", query.user_query)
-            elif param_name == "checklist_type" and not arguments.get("checklist_type"):
-                # Infer checklist type from incident type
-                incident_type = query.entities.get("incident_type", "").lower()
-                if incident_type in ["flooding", "flood", "water"]:
-                    arguments[param_name] = "emergency_response"
-                elif incident_type in ["fire"]:
-                    arguments[param_name] = "fire_safety"
+            # Intelligent parameter extraction for severity
+            elif param_name == "severity":
+                if "severity" in query.entities:
+                    arguments[param_name] = query.entities["severity"]
                 else:
-                    arguments[param_name] = "general_safety"
+                    # Extract from query context
+                    if any(word in query_lower for word in ["critical", "emergency", "urgent", "severe"]):
+                        arguments[param_name] = "critical"
+                    elif any(word in query_lower for word in ["high", "serious", "major"]):
+                        arguments[param_name] = "high"
+                    elif any(word in query_lower for word in ["low", "minor", "small"]):
+                        arguments[param_name] = "low"
+                    else:
+                        arguments[param_name] = "medium"  # Default
+            # Intelligent parameter extraction for checklist_type
+            elif param_name == "checklist_type":
+                if "checklist_type" in query.entities:
+                    arguments[param_name] = query.entities["checklist_type"]
+                else:
+                    # Infer from incident type or query context
+                    incident_type = query.entities.get("incident_type", "").lower()
+                    if not incident_type:
+                        # Try to infer from query
+                        if any(word in query_lower for word in ["flooding", "flood", "water"]):
+                            incident_type = "flooding"
+                        elif any(word in query_lower for word in ["fire", "burning", "smoke"]):
+                            incident_type = "fire"
+                        elif any(word in query_lower for word in ["spill", "chemical", "hazardous"]):
+                            incident_type = "spill"
+                        elif any(word in query_lower for word in ["over-temp", "over temp", "temperature", "overheating"]):
+                            incident_type = "over_temp"
+                    
+                    # Map incident type to checklist type
+                    if incident_type in ["flooding", "flood", "water"]:
+                        arguments[param_name] = "emergency_response"
+                    elif incident_type in ["fire", "burning", "smoke"]:
+                        arguments[param_name] = "fire_safety"
+                    elif incident_type in ["spill", "chemical", "hazardous"]:
+                        arguments[param_name] = "hazardous_material"
+                    elif incident_type in ["over-temp", "over temp", "temperature", "overheating"]:
+                        arguments[param_name] = "equipment_safety"
+                    else:
+                        arguments[param_name] = "general_safety"  # Default
+            # Intelligent parameter extraction for message (broadcast_alert)
+            elif param_name == "message":
+                if "message" in query.entities:
+                    arguments[param_name] = query.entities["message"]
+                else:
+                    # Generate message from query context
+                    location = query.entities.get("location", "the facility")
+                    incident_type = query.entities.get("incident_type", "incident")
+                    severity = query.entities.get("severity", "medium")
+                    
+                    # Create a descriptive alert message
+                    if "over-temp" in query_lower or "over temp" in query_lower or "temperature" in query_lower:
+                        arguments[param_name] = f"Immediate Attention: Machine Over-Temp at {location} - Area Caution Advised"
+                    elif "fire" in query_lower:
+                        arguments[param_name] = f"URGENT: Fire Alert at {location} - Evacuate Immediately"
+                    elif "flood" in query_lower or "water" in query_lower:
+                        arguments[param_name] = f"URGENT: Flooding Alert at {location} - Secure Equipment and Evacuate"
+                    elif "spill" in query_lower:
+                        arguments[param_name] = f"URGENT: Chemical Spill at {location} - Secure Area and Follow Safety Protocols"
+                    else:
+                        # Generic alert message
+                        severity_text = severity.upper() if severity else "MEDIUM"
+                        arguments[param_name] = f"{severity_text} Severity Safety Alert at {location}: {query.user_query[:100]}"
+            # Intelligent parameter extraction for description
+            elif param_name == "description":
+                if "description" in query.entities:
+                    arguments[param_name] = query.entities["description"]
+                else:
+                    arguments[param_name] = query.user_query  # Use full query as description
+            # Intelligent parameter extraction for assignee
+            elif param_name == "assignee":
+                if "assignee" in query.entities:
+                    arguments[param_name] = query.entities["assignee"]
+                elif "reported_by" in query.entities:
+                    arguments[param_name] = query.entities["reported_by"]
+                elif "employee_name" in query.entities:
+                    arguments[param_name] = query.entities["employee_name"]
+                else:
+                    # Extract from query or use default
+                    # Try to find employee/worker names in query
+                    employee_match = re.search(r'(?:employee|worker|staff|personnel|operator)\s+([A-Za-z0-9_]+)', query_lower)
+                    if employee_match:
+                        arguments[param_name] = employee_match.group(1)
+                    else:
+                        # Default to "Safety Team" if not specified
+                        arguments[param_name] = "Safety Team"
+            # Intelligent parameter extraction for location
+            elif param_name == "location":
+                if "location" in query.entities:
+                    arguments[param_name] = query.entities["location"]
+                else:
+                    # Extract location from query
+                    zone_match = re.search(r'zone\s+([a-z])', query_lower)
+                    if zone_match:
+                        arguments[param_name] = f"Zone {zone_match.group(1).upper()}"
+                    else:
+                        dock_match = re.search(r'dock\s+([a-z0-9]+)', query_lower)
+                        if dock_match:
+                            arguments[param_name] = f"Dock {dock_match.group(1).upper()}"
+                        else:
+                            arguments[param_name] = "Unknown Location"
+            # Intelligent parameter extraction for incident_type
+            elif param_name == "incident_type":
+                if "incident_type" in query.entities:
+                    arguments[param_name] = query.entities["incident_type"]
+                else:
+                    # Infer from query
+                    if any(word in query_lower for word in ["over-temp", "over temp", "temperature", "overheating"]):
+                        arguments[param_name] = "over_temp"
+                    elif any(word in query_lower for word in ["fire", "burning", "smoke"]):
+                        arguments[param_name] = "fire"
+                    elif any(word in query_lower for word in ["flood", "flooding", "water"]):
+                        arguments[param_name] = "flooding"
+                    elif any(word in query_lower for word in ["spill", "chemical"]):
+                        arguments[param_name] = "spill"
+                    else:
+                        arguments[param_name] = "general"
 
         return arguments
     
@@ -830,8 +943,26 @@ ABSOLUTELY CRITICAL:
                         "role": "system",
                         "content": """You are a certified warehouse safety and compliance expert. 
 Generate a comprehensive, expert-level natural language response based on the provided data.
-Your response must be detailed, informative, and directly answer the user's query.
-Include specific details from the data (policy names, requirements, hazard types, incident details, etc.).
+
+CRITICAL: Write in a clear, natural, conversational tone:
+- Use fluent, natural English that reads like a human expert speaking
+- Avoid robotic or template-like language
+- Be specific and detailed, but keep it readable
+- Use active voice when possible
+- Vary sentence structure for better readability
+- Make it sound like you're explaining to a colleague, not a machine
+- Include context and reasoning, not just facts
+- Write complete, well-formed sentences and paragraphs
+
+CRITICAL ANTI-ECHOING RULES - YOU MUST FOLLOW THESE:
+- NEVER start with phrases like "You asked", "You requested", "I'll", "Let me", "As you requested", "Here's what you asked for"
+- NEVER echo or repeat the user's query - start directly with the information or action result
+- Start with the actual information or what was accomplished (e.g., "Forklift operations require..." or "A high-severity incident has been logged...")
+- Write as if explaining to a colleague, not referencing the query
+- DO NOT say "Here's the response:" or "Here's what I found:" - just provide the information directly
+
+Your response must be detailed, informative, and directly answer the user's query WITHOUT echoing it.
+Include specific details from the data (policy names, requirements, hazard types, incident details, etc.) naturally woven into the explanation.
 Provide expert-level analysis and context."""
                     },
                     {
@@ -845,19 +976,23 @@ Tool execution results:
 {json.dumps(tool_results_summary, indent=2, default=str)[:1000]}
 
 Generate a comprehensive, expert-level natural language response that:
-1. Directly answers the user's query
-2. Includes specific details from the retrieved data
-3. Provides expert analysis and recommendations
-4. Is written in a professional, informative tone
+1. Directly answers the user's query WITHOUT echoing the query
+2. Starts immediately with the information (e.g., "Forklift operations require..." or "A high-severity incident has been logged...")
+3. NEVER starts with "You asked", "You requested", "I'll", "Let me", "Here's the response", etc.
+4. Includes specific details from the retrieved data naturally woven into the explanation
+5. Provides expert analysis and recommendations with context
+6. Is written in a clear, natural, conversational tone - like explaining to a colleague
+7. Uses varied sentence structure and flows naturally
+8. Is comprehensive but concise (typically 2-4 well-formed paragraphs)
 
-Return ONLY the natural language response text (no JSON, no formatting, just the response text)."""
+Write in a way that sounds natural and human, not robotic or template-like. Return ONLY the natural language response text (no JSON, no formatting, just the response text)."""
                     }
                 ]
                 
                 try:
                     generation_response = await self.nim_client.generate_response(
                         generation_prompt,
-                        temperature=0.3,  # Slightly higher for more natural language
+                        temperature=0.4,  # Higher temperature for more natural, fluent language
                         max_tokens=1000
                     )
                     natural_language = generation_response.content.strip()
@@ -957,12 +1092,71 @@ Do not include any other text, just the JSON array."""
                         "description": query.entities.get("description", query.user_query)
                     }
             
+            # Validate response quality
+            try:
+                validator = get_response_validator()
+                validation_result = validator.validate(
+                    response={
+                        "natural_language": natural_language,
+                        "confidence": response_data.get("confidence", 0.7),
+                        "response_type": response_data.get("response_type", "safety_info"),
+                        "recommendations": recommendations,
+                        "actions_taken": response_data.get("actions_taken", []),
+                        "mcp_tools_used": list(successful_results.keys()),
+                        "tool_execution_results": tool_results,
+                    },
+                    query=query.user_query if hasattr(query, 'user_query') else str(query),
+                    tool_results=tool_results,
+                )
+                
+                if not validation_result.is_valid:
+                    logger.warning(f"Response validation failed: {validation_result.issues}")
+                else:
+                    logger.info(f"Response validation passed (score: {validation_result.score:.2f})")
+            except Exception as e:
+                logger.warning(f"Response validation error: {e}")
+            
+            # Improved confidence calculation based on tool execution results
+            current_confidence = response_data.get("confidence", 0.7)
+            total_tools = len(tool_results)
+            successful_count = len(successful_results)
+            failed_count = len(failed_results)
+            
+            # Calculate confidence based on tool execution success
+            if total_tools == 0:
+                # No tools executed - use LLM confidence or default
+                calculated_confidence = current_confidence if current_confidence > 0.5 else 0.5
+            elif successful_count == total_tools:
+                # All tools succeeded - very high confidence
+                calculated_confidence = 0.95
+                logger.info(f"All {total_tools} tools succeeded - setting confidence to 0.95")
+            elif successful_count > 0:
+                # Some tools succeeded - confidence based on success rate
+                success_rate = successful_count / total_tools
+                # Base confidence: 0.75, plus bonus for success rate (up to 0.2)
+                calculated_confidence = 0.75 + (success_rate * 0.2)  # Range: 0.75 to 0.95
+                logger.info(f"Partial success ({successful_count}/{total_tools}) - setting confidence to {calculated_confidence:.2f}")
+            else:
+                # All tools failed - low confidence
+                calculated_confidence = 0.3
+                logger.info(f"All {total_tools} tools failed - setting confidence to 0.3")
+            
+            # Use the higher of LLM confidence and calculated confidence (but don't go below calculated if tools succeeded)
+            if successful_count > 0:
+                # If tools succeeded, use calculated confidence (which is based on actual results)
+                final_confidence = max(current_confidence, calculated_confidence)
+            else:
+                # If no tools or all failed, use calculated confidence
+                final_confidence = calculated_confidence
+            
+            logger.info(f"Final confidence: {final_confidence:.2f} (LLM: {current_confidence:.2f}, Calculated: {calculated_confidence:.2f})")
+            
             return MCPSafetyResponse(
                 response_type=response_data.get("response_type", "safety_info"),
                 data=data,
                 natural_language=natural_language,
                 recommendations=recommendations,
-                confidence=response_data.get("confidence", 0.7),
+                confidence=final_confidence,
                 actions_taken=actions_taken,
                 mcp_tools_used=list(successful_results.keys()),
                 tool_execution_results=tool_results,

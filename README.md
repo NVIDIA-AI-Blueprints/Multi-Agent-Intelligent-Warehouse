@@ -50,7 +50,6 @@
 | **MCP** | Model Context Protocol |
 | **NeMo** | NVIDIA NeMo |
 | **NIM/NIMs** | NVIDIA Inference Microservices |
-| **OAuth2** | Open Authorization 2.0 |
 | **OCR** | Optical Character Recognition |
 | **PPE** | Personal Protective Equipment |
 | **QPS** | Queries Per Second |
@@ -80,7 +79,7 @@ This repository implements a production-grade Multi-Agent-Intelligent-Warehouse 
 - **Production-Grade Vector Search** - NV-EmbedQA-E5-v5 embeddings (1024-dim) with NVIDIA cuVS GPU acceleration (19x performance)
 - **AI-Powered Demand Forecasting** - Multi-model ensemble (XGBoost, Random Forest, Gradient Boosting, Ridge, SVR) with NVIDIA RAPIDS GPU acceleration
 - **Real-Time Monitoring** - Equipment status, telemetry, Prometheus metrics, Grafana dashboards, and system health
-- **Enterprise Security** - JWT/OAuth2 + RBAC with 5 user roles, NeMo Guardrails for content safety, and comprehensive user management
+- **Enterprise Security** - JWT authentication + RBAC with 5 user roles, NeMo Guardrails for content safety, and comprehensive user management
 - **System Integrations** - WMS (SAP EWM, Manhattan, Oracle), ERP (SAP ECC, Oracle), IoT sensors, RFID/Barcode scanners, Time Attendance systems
 - **Advanced Features** - Redis caching, conversation memory, evidence scoring, intelligent query classification, automated reorder recommendations, business intelligence dashboards
 
@@ -157,7 +156,7 @@ The architecture consists of:
 - **Time Attendance** - Biometric systems, card readers, mobile apps
 
 ### Enterprise Security & Monitoring
-- **Authentication** - JWT/OAuth2 + RBAC with 5 user roles
+- **Authentication** - JWT authentication + RBAC with 5 user roles
 - **Real-Time Monitoring** - Prometheus metrics + Grafana dashboards
 - **Equipment Telemetry** - Battery, temperature, charging analytics
 - **System Health** - Comprehensive observability and alerting

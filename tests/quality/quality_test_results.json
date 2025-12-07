@@ -1,0 +1,296 @@
+{
+  "summary": {
+    "total_tests": 12,
+    "successful_tests": 12,
+    "failed_tests": 0,
+    "valid_responses": 12,
+    "invalid_responses": 0,
+    "avg_validation_score": 0.9833333333333334,
+    "avg_confidence": 0.9083333333333332
+  },
+  "results": [
+    {
+      "agent": "operations",
+      "query": "Create a wave for orders 1001-1010 in Zone A",
+      "response": {
+        "natural_language": "I've created a pick task for orders 1001-1010 in Zone A. The task, **TASK_PICK_20251206_165156**, is now queued with a medium priority. Unfortunately, the subsequent task assignment tool failed due to...",
+        "confidence": 0.95,
+        "response_type": "pick_wave_info",
+        "recommendations_count": 2,
+        "actions_taken_count": 2,
+        "tools_used": [
+          "3e307849-9a7d-4345-b067-9920e4f7e0ff",
+          "b0cc7d51-d35e-4b5a-8bd9-e71f227e58f9"
+        ]
+      },
+      "validation": {
+        "is_valid": true,
+        "score": 1.0,
+        "issues": [],
+        "warnings": [],
+        "suggestions": []
+      },
+      "timestamp": "2025-12-06T16:52:04.465511"
+    },
+    {
+      "agent": "operations",
+      "query": "Dispatch forklift FL-07 to Zone A for pick operations",
+      "response": {
+        "natural_language": "Here's the update on dispatching forklift FL-07 to Zone A for pick operations: A new pick task (TASK_PICK_20251206_165207) with medium priority has been successfully created for Zone A. However, there...",
+        "confidence": 0.95,
+        "response_type": "equipment_dispatch",
+        "recommendations_count": 2,
+        "actions_taken_count": 2,
+        "tools_used": [
+          "3e307849-9a7d-4345-b067-9920e4f7e0ff",
+          "b0cc7d51-d35e-4b5a-8bd9-e71f227e58f9"
+        ]
+      },
+      "validation": {
+        "is_valid": true,
+        "score": 1.0,
+        "issues": [],
+        "warnings": [],
+        "suggestions": []
+      },
+      "timestamp": "2025-12-06T16:52:16.445828"
+    },
+    {
+      "agent": "operations",
+      "query": "What's the status of task TASK_PICK_20251206_155737?",
+      "response": {
+        "natural_language": "Upon reviewing the task status for TASK_PICK_20251206_155737, I found that the latest attempt to assign this task failed due to an error updating the work queue entry. Notably, around the same time, a...",
+        "confidence": 0.95,
+        "response_type": "task_info",
+        "recommendations_count": 2,
+        "actions_taken_count": 2,
+        "tools_used": [
+          "3e307849-9a7d-4345-b067-9920e4f7e0ff",
+          "b0cc7d51-d35e-4b5a-8bd9-e71f227e58f9"
+        ]
+      },
+      "validation": {
+        "is_valid": true,
+        "score": 1.0,
+        "issues": [],
+        "warnings": [],
+        "suggestions": [
+          "Consider including specific IDs, names, or numbers for clarity"
+        ]
+      },
+      "timestamp": "2025-12-06T16:52:27.215408"
+    },
+    {
+      "agent": "operations",
+      "query": "Show me all available workers in Zone B",
+      "response": {
+        "natural_language": "Upon reviewing Zone B's workforce, I found that there are currently **0 active workers** assigned to this zone. Recently, a pick task (TASK_PICK_20251206_165229) was successfully created for Zone B bu...",
+        "confidence": 0.95,
+        "response_type": "workforce_info",
+        "recommendations_count": 2,
+        "actions_taken_count": 2,
+        "tools_used": [
+          "3e307849-9a7d-4345-b067-9920e4f7e0ff",
+          "b0cc7d51-d35e-4b5a-8bd9-e71f227e58f9",
+          "34eabb69-2791-4272-9d8c-c20f6399f189"
+        ]
+      },
+      "validation": {
+        "is_valid": true,
+        "score": 1.0,
+        "issues": [],
+        "warnings": [],
+        "suggestions": []
+      },
+      "timestamp": "2025-12-06T16:52:36.830293"
+    },
+    {
+      "agent": "equipment",
+      "query": "What's the status of our forklift fleet?",
+      "response": {
+        "natural_language": "We currently have a forklift fleet of three units, each with a distinct status. Starting with availability, FL-01, a Toyota 8FGU25 located in Zone A, is ready for use. This asset is due for its next p...",
+        "confidence": 0.95,
+        "response_type": "equipment_info",
+        "recommendations_count": 3,
+        "actions_taken_count": 0,
+        "tools_used": [
+          "e49f46c9-2bc1-4a3a-b774-a2f1387a5adc",
+          "c099b08c-cfd7-4262-aa69-0999a87cb735",
+          "cf9027ac-5d75-4ac3-9f80-160bf3d0fe02"
+        ]
+      },
+      "validation": {
+        "is_valid": true,
+        "score": 1.0,
+        "issues": [],
+        "warnings": [],
+        "suggestions": []
+      },
+      "timestamp": "2025-12-06T16:53:00.540493"
+    },
+    {
+      "agent": "equipment",
+      "query": "Show me all available forklifts in Zone A",
+      "response": {
+        "natural_language": "FL-01, a Toyota 8FGU25 forklift, is currently available in Zone A. This single unit accounts for the entirety of immediately available forklift resources in that zone, as per our latest system update....",
+        "confidence": 0.95,
+        "response_type": "equipment_info",
+        "recommendations_count": 3,
+        "actions_taken_count": 0,
+        "tools_used": [
+          "e49f46c9-2bc1-4a3a-b774-a2f1387a5adc",
+          "c099b08c-cfd7-4262-aa69-0999a87cb735",
+          "cf9027ac-5d75-4ac3-9f80-160bf3d0fe02"
+        ]
+      },
+      "validation": {
+        "is_valid": true,
+        "score": 1.0,
+        "issues": [],
+        "warnings": [],
+        "suggestions": []
+      },
+      "timestamp": "2025-12-06T16:53:21.534555"
+    },
+    {
+      "agent": "equipment",
+      "query": "When is FL-01 due for maintenance?",
+      "response": {
+        "natural_language": "FL-01, our forklift in question, currently shows a status of \"No Scheduled Maintenance\" in our system. Notably, its assigned zone is listed as \"Unknown\", which might indicate a need for an update in o...",
+        "confidence": 0.95,
+        "response_type": "equipment_info",
+        "recommendations_count": 3,
+        "actions_taken_count": 0,
+        "tools_used": [
+          "b8f0a234-a425-4c51-83cb-109bbda5c349",
+          "83e053c2-9dfd-417b-8d1f-6803841e1077"
+        ]
+      },
+      "validation": {
+        "is_valid": true,
+        "score": 1.0,
+        "issues": [],
+        "warnings": [],
+        "suggestions": []
+      },
+      "timestamp": "2025-12-06T16:53:37.930279"
+    },
+    {
+      "agent": "equipment",
+      "query": "What equipment is currently in maintenance?",
+      "response": {
+        "natural_language": "Currently, we have three pieces of equipment undergoing maintenance across different zones. CHG-01, our Forklift Charger located at the Charging Station, is in the midst of an inspection performed by ...",
+        "confidence": 0.95,
+        "response_type": "equipment_info",
+        "recommendations_count": 3,
+        "actions_taken_count": 0,
+        "tools_used": [
+          "b8f0a234-a425-4c51-83cb-109bbda5c349",
+          "83e053c2-9dfd-417b-8d1f-6803841e1077",
+          "a56c29f8-9a33-4a48-9a02-fb78a9f37398"
+        ]
+      },
+      "validation": {
+        "is_valid": true,
+        "score": 1.0,
+        "issues": [],
+        "warnings": [],
+        "suggestions": []
+      },
+      "timestamp": "2025-12-06T16:54:09.893044"
+    },
+    {
+      "agent": "safety",
+      "query": "What are the forklift operations safety procedures?",
+      "response": {
+        "natural_language": "Forklift operations require adherence to our comprehensive **Forklift Operations Safety Procedure (POL-SAF-001)** to ensure a safe working environment. At the core of this policy are key requirements ...",
+        "confidence": 0.7,
+        "response_type": "safety_info",
+        "recommendations_count": 3,
+        "actions_taken_count": 0,
+        "tools_used": []
+      },
+      "validation": {
+        "is_valid": true,
+        "score": 0.9,
+        "issues": [],
+        "warnings": [
+          "Response lacks specific action/status keywords"
+        ],
+        "suggestions": []
+      },
+      "timestamp": "2025-12-06T16:54:31.440723"
+    },
+    {
+      "agent": "safety",
+      "query": "Report a machine over-temp event at Dock D2",
+      "response": {
+        "natural_language": "A high-severity incident (INC_20251206_165434) has been logged for the machine over-temperature event at Dock D2, classified under our POL-EMER-002 (Emergency Response for Equipment Failures) and POL-...",
+        "confidence": 0.95,
+        "response_type": "safety_info",
+        "recommendations_count": 3,
+        "actions_taken_count": 3,
+        "tools_used": [
+          "ff731587-9885-4d2a-80fb-5d0f8ac4e834",
+          "ce01e31e-9d8a-4bf5-80cd-de55c4bff573",
+          "381bce51-ab40-493a-80ed-89371c5d6730"
+        ]
+      },
+      "validation": {
+        "is_valid": true,
+        "score": 1.0,
+        "issues": [],
+        "warnings": [],
+        "suggestions": []
+      },
+      "timestamp": "2025-12-06T16:54:55.578811"
+    },
+    {
+      "agent": "safety",
+      "query": "What safety incidents have occurred today?",
+      "response": {
+        "natural_language": "A medium-severity safety incident has been logged today, identified as INC_20251206_165458, with the description mirroring your inquiry about today's safety incidents. Notably, this incident is curren...",
+        "confidence": 0.95,
+        "response_type": "safety_info",
+        "recommendations_count": 3,
+        "actions_taken_count": 3,
+        "tools_used": [
+          "ff731587-9885-4d2a-80fb-5d0f8ac4e834",
+          "ce01e31e-9d8a-4bf5-80cd-de55c4bff573",
+          "381bce51-ab40-493a-80ed-89371c5d6730"
+        ]
+      },
+      "validation": {
+        "is_valid": true,
+        "score": 1.0,
+        "issues": [],
+        "warnings": [],
+        "suggestions": []
+      },
+      "timestamp": "2025-12-06T16:55:21.859014"
+    },
+    {
+      "agent": "safety",
+      "query": "Show me the safety checklist for equipment maintenance",
+      "response": {
+        "natural_language": "When performing equipment maintenance in our warehouse, it's crucial to follow the **Equipment Maintenance Safety Checklist (POL-MAINT-002)** to ensure a safe working environment. This policy outlines...",
+        "confidence": 0.7,
+        "response_type": "safety_info",
+        "recommendations_count": 3,
+        "actions_taken_count": 0,
+        "tools_used": []
+      },
+      "validation": {
+        "is_valid": true,
+        "score": 0.9,
+        "issues": [],
+        "warnings": [
+          "Response lacks specific action/status keywords"
+        ],
+        "suggestions": []
+      },
+      "timestamp": "2025-12-06T16:55:45.656071"
+    }
+  ],
+  "timestamp": "2025-12-06T16:55:46.657566"
+}

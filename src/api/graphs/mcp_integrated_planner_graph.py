@@ -754,8 +754,32 @@ class MCPPlannerGraph:
             enable_reasoning = state.get("enable_reasoning", False)
             reasoning_types = state.get("reasoning_types")
             
+            # Detect complex queries that need more processing time
+            message_lower = message_text.lower()
+            # Detect complex queries: analysis keywords, multiple actions, or long queries
+            is_complex_query = (
+                any(keyword in message_lower for keyword in [
+                    "optimize", "optimization", "optimizing", "analyze", "analysis", "analyzing",
+                    "relationship", "between", "compare", "evaluate", "correlation", "impact",
+                    "effect", "factors", "consider", "considering", "recommend", "recommendation",
+                    "strategy", "strategies", "improve", "improvement", "best practices"
+                ]) or 
+                # Multiple action keywords (create + dispatch, show + list, etc.)
+                (message_lower.count(" and ") > 0 and any(action in message_lower for action in ["create", "dispatch", "assign", "show", "list", "get", "check"])) or
+                len(message_text.split()) > 15
+            )
+            
             # Process with MCP equipment agent with timeout
-            agent_timeout = 45.0 if enable_reasoning else 20.0
+            # Increase timeout for complex queries and reasoning queries
+            if enable_reasoning:
+                agent_timeout = 90.0  # 90s for reasoning queries
+            elif is_complex_query:
+                agent_timeout = 50.0  # 50s for complex queries (was 20s)
+            else:
+                agent_timeout = 45.0  # 45s for simple queries (increased from 30s to prevent timeouts)
+            
+            logger.info(f"Equipment agent timeout: {agent_timeout}s (complex: {is_complex_query}, reasoning: {enable_reasoning})")
+            
             try:
                 response = await asyncio.wait_for(
                     mcp_equipment_agent.process_query(
@@ -845,22 +869,67 @@ class MCPPlannerGraph:
             # Get session ID from context
             session_id = state.get("session_id", "default")
 
-            # Get MCP operations agent
-            mcp_operations_agent = await get_mcp_operations_agent()
+            # Get MCP operations agent with timeout
+            try:
+                mcp_operations_agent = await asyncio.wait_for(
+                    get_mcp_operations_agent(),
+                    timeout=5.0  # 5 second timeout for agent initialization
+                )
+            except asyncio.TimeoutError:
+                logger.error("MCP operations agent initialization timed out")
+                raise
+            except Exception as init_error:
+                logger.error(f"MCP operations agent initialization failed: {init_error}")
+                raise
 
             # Extract reasoning parameters from state
             enable_reasoning = state.get("enable_reasoning", False)
             reasoning_types = state.get("reasoning_types")
             
-            # Process with MCP operations agent
-            response = await mcp_operations_agent.process_query(
-                query=message_text,
-                session_id=session_id,
-                context=state.get("context", {}),
-                mcp_results=state.get("mcp_results"),
-                enable_reasoning=enable_reasoning,
-                reasoning_types=reasoning_types,
+            # Detect complex queries that need more processing time
+            message_lower = message_text.lower()
+            # Detect complex queries: analysis keywords, multiple actions, or long queries
+            is_complex_query = (
+                any(keyword in message_lower for keyword in [
+                    "optimize", "optimization", "optimizing", "analyze", "analysis", "analyzing",
+                    "relationship", "between", "compare", "evaluate", "correlation", "impact",
+                    "effect", "factors", "consider", "considering", "recommend", "recommendation",
+                    "strategy", "strategies", "improve", "improvement", "best practices"
+                ]) or 
+                # Multiple action keywords (create + dispatch, show + list, etc.)
+                (message_lower.count(" and ") > 0 and any(action in message_lower for action in ["create", "dispatch", "assign", "show", "list", "get", "check"])) or
+                len(message_text.split()) > 15
             )
+            
+            # Process with MCP operations agent with timeout
+            # Increase timeout for complex queries and reasoning queries
+            if enable_reasoning:
+                agent_timeout = 90.0  # 90s for reasoning queries
+            elif is_complex_query:
+                agent_timeout = 50.0  # 50s for complex queries
+            else:
+                agent_timeout = 45.0  # 45s for simple queries (increased from 30s to prevent timeouts)
+            
+            logger.info(f"Operations agent timeout: {agent_timeout}s (complex: {is_complex_query}, reasoning: {enable_reasoning})")
+            
+            try:
+                response = await asyncio.wait_for(
+                    mcp_operations_agent.process_query(
+                        query=message_text,
+                        session_id=session_id,
+                        context=state.get("context", {}),
+                        mcp_results=state.get("mcp_results"),
+                        enable_reasoning=enable_reasoning,
+                        reasoning_types=reasoning_types,
+                    ),
+                    timeout=agent_timeout
+                )
+            except asyncio.TimeoutError:
+                logger.error(f"MCP operations agent process_query timed out after {agent_timeout}s")
+                raise TimeoutError(f"Operations agent processing timed out after {agent_timeout}s")
+            except Exception as process_error:
+                logger.error(f"MCP operations agent process_query failed: {process_error}")
+                raise
 
             # Store the response (handle both dict and object responses)
             if isinstance(response, dict):
@@ -940,9 +1009,32 @@ class MCPPlannerGraph:
             enable_reasoning = state.get("enable_reasoning", False)
             reasoning_types = state.get("reasoning_types")
             
+            # Detect complex queries that need more processing time
+            message_lower = message_text.lower()
+            # Detect complex queries: analysis keywords, multiple actions, or long queries
+            is_complex_query = (
+                any(keyword in message_lower for keyword in [
+                    "optimize", "optimization", "optimizing", "analyze", "analysis", "analyzing",
+                    "relationship", "between", "compare", "evaluate", "correlation", "impact",
+                    "effect", "factors", "consider", "considering", "recommend", "recommendation",
+                    "strategy", "strategies", "improve", "improvement", "best practices"
+                ]) or 
+                # Multiple action keywords (create + dispatch, show + list, etc.)
+                (message_lower.count(" and ") > 0 and any(action in message_lower for action in ["create", "dispatch", "assign", "show", "list", "get", "check"])) or
+                len(message_text.split()) > 15
+            )
+            
             # Process with MCP safety agent with timeout
-            # Use shorter timeout for agent processing (20s for simple queries)
-            agent_timeout = 45.0 if enable_reasoning else 20.0
+            # Increase timeout for complex queries and reasoning queries
+            if enable_reasoning:
+                agent_timeout = 90.0  # 90s for reasoning queries
+            elif is_complex_query:
+                agent_timeout = 50.0  # 50s for complex queries (was 20s)
+            else:
+                agent_timeout = 45.0  # 45s for simple queries (increased from 30s to prevent timeouts)
+            
+            logger.info(f"Safety agent timeout: {agent_timeout}s (complex: {is_complex_query}, reasoning: {enable_reasoning})")
+            
             try:
                 response = await asyncio.wait_for(
                     mcp_safety_agent.process_query(
@@ -1547,15 +1639,20 @@ class MCPPlannerGraph:
                 # Match the timeout in chat.py: 230s for complex, 115s for regular reasoning
                 graph_timeout = 230.0 if is_complex_query else 115.0  # 230s for complex, 115s for regular reasoning
             else:
-                # Regular queries: 30s for simple, 90s for complex (increased to match chat.py timeout)
-                graph_timeout = 90.0 if is_complex_query else 30.0
+                # Regular queries: Match chat.py timeouts (60s for simple, 90s for complex)
+                graph_timeout = 90.0 if is_complex_query else 60.0  # Increased from 30s to 60s for simple queries
+            logger.info(f"Graph timeout set to {graph_timeout}s (complex: {is_complex_query}, reasoning: {enable_reasoning})")
             try:
                 result = await asyncio.wait_for(
                     self.graph.ainvoke(initial_state),
                     timeout=graph_timeout
                 )
+                logger.info(f"✅ Graph execution completed in time: timeout={graph_timeout}s")
             except asyncio.TimeoutError:
-                logger.warning(f"Graph execution timed out after {graph_timeout}s, using fallback")
+                logger.error(
+                    f"⏱️ TIMEOUT: Graph execution timed out after {graph_timeout}s | "
+                    f"Message: {message[:100]} | Complex: {is_complex_query} | Reasoning: {enable_reasoning}"
+                )
                 return self._create_fallback_response(message, session_id)
 
             # Ensure structured response is properly included

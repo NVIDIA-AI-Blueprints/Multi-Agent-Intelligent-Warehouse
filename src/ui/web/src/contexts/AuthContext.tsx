@@ -40,7 +40,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const token = localStorage.getItem('auth_token');
     if (token) {
       // Verify token and get user info
-      api.get('/api/v1/auth/me')
+      // Use longer timeout for token verification (might be slow on first load)
+      api.get('/api/v1/auth/me', {
+        timeout: 30000, // 30 second timeout
+      })
         .then(response => {
           setUser(response.data);
         })
@@ -58,12 +61,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const login = async (username: string, password: string) => {
-    // Use shorter timeout for login (10 seconds) - login should be fast
+    // Login timeout increased to 30 seconds to accommodate slow backend responses
+    // Login should be fast, but backend might be slow during initialization
     const response = await api.post('/auth/login', {
       username,
       password,
     }, {
-      timeout: 10000, // 10 second timeout for login
+      timeout: 30000, // 30 second timeout for login
     });
 
     if (response.data.access_token) {

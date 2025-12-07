@@ -13,6 +13,9 @@ module.exports = function(app) {
       secure: false,
       logLevel: 'debug',
       timeout: 300000, // 5 minutes - increased for complex reasoning queries
+      proxyTimeout: 300000, // 5 minutes - timeout for proxy connection
+      // Increase socket timeout to handle long-running queries
+      socketTimeout: 300000, // 5 minutes
       pathRewrite: (path, req) => {
         // path will be like '/v1/version' (without /api)
         // Add /api back to get '/api/v1/version'

@@ -259,6 +259,198 @@ class OperationsActionTools:
                 skills_required=constraints.get("skills", []),
             )
 
+    async def create_task(
+        self,
+        task_type: str,
+        sku: str,
+        quantity: int = 1,
+        priority: str = "medium",
+        zone: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Create a new task for warehouse operations.
+
+        Args:
+            task_type: Type of task (pick, pack, putaway, etc.)
+            sku: SKU for the task
+            quantity: Quantity for the task
+            priority: Task priority (high, medium, low)
+            zone: Zone for the task
+
+        Returns:
+            Dict with task creation result
+        """
+        try:
+            if not self.wms_service:
+                await self.initialize()
+
+            task_id = f"TASK_{task_type.upper()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            
+            constraints = {
+                "priority": priority,
+                "zone": zone,
+            }
+            
+            assignment = await self.assign_tasks(
+                task_type=task_type,
+                quantity=quantity,
+                constraints=constraints,
+            )
+            
+            return {
+                "success": True,
+                "task_id": assignment.task_id,
+                "task_type": assignment.task_type,
+                "status": assignment.status,
+                "zone": assignment.zone,
+                "priority": assignment.priority,
+            }
+        except Exception as e:
+            logger.error(f"Failed to create task: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "task_id": None,
+            }
+
+    async def assign_task(
+        self,
+        task_id: str,
+        worker_id: str,
+        assignment_type: str = "manual",
+    ) -> Dict[str, Any]:
+        """
+        Assign a task to a worker.
+
+        Args:
+            task_id: Task ID to assign
+            worker_id: Worker ID to assign task to
+            assignment_type: Type of assignment (manual, automatic)
+
+        Returns:
+            Dict with assignment result
+        """
+        try:
+            if not self.wms_service:
+                await self.initialize()
+
+            # Update task assignment in WMS
+            result = await self.wms_service.update_work_queue_entry(
+                task_id=task_id,
+                assigned_worker=worker_id,
+            )
+            
+            if result and result.get("success"):
+                return {
+                    "success": True,
+                    "task_id": task_id,
+                    "worker_id": worker_id,
+                    "assignment_type": assignment_type,
+                    "status": "assigned",
+                }
+            else:
+                return {
+                    "success": False,
+                    "task_id": task_id,
+                    "worker_id": worker_id,
+                    "error": "Failed to update work queue entry",
+                }
+        except Exception as e:
+            logger.error(f"Failed to assign task: {e}")
+            return {
+                "success": False,
+                "task_id": task_id,
+                "worker_id": worker_id,
+                "error": str(e),
+            }
+
+    async def get_task_status(
+        self,
+        task_id: Optional[str] = None,
+        worker_id: Optional[str] = None,
+        status: Optional[str] = None,
+        task_type: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Get status of tasks.
+
+        Args:
+            task_id: Specific task ID to check
+            worker_id: Worker ID to get tasks for
+            status: Filter by task status
+            task_type: Filter by task type
+
+        Returns:
+            Dict with task status information
+        """
+        try:
+            if not self.wms_service:
+                await self.initialize()
+
+            # Get tasks from WMS
+            tasks = await self.wms_service.get_work_queue_entries(
+                task_id=task_id,
+                worker_id=worker_id,
+                status=status,
+                task_type=task_type,
+            )
+            
+            return {
+                "success": True,
+                "tasks": tasks if tasks else [],
+                "count": len(tasks) if tasks else 0,
+            }
+        except Exception as e:
+            logger.error(f"Failed to get task status: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "tasks": [],
+                "count": 0,
+            }
+
+    async def get_workforce_status(
+        self,
+        worker_id: Optional[str] = None,
+        shift: Optional[str] = None,
+        status: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Get workforce status and availability.
+
+        Args:
+            worker_id: Specific worker ID to check
+            shift: Shift to check (day, night, etc.)
+            status: Filter by worker status
+
+        Returns:
+            Dict with workforce status information
+        """
+        try:
+            if not self.attendance_service:
+                await self.initialize()
+
+            # Get workforce status from attendance service
+            workforce = await self.attendance_service.get_worker_status(
+                worker_id=worker_id,
+                shift=shift,
+                status=status,
+            )
+            
+            return {
+                "success": True,
+                "workforce": workforce if workforce else [],
+                "count": len(workforce) if workforce else 0,
+            }
+        except Exception as e:
+            logger.error(f"Failed to get workforce status: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "workforce": [],
+                "count": 0,
+            }
+
     async def rebalance_workload(
         self, sla_rules: Optional[Dict[str, Any]] = None
     ) -> WorkloadRebalance:

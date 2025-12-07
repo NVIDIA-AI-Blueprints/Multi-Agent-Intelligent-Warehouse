@@ -30,6 +30,10 @@ const queryClient = new QueryClient({
     queries: {
       retry: 1,
       refetchOnWindowFocus: false,
+      // Increase default query timeout to prevent premature timeouts
+      // Individual API calls can override this with their own timeout
+      staleTime: 30000, // Consider data fresh for 30 seconds
+      cacheTime: 300000, // Keep in cache for 5 minutes
     },
   },
 });
