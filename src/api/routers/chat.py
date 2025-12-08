@@ -995,7 +995,8 @@ async def chat(req: ChatRequest):
             logger.error(f"Query processing error: {_sanitize_log_data(str(query_error))}")
             # Return a more helpful fallback response
             error_type = type(query_error).__name__
-            error_message = str(query_error)
+            from src.api.utils.error_handler import sanitize_error_message
+            error_message = sanitize_error_message(query_error, "Query processing")
 
             # Provide specific error messages based on error type
             if "timeout" in error_message.lower() or isinstance(query_error, asyncio.TimeoutError):
@@ -1626,7 +1627,9 @@ async def get_conversation_summary(req: ConversationSummaryRequest):
 
     except Exception as e:
         logger.error(f"Error getting conversation summary: {_sanitize_log_data(str(e))}")
-        return {"success": False, "error": str(e)}
+        from src.api.utils.error_handler import sanitize_error_message
+        error_msg = sanitize_error_message(e, "Get conversation summary")
+        return {"success": False, "error": error_msg}
 
 
 @router.post("/chat/conversation/search")
@@ -1647,7 +1650,9 @@ async def search_conversation_history(req: ConversationSearchRequest):
 
     except Exception as e:
         logger.error(f"Error searching conversation history: {_sanitize_log_data(str(e))}")
-        return {"success": False, "error": str(e)}
+        from src.api.utils.error_handler import sanitize_error_message
+        error_msg = sanitize_error_message(e, "Search conversation history")
+        return {"success": False, "error": error_msg}
 
 
 @router.delete("/chat/conversation/{session_id}")
@@ -1669,7 +1674,9 @@ async def clear_conversation(session_id: str):
 
     except Exception as e:
         logger.error(f"Error clearing conversation: {_sanitize_log_data(str(e))}")
-        return {"success": False, "error": str(e)}
+        from src.api.utils.error_handler import sanitize_error_message
+        error_msg = sanitize_error_message(e, "Clear conversation")
+        return {"success": False, "error": error_msg}
 
 
 @router.post("/chat/validate")
@@ -1710,7 +1717,9 @@ async def validate_response(req: ChatRequest):
 
     except Exception as e:
         logger.error(f"Error in validation endpoint: {_sanitize_log_data(str(e))}")
-        return {"error": str(e), "validation_score": 0.0, "validation_passed": False}
+        from src.api.utils.error_handler import sanitize_error_message
+        error_msg = sanitize_error_message(e, "Validate response")
+        return {"error": error_msg, "validation_score": 0.0, "validation_passed": False}
 
 
 @router.get("/chat/conversation/stats")
@@ -1729,7 +1738,9 @@ async def get_conversation_stats():
 
     except Exception as e:
         logger.error(f"Error getting conversation stats: {_sanitize_log_data(str(e))}")
-        return {"success": False, "error": str(e)}
+        from src.api.utils.error_handler import sanitize_error_message
+        error_msg = sanitize_error_message(e, "Get conversation stats")
+        return {"success": False, "error": error_msg}
 
 
 @router.get("/chat/performance/stats")
@@ -1776,4 +1787,6 @@ async def get_performance_stats(time_window_minutes: int = 60, include_alerts: b
 
     except Exception as e:
         logger.error(f"Error getting performance stats: {_sanitize_log_data(str(e))}")
-        return {"success": False, "error": str(e)}
+        from src.api.utils.error_handler import sanitize_error_message
+        error_msg = sanitize_error_message(e, "Get performance stats")
+        return {"success": False, "error": error_msg}

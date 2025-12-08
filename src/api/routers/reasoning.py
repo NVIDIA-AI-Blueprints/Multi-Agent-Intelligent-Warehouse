@@ -91,8 +91,9 @@ def _handle_reasoning_error(operation: str, error: Exception) -> HTTPException:
     Returns:
         HTTPException with appropriate error message
     """
-    logger.error(f"{operation} failed: {_sanitize_log_data(str(error))}")
-    return HTTPException(status_code=500, detail=f"{operation} failed: {str(error)}")
+    from src.api.utils.error_handler import sanitize_error_message
+    error_msg = sanitize_error_message(error, operation)
+    return HTTPException(status_code=500, detail=error_msg)
 
 
 def _get_confidence_level(confidence: float) -> str:

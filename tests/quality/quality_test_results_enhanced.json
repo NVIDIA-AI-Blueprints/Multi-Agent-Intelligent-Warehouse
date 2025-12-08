@@ -1,0 +1,1254 @@
+{
+  "summary": {
+    "total_tests": 12,
+    "successful_tests": 12,
+    "failed_tests": 0,
+    "valid_responses": 12,
+    "invalid_responses": 0,
+    "avg_validation_score": 0.9916666666666667,
+    "avg_confidence": 0.9083333333333332,
+    "avg_processing_time_seconds": 16.094583583333332
+  },
+  "log_analysis": {
+    "aggregate_patterns": {
+      "routing": 0,
+      "tool_execution": 63,
+      "llm_calls": 33,
+      "validation": 13,
+      "errors": 10,
+      "warnings": 0,
+      "timeouts": 2,
+      "cache": 33,
+      "confidence": 26,
+      "tool_discovery": 44
+    },
+    "insights": [
+      "Tool executions detected: 4 operations",
+      "\u26a0\ufe0f Errors detected: 3 occurrences",
+      "\u2705 No errors detected in logs",
+      "LLM calls made: 2 requests",
+      "Cache operations: 4 hits/misses",
+      "LLM calls made: 3 requests",
+      "Tool executions detected: 9 operations",
+      "Cache operations: 1 hits/misses",
+      "Cache operations: 2 hits/misses",
+      "Tool executions detected: 5 operations",
+      "\u26a0\ufe0f Errors detected: 2 occurrences",
+      "LLM calls made: 1 requests",
+      "LLM calls made: 4 requests",
+      "Cache operations: 3 hits/misses",
+      "\u26a0\ufe0f Errors detected: 1 occurrences",
+      "\u26a0\ufe0f Errors detected: 4 occurrences",
+      "\u23f1\ufe0f Timeouts detected: 2 occurrences",
+      "Tool executions detected: 8 operations",
+      "Tool executions detected: 10 operations"
+    ],
+    "recommendations": [
+      {
+        "priority": "medium",
+        "category": "performance",
+        "message": "Timeouts detected. Consider optimizing query processing or increasing timeouts.",
+        "action": "Review timeout occurrences and optimize slow operations"
+      },
+      {
+        "priority": "low",
+        "category": "tool_usage",
+        "message": "No tool executions detected. Verify tool discovery and execution is working.",
+        "action": "Check tool discovery service and ensure tools are being called"
+      },
+      {
+        "priority": "low",
+        "category": "tool_usage",
+        "message": "No tool executions detected. Verify tool discovery and execution is working.",
+        "action": "Check tool discovery service and ensure tools are being called"
+      }
+    ]
+  },
+  "results": [
+    {
+      "agent": "operations",
+      "query": "Create a wave for orders 1001-1010 in Zone A",
+      "processing_time_seconds": 9.742458,
+      "response": {
+        "natural_language": "I've created a pick task (TASK_PICK_20251207_131235) for orders 1001-1010 in Zone A, which is currently in 'queued' status with medium priority. Unfortunately, the subsequent task assignment failed du...",
+        "confidence": 0.95,
+        "response_type": "pick_wave_info",
+        "recommendations_count": 2,
+        "actions_taken_count": 2,
+        "tools_used": [
+          "d81a7b36-ef3f-4a87-92a2-65e2155a5b21",
+          "f3ab79fa-a588-4082-a311-a781a8677d00"
+        ],
+        "tools_used_count": 2
+      },
+      "validation": {
+        "is_valid": true,
+        "score": 1.0,
+        "issues": [],
+        "warnings": [],
+        "suggestions": []
+      },
+      "log_analysis": {
+        "total_log_lines": 51,
+        "patterns": {
+          "routing": {
+            "count": 0,
+            "examples": []
+          },
+          "tool_execution": {
+            "count": 8,
+            "examples": [
+              "Executing 2 tools for intent 'wave_creation': ['create_task', 'assign_task']",
+              "Executing MCP tool: create_task with arguments: {'task_type': 'pick', 'sku': 'ORDER_1001', 'quantity': 1001, 'priority': 'medium', 'zone': 'A'}",
+              "Executing MCP tool: assign_task with arguments: {'task_id': 'TASK_PICK_20251207_131235', 'worker_id': None}"
+            ]
+          },
+          "llm_calls": {
+            "count": 2,
+            "examples": [
+              "LLM generation attempt 1/3",
+              "LLM generation attempt 1/3"
+            ]
+          },
+          "validation": {
+            "count": 1,
+            "examples": [
+              "Response validation passed (score: 0.81)"
+            ]
+          },
+          "errors": {
+            "count": 3,
+            "examples": [
+              "Tool f3ab79fa-a588-4082-a311-a781a8677d00 (assign_task): {'success': False, 'task_id': 'TASK_PICK_20251207_131235', 'worker_id': None, 'error': 'Failed to update work queue entry'}",
+              "Successfully parsed LLM response: {'response_type': 'pick_wave_info', 'data': {'wave_id': 'TASK_PICK_20251207_131235', 'order_range': '1001-1010', 'zone': 'A', 'status': 'queued', 'priority': 'medium', 'task_type': 'pick', 'execution_status': {'create_task': 'SUCCESS', 'assign_task': 'FAILURE', 'error_reason': 'Failed to update work queue entry'}}, 'natural_language': \"I've created a pick task (TASK_PICK_20251207_131235) for orders 1001-1010 in Zone A, which is currently in 'queued' status with medium priority. Unfortunately, the subsequent task assignment failed due to an issue updating the work queue entry. You can manually assign this task to an operator or investigate the queue update error. For optimal throughput, consider reviewing your work queue configuration to prevent future assignment failures.\", 'recommendations': ['Manually assign TASK_PICK_20251207_131235 to an available operator in Zone A', \"Investigate and resolve the 'work queue entry update' error to prevent future assignment failures\"], 'confidence': 0.7, 'actions_taken': [{'action': 'create_task', 'details': 'Successfully created task TASK_PICK_20251207_131235 for orders 1001-1010 in Zone A'}, {'action': 'assign_task', 'details': 'Failed to assign task TASK_PICK_20251207_131235 due to work queue update error'}]}"
+            ]
+          },
+          "warnings": {
+            "count": 0,
+            "examples": []
+          },
+          "timeouts": {
+            "count": 2,
+            "examples": [
+              "connect_tcp.started host='api.brev.dev' port=443 local_address=None timeout=120 socket_options=None",
+              "start_tls.started ssl_context=<ssl.SSLContext object at 0x7f2eaa8c02c0> server_hostname='api.brev.dev' timeout=120"
+            ]
+          },
+          "cache": {
+            "count": 2,
+            "examples": [
+              "Cached LLM response (key: 7600ed7eb7d4e55a..., TTL: 300s)",
+              "Cached LLM response (key: a66143928525a64b..., TTL: 300s)"
+            ]
+          },
+          "confidence": {
+            "count": 3,
+            "examples": [
+              "Successfully parsed LLM response: {'response_type': 'pick_wave_info', 'data': {'wave_id': 'TASK_PICK_20251207_131235', 'order_range': '1001-1010', 'zone': 'A', 'status': 'queued', 'priority': 'medium', 'task_type': 'pick', 'execution_status': {'create_task': 'SUCCESS', 'assign_task': 'FAILURE', 'error_reason': 'Failed to update work queue entry'}}, 'natural_language': \"I've created a pick task (TASK_PICK_20251207_131235) for orders 1001-1010 in Zone A, which is currently in 'queued' status with medium priority. Unfortunately, the subsequent task assignment failed due to an issue updating the work queue entry. You can manually assign this task to an operator or investigate the queue update error. For optimal throughput, consider reviewing your work queue configuration to prevent future assignment failures.\", 'recommendations': ['Manually assign TASK_PICK_20251207_131235 to an available operator in Zone A', \"Investigate and resolve the 'work queue entry update' error to prevent future assignment failures\"], 'confidence': 0.7, 'actions_taken': [{'action': 'create_task', 'details': 'Successfully created task TASK_PICK_20251207_131235 for orders 1001-1010 in Zone A'}, {'action': 'assign_task', 'details': 'Failed to assign task TASK_PICK_20251207_131235 due to work queue update error'}]}",
+              "All 2 tools succeeded - setting confidence to 0.95",
+              "Final confidence: 0.95 (LLM: 0.70, Calculated: 0.95)"
+            ]
+          },
+          "tool_discovery": {
+            "count": 1,
+            "examples": [
+              "Discovered 4 tools for intent 'wave_creation': ['create_task', 'assign_task', 'get_task_status', 'get_workforce_status']"
+            ]
+          }
+        },
+        "insights": [
+          "Tool executions detected: 8 operations",
+          "\u26a0\ufe0f Errors detected: 3 occurrences",
+          "\u23f1\ufe0f Timeouts detected: 2 occurrences",
+          "LLM calls made: 2 requests",
+          "Cache operations: 2 hits/misses"
+        ],
+        "recommendations": [
+          {
+            "priority": "medium",
+            "category": "performance",
+            "message": "Timeouts detected. Consider optimizing query processing or increasing timeouts.",
+            "action": "Review timeout occurrences and optimize slow operations"
+          }
+        ]
+      },
+      "timestamp": "2025-12-07T13:12:44.009871"
+    },
+    {
+      "agent": "operations",
+      "query": "Dispatch forklift FL-07 to Zone A for pick operations",
+      "processing_time_seconds": 10.932105,
+      "response": {
+        "natural_language": "Here's the update on dispatching forklift FL-07 to Zone A for pick operations. A new pick task, TASK_PICK_20251207_131246, with medium priority, has been successfully created and queued for Zone A. Ho...",
+        "confidence": 0.95,
+        "response_type": "equipment_dispatch",
+        "recommendations_count": 2,
+        "actions_taken_count": 2,
+        "tools_used": [
+          "d81a7b36-ef3f-4a87-92a2-65e2155a5b21",
+          "f3ab79fa-a588-4082-a311-a781a8677d00"
+        ],
+        "tools_used_count": 2
+      },
+      "validation": {
+        "is_valid": true,
+        "score": 1.0,
+        "issues": [],
+        "warnings": [],
+        "suggestions": []
+      },
+      "log_analysis": {
+        "total_log_lines": 47,
+        "patterns": {
+          "routing": {
+            "count": 0,
+            "examples": []
+          },
+          "tool_execution": {
+            "count": 9,
+            "examples": [
+              "Executing 2 tools for intent 'task_assignment': ['create_task', 'assign_task']",
+              "Executing MCP tool: create_task with arguments: {'task_type': 'pick', 'sku': 'GENERAL', 'quantity': 7, 'priority': 'medium', 'zone': 'A'}",
+              "Executing MCP tool: assign_task with arguments: {'task_id': 'TASK_PICK_20251207_131246', 'worker_id': None}"
+            ]
+          },
+          "llm_calls": {
+            "count": 2,
+            "examples": [
+              "LLM generation attempt 1/3",
+              "LLM generation attempt 1/3"
+            ]
+          },
+          "validation": {
+            "count": 1,
+            "examples": [
+              "Response validation passed (score: 0.81)"
+            ]
+          },
+          "errors": {
+            "count": 4,
+            "examples": [
+              "Tool f3ab79fa-a588-4082-a311-a781a8677d00 (assign_task): {'success': False, 'task_id': 'TASK_PICK_20251207_131246', 'worker_id': None, 'error': 'Failed to update work queue entry'}",
+              "Successfully parsed LLM response: {'response_type': 'equipment_dispatch', 'data': {'equipment_id': 'FL-07', 'zone': 'A', 'operation_type': 'pick', 'dispatch_status': 'partial_success', 'task_details': {'task_id': 'TASK_PICK_20251207_131246', 'task_type': 'pick', 'status': 'queued', 'priority': 'medium'}, 'error_details': {'tool_name': 'assign_task', 'error_message': 'Failed to update work queue entry'}}, 'natural_language': \"Here's the update on dispatching forklift FL-07 to Zone A for pick operations. A new pick task, TASK_PICK_20251207_131246, with medium priority, has been successfully created and queued for Zone A. However, there was an issue assigning this task to a worker due to a failure in updating the work queue entry. FL-07 is technically dispatched to the zone but remains unassigned. **Next Steps:** Manually assign TASK_PICK_20251207_131246 or investigate the work queue update error. Consider reviewing worker availability in Zone A to ensure efficient task allocation.\", 'recommendations': ['Manually assign TASK_PICK_20251207_131246 to an available worker in Zone A', \"Investigate and resolve the 'Failed to update work queue entry' error to prevent future assignment issues\"], 'confidence': 0.7, 'actions_taken': [{'action': 'create_task', 'details': 'Successfully created TASK_PICK_20251207_131246 for pick operations in Zone A'}, {'action': 'assign_task', 'details': 'Failed to assign TASK_PICK_20251207_131246 due to work queue update error'}]}"
+            ]
+          },
+          "warnings": {
+            "count": 0,
+            "examples": []
+          },
+          "timeouts": {
+            "count": 0,
+            "examples": []
+          },
+          "cache": {
+            "count": 2,
+            "examples": [
+              "Cached LLM response (key: fe9a7cca435bf4fc..., TTL: 300s)",
+              "Cached LLM response (key: a3070ec93a343cb7..., TTL: 300s)"
+            ]
+          },
+          "confidence": {
+            "count": 3,
+            "examples": [
+              "Successfully parsed LLM response: {'response_type': 'equipment_dispatch', 'data': {'equipment_id': 'FL-07', 'zone': 'A', 'operation_type': 'pick', 'dispatch_status': 'partial_success', 'task_details': {'task_id': 'TASK_PICK_20251207_131246', 'task_type': 'pick', 'status': 'queued', 'priority': 'medium'}, 'error_details': {'tool_name': 'assign_task', 'error_message': 'Failed to update work queue entry'}}, 'natural_language': \"Here's the update on dispatching forklift FL-07 to Zone A for pick operations. A new pick task, TASK_PICK_20251207_131246, with medium priority, has been successfully created and queued for Zone A. However, there was an issue assigning this task to a worker due to a failure in updating the work queue entry. FL-07 is technically dispatched to the zone but remains unassigned. **Next Steps:** Manually assign TASK_PICK_20251207_131246 or investigate the work queue update error. Consider reviewing worker availability in Zone A to ensure efficient task allocation.\", 'recommendations': ['Manually assign TASK_PICK_20251207_131246 to an available worker in Zone A', \"Investigate and resolve the 'Failed to update work queue entry' error to prevent future assignment issues\"], 'confidence': 0.7, 'actions_taken': [{'action': 'create_task', 'details': 'Successfully created TASK_PICK_20251207_131246 for pick operations in Zone A'}, {'action': 'assign_task', 'details': 'Failed to assign TASK_PICK_20251207_131246 due to work queue update error'}]}",
+              "All 2 tools succeeded - setting confidence to 0.95",
+              "Final confidence: 0.95 (LLM: 0.70, Calculated: 0.95)"
+            ]
+          },
+          "tool_discovery": {
+            "count": 1,
+            "examples": [
+              "Discovered 4 tools for intent 'task_assignment': ['create_task', 'assign_task', 'get_task_status', 'get_workforce_status']"
+            ]
+          }
+        },
+        "insights": [
+          "Tool executions detected: 9 operations",
+          "\u26a0\ufe0f Errors detected: 4 occurrences",
+          "LLM calls made: 2 requests",
+          "Cache operations: 2 hits/misses"
+        ],
+        "recommendations": []
+      },
+      "timestamp": "2025-12-07T13:12:55.950417"
+    },
+    {
+      "agent": "operations",
+      "query": "What's the status of task TASK_PICK_20251206_155737?",
+      "processing_time_seconds": 9.958304,
+      "response": {
+        "natural_language": "Upon reviewing the task status for TASK_PICK_20251206_155737, I found that the latest attempt to assign this task failed due to an error updating the work queue entry. Notably, around the same time, a...",
+        "confidence": 0.95,
+        "response_type": "task_info",
+        "recommendations_count": 2,
+        "actions_taken_count": 2,
+        "tools_used": [
+          "d81a7b36-ef3f-4a87-92a2-65e2155a5b21",
+          "f3ab79fa-a588-4082-a311-a781a8677d00"
+        ],
+        "tools_used_count": 2
+      },
+      "validation": {
+        "is_valid": true,
+        "score": 1.0,
+        "issues": [],
+        "warnings": [],
+        "suggestions": [
+          "Consider including specific IDs, names, or numbers for clarity"
+        ]
+      },
+      "log_analysis": {
+        "total_log_lines": 69,
+        "patterns": {
+          "routing": {
+            "count": 0,
+            "examples": []
+          },
+          "tool_execution": {
+            "count": 8,
+            "examples": [
+              "Executing 2 tools for intent 'task_assignment': ['create_task', 'assign_task']",
+              "Executing MCP tool: create_task with arguments: {'task_type': 'pick', 'sku': 'GENERAL', 'quantity': 1, 'priority': 'medium', 'zone': 'Zone A'}",
+              "Executing MCP tool: assign_task with arguments: {'task_id': 'TASK_PICK_20251206_155737', 'worker_id': None}"
+            ]
+          },
+          "llm_calls": {
+            "count": 2,
+            "examples": [
+              "LLM generation attempt 1/3",
+              "LLM generation attempt 1/3"
+            ]
+          },
+          "validation": {
+            "count": 2,
+            "examples": [
+              "Response validation passed (score: 0.81)",
+              "Validation suggestions: ['Consider including specific IDs, names, or numbers for clarity']"
+            ]
+          },
+          "errors": {
+            "count": 2,
+            "examples": [
+              "Tool f3ab79fa-a588-4082-a311-a781a8677d00 (assign_task): {'success': False, 'task_id': 'TASK_PICK_20251206_155737', 'worker_id': None, 'error': 'Failed to update work queue entry'}",
+              "Successfully parsed LLM response: {'response_type': 'task_info', 'data': {'task_id': 'TASK_PICK_20251206_155737', 'status': 'Assignment Failed', 'error': 'Failed to update work queue entry', 'additional_context': {'recently_created_task': {'task_id': 'TASK_PICK_20251207_131257', 'task_type': 'pick', 'status': 'queued', 'zone': 'Zone A', 'priority': 'medium'}}}, 'natural_language': 'Upon reviewing the task status for TASK_PICK_20251206_155737, I found that the latest attempt to assign this task failed due to an error updating the work queue entry. Notably, around the same time, a new pick task (TASK_PICK_20251207_131257) was successfully created for Zone A with a medium priority and is currently queued. This new task might be a priority to address the backlog. I recommend checking the work queue for any configuration issues and re-attempting the assignment for TASK_PICK_20251206_155737 once resolved.', 'recommendations': ['Investigate and resolve the work queue update error to facilitate task assignment.', 'Consider prioritizing the newly created TASK_PICK_20251207_131257 if it aligns with current operational needs.'], 'confidence': 0.7, 'actions_taken': [{'action': 'task_status_query', 'details': 'Retrieved status for TASK_PICK_20251206_155737 with assignment error.'}, {'action': 'note_recent_task_creation', 'details': 'Acknowledged successful creation of TASK_PICK_20251207_131257.'}]}"
+            ]
+          },
+          "warnings": {
+            "count": 0,
+            "examples": []
+          },
+          "timeouts": {
+            "count": 0,
+            "examples": []
+          },
+          "cache": {
+            "count": 2,
+            "examples": [
+              "Cached LLM response (key: d2754ec6e96884c0..., TTL: 300s)",
+              "Cached LLM response (key: 67d58727572ad6d3..., TTL: 300s)"
+            ]
+          },
+          "confidence": {
+            "count": 3,
+            "examples": [
+              "Successfully parsed LLM response: {'response_type': 'task_info', 'data': {'task_id': 'TASK_PICK_20251206_155737', 'status': 'Assignment Failed', 'error': 'Failed to update work queue entry', 'additional_context': {'recently_created_task': {'task_id': 'TASK_PICK_20251207_131257', 'task_type': 'pick', 'status': 'queued', 'zone': 'Zone A', 'priority': 'medium'}}}, 'natural_language': 'Upon reviewing the task status for TASK_PICK_20251206_155737, I found that the latest attempt to assign this task failed due to an error updating the work queue entry. Notably, around the same time, a new pick task (TASK_PICK_20251207_131257) was successfully created for Zone A with a medium priority and is currently queued. This new task might be a priority to address the backlog. I recommend checking the work queue for any configuration issues and re-attempting the assignment for TASK_PICK_20251206_155737 once resolved.', 'recommendations': ['Investigate and resolve the work queue update error to facilitate task assignment.', 'Consider prioritizing the newly created TASK_PICK_20251207_131257 if it aligns with current operational needs.'], 'confidence': 0.7, 'actions_taken': [{'action': 'task_status_query', 'details': 'Retrieved status for TASK_PICK_20251206_155737 with assignment error.'}, {'action': 'note_recent_task_creation', 'details': 'Acknowledged successful creation of TASK_PICK_20251207_131257.'}]}",
+              "All 2 tools succeeded - setting confidence to 0.95",
+              "Final confidence: 0.95 (LLM: 0.70, Calculated: 0.95)"
+            ]
+          },
+          "tool_discovery": {
+            "count": 7,
+            "examples": [
+              "Discovered 4 tools for intent 'task_assignment': ['create_task', 'assign_task', 'get_task_status', 'get_workforce_status']",
+              "Discovered 4 tools from source 'operations_action_tools'",
+              "Tool discovery completed: 4 tools discovered from 1 sources"
+            ]
+          }
+        },
+        "insights": [
+          "Tool executions detected: 8 operations",
+          "\u26a0\ufe0f Errors detected: 2 occurrences",
+          "LLM calls made: 2 requests",
+          "Cache operations: 2 hits/misses"
+        ],
+        "recommendations": []
+      },
+      "timestamp": "2025-12-07T13:13:06.917180"
+    },
+    {
+      "agent": "operations",
+      "query": "Show me all available workers in Zone B",
+      "processing_time_seconds": 9.795482,
+      "response": {
+        "natural_language": "Upon reviewing Zone B's workforce, I found that there are currently **0 active workers** assigned to this zone. Recently, a pick task (TASK_PICK_20251207_131308) was created for Zone B with a medium p...",
+        "confidence": 0.95,
+        "response_type": "workforce_info",
+        "recommendations_count": 3,
+        "actions_taken_count": 3,
+        "tools_used": [
+          "d81a7b36-ef3f-4a87-92a2-65e2155a5b21",
+          "be0a5c18-5868-4bd8-8291-90388e243378",
+          "f3ab79fa-a588-4082-a311-a781a8677d00"
+        ],
+        "tools_used_count": 3
+      },
+      "validation": {
+        "is_valid": true,
+        "score": 1.0,
+        "issues": [],
+        "warnings": [],
+        "suggestions": []
+      },
+      "log_analysis": {
+        "total_log_lines": 49,
+        "patterns": {
+          "routing": {
+            "count": 0,
+            "examples": []
+          },
+          "tool_execution": {
+            "count": 10,
+            "examples": [
+              "Executing 3 tools for intent 'workforce_management': ['create_task', 'assign_task', 'get_task_status']",
+              "Executing MCP tool: create_task with arguments: {'task_type': 'pick', 'sku': 'GENERAL', 'quantity': 1, 'priority': 'medium', 'zone': 'B'}",
+              "Executing MCP tool: get_task_status with arguments: {}"
+            ]
+          },
+          "llm_calls": {
+            "count": 2,
+            "examples": [
+              "LLM generation attempt 1/3",
+              "LLM generation attempt 1/3"
+            ]
+          },
+          "validation": {
+            "count": 1,
+            "examples": [
+              "Response validation passed (score: 0.81)"
+            ]
+          },
+          "errors": {
+            "count": 1,
+            "examples": [
+              "Tool f3ab79fa-a588-4082-a311-a781a8677d00 (assign_task): {'success': False, 'task_id': 'TASK_PICK_20251207_131308', 'worker_id': None, 'error': 'Failed to update work queue entry'}"
+            ]
+          },
+          "warnings": {
+            "count": 0,
+            "examples": []
+          },
+          "timeouts": {
+            "count": 0,
+            "examples": []
+          },
+          "cache": {
+            "count": 2,
+            "examples": [
+              "Cached LLM response (key: cc23b692759d6809..., TTL: 300s)",
+              "Cached LLM response (key: 04f0b17265894fb2..., TTL: 300s)"
+            ]
+          },
+          "confidence": {
+            "count": 3,
+            "examples": [
+              "Successfully parsed LLM response: {'response_type': 'workforce_info', 'data': {'total_active_workers': 0, 'shifts': {'note': 'No active workers found in Zone B'}, 'productivity_metrics': {'note': 'Insufficient data for productivity metrics due to lack of active workers'}}, 'natural_language': \"Upon reviewing Zone B's workforce, I found that there are currently **0 active workers** assigned to this zone. Recently, a pick task (TASK_PICK_20251207_131308) was created for Zone B with a medium priority, but unfortunately, the subsequent attempt to assign this task to a worker **failed** due to an error updating the work queue entry. This indicates a potential issue with task assignment processes in Zone B. I recommend verifying the work queue integrity and ensuring adequate staffing for Zone B to prevent operational bottlenecks.\", 'recommendations': ['Verify and resolve the work queue update error to ensure smooth task assignment.', 'Review staffing allocations to ensure Zone B has sufficient workers assigned, especially considering the newly created task.', 'Consider temporary reallocation of workers from other zones if feasible, based on current workload demands.'], 'confidence': 0.3, 'actions_taken': [{'action': 'Task Creation', 'details': 'TASK_PICK_20251207_131308 created in Zone B (Status: Queued, Priority: Medium)'}, {'action': 'Task Assignment Attempt', 'details': 'Assignment of TASK_PICK_20251207_131308 failed due to work queue update error'}, {'action': 'Workforce Query for Zone B', 'details': '0 Active Workers Found'}]}",
+              "All 3 tools succeeded - setting confidence to 0.95",
+              "Final confidence: 0.95 (LLM: 0.30, Calculated: 0.95)"
+            ]
+          },
+          "tool_discovery": {
+            "count": 1,
+            "examples": [
+              "Discovered 8 tools for intent 'workforce_management': ['create_task', 'assign_task', 'get_task_status', 'get_workforce_status', 'create_task']"
+            ]
+          }
+        },
+        "insights": [
+          "Tool executions detected: 10 operations",
+          "\u26a0\ufe0f Errors detected: 1 occurrences",
+          "LLM calls made: 2 requests",
+          "Cache operations: 2 hits/misses"
+        ],
+        "recommendations": []
+      },
+      "timestamp": "2025-12-07T13:13:17.717814"
+    },
+    {
+      "agent": "equipment",
+      "query": "What's the status of our forklift fleet?",
+      "processing_time_seconds": 22.309553,
+      "response": {
+        "natural_language": "We currently have a forklift fleet of three units, each with distinct statuses affecting immediate availability. FL-01, a Toyota 8FGU25 located in Zone A, is available for use. Conversely, FL-02, an i...",
+        "confidence": 0.95,
+        "response_type": "equipment_info",
+        "recommendations_count": 3,
+        "actions_taken_count": 0,
+        "tools_used": [
+          "b0917fdf-d555-47c0-9d27-3809999cfca2",
+          "e78a263c-c630-49a8-8984-6587d3190696",
+          "fbd9a04f-bba2-462a-8ccf-8df6fce6420f"
+        ],
+        "tools_used_count": 3
+      },
+      "validation": {
+        "is_valid": true,
+        "score": 1.0,
+        "issues": [],
+        "warnings": [],
+        "suggestions": []
+      },
+      "log_analysis": {
+        "total_log_lines": 136,
+        "patterns": {
+          "routing": {
+            "count": 0,
+            "examples": []
+          },
+          "tool_execution": {
+            "count": 5,
+            "examples": [
+              "Executing MCP tool: get_equipment_status (attempt 1/3) with arguments: {'equipment_type': 'forklift'}",
+              "Executing MCP tool: assign_equipment (attempt 1/3) with arguments: {}",
+              "Executing MCP tool: get_equipment_utilization (attempt 1/3) with arguments: {'equipment_type': 'forklift'}"
+            ]
+          },
+          "llm_calls": {
+            "count": 3,
+            "examples": [
+              "LLM generation attempt 1/3",
+              "LLM generation attempt 1/3",
+              "LLM generation attempt 1/3"
+            ]
+          },
+          "validation": {
+            "count": 1,
+            "examples": [
+              "Response validation passed (score: 0.90)"
+            ]
+          },
+          "errors": {
+            "count": 0,
+            "examples": []
+          },
+          "warnings": {
+            "count": 0,
+            "examples": []
+          },
+          "timeouts": {
+            "count": 0,
+            "examples": []
+          },
+          "cache": {
+            "count": 3,
+            "examples": [
+              "Cached LLM response (key: 6e09ba117f864dbd..., TTL: 300s)",
+              "Cached LLM response (key: 0db7559f506824d2..., TTL: 300s)",
+              "Cached LLM response (key: 6cbdeee0bbe78ea9..., TTL: 300s)"
+            ]
+          },
+          "confidence": {
+            "count": 2,
+            "examples": [
+              "All 3 tools succeeded - setting confidence to 0.95",
+              "Final confidence: 0.95 (LLM: 0.70, Calculated: 0.95)"
+            ]
+          },
+          "tool_discovery": {
+            "count": 7,
+            "examples": [
+              "Discovered 6 tools for query: What's the status of our forklift fleet?, intent: equipment_lookup",
+              "Discovered 4 tools from source 'operations_action_tools'",
+              "Tool discovery completed: 4 tools discovered from 1 sources"
+            ]
+          }
+        },
+        "insights": [
+          "Tool executions detected: 5 operations",
+          "\u2705 No errors detected in logs",
+          "LLM calls made: 3 requests",
+          "Cache operations: 3 hits/misses"
+        ],
+        "recommendations": []
+      },
+      "timestamp": "2025-12-07T13:13:41.037320"
+    },
+    {
+      "agent": "equipment",
+      "query": "Show me all available forklifts in Zone A",
+      "processing_time_seconds": 6.931763,
+      "response": {
+        "natural_language": "After reviewing the current equipment status in Zone A, I couldn't find any forklifts available for assignment. The query returned zero results for forklifts in this zone, indicating all potentially a...",
+        "confidence": 0.95,
+        "response_type": "availability_status",
+        "recommendations_count": 3,
+        "actions_taken_count": 2,
+        "tools_used": [
+          "b0917fdf-d555-47c0-9d27-3809999cfca2",
+          "e78a263c-c630-49a8-8984-6587d3190696",
+          "fbd9a04f-bba2-462a-8ccf-8df6fce6420f"
+        ],
+        "tools_used_count": 3
+      },
+      "validation": {
+        "is_valid": true,
+        "score": 1.0,
+        "issues": [],
+        "warnings": [],
+        "suggestions": []
+      },
+      "log_analysis": {
+        "total_log_lines": 35,
+        "patterns": {
+          "routing": {
+            "count": 0,
+            "examples": []
+          },
+          "tool_execution": {
+            "count": 5,
+            "examples": [
+              "Executing MCP tool: get_equipment_status (attempt 1/3) with arguments: {'equipment_type': 'forklift', 'zone': 'A'}",
+              "Executing MCP tool: assign_equipment (attempt 1/3) with arguments: {}",
+              "Executing MCP tool: get_equipment_utilization (attempt 1/3) with arguments: {'equipment_type': 'forklift'}"
+            ]
+          },
+          "llm_calls": {
+            "count": 1,
+            "examples": [
+              "LLM generation attempt 1/3"
+            ]
+          },
+          "validation": {
+            "count": 1,
+            "examples": [
+              "Response validation passed (score: 1.00)"
+            ]
+          },
+          "errors": {
+            "count": 0,
+            "examples": []
+          },
+          "warnings": {
+            "count": 0,
+            "examples": []
+          },
+          "timeouts": {
+            "count": 0,
+            "examples": []
+          },
+          "cache": {
+            "count": 1,
+            "examples": [
+              "Cached LLM response (key: de37db84ab5a1554..., TTL: 300s)"
+            ]
+          },
+          "confidence": {
+            "count": 2,
+            "examples": [
+              "All 3 tools succeeded - setting confidence to 0.95",
+              "Final confidence: 0.95 (LLM: 0.95, Calculated: 0.95)"
+            ]
+          },
+          "tool_discovery": {
+            "count": 1,
+            "examples": [
+              "Discovered 9 tools for query: Show me all available forklifts in Zone A, intent: equipment_availability"
+            ]
+          }
+        },
+        "insights": [
+          "Tool executions detected: 5 operations",
+          "\u2705 No errors detected in logs",
+          "LLM calls made: 1 requests",
+          "Cache operations: 1 hits/misses"
+        ],
+        "recommendations": []
+      },
+      "timestamp": "2025-12-07T13:13:48.973763"
+    },
+    {
+      "agent": "equipment",
+      "query": "When is FL-01 due for maintenance?",
+      "processing_time_seconds": 16.737826,
+      "response": {
+        "natural_language": "FL-01, our forklift in question, currently has no scheduled maintenance on the horizon, at least not within the next 30 days. This \"No Scheduled Maintenance\" status is somewhat unusual given our typic...",
+        "confidence": 0.95,
+        "response_type": "equipment_info",
+        "recommendations_count": 3,
+        "actions_taken_count": 0,
+        "tools_used": [
+          "5dafff96-2bb8-4b45-ac9a-dc90f97711ae",
+          "929f3ec4-f668-411a-a7be-3d8aba0f83cb",
+          "ddce5161-c1d9-45b6-af96-bb6039d125fb"
+        ],
+        "tools_used_count": 3
+      },
+      "validation": {
+        "is_valid": true,
+        "score": 1.0,
+        "issues": [],
+        "warnings": [],
+        "suggestions": []
+      },
+      "log_analysis": {
+        "total_log_lines": 112,
+        "patterns": {
+          "routing": {
+            "count": 0,
+            "examples": []
+          },
+          "tool_execution": {
+            "count": 5,
+            "examples": [
+              "Executing MCP tool: get_maintenance_schedule (attempt 1/3) with arguments: {'asset_id': 'FL-01'}",
+              "Executing MCP tool: get_maintenance_schedule (attempt 1/3) with arguments: {'asset_id': 'FL-01'}",
+              "Executing MCP tool: get_maintenance_schedule (attempt 1/3) with arguments: {'asset_id': 'FL-01'}"
+            ]
+          },
+          "llm_calls": {
+            "count": 3,
+            "examples": [
+              "LLM generation attempt 1/3",
+              "LLM generation attempt 1/3",
+              "LLM generation attempt 1/3"
+            ]
+          },
+          "validation": {
+            "count": 1,
+            "examples": [
+              "Response validation passed (score: 0.90)"
+            ]
+          },
+          "errors": {
+            "count": 0,
+            "examples": []
+          },
+          "warnings": {
+            "count": 0,
+            "examples": []
+          },
+          "timeouts": {
+            "count": 0,
+            "examples": []
+          },
+          "cache": {
+            "count": 3,
+            "examples": [
+              "Cached LLM response (key: 5470d8f74bc55d95..., TTL: 300s)",
+              "Cached LLM response (key: 3cc4f5981a811e3f..., TTL: 300s)",
+              "Cached LLM response (key: 7a0e04ec765cb34d..., TTL: 300s)"
+            ]
+          },
+          "confidence": {
+            "count": 2,
+            "examples": [
+              "All 3 tools succeeded - setting confidence to 0.95",
+              "Final confidence: 0.95 (LLM: 0.70, Calculated: 0.95)"
+            ]
+          },
+          "tool_discovery": {
+            "count": 7,
+            "examples": [
+              "Discovered 3 tools for query: When is FL-01 due for maintenance?, intent: equipment_maintenance",
+              "Discovered 4 tools from source 'operations_action_tools'",
+              "Tool discovery completed: 4 tools discovered from 1 sources"
+            ]
+          }
+        },
+        "insights": [
+          "Tool executions detected: 5 operations",
+          "\u2705 No errors detected in logs",
+          "LLM calls made: 3 requests",
+          "Cache operations: 3 hits/misses"
+        ],
+        "recommendations": []
+      },
+      "timestamp": "2025-12-07T13:14:06.721722"
+    },
+    {
+      "agent": "equipment",
+      "query": "What equipment is currently in maintenance?",
+      "processing_time_seconds": 20.600449,
+      "response": {
+        "natural_language": "We currently have four pieces of equipment undergoing maintenance across different zones. Specifically, CHG-01, a charger located at the Charging Station, is out of commission. Over at the Loading Doc...",
+        "confidence": 0.95,
+        "response_type": "equipment_info",
+        "recommendations_count": 3,
+        "actions_taken_count": 0,
+        "tools_used": [
+          "5dafff96-2bb8-4b45-ac9a-dc90f97711ae",
+          "929f3ec4-f668-411a-a7be-3d8aba0f83cb",
+          "ddce5161-c1d9-45b6-af96-bb6039d125fb"
+        ],
+        "tools_used_count": 3
+      },
+      "validation": {
+        "is_valid": true,
+        "score": 1.0,
+        "issues": [],
+        "warnings": [],
+        "suggestions": []
+      },
+      "log_analysis": {
+        "total_log_lines": 118,
+        "patterns": {
+          "routing": {
+            "count": 0,
+            "examples": []
+          },
+          "tool_execution": {
+            "count": 5,
+            "examples": [
+              "Executing MCP tool: get_maintenance_schedule (attempt 1/3) with arguments: {}",
+              "Executing MCP tool: get_maintenance_schedule (attempt 1/3) with arguments: {}",
+              "Executing MCP tool: get_maintenance_schedule (attempt 1/3) with arguments: {}"
+            ]
+          },
+          "llm_calls": {
+            "count": 4,
+            "examples": [
+              "LLM generation attempt 1/3",
+              "LLM generation attempt 1/3",
+              "LLM generation attempt 1/3"
+            ]
+          },
+          "validation": {
+            "count": 1,
+            "examples": [
+              "Response validation passed (score: 0.90)"
+            ]
+          },
+          "errors": {
+            "count": 0,
+            "examples": []
+          },
+          "warnings": {
+            "count": 0,
+            "examples": []
+          },
+          "timeouts": {
+            "count": 0,
+            "examples": []
+          },
+          "cache": {
+            "count": 4,
+            "examples": [
+              "Cached LLM response (key: 6849dc22830688b8..., TTL: 300s)",
+              "Cached LLM response (key: 497ed04dbb66c4db..., TTL: 300s)",
+              "Cached LLM response (key: 100be2708153ad0b..., TTL: 300s)"
+            ]
+          },
+          "confidence": {
+            "count": 2,
+            "examples": [
+              "All 3 tools succeeded - setting confidence to 0.95",
+              "Final confidence: 0.95 (LLM: 0.70, Calculated: 0.95)"
+            ]
+          },
+          "tool_discovery": {
+            "count": 1,
+            "examples": [
+              "Discovered 4 tools for query: What equipment is currently in maintenance?, intent: equipment_maintenance"
+            ]
+          }
+        },
+        "insights": [
+          "Tool executions detected: 5 operations",
+          "\u2705 No errors detected in logs",
+          "LLM calls made: 4 requests",
+          "Cache operations: 4 hits/misses"
+        ],
+        "recommendations": []
+      },
+      "timestamp": "2025-12-07T13:14:28.333180"
+    },
+    {
+      "agent": "safety",
+      "query": "What are the forklift operations safety procedures?",
+      "processing_time_seconds": 20.871229,
+      "response": {
+        "natural_language": "Forklift operations require adherence to our comprehensive **Forklift Operations Safety Procedure (POL-SAF-001)**, grounded in OSHA's regulatory framework (29 CFR 1910.178). At the core of this policy...",
+        "confidence": 0.7,
+        "response_type": "safety_info",
+        "recommendations_count": 3,
+        "actions_taken_count": 0,
+        "tools_used": [],
+        "tools_used_count": 0
+      },
+      "validation": {
+        "is_valid": true,
+        "score": 0.9,
+        "issues": [],
+        "warnings": [
+          "Response lacks specific action/status keywords"
+        ],
+        "suggestions": []
+      },
+      "log_analysis": {
+        "total_log_lines": 71,
+        "patterns": {
+          "routing": {
+            "count": 0,
+            "examples": []
+          },
+          "tool_execution": {
+            "count": 0,
+            "examples": []
+          },
+          "llm_calls": {
+            "count": 3,
+            "examples": [
+              "LLM generation attempt 1/3",
+              "LLM generation attempt 1/3",
+              "LLM generation attempt 1/3"
+            ]
+          },
+          "validation": {
+            "count": 1,
+            "examples": [
+              "Response validation passed (score: 0.90)"
+            ]
+          },
+          "errors": {
+            "count": 0,
+            "examples": []
+          },
+          "warnings": {
+            "count": 0,
+            "examples": []
+          },
+          "timeouts": {
+            "count": 0,
+            "examples": []
+          },
+          "cache": {
+            "count": 3,
+            "examples": [
+              "Cached LLM response (key: 3e8ac77a0666e4d4..., TTL: 300s)",
+              "Cached LLM response (key: ac994266316db97f..., TTL: 300s)",
+              "Cached LLM response (key: 2e2f692cf33b1768..., TTL: 300s)"
+            ]
+          },
+          "confidence": {
+            "count": 1,
+            "examples": [
+              "Final confidence: 0.70 (LLM: 0.70, Calculated: 0.70)"
+            ]
+          },
+          "tool_discovery": {
+            "count": 6,
+            "examples": [
+              "Discovered 4 tools from source 'operations_action_tools'",
+              "Tool discovery completed: 4 tools discovered from 1 sources",
+              "Discovered 4 tools from source 'equipment_asset_tools'"
+            ]
+          }
+        },
+        "insights": [
+          "\u2705 No errors detected in logs",
+          "LLM calls made: 3 requests",
+          "Cache operations: 3 hits/misses"
+        ],
+        "recommendations": [
+          {
+            "priority": "low",
+            "category": "tool_usage",
+            "message": "No tool executions detected. Verify tool discovery and execution is working.",
+            "action": "Check tool discovery service and ensure tools are being called"
+          }
+        ]
+      },
+      "timestamp": "2025-12-07T13:14:50.212735"
+    },
+    {
+      "agent": "safety",
+      "query": "Report a machine over-temp event at Dock D2",
+      "processing_time_seconds": 22.979382,
+      "response": {
+        "natural_language": "A high-severity incident (INC_20251207_131453) has been logged at Dock D2 due to a machine over-temperature event. This incident automatically triggers **POL-EMER-002 (Emergency Response for Equipment...",
+        "confidence": 0.95,
+        "response_type": "safety_info",
+        "recommendations_count": 4,
+        "actions_taken_count": 3,
+        "tools_used": [
+          "45f9b465-cb16-4e72-a47a-dffbc3e009ee",
+          "72a35b5a-8322-4f77-903a-f699383186a0",
+          "37194bd7-252d-4374-b773-c431a2f0f467"
+        ],
+        "tools_used_count": 3
+      },
+      "validation": {
+        "is_valid": true,
+        "score": 1.0,
+        "issues": [],
+        "warnings": [],
+        "suggestions": []
+      },
+      "log_analysis": {
+        "total_log_lines": 93,
+        "patterns": {
+          "routing": {
+            "count": 0,
+            "examples": []
+          },
+          "tool_execution": {
+            "count": 4,
+            "examples": [
+              "Executing MCP tool: log_incident with arguments: {'severity': 'high', 'description': 'machine over-temp event at Dock D2', 'location': 'Dock D2', 'reporter': 'user'}",
+              "Executing MCP tool: start_checklist with arguments: {'checklist_type': 'general_safety', 'assignee': 'Safety Team'}",
+              "Executing MCP tool: broadcast_alert with arguments: {'message': 'Immediate Attention: Machine Over-Temp at Dock D2 - Area Caution Advised'}"
+            ]
+          },
+          "llm_calls": {
+            "count": 4,
+            "examples": [
+              "LLM generation attempt 1/3",
+              "LLM generation attempt 1/3",
+              "LLM generation attempt 1/3"
+            ]
+          },
+          "validation": {
+            "count": 1,
+            "examples": [
+              "Response validation passed (score: 0.90)"
+            ]
+          },
+          "errors": {
+            "count": 0,
+            "examples": []
+          },
+          "warnings": {
+            "count": 0,
+            "examples": []
+          },
+          "timeouts": {
+            "count": 0,
+            "examples": []
+          },
+          "cache": {
+            "count": 4,
+            "examples": [
+              "Cached LLM response (key: afc54ab747310fde..., TTL: 300s)",
+              "Cached LLM response (key: 3a31af5f11c23875..., TTL: 300s)",
+              "Cached LLM response (key: 0e4f7119ec2eec01..., TTL: 300s)"
+            ]
+          },
+          "confidence": {
+            "count": 2,
+            "examples": [
+              "All 3 tools succeeded - setting confidence to 0.95",
+              "Final confidence: 0.95 (LLM: 0.70, Calculated: 0.95)"
+            ]
+          },
+          "tool_discovery": {
+            "count": 6,
+            "examples": [
+              "Discovered 4 tools from source 'operations_action_tools'",
+              "Tool discovery completed: 4 tools discovered from 1 sources",
+              "Discovered 4 tools from source 'equipment_asset_tools'"
+            ]
+          }
+        },
+        "insights": [
+          "Tool executions detected: 4 operations",
+          "\u2705 No errors detected in logs",
+          "LLM calls made: 4 requests",
+          "Cache operations: 4 hits/misses"
+        ],
+        "recommendations": []
+      },
+      "timestamp": "2025-12-07T13:15:14.202465"
+    },
+    {
+      "agent": "safety",
+      "query": "What safety incidents have occurred today?",
+      "processing_time_seconds": 22.026721,
+      "response": {
+        "natural_language": "A quick review of today's safety logs shows that, surprisingly, there's only one incident logged so far, and it's somewhat meta - it's actually a record of your query about today's safety incidents, l...",
+        "confidence": 0.95,
+        "response_type": "safety_info",
+        "recommendations_count": 3,
+        "actions_taken_count": 3,
+        "tools_used": [
+          "45f9b465-cb16-4e72-a47a-dffbc3e009ee",
+          "72a35b5a-8322-4f77-903a-f699383186a0",
+          "37194bd7-252d-4374-b773-c431a2f0f467"
+        ],
+        "tools_used_count": 3
+      },
+      "validation": {
+        "is_valid": true,
+        "score": 1.0,
+        "issues": [],
+        "warnings": [],
+        "suggestions": []
+      },
+      "log_analysis": {
+        "total_log_lines": 93,
+        "patterns": {
+          "routing": {
+            "count": 0,
+            "examples": []
+          },
+          "tool_execution": {
+            "count": 4,
+            "examples": [
+              "Executing MCP tool: log_incident with arguments: {'severity': 'medium', 'description': 'What safety incidents have occurred today?', 'location': 'Unknown Location', 'reporter': 'user'}",
+              "Executing MCP tool: start_checklist with arguments: {'checklist_type': 'general_safety', 'assignee': 'Safety Team'}",
+              "Executing MCP tool: broadcast_alert with arguments: {'message': 'MEDIUM Severity Safety Alert at the facility: What safety incidents have occurred today?'}"
+            ]
+          },
+          "llm_calls": {
+            "count": 4,
+            "examples": [
+              "LLM generation attempt 1/3",
+              "LLM generation attempt 1/3",
+              "LLM generation attempt 1/3"
+            ]
+          },
+          "validation": {
+            "count": 1,
+            "examples": [
+              "Response validation passed (score: 0.90)"
+            ]
+          },
+          "errors": {
+            "count": 0,
+            "examples": []
+          },
+          "warnings": {
+            "count": 0,
+            "examples": []
+          },
+          "timeouts": {
+            "count": 0,
+            "examples": []
+          },
+          "cache": {
+            "count": 4,
+            "examples": [
+              "Cached LLM response (key: e0544028c77c4d3e..., TTL: 300s)",
+              "Cached LLM response (key: 192a8c2b72a8804a..., TTL: 300s)",
+              "Cached LLM response (key: 61a8203c98211cd0..., TTL: 300s)"
+            ]
+          },
+          "confidence": {
+            "count": 2,
+            "examples": [
+              "All 3 tools succeeded - setting confidence to 0.95",
+              "Final confidence: 0.95 (LLM: 0.70, Calculated: 0.95)"
+            ]
+          },
+          "tool_discovery": {
+            "count": 6,
+            "examples": [
+              "Discovered 4 tools from source 'operations_action_tools'",
+              "Tool discovery completed: 4 tools discovered from 1 sources",
+              "Discovered 4 tools from source 'equipment_asset_tools'"
+            ]
+          }
+        },
+        "insights": [
+          "Tool executions detected: 4 operations",
+          "\u2705 No errors detected in logs",
+          "LLM calls made: 4 requests",
+          "Cache operations: 4 hits/misses"
+        ],
+        "recommendations": []
+      },
+      "timestamp": "2025-12-07T13:15:37.238036"
+    },
+    {
+      "agent": "safety",
+      "query": "Show me the safety checklist for equipment maintenance",
+      "processing_time_seconds": 20.249731,
+      "response": {
+        "natural_language": "**Equipment Maintenance Safety Checklist Overview**\n\nWhen performing equipment maintenance in our warehouse, adherence to the **Equipment Maintenance Safety Checklist (POL-MAINT-002)** is mandatory to...",
+        "confidence": 0.7,
+        "response_type": "safety_info",
+        "recommendations_count": 3,
+        "actions_taken_count": 0,
+        "tools_used": [],
+        "tools_used_count": 0
+      },
+      "validation": {
+        "is_valid": true,
+        "score": 1.0,
+        "issues": [],
+        "warnings": [],
+        "suggestions": []
+      },
+      "log_analysis": {
+        "total_log_lines": 52,
+        "patterns": {
+          "routing": {
+            "count": 0,
+            "examples": []
+          },
+          "tool_execution": {
+            "count": 0,
+            "examples": []
+          },
+          "llm_calls": {
+            "count": 3,
+            "examples": [
+              "LLM generation attempt 1/3",
+              "LLM generation attempt 1/3",
+              "LLM generation attempt 1/3"
+            ]
+          },
+          "validation": {
+            "count": 1,
+            "examples": [
+              "Response validation passed (score: 1.00)"
+            ]
+          },
+          "errors": {
+            "count": 0,
+            "examples": []
+          },
+          "warnings": {
+            "count": 0,
+            "examples": []
+          },
+          "timeouts": {
+            "count": 0,
+            "examples": []
+          },
+          "cache": {
+            "count": 3,
+            "examples": [
+              "Cached LLM response (key: 24bc6831527d1c4e..., TTL: 300s)",
+              "Cached LLM response (key: d5af29d2efda8751..., TTL: 300s)",
+              "Cached LLM response (key: 8211636c07d43126..., TTL: 300s)"
+            ]
+          },
+          "confidence": {
+            "count": 1,
+            "examples": [
+              "Final confidence: 0.70 (LLM: 0.70, Calculated: 0.70)"
+            ]
+          },
+          "tool_discovery": {
+            "count": 0,
+            "examples": []
+          }
+        },
+        "insights": [
+          "\u2705 No errors detected in logs",
+          "LLM calls made: 3 requests",
+          "Cache operations: 3 hits/misses"
+        ],
+        "recommendations": [
+          {
+            "priority": "low",
+            "category": "tool_usage",
+            "message": "No tool executions detected. Verify tool discovery and execution is working.",
+            "action": "Check tool discovery service and ensure tools are being called"
+          }
+        ]
+      },
+      "timestamp": "2025-12-07T13:15:58.494413"
+    }
+  ],
+  "timestamp": "2025-12-07T13:15:59.495548"
+}

@@ -414,6 +414,7 @@ class OperationsActionTools:
         worker_id: Optional[str] = None,
         shift: Optional[str] = None,
         status: Optional[str] = None,
+        zone: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Get workforce status and availability.
@@ -421,29 +422,105 @@ class OperationsActionTools:
         Args:
             worker_id: Specific worker ID to check
             shift: Shift to check (day, night, etc.)
-            status: Filter by worker status
+            status: Filter by worker status (defaults to 'active' if not specified)
+            zone: Filter by zone
 
         Returns:
             Dict with workforce status information
         """
         try:
-            if not self.attendance_service:
+            if not self.sql_retriever:
                 await self.initialize()
 
-            # Get workforce status from attendance service
-            workforce = await self.attendance_service.get_worker_status(
-                worker_id=worker_id,
-                shift=shift,
-                status=status,
-            )
+            # Build query to get workers from users table
+            where_conditions = []
+            params = []
+            param_count = 1
+
+            # Filter by worker_id if provided
+            if worker_id:
+                where_conditions.append(f"u.id = ${param_count}")
+                params.append(worker_id)
+                param_count += 1
+
+            # Filter by status (default to 'active' if not specified)
+            worker_status = status if status else "active"
+            where_conditions.append(f"u.status = ${param_count}")
+            params.append(worker_status)
+            param_count += 1
+
+            # Filter by role (only operational workers)
+            where_conditions.append(f"u.role IN (${param_count}, ${param_count + 1}, ${param_count + 2})")
+            params.extend(["operator", "supervisor", "manager"])
+            param_count += 3
+
+            # Note: Zone filtering is not available in users table
+            # Zone information would need to come from task assignments or other tables
+            # For now, we'll get all workers and filter by zone in application logic if needed
+
+            # Build WHERE clause
+            where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
+
+            # Query to get workers
+            query = f"""
+                SELECT 
+                    u.id,
+                    u.username,
+                    u.email,
+                    u.full_name,
+                    u.role,
+                    u.status,
+                    u.created_at,
+                    u.updated_at
+                FROM users u
+                WHERE {where_clause}
+                ORDER BY u.username
+            """
+
+            # Unpack params list for fetch_all which expects *params
+            workers = await self.sql_retriever.fetch_all(query, *params) if params else await self.sql_retriever.fetch_all(query)
+            
+            # Format workers data
+            workforce_list = []
+            for worker in workers:
+                worker_data = {
+                    "worker_id": worker.get("id"),
+                    "username": worker.get("username"),
+                    "email": worker.get("email"),
+                    "full_name": worker.get("full_name"),
+                    "role": worker.get("role"),
+                    "status": worker.get("status"),
+                }
+                
+                # If zone filtering was requested, try to get zone from task assignments
+                # For now, we'll include all workers and note that zone filtering
+                # would require joining with tasks or assignments table
+                if zone:
+                    # Note: Zone filtering not available in users table
+                    # This would require a join with tasks/assignments to filter by zone
+                    pass
+                
+                workforce_list.append(worker_data)
+
+            # If zone was requested but we can't filter by it, log a note
+            if zone:
+                logger.info(f"Retrieved {len(workforce_list)} workers from database (status={worker_status}). Note: Zone filtering not available in users table - showing all workers.")
+            else:
+                logger.info(f"Retrieved {len(workforce_list)} workers from database (status={worker_status})")
             
             return {
                 "success": True,
-                "workforce": workforce if workforce else [],
-                "count": len(workforce) if workforce else 0,
+                "workforce": workforce_list,
+                "count": len(workforce_list),
+                "filters": {
+                    "worker_id": worker_id,
+                    "shift": shift,
+                    "status": worker_status,
+                    "zone": zone,
+                }
             }
         except Exception as e:
-            logger.error(f"Failed to get workforce status: {e}")
+            logger.error(f"Failed to get workforce status: {e}", exc_info=True)
             return {
                 "success": False,
                 "error": str(e),

@@ -60,17 +60,24 @@ class SemanticRouter:
                     name="operations",
                     description=(
                         "Queries about warehouse operations, daily tasks, work assignments, job lists, "
-                        "workforce management, employee shifts, pick waves, packing operations, putaway tasks, "
-                        "order fulfillment, scheduling, task assignments, productivity metrics, "
-                        "operational workflows, work queues, pending work, today's jobs, and operational planning. "
-                        "Examples: 'What tasks need to be done today?', 'Show me today's job list', "
-                        "'What work assignments are pending?', 'What operations are scheduled?'"
+                        "workforce management, employee shifts, workers, staff, team members, personnel, "
+                        "available workers, active workers, worker assignments, employee availability, "
+                        "headcount, staffing levels, worker status, employee status, team composition, "
+                        "pick waves, packing operations, putaway tasks, order fulfillment, scheduling, "
+                        "task assignments, productivity metrics, operational workflows, work queues, "
+                        "pending work, today's jobs, and operational planning. "
+                        "Examples: 'Show me all available workers in Zone B', 'What workers are available?', "
+                        "'How many employees are working?', 'What tasks need to be done today?', "
+                        "'Show me today's job list', 'What work assignments are pending?', "
+                        "'What operations are scheduled?', 'Who is working in Zone A?'"
                     ),
                     keywords=[
                         "task", "tasks", "work", "job", "jobs", "assignment", "assignments", "wave", "order",
-                        "workforce", "worker", "employee", "shift", "schedule", "pick", "pack", "putaway",
-                        "fulfillment", "operations", "pending", "queue", "today", "scheduled", "planning",
-                        "productivity", "workflow", "list", "show", "need", "done"
+                        "workforce", "worker", "workers", "employee", "employees", "staff", "team", "personnel",
+                        "available", "active", "headcount", "staffing", "shift", "schedule", "pick", "pack",
+                        "putaway", "fulfillment", "operations", "pending", "queue", "today", "scheduled",
+                        "planning", "productivity", "workflow", "list", "show", "need", "done", "who",
+                        "how many", "status", "composition", "assignments"
                     ]
                 ),
                 "inventory": IntentCategory(

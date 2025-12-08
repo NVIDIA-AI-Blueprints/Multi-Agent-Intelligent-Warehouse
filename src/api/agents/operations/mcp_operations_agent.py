@@ -123,6 +123,10 @@ class MCPOperationsCoordinationAgent:
             from src.api.services.mcp.adapters.operations_adapter import (
                 get_operations_adapter,
             )
+            # Import and register the equipment MCP adapter for equipment dispatch tools
+            from src.api.services.mcp.adapters.equipment_adapter import (
+                get_equipment_adapter,
+            )
 
             # Register the operations adapter as an MCP source
             operations_adapter = await get_operations_adapter()
@@ -130,7 +134,13 @@ class MCPOperationsCoordinationAgent:
                 "operations_action_tools", operations_adapter, "mcp_adapter"
             )
 
-            logger.info("MCP sources registered successfully")
+            # Register the equipment adapter as an MCP source for equipment dispatch
+            equipment_adapter = await get_equipment_adapter()
+            await self.tool_discovery.register_discovery_source(
+                "equipment_asset_tools", equipment_adapter, "mcp_adapter"
+            )
+
+            logger.info("MCP sources registered successfully (operations + equipment)")
         except Exception as e:
             logger.error(f"Failed to register MCP sources: {e}")
 
@@ -219,6 +229,13 @@ class MCPOperationsCoordinationAgent:
                 available_tools = await self._discover_relevant_tools(parsed_query)
                 parsed_query.mcp_tools = [tool.tool_id for tool in available_tools]
                 logger.info(f"Discovered {len(available_tools)} tools for intent '{parsed_query.intent}': {[tool.name for tool in available_tools[:5]]}")
+                # Log equipment tools specifically if dispatch is mentioned
+                if any(keyword in query.lower() for keyword in ["dispatch", "forklift", "equipment"]):
+                    equipment_tools_found = [t for t in available_tools if "equipment" in t.name.lower() or "dispatch" in t.name.lower()]
+                    if equipment_tools_found:
+                        logger.info(f"✅ Equipment tools discovered: {[t.name for t in equipment_tools_found]}")
+                    else:
+                        logger.warning(f"⚠️ No equipment tools found for dispatch query. All available tools: {[t.name for t in available_tools]}")
 
                 # Create tool execution plan
                 execution_plan = await self._create_tool_execution_plan(
@@ -227,6 +244,13 @@ class MCPOperationsCoordinationAgent:
                 parsed_query.tool_execution_plan = execution_plan
                 if execution_plan:
                     logger.info(f"Created execution plan with {len(execution_plan)} tools: {[step.get('tool_name') for step in execution_plan]}")
+                    # Log equipment tools in execution plan if dispatch is mentioned
+                    if any(keyword in query.lower() for keyword in ["dispatch", "forklift", "equipment"]):
+                        equipment_steps = [step for step in execution_plan if "equipment" in step.get('tool_name', '').lower() or "dispatch" in step.get('tool_name', '').lower()]
+                        if equipment_steps:
+                            logger.info(f"✅ Equipment tools in execution plan: {[step.get('tool_name') for step in equipment_steps]}")
+                        else:
+                            logger.warning(f"⚠️ No equipment tools in execution plan for dispatch query")
 
                 # Execute tools and gather results
                 if execution_plan:
@@ -306,7 +330,9 @@ Return only valid JSON.""",
             )
 
         except Exception as e:
-            logger.error(f"Error parsing operations query: {e}")
+            logger.error(f"Error parsing operations query: {e}", exc_info=True)
+            # Return default query structure on parse failure
+            # This allows the system to continue processing even if LLM parsing fails
             return MCPOperationsQuery(
                 intent="workforce_management", entities={}, context={}, user_query=query
             )
@@ -335,7 +361,7 @@ Return only valid JSON.""",
                 "performance_monitoring": ToolCategory.ANALYSIS,
                 "resource_allocation": ToolCategory.OPERATIONS,
                 "wave_creation": ToolCategory.OPERATIONS,
-                "equipment_dispatch": ToolCategory.OPERATIONS,
+                "equipment_dispatch": ToolCategory.OPERATIONS,  # Also search EQUIPMENT category
                 "order_management": ToolCategory.OPERATIONS,
             }
 
@@ -346,6 +372,14 @@ Return only valid JSON.""",
                 intent_category
             )
             relevant_tools.extend(category_tools)
+            
+            # For equipment_dispatch intent or dispatch keywords, also search EQUIPMENT category
+            if query.intent == "equipment_dispatch" or any(keyword in query.user_query.lower() for keyword in ["dispatch", "forklift", "equipment"]):
+                equipment_category_tools = await self.tool_discovery.get_tools_by_category(
+                    ToolCategory.EQUIPMENT
+                )
+                relevant_tools.extend(equipment_category_tools)
+                logger.info(f"Also searched EQUIPMENT category for dispatch query, found {len(equipment_category_tools)} tools")
 
             # Search by keywords
             for term in search_terms:
@@ -407,10 +441,72 @@ Return only valid JSON.""",
         """Create a plan for executing MCP tools."""
         try:
             execution_plan = []
+            query_lower = query.user_query.lower()
+
+            # Special handling for workforce/worker queries - prioritize get_workforce_status
+            workforce_keywords = ["worker", "workers", "workforce", "employee", "employees", "staff", "team", "personnel", "available workers", "show workers"]
+            is_workforce_query = (
+                query.intent == "workforce_management" or
+                any(keyword in query_lower for keyword in workforce_keywords)
+            )
+            
+            if is_workforce_query:
+                # Prioritize get_workforce_status tool for workforce queries
+                workforce_tool = next((t for t in tools if t.name == "get_workforce_status"), None)
+                if workforce_tool:
+                    execution_plan.append({
+                        "tool_id": workforce_tool.tool_id,
+                        "tool_name": workforce_tool.name,
+                        "arguments": self._prepare_tool_arguments(workforce_tool, query),
+                        "priority": 1,  # Highest priority
+                        "required": True,
+                    })
+                    logger.info(f"Added get_workforce_status tool to execution plan for workforce query")
+                else:
+                    logger.warning(f"get_workforce_status tool not found for workforce query")
+            
+            # Special handling for equipment dispatch queries - detect dispatch/forklift keywords
+            dispatch_keywords = ["dispatch", "dispatch a", "dispatch the", "send", "assign equipment", "forklift", "fork lift", "equipment"]
+            is_dispatch_query = (
+                query.intent == "equipment_dispatch" or
+                any(keyword in query_lower for keyword in dispatch_keywords)
+            )
+            
+            # If dispatch is mentioned, look for equipment tools
+            if is_dispatch_query:
+                # Look for assign_equipment or dispatch_equipment tools
+                equipment_tools = [t for t in tools if t.name in ["assign_equipment", "dispatch_equipment", "get_equipment_status"]]
+                if equipment_tools:
+                    # Add get_equipment_status first to find available equipment
+                    # This helps find available forklifts when no specific asset_id is provided
+                    status_tool = next((t for t in equipment_tools if t.name == "get_equipment_status"), None)
+                    if status_tool:
+                        execution_plan.append({
+                            "tool_id": status_tool.tool_id,
+                            "tool_name": status_tool.name,
+                            "arguments": self._prepare_tool_arguments(status_tool, query),
+                            "priority": 2,  # After wave creation, before assignment
+                            "required": False,
+                        })
+                        logger.info(f"Added get_equipment_status tool for dispatch query")
+                    
+                    # Add assign_equipment tool (this is the main dispatch action)
+                    dispatch_tool = next((t for t in equipment_tools if t.name in ["assign_equipment", "dispatch_equipment"]), None)
+                    if dispatch_tool:
+                        execution_plan.append({
+                            "tool_id": dispatch_tool.tool_id,
+                            "tool_name": dispatch_tool.name,
+                            "arguments": self._prepare_tool_arguments(dispatch_tool, query),
+                            "priority": 3,  # After equipment status check and task creation
+                            "required": False,
+                        })
+                        logger.info(f"Added {dispatch_tool.name} tool for dispatch query")
+                else:
+                    logger.warning(f"Equipment dispatch tools not found for dispatch query. Available tools: {[t.name for t in tools[:10]]}")
 
             # Create execution steps based on query intent
             intent_config = {
-                "workforce_management": (ToolCategory.OPERATIONS, 3),
+                "workforce_management": (ToolCategory.OPERATIONS, 2),  # Reduced since we already added get_workforce_status
                 "task_assignment": (ToolCategory.OPERATIONS, 2),
                 "kpi_analysis": (ToolCategory.ANALYSIS, 2),
                 "shift_planning": (ToolCategory.OPERATIONS, 3),
@@ -423,8 +519,16 @@ Return only valid JSON.""",
             category, limit = intent_config.get(
                 query.intent, (ToolCategory.OPERATIONS, 2)
             )
+            
+            # For workforce queries, exclude get_workforce_status from additional tools
+            # since we already added it above
+            tools_to_add = tools
+            if is_workforce_query:
+                tools_to_add = [t for t in tools if t.name != "get_workforce_status"]
+                limit = max(1, limit - 1)  # Reduce limit since we already added one tool
+            
             self._add_tools_to_execution_plan(
-                execution_plan, tools, category, limit, query
+                execution_plan, tools_to_add, category, limit, query
             )
 
             # Sort by priority
@@ -551,6 +655,63 @@ Return only valid JSON.""",
                 else:
                     # Will be assigned automatically if not specified
                     arguments[param_name] = None
+            # Intelligent parameter extraction for get_workforce_status
+            elif param_name == "worker_id" and tool.name == "get_workforce_status":
+                if "worker_id" in query.entities:
+                    arguments[param_name] = query.entities["worker_id"]
+                else:
+                    arguments[param_name] = None  # Get all workers if not specified
+            elif param_name == "shift" and tool.name == "get_workforce_status":
+                if "shift" in query.entities:
+                    arguments[param_name] = query.entities["shift"]
+                else:
+                    arguments[param_name] = None  # Get all shifts if not specified
+            elif param_name == "status" and tool.name == "get_workforce_status":
+                if "status" in query.entities:
+                    arguments[param_name] = query.entities["status"]
+                elif "available" in query_lower or "active" in query_lower:
+                    arguments[param_name] = "active"  # Default to active workers for availability queries
+                else:
+                    arguments[param_name] = None  # Get all statuses if not specified
+            # Intelligent parameter extraction for equipment dispatch tools
+            elif param_name == "asset_id" and tool.name in ["assign_equipment", "dispatch_equipment", "get_equipment_status"]:
+                if "asset_id" in query.entities:
+                    arguments[param_name] = query.entities["asset_id"]
+                elif "equipment_id" in query.entities:
+                    arguments[param_name] = query.entities["equipment_id"]
+                else:
+                    # Extract equipment ID from query (e.g., "FL-01", "forklift FL-07")
+                    import re
+                    equipment_match = re.search(r'\b([A-Z]{1,3}-?\d{1,3})\b', query.user_query, re.IGNORECASE)
+                    if equipment_match:
+                        arguments[param_name] = equipment_match.group(1).upper()
+                    else:
+                        arguments[param_name] = None  # Will need to find available equipment
+            elif param_name == "equipment_type" and tool.name in ["assign_equipment", "dispatch_equipment", "get_equipment_status"]:
+                if "equipment_type" in query.entities:
+                    arguments[param_name] = query.entities["equipment_type"]
+                elif "forklift" in query_lower or "fork lift" in query_lower:
+                    arguments[param_name] = "forklift"
+                else:
+                    arguments[param_name] = None
+            elif param_name == "zone" and tool.name in ["assign_equipment", "dispatch_equipment", "get_equipment_status"]:
+                if "zone" in query.entities:
+                    arguments[param_name] = query.entities["zone"]
+                else:
+                    # Extract zone from query
+                    import re
+                    zone_match = re.search(r'zone\s+([A-Za-z])', query_lower)
+                    if zone_match:
+                        arguments[param_name] = f"Zone {zone_match.group(1).upper()}"
+                    else:
+                        arguments[param_name] = None
+            elif param_name == "task_id" and tool.name in ["assign_equipment", "dispatch_equipment"]:
+                # For equipment dispatch, task_id will come from create_task result
+                # This will be handled by dependency extraction in tool execution
+                if "task_id" in query.entities:
+                    arguments[param_name] = query.entities["task_id"]
+                else:
+                    arguments[param_name] = None  # Will be extracted from create_task result
 
         return arguments
 
@@ -567,6 +728,8 @@ Return only valid JSON.""",
         # Define tool dependencies: tools that depend on other tools
         tool_dependencies = {
             "assign_task": ["create_task"],  # assign_task needs task_id from create_task
+            "assign_equipment": ["create_task", "get_equipment_status"],  # assign_equipment needs task_id and asset_id from equipment status
+            "dispatch_equipment": ["create_task", "get_equipment_status"],  # dispatch_equipment needs task_id and asset_id from equipment status
         }
 
         async def execute_single_tool(step: Dict[str, Any], previous_results: Dict[str, Any] = None) -> tuple:
@@ -580,19 +743,119 @@ Return only valid JSON.""",
                 dependencies = tool_dependencies[tool_name]
                 for dep_tool_name in dependencies:
                     # Find the result from the dependent tool
+                    dep_result = None
                     for prev_tool_id, prev_result in previous_results.items():
+                        # Match by tool_name stored in result_dict
                         if prev_result.get("tool_name") == dep_tool_name and prev_result.get("success"):
                             dep_result = prev_result.get("result", {})
-                            
-                            # Extract task_id from create_task result
-                            if dep_tool_name == "create_task" and tool_name == "assign_task":
-                                if isinstance(dep_result, dict):
-                                    task_id = dep_result.get("task_id") or dep_result.get("taskId")
-                                    if task_id and arguments.get("task_id") is None:
-                                        arguments["task_id"] = task_id
-                                        logger.info(f"Extracted task_id '{task_id}' from {dep_tool_name} result for {tool_name}")
-                            
+                            logger.debug(f"Found dependency result for {dep_tool_name}: {dep_result}")
                             break
+                    
+                    # If not found by tool_name, try to find by matching tool_id from execution plan
+                    if dep_result is None:
+                        # Look for any successful result that might be the dependency
+                        # This handles cases where tool_name might not match exactly
+                        for prev_tool_id, prev_result in previous_results.items():
+                            if prev_result.get("success"):
+                                candidate_result = prev_result.get("result", {})
+                                # Check if this result contains the data we need
+                                if isinstance(candidate_result, dict):
+                                    # For create_task -> assign_task/equipment dispatch dependency, look for task_id in result
+                                    if dep_tool_name == "create_task" and tool_name in ["assign_task", "assign_equipment", "dispatch_equipment"]:
+                                        if "task_id" in candidate_result or "taskId" in candidate_result:
+                                            dep_result = candidate_result
+                                            logger.info(f"Found create_task result by task_id presence: {candidate_result}")
+                                            break
+                                    # For get_equipment_status -> assign_equipment dependency, look for equipment list in result
+                                    if dep_tool_name == "get_equipment_status" and tool_name in ["assign_equipment", "dispatch_equipment"]:
+                                        # Check if result contains equipment list (could be in various formats)
+                                        if isinstance(candidate_result, dict):
+                                            has_equipment = (
+                                                "equipment" in candidate_result or
+                                                "assets" in candidate_result or
+                                                "items" in candidate_result or
+                                                "data" in candidate_result
+                                            )
+                                            if has_equipment:
+                                                dep_result = candidate_result
+                                                logger.info(f"Found get_equipment_status result with equipment data")
+                                                break
+                    
+                    # Extract task_id from create_task result
+                    if dep_result and dep_tool_name == "create_task" and tool_name in ["assign_task", "assign_equipment", "dispatch_equipment"]:
+                        if isinstance(dep_result, dict):
+                            # Try multiple possible keys for task_id
+                            task_id = (
+                                dep_result.get("task_id") or 
+                                dep_result.get("taskId") or 
+                                dep_result.get("id") or
+                                (dep_result.get("data", {}).get("task_id") if isinstance(dep_result.get("data"), dict) else None) or
+                                (dep_result.get("data", {}).get("taskId") if isinstance(dep_result.get("data"), dict) else None)
+                            )
+                            
+                            if task_id:
+                                # For assign_task and equipment dispatch tools, use task_id parameter
+                                if tool_name in ["assign_task", "assign_equipment", "dispatch_equipment"]:
+                                    if arguments.get("task_id") is None or arguments.get("task_id") == "None":
+                                        arguments["task_id"] = task_id
+                                        logger.info(f"✅ Extracted task_id '{task_id}' from {dep_tool_name} result for {tool_name}")
+                                    else:
+                                        logger.info(f"task_id already set to '{arguments.get('task_id')}', keeping existing value")
+                            else:
+                                logger.warning(f"⚠️ Could not extract task_id from {dep_tool_name} result: {dep_result}")
+                        else:
+                            logger.warning(f"⚠️ Dependency result for {dep_tool_name} is not a dict: {type(dep_result)}")
+                    
+                    # Extract asset_id from get_equipment_status result for equipment dispatch
+                    if dep_result and dep_tool_name == "get_equipment_status" and tool_name in ["assign_equipment", "dispatch_equipment"]:
+                        if isinstance(dep_result, dict):
+                            # Try to find available equipment in the result
+                            equipment_list = None
+                            
+                            # Check various possible structures
+                            if "equipment" in dep_result and isinstance(dep_result["equipment"], list):
+                                equipment_list = dep_result["equipment"]
+                            elif "assets" in dep_result and isinstance(dep_result["assets"], list):
+                                equipment_list = dep_result["assets"]
+                            elif "items" in dep_result and isinstance(dep_result["items"], list):
+                                equipment_list = dep_result["items"]
+                            elif "data" in dep_result and isinstance(dep_result["data"], dict):
+                                if "equipment" in dep_result["data"] and isinstance(dep_result["data"]["equipment"], list):
+                                    equipment_list = dep_result["data"]["equipment"]
+                                elif "assets" in dep_result["data"] and isinstance(dep_result["data"]["assets"], list):
+                                    equipment_list = dep_result["data"]["assets"]
+                            
+                            # Find first available forklift if equipment_type is forklift
+                            if equipment_list and arguments.get("asset_id") is None:
+                                equipment_type_filter = arguments.get("equipment_type", "").lower()
+                                for equipment in equipment_list:
+                                    if isinstance(equipment, dict):
+                                        # Check if equipment is available and matches type
+                                        status = equipment.get("status", "").lower()
+                                        eq_type = equipment.get("equipment_type", equipment.get("type", "")).lower()
+                                        asset_id = equipment.get("asset_id") or equipment.get("id") or equipment.get("equipment_id")
+                                        
+                                        # If looking for forklift, match forklift type; otherwise match any available
+                                        is_match = (
+                                            (equipment_type_filter == "forklift" and "forklift" in eq_type) or
+                                            (not equipment_type_filter or equipment_type_filter in eq_type) or
+                                            (not equipment_type_filter and eq_type)
+                                        )
+                                        
+                                        if is_match and status in ["available", "idle", "ready"] and asset_id:
+                                            arguments["asset_id"] = asset_id
+                                            logger.info(f"✅ Extracted asset_id '{asset_id}' from {dep_tool_name} result for {tool_name}")
+                                            break
+                                
+                                if arguments.get("asset_id") is None:
+                                    logger.warning(f"⚠️ Could not find available equipment matching criteria in {dep_tool_name} result")
+                            elif not equipment_list:
+                                logger.warning(f"⚠️ No equipment list found in {dep_tool_name} result: {list(dep_result.keys())}")
+                        else:
+                            logger.warning(f"⚠️ Dependency result for {dep_tool_name} is not a dict: {type(dep_result)}")
+                    
+                    if dep_result:
+                        break  # Found the dependency, no need to check others
             
             try:
                 logger.info(
@@ -663,7 +926,12 @@ Return only valid JSON.""",
             results[tool_id] = result_dict
 
         successful_count = len([r for r in results.values() if r.get('success')])
-        logger.info(f"Executed {len(execution_plan)} tools ({len(independent_tools)} parallel, {len(dependent_tools)} sequential), {successful_count} successful")
+        failed_count = len([r for r in results.values() if not r.get('success')])
+        logger.info(f"Executed {len(execution_plan)} tools ({len(independent_tools)} parallel, {len(dependent_tools)} sequential), {successful_count} successful, {failed_count} failed")
+        # Log equipment tool execution results specifically
+        equipment_results = {k: v for k, v in results.items() if "equipment" in v.get('tool_name', '').lower() or "dispatch" in v.get('tool_name', '').lower()}
+        if equipment_results:
+            logger.info(f"Equipment tool execution results: {[(k, v.get('tool_name'), 'SUCCESS' if v.get('success') else 'FAILED', str(v.get('error', 'N/A'))[:100]) for k, v in equipment_results.items()]}")
         return results
 
     async def _generate_response_with_tools(
@@ -973,8 +1241,26 @@ Expand this into a natural, conversational response (2-4 sentences) that explain
             )
 
         except Exception as e:
-            logger.error(f"Error generating response: {e}")
-            error_response = self._create_error_response(str(e), "generating a response")
+            logger.error(f"Error generating response: {e}", exc_info=True)
+            
+            # Sanitize error message for user-facing response
+            error_message = str(e)
+            user_friendly_message = "generating a response"
+            
+            # Provide specific error messages based on error type
+            if "404" in error_message or "not found" in error_message.lower():
+                user_friendly_message = "The language processing service is not available. Please check system configuration."
+            elif "401" in error_message or "403" in error_message or "authentication" in error_message.lower():
+                user_friendly_message = "Authentication failed with the language processing service. Please check API configuration."
+            elif "connection" in error_message.lower() or "connect" in error_message.lower():
+                user_friendly_message = "Unable to connect to the language processing service. Please try again later."
+            elif "timeout" in error_message.lower():
+                user_friendly_message = "The request timed out. Please try again with a simpler query."
+            else:
+                # Generic error message that doesn't expose technical details
+                user_friendly_message = "An error occurred while processing your request. Please try again."
+            
+            error_response = self._create_error_response(user_friendly_message, "generating a response")
             error_response.tool_execution_results = tool_results
             return error_response
 
@@ -1006,10 +1292,10 @@ Expand this into a natural, conversational response (2-4 sentences) that explain
         self, error_message: str, operation: str
     ) -> MCPOperationsResponse:
         """
-        Create standardized error response.
+        Create standardized error response with user-friendly messages.
         
         Args:
-            error_message: Error message
+            error_message: User-friendly error message (already sanitized)
             operation: Description of the operation that failed
             
         Returns:
@@ -1019,12 +1305,20 @@ Expand this into a natural, conversational response (2-4 sentences) that explain
             "Please try rephrasing your question or contact support if the issue persists."
         ]
         if "generating" in operation:
-            recommendations = ["Please try again or contact support."]
+            recommendations = [
+                "Please try again in a moment.",
+                "If the issue persists, try simplifying your query.",
+                "Contact support if the problem continues."
+            ]
+        
+        # Create user-friendly natural language message
+        # Don't expose technical error details to users
+        natural_language = f"I'm having trouble {operation} right now. {error_message}"
         
         return MCPOperationsResponse(
             response_type="error",
             data={"error": error_message},
-            natural_language=f"I encountered an error {operation}: {error_message}",
+            natural_language=natural_language,
             recommendations=recommendations,
             confidence=0.0,
             actions_taken=[],

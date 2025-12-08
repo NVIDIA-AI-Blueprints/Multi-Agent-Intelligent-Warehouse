@@ -78,8 +78,9 @@ def _handle_endpoint_error(operation: str, error: Exception) -> HTTPException:
     Returns:
         HTTPException with appropriate status code and message
     """
-    logger.error(f"{operation} failed: {_sanitize_log_data(str(error))}")
-    return HTTPException(status_code=500, detail=f"{operation} failed: {str(error)}")
+    from src.api.utils.error_handler import sanitize_error_message
+    error_msg = sanitize_error_message(error, operation)
+    return HTTPException(status_code=500, detail=error_msg)
 
 
 def _check_result_success(result: Dict[str, Any], operation: str) -> None:
@@ -164,7 +165,8 @@ async def _handle_stage_error(
         stage_name: Name of the stage that failed
         error: Exception that occurred
     """
-    error_msg = f"{stage_name} failed: {str(error)}"
+    from src.api.utils.error_handler import sanitize_error_message
+    error_msg = sanitize_error_message(error, stage_name)
     logger.error(f"{stage_name} failed for {_sanitize_log_data(document_id)}: {_sanitize_log_data(str(error))}")
     await tools._update_document_status(document_id, "failed", error_msg)
 
@@ -814,9 +816,10 @@ async def process_document_background(
         logger.info(f"Document file preserved at: {_sanitize_log_data(file_path)} (for re-processing if needed)")
 
     except Exception as e:
-        error_message = f"{type(e).__name__}: {str(e)}"
+        from src.api.utils.error_handler import sanitize_error_message
+        error_message = sanitize_error_message(e, "NVIDIA NeMo processing")
         logger.error(
-            f"NVIDIA NeMo processing failed for document {_sanitize_log_data(document_id)}: {_sanitize_log_data(error_message)}",
+            f"NVIDIA NeMo processing failed for document {_sanitize_log_data(document_id)}: {_sanitize_log_data(str(e))}",
             exc_info=True,
         )
         # Update status to failed with detailed error message

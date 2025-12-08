@@ -205,14 +205,22 @@ class MCPEquipmentAssetOperationsAgent:
                     # Determine reasoning types if not provided
                     if reasoning_type_enums is None:
                         reasoning_type_enums = self._determine_reasoning_types(query, context)
-
-                    reasoning_chain = await self.reasoning_engine.process_with_reasoning(
-                        query=query,
-                        context=context or {},
-                        reasoning_types=reasoning_type_enums,
-                        session_id=session_id,
-                    )
-                    logger.info(f"Advanced reasoning completed: {len(reasoning_chain.steps)} steps")
+                    
+                    # Skip reasoning for simple queries to improve performance
+                    simple_query_indicators = ["status", "show", "list", "available", "what", "when"]
+                    is_simple_query = any(indicator in query.lower() for indicator in simple_query_indicators) and len(query.split()) < 15
+                    
+                    if is_simple_query:
+                        logger.info(f"Skipping reasoning for simple query to improve performance: {query[:50]}")
+                        reasoning_chain = None
+                    else:
+                        reasoning_chain = await self.reasoning_engine.process_with_reasoning(
+                            query=query,
+                            context=context or {},
+                            reasoning_types=reasoning_type_enums,
+                            session_id=session_id,
+                        )
+                        logger.info(f"Advanced reasoning completed: {len(reasoning_chain.steps)} steps")
                 except Exception as e:
                     logger.warning(f"Advanced reasoning failed, continuing with standard processing: {e}")
             else:
@@ -292,6 +300,59 @@ class MCPEquipmentAssetOperationsAgent:
     ) -> MCPEquipmentQuery:
         """Parse equipment query and extract intent and entities."""
         try:
+            # Fast path: Try keyword-based parsing first for simple queries
+            query_lower = query.lower()
+            entities = {}
+            intent = "equipment_lookup"  # Default intent
+            
+            # Quick intent detection based on keywords
+            if any(word in query_lower for word in ["status", "show", "list", "available", "what"]):
+                intent = "equipment_availability" if "available" in query_lower else "equipment_lookup"
+            elif "maintenance" in query_lower or "due" in query_lower:
+                intent = "equipment_maintenance"
+            elif "dispatch" in query_lower or "assign" in query_lower:
+                intent = "equipment_dispatch"
+            elif "utilization" in query_lower or "usage" in query_lower:
+                intent = "equipment_utilization"
+            
+            # Quick entity extraction
+            # Extract equipment ID (e.g., FL-01, FL-001)
+            equipment_match = re.search(r'\b([A-Z]{1,3}-?\d{1,3})\b', query, re.IGNORECASE)
+            if equipment_match:
+                entities["equipment_id"] = equipment_match.group(1).upper()
+            
+            # Extract zone
+            zone_match = re.search(r'zone\s+([a-z])', query_lower)
+            if zone_match:
+                entities["zone"] = zone_match.group(1).upper()
+            
+            # Extract equipment type
+            if "forklift" in query_lower:
+                entities["equipment_type"] = "forklift"
+            elif "loader" in query_lower:
+                entities["equipment_type"] = "loader"
+            elif "charger" in query_lower:
+                entities["equipment_type"] = "charger"
+            
+            # For simple queries, use keyword-based parsing (faster, no LLM call)
+            simple_query_indicators = [
+                "status", "show", "list", "available", "what", "when", "where"
+            ]
+            is_simple_query = (
+                any(indicator in query_lower for indicator in simple_query_indicators) and
+                len(query.split()) < 15  # Short queries
+            )
+            
+            if is_simple_query and entities:
+                logger.info(f"Using fast keyword-based parsing for simple query: {query[:50]}")
+                return MCPEquipmentQuery(
+                    intent=intent,
+                    entities=entities,
+                    context=context or {},
+                    user_query=query,
+                )
+            
+            # For complex queries, use LLM parsing
             # Use LLM to parse the query
             parse_prompt = [
                 {

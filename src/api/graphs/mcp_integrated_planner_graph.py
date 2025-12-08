@@ -553,22 +553,44 @@ class MCPPlannerGraph:
                 message_text = str(latest_message.content)
 
             # Use MCP-enhanced intent classification (keyword-based)
-            keyword_intent = await self.intent_classifier.classify_intent_with_mcp(message_text)
+            intent_result = await self.intent_classifier.classify_intent_with_mcp(message_text)
+            
+            # Extract intent string from result (it's a dict)
+            keyword_intent = intent_result.get("intent", "general") if isinstance(intent_result, dict) else intent_result
+            keyword_confidence = intent_result.get("confidence", 0.7) if isinstance(intent_result, dict) else 0.7
+            
+            # Special handling: If keyword classification found worker-related terms, prioritize operations
+            # This prevents semantic router from overriding correct worker classification
+            message_lower = message_text.lower()
+            worker_keywords = ["worker", "workers", "workforce", "employee", "employees", "staff", "team members", "personnel"]
+            has_worker_keywords = any(keyword in message_lower for keyword in worker_keywords)
+            
+            if has_worker_keywords and keyword_intent != "operations":
+                logger.info(f"🔧 Overriding intent from '{keyword_intent}' to 'operations' due to worker keywords")
+                keyword_intent = "operations"
+                keyword_confidence = 0.9  # High confidence for explicit worker queries
             
             # Enhance with semantic routing
             try:
                 from src.api.services.routing.semantic_router import get_semantic_router
                 semantic_router = await get_semantic_router()
-                intent, confidence = await semantic_router.classify_intent_semantic(
-                    message_text,
-                    keyword_intent,
-                    keyword_confidence=0.7  # Assume medium-high confidence for keyword match
-                )
-                logger.info(f"Semantic routing: keyword={keyword_intent}, semantic={intent}, confidence={confidence:.2f}")
+                
+                # If we have high confidence worker keywords, skip semantic routing to avoid override
+                if has_worker_keywords:
+                    intent = "operations"
+                    confidence = 0.9
+                    logger.info(f"🔧 Using operations intent directly for worker query (skipping semantic override)")
+                else:
+                    intent, confidence = await semantic_router.classify_intent_semantic(
+                        message_text,
+                        keyword_intent,
+                        keyword_confidence=keyword_confidence
+                    )
+                    logger.info(f"Semantic routing: keyword={keyword_intent}, semantic={intent}, confidence={confidence:.2f}")
             except Exception as e:
                 logger.warning(f"Semantic routing failed, using keyword-based: {e}")
                 intent = keyword_intent
-                confidence = 0.7
+                confidence = keyword_confidence
             
             state["user_intent"] = intent
             state["routing_decision"] = intent

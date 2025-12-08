@@ -192,13 +192,21 @@ class MCPSafetyComplianceAgent:
                     if reasoning_type_enums is None:
                         reasoning_type_enums = self._determine_reasoning_types(query, context)
 
-                    reasoning_chain = await self.reasoning_engine.process_with_reasoning(
-                        query=query,
-                        context=context or {},
-                        reasoning_types=reasoning_type_enums,
-                        session_id=session_id,
-                    )
-                    logger.info(f"Advanced reasoning completed: {len(reasoning_chain.steps)} steps")
+                    # Skip reasoning for simple queries to improve performance
+                    simple_query_indicators = ["procedure", "checklist", "what are", "show me", "safety"]
+                    is_simple_query = any(indicator in query.lower() for indicator in simple_query_indicators) and len(query.split()) < 20
+                    
+                    if is_simple_query:
+                        logger.info(f"Skipping reasoning for simple safety query to improve performance: {query[:50]}")
+                        reasoning_chain = None
+                    else:
+                        reasoning_chain = await self.reasoning_engine.process_with_reasoning(
+                            query=query,
+                            context=context or {},
+                            reasoning_types=reasoning_type_enums,
+                            session_id=session_id,
+                        )
+                        logger.info(f"Advanced reasoning completed: {len(reasoning_chain.steps)} steps")
                 except Exception as e:
                     logger.warning(f"Advanced reasoning failed, continuing with standard processing: {e}")
             else:
@@ -262,6 +270,49 @@ class MCPSafetyComplianceAgent:
     ) -> MCPSafetyQuery:
         """Parse safety query and extract intent and entities."""
         try:
+            # Fast path: Try keyword-based parsing first for simple queries
+            query_lower = query.lower()
+            entities = {}
+            intent = "incident_reporting"  # Default intent
+            
+            # Quick intent detection based on keywords
+            if any(word in query_lower for word in ["procedure", "checklist", "policy", "what are"]):
+                intent = "policy_lookup"
+            elif any(word in query_lower for word in ["report", "incident", "alert", "issue"]):
+                intent = "incident_reporting"
+            elif any(word in query_lower for word in ["compliance", "audit"]):
+                intent = "compliance_check"
+            
+            # Quick entity extraction using fallback parser
+            fallback_entities = self._fallback_parse_safety_query(query)
+            entities.update(fallback_entities)
+            
+            # For simple policy/procedure queries, use keyword-based parsing (faster, no LLM call)
+            simple_query_indicators = [
+                "procedure", "checklist", "what are", "show me", "safety"
+            ]
+            is_simple_query = (
+                any(indicator in query_lower for indicator in simple_query_indicators) and
+                len(query.split()) < 20 and  # Short queries
+                intent == "policy_lookup"  # Only for policy lookups
+            )
+            
+            if is_simple_query:
+                logger.info(f"Using fast keyword-based parsing for simple safety query: {query[:50]}")
+                # Ensure critical entities are present
+                if not entities.get("description"):
+                    entities["description"] = query
+                if not entities.get("reporter"):
+                    entities["reporter"] = "user"
+                
+                return MCPSafetyQuery(
+                    intent=intent,
+                    entities=entities,
+                    context=context or {},
+                    user_query=query,
+                )
+            
+            # For complex queries, use LLM parsing
             # Use LLM to parse the query with better entity extraction
             parse_prompt = [
                 {

@@ -239,6 +239,12 @@ class MCPIntentClassifier:
         if any(keyword in message_lower for keyword in self.SAFETY_KEYWORDS):
             return "safety"
 
+        # Check for worker/workforce/employee queries (high priority - before equipment)
+        # This ensures "available workers" routes to operations, not equipment
+        worker_keywords = ["worker", "workers", "workforce", "employee", "employees", "staff", "team members", "personnel"]
+        if any(keyword in message_lower for keyword in worker_keywords):
+            return "operations"
+
         # Check for equipment dispatch/assignment keywords (high priority)
         if any(
             term in message_lower for term in ["dispatch", "assign", "deploy"]
