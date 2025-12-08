@@ -11,6 +11,7 @@ import urllib.request
 import urllib.error
 import time
 import email.header
+from datetime import datetime
 from typing import Dict, List, Optional
 from pathlib import Path
 
@@ -57,9 +58,30 @@ def get_pypi_info(package_name: str, version: Optional[str] = None) -> Dict:
             if author and '=?' in author:
                 try:
                     decoded_parts = email.header.decode_header(author)
-                    author = ''.join([part[0].decode(part[1] or 'utf-8') if isinstance(part[0], bytes) else part[0] 
-                                     for part in decoded_parts])
-                except:
+                    decoded_author = ''
+                    for part in decoded_parts:
+                        if isinstance(part[0], bytes):
+                            encoding = part[1] or 'utf-8'
+                            decoded_author += part[0].decode(encoding)
+                        else:
+                            decoded_author += part[0]
+                    author = decoded_author.strip()
+                except Exception:
+                    pass  # Keep original if decoding fails
+            
+            # Also decode author_email if it's encoded
+            if author_email and '=?' in author_email:
+                try:
+                    decoded_parts = email.header.decode_header(author_email)
+                    decoded_email = ''
+                    for part in decoded_parts:
+                        if isinstance(part[0], bytes):
+                            encoding = part[1] or 'utf-8'
+                            decoded_email += part[0].decode(encoding)
+                        else:
+                            decoded_email += part[0]
+                    author_email = decoded_email.strip()
+                except Exception:
                     pass  # Keep original if decoding fails
             
             if author_email:
@@ -287,10 +309,28 @@ def main():
     output_file = repo_root / 'docs' / 'SOFTWARE_INVENTORY.md'
     output_file.parent.mkdir(parents=True, exist_ok=True)
     
+    # Get current date for "Last Updated"
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    
     with open(output_file, 'w') as f:
         f.write("# Software Inventory\n\n")
         f.write("This document lists all third-party software packages used in this project, including their versions, licenses, authors, and sources.\n\n")
-        f.write("**Generated:** Automatically from dependency files\n\n")
+        f.write("**Generated:** Automatically from dependency files\n")
+        f.write(f"**Last Updated:** {current_date}\n")
+        f.write("**Generation Script:** `scripts/tools/generate_software_inventory.py`\n\n")
+        f.write("## How to Regenerate\n\n")
+        f.write("To regenerate this inventory with the latest package information:\n\n")
+        f.write("```bash\n")
+        f.write("# Activate virtual environment\n")
+        f.write("source env/bin/activate\n\n")
+        f.write("# Run the generation script\n")
+        f.write("python scripts/tools/generate_software_inventory.py\n")
+        f.write("```\n\n")
+        f.write("The script automatically:\n")
+        f.write("- Parses `requirements.txt`, `requirements.docker.txt`, and `scripts/requirements_synthetic_data.txt`\n")
+        f.write("- Parses `package.json` for Node.js dependencies\n")
+        f.write("- Queries PyPI and npm registries for package metadata\n")
+        f.write("- Removes duplicates and formats the data into this table\n\n")
         f.write("## Python Packages (PyPI)\n\n")
         f.write("| Package Name | Version | License | License URL | Author | Source | Distribution Method |\n")
         f.write("|--------------|---------|---------|-------------|--------|--------|---------------------|\n")

@@ -11,6 +11,7 @@ import asyncio
 import hashlib
 from typing import Dict, List, Optional, Any, Union
 from dataclasses import dataclass, asdict
+from datetime import datetime, timedelta, timezone
 import os
 from dotenv import load_dotenv
 
@@ -29,7 +30,7 @@ class NIMConfig:
     embedding_base_url: str = os.getenv(
         "EMBEDDING_NIM_URL", "https://integrate.api.nvidia.com/v1"
     )
-    llm_model: str = os.getenv("LLM_MODEL", "nvcf:nvidia/llama-3.3-nemotron-super-49b-v1:dep-36WjmkwKIbIPd1lPiUFUI54SK2d")
+    llm_model: str = os.getenv("LLM_MODEL", "nvcf:nvidia/llama-3.3-nemotron-super-49b-v1:dep-36ZiLbQIG2ZzK7gIIC5yh1E6lGk")
     embedding_model: str = "nvidia/nv-embedqa-e5-v5"
     timeout: int = int(os.getenv("LLM_CLIENT_TIMEOUT", "120"))  # Increased from 60s to 120s to prevent premature timeouts
     # LLM generation parameters (configurable via environment variables)
@@ -98,25 +99,10 @@ class NIMClient:
     def _validate_config(self) -> None:
         """Validate NIM configuration and log warnings for common issues."""
         # Check for common misconfigurations
-        if not self.config.llm_api_key:
+        if not self.config.llm_api_key or not self.config.llm_api_key.strip():
             logger.warning(
-                "NVIDIA_API_KEY is not set. LLM requests will fail with authentication errors."
+                "NVIDIA_API_KEY is not set or is empty. LLM requests will fail with authentication errors."
             )
-        
-        # Check for known incorrect base URLs
-        incorrect_urls = [
-            "api.brev.dev",
-            "brev.dev",
-        ]
-        
-        for incorrect_url in incorrect_urls:
-            if incorrect_url in self.config.llm_base_url:
-                logger.error(
-                    f"⚠️  WARNING: LLM_NIM_URL appears to be misconfigured: {self.config.llm_base_url}\n"
-                    f"   This URL is not a valid NVIDIA NIM endpoint and will result in 404 errors.\n"
-                    f"   Expected format: https://integrate.api.nvidia.com/v1 or a valid NIM endpoint.\n"
-                    f"   Please check your LLM_NIM_URL environment variable."
-                )
         
         # Validate URL format
         if not self.config.llm_base_url.startswith(("http://", "https://")):
@@ -126,10 +112,13 @@ class NIMClient:
             )
         
         # Log configuration (without exposing API key)
+        # Note: api.brev.dev is valid for certain models (e.g., 49B), 
+        # while integrate.api.nvidia.com is used for other NIM endpoints
         logger.info(
             f"NIM Client configured: base_url={self.config.llm_base_url}, "
             f"model={self.config.llm_model}, "
-            f"api_key_set={bool(self.config.llm_api_key)}"
+            f"api_key_set={bool(self.config.llm_api_key and self.config.llm_api_key.strip())}, "
+            f"timeout={self.config.timeout}s"
         )
 
     def _normalize_content_for_cache(self, content: str) -> str:
@@ -200,8 +189,7 @@ class NIMClient:
             expires_at = cached_item.get("expires_at")
             
             # Check if expired
-            from datetime import datetime
-            if expires_at and datetime.utcnow() > expires_at:
+            if expires_at and datetime.now(timezone.utc) > expires_at:
                 del self._response_cache[cache_key]
                 logger.debug(f"Cache entry expired for key: {cache_key[:16]}...")
                 return None
@@ -216,13 +204,13 @@ class NIMClient:
             return
         
         async with self._cache_lock:
-            from datetime import datetime, timedelta
-            expires_at = datetime.utcnow() + timedelta(seconds=self.cache_ttl)
+            now = datetime.now(timezone.utc)
+            expires_at = now + timedelta(seconds=self.cache_ttl)
             
             self._response_cache[cache_key] = {
                 "response": response,
                 "expires_at": expires_at,
-                "cached_at": datetime.utcnow(),
+                "cached_at": now,
             }
             
             logger.debug(f"Cached LLM response (key: {cache_key[:16]}..., TTL: {self.cache_ttl}s)")

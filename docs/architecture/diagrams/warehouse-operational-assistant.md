@@ -2,6 +2,23 @@
 
 ## System Architecture Overview
 
+The Warehouse Operational Assistant is a production-grade multi-agent AI system built on NVIDIA AI Blueprints, featuring:
+
+- **Multi-Agent Orchestration**: LangGraph-based planner/router with specialized agents (Equipment, Operations, Safety, Forecasting, Document)
+- **NVIDIA NIM Integration**: Cloud or self-hosted NIM endpoints for LLM, embeddings, and document processing
+- **MCP Framework**: Model Context Protocol with dynamic tool discovery and execution
+- **Hybrid RAG**: PostgreSQL/TimescaleDB + Milvus vector database with intelligent query routing
+- **GPU Acceleration**: NVIDIA cuVS for vector search, RAPIDS for forecasting
+- **Production-Ready**: Complete monitoring, security, and deployment infrastructure
+
+### Key Architectural Decisions
+
+1. **NVIDIA NIMs**: All AI services use NVIDIA NIMs, which can be deployed as cloud endpoints or self-hosted instances
+2. **Hybrid Retrieval**: Combines structured SQL queries with semantic vector search for optimal accuracy
+3. **MCP Integration**: Dynamic tool discovery and execution for flexible external system integration
+4. **Multi-Agent System**: Specialized agents for different operational domains with centralized planning
+5. **GPU Acceleration**: Optional but recommended for production-scale performance
+
 ```mermaid
 graph TB
     subgraph UI_LAYER["User Interface Layer"]
@@ -48,15 +65,16 @@ graph TB
 
     subgraph AI_LAYER["AI Services - NVIDIA NIMs"]
         NIM_LLM["NVIDIA NIM LLM<br/>Llama 3.3 Nemotron Super 49B<br/>Fully Integrated"]
-        NIM_EMB["NVIDIA NIM Embeddings<br/>NV-EmbedQA-E5-v5<br/>1024-dim, GPU Accelerated"]
+        NIM_EMB["NVIDIA NIM Embeddings<br/>llama-3_2-nv-embedqa-1b-v2<br/>GPU Accelerated"]
+        GUARDRAILS_NIM["NeMo Guardrails<br/>Content Safety & Compliance"]
     end
 
     subgraph DOC_LAYER["Document Processing Pipeline - NVIDIA NeMo"]
         NEMO_RETRIEVER["NeMo Retriever<br/>Document Preprocessing<br/>Stage 1"]
         NEMO_OCR["NeMoRetriever-OCR-v1<br/>Intelligent OCR<br/>Stage 2"]
-        NANO_VL["Llama Nemotron Nano VL 8B<br/>Small LLM Processing<br/>Stage 3"]
-        E5_EMBEDDINGS["nv-embedqa-e5-v5<br/>Embedding Indexing<br/>Stage 4"]
-        NEMOTRON_70B["Llama 3.1 Nemotron 70B<br/>Large LLM Judge<br/>Stage 5"]
+        NANO_VL["nemotron-nano-12b-v2-vl<br/>Small LLM Processing<br/>Stage 3"]
+        E5_EMBEDDINGS["llama-3_2-nv-embedqa-1b-v2<br/>Embedding Indexing<br/>Stage 4"]
+        NEMOTRON_70B["Llama 3.3 Nemotron Super 49B<br/>Large LLM Judge<br/>Stage 5"]
         INTELLIGENT_ROUTER["Intelligent Router<br/>Quality-based Routing<br/>Stage 6"]
     end
 
@@ -435,7 +453,7 @@ sequenceDiagram
 | **Forecasting Agent** | Complete | Python, async + MCP | - | Demand forecasting, reorder recommendations |
 | **Document Extraction Agent** | Complete | Python, async + NVIDIA NeMo | - | 6-stage document processing pipeline |
 | **Memory Manager** | Complete | PostgreSQL, Redis | - | Session context, conversation history |
-| **NVIDIA NIMs** | Complete | Llama 3.3 Nemotron Super 49B, NV-EmbedQA-E5-v5 | - | AI-powered responses |
+| **NVIDIA NIMs** | Complete | Llama 3.3 Nemotron Super 49B, llama-3_2-nv-embedqa-1b-v2 | - | AI-powered responses |
 | **Document Processing Pipeline** | Complete | NVIDIA NeMo Models | - | 6-stage intelligent document processing |
 | **Forecasting Service** | Complete | Python, scikit-learn, XGBoost | - | Multi-model ensemble forecasting |
 | **Forecasting Training** | Complete | Python, RAPIDS cuML (GPU) | - | Phase 1-3 training pipeline |
@@ -537,6 +555,70 @@ The Forecasting Agent provides AI-powered demand forecasting with the following 
 - **Model Performance Tracking** - Live accuracy, MAPE, drift scores from actual predictions
 - **Redis Caching** - Intelligent caching for improved performance
 
+## NVIDIA NIMs Overview
+
+The Warehouse Operational Assistant uses multiple NVIDIA NIMs (NVIDIA Inference Microservices) for various AI capabilities. These can be deployed as cloud endpoints or self-hosted instances.
+
+### NVIDIA NIMs Used in the System
+
+| NIM Service | Model | Purpose | Endpoint Type | Environment Variable | Default Endpoint |
+|-------------|-------|---------|---------------|---------------------|------------------|
+| **LLM Service** | Llama 3.3 Nemotron Super 49B | Primary language model for chat, reasoning, and generation | Cloud (api.brev.dev) or Self-hosted | `LLM_NIM_URL` | `https://api.brev.dev/v1` |
+| **Embedding Service** | llama-3_2-nv-embedqa-1b-v2 | Semantic search embeddings for RAG | Cloud (integrate.api.nvidia.com) or Self-hosted | `EMBEDDING_NIM_URL` | `https://integrate.api.nvidia.com/v1` |
+| **NeMo Retriever** | NeMo Retriever | Document preprocessing and structure analysis | Cloud or Self-hosted | `NEMO_RETRIEVER_URL` | `https://integrate.api.nvidia.com/v1` |
+| **NeMo OCR** | NeMoRetriever-OCR-v1 | Intelligent OCR with layout understanding | Cloud or Self-hosted | `NEMO_OCR_URL` | `https://integrate.api.nvidia.com/v1` |
+| **Nemotron Parse** | Nemotron Parse | Advanced document parsing and extraction | Cloud or Self-hosted | `NEMO_PARSE_URL` | `https://integrate.api.nvidia.com/v1` |
+| **Small LLM** | nemotron-nano-12b-v2-vl | Structured data extraction and entity recognition | Cloud or Self-hosted | `LLAMA_NANO_VL_URL` | `https://integrate.api.nvidia.com/v1` |
+| **Large LLM Judge** | Llama 3.3 Nemotron Super 49B | Quality validation and confidence scoring | Cloud or Self-hosted | `LLAMA_70B_URL` | `https://integrate.api.nvidia.com/v1` |
+| **NeMo Guardrails** | NeMo Guardrails | Content safety and compliance validation | Cloud or Self-hosted | `RAIL_API_KEY` (uses NVIDIA endpoint) | `https://integrate.api.nvidia.com/v1` |
+
+### NIM Deployment Options
+
+| Deployment Type | Description | Use Case | Configuration |
+|----------------|-------------|----------|---------------|
+| **Cloud Endpoints** | NVIDIA-hosted NIM services | Production deployments, quick setup | Use default endpoints (api.brev.dev or integrate.api.nvidia.com) |
+| **Self-Hosted NIMs** | Deploy NIMs on your own infrastructure | Data privacy, cost control, custom requirements | Set custom endpoint URLs (e.g., `http://localhost:8000/v1` or `https://your-nim-instance.com/v1`) |
+
+### Installation Requirements
+
+| Component | Installation Type | Required For | Notes |
+|-----------|------------------|--------------|-------|
+| **Llama 3.3 Nemotron Super 49B** | Endpoint (Cloud or Self-hosted) | Core LLM functionality, chat, reasoning | Required - Can use cloud endpoint (api.brev.dev) or deploy locally |
+| **llama-3_2-nv-embedqa-1b-v2** | Endpoint (Cloud or Self-hosted) | Semantic search, RAG, vector embeddings | Required - Can use cloud endpoint or deploy locally |
+| **NeMo Retriever** | Endpoint (Cloud or Self-hosted) | Document preprocessing (Stage 1) | Required for document processing pipeline |
+| **NeMoRetriever-OCR-v1** | Endpoint (Cloud or Self-hosted) | OCR processing (Stage 2) | Required for document processing pipeline |
+| **Nemotron Parse** | Endpoint (Cloud or Self-hosted) | Document parsing (Stage 2) | Required for document processing pipeline |
+| **nemotron-nano-12b-v2-vl** | Endpoint (Cloud or Self-hosted) | Small LLM processing (Stage 3) | Required for document processing pipeline |
+| **Llama 3.3 Nemotron Super 49B** | Endpoint (Cloud or Self-hosted) | Quality validation (Stage 5) | Required for document processing pipeline |
+| **NeMo Guardrails** | Endpoint (Cloud or Self-hosted) | Content safety and compliance | Required for production deployments |
+| **Milvus** | Local Installation | Vector database for embeddings | Required - Install locally or via Docker |
+| **PostgreSQL/TimescaleDB** | Local Installation | Structured data storage | Required - Install locally or via Docker |
+| **Redis** | Local Installation | Caching and session management | Required - Install locally or via Docker |
+| **NVIDIA GPU Drivers** | Local Installation | GPU acceleration for Milvus (cuVS) | Optional but recommended for performance |
+| **NVIDIA RAPIDS** | Local Installation | GPU-accelerated forecasting | Optional - For enhanced forecasting performance |
+
+### Endpoint Configuration Guide
+
+**For Cloud Endpoints:**
+- Use the default endpoints provided by NVIDIA
+- 49B model: `https://api.brev.dev/v1`
+- Other NIMs: `https://integrate.api.nvidia.com/v1`
+- All use the same `NVIDIA_API_KEY` for authentication
+
+**For Self-Hosted NIMs:**
+- Deploy NIMs on your own infrastructure (local or cloud)
+- Configure endpoint URLs in `.env` file (e.g., `http://localhost:8000/v1`)
+- Ensure endpoints are accessible and properly configured
+- Use appropriate API keys for authentication
+- See NVIDIA NIM documentation for deployment instructions
+
+**Key Points:**
+- All NIMs can be consumed via HTTP/HTTPS endpoints
+- You can mix cloud and self-hosted NIMs (e.g., cloud LLM + self-hosted embeddings)
+- Self-hosted NIMs provide data privacy and cost control benefits
+- Cloud endpoints offer quick setup and managed infrastructure
+- The same API key typically works for both cloud endpoints
+
 ## Document Processing Pipeline (6-Stage NVIDIA NeMo)
 
 The Document Extraction Agent implements a comprehensive **6-stage pipeline** using NVIDIA NeMo models:
@@ -552,17 +634,17 @@ The Document Extraction Agent implements a comprehensive **6-stage pipeline** us
 - **Capabilities**: Multi-language OCR, table extraction, form recognition, layout preservation
 
 ### Stage 3: Small LLM Processing
-- **Model**: Llama Nemotron Nano VL 8B
+- **Model**: nemotron-nano-12b-v2-vl
 - **Purpose**: Structured data extraction and entity recognition
 - **Capabilities**: Entity extraction, data structuring, content analysis, metadata generation
 
 ### Stage 4: Embedding & Indexing
-- **Model**: nv-embedqa-e5-v5
+- **Model**: llama-3_2-nv-embedqa-1b-v2
 - **Purpose**: Vector embedding generation and semantic indexing
 - **Capabilities**: Semantic search preparation, content indexing, similarity matching
 
 ### Stage 5: Large LLM Judge
-- **Model**: Llama 3.1 Nemotron 70B Instruct NIM
+- **Model**: Llama 3.3 Nemotron Super 49B
 - **Purpose**: Quality validation and confidence scoring
 - **Capabilities**: Content validation, quality assessment, confidence scoring, error detection
 

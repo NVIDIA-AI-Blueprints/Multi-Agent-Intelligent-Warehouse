@@ -2,8 +2,8 @@
 
 This document lists all third-party software packages used in this project, including their versions, licenses, authors, and sources.
 
-**Generated:** Automatically from dependency files  
-**Last Updated:** 2025-01-XX  
+**Generated:** Automatically from dependency files
+**Last Updated:** 2025-12-08
 **Generation Script:** `scripts/tools/generate_software_inventory.py`
 
 ## How to Regenerate
@@ -37,15 +37,16 @@ The script automatically:
 | Faker | 19.0.0 | MIT License | https://github.com/joke2k/faker | joke2k <joke2k@gmail.com> | PyPI | pip |
 | fastapi | 0.119.0 | MIT License | https://pypi.org/project/fastapi/ | Sebastián Ramírez <tiangolo@gmail.com> | PyPI | pip |
 | httpx | 0.27.0 | BSD License | https://pypi.org/project/httpx/ | Tom Christie <tom@tomchristie.com> | PyPI | pip |
-| langchain-core | 0.1.0 | MIT | https://github.com/langchain-ai/langchain | N/A | PyPI | pip |
+| langchain-core | 0.3.80 | MIT | https://pypi.org/project/langchain-core/ | N/A | PyPI | pip |
 | langgraph | 0.2.30 | MIT | https://www.github.com/langchain-ai/langgraph | N/A | PyPI | pip |
 | loguru | 0.7.0 | MIT license | https://github.com/Delgan/loguru | Delgan <delgan.py@gmail.com> | PyPI | pip |
 | numpy | 1.24.0 | BSD-3-Clause | https://www.numpy.org | Travis E. Oliphant et al. | PyPI | pip |
 | paho-mqtt | 1.6.0 | Eclipse Public License v2.0 / Eclipse Distribution License v1.0 | http://eclipse.org/paho | Roger Light <roger@atchoo.org> | PyPI | pip |
 | pandas | 1.2.4 | BSD | https://pandas.pydata.org | N/A | PyPI | pip |
 | passlib | 1.7.4 | BSD | https://passlib.readthedocs.io | Eli Collins <elic@assurancetechnologies.com> | PyPI | pip |
-| pillow | 10.0.0 | HPND | https://python-pillow.org | Jeffrey A. Clark (Alex) <aclark@aclark.net> | PyPI | pip |
+| pillow | 10.3.0 | HPND | https://pypi.org/project/Pillow/ | "Jeffrey A. Clark" <aclark@aclark.net> | PyPI | pip |
 | prometheus-client | 0.19.0 | Apache Software License 2.0 | https://github.com/prometheus/client_python | Brian Brazil <brian.brazil@robustperception.io> | PyPI | pip |
+| psutil | 5.9.0 | BSD | https://github.com/giampaolo/psutil | Giampaolo Rodola <g.rodola@gmail.com> | PyPI | pip |
 | psycopg | 3.0 | GNU Lesser General Public License v3 (LGPLv3) | https://psycopg.org/psycopg3/ | Daniele Varrazzo <daniele.varrazzo@gmail.com> | PyPI | pip |
 | pydantic | 2.7.0 | MIT License | https://pypi.org/project/pydantic/ | Samuel Colvin <s@muelcolvin.com>, Eric Jolibois <em.jolibois@gmail.com>, Hasan Ramezani <hasan.r67@gmail.com>, Adrian Garcia Badaracco <1755071+adr... | PyPI | pip |
 | PyJWT | 2.8.0 | MIT | https://github.com/jpadilla/pyjwt | Jose Padilla <hello@jpadilla.com> | PyPI | pip |
@@ -57,8 +58,8 @@ The script automatically:
 | python-multipart | 0.0.20 | Apache Software License | https://pypi.org/project/python-multipart/ | Andrew Dunham <andrew@du.nham.ca>, Marcelo Trylesinski <marcelotryle@gmail.com> | PyPI | pip |
 | PyYAML | 6.0 | MIT | https://pyyaml.org/ | Kirill Simonov <xi@resolvent.net> | PyPI | pip |
 | redis | 5.0.0 | MIT | https://github.com/redis/redis-py | Redis Inc. <oss@redis.com> | PyPI | pip |
-| requests | 2.31.0 | Apache 2.0 | https://requests.readthedocs.io | Kenneth Reitz <me@kennethreitz.org> | PyPI | pip |
-| scikit-learn | 1.0 | new BSD | http://scikit-learn.org | N/A | PyPI | pip |
+| requests | 2.32.4 | Apache-2.0 | https://requests.readthedocs.io | Kenneth Reitz <me@kennethreitz.org> | PyPI | pip |
+| scikit-learn | 1.5.0 | new BSD | https://scikit-learn.org | N/A | PyPI | pip |
 | tiktoken | 0.12.0 | MIT License | https://pypi.org/project/tiktoken/ | Shantanu Jain <shantanu@openai.com> | PyPI | pip |
 | uvicorn | 0.30.1 | BSD License | https://pypi.org/project/uvicorn/ | Tom Christie <tom@tomchristie.com> | PyPI | pip |
 | websockets | 11.0 | BSD-3-Clause | https://pypi.org/project/websockets/ | Aymeric Augustin <aymeric.augustin@m4x.org> | PyPI | pip |
@@ -93,10 +94,11 @@ The script automatically:
 | MIT | 14 |
 | BSD-3-Clause | 5 |
 | MIT License | 4 |
-| BSD | 3 |
+| BSD | 4 |
 | BSD License | 2 |
 | Apache License, Version 2.0 | 2 |
 | Apache Software License | 2 |
+| Apache-2.0 | 2 |
 | MIT license | 1 |
 | Apache 2 | 1 |
 | CC0 (copyright waived) | 1 |
@@ -104,9 +106,7 @@ The script automatically:
 | GNU Lesser General Public License v3 (LGPLv3) | 1 |
 | Eclipse Public License v2.0 / Eclipse Distribution License v1.0 | 1 |
 | N/A | 1 |
-| Apache 2.0 | 1 |
 | new BSD | 1 |
-| Apache-2.0 | 1 |
 | HPND | 1 |
 | GNU AFFERO GPL 3.0 | 1 |
 | ISC | 1 |

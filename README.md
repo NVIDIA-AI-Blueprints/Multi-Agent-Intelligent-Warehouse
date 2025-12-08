@@ -498,9 +498,10 @@ The system implements **NVIDIA NeMo Guardrails** for content safety, security, a
 
 NeMo Guardrails provides multi-layer protection for the warehouse operational assistant:
 
+- **API Integration** - Uses NVIDIA NeMo Guardrails API for intelligent safety validation
 - **Input Safety Validation** - Checks user queries before processing
 - **Output Safety Validation** - Validates AI responses before returning to users
-- **Pattern-Based Detection** - Identifies violations using keyword and phrase matching
+- **Pattern-Based Fallback** - Falls back to keyword/phrase matching if API is unavailable
 - **Timeout Protection** - Prevents hanging requests with configurable timeouts
 - **Graceful Degradation** - Continues operation even if guardrails fail
 
@@ -546,7 +547,31 @@ Redirects non-warehouse related queries:
 
 ### Configuration
 
-Guardrails configuration is defined in `data/config/guardrails/rails.yaml`:
+#### Environment Variables
+
+The guardrails service can be configured via environment variables:
+
+```bash
+# NeMo Guardrails API Configuration
+# Use RAIL_API_KEY for guardrails-specific key, or it will fall back to NVIDIA_API_KEY
+RAIL_API_KEY=your-nvidia-api-key-here
+
+# Guardrails API endpoint (defaults to NVIDIA's cloud endpoint)
+RAIL_API_URL=https://integrate.api.nvidia.com/v1
+
+# Timeout for guardrails API calls in seconds (default: 10)
+GUARDRAILS_TIMEOUT=10
+
+# Enable/disable API usage (default: true)
+# If false, will only use pattern-based matching
+GUARDRAILS_USE_API=true
+```
+
+**Note:** If `RAIL_API_KEY` is not set, the service will use `NVIDIA_API_KEY` as a fallback. If neither is set, the service will use pattern-based matching only.
+
+#### YAML Configuration
+
+Guardrails configuration is also defined in `data/config/guardrails/rails.yaml`:
 
 ```yaml
 # Safety and compliance rules
@@ -623,10 +648,12 @@ python tests/unit/test_guardrails.py
 The guardrails service (`src/api/services/guardrails/guardrails_service.py`) provides:
 
 - **GuardrailsService** class with async methods
-- **Pattern matching** for violation detection
+- **API Integration** - Calls NVIDIA NeMo Guardrails API for intelligent validation
+- **Pattern-based Fallback** - Falls back to keyword/phrase matching if API unavailable
 - **Safety response generation** based on violation types
 - **Configuration loading** from YAML files
 - **Error handling** with graceful degradation
+- **Automatic fallback** - Seamlessly switches to pattern matching on API failures
 
 ### Response Format
 
@@ -666,13 +693,32 @@ Guardrails activity is logged and monitored:
 4. **Customization**: Adjust timeout values based on your infrastructure
 5. **Response Messages**: Keep safety responses professional and helpful
 
+### API Integration Details
+
+The guardrails service now integrates with the NVIDIA NeMo Guardrails API:
+
+1. **Primary Method**: API-based validation using NVIDIA's guardrails endpoint
+   - Uses `/chat/completions` endpoint with safety-focused prompts
+   - Leverages LLM-based violation detection for more intelligent analysis
+   - Returns structured JSON with violation details and confidence scores
+
+2. **Fallback Method**: Pattern-based matching
+   - Automatically used if API is unavailable or times out
+   - Uses keyword/phrase matching for common violation patterns
+   - Ensures system continues to function even without API access
+
+3. **Hybrid Approach**: Best of both worlds
+   - API provides intelligent, context-aware validation
+   - Pattern matching ensures reliability and low latency fallback
+   - Seamless switching between methods based on availability
+
 ### Future Enhancements
 
 Planned improvements:
-- Integration with full NeMo Guardrails SDK
-- LLM-based violation detection (beyond pattern matching)
+- Enhanced API integration with dedicated guardrails endpoints
 - Machine learning for adaptive threat detection
 - Enhanced monitoring dashboards
+- Custom guardrails rules via API configuration
 
 **Related Documentation:**
 - Configuration file: `data/config/guardrails/rails.yaml`
