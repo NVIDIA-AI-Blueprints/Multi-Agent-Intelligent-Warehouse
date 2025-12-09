@@ -7,6 +7,7 @@ Complete deployment guide for the Warehouse Operational Assistant with Docker an
 - [Quick Start](#quick-start)
 - [Prerequisites](#prerequisites)
 - [Environment Configuration](#environment-configuration)
+- [NVIDIA NIMs Deployment & Configuration](#nvidia-nims-deployment--configuration)
 - [Deployment Options](#deployment-options)
   - [Option 1: Docker Deployment](#option-1-docker-deployment)
   - [Option 2: Kubernetes/Helm Deployment](#option-2-kuberneteshelm-deployment)
@@ -173,12 +174,6 @@ REDIS_PORT=6379
 # Kafka
 KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 
-# NVIDIA NIMs (optional)
-NIM_LLM_BASE_URL=http://localhost:8000/v1
-NIM_LLM_API_KEY=your-nim-llm-api-key
-NIM_EMBEDDINGS_BASE_URL=http://localhost:8001/v1
-NIM_EMBEDDINGS_API_KEY=your-nim-embeddings-api-key
-
 # CORS (for frontend access)
 CORS_ORIGINS=http://localhost:3001,http://localhost:3000
 ```
@@ -190,6 +185,266 @@ CORS_ORIGINS=http://localhost:3001,http://localhost:3000
 - Never commit `.env` files to version control
 
 See [docs/secrets.md](docs/secrets.md) for detailed security configuration.
+
+## NVIDIA NIMs Deployment & Configuration
+
+The Warehouse Operational Assistant uses **NVIDIA NIMs (NVIDIA Inference Microservices)** for AI-powered capabilities including LLM inference, embeddings, document processing, and content safety. All NIMs use **OpenAI-compatible API endpoints**, allowing for flexible deployment options.
+
+**Configuration Method:** All NIM endpoint URLs and API keys are configured via **environment variables**. The NeMo Guardrails SDK additionally uses Colang (`.co`) and YAML (`.yml`) configuration files for guardrails logic, but these files reference environment variables for endpoint URLs and API keys.
+
+### NIMs Overview
+
+The system uses the following NVIDIA NIMs:
+
+| NIM Service | Model | Purpose | Environment Variable | Default Endpoint |
+|-------------|-------|---------|---------------------|------------------|
+| **LLM Service** | Llama 3.3 Nemotron Super 49B | Primary language model for chat, reasoning, and generation | `LLM_NIM_URL` | `https://api.brev.dev/v1` |
+| **Embedding Service** | llama-3_2-nv-embedqa-1b-v2 | Semantic search embeddings for RAG | `EMBEDDING_NIM_URL` | `https://integrate.api.nvidia.com/v1` |
+| **NeMo Retriever** | NeMo Retriever | Document preprocessing and structure analysis | `NEMO_RETRIEVER_URL` | `https://integrate.api.nvidia.com/v1` |
+| **NeMo OCR** | NeMoRetriever-OCR-v1 | Intelligent OCR with layout understanding | `NEMO_OCR_URL` | `https://integrate.api.nvidia.com/v1` |
+| **Nemotron Parse** | Nemotron Parse | Advanced document parsing and extraction | `NEMO_PARSE_URL` | `https://integrate.api.nvidia.com/v1` |
+| **Small LLM** | nemotron-nano-12b-v2-vl | Structured data extraction and entity recognition | `LLAMA_NANO_VL_URL` | `https://integrate.api.nvidia.com/v1` |
+| **Large LLM Judge** | Llama 3.3 Nemotron Super 49B | Quality validation and confidence scoring | `LLAMA_70B_URL` | `https://integrate.api.nvidia.com/v1` |
+| **NeMo Guardrails** | NeMo Guardrails | Content safety and compliance validation | `RAIL_API_URL` | `https://integrate.api.nvidia.com/v1` |
+
+### Deployment Options
+
+NIMs can be deployed in three ways:
+
+#### Option 1: Cloud Endpoints (Recommended for Quick Start)
+
+Use NVIDIA-hosted cloud endpoints for immediate deployment without infrastructure setup.
+
+**For the 49B LLM Model:**
+- **Endpoint**: `https://api.brev.dev/v1`
+- **Use Case**: Production deployments, quick setup
+- **Configuration**: Set `LLM_NIM_URL=https://api.brev.dev/v1`
+
+**For Other NIMs:**
+- **Endpoint**: `https://integrate.api.nvidia.com/v1`
+- **Use Case**: Production deployments, quick setup
+- **Configuration**: Set respective environment variables (e.g., `EMBEDDING_NIM_URL=https://integrate.api.nvidia.com/v1`)
+
+**Environment Variables:**
+```bash
+# NVIDIA API Key (required for all cloud endpoints)
+NVIDIA_API_KEY=your-nvidia-api-key-here
+
+# LLM Service (49B model - uses brev.dev)
+LLM_NIM_URL=https://api.brev.dev/v1
+LLM_MODEL=nvcf:nvidia/llama-3.3-nemotron-super-49b-v1:dep-36ZiLbQIG2ZzK7gIIC5yh1E6lGk
+
+# Embedding Service (uses integrate.api.nvidia.com)
+EMBEDDING_NIM_URL=https://integrate.api.nvidia.com/v1
+
+# Document Processing NIMs (all use integrate.api.nvidia.com)
+NEMO_RETRIEVER_URL=https://integrate.api.nvidia.com/v1
+NEMO_OCR_URL=https://integrate.api.nvidia.com/v1
+NEMO_PARSE_URL=https://integrate.api.nvidia.com/v1
+LLAMA_NANO_VL_URL=https://integrate.api.nvidia.com/v1
+LLAMA_70B_URL=https://integrate.api.nvidia.com/v1
+
+# NeMo Guardrails
+RAIL_API_URL=https://integrate.api.nvidia.com/v1
+RAIL_API_KEY=your-nvidia-api-key-here  # Falls back to NVIDIA_API_KEY if not set
+```
+
+#### Option 2: Self-Hosted NIMs (Recommended for Production)
+
+Deploy NIMs on your own infrastructure for data privacy, cost control, and custom requirements.
+
+**Benefits:**
+- **Data Privacy**: Keep sensitive data on-premises
+- **Cost Control**: Avoid per-request cloud costs
+- **Custom Requirements**: Full control over infrastructure and configuration
+- **Low Latency**: Reduced network latency for on-premises deployments
+
+**Deployment Steps:**
+
+1. **Deploy NIMs on your infrastructure** (using NVIDIA NGC containers or Kubernetes):
+   ```bash
+   # Example: Deploy LLM NIM on port 8000
+   docker run --gpus all -p 8000:8000 \
+     nvcr.io/nvidia/nim/llama-3.3-nemotron-super-49b:latest
+   
+   # Example: Deploy Embedding NIM on port 8001
+   docker run --gpus all -p 8001:8001 \
+     nvcr.io/nvidia/nim/nv-embedqa-e5-v5:latest
+   ```
+
+2. **Configure environment variables** to point to your self-hosted endpoints:
+   ```bash
+   # Self-hosted LLM NIM
+   LLM_NIM_URL=http://your-nim-host:8000/v1
+   LLM_MODEL=nvidia/llama-3.3-nemotron-super-49b-v1
+   
+   # Self-hosted Embedding NIM
+   EMBEDDING_NIM_URL=http://your-nim-host:8001/v1
+   
+   # Self-hosted Document Processing NIMs
+   NEMO_RETRIEVER_URL=http://your-nim-host:8002/v1
+   NEMO_OCR_URL=http://your-nim-host:8003/v1
+   NEMO_PARSE_URL=http://your-nim-host:8004/v1
+   LLAMA_NANO_VL_URL=http://your-nim-host:8005/v1
+   LLAMA_70B_URL=http://your-nim-host:8006/v1
+   
+   # Self-hosted NeMo Guardrails
+   RAIL_API_URL=http://your-nim-host:8007/v1
+   
+   # API Key (if your self-hosted NIMs require authentication)
+   NVIDIA_API_KEY=your-api-key-here
+   ```
+
+3. **Verify connectivity**:
+   ```bash
+   # Test LLM endpoint
+   curl -X POST http://your-nim-host:8000/v1/chat/completions \
+     -H "Authorization: Bearer $NVIDIA_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"model":"nvidia/llama-3.3-nemotron-super-49b-v1","messages":[{"role":"user","content":"test"}]}'
+   
+   # Test Embedding endpoint
+   curl -X POST http://your-nim-host:8001/v1/embeddings \
+     -H "Authorization: Bearer $NVIDIA_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d '{"model":"nvidia/nv-embedqa-e5-v5","input":"test"}'
+   ```
+
+**Important Notes:**
+- All NIMs use **OpenAI-compatible API endpoints** (`/v1/chat/completions`, `/v1/embeddings`, etc.)
+- Self-hosted NIMs can be accessed via HTTP/HTTPS endpoints in the same fashion as cloud endpoints
+- Ensure your self-hosted NIMs are accessible from the Warehouse Operational Assistant application
+- For production, use HTTPS and proper authentication/authorization
+
+#### Option 3: Hybrid Deployment
+
+Mix cloud and self-hosted NIMs based on your requirements:
+
+```bash
+# Use cloud for LLM (49B model)
+LLM_NIM_URL=https://api.brev.dev/v1
+
+# Use self-hosted for embeddings (for data privacy)
+EMBEDDING_NIM_URL=http://your-nim-host:8001/v1
+
+# Use cloud for document processing
+NEMO_RETRIEVER_URL=https://integrate.api.nvidia.com/v1
+NEMO_OCR_URL=https://integrate.api.nvidia.com/v1
+```
+
+### Configuration Details
+
+#### LLM Service Configuration
+
+```bash
+# Required: API endpoint (cloud or self-hosted)
+LLM_NIM_URL=https://api.brev.dev/v1  # or http://your-nim-host:8000/v1
+
+# Required: Model identifier
+LLM_MODEL=nvcf:nvidia/llama-3.3-nemotron-super-49b-v1:dep-36ZiLbQIG2ZzK7gIIC5yh1E6lGk  # Cloud
+# OR
+LLM_MODEL=nvidia/llama-3.3-nemotron-super-49b-v1  # Self-hosted
+
+# Required: API key (same key works for all NVIDIA endpoints)
+NVIDIA_API_KEY=your-nvidia-api-key-here
+
+# Optional: Generation parameters
+LLM_TEMPERATURE=0.1
+LLM_MAX_TOKENS=2000
+LLM_TOP_P=1.0
+LLM_FREQUENCY_PENALTY=0.0
+LLM_PRESENCE_PENALTY=0.0
+
+# Optional: Client timeout (seconds)
+LLM_CLIENT_TIMEOUT=120
+
+# Optional: Caching
+LLM_CACHE_ENABLED=true
+LLM_CACHE_TTL_SECONDS=300
+```
+
+#### Embedding Service Configuration
+
+```bash
+# Required: API endpoint (cloud or self-hosted)
+EMBEDDING_NIM_URL=https://integrate.api.nvidia.com/v1  # or http://your-nim-host:8001/v1
+
+# Required: API key
+NVIDIA_API_KEY=your-nvidia-api-key-here
+```
+
+#### NeMo Guardrails Configuration
+
+```bash
+# Required: API endpoint (cloud or self-hosted)
+RAIL_API_URL=https://integrate.api.nvidia.com/v1  # or http://your-nim-host:8007/v1
+
+# Required: API key (falls back to NVIDIA_API_KEY if not set)
+RAIL_API_KEY=your-nvidia-api-key-here
+
+# Optional: Guardrails implementation mode
+USE_NEMO_GUARDRAILS_SDK=false  # Set to 'true' to use SDK with Colang (recommended)
+GUARDRAILS_USE_API=true  # Set to 'false' to use pattern-based fallback
+GUARDRAILS_TIMEOUT=10  # Timeout in seconds
+```
+
+### Getting NVIDIA API Keys
+
+1. **Sign up** for NVIDIA API access at [NVIDIA API Portal](https://build.nvidia.com/)
+2. **Generate API key** from your account dashboard
+3. **Set environment variable**: `NVIDIA_API_KEY=your-api-key-here`
+
+**Note:** The same API key works for all NVIDIA cloud endpoints (`api.brev.dev` and `integrate.api.nvidia.com`).
+
+### Verification
+
+After configuring NIMs, verify they are working:
+
+```bash
+# Test LLM endpoint
+curl -X POST $LLM_NIM_URL/chat/completions \
+  -H "Authorization: Bearer $NVIDIA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"'$LLM_MODEL'","messages":[{"role":"user","content":"Hello"}]}'
+
+# Test Embedding endpoint
+curl -X POST $EMBEDDING_NIM_URL/embeddings \
+  -H "Authorization: Bearer $NVIDIA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"nvidia/nv-embedqa-e5-v5","input":"test"}'
+
+# Check application health (includes NIM connectivity)
+curl http://localhost:8001/api/v1/health
+```
+
+### Troubleshooting NIMs
+
+**Common Issues:**
+
+1. **Authentication Errors (401/403)**:
+   - Verify `NVIDIA_API_KEY` is set correctly
+   - Ensure API key has access to the requested models
+   - Check API key hasn't expired
+
+2. **Connection Timeouts**:
+   - Verify NIM endpoint URLs are correct
+   - Check network connectivity to endpoints
+   - Increase `LLM_CLIENT_TIMEOUT` if needed
+   - For self-hosted NIMs, ensure they are running and accessible
+
+3. **Model Not Found (404)**:
+   - Verify `LLM_MODEL` matches the model available at your endpoint
+   - For cloud endpoints, check model identifier format (e.g., `nvcf:nvidia/...`)
+   - For self-hosted, use model name format (e.g., `nvidia/llama-3.3-nemotron-super-49b-v1`)
+
+4. **Rate Limiting (429)**:
+   - Reduce request frequency
+   - Implement request queuing/retry logic
+   - Consider self-hosting for higher throughput
+
+**For detailed NIM deployment guides, see:**
+- [NVIDIA NIM Documentation](https://docs.nvidia.com/nim/)
+- [NVIDIA NGC Containers](https://catalog.ngc.nvidia.com/containers?filters=&orderBy=scoreDESC&query=nim)
 
 ## Deployment Options
 
@@ -329,8 +584,8 @@ docker-compose -f deploy/compose/docker-compose.yaml up -d
    kubectl create secret generic warehouse-secrets \
      --from-literal=db-password=your-db-password \
      --from-literal=jwt-secret=your-jwt-secret \
-     --from-literal=nim-llm-api-key=your-nim-key \
-     --from-literal=nim-embeddings-api-key=your-embeddings-key \
+     --from-literal=nvidia-api-key=your-nvidia-api-key \
+     --from-literal=rail-api-key=your-rail-api-key \
      --from-literal=admin-password=your-admin-password \
      --namespace=warehouse-assistant
    ```
