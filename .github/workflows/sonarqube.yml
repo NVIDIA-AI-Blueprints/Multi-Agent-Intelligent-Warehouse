@@ -1,0 +1,16 @@
+name: SonarQube Analysis
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  sonarqube:
+    uses: NVIDIA-AI-Blueprints/sonarqube-workflows/.github/workflows/sonarqube-reusable-template.yml@main
+    with:
+      language: python
+      # testCommand: pytest --cov=chain_server,inventory_retriever,memory_retriever,guardrails --cov-report=xml
+    secrets: inherit
