@@ -14,7 +14,8 @@ jobs:
       # Language and test configuration
       language: python
       languageVersion: '3.11'
-      testCommand: pytest tests/ --cov=src --cov-report=xml
+      # testCommand not needed - workflow auto-detects requirements.txt and runs:
+      # uv run pytest tests/ --cov=src --cov-report=xml
 
       # Project creation parameters
       organization: TEGRASW
