@@ -2,7 +2,7 @@ name: SonarQube Analysis
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, add-sonarqube-integration ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
