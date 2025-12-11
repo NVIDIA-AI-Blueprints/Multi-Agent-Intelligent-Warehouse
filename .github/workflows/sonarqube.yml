@@ -1,0 +1,29 @@
+name: SonarQube Analysis
+
+on:
+  push:
+    branches: [ main, develop, add-sonarqube-integration ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  sonarqube:
+    uses: NVIDIA-AI-Blueprints/sonarqube-workflows/.github/workflows/sonarqube-reusable-template.yml@main
+    with:
+      # Language and test configuration
+      language: python
+      languageVersion: '3.11'
+      # testCommand not needed - workflow auto-detects requirements.txt and runs:
+      # uv run pytest tests/ --cov=src --cov-report=xml
+
+      # Project creation parameters
+      organization: TEGRASW
+      team: Blueprints-SRE
+      product: warehouse-operational-assistant
+      scmRepoName: Multi-Agent-Intelligent-Warehouse
+
+      # Optional parameters
+      projectTags: ai-blueprint,warehouse,multi-agent
+
+    secrets: inherit
