@@ -24,6 +24,5 @@ jobs:
 
       # Optional parameters
       projectTags: ai-blueprint,warehouse,multi-agent
-      projectKey: TEGRASW_Blueprints-SRE_warehouse-operational-assistant_multi-agent-warehouse
 
     secrets: inherit
