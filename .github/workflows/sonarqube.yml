@@ -9,7 +9,7 @@ on:
 
 jobs:
   sonarqube:
-    uses: NVIDIA-AI-Blueprints/sonarqube-workflows/.github/workflows/sonarqube-reusable-template.yml@main
+    uses: NVIDIA-AI-Blueprints/sonarqube-workflows/.github/workflows/sonarqube-reusable-template.yml@1e49f25
     with:
       language: python
       # testCommand: pytest --cov=chain_server,inventory_retriever,memory_retriever,guardrails --cov-report=xml
