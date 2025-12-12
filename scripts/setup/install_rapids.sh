@@ -57,19 +57,26 @@ pip install --upgrade pip setuptools wheel
 # Install RAPIDS cuML and cuDF
 echo "📦 Installing RAPIDS cuML and cuDF for $RAPIDS_CUDA..."
 echo "   This may take several minutes..."
+echo "   Installing core packages: cudf and cuml (required for forecasting)"
 
-# Install from NVIDIA PyPI index
+# Install core RAPIDS packages required for forecasting
+# Note: Only cudf and cuml are required. Other packages are optional.
 pip install --extra-index-url=https://pypi.nvidia.com \
-    cudf-cu12 \
-    cuml-cu12 \
-    cugraph-cu12 \
-    cuspatial-cu12 \
-    cuproj-cu12 \
-    cusignal-cu12 \
-    cuxfilter-cu12 \
-    cudf-pandas \
-    dask-cudf-cu12 \
-    dask-cuda
+    cudf-${RAPIDS_CUDA} \
+    cuml-${RAPIDS_CUDA}
+
+# Optional: Install additional RAPIDS packages if needed
+# Uncomment the lines below if you need these packages:
+# pip install --extra-index-url=https://pypi.nvidia.com \
+#     cugraph-${RAPIDS_CUDA} \
+#     cuspatial-${RAPIDS_CUDA} \
+#     cuproj-${RAPIDS_CUDA} \
+#     cuxfilter-${RAPIDS_CUDA} \
+#     cudf-pandas \
+#     dask-cudf-${RAPIDS_CUDA} \
+#     dask-cuda
+
+echo "   ✅ Core RAPIDS packages installed (cudf, cuml)"
 
 echo ""
 echo "✅ RAPIDS installation complete!"
