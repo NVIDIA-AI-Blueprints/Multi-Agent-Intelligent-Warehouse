@@ -87,7 +87,7 @@ def test_required_sections(nb: Dict) -> Tuple[bool, List[str]]:
         'Prerequisites',
         'Repository Setup',
         'Environment Setup',
-        'NVIDIA API Key',
+        'API Key',  # Updated to match "API Key Configuration (NVIDIA & Brev)"
         'Database Setup',
         'Verification',
         'Troubleshooting'
