@@ -118,6 +118,17 @@ npm start
 - **Node.js 20.0.0+** (LTS recommended) and npm (for frontend)
   - **Minimum**: Node.js 18.17.0+ (required for `node:path` protocol support)
   - **Recommended**: Node.js 20.x LTS for best compatibility
+
+### GPU Acceleration Prerequisites (Optional but Recommended)
+For **10-100x faster forecasting** with NVIDIA RAPIDS cuML:
+- **NVIDIA GPU** with CUDA 12.x support
+- **CUDA Compute Capability 7.0+** (Volta, Turing, Ampere, Ada, Hopper architectures)
+- **16GB+ GPU memory** (recommended for large datasets)
+- **32GB+ system RAM** (recommended)
+- **NVIDIA GPU drivers** (latest recommended)
+- **CUDA Toolkit 12.0+** (if not using Docker)
+
+**Note**: GPU acceleration is **optional**. The system works perfectly on CPU-only systems with automatic fallback.
   - **Note**: Node.js 18.0.0 - 18.16.x will fail with `Cannot find module 'node:path'` error during frontend build
 - Git
 - PostgreSQL client (`psql`) - Required for running database migrations
