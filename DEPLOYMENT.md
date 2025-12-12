@@ -253,7 +253,7 @@ Deploy NIMs on your own infrastructure for data privacy, cost control, and custo
 
 **Deployment Steps:**
 
-1. **Deploy NIMs on your infrastructure** (using NVIDIA NGC containers or Kubernetes):
+1. **Deploy NIMs on your infrastructure** (using NVIDIA NGC containers):
    ```bash
    # Example: Deploy LLM NIM on port 8000
    docker run --gpus all -p 8000:8000 \
