@@ -71,10 +71,30 @@ python scripts/data/quick_demo_data.py
 # 9. Generate historical demand data for forecasting (optional, required for Forecasting page)
 python scripts/data/generate_historical_demand.py
 
-# 10. Start API server
+# 10. (Optional) Install RAPIDS GPU acceleration for forecasting
+# ⚡ GPU Acceleration: Enables 10-100x faster forecasting with NVIDIA GPUs
+# Requirements:
+#   - NVIDIA GPU with CUDA 12.x support
+#   - CUDA Compute Capability 7.0+ (Volta, Turing, Ampere, Ada, Hopper)
+#   - 16GB+ GPU memory recommended
+#   - Python 3.9-3.11
+#
+# Installation:
+./scripts/setup/install_rapids.sh
+#
+# Or manually:
+# pip install --extra-index-url=https://pypi.nvidia.com cudf-cu12 cuml-cu12
+#
+# Verify installation:
+# python -c "import cudf, cuml; print('✅ RAPIDS installed successfully')"
+#
+# Note: If RAPIDS is not installed, forecasting will use CPU fallback with XGBoost GPU support
+#       The system automatically detects GPU availability and uses it when available
+
+# 11. Start API server
 ./scripts/start_server.sh
 
-# 11. Start frontend (in another terminal)
+# 12. Start frontend (in another terminal)
 cd src/ui/web
 npm install
 npm start
@@ -770,12 +790,92 @@ LIMIT 10;
 docker-compose up -d --scale api=3
 ```
 
+## GPU Acceleration with RAPIDS
+
+### Overview
+
+The forecasting system supports **NVIDIA RAPIDS cuML** for GPU-accelerated demand forecasting, providing **10-100x performance improvements** over CPU-only execution.
+
+### Key Benefits
+
+- **🚀 10-100x Faster Training**: GPU-accelerated model training with cuML
+- **⚡ Real-Time Inference**: Sub-second predictions for large datasets
+- **🔄 Automatic Fallback**: Seamlessly falls back to CPU if GPU unavailable
+- **📊 Full Model Support**: Random Forest, Linear Regression, SVR via cuML; XGBoost via CUDA
+- **🎯 Zero Code Changes**: Works automatically when RAPIDS is installed
+
+### Installation
+
+#### Quick Install (Recommended)
+
+```bash
+# Activate virtual environment
+source env/bin/activate
+
+# Run installation script
+./scripts/setup/install_rapids.sh
+```
+
+#### Manual Installation
+
+```bash
+# Activate virtual environment
+source env/bin/activate
+
+# Install RAPIDS cuDF and cuML
+pip install --extra-index-url=https://pypi.nvidia.com cudf-cu12 cuml-cu12
+```
+
+#### Verify Installation
+
+```bash
+python -c "import cudf, cuml; print('✅ RAPIDS installed successfully')"
+```
+
+### Usage
+
+Once installed, RAPIDS is **automatically detected and used** when:
+1. GPU is available and CUDA is properly configured
+2. Training is initiated from the Forecasting page
+3. The system will show: `🚀 GPU acceleration: ✅ Enabled (RAPIDS cuML)`
+
+### Performance Metrics
+
+With RAPIDS enabled, you can expect:
+- **Training Time**: 10-100x faster than CPU-only
+- **Inference Speed**: Sub-second predictions for 38+ SKUs
+- **Memory Efficiency**: Optimized GPU memory usage
+- **Scalability**: Linear scaling with additional GPUs
+
+### Troubleshooting
+
+**GPU not detected?**
+- Verify NVIDIA drivers: `nvidia-smi`
+- Check CUDA version: `nvcc --version` (should be 12.0+)
+- Ensure GPU has compute capability 7.0+
+
+**RAPIDS installation failed?**
+- Check Python version (3.9-3.11 supported)
+- Verify CUDA toolkit is installed
+- Try manual installation: `pip install --extra-index-url=https://pypi.nvidia.com cudf-cu12 cuml-cu12`
+
+**System falls back to CPU?**
+- This is normal if GPU is unavailable
+- CPU fallback still works with XGBoost GPU support
+- Check logs for: `⚠️ RAPIDS cuML not available - checking for XGBoost GPU support...`
+
+### Additional Resources
+
+- **Detailed RAPIDS Setup**: [docs/forecasting/RAPIDS_SETUP.md](docs/forecasting/RAPIDS_SETUP.md)
+- **RAPIDS Documentation**: https://rapids.ai/
+- **NVIDIA cuML**: https://docs.rapids.ai/api/cuml/stable/
+
 ## Additional Resources
 
 - **Security Guide**: [docs/secrets.md](docs/secrets.md)
 - **API Documentation**: http://localhost:8001/docs (when running)
 - **Architecture**: [README.md](README.md)
-- **RAPIDS Setup**: [docs/forecasting/RAPIDS_SETUP.md](docs/forecasting/RAPIDS_SETUP.md) (for GPU-accelerated forecasting)
+- **RAPIDS Setup Guide**: [docs/forecasting/RAPIDS_SETUP.md](docs/forecasting/RAPIDS_SETUP.md)
 
 ## Support
 
