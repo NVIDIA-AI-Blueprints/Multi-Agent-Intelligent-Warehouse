@@ -26,12 +26,12 @@ class NIMConfig:
 
     llm_api_key: str = os.getenv("NVIDIA_API_KEY", "")
     llm_base_url: str = os.getenv("LLM_NIM_URL", "https://integrate.api.nvidia.com/v1")
-    embedding_api_key: str = os.getenv("NVIDIA_API_KEY", "")
+    embedding_api_key: str = os.getenv("EMBEDDING_API_KEY") or os.getenv("NVIDIA_API_KEY", "")
     embedding_base_url: str = os.getenv(
         "EMBEDDING_NIM_URL", "https://integrate.api.nvidia.com/v1"
     )
-    llm_model: str = os.getenv("LLM_MODEL", "nvcf:nvidia/llama-3.3-nemotron-super-49b-v1:dep-36aDoCw8eWAvcL3iQGtYZUoRHVM")
-    embedding_model: str = "nvidia/nv-embedqa-e5-v5"
+    llm_model: str = os.getenv("LLM_MODEL", "nvcf:nvidia/llama-3.3-nemotron-super-49b-v1:dep-36is50clLXA5mF69NPgpmw1HJKs")
+    embedding_model: str = os.getenv("EMBEDDING_MODEL", "nvidia/nv-embedqa-e5-v5")
     timeout: int = int(os.getenv("LLM_CLIENT_TIMEOUT", "120"))  # Increased from 60s to 120s to prevent premature timeouts
     # LLM generation parameters (configurable via environment variables)
     default_temperature: float = float(os.getenv("LLM_TEMPERATURE", "0.1"))

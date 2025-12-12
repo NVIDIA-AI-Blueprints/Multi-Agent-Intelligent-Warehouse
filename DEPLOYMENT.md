@@ -269,7 +269,7 @@ Deploy NIMs on your own infrastructure for data privacy, cost control, and custo
    
    # Example: Deploy Embedding NIM on port 8001
    docker run --gpus all -p 8001:8001 \
-     nvcr.io/nvidia/nim/nv-embedqa-e5-v5:latest
+     nvcr.io/nvidia/nim/llama-3_2-nv-embedqa-1b-v2:latest
    ```
 
 2. **Configure environment variables** to point to your self-hosted endpoints:
@@ -307,7 +307,7 @@ Deploy NIMs on your own infrastructure for data privacy, cost control, and custo
    curl -X POST http://your-nim-host:8001/v1/embeddings \
      -H "Authorization: Bearer $NVIDIA_API_KEY" \
      -H "Content-Type: application/json" \
-     -d '{"model":"nvidia/nv-embedqa-e5-v5","input":"test"}'
+     -d '{"model":"nvidia/llama-3_2-nv-embedqa-1b-v2","input":"test"}'
    ```
 
 **Important Notes:**
@@ -411,7 +411,7 @@ curl -X POST $LLM_NIM_URL/chat/completions \
 curl -X POST $EMBEDDING_NIM_URL/embeddings \
   -H "Authorization: Bearer $NVIDIA_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"model":"nvidia/nv-embedqa-e5-v5","input":"test"}'
+  -d '{"model":"nvidia/llama-3_2-nv-embedqa-1b-v2","input":"test"}'
 
 # Check application health (includes NIM connectivity)
 curl http://localhost:8001/api/v1/health

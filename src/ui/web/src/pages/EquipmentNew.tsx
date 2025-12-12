@@ -36,6 +36,29 @@ import {
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { equipmentAPI, EquipmentAsset } from '../services/api';
 
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`equipment-tabpanel-${index}`}
+      aria-labelledby={`equipment-tab-${index}`}
+      style={{ width: '100%' }}
+      {...other}
+    >
+      {value === index && <Box sx={{ width: '100%' }}>{children}</Box>}
+    </div>
+  );
+}
+
 const EquipmentNew: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<EquipmentAsset | null>(null);
@@ -166,7 +189,7 @@ const EquipmentNew: React.FC = () => {
     { 
       field: 'asset_id', 
       headerName: 'Asset ID', 
-      width: 120,
+      width: 150,
       renderCell: (params) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <span>{getTypeIcon(params.row.type)}</span>
@@ -176,13 +199,13 @@ const EquipmentNew: React.FC = () => {
         </Box>
       ),
     },
-    { field: 'type', headerName: 'Type', width: 100 },
-    { field: 'model', headerName: 'Model', width: 150 },
-    { field: 'zone', headerName: 'Zone', width: 100 },
+    { field: 'type', headerName: 'Type', width: 120 },
+    { field: 'model', headerName: 'Model', flex: 2, minWidth: 200 },
+    { field: 'zone', headerName: 'Zone', width: 120 },
     {
       field: 'status',
       headerName: 'Status',
-      width: 120,
+      width: 140,
       renderCell: (params) => (
         <Chip
           label={params.value}
@@ -191,11 +214,11 @@ const EquipmentNew: React.FC = () => {
         />
       ),
     },
-    { field: 'owner_user', headerName: 'Assigned To', width: 120 },
+    { field: 'owner_user', headerName: 'Assigned To', flex: 1.5, minWidth: 150 },
     {
       field: 'next_pm_due',
       headerName: 'Next PM',
-      width: 120,
+      width: 140,
       renderCell: (params) => 
         params.value ? new Date(params.value).toLocaleDateString() : 'N/A',
     },
@@ -243,7 +266,7 @@ const EquipmentNew: React.FC = () => {
   }
 
   return (
-    <Box>
+    <Box sx={{ width: '100%', flexGrow: 1 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4" gutterBottom>
           Equipment & Asset Operations
@@ -258,7 +281,8 @@ const EquipmentNew: React.FC = () => {
         </Button>
       </Box>
 
-      <Paper sx={{ mb: 3 }}>
+      {/* Tabs */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
         <Tabs
           value={activeTab}
           onChange={(_, newValue) => {
@@ -268,190 +292,192 @@ const EquipmentNew: React.FC = () => {
               setSelectedAssetId(equipmentAssets[0].asset_id);
             }
           }}
-          sx={{ borderBottom: 1, borderColor: 'divider' }}
         >
           <Tab label="Assets" icon={<BuildIcon />} />
           <Tab label="Assignments" icon={<AssignmentIcon />} />
           <Tab label="Maintenance" icon={<SecurityIcon />} />
           <Tab label="Telemetry" icon={<TrendingUpIcon />} />
         </Tabs>
+      </Box>
 
-        <Box sx={{ p: 2 }}>
-          {activeTab === 0 && (
-            <DataGrid
-              rows={equipmentAssets || []}
-              columns={columns}
-              loading={isLoading}
-              pageSize={10}
-              rowsPerPageOptions={[10, 25, 50]}
-              disableSelectionOnClick
-              getRowId={(row) => row.asset_id}
-              autoHeight
-              sx={{
-                '& .MuiDataGrid-root': {
-                  border: 'none',
-                },
-                '& .MuiDataGrid-cell': {
-                  borderBottom: '1px solid #f0f0f0',
-                },
-                '& .MuiDataGrid-row': {
-                  minHeight: '48px !important',
-                },
-                '& .MuiDataGrid-columnHeaders': {
-                  backgroundColor: '#f5f5f5',
-                  fontWeight: 'bold',
-                },
-              }}
-            />
-          )}
+      {/* Assets Tab */}
+      <TabPanel value={activeTab} index={0}>
+        <Paper sx={{ height: 600, width: '100%', display: 'flex', flexDirection: 'column' }}>
+          <DataGrid
+            rows={equipmentAssets || []}
+            columns={columns}
+            loading={isLoading}
+            pageSize={10}
+            rowsPerPageOptions={[10, 25, 50]}
+            disableSelectionOnClick
+            getRowId={(row) => row.asset_id}
+            sx={{
+              flex: 1,
+              width: '100%',
+              border: 'none',
+              '& .MuiDataGrid-cell': {
+                borderBottom: '1px solid #f0f0f0',
+              },
+              '& .MuiDataGrid-row': {
+                minHeight: '48px !important',
+              },
+              '& .MuiDataGrid-columnHeaders': {
+                backgroundColor: '#f5f5f5',
+                fontWeight: 'bold',
+              },
+            }}
+          />
+        </Paper>
+      </TabPanel>
 
-          {activeTab === 1 && (
-            <Box>
-              <Typography variant="h6" gutterBottom>
-                Active Assignments
-              </Typography>
-              {assignments && assignments.length > 0 ? (
-                <List>
-                  {assignments.map((assignment: any) => (
-                    <Card key={assignment.id} sx={{ mb: 2 }}>
-                      <CardContent>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Box>
-                            <Typography variant="h6">
-                              {assignment.asset_id}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              Assigned to: {assignment.assignee}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              Type: {assignment.assignment_type}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              Since: {new Date(assignment.assigned_at).toLocaleString()}
-                            </Typography>
-                          </Box>
-                          <Button
-                            variant="outlined"
-                            color="error"
-                            onClick={() => handleRelease(assignment.asset_id)}
-                          >
-                            Release
-                          </Button>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </List>
-              ) : (
-                <Typography variant="body2" color="text.secondary">
-                  No active assignments
-                </Typography>
-              )}
-            </Box>
-          )}
-
-          {activeTab === 2 && (
-            <Box>
-              <Typography variant="h6" gutterBottom>
-                Maintenance Schedule
-              </Typography>
-              {maintenanceSchedule && maintenanceSchedule.length > 0 ? (
-                <List>
-                  {maintenanceSchedule.map((maintenance: any) => (
-                    <Card key={maintenance.id} sx={{ mb: 2 }}>
-                      <CardContent>
+      {/* Assignments Tab */}
+      <TabPanel value={activeTab} index={1}>
+        <Paper sx={{ p: 2, mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Active Assignments
+          </Typography>
+          {assignments && assignments.length > 0 ? (
+            <List>
+              {assignments.map((assignment: any) => (
+                <Card key={assignment.id} sx={{ mb: 2 }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Box>
                         <Typography variant="h6">
-                          {maintenance.asset_id} - {maintenance.maintenance_type}
+                          {assignment.asset_id}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          {maintenance.description}
+                          Assigned to: {assignment.assignee}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          Scheduled: {new Date(maintenance.performed_at).toLocaleString()}
+                          Type: {assignment.assignment_type}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          Duration: {maintenance.duration_minutes} minutes
+                          Since: {new Date(assignment.assigned_at).toLocaleString()}
                         </Typography>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </List>
-              ) : (
-                <Typography variant="body2" color="text.secondary">
-                  No scheduled maintenance
-                </Typography>
-              )}
-            </Box>
+                      </Box>
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        onClick={() => handleRelease(assignment.asset_id)}
+                      >
+                        Release
+                      </Button>
+                    </Box>
+                  </CardContent>
+                </Card>
+              ))}
+            </List>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              No active assignments
+            </Typography>
           )}
+        </Paper>
+      </TabPanel>
 
-          {activeTab === 3 && (
-            <Box>
-              <Typography variant="h6" gutterBottom>
-                Equipment Telemetry
-              </Typography>
-              {equipmentAssets && equipmentAssets.length > 0 ? (
-                <Box>
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      Select an asset to view telemetry data:
+      {/* Maintenance Tab */}
+      <TabPanel value={activeTab} index={2}>
+        <Paper sx={{ p: 2, mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Maintenance Schedule
+          </Typography>
+          {maintenanceSchedule && maintenanceSchedule.length > 0 ? (
+            <List>
+              {maintenanceSchedule.map((maintenance: any) => (
+                <Card key={maintenance.id} sx={{ mb: 2 }}>
+                  <CardContent>
+                    <Typography variant="h6">
+                      {maintenance.asset_id} - {maintenance.maintenance_type}
                     </Typography>
-                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
-                      {equipmentAssets.map((asset) => (
-                        <Chip
-                          key={asset.asset_id}
-                          label={`${asset.asset_id} (${asset.type})`}
-                          onClick={() => setSelectedAssetId(asset.asset_id)}
-                          color={selectedAssetId === asset.asset_id ? 'primary' : 'default'}
-                          variant={selectedAssetId === asset.asset_id ? 'filled' : 'outlined'}
-                          sx={{ cursor: 'pointer' }}
-                        />
+                    <Typography variant="body2" color="text.secondary">
+                      {maintenance.description}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Scheduled: {new Date(maintenance.performed_at).toLocaleString()}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Duration: {maintenance.duration_minutes} minutes
+                    </Typography>
+                  </CardContent>
+                </Card>
+              ))}
+            </List>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              No scheduled maintenance
+            </Typography>
+          )}
+        </Paper>
+      </TabPanel>
+
+      {/* Telemetry Tab */}
+      <TabPanel value={activeTab} index={3}>
+        <Paper sx={{ p: 2, mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Equipment Telemetry
+          </Typography>
+          {equipmentAssets && equipmentAssets.length > 0 ? (
+            <Box>
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  Select an asset to view telemetry data:
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
+                  {equipmentAssets.map((asset) => (
+                    <Chip
+                      key={asset.asset_id}
+                      label={`${asset.asset_id} (${asset.type})`}
+                      onClick={() => setSelectedAssetId(asset.asset_id)}
+                      color={selectedAssetId === asset.asset_id ? 'primary' : 'default'}
+                      variant={selectedAssetId === asset.asset_id ? 'filled' : 'outlined'}
+                      sx={{ cursor: 'pointer' }}
+                    />
+                  ))}
+                </Box>
+              </Box>
+              {selectedAssetId ? (
+                <Box>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    Asset: {selectedAssetId}
+                  </Typography>
+                  {telemetryLoading ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                      <CircularProgress />
+                    </Box>
+                  ) : telemetryData && telemetryData.length > 0 ? (
+                    <List>
+                      {telemetryData.map((data: any, index: number) => (
+                        <ListItem key={index}>
+                          <ListItemText
+                            primary={`${data.metric}: ${data.value} ${data.unit || ''}`}
+                            secondary={`${new Date(data.timestamp).toLocaleString()}${data.quality_score ? ` (Quality: ${(data.quality_score * 100).toFixed(1)}%)` : ''}`}
+                          />
+                        </ListItem>
                       ))}
-                    </Box>
-                  </Box>
-                  {selectedAssetId ? (
-                    <Box>
-                      <Typography variant="body2" color="text.secondary" gutterBottom>
-                        Asset: {selectedAssetId}
-                      </Typography>
-                      {telemetryLoading ? (
-                        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-                          <CircularProgress />
-                        </Box>
-                      ) : telemetryData && telemetryData.length > 0 ? (
-                        <List>
-                          {telemetryData.map((data: any, index: number) => (
-                            <ListItem key={index}>
-                              <ListItemText
-                                primary={`${data.metric}: ${data.value} ${data.unit || ''}`}
-                                secondary={`${new Date(data.timestamp).toLocaleString()}${data.quality_score ? ` (Quality: ${(data.quality_score * 100).toFixed(1)}%)` : ''}`}
-                              />
-                            </ListItem>
-                          ))}
-                        </List>
-                      ) : (
-                        <Alert severity="info" sx={{ mt: 2 }}>
-                          No telemetry data available for {selectedAssetId} in the last 7 days.
-                          <Typography variant="body2" sx={{ mt: 1 }}>
-                            Telemetry data may not have been generated yet, or the asset may not have any recent telemetry records.
-                          </Typography>
-                        </Alert>
-                      )}
-                    </Box>
+                    </List>
                   ) : (
-                    <Alert severity="info">
-                      Please select an asset from the list above to view telemetry data.
+                    <Alert severity="info" sx={{ mt: 2 }}>
+                      No telemetry data available for {selectedAssetId} in the last 7 days.
+                      <Typography variant="body2" sx={{ mt: 1 }}>
+                        Telemetry data may not have been generated yet, or the asset may not have any recent telemetry records.
+                      </Typography>
                     </Alert>
                   )}
                 </Box>
               ) : (
-                <Typography variant="body2" color="text.secondary">
-                  No equipment assets available
-                </Typography>
+                <Alert severity="info">
+                  Please select an asset from the list above to view telemetry data.
+                </Alert>
               )}
             </Box>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              No equipment assets available
+            </Typography>
           )}
-        </Box>
-      </Paper>
+        </Paper>
+      </TabPanel>
 
       {/* Asset Details Dialog */}
       <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>

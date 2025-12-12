@@ -222,12 +222,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         component="main"
         sx={{
           flexGrow: 1,
-          p: 3,
-          width: { md: `calc(100% - ${drawerWidth}px)` },
+          pt: 3,
+          px: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          minWidth: 0,
         }}
       >
         <Toolbar />
-        {children}
+        <Box sx={{ flex: 1, width: '100%', minWidth: 0 }}>
+          {children}
+        </Box>
       </Box>
     </Box>
   );
