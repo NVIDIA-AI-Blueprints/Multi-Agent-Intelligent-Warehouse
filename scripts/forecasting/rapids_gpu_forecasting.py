@@ -437,16 +437,16 @@ class RAPIDSForecastingAgent:
             'mae': mean_absolute_error(y_test_np, gb_pred)
         }
         
-        # 5. Ridge Regression
+        # 5. Ridge Regression (sklearn - needs NumPy arrays)
         logger.info("📊 Training Ridge Regression...")
         ridge_model = Ridge(alpha=1.0, random_state=self.config['random_state'])
-        ridge_model.fit(X_train_scaled, y_train)
-        ridge_pred = ridge_model.predict(X_test_scaled)
+        ridge_model.fit(X_train_scaled_np, y_train_np)
+        ridge_pred = ridge_model.predict(X_test_scaled_np)
         
         models['ridge_regression'] = ridge_model
         metrics['ridge_regression'] = {
-            'mse': mean_squared_error(y_test, ridge_pred),
-            'mae': mean_absolute_error(y_test, ridge_pred)
+            'mse': mean_squared_error(y_test_np, ridge_pred),
+            'mae': mean_absolute_error(y_test_np, ridge_pred)
         }
         
         # 6. Support Vector Regression (SVR)
