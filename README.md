@@ -140,13 +140,18 @@ The architecture consists of:
 - **Redis Caching** - Intelligent caching with 85%+ hit rate
 
 ### Demand Forecasting & Inventory Intelligence
+- **🚀 GPU-Accelerated Forecasting** - **NVIDIA RAPIDS cuML** integration for enterprise-scale performance
+  - **10-100x faster** training and inference compared to CPU-only
+  - **Automatic GPU detection** - Falls back to CPU if GPU not available
+  - **Full GPU acceleration** for Random Forest, Linear Regression, SVR via cuML
+  - **XGBoost GPU support** via CUDA when RAPIDS is available
+  - **Seamless integration** - No code changes needed, works out of the box
 - **AI-Powered Demand Forecasting** - Multi-model ensemble with Random Forest, XGBoost, Gradient Boosting, Linear Regression, Ridge Regression, SVR
 - **Advanced Feature Engineering** - Lag features, rolling statistics, seasonal patterns, promotional impacts
 - **Hyperparameter Optimization** - Optuna-based tuning with Time Series Cross-Validation
 - **Real-Time Predictions** - Live demand forecasts with confidence intervals
 - **Automated Reorder Recommendations** - AI-suggested stock orders with urgency levels
 - **Business Intelligence Dashboard** - Comprehensive analytics and performance monitoring
-- **GPU Acceleration** - NVIDIA RAPIDS cuML integration for enterprise-scale forecasting (10-100x faster)
 
 ### System Integrations
 - **WMS Integration** - SAP EWM, Manhattan, Oracle WMS
@@ -247,10 +252,16 @@ python scripts/data/quick_demo_data.py
 # 9. Generate historical demand data for forecasting (optional, required for Forecasting page)
 python scripts/data/generate_historical_demand.py
 
-# 10. Start API server
+# 10. (Optional) Install RAPIDS GPU acceleration for forecasting
+# This enables 10-100x faster forecasting with NVIDIA GPUs
+# Requires: NVIDIA GPU with CUDA 12.x support
+./scripts/setup/install_rapids.sh
+# Or manually: pip install --extra-index-url=https://pypi.nvidia.com cudf-cu12 cuml-cu12
+
+# 11. Start API server
 ./scripts/start_server.sh
 
-# 11. Start frontend (in another terminal)
+# 12. Start frontend (in another terminal)
 cd src/ui/web
 npm install
 npm start
