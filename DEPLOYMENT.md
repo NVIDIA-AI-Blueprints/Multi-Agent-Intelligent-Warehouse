@@ -9,7 +9,6 @@ Complete deployment guide for the Warehouse Operational Assistant with Docker de
 - [Environment Configuration](#environment-configuration)
 - [NVIDIA NIMs Deployment & Configuration](#nvidia-nims-deployment--configuration)
 - [Deployment Options](#deployment-options)
-  - [Option 1: Docker Deployment](#option-1-docker-deployment)
 - [Post-Deployment Setup](#post-deployment-setup)
 - [Access Points](#access-points)
 - [Monitoring & Maintenance](#monitoring--maintenance)
@@ -105,7 +104,7 @@ npm start
   - **Ubuntu/Debian**: `sudo apt-get install postgresql-client`
   - **macOS**: `brew install postgresql` or `brew install libpq`
   - **Windows**: Install from [PostgreSQL downloads](https://www.postgresql.org/download/windows/)
-  - **Alternative**: Use Docker (see Docker Deployment section below)
+  - **Alternative**: Use Docker (see [Complete Setup Guide](#complete-setup-guide) notebook)
 
 ## Environment Configuration
 
@@ -440,127 +439,24 @@ curl http://localhost:8001/api/v1/health
 
 ## Deployment Options
 
-### Option 1: Docker Deployment
+### Complete Setup Guide
 
-#### Single Container Deployment
+For a comprehensive, step-by-step setup guide with automated checks and interactive instructions, see:
 
-```bash
-# 1. Build Docker image
-docker build -t warehouse-assistant:latest .
+📓 **[Complete Setup Guide (Jupyter Notebook)](notebooks/setup/complete_setup_guide.ipynb)**
 
-# 2. Run container
-docker run -d \
-  --name warehouse-assistant \
-  -p 8001:8001 \
-  -p 3001:3001 \
-  --env-file .env \
-  warehouse-assistant:latest
-```
+This interactive notebook provides:
+- Automated environment validation
+- Step-by-step setup instructions
+- Interactive API key configuration
+- Database setup and migration guidance
+- User creation and demo data generation
+- Backend and frontend startup instructions
 
-#### Multi-Container Deployment (Recommended)
-
-Use Docker Compose for full stack deployment:
-
-```bash
-# 1. Start all services
-docker-compose -f deploy/compose/docker-compose.dev.yaml up -d
-
-# 2. View logs
-docker-compose -f deploy/compose/docker-compose.dev.yaml logs -f
-
-# 3. Stop services
-docker-compose -f deploy/compose/docker-compose.dev.yaml down
-
-# 4. Rebuild and restart
-docker-compose -f deploy/compose/docker-compose.dev.yaml up -d --build
-```
-
-**Docker Compose Services:**
-- **timescaledb**: TimescaleDB database (port 5435)
-- **redis**: Caching layer (port 6379)
-- **kafka**: Message broker (port 9092)
-- **milvus**: Vector database (port 19530)
-- **prometheus**: Metrics collection (port 9090)
-- **grafana**: Monitoring dashboards (port 3000)
-
-**Manually Start Specific Services:**
-
-If you want to start only specific services (e.g., just the database services):
-
-```bash
-# Start only database and infrastructure services
-docker-compose -f deploy/compose/docker-compose.dev.yaml up -d timescaledb redis milvus
-```
-
-**Production Docker Compose:**
-
-```bash
-# Use production compose file
-docker-compose -f deploy/compose/docker-compose.yaml up -d
-```
-
-**Note:** The production `docker-compose.yaml` only contains the `chain_server` service. For full infrastructure, use `docker-compose.dev.yaml` or deploy services separately.
-
-#### Docker Deployment Steps
-
-1. **Configure environment:**
-   ```bash
-   # For Docker Compose, place .env in deploy/compose/ directory
-   cp .env.example deploy/compose/.env
-   # Edit deploy/compose/.env with production values
-   nano deploy/compose/.env  # or your preferred editor
-   
-   # Alternative: If using project root .env, ensure you run commands from project root
-   # cp .env.example .env
-   # nano .env
-   ```
-
-2. **Start infrastructure:**
-   ```bash
-   # For development (uses timescaledb service)
-   docker-compose -f deploy/compose/docker-compose.dev.yaml up -d timescaledb redis milvus
-   
-   # For production, you may need to deploy services separately
-   # or use docker-compose.dev.yaml for local testing
-   ```
-
-3. **Run database migrations:**
-   ```bash
-   # Wait for services to be ready
-   sleep 10
-   
-   # For development (timescaledb service)
-   docker-compose -f deploy/compose/docker-compose.dev.yaml exec timescaledb psql -U warehouse -d warehouse -f /docker-entrypoint-initdb.d/000_schema.sql
-   # ... (run other migration files)
-   
-   # Or using psql from host (if installed)
-   PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f data/postgres/000_schema.sql
-   ```
-
-4. **Create users:**
-   ```bash
-   # For development, run from host (requires Python environment)
-   source env/bin/activate
-   python scripts/setup/create_default_users.py
-   
-   # Or if running in a container
-   docker-compose -f deploy/compose/docker-compose.dev.yaml exec chain_server python scripts/setup/create_default_users.py
-   ```
-
-5. **Generate demo data (optional):**
-   ```bash
-   # Quick demo data (run from host)
-   source env/bin/activate
-   python scripts/data/quick_demo_data.py
-   
-   # Historical demand data (required for Forecasting page)
-   python scripts/data/generate_historical_demand.py
-   ```
-
-6. **Start application:**
-   ```bash
-   docker-compose -f deploy/compose/docker-compose.yaml up -d
-   ```
+**To use the notebook:**
+1. Open `notebooks/setup/complete_setup_guide.ipynb` in Jupyter Lab/Notebook
+2. Follow the interactive cells step by step
+3. The notebook will guide you through the entire setup process
 
 ## Post-Deployment Setup
 
