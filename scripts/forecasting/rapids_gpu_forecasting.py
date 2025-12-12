@@ -19,6 +19,9 @@ import sys
 RAPIDS_AVAILABLE = False
 CUDA_AVAILABLE = False
 
+# Always import xgboost (needed for XGBoost training regardless of RAPIDS)
+import xgboost as xgb
+
 try:
     import cudf
     import cuml
@@ -36,15 +39,13 @@ except ImportError:
     RAPIDS_AVAILABLE = False
     print("⚠️ RAPIDS cuML not available - checking for XGBoost GPU support...")
 
-# CPU fallback imports
-if not RAPIDS_AVAILABLE:
-    from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
-    from sklearn.linear_model import LinearRegression, Ridge
-    from sklearn.svm import SVR
-    from sklearn.preprocessing import StandardScaler
-    from sklearn.model_selection import train_test_split
-    from sklearn.metrics import mean_squared_error, mean_absolute_error
-    import xgboost as xgb
+# CPU fallback imports (always import these for fallback compatibility)
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.linear_model import LinearRegression, Ridge
+from sklearn.svm import SVR
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, mean_absolute_error
     
     # Check if CUDA is available for XGBoost GPU support
     CUDA_AVAILABLE = False
