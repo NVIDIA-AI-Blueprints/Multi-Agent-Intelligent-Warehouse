@@ -1,6 +1,6 @@
 # Deployment Guide
 
-Complete deployment guide for the Warehouse Operational Assistant with Docker deployment options.
+Complete deployment guide for the Warehouse Operational Assistant.
 
 ## Table of Contents
 
