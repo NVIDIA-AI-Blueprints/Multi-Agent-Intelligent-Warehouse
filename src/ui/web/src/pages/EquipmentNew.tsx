@@ -22,6 +22,10 @@ import {
   IconButton,
   Tooltip,
   CircularProgress,
+  Drawer,
+  Divider,
+  LinearProgress,
+  Stack,
 } from '@mui/material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import {
@@ -32,7 +36,19 @@ import {
   Security as SecurityIcon,
   TrendingUp as TrendingUpIcon,
   Visibility as VisibilityIcon,
+  Close as CloseIcon,
+  CalendarToday as CalendarIcon,
+  Factory as FactoryIcon,
+  Settings as SettingsIcon,
+  BatteryChargingFull as BatteryIcon,
+  Speed as SpeedIcon,
+  LocationOn as LocationIcon,
+  Person as PersonIcon,
+  CheckCircle as CheckCircleIcon,
+  Warning as WarningIcon,
+  Info as InfoIcon,
 } from '@mui/icons-material';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { equipmentAPI, EquipmentAsset } from '../services/api';
 
@@ -65,6 +81,8 @@ const EquipmentNew: React.FC = () => {
   const [formData, setFormData] = useState<Partial<EquipmentAsset>>({});
   const [activeTab, setActiveTab] = useState(0);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerAssetId, setDrawerAssetId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const { data: equipmentAssets, isLoading, error } = useQuery(
@@ -88,6 +106,54 @@ const EquipmentNew: React.FC = () => {
     ['equipment-telemetry', selectedAssetId],
     () => selectedAssetId ? equipmentAPI.getTelemetry(selectedAssetId, undefined, 168) : [],
     { enabled: !!selectedAssetId && activeTab === 3 }
+  );
+
+  // Fetch detailed asset data for drawer
+  const { data: drawerAsset, isLoading: drawerAssetLoading } = useQuery(
+    ['equipment-asset-detail', drawerAssetId],
+    () => drawerAssetId ? equipmentAPI.getAsset(drawerAssetId) : null,
+    { enabled: !!drawerAssetId }
+  );
+
+  // Fetch telemetry for drawer
+  const { data: drawerTelemetryRaw, isLoading: drawerTelemetryLoading } = useQuery(
+    ['equipment-telemetry-drawer', drawerAssetId],
+    () => drawerAssetId ? equipmentAPI.getTelemetry(drawerAssetId, undefined, 168) : [],
+    { enabled: !!drawerAssetId && drawerOpen }
+  );
+
+  // Transform telemetry data for chart
+  const drawerTelemetry = React.useMemo(() => {
+    if (!drawerTelemetryRaw || !Array.isArray(drawerTelemetryRaw) || drawerTelemetryRaw.length === 0) return [];
+    
+    // Group by timestamp and aggregate metrics
+    const grouped: Record<string, Record<string, any>> = {};
+    drawerTelemetryRaw.forEach((item: any) => {
+      const timestamp = item.timestamp || item.ts;
+      if (!timestamp) return;
+      
+      const timeKey = new Date(timestamp).toISOString();
+      if (!grouped[timeKey]) {
+        grouped[timeKey] = { timestamp: new Date(timestamp).getTime(), timeLabel: new Date(timestamp).toLocaleString() };
+      }
+      const metricName = item.metric || 'value';
+      grouped[timeKey][metricName] = item.value;
+    });
+    
+    return Object.values(grouped).sort((a: any, b: any) => a.timestamp - b.timestamp);
+  }, [drawerTelemetryRaw]);
+
+  // Get unique metrics for chart lines
+  const telemetryMetrics = React.useMemo(() => {
+    if (!drawerTelemetryRaw || !Array.isArray(drawerTelemetryRaw)) return [];
+    return Array.from(new Set(drawerTelemetryRaw.map((item: any) => item.metric).filter(Boolean)));
+  }, [drawerTelemetryRaw]);
+
+  // Fetch maintenance schedule for drawer
+  const { data: drawerMaintenance, isLoading: drawerMaintenanceLoading } = useQuery(
+    ['equipment-maintenance-drawer', drawerAssetId],
+    () => drawerAssetId ? equipmentAPI.getMaintenanceSchedule(drawerAssetId, undefined, 90) : [],
+    { enabled: !!drawerAssetId && drawerOpen }
   );
 
   const assignMutation = useMutation(equipmentAPI.assignAsset, {
@@ -185,13 +251,35 @@ const EquipmentNew: React.FC = () => {
     }
   };
 
+  const handleAssetClick = (assetId: string) => {
+    setDrawerAssetId(assetId);
+    setDrawerOpen(true);
+  };
+
+  const handleDrawerClose = () => {
+    setDrawerOpen(false);
+    setDrawerAssetId(null);
+  };
+
   const columns: GridColDef[] = [
     { 
       field: 'asset_id', 
       headerName: 'Asset ID', 
       width: 150,
       renderCell: (params) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box 
+          sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 1,
+            cursor: 'pointer',
+            '&:hover': {
+              textDecoration: 'underline',
+              color: 'primary.main',
+            }
+          }}
+          onClick={() => handleAssetClick(params.value)}
+        >
           <span>{getTypeIcon(params.row.type)}</span>
           <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
             {params.value}
@@ -200,7 +288,7 @@ const EquipmentNew: React.FC = () => {
       ),
     },
     { field: 'type', headerName: 'Type', width: 120 },
-    { field: 'model', headerName: 'Model', flex: 2, minWidth: 200 },
+    { field: 'model', headerName: 'Model', flex: 1, minWidth: 200 },
     { field: 'zone', headerName: 'Zone', width: 120 },
     {
       field: 'status',
@@ -214,7 +302,7 @@ const EquipmentNew: React.FC = () => {
         />
       ),
     },
-    { field: 'owner_user', headerName: 'Assigned To', flex: 1.5, minWidth: 150 },
+    { field: 'owner_user', headerName: 'Assigned To', flex: 1, minWidth: 150 },
     {
       field: 'next_pm_due',
       headerName: 'Next PM',
@@ -266,7 +354,7 @@ const EquipmentNew: React.FC = () => {
   }
 
   return (
-    <Box sx={{ width: '100%', flexGrow: 1 }}>
+    <Box sx={{ width: '100%', maxWidth: 'none', p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4" gutterBottom>
           Equipment & Asset Operations
@@ -302,7 +390,7 @@ const EquipmentNew: React.FC = () => {
 
       {/* Assets Tab */}
       <TabPanel value={activeTab} index={0}>
-        <Paper sx={{ height: 600, width: '100%', display: 'flex', flexDirection: 'column' }}>
+        <Paper sx={{ height: 600, width: '100%' }}>
           <DataGrid
             rows={equipmentAssets || []}
             columns={columns}
@@ -312,8 +400,6 @@ const EquipmentNew: React.FC = () => {
             disableSelectionOnClick
             getRowId={(row) => row.asset_id}
             sx={{
-              flex: 1,
-              width: '100%',
               border: 'none',
               '& .MuiDataGrid-cell': {
                 borderBottom: '1px solid #f0f0f0',
@@ -568,6 +654,358 @@ const EquipmentNew: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Asset Details Drawer */}
+      <Drawer
+        anchor="right"
+        open={drawerOpen}
+        onClose={handleDrawerClose}
+        PaperProps={{
+          sx: {
+            width: { xs: '100%', sm: '600px', md: '700px' },
+            maxWidth: '90vw',
+          },
+        }}
+      >
+        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+          {/* Header */}
+          <Box
+            sx={{
+              p: 3,
+              backgroundColor: 'primary.main',
+              color: 'white',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                {drawerAssetLoading ? (
+                  <CircularProgress size={24} sx={{ color: 'white' }} />
+                ) : (
+                  <>
+                    <span style={{ fontSize: '1.5rem', marginRight: '8px' }}>
+                      {drawerAsset ? getTypeIcon(drawerAsset.type) : '⚙️'}
+                    </span>
+                    {drawerAsset?.asset_id || drawerAssetId}
+                  </>
+                )}
+              </Typography>
+            </Box>
+            <IconButton onClick={handleDrawerClose} sx={{ color: 'white' }}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+
+          {/* Content */}
+          <Box sx={{ p: 3, flex: 1, overflow: 'auto' }}>
+            {drawerAssetLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+                <CircularProgress />
+              </Box>
+            ) : drawerAsset ? (
+              <Stack spacing={3}>
+                {/* Status Card */}
+                <Card sx={{ background: 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)', color: 'white' }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Box>
+                        <Typography variant="overline" sx={{ opacity: 0.9 }}>
+                          Current Status
+                        </Typography>
+                        <Typography variant="h4" sx={{ fontWeight: 'bold', mt: 1 }}>
+                          {drawerAsset.status.toUpperCase()}
+                        </Typography>
+                      </Box>
+                      <Chip
+                        label={drawerAsset.status}
+                        color={getStatusColor(drawerAsset.status) as any}
+                        sx={{ 
+                          backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                          color: 'white',
+                          fontWeight: 'bold',
+                          fontSize: '0.875rem',
+                        }}
+                      />
+                    </Box>
+                  </CardContent>
+                </Card>
+
+                {/* Basic Information Grid */}
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <Card sx={{ height: '100%' }}>
+                      <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                          <BuildIcon color="primary" />
+                          <Typography variant="subtitle2" color="text.secondary">
+                            Type
+                          </Typography>
+                        </Box>
+                        <Typography variant="h6">{drawerAsset.type}</Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Card sx={{ height: '100%' }}>
+                      <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                          <SettingsIcon color="primary" />
+                          <Typography variant="subtitle2" color="text.secondary">
+                            Model
+                          </Typography>
+                        </Box>
+                        <Typography variant="h6">{drawerAsset.model || 'N/A'}</Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Card sx={{ height: '100%' }}>
+                      <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                          <LocationIcon color="primary" />
+                          <Typography variant="subtitle2" color="text.secondary">
+                            Zone
+                          </Typography>
+                        </Box>
+                        <Typography variant="h6">{drawerAsset.zone || 'N/A'}</Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Card sx={{ height: '100%' }}>
+                      <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                          <PersonIcon color="primary" />
+                          <Typography variant="subtitle2" color="text.secondary">
+                            Assigned To
+                          </Typography>
+                        </Box>
+                        <Typography variant="h6">{drawerAsset.owner_user || 'Unassigned'}</Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
+
+                {/* Manufacturing Year */}
+                {drawerAsset.metadata?.manufacturing_year && (
+                  <Card sx={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white' }}>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <FactoryIcon sx={{ fontSize: 40 }} />
+                        <Box>
+                          <Typography variant="overline" sx={{ opacity: 0.9 }}>
+                            Manufacturing Year
+                          </Typography>
+                          <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+                            {drawerAsset.metadata.manufacturing_year}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Maintenance Cards */}
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <Card sx={{ borderLeft: '4px solid', borderLeftColor: 'success.main' }}>
+                      <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                          <CheckCircleIcon color="success" />
+                          <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                            Last Maintenance
+                          </Typography>
+                        </Box>
+                        {drawerAsset.last_maintenance ? (
+                          <Box>
+                            <Typography variant="h6" sx={{ mb: 1 }}>
+                              {new Date(drawerAsset.last_maintenance).toLocaleDateString()}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {new Date(drawerAsset.last_maintenance).toLocaleTimeString()}
+                            </Typography>
+                          </Box>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            No maintenance records
+                          </Typography>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Card sx={{ borderLeft: '4px solid', borderLeftColor: 'warning.main' }}>
+                      <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                          <CalendarIcon color="warning" />
+                          <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                            Next Maintenance
+                          </Typography>
+                        </Box>
+                        {drawerAsset.next_pm_due ? (
+                          <Box>
+                            <Typography variant="h6" sx={{ mb: 1 }}>
+                              {new Date(drawerAsset.next_pm_due).toLocaleDateString()}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {Math.ceil((new Date(drawerAsset.next_pm_due).getTime() - Date.now()) / (1000 * 60 * 60 * 24))} days remaining
+                            </Typography>
+                          </Box>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            Not scheduled
+                          </Typography>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                </Grid>
+
+                {/* Telemetry Chart */}
+                {drawerTelemetry && drawerTelemetry.length > 0 && (
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <TrendingUpIcon color="primary" />
+                        Telemetry Data (Last 7 Days)
+                      </Typography>
+                      {drawerTelemetryLoading ? (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                          <CircularProgress />
+                        </Box>
+                      ) : (
+                        <Box sx={{ height: 300 }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={drawerTelemetry.slice(-50)}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis 
+                                dataKey="timeLabel" 
+                                tick={{ fontSize: 12 }}
+                                angle={-45}
+                                textAnchor="end"
+                                height={80}
+                              />
+                              <YAxis />
+                              <RechartsTooltip />
+                              <Legend />
+                              {telemetryMetrics.length > 0 ? (
+                                telemetryMetrics.map((metric: string, index: number) => {
+                                  const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#00ff00', '#0088fe'];
+                                  return (
+                                    <Line 
+                                      key={metric}
+                                      type="monotone" 
+                                      dataKey={metric} 
+                                      stroke={colors[index % colors.length]} 
+                                      name={metric.replace(/_/g, ' ')}
+                                      strokeWidth={2}
+                                      dot={false}
+                                    />
+                                  );
+                                })
+                              ) : (
+                                <Line 
+                                  type="monotone" 
+                                  dataKey="value" 
+                                  stroke="#8884d8" 
+                                  name="Value"
+                                  strokeWidth={2}
+                                  dot={false}
+                                />
+                              )}
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </Box>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Maintenance History */}
+                {drawerMaintenance && drawerMaintenance.length > 0 && (
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <SecurityIcon color="primary" />
+                        Maintenance History
+                      </Typography>
+                      <List>
+                        {drawerMaintenance.slice(0, 5).map((maintenance: any, index: number) => (
+                          <React.Fragment key={index}>
+                            <ListItem>
+                              <ListItemText
+                                primary={
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                                      {maintenance.maintenance_type || 'Maintenance'}
+                                    </Typography>
+                                    <Chip 
+                                      label={maintenance.priority || 'medium'} 
+                                      size="small"
+                                      color={maintenance.priority === 'high' ? 'error' : maintenance.priority === 'medium' ? 'warning' : 'default'}
+                                    />
+                                  </Box>
+                                }
+                                secondary={
+                                  <Box>
+                                    <Typography variant="body2" color="text.secondary">
+                                      {maintenance.description || 'No description'}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {maintenance.performed_at 
+                                        ? new Date(maintenance.performed_at).toLocaleString()
+                                        : maintenance.scheduled_for
+                                        ? `Scheduled: ${new Date(maintenance.scheduled_for).toLocaleString()}`
+                                        : 'Date not available'}
+                                    </Typography>
+                                  </Box>
+                                }
+                              />
+                            </ListItem>
+                            {index < drawerMaintenance.length - 1 && <Divider />}
+                          </React.Fragment>
+                        ))}
+                      </List>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Additional Metadata */}
+                {drawerAsset.metadata && Object.keys(drawerAsset.metadata).length > 0 && (
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <InfoIcon color="primary" />
+                        Additional Information
+                      </Typography>
+                      <Grid container spacing={2}>
+                        {Object.entries(drawerAsset.metadata)
+                          .filter(([key]) => key !== 'manufacturing_year')
+                          .map(([key, value]) => (
+                            <Grid item xs={12} sm={6} key={key}>
+                              <Box sx={{ p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}>
+                                <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase' }}>
+                                  {key.replace(/_/g, ' ')}
+                                </Typography>
+                                <Typography variant="body1" sx={{ fontWeight: 'medium', mt: 0.5 }}>
+                                  {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                </Typography>
+                              </Box>
+                            </Grid>
+                          ))}
+                      </Grid>
+                    </CardContent>
+                  </Card>
+                )}
+              </Stack>
+            ) : (
+              <Alert severity="error">Failed to load asset details</Alert>
+            )}
+          </Box>
+        </Box>
+      </Drawer>
     </Box>
   );
 };
