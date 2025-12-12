@@ -42,9 +42,9 @@ class GuardrailsConfig:
         "RAIL_API_URL", "https://integrate.api.nvidia.com/v1"
     )
     timeout: int = int(os.getenv("GUARDRAILS_TIMEOUT", "10"))
-    use_api: bool = os.getenv("GUARDRAILS_USE_API", "true").lower() == "true"
+    use_api: bool = os.getenv("GUARDRAILS_USE_API", "false").lower() == "true"  # Disabled by default - API endpoint not available
     use_sdk: bool = os.getenv("USE_NEMO_GUARDRAILS_SDK", "false").lower() == "true"
-    model_name: str = "nvidia/llama-3-70b-instruct"
+    model_name: str = os.getenv("GUARDRAILS_MODEL", "nvidia/llama-3-70b-instruct")  # Note: This model may not be available at the endpoint
     temperature: float = 0.1
     max_tokens: int = 1000
     top_p: float = 0.9
@@ -197,8 +197,10 @@ class GuardrailsService:
                 )
 
             # Use chat completions endpoint for guardrails
-            # NeMo Guardrails can be accessed via the standard chat completions endpoint
-            # with a guardrails-enabled model or via a dedicated guardrails endpoint
+            # NOTE: The API approach is currently disabled by default (GUARDRAILS_USE_API=false)
+            # because the guardrails endpoint/model may not be available at integrate.api.nvidia.com
+            # The model "nvidia/llama-3-70b-instruct" returns 404 at this endpoint.
+            # Use pattern matching (default) or SDK (USE_NEMO_GUARDRAILS_SDK=true) instead.
             response = await self.api_client.post(
                 "/chat/completions",
                 json={
