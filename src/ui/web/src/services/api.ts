@@ -559,12 +559,30 @@ export interface User {
 export const userAPI = {
   getUsers: async (): Promise<User[]> => {
     try {
-      const response = await api.get('/auth/users');
-      return response.data;
+      // Try public endpoint first (for dropdowns)
+      const response = await api.get('/auth/users/public');
+      // Map the public response to User format
+      return response.data.map((user: any) => ({
+        id: user.id,
+        username: user.username,
+        full_name: user.full_name,
+        role: user.role,
+        email: '', // Not included in public endpoint
+        status: 'active',
+        created_at: '',
+        updated_at: '',
+        last_login: null,
+      }));
     } catch (error) {
-      // If not admin or endpoint doesn't exist, return empty array
-      console.warn('Could not fetch users:', error);
-      return [];
+      // Fallback to admin endpoint if public fails
+      try {
+        const response = await api.get('/auth/users');
+        return response.data;
+      } catch (adminError) {
+        // If both fail, return empty array
+        console.warn('Could not fetch users:', error);
+        return [];
+      }
     }
   },
 };

@@ -38,9 +38,13 @@ const Safety: React.FC = () => {
     safetyAPI.getPolicies
   );
 
-  const { data: users } = useQuery(
+  const { data: users, isLoading: usersLoading, error: usersError } = useQuery(
     'users',
-    userAPI.getUsers
+    userAPI.getUsers,
+    {
+      retry: 2,
+      staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    }
   );
 
   const reportMutation = useMutation(safetyAPI.reportIncident, {
@@ -206,14 +210,18 @@ const Safety: React.FC = () => {
                   label="Reported By"
                   required
                 >
-                  {users && users.length > 0 ? (
+                  {usersLoading ? (
+                    <MenuItem value="" disabled>Loading users...</MenuItem>
+                  ) : usersError ? (
+                    <MenuItem value="" disabled>Error loading users</MenuItem>
+                  ) : users && users.length > 0 ? (
                     users.map((user: User) => (
                       <MenuItem key={user.id} value={user.full_name || user.username}>
                         {user.full_name || user.username} ({user.role})
                       </MenuItem>
                     ))
                   ) : (
-                    <MenuItem value="">No users available</MenuItem>
+                    <MenuItem value="" disabled>No users available</MenuItem>
                   )}
                 </Select>
               </FormControl>

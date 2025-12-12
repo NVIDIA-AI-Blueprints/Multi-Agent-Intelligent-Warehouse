@@ -271,6 +271,28 @@ async def change_password(
         )
 
 
+@router.get("/auth/users/public", response_model=List[dict])
+async def get_users_for_selection():
+    """Get list of users for dropdown selection (public endpoint, returns basic info only)."""
+    try:
+        await user_service.initialize()
+        users = await user_service.get_all_users()
+        # Return only basic info needed for dropdowns
+        return [
+            {
+                "id": user.id,
+                "username": user.username,
+                "full_name": user.full_name,
+                "role": user.role.value if hasattr(user.role, 'value') else str(user.role),
+            }
+            for user in users
+            if user.status == UserStatus.ACTIVE  # Only return active users
+        ]
+    except Exception as e:
+        logger.error(f"Failed to get users for selection: {e}")
+        return []  # Return empty list instead of raising error
+
+
 @router.get("/auth/users", response_model=List[User])
 async def get_all_users(admin_user: CurrentUser = Depends(require_admin)):
     """Get all users (admin only)."""

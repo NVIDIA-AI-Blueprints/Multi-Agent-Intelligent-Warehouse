@@ -424,6 +424,8 @@ See [docs/architecture/mcp-integration.md](docs/architecture/mcp-integration.md)
 ### Authentication
 - `POST /api/v1/auth/login` - User authentication
 - `GET /api/v1/auth/me` - Get current user information
+- `GET /api/v1/auth/users/public` - Get list of users for dropdown selection (public, no auth required)
+- `GET /api/v1/auth/users` - Get all users (admin only)
 
 ### Chat
 - `POST /api/v1/chat` - Chat with multi-agent system (requires NVIDIA API keys)

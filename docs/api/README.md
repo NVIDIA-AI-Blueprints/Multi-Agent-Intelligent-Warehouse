@@ -49,10 +49,57 @@ The Multi-Agent-Intelligent-Warehouse provides a comprehensive REST API for ware
 
 ## Authentication
 
-All API endpoints require authentication using JWT tokens. Include the token in the Authorization header:
+Most API endpoints require authentication using JWT tokens. Include the token in the Authorization header:
 
 ```http
 Authorization: Bearer <your-jwt-token>
+```
+
+**Note:** Some endpoints are public and do not require authentication (e.g., `/api/v1/auth/users/public`).
+
+### Authentication Endpoints
+
+#### GET /api/v1/auth/users/public
+Get list of users for dropdown selection (public endpoint, no authentication required).
+
+**Response:**
+```json
+[
+  {
+    "id": 1,
+    "username": "admin",
+    "full_name": "System Administrator",
+    "role": "admin"
+  },
+  {
+    "id": 2,
+    "username": "operator1",
+    "full_name": "John Doe",
+    "role": "operator"
+  }
+]
+```
+
+**Note:** Only returns active users with basic information (id, username, full_name, role).
+
+#### GET /api/v1/auth/users
+Get all users (admin only, requires authentication).
+
+**Response:**
+```json
+[
+  {
+    "id": 1,
+    "username": "admin",
+    "email": "admin@example.com",
+    "full_name": "System Administrator",
+    "role": "admin",
+    "status": "active",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z",
+    "last_login": "2024-01-15T10:30:00Z"
+  }
+]
 ```
 
 ## API Endpoints

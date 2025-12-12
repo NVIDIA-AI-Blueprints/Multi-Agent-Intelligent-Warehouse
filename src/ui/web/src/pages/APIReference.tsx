@@ -104,7 +104,9 @@ const APIReference: React.FC = () => {
         { method: "POST", path: "/api/v1/auth/login", description: "User login", status: "✅ Working" },
         { method: "POST", path: "/api/v1/auth/logout", description: "User logout", status: "✅ Working" },
         { method: "GET", path: "/api/v1/auth/profile", description: "Get user profile", status: "✅ Working" },
-        { method: "POST", path: "/api/v1/auth/refresh", description: "Refresh JWT token", status: "✅ Working" }
+        { method: "POST", path: "/api/v1/auth/refresh", description: "Refresh JWT token", status: "✅ Working" },
+        { method: "GET", path: "/api/v1/auth/users/public", description: "Get list of users for dropdown selection (public, no auth required)", status: "✅ Working" },
+        { method: "GET", path: "/api/v1/auth/users", description: "Get all users (admin only)", status: "✅ Working" }
       ]
     },
     {
