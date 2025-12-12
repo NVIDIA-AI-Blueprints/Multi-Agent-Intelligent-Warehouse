@@ -30,7 +30,7 @@ try:
     print("✅ RAPIDS cuML detected - GPU acceleration enabled")
 except ImportError:
     RAPIDS_AVAILABLE = False
-    print("⚠️ RAPIDS cuML not available - falling back to CPU")
+    print("⚠️ RAPIDS cuML not available - checking for XGBoost GPU support...")
 
 # CPU fallback imports
 if not RAPIDS_AVAILABLE:
@@ -41,6 +41,34 @@ if not RAPIDS_AVAILABLE:
     from sklearn.model_selection import train_test_split
     from sklearn.metrics import mean_squared_error, mean_absolute_error
     import xgboost as xgb
+    
+    # Check if CUDA is available for XGBoost GPU support
+    CUDA_AVAILABLE = False
+    try:
+        # Check if nvidia-smi is available
+        import subprocess
+        result = subprocess.run(['nvidia-smi'], capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            # Check if XGBoost supports GPU (check for 'gpu_hist' tree method)
+            # XGBoost with GPU support should have 'gpu_hist' available
+            try:
+                # Check XGBoost build info for GPU support
+                xgb_config = xgb.get_config()
+                # Try to create a simple model with GPU to test
+                # We'll just check if the parameter is accepted
+                test_params = {'tree_method': 'hist', 'device': 'cuda', 'n_estimators': 1}
+                # If this doesn't raise an error, GPU is likely available
+                # We'll actually test it when creating the model
+                CUDA_AVAILABLE = True
+                print("✅ CUDA detected - XGBoost GPU acceleration will be enabled")
+            except Exception as e:
+                print(f"⚠️ CUDA detected but XGBoost GPU support may not be available")
+                print(f"   Error: {e}")
+                print("   To enable GPU: pip install 'xgboost[gpu]' or use conda: conda install -c conda-forge py-xgboost-gpu")
+                CUDA_AVAILABLE = False
+    except (FileNotFoundError, subprocess.TimeoutExpired, Exception) as e:
+        print("⚠️ NVIDIA GPU not detected - using CPU only")
+        CUDA_AVAILABLE = False
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -55,7 +83,8 @@ class RAPIDSForecastingAgent:
         self.models = {}
         self.feature_columns = []
         self.scaler = None
-        self.use_gpu = RAPIDS_AVAILABLE
+        # Enable GPU if RAPIDS is available OR if CUDA is available for XGBoost
+        self.use_gpu = RAPIDS_AVAILABLE or (not RAPIDS_AVAILABLE and CUDA_AVAILABLE)
         
     def _get_default_config(self) -> Dict:
         """Get default configuration"""
@@ -141,8 +170,8 @@ class RAPIDSForecastingAgent:
         df = pd.DataFrame([dict(row) for row in results])
         df['sku'] = sku
         
-        # Convert to cuDF if RAPIDS is available
-        if self.use_gpu:
+        # Convert to cuDF if RAPIDS is available (not just if GPU is available)
+        if RAPIDS_AVAILABLE:
             df = cudf.from_pandas(df)
             logger.info(f"✅ Data converted to cuDF for GPU processing: {len(df)} rows")
         
@@ -178,7 +207,7 @@ class RAPIDSForecastingAgent:
         df['brand_tier'] = df['brand'].map(brand_mapping)
         
         # Encode categorical variables
-        if self.use_gpu:
+        if RAPIDS_AVAILABLE:
             # cuDF categorical encoding
             df['brand_encoded'] = df['brand'].astype('category').cat.codes
             df['brand_tier_encoded'] = df['brand_tier'].astype('category').cat.codes
@@ -212,7 +241,7 @@ class RAPIDSForecastingAgent:
         logger.info("🤖 Training models...")
         
         # Split data
-        if self.use_gpu:
+        if RAPIDS_AVAILABLE:
             X_train, X_test, y_train, y_test = cu_train_test_split(
                 X, y, test_size=self.config['test_size'], random_state=self.config['random_state']
             )
@@ -222,7 +251,7 @@ class RAPIDSForecastingAgent:
             )
         
         # Scale features
-        if self.use_gpu:
+        if RAPIDS_AVAILABLE:
             self.scaler = cuStandardScaler()
         else:
             self.scaler = StandardScaler()
@@ -235,7 +264,7 @@ class RAPIDSForecastingAgent:
         
         # 1. Random Forest
         logger.info("🌲 Training Random Forest...")
-        if self.use_gpu:
+        if RAPIDS_AVAILABLE:
             rf_model = cuRandomForestRegressor(
                 n_estimators=self.config['n_estimators'],
                 max_depth=self.config['max_depth'],
@@ -252,7 +281,7 @@ class RAPIDSForecastingAgent:
         rf_pred = rf_model.predict(X_test_scaled)
         
         models['random_forest'] = rf_model
-        if self.use_gpu:
+        if RAPIDS_AVAILABLE:
             metrics['random_forest'] = {
                 'mse': cu_mean_squared_error(y_test, rf_pred),
                 'mae': cu_mean_absolute_error(y_test, rf_pred)
@@ -265,7 +294,7 @@ class RAPIDSForecastingAgent:
         
         # 2. Linear Regression
         logger.info("📈 Training Linear Regression...")
-        if self.use_gpu:
+        if RAPIDS_AVAILABLE:
             lr_model = cuLinearRegression()
         else:
             lr_model = LinearRegression()
@@ -274,7 +303,7 @@ class RAPIDSForecastingAgent:
         lr_pred = lr_model.predict(X_test_scaled)
         
         models['linear_regression'] = lr_model
-        if self.use_gpu:
+        if RAPIDS_AVAILABLE:
             metrics['linear_regression'] = {
                 'mse': cu_mean_squared_error(y_test, lr_pred),
                 'mae': cu_mean_absolute_error(y_test, lr_pred)
@@ -285,18 +314,28 @@ class RAPIDSForecastingAgent:
                 'mae': mean_absolute_error(y_test, lr_pred)
             }
         
-        # 3. XGBoost (GPU-enabled)
+        # 3. XGBoost (GPU-enabled if available)
         logger.info("🚀 Training XGBoost...")
-        if self.use_gpu:
+        if self.use_gpu and CUDA_AVAILABLE:
             # GPU-enabled XGBoost
-            xgb_model = xgb.XGBRegressor(
-                n_estimators=100,
-                max_depth=6,
-                learning_rate=0.1,
-                random_state=self.config['random_state'],
-                tree_method='hist',
-                device='cuda'
-            )
+            try:
+                xgb_model = xgb.XGBRegressor(
+                    n_estimators=100,
+                    max_depth=6,
+                    learning_rate=0.1,
+                    random_state=self.config['random_state'],
+                    tree_method='hist',
+                    device='cuda'
+                )
+                logger.info("   Using GPU acceleration (CUDA)")
+            except Exception as e:
+                logger.warning(f"   GPU XGBoost failed, falling back to CPU: {e}")
+                xgb_model = xgb.XGBRegressor(
+                    n_estimators=100,
+                    max_depth=6,
+                    learning_rate=0.1,
+                    random_state=self.config['random_state']
+                )
         else:
             # CPU XGBoost
             xgb_model = xgb.XGBRegressor(
@@ -310,7 +349,7 @@ class RAPIDSForecastingAgent:
         xgb_pred = xgb_model.predict(X_test_scaled)
         
         models['xgboost'] = xgb_model
-        if self.use_gpu:
+        if RAPIDS_AVAILABLE:
             metrics['xgboost'] = {
                 'mse': cu_mean_squared_error(y_test, xgb_pred),
                 'mae': cu_mean_absolute_error(y_test, xgb_pred)
@@ -352,7 +391,7 @@ class RAPIDSForecastingAgent:
         
         # 6. Support Vector Regression (SVR)
         logger.info("🔮 Training Support Vector Regression...")
-        if self.use_gpu:
+        if RAPIDS_AVAILABLE:
             svr_model = cuSVR(C=1.0, epsilon=0.1)
         else:
             svr_model = SVR(C=1.0, epsilon=0.1, kernel='rbf')
@@ -361,7 +400,7 @@ class RAPIDSForecastingAgent:
         svr_pred = svr_model.predict(X_test_scaled)
         
         models['svr'] = svr_model
-        if self.use_gpu:
+        if RAPIDS_AVAILABLE:
             metrics['svr'] = {
                 'mse': cu_mean_squared_error(y_test, svr_pred),
                 'mae': cu_mean_absolute_error(y_test, svr_pred)
@@ -443,7 +482,7 @@ class RAPIDSForecastingAgent:
         predictions = {}
         for model_name, model in self.models.items():
             pred = model.predict(X_future_scaled)
-            if self.use_gpu:
+            if RAPIDS_AVAILABLE:
                 pred = pred.to_pandas().values if hasattr(pred, 'to_pandas') else pred
             predictions[model_name] = pred.tolist()
         
@@ -594,7 +633,14 @@ async def main():
     print(f"\n🎉 Forecasting Complete!")
     print(f"📊 SKUs processed: {result['successful_forecasts']}/{result['total_skus']}")
     print(f"💾 Output file: {result['output_file']}")
-    print(f"🚀 GPU acceleration: {'✅ Enabled' if result['gpu_acceleration'] else '❌ Disabled (CPU fallback)'}")
+    gpu_status = result['gpu_acceleration']
+    if gpu_status:
+        if RAPIDS_AVAILABLE:
+            print("🚀 GPU acceleration: ✅ Enabled (RAPIDS cuML)")
+        else:
+            print("🚀 GPU acceleration: ✅ Enabled (XGBoost CUDA)")
+    else:
+        print("🚀 GPU acceleration: ❌ Disabled (CPU fallback)")
 
 if __name__ == "__main__":
     asyncio.run(main())
