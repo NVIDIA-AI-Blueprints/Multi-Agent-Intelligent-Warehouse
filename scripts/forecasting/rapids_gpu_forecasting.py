@@ -170,10 +170,18 @@ class RAPIDSForecastingAgent:
         df = pd.DataFrame([dict(row) for row in results])
         df['sku'] = sku
         
+        # Convert date column to datetime if it exists (required for cuDF)
+        if 'date' in df.columns:
+            df['date'] = pd.to_datetime(df['date'])
+        
         # Convert to cuDF if RAPIDS is available (not just if GPU is available)
         if RAPIDS_AVAILABLE:
-            df = cudf.from_pandas(df)
-            logger.info(f"✅ Data converted to cuDF for GPU processing: {len(df)} rows")
+            try:
+                df = cudf.from_pandas(df)
+                logger.info(f"✅ Data converted to cuDF for GPU processing: {len(df)} rows")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to convert to cuDF: {e}. Using pandas DataFrame instead.")
+                # If conversion fails, continue with pandas (don't modify global RAPIDS_AVAILABLE)
         
         return df
     
@@ -537,7 +545,18 @@ class RAPIDSForecastingAgent:
                 models, metrics = await self.train_models(X, y)
                 
                 # Generate future features for forecasting
-                last_date = df['date'].iloc[-1] if hasattr(df['date'], 'iloc') else df['date'].values[-1]
+                # Get last date - handle both pandas and cuDF
+                if RAPIDS_AVAILABLE and hasattr(df['date'], 'to_pandas'):
+                    last_date = df['date'].to_pandas().iloc[-1]
+                elif hasattr(df['date'], 'iloc'):
+                    last_date = df['date'].iloc[-1]
+                else:
+                    last_date = df['date'].values[-1]
+                
+                # Ensure last_date is a datetime object
+                if not isinstance(last_date, (pd.Timestamp, datetime)):
+                    last_date = pd.to_datetime(last_date)
+                
                 future_dates = pd.date_range(start=last_date + timedelta(days=1), periods=self.config['forecast_days'])
                 
                 # Create future feature matrix (simplified)
