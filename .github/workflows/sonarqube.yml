@@ -26,4 +26,7 @@ jobs:
       # Optional parameters
       projectTags: ai-blueprint,warehouse,multi-agent
 
+      # Grant admin permissions to team members
+      projectAdmins: jonp@nvidia.com,karthikt@nvidia.com,vidushig@nvidia.com
+
     secrets: inherit
