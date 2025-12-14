@@ -3,7 +3,7 @@
 This document lists all third-party software packages used in this project, including their versions, licenses, authors, and sources.
 
 **Generated:** Automatically from dependency files
-**Last Updated:** 2025-12-08
+**Last Updated:** 2025-12-13
 **Generation Script:** `scripts/tools/generate_software_inventory.py`
 
 ## How to Regenerate
@@ -35,11 +35,12 @@ The script automatically:
 | click | 8.0.0 | BSD-3-Clause | https://palletsprojects.com/p/click/ | Armin Ronacher <armin.ronacher@active-4.com> | PyPI | pip |
 | email-validator | 2.0.0 | CC0 (copyright waived) | https://github.com/JoshData/python-email-validator | Joshua Tauberer <jt@occams.info> | PyPI | pip |
 | Faker | 19.0.0 | MIT License | https://github.com/joke2k/faker | joke2k <joke2k@gmail.com> | PyPI | pip |
-| fastapi | 0.119.0 | MIT License | https://pypi.org/project/fastapi/ | Sebastián Ramírez <tiangolo@gmail.com> | PyPI | pip |
+| fastapi | 0.120.0 | MIT License | https://pypi.org/project/fastapi/ | Sebastián Ramírez <tiangolo@gmail.com> | PyPI | pip |
 | httpx | 0.27.0 | BSD License | https://pypi.org/project/httpx/ | Tom Christie <tom@tomchristie.com> | PyPI | pip |
 | langchain-core | 0.3.80 | MIT | https://pypi.org/project/langchain-core/ | N/A | PyPI | pip |
 | langgraph | 0.2.30 | MIT | https://www.github.com/langchain-ai/langgraph | N/A | PyPI | pip |
 | loguru | 0.7.0 | MIT license | https://github.com/Delgan/loguru | Delgan <delgan.py@gmail.com> | PyPI | pip |
+| nemoguardrails | 0.19.0 | LICENSE.md | https://pypi.org/project/nemoguardrails/ | NVIDIA <nemoguardrails@nvidia.com> | PyPI | pip |
 | numpy | 1.24.0 | BSD-3-Clause | https://www.numpy.org | Travis E. Oliphant et al. | PyPI | pip |
 | paho-mqtt | 1.6.0 | Eclipse Public License v2.0 / Eclipse Distribution License v1.0 | http://eclipse.org/paho | Roger Light <roger@atchoo.org> | PyPI | pip |
 | pandas | 1.2.4 | BSD | https://pandas.pydata.org | N/A | PyPI | pip |
@@ -60,6 +61,7 @@ The script automatically:
 | redis | 5.0.0 | MIT | https://github.com/redis/redis-py | Redis Inc. <oss@redis.com> | PyPI | pip |
 | requests | 2.32.4 | Apache-2.0 | https://requests.readthedocs.io | Kenneth Reitz <me@kennethreitz.org> | PyPI | pip |
 | scikit-learn | 1.5.0 | new BSD | https://scikit-learn.org | N/A | PyPI | pip |
+| starlette | 0.49.1 | N/A | https://pypi.org/project/starlette/ | Tom Christie <tom@tomchristie.com> | PyPI | pip |
 | tiktoken | 0.12.0 | MIT License | https://pypi.org/project/tiktoken/ | Shantanu Jain <shantanu@openai.com> | PyPI | pip |
 | uvicorn | 0.30.1 | BSD License | https://pypi.org/project/uvicorn/ | Tom Christie <tom@tomchristie.com> | PyPI | pip |
 | websockets | 11.0 | BSD-3-Clause | https://pypi.org/project/websockets/ | Aymeric Augustin <aymeric.augustin@m4x.org> | PyPI | pip |
@@ -95,6 +97,7 @@ The script automatically:
 | BSD-3-Clause | 5 |
 | MIT License | 4 |
 | BSD | 4 |
+| N/A | 2 |
 | BSD License | 2 |
 | Apache License, Version 2.0 | 2 |
 | Apache Software License | 2 |
@@ -105,8 +108,8 @@ The script automatically:
 | Apache Software License 2.0 | 1 |
 | GNU Lesser General Public License v3 (LGPLv3) | 1 |
 | Eclipse Public License v2.0 / Eclipse Distribution License v1.0 | 1 |
-| N/A | 1 |
 | new BSD | 1 |
 | HPND | 1 |
 | GNU AFFERO GPL 3.0 | 1 |
+| LICENSE.md | 1 |
 | ISC | 1 |

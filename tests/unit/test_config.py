@@ -43,3 +43,4 @@ TEST_INVOICE_CANDIDATES = [
     str(TEST_DATA_DIR / "test_invoice.png"),
 ]
 
+

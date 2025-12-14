@@ -493,7 +493,7 @@ The system includes comprehensive monitoring with Prometheus metrics collection 
 **Quick Start:**
 ```bash
 # Start monitoring stack
-./deploy/scripts/setup_monitoring.sh
+./scripts/setup/setup_monitoring.sh
 ```
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed monitoring setup instructions.

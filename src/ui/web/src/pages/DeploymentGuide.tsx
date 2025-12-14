@@ -44,7 +44,6 @@ import {
   ArrowBack as ArrowBackIcon,
   CheckCircle as CheckCircleIcon,
   Storage as DockerIcon,
-  AccountTree as KubernetesIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 
@@ -108,30 +107,6 @@ const DeploymentGuide: React.FC = () => {
       ],
       status: "✅ Available"
     },
-    {
-      name: "Kubernetes",
-      description: "Production-grade orchestrated deployment with scaling and high availability",
-      pros: ["High availability", "Auto-scaling", "Production ready", "Multi-node"],
-      cons: ["Complex setup", "Requires Kubernetes knowledge", "More resources needed"],
-      commands: [
-        "kubectl apply -f k8s/",
-        "helm install warehouse-assistant ./helm/",
-        "kubectl get pods"
-      ],
-      status: "🔄 In Progress"
-    },
-    {
-      name: "Helm Charts",
-      description: "Package manager for Kubernetes with templated configurations",
-      pros: ["Easy upgrades", "Configuration management", "Rollback support"],
-      cons: ["Requires Helm", "Kubernetes dependency"],
-      commands: [
-        "helm install warehouse-assistant ./helm/",
-        "helm upgrade warehouse-assistant ./helm/",
-        "helm rollback warehouse-assistant 1"
-      ],
-      status: "🔄 In Progress"
-    }
   ];
 
   const deploymentSteps = [
@@ -140,8 +115,6 @@ const DeploymentGuide: React.FC = () => {
       description: "Install required software and dependencies",
       content: [
         "Install Docker and Docker Compose",
-        "Install Kubernetes (for production)",
-        "Install Helm (for Kubernetes deployment)",
         "Set up NVIDIA GPU drivers (for Milvus)",
         "Configure NVIDIA API keys"
       ]
@@ -243,12 +216,10 @@ const DeploymentGuide: React.FC = () => {
         </Typography>
         <Typography variant="body1" sx={{ mb: 2 }}>
           Comprehensive guide for deploying the Multi-Agent-Intelligent-Warehouse across different environments. 
-          This guide covers Docker Compose, Kubernetes, and Helm deployments with monitoring and security configurations.
+          This guide covers Docker Compose deployment with monitoring and security configurations.
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 3 }}>
           <Chip label="Docker" color="primary" />
-          <Chip label="Kubernetes" color="secondary" />
-          <Chip label="Helm" color="info" />
           <Chip label="Production Ready" color="success" />
           <Chip label="Monitoring" color="warning" />
         </Box>
@@ -258,7 +229,7 @@ const DeploymentGuide: React.FC = () => {
       <Alert severity="info" sx={{ mb: 4 }}>
         <AlertTitle>🚀 Multiple Deployment Options</AlertTitle>
         The system supports multiple deployment methods from simple Docker Compose for development 
-        to full Kubernetes with Helm charts for production environments.
+        for production environments.
       </Alert>
 
       {/* Deployment Environments */}
@@ -521,13 +492,13 @@ const DeploymentGuide: React.FC = () => {
                     <ListItem>
                       <ListItemText 
                         primary="Network Policies" 
-                        secondary="Implement Kubernetes network policies"
+                        secondary="Implement network policies and firewall rules"
                       />
                     </ListItem>
                     <ListItem>
                       <ListItemText 
                         primary="Secrets Management" 
-                        secondary="Use Kubernetes secrets or external secret management"
+                        secondary="Use Docker secrets or external secret management"
                       />
                     </ListItem>
                   </List>
