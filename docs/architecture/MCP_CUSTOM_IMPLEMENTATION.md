@@ -2,7 +2,7 @@
 
 ## Overview
 
-Yes, **MCP (Model Context Protocol) is a custom implementation** in this codebase. The system does not use the official [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) but instead implements a custom MCP-compatible system tailored specifically for the Warehouse Operational Assistant.
+**MCP (Model Context Protocol) is a custom implementation** in this codebase. The system does not use the official [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) but instead implements a custom MCP-compatible system tailored specifically for the Warehouse Operational Assistant.
 
 ## Verification
 

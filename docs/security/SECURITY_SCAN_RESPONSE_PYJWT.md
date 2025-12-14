@@ -28,9 +28,9 @@ The PyJWT maintainers have **disputed** this CVE because:
 
 ## Our Mitigation Implementation
 
-### ✅ Application-Level Key Validation
+### ✅ Comprehensive Security Hardening
 
-We have implemented comprehensive key strength validation in `src/api/services/auth/jwt_handler.py` that:
+We have implemented comprehensive security hardening in `src/api/services/auth/jwt_handler.py` that addresses CVE-2025-45768 and prevents algorithm confusion attacks:
 
 1. **Enforces Minimum Key Length**:
    - **Minimum**: 32 bytes (256 bits) for HS256 algorithm
@@ -38,20 +38,34 @@ We have implemented comprehensive key strength validation in `src/api/services/a
    - Complies with **RFC 7518 Section 3.2** (JWS HMAC SHA-2 Algorithms)
    - Complies with **NIST SP800-117** (Key Management)
 
-2. **Production Protection**:
+2. **Prevents Algorithm Confusion**:
+   - **Hardcodes allowed algorithm**: Only HS256 is accepted, never accepts token header's algorithm
+   - **Explicitly rejects 'none' algorithm**: Tokens with `alg: "none"` are immediately rejected
+   - **Signature verification required**: Always verifies signatures, never accepts unsigned tokens
+   - **Algorithm validation**: Checks token header algorithm before decoding and rejects mismatches
+
+3. **Comprehensive Claim Validation**:
+   - **Requires 'exp' and 'iat' claims**: Enforced via PyJWT's `require` option
+   - **Automatic expiration validation**: PyJWT automatically validates expiration
+   - **Issued-at validation**: Validates token was issued at a valid time
+   - **Token type validation**: Additional application-level validation for token type
+
+4. **Production Protection**:
    - Weak keys are **automatically rejected** in production
    - Application **will not start** with weak keys
    - Clear error messages guide administrators to generate secure keys
    - Prevents deployment with insecure configurations
 
-3. **Development Warnings**:
+5. **Development Warnings**:
    - Weak keys generate warnings in development mode
    - Developers are informed about security requirements
    - Default development key is clearly marked as insecure
 
 ### Code Implementation
 
-**Location**: `src/api/services/auth/jwt_handler.py` (lines 23-76)
+**Location**: `src/api/services/auth/jwt_handler.py`
+
+#### Key Validation (lines 23-76)
 
 ```python
 def validate_jwt_secret_key(secret_key: str, algorithm: str, environment: str) -> bool:
@@ -64,6 +78,48 @@ def validate_jwt_secret_key(secret_key: str, algorithm: str, environment: str) -
     # Enforces minimum 32 bytes (256 bits) for HS256
     # Recommends 64+ bytes (512 bits) for better security
     # Validates at application startup
+```
+
+#### Token Verification with Algorithm Confusion Prevention (verify_token method)
+
+```python
+def verify_token(self, token: str, token_type: str = "access") -> Optional[Dict[str, Any]]:
+    """
+    Verify and decode a JWT token with comprehensive security hardening.
+    
+    Security features:
+    - Explicitly rejects 'none' algorithm (algorithm confusion prevention)
+    - Hardcodes allowed algorithm (HS256) - never accepts token header's algorithm
+    - Requires signature verification
+    - Requires 'exp' and 'iat' claims
+    """
+    # Decode token header first to check algorithm
+    unverified_header = jwt.get_unverified_header(token)
+    token_algorithm = unverified_header.get("alg")
+    
+    # CRITICAL: Explicitly reject 'none' algorithm
+    if token_algorithm == "none":
+        logger.warning("❌ SECURITY: Token uses 'none' algorithm - REJECTED")
+        return None
+    
+    # CRITICAL: Only accept our hardcoded algorithm, ignore token header
+    if token_algorithm != self.algorithm:
+        logger.warning(f"❌ SECURITY: Token algorithm mismatch - REJECTED")
+        return None
+    
+    # Decode with strict security options
+    payload = jwt.decode(
+        token,
+        self.secret_key,
+        algorithms=[self.algorithm],  # Hardcoded - never accept token's algorithm
+        options={
+            "verify_signature": True,  # Explicitly require signature verification
+            "require": ["exp", "iat"],  # Require expiration and issued-at
+            "verify_exp": True,
+            "verify_iat": True,
+        },
+    )
+    return payload
 ```
 
 ### Validation at Startup
@@ -106,9 +162,15 @@ validate_jwt_secret_key('a' * 64, 'HS256', 'production')
 
 ### Standards Compliance
 
-- ✅ **RFC 7518 Section 3.2**: JWS HMAC SHA-2 Algorithms
+- ✅ **RFC 7518 Section 3.2**: JWS HMAC SHA-2 Algorithms (minimum key length)
+- ✅ **RFC 7519 Section 4.1**: JWT Claims (exp, iat validation)
 - ✅ **NIST SP800-117**: Key Management
-- ✅ **Industry Best Practices**: Minimum 256-bit keys for HS256
+- ✅ **OWASP JWT Security Cheat Sheet**: Algorithm confusion prevention
+- ✅ **Industry Best Practices**: 
+  - Minimum 256-bit keys for HS256
+  - Explicit algorithm enforcement
+  - Rejection of 'none' algorithm
+  - Comprehensive claim validation
 
 ---
 
@@ -132,8 +194,10 @@ Status: FALSE POSITIVE - Mitigated
 Justification:
 1. The CVE is DISPUTED by the PyJWT vendor - key length is application-controlled
 2. We implement application-level key validation enforcing minimum 32 bytes (256 bits)
-3. Production deployments automatically reject weak keys (application won't start)
-4. Our implementation complies with RFC 7518 Section 3.2 and NIST SP800-117
+3. We prevent algorithm confusion attacks by hardcoding allowed algorithms and rejecting 'none'
+4. We enforce comprehensive claim validation (exp, iat) and signature verification
+5. Production deployments automatically reject weak keys (application won't start)
+6. Our implementation complies with RFC 7518 Section 3.2, RFC 7519, and NIST SP800-117
 
 Evidence:
 - Implementation: src/api/services/auth/jwt_handler.py (validate_jwt_secret_key function)
@@ -154,9 +218,37 @@ Risk Level: NONE - Vulnerability is mitigated through application-level controls
 
 ---
 
+## Additional Security Measures
+
+### Key Management Best Practices
+
+1. **Secret Manager Storage**: 
+   - Keys should be stored in a secret manager (AWS Secrets Manager, HashiCorp Vault, Azure Key Vault, etc.)
+   - Never store keys in plain text environment variables in production
+   - Use environment variables only for development/testing
+
+2. **Key Rotation**:
+   - Rotate keys regularly (recommended: every 90 days)
+   - During rotation, support multiple active keys using key IDs (kid) in JWT header
+   - Implement JWKS (JSON Web Key Set) endpoint for key rotation
+   - Maintain backward compatibility during rotation period
+
+3. **Key Generation**:
+   ```python
+   import secrets
+   # Generate a secure 64-byte key (recommended)
+   secret_key = secrets.token_urlsafe(64)
+   ```
+
 ## Conclusion
 
-The PyJWT weak encryption vulnerability (CVE-2025-45768) is **fully mitigated** through application-level key validation. The application enforces minimum key lengths per security standards and prevents deployment with weak keys in production environments.
+The PyJWT weak encryption vulnerability (CVE-2025-45768) is **fully mitigated** through:
+- Application-level key validation (minimum 32 bytes, recommends 64+ bytes)
+- Algorithm confusion prevention (hardcoded algorithms, rejects 'none')
+- Comprehensive claim validation (exp, iat required)
+- Explicit signature verification
+
+The application enforces minimum key lengths per security standards, prevents algorithm confusion attacks, and prevents deployment with weak keys in production environments.
 
 **Recommendation**: This finding can be safely marked as a **false positive** or **mitigated** in security scans.
 

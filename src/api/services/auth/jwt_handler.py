@@ -107,7 +107,22 @@ except ValueError as e:
 
 
 class JWTHandler:
-    """Handle JWT token creation, validation, and password operations."""
+    """
+    Handle JWT token creation, validation, and password operations.
+    
+    Security Hardening (Addresses CVE-2025-45768 and algorithm confusion):
+    - Enforces strong algorithms: Only HS256 allowed, explicitly rejects 'none'
+    - Prevents algorithm confusion: Hardcodes algorithm in decode, ignores token header
+    - Strong key validation: Minimum 32 bytes (256 bits) for HS256, recommends 64+ bytes
+    - Comprehensive claim validation: Requires 'exp' and 'iat', validates all claims
+    - Signature verification: Always verifies signatures, never accepts unsigned tokens
+    
+    Key Management:
+    - Keys must be stored in a secret manager (AWS Secrets Manager, HashiCorp Vault, etc.)
+    - Keys should be rotated regularly (recommended: every 90 days)
+    - During rotation, support multiple active keys using key IDs (kid) in JWT header
+    - Never store keys in plain text environment variables in production
+    """
 
     def __init__(self):
         self.secret_key = SECRET_KEY
@@ -118,53 +133,130 @@ class JWTHandler:
     def create_access_token(
         self, data: Dict[str, Any], expires_delta: Optional[timedelta] = None
     ) -> str:
-        """Create a JWT access token."""
+        """
+        Create a JWT access token with security hardening.
+        
+        Security features:
+        - Always includes 'exp' (expiration) and 'iat' (issued at) claims
+        - Uses explicit algorithm (HS256) to prevent algorithm confusion
+        - Never allows 'none' algorithm
+        """
         to_encode = data.copy()
+        now = datetime.utcnow()
+        
         if expires_delta:
-            expire = datetime.utcnow() + expires_delta
+            expire = now + expires_delta
         else:
-            expire = datetime.utcnow() + timedelta(
-                minutes=self.access_token_expire_minutes
-            )
+            expire = now + timedelta(minutes=self.access_token_expire_minutes)
 
-        to_encode.update({"exp": expire, "type": "access"})
+        # Always include exp and iat for proper validation
+        to_encode.update({
+            "exp": expire,
+            "iat": now,  # Issued at time
+            "type": "access"
+        })
+        
+        # Explicitly use algorithm to prevent algorithm confusion attacks
         encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
         return encoded_jwt
 
     def create_refresh_token(self, data: Dict[str, Any]) -> str:
-        """Create a JWT refresh token."""
+        """
+        Create a JWT refresh token with security hardening.
+        
+        Security features:
+        - Always includes 'exp' (expiration) and 'iat' (issued at) claims
+        - Uses explicit algorithm (HS256) to prevent algorithm confusion
+        - Never allows 'none' algorithm
+        """
         to_encode = data.copy()
-        expire = datetime.utcnow() + timedelta(days=self.refresh_token_expire_days)
-        to_encode.update({"exp": expire, "type": "refresh"})
+        now = datetime.utcnow()
+        expire = now + timedelta(days=self.refresh_token_expire_days)
+        
+        # Always include exp and iat for proper validation
+        to_encode.update({
+            "exp": expire,
+            "iat": now,  # Issued at time
+            "type": "refresh"
+        })
+        
+        # Explicitly use algorithm to prevent algorithm confusion attacks
         encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
         return encoded_jwt
 
     def verify_token(
         self, token: str, token_type: str = "access"
     ) -> Optional[Dict[str, Any]]:
-        """Verify and decode a JWT token."""
+        """
+        Verify and decode a JWT token with comprehensive security hardening.
+        
+        Security features:
+        - Explicitly rejects 'none' algorithm (algorithm confusion prevention)
+        - Hardcodes allowed algorithm (HS256) - never accepts token header's algorithm
+        - Requires signature verification
+        - Requires 'exp' and 'iat' claims
+        - Validates token type
+        - Prevents algorithm confusion attacks
+        
+        This addresses CVE-2025-45768 and algorithm confusion vulnerabilities.
+        """
         try:
-            payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
+            # Decode token header first to check algorithm
+            # This prevents algorithm confusion attacks
+            unverified_header = jwt.get_unverified_header(token)
+            token_algorithm = unverified_header.get("alg")
+            
+            # CRITICAL: Explicitly reject 'none' algorithm
+            if token_algorithm == "none":
+                logger.warning("❌ SECURITY: Token uses 'none' algorithm - REJECTED")
+                return None
+            
+            # CRITICAL: Only accept our hardcoded algorithm, ignore token header
+            # This prevents algorithm confusion attacks where attacker tries to
+            # force use of a different algorithm (e.g., HS256 with RSA public key)
+            if token_algorithm != self.algorithm:
+                logger.warning(
+                    f"❌ SECURITY: Token algorithm mismatch - expected {self.algorithm}, "
+                    f"got {token_algorithm} - REJECTED"
+                )
+                return None
+            
+            # Decode with strict security options
+            # - algorithms=[self.algorithm]: Only accept our hardcoded algorithm
+            # - verify_signature=True: Explicitly require signature verification
+            # - require=["exp", "iat"]: Require expiration and issued-at claims
+            payload = jwt.decode(
+                token,
+                self.secret_key,
+                algorithms=[self.algorithm],  # Hardcoded - never accept token's algorithm
+                options={
+                    "verify_signature": True,  # Explicitly require signature verification
+                    "require": ["exp", "iat"],  # Require expiration and issued-at
+                    "verify_exp": True,  # Verify expiration
+                    "verify_iat": True,  # Verify issued-at
+                },
+            )
 
-            # Check token type
+            # Additional token type validation
             if payload.get("type") != token_type:
                 logger.warning(
                     f"Invalid token type: expected {token_type}, got {payload.get('type')}"
                 )
                 return None
 
-            # Check expiration
-            exp = payload.get("exp")
-            if exp and datetime.utcnow() > datetime.fromtimestamp(exp):
-                logger.warning("Token has expired")
-                return None
-
             return payload
+            
         except jwt.ExpiredSignatureError:
             logger.warning("Token has expired")
             return None
+        except jwt.InvalidTokenError as e:
+            logger.warning(f"Invalid token: {e}")
+            return None
         except jwt.JWTError as e:
             logger.warning(f"JWT error: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error during token verification: {e}")
             return None
 
     def hash_password(self, password: str) -> str:

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document provides comprehensive API reference for the Model Context Protocol (MCP) implementation in the Warehouse Operational Assistant. The MCP system provides standardized interfaces for tool discovery, execution, and communication between AI agents and external systems.
+This document provides comprehensive API reference for the Model Context Protocol (MCP) implementation in the Multi-Agent-Intelligent-Warehouse. The MCP system provides standardized interfaces for tool discovery, execution, and communication between AI agents and external systems.
 
 ## Table of Contents
 
