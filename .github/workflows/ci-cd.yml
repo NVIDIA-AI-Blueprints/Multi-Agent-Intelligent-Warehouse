@@ -183,7 +183,7 @@ jobs:
         npm test -- --coverage --watchAll=false --passWithNoTests || echo "Some tests failed"
     
     - name: Upload coverage reports
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v5
       with:
         files: ./coverage.xml,./src/ui/web/coverage/lcov.info
         flags: unittests
