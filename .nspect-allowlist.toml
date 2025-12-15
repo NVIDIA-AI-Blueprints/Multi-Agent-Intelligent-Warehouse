@@ -1,0 +1,23 @@
+# nspect Security Scan Allowlist
+# This file is used to exclude OSS packages/directories that are NOT shipped with the product
+# (e.g., build tools, test code, development dependencies)
+#
+# For vulnerability allowlisting (Not Affected cases), use Exception Tracker, NOT this file.
+# See: Exception Tracker User Guide
+#
+# Use Case: OSS Package/directory is not shipped (ie. build or test code)
+# The OSS package(s) in a directory/location should not be included in the report (and SBOM)
+# due to the fact that it is not shipped with the product (ie. it is used in test or build code ONLY)
+
+version = "1.0.0"
+
+# If you are not adding excluded directories, remove [oss.excluded] and [[oss.excluded.directories]] both tags from file.
+# [oss.excluded]
+# 
+# Example: Exclude vulnerabilities related to unused/tools code
+# [[oss.excluded.directories]]
+# paths = ['tools/3rdparty/src/cub-1.8.0/', 'tools/3rdparty/src/grpc/grpc/']
+# comment = 'tools packages'
+# 
+# Optional: nspect_ids attribute - Useful for shared repos allow list
+# nspect_ids = ['NSPECT-0000-0003']  # Only apply for specific programs

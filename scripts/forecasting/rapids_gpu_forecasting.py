@@ -94,7 +94,7 @@ class RAPIDSForecastingAgent:
     def _get_default_config(self) -> Dict:
         """Get default configuration"""
         return {
-            "lookback_days": 365,
+            "lookback_days": 180,  # Match historical data generation (180 days)
             "forecast_days": 30,
             "test_size": 0.2,
             "random_state": 42,
@@ -129,7 +129,9 @@ class RAPIDSForecastingAgent:
         """Extract historical demand data for a SKU"""
         logger.info(f"📊 Extracting historical data for {sku}")
         
-        query = f"""
+        # Use parameterized query with proper INTERVAL handling
+        lookback_days = self.config.get('lookback_days', 180)  # Default to 180 to match data generation
+        query = """
         SELECT 
             DATE(timestamp) as date,
             SUM(quantity) as daily_demand,
@@ -160,12 +162,12 @@ class RAPIDSForecastingAgent:
         FROM inventory_movements 
         WHERE sku = $1 
             AND movement_type = 'outbound'
-            AND timestamp >= NOW() - INTERVAL '{self.config['lookback_days']} days'
+            AND timestamp >= NOW() - INTERVAL '1 day' * $2
         GROUP BY DATE(timestamp)
         ORDER BY date
         """
         
-        results = await self.pg_conn.fetch(query, sku)
+        results = await self.pg_conn.fetch(query, sku, lookback_days)
         
         if not results:
             logger.warning(f"⚠️ No historical data found for {sku}")
