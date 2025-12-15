@@ -3,7 +3,7 @@
 This document lists all third-party software packages used in this project, including their versions, licenses, authors, and sources.
 
 **Generated:** Automatically from dependency files
-**Last Updated:** 2025-12-13
+**Last Updated:** 2025-12-15
 **Generation Script:** `scripts/tools/generate_software_inventory.py`
 
 ## How to Regenerate
@@ -79,33 +79,36 @@ The script automatically:
 | @emotion/react | 11.10.0 | MIT | https://github.com/emotion-js/emotion.git#main/blob/main/LICENSE | Emotion Contributors | npm | npm | https://www.npmjs.com/package/@emotion/react |
 | @emotion/styled | 11.10.0 | MIT | https://github.com/emotion-js/emotion.git#main/blob/main/LICENSE | N/A | npm | npm | https://www.npmjs.com/package/@emotion/styled |
 | @mui/icons-material | 5.10.0 | N/A | https://mui.com/material-ui/material-icons/ | N/A | npm | npm | https://www.npmjs.com/package/@mui/icons-material |
-| @mui/material | 5.10.0 | MIT | https://github.com/mui/material-ui/blob/main/LICENSE | MUI Team | npm | npm | https://www.npmjs.com/package/@mui/material |
-| @mui/x-data-grid | 5.17.0 | MIT | https://github.com/mui/mui-x/blob/main/LICENSE | MUI Team | npm | npm | https://www.npmjs.com/package/@mui/x-data-grid |
+| @mui/material | 5.18.0 | MIT | https://github.com/mui/material-ui/blob/main/LICENSE | MUI Team | npm | npm | https://www.npmjs.com/package/@mui/material |
+| @mui/x-data-grid | 5.17.26 | MIT | https://github.com/mui/mui-x/blob/main/LICENSE | MUI Team | npm | npm | https://www.npmjs.com/package/@mui/x-data-grid |
 | @semantic-release/changelog | 6.0.3 | MIT | https://github.com/semantic-release/changelog/blob/main/LICENSE | Pierre Vanduynslager | npm | npm | https://www.npmjs.com/package/@semantic-release/changelog |
 | @semantic-release/exec | 7.1.0 | MIT | https://github.com/semantic-release/exec/blob/main/LICENSE | Pierre Vanduynslager | npm | npm | https://www.npmjs.com/package/@semantic-release/exec |
 | @semantic-release/git | 10.0.1 | MIT | https://github.com/semantic-release/git/blob/main/LICENSE | Pierre Vanduynslager | npm | npm | https://www.npmjs.com/package/@semantic-release/git |
 | @semantic-release/github | 11.0.6 | MIT | https://github.com/semantic-release/github/blob/main/LICENSE | Pierre Vanduynslager | npm | npm | https://www.npmjs.com/package/@semantic-release/github |
+| @testing-library/dom | 10.4.1 | MIT | https://github.com/testing-library/dom-testing-library/blob/main/LICENSE | Kent C. Dodds <me@kentcdodds.com> | npm | npm | https://www.npmjs.com/package/@testing-library/dom |
 | @testing-library/jest-dom | 5.16.4 | MIT | https://github.com/testing-library/jest-dom/blob/main/LICENSE | Ernesto Garcia <gnapse@gmail.com> | npm | npm | https://www.npmjs.com/package/@testing-library/jest-dom |
-| @testing-library/react | 13.3.0 | MIT | https://github.com/testing-library/react-testing-library/blob/main/LICENSE | Kent C. Dodds <me@kentcdodds.com> | npm | npm | https://www.npmjs.com/package/@testing-library/react |
+| @testing-library/react | 16.0.0 | MIT | https://github.com/testing-library/react-testing-library/blob/main/LICENSE | Kent C. Dodds <me@kentcdodds.com> | npm | npm | https://www.npmjs.com/package/@testing-library/react |
 | @testing-library/user-event | 13.5.0 | MIT | https://github.com/testing-library/user-event/blob/main/LICENSE | Giorgio Polvara <polvara@gmail.com> | npm | npm | https://www.npmjs.com/package/@testing-library/user-event |
 | @types/jest | 27.5.2 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped/blob/main/LICENSE | N/A | npm | npm | https://www.npmjs.com/package/@types/jest |
 | @types/node | 16.11.56 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped/blob/main/LICENSE | N/A | npm | npm | https://www.npmjs.com/package/@types/node |
 | @types/papaparse | 5.5.1 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped/blob/main/LICENSE | N/A | npm | npm | https://www.npmjs.com/package/@types/papaparse |
-| @types/react | 18.3.27 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped/blob/main/LICENSE | N/A | npm | npm | https://www.npmjs.com/package/@types/react |
+| @types/react | 19.0.0 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped/blob/main/LICENSE | N/A | npm | npm | https://www.npmjs.com/package/@types/react |
 | @types/react-copy-to-clipboard | 5.0.7 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped/blob/main/LICENSE | N/A | npm | npm | https://www.npmjs.com/package/@types/react-copy-to-clipboard |
-| @types/react-dom | 18.3.7 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped/blob/main/LICENSE | N/A | npm | npm | https://www.npmjs.com/package/@types/react-dom |
+| @types/react-dom | 19.0.0 | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped/blob/main/LICENSE | N/A | npm | npm | https://www.npmjs.com/package/@types/react-dom |
 | @uiw/react-json-view | 2.0.0-alpha.39 | MIT | https://github.com/uiwjs/react-json-view/blob/main/LICENSE | Kenny Wang <wowohoo@qq.com> | npm | npm | https://www.npmjs.com/package/@uiw/react-json-view |
 | axios | 1.8.3 | MIT | https://github.com/axios/axios/blob/main/LICENSE | Matt Zabriskie | npm | npm | https://www.npmjs.com/package/axios |
 | commitizen | 4.3.1 | MIT | https://github.com/commitizen/cz-cli/blob/main/LICENSE | Jim Cummins <jimthedev@gmail.com> | npm | npm | https://www.npmjs.com/package/commitizen |
 | conventional-changelog-conventionalcommits | 9.1.0 | ISC | https://github.com/conventional-changelog/conventional-changelog/blob/main/LICENSE | Ben Coe | npm | npm | https://www.npmjs.com/package/conventional-changelog-conventionalcommits |
 | cz-conventional-changelog | 3.3.0 | MIT | https://github.com/commitizen/cz-conventional-changelog/blob/main/LICENSE | Jim Cummins <jimthedev@gmail.com> | npm | npm | https://www.npmjs.com/package/cz-conventional-changelog |
 | date-fns | 2.29.0 | MIT | https://github.com/date-fns/date-fns/blob/main/LICENSE | N/A | npm | npm | https://www.npmjs.com/package/date-fns |
+| fast-equals | 5.4.0 | MIT | https://github.com/planttheidea/fast-equals/blob/main/LICENSE | tony_quetano@planttheidea.com | npm | npm | https://www.npmjs.com/package/fast-equals |
 | http-proxy-middleware | 3.0.5 | MIT | https://github.com/chimurai/http-proxy-middleware/blob/main/LICENSE | Steven Chim | npm | npm | https://www.npmjs.com/package/http-proxy-middleware |
 | husky | 9.1.7 | MIT | https://github.com/typicode/husky/blob/main/LICENSE | typicode | npm | npm | https://www.npmjs.com/package/husky |
+| identity-obj-proxy | 3.0.0 | MIT | https://github.com/keyanzhang/identity-obj-proxy/blob/main/LICENSE | Keyan Zhang <root@keyanzhang.com> | npm | npm | https://www.npmjs.com/package/identity-obj-proxy |
 | papaparse | 5.5.3 | MIT | https://github.com/mholt/PapaParse/blob/main/LICENSE | Matthew Holt | npm | npm | https://www.npmjs.com/package/papaparse |
-| react | 18.2.0 | MIT | https://github.com/facebook/react/blob/main/LICENSE | N/A | npm | npm | https://www.npmjs.com/package/react |
+| react | 19.2.3 | MIT | https://github.com/facebook/react/blob/main/LICENSE | N/A | npm | npm | https://www.npmjs.com/package/react |
 | react-copy-to-clipboard | 5.1.0 | MIT | https://github.com/nkbt/react-copy-to-clipboard/blob/main/LICENSE | Nik Butenko <nik@butenko.me> | npm | npm | https://www.npmjs.com/package/react-copy-to-clipboard |
-| react-dom | 18.2.0 | MIT | https://github.com/facebook/react/blob/main/LICENSE | N/A | npm | npm | https://www.npmjs.com/package/react-dom |
+| react-dom | 19.2.3 | MIT | https://github.com/facebook/react/blob/main/LICENSE | N/A | npm | npm | https://www.npmjs.com/package/react-dom |
 | react-query | 3.39.0 | MIT | https://github.com/tannerlinsley/react-query/blob/main/LICENSE | tannerlinsley | npm | npm | https://www.npmjs.com/package/react-query |
 | react-router-dom | 6.8.0 | MIT | https://github.com/remix-run/react-router/blob/main/LICENSE | Remix Software <hello@remix.run> | npm | npm | https://www.npmjs.com/package/react-router-dom |
 | react-scripts | 5.0.1 | MIT | https://github.com/facebook/create-react-app/blob/main/LICENSE | N/A | npm | npm | https://www.npmjs.com/package/react-scripts |
@@ -124,7 +127,7 @@ The script automatically:
 
 | License | Count |
 |---------|-------|
-| MIT | 39 |
+| MIT | 42 |
 | BSD-3-Clause | 5 |
 | Apache-2.0 | 5 |
 | MIT License | 4 |
