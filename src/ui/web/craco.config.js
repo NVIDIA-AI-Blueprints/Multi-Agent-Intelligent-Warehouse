@@ -24,17 +24,31 @@ module.exports = {
           rule.exclude = [rule.exclude];
         }
         
+        let modified = false;
+        
         // Add webpack-dev-server to exclude list if not already present
-        const excludePattern = /node_modules[\\/]webpack-dev-server/;
-        const hasExclude = rule.exclude.some(
-          (excl) => excl instanceof RegExp && excl.source === excludePattern.source
+        const webpackDevServerPattern = /node_modules[\\/]webpack-dev-server/;
+        const hasWebpackExclude = rule.exclude.some(
+          (excl) => excl instanceof RegExp && excl.source === webpackDevServerPattern.source
         );
         
-        if (!hasExclude) {
-          rule.exclude.push(excludePattern);
-          return true;
+        if (!hasWebpackExclude) {
+          rule.exclude.push(webpackDevServerPattern);
+          modified = true;
         }
-        return false;
+        
+        // Add @mui packages to exclude list if not already present (they often have missing source maps)
+        const muiPattern = /node_modules[\\/]@mui/;
+        const hasMuiExclude = rule.exclude.some(
+          (excl) => excl instanceof RegExp && excl.source === muiPattern.source
+        );
+        
+        if (!hasMuiExclude) {
+          rule.exclude.push(muiPattern);
+          modified = true;
+        }
+        
+        return modified;
       };
       
       // Process all rules
@@ -52,7 +66,18 @@ module.exports = {
               ) {
                 if (addExclude(rule)) {
                   modified = true;
-                  console.log('✅ CRACO: Excluded webpack-dev-server from source-map-loader');
+                  console.log('✅ CRACO: Excluded webpack-dev-server and @mui from source-map-loader');
+                }
+                // Also configure source-map-loader to ignore missing source maps
+                if (typeof use === 'object' && use.loader && use.loader.includes('source-map-loader')) {
+                  use.options = use.options || {};
+                  use.options.filterSourceMappingUrl = (url, resourcePath) => {
+                    // Ignore missing source maps for @mui and webpack-dev-server
+                    if (resourcePath.includes('@mui') || resourcePath.includes('webpack-dev-server')) {
+                      return false;
+                    }
+                    return true;
+                  };
                 }
                 break;
               }
@@ -71,7 +96,18 @@ module.exports = {
                   ) {
                     if (addExclude(oneOfRule)) {
                       modified = true;
-                      console.log('✅ CRACO: Excluded webpack-dev-server from source-map-loader (oneOf)');
+                      console.log('✅ CRACO: Excluded webpack-dev-server and @mui from source-map-loader (oneOf)');
+                    }
+                    // Also configure source-map-loader to ignore missing source maps
+                    if (typeof use === 'object' && use.loader && use.loader.includes('source-map-loader')) {
+                      use.options = use.options || {};
+                      use.options.filterSourceMappingUrl = (url, resourcePath) => {
+                        // Ignore missing source maps for @mui and webpack-dev-server
+                        if (resourcePath.includes('@mui') || resourcePath.includes('webpack-dev-server')) {
+                          return false;
+                        }
+                        return true;
+                      };
                     }
                     break;
                   }
