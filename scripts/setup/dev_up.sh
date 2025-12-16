@@ -6,6 +6,18 @@ set -euo pipefail
 
 echo "Starting Warehouse Operational Assistant development infrastructure..."
 
+# Load environment variables from .env file if it exists
+# Use set -a to automatically export all variables
+if [ -f .env ]; then
+    echo "Loading environment variables from .env file..."
+    set -a
+    source .env
+    set +a
+    echo "✅ Environment variables loaded"
+else
+    echo "⚠️  Warning: .env file not found. Using default values."
+fi
+
 # Choose compose flavor
 if docker compose version >/dev/null 2>&1; then 
     COMPOSE=(docker compose)
