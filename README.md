@@ -229,7 +229,7 @@ set -a && source deploy/compose/.env && set +a
 # OR if .env is in project root:
 # set -a && source .env && set +a
 
-# Option A: Using Docker Compose (Recommended - no psql client needed)
+# Docker Compose: Using Docker Compose (Recommended - no psql client needed)
 docker-compose -f deploy/compose/docker-compose.dev.yaml exec -T timescaledb psql -U warehouse -d warehouse < data/postgres/000_schema.sql
 docker-compose -f deploy/compose/docker-compose.dev.yaml exec -T timescaledb psql -U warehouse -d warehouse < data/postgres/001_equipment_schema.sql
 docker-compose -f deploy/compose/docker-compose.dev.yaml exec -T timescaledb psql -U warehouse -d warehouse < data/postgres/002_document_schema.sql
