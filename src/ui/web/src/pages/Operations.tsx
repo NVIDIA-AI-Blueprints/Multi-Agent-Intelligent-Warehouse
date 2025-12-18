@@ -46,11 +46,11 @@ const Operations: React.FC = () => {
   const assignMutation = useMutation({
     mutationFn: ({ taskId, assignee }: { taskId: number; assignee: string }) =>
       operationsAPI.assignTask(taskId, assignee),
-    onSuccess: () => {
+      onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      setOpen(false);
-      setSelectedTask(null);
-      setFormData({});
+        setOpen(false);
+        setSelectedTask(null);
+        setFormData({});
     }
   });
 
