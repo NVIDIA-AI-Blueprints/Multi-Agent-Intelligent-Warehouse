@@ -194,6 +194,10 @@ For more security information, see [docs/secrets.md](docs/secrets.md) and [SECUR
   - **macOS**: `brew install postgresql` or `brew install libpq`
   - **Windows**: Install from [PostgreSQL downloads](https://www.postgresql.org/download/windows/)
   - **Alternative**: Use Docker (see [DEPLOYMENT.md](DEPLOYMENT.md))
+- **CUDA (for GPU acceleration)** - Optional but recommended for RAPIDS GPU-accelerated forecasting
+  - **Recommended**: CUDA 12.x (default for RAPIDS packages)
+  - **Supported**: CUDA 11.x (via `install_rapids.sh` auto-detection)
+  - **Note**: CUDA version is auto-detected during RAPIDS installation. If you have CUDA 13.x, it will install CUDA 12.x packages (backward compatible). For best results, ensure your CUDA driver version matches or exceeds the toolkit version.
 
 ### Local Development Setup
 
