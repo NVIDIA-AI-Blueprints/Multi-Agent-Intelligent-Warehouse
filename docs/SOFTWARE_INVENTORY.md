@@ -3,7 +3,7 @@
 This document lists all third-party software packages used in this project, including their versions, licenses, authors, and sources.
 
 **Generated:** Automatically from dependency files
-**Last Updated:** 2025-12-18
+**Last Updated:** 2025-12-19
 **Generation Script:** `scripts/tools/generate_software_inventory.py`
 
 ## How to Regenerate
