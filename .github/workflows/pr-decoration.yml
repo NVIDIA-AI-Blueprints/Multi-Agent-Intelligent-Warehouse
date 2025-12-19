@@ -1,0 +1,430 @@
+name: PR Decoration
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+  issues: write
+
+jobs:
+  # =============================================================================
+  # Collect Test Results & Coverage
+  # =============================================================================
+  test-results:
+    name: Collect Test Results
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Set up Node.js 20
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: src/ui/web/package-lock.json
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov pytest-json-report
+
+    - name: Install Node.js dependencies
+      run: |
+        cd src/ui/web
+        npm ci
+
+    - name: Run Python tests with coverage
+      id: pytest
+      continue-on-error: true
+      run: |
+        pytest tests/ \
+          --cov=src/api \
+          --cov=src/retrieval \
+          --cov=src/memory \
+          --cov-report=json \
+          --cov-report=html \
+          --cov-report=term \
+          --json-report \
+          --json-report-file=pytest-report.json \
+          --junit-xml=pytest-junit.xml || true
+
+        # Extract coverage percentage
+        if [ -f coverage.json ]; then
+          COVERAGE=$(python -c "import json; data=json.load(open('coverage.json')); print(f\"{data['totals']['percent_covered']:.1f}\")" 2>/dev/null || echo "0")
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+        else
+          echo "coverage=0" >> $GITHUB_OUTPUT
+        fi
+
+        # Extract test results
+        if [ -f .report.json ]; then
+          TOTAL=$(python -c "import json; data=json.load(open('.report.json')); print(data['summary']['total'])" 2>/dev/null || echo "0")
+          PASSED=$(python -c "import json; data=json.load(open('.report.json')); print(data['summary']['passed'])" 2>/dev/null || echo "0")
+          FAILED=$(python -c "import json; data=json.load(open('.report.json')); print(data['summary'].get('failed', 0))" 2>/dev/null || echo "0")
+          echo "total=$TOTAL" >> $GITHUB_OUTPUT
+          echo "passed=$PASSED" >> $GITHUB_OUTPUT
+          echo "failed=$FAILED" >> $GITHUB_OUTPUT
+        else
+          echo "total=0" >> $GITHUB_OUTPUT
+          echo "passed=0" >> $GITHUB_OUTPUT
+          echo "failed=0" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Run Node.js tests with coverage
+      id: jest
+      continue-on-error: true
+      run: |
+        cd src/ui/web
+        npm test -- --coverage --watchAll=false --passWithNoTests --json --outputFile=../../jest-results.json || true
+
+        # Extract coverage if available
+        if [ -f coverage/coverage-summary.json ]; then
+          COVERAGE=$(node -p "JSON.parse(require('fs').readFileSync('coverage/coverage-summary.json')).total.lines.pct" 2>/dev/null || echo "0")
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+        else
+          echo "coverage=0" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results
+        path: |
+          pytest-report.json
+          pytest-junit.xml
+          coverage.json
+          htmlcov/
+          jest-results.json
+          src/ui/web/coverage/
+
+    - name: Publish test results
+      uses: EnricoMi/publish-unit-test-result-action@v2
+      if: always()
+      with:
+        files: |
+          pytest-junit.xml
+        check_name: Python Test Results
+        comment_mode: off
+
+    outputs:
+      py_coverage: ${{ steps.pytest.outputs.coverage }}
+      py_total: ${{ steps.pytest.outputs.total }}
+      py_passed: ${{ steps.pytest.outputs.passed }}
+      py_failed: ${{ steps.pytest.outputs.failed }}
+      js_coverage: ${{ steps.jest.outputs.coverage }}
+
+  # =============================================================================
+  # Security Scan Results
+  # =============================================================================
+  security-scan:
+    name: Security Scan Summary
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'json'
+        output: 'trivy-results.json'
+
+    - name: Parse Trivy results
+      id: trivy
+      run: |
+        if [ -f trivy-results.json ]; then
+          CRITICAL=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' trivy-results.json 2>/dev/null || echo "0")
+          HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' trivy-results.json 2>/dev/null || echo "0")
+          MEDIUM=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' trivy-results.json 2>/dev/null || echo "0")
+          LOW=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="LOW")] | length' trivy-results.json 2>/dev/null || echo "0")
+
+          echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
+          echo "high=$HIGH" >> $GITHUB_OUTPUT
+          echo "medium=$MEDIUM" >> $GITHUB_OUTPUT
+          echo "low=$LOW" >> $GITHUB_OUTPUT
+        else
+          echo "critical=0" >> $GITHUB_OUTPUT
+          echo "high=0" >> $GITHUB_OUTPUT
+          echo "medium=0" >> $GITHUB_OUTPUT
+          echo "low=0" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Upload security results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-results
+        path: trivy-results.json
+
+    outputs:
+      critical: ${{ steps.trivy.outputs.critical }}
+      high: ${{ steps.trivy.outputs.high }}
+      medium: ${{ steps.trivy.outputs.medium }}
+      low: ${{ steps.trivy.outputs.low }}
+
+  # =============================================================================
+  # Code Quality & Linting
+  # =============================================================================
+  code-quality:
+    name: Code Quality Check
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install linting tools
+      run: |
+        pip install black flake8 mypy
+
+    - name: Run Black (formatting check)
+      id: black
+      continue-on-error: true
+      run: |
+        black --check src/ > black-output.txt 2>&1 || true
+        ISSUES=$(wc -l < black-output.txt 2>/dev/null || echo "0")
+        echo "issues=$ISSUES" >> $GITHUB_OUTPUT
+
+    - name: Run Flake8 (linting)
+      id: flake8
+      continue-on-error: true
+      run: |
+        flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics > flake8-critical.txt 2>&1 || true
+        flake8 src/ --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics > flake8-all.txt 2>&1 || true
+        CRITICAL=$(tail -1 flake8-critical.txt 2>/dev/null | grep -oE '[0-9]+' || echo "0")
+        ALL=$(tail -1 flake8-all.txt 2>/dev/null | grep -oE '[0-9]+' || echo "0")
+        echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
+        echo "all=$ALL" >> $GITHUB_OUTPUT
+
+    - name: Run MyPy (type checking)
+      id: mypy
+      continue-on-error: true
+      run: |
+        mypy src/api --ignore-missing-imports > mypy-output.txt 2>&1 || true
+        ERRORS=$(grep -c "error:" mypy-output.txt 2>/dev/null || echo "0")
+        echo "errors=$ERRORS" >> $GITHUB_OUTPUT
+
+    outputs:
+      black_issues: ${{ steps.black.outputs.issues }}
+      flake8_critical: ${{ steps.flake8.outputs.critical }}
+      flake8_all: ${{ steps.flake8.outputs.all }}
+      mypy_errors: ${{ steps.mypy.outputs.errors }}
+
+  # =============================================================================
+  # Create PR Comment with Summary
+  # =============================================================================
+  pr-comment:
+    name: Create PR Summary Comment
+    runs-on: ubuntu-latest
+    needs: [test-results, security-scan, code-quality]
+    if: always()
+
+    steps:
+    - name: Create PR Comment
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+
+          // Find existing bot comment
+          const botComment = comments.find(comment =>
+            comment.user.type === 'Bot' &&
+            comment.body.includes('## 📊 PR Quality Report')
+          );
+
+          // Get outputs from previous jobs
+          const pyCoverage = '${{ needs.test-results.outputs.py_coverage }}' || '0';
+          const pyTotal = '${{ needs.test-results.outputs.py_total }}' || '0';
+          const pyPassed = '${{ needs.test-results.outputs.py_passed }}' || '0';
+          const pyFailed = '${{ needs.test-results.outputs.py_failed }}' || '0';
+          const jsCoverage = '${{ needs.test-results.outputs.js_coverage }}' || '0';
+
+          const critical = '${{ needs.security-scan.outputs.critical }}' || '0';
+          const high = '${{ needs.security-scan.outputs.high }}' || '0';
+          const medium = '${{ needs.security-scan.outputs.medium }}' || '0';
+          const low = '${{ needs.security-scan.outputs.low }}' || '0';
+
+          const blackIssues = '${{ needs.code-quality.outputs.black_issues }}' || '0';
+          const flake8Critical = '${{ needs.code-quality.outputs.flake8_critical }}' || '0';
+          const flake8All = '${{ needs.code-quality.outputs.flake8_all }}' || '0';
+          const mypyErrors = '${{ needs.code-quality.outputs.mypy_errors }}' || '0';
+
+          // Determine status emojis
+          const coverageNum = parseFloat(pyCoverage);
+          const coverageEmoji = coverageNum >= 80 ? '✅' : coverageNum >= 60 ? '⚠️' : '❌';
+          const testEmoji = pyFailed == 0 ? '✅' : '❌';
+          const securityEmoji = (critical == 0 && high == 0) ? '✅' : critical > 0 ? '❌' : '⚠️';
+          const qualityEmoji = (blackIssues == 0 && flake8Critical == 0) ? '✅' : '⚠️';
+
+          // Build comment body
+          const body = `## 📊 PR Quality Report
+
+          ### 🧪 Test Results
+          ${testEmoji} **Python Tests**: ${pyPassed}/${pyTotal} passed${pyFailed > 0 ? `, ${pyFailed} failed` : ''}
+          ${coverageEmoji} **Python Coverage**: ${pyCoverage}%
+          ${jsCoverage && jsCoverage != '0' ? `📊 **Frontend Coverage**: ${jsCoverage}%` : ''}
+
+          ### 🔒 Security Scan (Trivy)
+          ${securityEmoji} **Vulnerabilities Found**:
+          - 🔴 Critical: ${critical}
+          - 🟠 High: ${high}
+          - 🟡 Medium: ${medium}
+          - 🟢 Low: ${low}
+
+          ${critical > 0 || high > 0 ? '⚠️ **Action Required**: Critical or high severity vulnerabilities detected!' : ''}
+
+          ### 📝 Code Quality
+          ${qualityEmoji} **Linting Results**:
+          - **Black** (formatting): ${blackIssues} files need formatting
+          - **Flake8** (critical): ${flake8Critical} critical issues
+          - **Flake8** (total): ${flake8All} total issues
+          - **MyPy** (type errors): ${mypyErrors} type errors
+
+          ### 📋 Recommendations
+          ${coverageNum < 80 ? '- 📈 Consider adding more tests to improve coverage\n' : ''}
+          ${pyFailed > 0 ? '- ❌ Fix failing tests before merging\n' : ''}
+          ${critical > 0 ? '- 🔒 **URGENT**: Address critical security vulnerabilities\n' : ''}
+          ${high > 0 ? '- 🔒 Address high severity security vulnerabilities\n' : ''}
+          ${blackIssues > 0 ? '- 🎨 Run \`black src/\` to format code\n' : ''}
+          ${flake8Critical > 0 ? '- 🔍 Fix critical flake8 issues\n' : ''}
+          ${mypyErrors > 0 ? '- 📝 Review type hints and fix mypy errors\n' : ''}
+          ${coverageNum >= 80 && pyFailed == 0 && critical == 0 && high == 0 && blackIssues == 0 && flake8Critical == 0 ? '✅ **Excellent work!** All quality checks passed.\n' : ''}
+
+          ---
+
+          💡 **Tip**: Click "Details" next to each check for more information
+
+          🤖 _This comment is automatically updated on each push_`;
+
+          // Create or update comment
+          if (botComment) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: botComment.id,
+              body: body
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
+          }
+
+  # =============================================================================
+  # PR Size Label
+  # =============================================================================
+  pr-size:
+    name: Label PR Size
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Calculate PR size and add label
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const { data: files } = await github.rest.pulls.listFiles({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            pull_number: context.issue.number,
+          });
+
+          const additions = files.reduce((sum, file) => sum + file.additions, 0);
+          const deletions = files.reduce((sum, file) => sum + file.deletions, 0);
+          const changes = additions + deletions;
+
+          let size, color;
+          if (changes < 10) {
+            size = 'XS';
+            color = '00FF00';
+          } else if (changes < 50) {
+            size = 'S';
+            color = '7FFF00';
+          } else if (changes < 200) {
+            size = 'M';
+            color = 'FFFF00';
+          } else if (changes < 500) {
+            size = 'L';
+            color = 'FFA500';
+          } else if (changes < 1000) {
+            size = 'XL';
+            color = 'FF4500';
+          } else {
+            size = 'XXL';
+            color = 'FF0000';
+          }
+
+          const label = `size/${size}`;
+
+          // Create label if it doesn't exist
+          try {
+            await github.rest.issues.createLabel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: label,
+              color: color,
+              description: `PR with ${size} size changes`
+            });
+          } catch (error) {
+            // Label already exists
+          }
+
+          // Remove old size labels
+          const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+
+          for (const oldLabel of currentLabels) {
+            if (oldLabel.name.startsWith('size/') && oldLabel.name !== label) {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name: oldLabel.name,
+              });
+            }
+          }
+
+          // Add new size label
+          await github.rest.issues.addLabels({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            labels: [label]
+          });
