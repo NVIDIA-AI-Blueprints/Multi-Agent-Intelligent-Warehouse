@@ -41,7 +41,7 @@ class GuardrailsConfig:
     base_url: str = os.getenv(
         "RAIL_API_URL", "https://integrate.api.nvidia.com/v1"
     )
-    timeout: int = int(os.getenv("GUARDRAILS_TIMEOUT", "10"))
+    timeout: int = int(os.getenv("GUARDRAILS_TIMEOUT", "10").split('#')[0].strip())
     use_api: bool = os.getenv("GUARDRAILS_USE_API", "false").lower() == "true"  # Disabled by default - API endpoint not available
     use_sdk: bool = os.getenv("USE_NEMO_GUARDRAILS_SDK", "false").lower() == "true"
     model_name: str = os.getenv("GUARDRAILS_MODEL", "nvidia/llama-3-70b-instruct")  # Note: This model may not be available at the endpoint

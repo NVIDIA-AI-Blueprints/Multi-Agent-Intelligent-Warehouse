@@ -96,8 +96,17 @@ async def lifespan(app: FastAPI):
 
 
 # Request size limits (10MB for JSON, 50MB for file uploads)
-MAX_REQUEST_SIZE = int(os.getenv("MAX_REQUEST_SIZE", "10485760"))  # 10MB default
-MAX_UPLOAD_SIZE = int(os.getenv("MAX_UPLOAD_SIZE", "52428800"))  # 50MB default
+def _safe_int_env(key: str, default: int) -> int:
+    """Safely parse integer from environment variable, stripping comments."""
+    value = os.getenv(key, str(default))
+    value = value.split('#')[0].strip()
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+MAX_REQUEST_SIZE = _safe_int_env("MAX_REQUEST_SIZE", 10485760)  # 10MB default
+MAX_UPLOAD_SIZE = _safe_int_env("MAX_UPLOAD_SIZE", 52428800)  # 50MB default
 
 app = FastAPI(
     title="Warehouse Operational Assistant",

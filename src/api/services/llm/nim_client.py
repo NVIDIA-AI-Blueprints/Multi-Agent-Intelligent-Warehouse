@@ -20,6 +20,30 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
+def _getenv_int(key: str, default: int) -> int:
+    """Safely get integer from environment variable, stripping comments."""
+    value = os.getenv(key, str(default))
+    # Strip comments (everything after #) and whitespace
+    value = value.split('#')[0].strip()
+    try:
+        return int(value)
+    except ValueError:
+        logger.warning(f"Invalid integer value for {key}: '{value}', using default {default}")
+        return default
+
+
+def _getenv_float(key: str, default: float) -> float:
+    """Safely get float from environment variable, stripping comments."""
+    value = os.getenv(key, str(default))
+    # Strip comments (everything after #) and whitespace
+    value = value.split('#')[0].strip()
+    try:
+        return float(value)
+    except ValueError:
+        logger.warning(f"Invalid float value for {key}: '{value}', using default {default}")
+        return default
+
+
 @dataclass
 class NIMConfig:
     """NVIDIA NIM configuration."""
@@ -32,13 +56,13 @@ class NIMConfig:
     )
     llm_model: str = os.getenv("LLM_MODEL", "nvcf:nvidia/llama-3.3-nemotron-super-49b-v1:dep-36lKV0IHjM2xq0MqnzR8wTnQwON")
     embedding_model: str = os.getenv("EMBEDDING_MODEL", "nvidia/nv-embedqa-e5-v5")
-    timeout: int = int(os.getenv("LLM_CLIENT_TIMEOUT", "120"))  # Increased from 60s to 120s to prevent premature timeouts
+    timeout: int = _getenv_int("LLM_CLIENT_TIMEOUT", 120)  # Increased from 60s to 120s to prevent premature timeouts
     # LLM generation parameters (configurable via environment variables)
-    default_temperature: float = float(os.getenv("LLM_TEMPERATURE", "0.1"))
-    default_max_tokens: int = int(os.getenv("LLM_MAX_TOKENS", "2000"))
-    default_top_p: float = float(os.getenv("LLM_TOP_P", "1.0"))
-    default_frequency_penalty: float = float(os.getenv("LLM_FREQUENCY_PENALTY", "0.0"))
-    default_presence_penalty: float = float(os.getenv("LLM_PRESENCE_PENALTY", "0.0"))
+    default_temperature: float = _getenv_float("LLM_TEMPERATURE", 0.1)
+    default_max_tokens: int = _getenv_int("LLM_MAX_TOKENS", 2000)
+    default_top_p: float = _getenv_float("LLM_TOP_P", 1.0)
+    default_frequency_penalty: float = _getenv_float("LLM_FREQUENCY_PENALTY", 0.0)
+    default_presence_penalty: float = _getenv_float("LLM_PRESENCE_PENALTY", 0.0)
 
 
 @dataclass
@@ -515,7 +539,7 @@ async def get_nim_client(enable_cache: bool = True, cache_ttl: int = 300) -> NIM
     if _nim_client is None:
         # Enable caching by default for better performance
         cache_enabled = os.getenv("LLM_CACHE_ENABLED", "true").lower() == "true"
-        cache_ttl_seconds = int(os.getenv("LLM_CACHE_TTL_SECONDS", str(cache_ttl)))
+        cache_ttl_seconds = _getenv_int("LLM_CACHE_TTL_SECONDS", cache_ttl)
         _nim_client = NIMClient(enable_cache=cache_enabled and enable_cache, cache_ttl=cache_ttl_seconds)
         logger.info(f"NIM Client initialized with caching: {cache_enabled and enable_cache} (TTL: {cache_ttl_seconds}s)")
     return _nim_client
