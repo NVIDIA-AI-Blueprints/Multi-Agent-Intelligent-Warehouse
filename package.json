@@ -44,5 +44,8 @@
     "conventional-changelog-conventionalcommits": "^9.1.0",
     "cz-conventional-changelog": "^3.3.0",
     "husky": "^9.1.7"
+  },
+  "dependencies": {
+    "license-checker": "^25.0.1"
   }
 }

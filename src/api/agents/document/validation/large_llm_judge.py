@@ -46,7 +46,9 @@ class LargeLLMJudge:
         self.base_url = os.getenv(
             "LLAMA_70B_URL", "https://integrate.api.nvidia.com/v1"
         )
-        self.timeout = 60
+        # Large LLM (70B) models need more time for complex evaluation prompts
+        # Default: 120 seconds (2 minutes), configurable via LLAMA_70B_TIMEOUT env var
+        self.timeout = int(os.getenv("LLAMA_70B_TIMEOUT", "120"))
 
     async def initialize(self):
         """Initialize the Large LLM Judge."""
@@ -196,6 +198,8 @@ class LargeLLMJudge:
         """Call Llama 3.1 Nemotron 70B API for evaluation."""
         try:
             messages = [{"role": "user", "content": prompt}]
+            
+            logger.info(f"Calling Large LLM Judge API with timeout: {self.timeout}s")
 
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(
@@ -233,6 +237,9 @@ class LargeLLMJudge:
                         "raw_response": content,
                     }
 
+        except httpx.TimeoutException as e:
+            logger.error(f"Judge API call timed out after {self.timeout}s: {e}")
+            raise TimeoutError(f"Large LLM Judge evaluation timed out after {self.timeout} seconds. The model may need more time for complex documents. Consider increasing LLAMA_70B_TIMEOUT environment variable.")
         except Exception as e:
             logger.error(f"Judge API call failed: {e}")
             raise

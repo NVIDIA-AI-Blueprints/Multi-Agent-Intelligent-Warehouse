@@ -372,7 +372,38 @@ def main():
     print("Fetching package information...")
     inventory = []
     
-    # Remove duplicates - keep the most specific version (exact version > minimum version)
+    # Remove duplicates - keep the latest/most specific version
+    # When same package appears in multiple requirements files, keep only one entry
+    try:
+        from packaging import version as packaging_version
+        HAS_PACKAGING = True
+    except ImportError:
+        HAS_PACKAGING = False
+    
+    def compare_versions(v1: str, v2: str) -> int:
+        """Compare two version strings. Returns 1 if v1 > v2, -1 if v1 < v2, 0 if equal."""
+        if not v1 and not v2:
+            return 0
+        if not v1:
+            return -1
+        if not v2:
+            return 1
+        try:
+            if HAS_PACKAGING:
+                v1_parsed = packaging_version.parse(v1)
+                v2_parsed = packaging_version.parse(v2)
+                if v1_parsed > v2_parsed:
+                    return 1
+                elif v1_parsed < v2_parsed:
+                    return -1
+                return 0
+            else:
+                # Fallback: simple string comparison (not perfect but better than nothing)
+                return 1 if v1 > v2 else (-1 if v1 < v2 else 0)
+        except:
+            # If parsing fails, use string comparison
+            return 1 if v1 > v2 else (-1 if v1 < v2 else 0)
+    
     package_dict = {}
     for pkg in all_packages:
         name_lower = pkg['name'].lower()
@@ -380,11 +411,50 @@ def main():
         source = pkg.get('source', 'pypi')
         key = (name_lower, source)
         
-        # If we haven't seen this package, or if this version is more specific (exact version vs None)
-        if key not in package_dict or (version and not package_dict[key].get('version')):
+        # If we haven't seen this package, add it
+        if key not in package_dict:
             package_dict[key] = pkg
+        else:
+            # If we have seen it, keep the one with the higher/latest version
+            existing_version = package_dict[key].get('version')
+            if not version and existing_version:
+                # Existing has version, new doesn't - keep existing
+                pass
+            elif version and not existing_version:
+                # New one has version, existing doesn't - replace
+                package_dict[key] = pkg
+            elif version and existing_version:
+                # Both have versions - keep the newer/higher version
+                if compare_versions(version, existing_version) > 0:
+                    package_dict[key] = pkg
+                # Otherwise keep existing (it's newer or same)
+            else:
+                # Neither has version - keep first one
+                pass
     
     unique_packages = list(package_dict.values())
+    
+    # Final deduplication: After PyPI queries, we might still have duplicates
+    # because PyPI returns version info. Remove any remaining duplicates by name only.
+    final_package_dict = {}
+    for pkg in unique_packages:
+        name_lower = pkg['name'].lower()
+        source = pkg.get('source', 'pypi')
+        key = (name_lower, source)
+        
+        if key not in final_package_dict:
+            final_package_dict[key] = pkg
+        else:
+            # Keep the one with the higher version
+            existing_version = final_package_dict[key].get('version', '')
+            new_version = pkg.get('version', '')
+            if new_version and existing_version:
+                if compare_versions(new_version, existing_version) > 0:
+                    final_package_dict[key] = pkg
+            elif new_version and not existing_version:
+                final_package_dict[key] = pkg
+    
+    unique_packages = list(final_package_dict.values())
     
     print(f"Processing {len(unique_packages)} unique packages (removed {len(all_packages) - len(unique_packages)} duplicates)...")
     
@@ -406,6 +476,29 @@ def main():
         
         # Rate limiting
         time.sleep(0.1)
+    
+    # Final deduplication after PyPI/npm queries
+    # Some packages may appear multiple times with different versions from different requirements files
+    # Keep only one entry per package name (prefer latest version)
+    final_inventory_dict = {}
+    for info in inventory:
+        name_lower = info['name'].lower()
+        source = info.get('source', 'pypi').lower()
+        key = (name_lower, source)
+        version = info.get('version', '')
+        
+        if key not in final_inventory_dict:
+            final_inventory_dict[key] = info
+        else:
+            # Keep the one with the higher version
+            existing_version = final_inventory_dict[key].get('version', '')
+            if version and existing_version:
+                if compare_versions(version, existing_version) > 0:
+                    final_inventory_dict[key] = info
+            elif version and not existing_version:
+                final_inventory_dict[key] = info
+    
+    inventory = list(final_inventory_dict.values())
     
     # Generate markdown table
     output_file = repo_root / 'docs' / 'SOFTWARE_INVENTORY.md'
