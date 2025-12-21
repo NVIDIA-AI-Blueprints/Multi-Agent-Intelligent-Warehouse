@@ -22,7 +22,7 @@ psycopg[binary]>=3.0.0
 websockets>=11.0.0
 paho-mqtt>=1.6.0
 pymodbus>=3.0.0
-bacpypes3>=0.0.0
+bacpypes3>=0.0.100  # BACnet protocol library for IoT safety sensors (optional - only needed for BACnet integration)
 # ERP Integration
 requests>=2.32.4  # Fixed .netrc credentials leak (CVE-2024-47081) and Session verify=False persistence MITM (CVE-2024-35195)
 # RFID/Barcode Scanning

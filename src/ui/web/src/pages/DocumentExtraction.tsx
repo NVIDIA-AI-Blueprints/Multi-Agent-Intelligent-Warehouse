@@ -317,22 +317,43 @@ const DocumentExtraction: React.FC = () => {
               console.log('Backend status:', status);
               console.log('Backend stages:', status.stages);
               
+              // Determine which stages are completed and which is current
+              const stageStatuses = doc.stages.map((stage) => {
+                // Find the corresponding backend stage by matching the stage name
+                const backendStage = status.stages?.find((bs: any) => 
+                  stageMapping[bs.stage_name] === stage.name
+                );
+                console.log(`Mapping stage "${stage.name}" to backend stage:`, backendStage);
+                return {
+                  ...stage,
+                  completed: backendStage?.status === 'completed',
+                  isProcessing: backendStage?.status === 'processing'
+                };
+              });
+
+              // Find the first stage that is processing
+              const processingIndex = stageStatuses.findIndex(s => s.isProcessing);
+              
+              // If no stage is processing, find the first incomplete stage (it should be current)
+              // Only if there are incomplete stages
+              const firstIncompleteIndex = stageStatuses.findIndex(s => !s.completed);
+              const currentIndex = processingIndex >= 0 
+                ? processingIndex 
+                : (firstIncompleteIndex >= 0 ? firstIncompleteIndex : -1);
+
+              // Update stages with proper current/completed flags
+              const updatedStages = stageStatuses.map((stage, index) => ({
+                ...stage,
+                // Mark as current only if it's the current index and not completed
+                current: currentIndex >= 0 && index === currentIndex && !stage.completed,
+                completed: stage.completed
+              }));
+
               const updatedDoc = {
                 ...doc,
                 status: status.status || doc.status,  // Update document status
                 progress: status.progress || 0,
-                stages: doc.stages.map((stage) => {
-                  // Find the corresponding backend stage by matching the stage name
-                  const backendStage = status.stages?.find((bs: any) => 
-                    stageMapping[bs.stage_name] === stage.name
-                  );
-                  console.log(`Mapping stage "${stage.name}" to backend stage:`, backendStage);
-                  return {
-                    ...stage,
-                    completed: backendStage?.status === 'completed',
-                    current: backendStage?.status === 'processing'
-                  };
-                })
+                stages: updatedStages
               };
               
               console.log(`Updated document ${documentId}: status=${updatedDoc.status}, progress=${updatedDoc.progress}%`);
