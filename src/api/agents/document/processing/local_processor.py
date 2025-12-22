@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime
 import json
 from PIL import Image
-import fitz  # PyMuPDF for PDF processing
+import pdfplumber  # MIT License - PDF text extraction
 import io
 import re
 import random
@@ -78,7 +78,7 @@ class LocalDocumentProcessor:
             }
     
     async def _extract_text_from_pdf(self, file_path: str) -> str:
-        """Extract text from PDF using PyMuPDF."""
+        """Extract text from PDF using pdfplumber."""
         try:
             # Check if file exists
             if not os.path.exists(file_path):
@@ -89,24 +89,39 @@ class LocalDocumentProcessor:
                 else:
                     return self._generate_sample_document_text()
             
-            doc = fitz.open(file_path)
             text_content = []
             
-            for page_num in range(doc.page_count):
-                page = doc[page_num]
-                # Try different text extraction methods
-                text = page.get_text()
-                if not text.strip():
-                    # Try getting text with layout preservation
-                    text = page.get_text("text")
-                if not text.strip():
-                    # Try getting text blocks
-                    blocks = page.get_text("blocks")
-                    text = "\n".join([block[4] for block in blocks if len(block) > 4])
+            # Open PDF with pdfplumber
+            with pdfplumber.open(file_path) as pdf:
+                logger.info(f"Extracting text from {len(pdf.pages)} pages")
                 
-                text_content.append(text)
+                for page_num, page in enumerate(pdf.pages, start=1):
+                    logger.debug(f"Extracting text from page {page_num}/{len(pdf.pages)}")
+                    
+                    # Extract text with layout preservation
+                    text = page.extract_text()
+                    
+                    # If no text found, try extracting tables and text separately
+                    if not text or not text.strip():
+                        # Try extracting tables
+                        tables = page.extract_tables()
+                        if tables:
+                            table_text = "\n".join([
+                                " | ".join([str(cell) if cell else "" for cell in row])
+                                for table in tables
+                                for row in table
+                            ])
+                            text = table_text
+                    
+                    # If still no text, try words extraction
+                    if not text or not text.strip():
+                        words = page.extract_words()
+                        if words:
+                            text = " ".join([word.get('text', '') for word in words])
+                    
+                    if text and text.strip():
+                        text_content.append(text)
             
-            doc.close()
             full_text = "\n\n".join(text_content)
             
             # If still no text, try OCR fallback (basic)

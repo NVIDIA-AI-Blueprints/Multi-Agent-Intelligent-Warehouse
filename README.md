@@ -704,7 +704,7 @@ Contributions are welcome! Please see our contributing guidelines and code of co
 
 ## License
 
-TBD (add your organization's license file).
+See [LICENSE](LICENSE) for license information.
 
 ---
 

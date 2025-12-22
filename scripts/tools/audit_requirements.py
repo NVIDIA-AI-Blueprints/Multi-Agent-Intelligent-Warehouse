@@ -162,7 +162,7 @@ def normalize_package_name(import_name: str) -> str:
         'langgraph': 'langgraph',
         'prometheus_client': 'prometheus-client',
         'psycopg': 'psycopg',
-        'fitz': 'pymupdf',
+        'fitz': 'pymupdf',  # Legacy mapping - PyMuPDF replaced with pdf2image/pdfplumber
         'tiktoken': 'tiktoken',
         'faker': 'faker',
         'bcrypt': 'bcrypt',

@@ -14,13 +14,13 @@ import json
 from PIL import Image
 import io
 
-# Try to import PyMuPDF, fallback to None if not available
+# Try to import pdf2image, fallback to None if not available
 try:
-    import fitz  # PyMuPDF for PDF processing
-    FITZ_AVAILABLE = True
+    from pdf2image import convert_from_path
+    PDF2IMAGE_AVAILABLE = True
 except ImportError:
-    FITZ_AVAILABLE = False
-    logger.warning("PyMuPDF (fitz) not available. PDF processing will be limited.")
+    PDF2IMAGE_AVAILABLE = False
+    logger.warning("pdf2image not available. PDF processing will be limited. Install with: pip install pdf2image")
 
 logger = logging.getLogger(__name__)
 
@@ -180,42 +180,37 @@ class NeMoRetrieverPreprocessor:
             raise
 
     async def _extract_pdf_images(self, file_path: str) -> List[Image.Image]:
-        """Extract images from PDF pages."""
+        """Extract images from PDF pages using pdf2image."""
         images = []
 
         try:
-            if not FITZ_AVAILABLE:
+            if not PDF2IMAGE_AVAILABLE:
                 raise ImportError(
-                    "PyMuPDF (fitz) is not installed. Install it with: pip install PyMuPDF"
+                    "pdf2image is not installed. Install it with: pip install pdf2image. "
+                    "Also requires poppler-utils system package: sudo apt-get install poppler-utils"
                 )
             
-            logger.info(f"Opening PDF: {file_path}")
-            # Open PDF with PyMuPDF
-            pdf_document = fitz.open(file_path)
-            total_pages = pdf_document.page_count
-            logger.info(f"PDF has {total_pages} pages")
-
+            logger.info(f"Converting PDF to images: {file_path}")
+            
             # Limit pages for faster processing
             max_pages = int(os.getenv("MAX_PDF_PAGES_TO_EXTRACT", "10"))
-            pages_to_extract = min(total_pages, max_pages)
             
-            if total_pages > max_pages:
-                logger.info(f"Extracting first {pages_to_extract} pages out of {total_pages} total")
-
-            for page_num in range(pages_to_extract):
-                logger.debug(f"Extracting page {page_num + 1}/{pages_to_extract}")
-                page = pdf_document[page_num]
-
-                # Render page as image (use 1.5x zoom for faster processing, still good quality)
-                mat = fitz.Matrix(1.5, 1.5)
-                pix = page.get_pixmap(matrix=mat)
-
-                # Convert to PIL Image
-                img_data = pix.tobytes("png")
-                image = Image.open(io.BytesIO(img_data))
-                images.append(image)
-
-            pdf_document.close()
+            # Convert PDF pages to PIL Images
+            # dpi=150 provides good quality for OCR processing
+            # first_page and last_page limit the number of pages processed
+            pdf_images = convert_from_path(
+                file_path,
+                dpi=150,
+                first_page=1,
+                last_page=max_pages,
+                fmt='png'
+            )
+            
+            total_pages = len(pdf_images)
+            logger.info(f"Converted {total_pages} pages from PDF")
+            
+            # Convert to list of PIL Images
+            images = pdf_images
             logger.info(f"Extracted {len(images)} pages from PDF")
 
         except Exception as e:

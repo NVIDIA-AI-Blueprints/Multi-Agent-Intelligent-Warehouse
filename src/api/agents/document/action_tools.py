@@ -1118,8 +1118,8 @@ class DocumentActionTools:
             except ImportError as e:
                 logger.warning(f"Local processor not available (missing dependencies): {_sanitize_log_data(str(e))}")
                 missing_module = str(e).replace("No module named ", "").strip("'\"")
-                if "fitz" in missing_module.lower() or "pymupdf" in missing_module.lower():
-                    logger.info("Install PyMuPDF for PDF processing: pip install PyMuPDF")
+                if "pdfplumber" in missing_module.lower() or "pdf2image" in missing_module.lower():
+                    logger.info("Install PDF processing libraries: pip install pdfplumber pdf2image. Also install poppler-utils: sudo apt-get install poppler-utils")
                 elif "PIL" in missing_module or "Pillow" in missing_module:
                     logger.info("Install Pillow (PIL) for image processing: pip install Pillow")
                 else:
