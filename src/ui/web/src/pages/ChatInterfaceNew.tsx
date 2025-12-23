@@ -502,7 +502,7 @@ const ChatInterfaceNew: React.FC = () => {
   }
 
   return (
-    <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff' }}>
+    <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'background.default' }}>
       {/* Top Bar */}
       <TopBar
         warehouse={warehouse}
@@ -523,14 +523,14 @@ const ChatInterfaceNew: React.FC = () => {
         />
 
         {/* Chat Area */}
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#f5f5f5' }}>
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: 'background.default' }}>
           {/* Chat Messages */}
           <Box
             sx={{
               flex: 1,
               overflow: 'auto',
               p: 0,
-              backgroundColor: '#f5f5f5',
+              backgroundColor: 'background.default',
             }}
           >
             {messages.map((message) => (
@@ -546,18 +546,18 @@ const ChatInterfaceNew: React.FC = () => {
             {/* Streaming Events */}
             {streamingEvents.length > 0 && (
               <Box sx={{ px: 2, mb: 2 }}>
-                <Paper sx={{ backgroundColor: '#ffffff', p: 2, border: '1px solid #e0e0e0', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                  <Typography variant="body2" sx={{ color: '#76B900', mb: 1, fontWeight: 500 }}>
+                <Paper sx={{ backgroundColor: 'background.paper', p: 2, border: '1px solid', borderColor: 'divider', boxShadow: 1 }}>
+                  <Typography variant="body2" sx={{ color: 'primary.main', mb: 1, fontWeight: 500 }}>
                     Processing...
                   </Typography>
                   {streamingEvents
                     .filter((event): event is StreamingEvent => event !== null && event !== undefined)
                     .map((event, index) => (
                       <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                        <Typography variant="caption" sx={{ color: '#666666', minWidth: '100px' }}>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', minWidth: '100px' }}>
                           {event?.stage || 'unknown'}:
                         </Typography>
-                        <Typography variant="caption" sx={{ color: '#333333' }}>
+                        <Typography variant="caption" sx={{ color: 'text.primary' }}>
                           {event?.agent && `Agent: ${event.agent}`}
                           {event?.confidence && ` (${(event.confidence * 100).toFixed(1)}%)`}
                           {event?.k !== undefined && ` K=${event.k}→${event.reranked}`}
@@ -575,9 +575,9 @@ const ChatInterfaceNew: React.FC = () => {
             {isLoading && (
               <Box sx={{ px: 2, mb: 2 }}>
                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-                  <Skeleton variant="circular" width={32} height={32} sx={{ backgroundColor: '#e0e0e0' }} />
+                  <Skeleton variant="circular" width={32} height={32} sx={{ backgroundColor: 'grey.700' }} />
                   <Box sx={{ flex: 1 }}>
-                    <Skeleton variant="rectangular" width="70%" height={60} sx={{ backgroundColor: '#ffffff', borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }} />
+                    <Skeleton variant="rectangular" width="70%" height={60} sx={{ backgroundColor: 'background.paper', borderRadius: 2, boxShadow: 1 }} />
                   </Box>
                 </Box>
               </Box>
@@ -590,9 +590,10 @@ const ChatInterfaceNew: React.FC = () => {
           <Box
             sx={{
               p: 2,
-              borderTop: '1px solid #e0e0e0',
-              backgroundColor: '#ffffff',
-              boxShadow: '0 -2px 8px rgba(0,0,0,0.05)',
+              borderTop: '1px solid',
+              borderColor: 'divider',
+              backgroundColor: 'background.paper',
+              boxShadow: '0 -2px 8px rgba(0,0,0,0.3)',
             }}
           >
             {/* Reasoning Controls */}
@@ -621,7 +622,7 @@ const ChatInterfaceNew: React.FC = () => {
                 label={
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <PsychologyIcon sx={{ fontSize: 18, color: enableReasoning ? '#76B900' : '#666666' }} />
-                    <Typography variant="body2" sx={{ color: '#333333' }}>
+                    <Typography variant="body2" sx={{ color: 'text.primary' }}>
                       Enable Reasoning
                     </Typography>
                   </Box>
@@ -654,11 +655,11 @@ const ChatInterfaceNew: React.FC = () => {
                             size="small"
                             onDelete={() => handleReasoningTypeToggle(type)}
                             sx={{
-                              backgroundColor: '#76B900',
-                              color: '#000000',
+                              backgroundColor: 'primary.main',
+                              color: 'primary.contrastText',
                               fontSize: '10px',
                               '& .MuiChip-deleteIcon': {
-                                color: '#000000',
+                                color: 'primary.contrastText',
                               },
                             }}
                           />
@@ -676,12 +677,13 @@ const ChatInterfaceNew: React.FC = () => {
                 sx={{
                   p: 1.5,
                   mb: 1,
-                  backgroundColor: '#fafafa',
-                  border: '1px solid #e0e0e0',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                  backgroundColor: 'background.paper',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  boxShadow: 1,
                 }}
               >
-                <Typography variant="caption" sx={{ color: '#666666', mb: 1, display: 'block' }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary', mb: 1, display: 'block' }}>
                   Select reasoning types (optional - leave empty for auto-selection):
                 </Typography>
                 <FormGroup>
@@ -729,22 +731,22 @@ const ChatInterfaceNew: React.FC = () => {
                 disabled={isLoading}
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    backgroundColor: '#ffffff',
-                    color: '#333333',
+                    backgroundColor: 'background.default',
+                    color: 'text.primary',
                     '& fieldset': {
-                      borderColor: '#e0e0e0',
+                      borderColor: 'divider',
                     },
                     '&:hover fieldset': {
-                      borderColor: '#76B900',
+                      borderColor: 'primary.main',
                     },
                     '&.Mui-focused fieldset': {
-                      borderColor: '#76B900',
+                      borderColor: 'primary.main',
                     },
                   },
                   '& .MuiInputBase-input': {
-                    color: '#333333',
+                    color: 'text.primary',
                     '&::placeholder': {
-                      color: '#999999',
+                      color: 'text.secondary',
                       opacity: 1,
                     },
                   },
@@ -754,14 +756,14 @@ const ChatInterfaceNew: React.FC = () => {
                 onClick={handleSendMessage}
                 disabled={!inputValue.trim() || isLoading}
                 sx={{
-                  backgroundColor: '#76B900',
-                  color: '#ffffff',
+                  backgroundColor: 'primary.main',
+                  color: 'primary.contrastText',
                   '&:hover': {
-                    backgroundColor: '#5a8f00',
+                    backgroundColor: 'primary.light',
                   },
                   '&:disabled': {
-                    backgroundColor: '#e0e0e0',
-                    color: '#999999',
+                    backgroundColor: 'grey.700',
+                    color: 'text.disabled',
                   },
                 }}
               >
@@ -791,11 +793,11 @@ const ChatInterfaceNew: React.FC = () => {
           size="small"
           onClick={() => setRightPanelOpen(!rightPanelOpen)}
           sx={{
-            backgroundColor: rightPanelOpen ? '#76B900' : '#ffffff',
-            color: rightPanelOpen ? '#ffffff' : '#333333',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            backgroundColor: rightPanelOpen ? 'primary.main' : 'background.paper',
+            color: rightPanelOpen ? 'primary.contrastText' : 'text.primary',
+            boxShadow: 2,
             '&:hover': {
-              backgroundColor: rightPanelOpen ? '#5a8f00' : '#f5f5f5',
+              backgroundColor: rightPanelOpen ? 'primary.light' : 'background.default',
             },
           }}
         >
@@ -806,11 +808,11 @@ const ChatInterfaceNew: React.FC = () => {
           size="small"
           onClick={() => setShowInternals(!showInternals)}
           sx={{
-            backgroundColor: showInternals ? '#9C27B0' : '#ffffff',
-            color: showInternals ? '#ffffff' : '#333333',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            backgroundColor: showInternals ? 'secondary.main' : 'background.paper',
+            color: showInternals ? 'secondary.contrastText' : 'text.primary',
+            boxShadow: 2,
             '&:hover': {
-              backgroundColor: showInternals ? '#7b1fa2' : '#f5f5f5',
+              backgroundColor: showInternals ? 'secondary.light' : 'background.default',
             },
           }}
         >

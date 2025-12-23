@@ -172,7 +172,7 @@ const DemoScript: React.FC<DemoScriptProps> = ({ onScenarioSelect }) => {
   };
 
   return (
-    <Box sx={{ p: 2, backgroundColor: '#ffffff', height: '100%', overflow: 'auto' }}>
+    <Box sx={{ p: 2, backgroundColor: 'background.default', height: '100%', overflow: 'auto' }}>
       <Typography variant="h6" sx={{ color: '#333333', mb: 3, textAlign: 'center', fontWeight: 500 }}>
         Demo Scripts
       </Typography>
@@ -301,7 +301,7 @@ const DemoScript: React.FC<DemoScriptProps> = ({ onScenarioSelect }) => {
                             borderColor: '#76B900',
                             '&:hover': {
                               backgroundColor: isCompleted ? '#76B900' : '#5a8f00',
-                              color: isCompleted ? '#000000' : '#ffffff',
+                              color: isCompleted ? 'primary.contrastText' : 'text.primary',
                             },
                             '&:disabled': {
                               backgroundColor: 'transparent',

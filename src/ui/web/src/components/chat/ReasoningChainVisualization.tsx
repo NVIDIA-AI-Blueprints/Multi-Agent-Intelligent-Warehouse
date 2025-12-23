@@ -111,7 +111,7 @@ const ReasoningChainVisualization: React.FC<ReasoningChainVisualizationProps> = 
                     key={step.step_id || index}
                     sx={{
                       mt: index > 0 ? 1 : 0,
-                      backgroundColor: '#ffffff',
+                      backgroundColor: 'background.paper',
                       border: '1px solid #e0e0e0',
                       boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
                     }}

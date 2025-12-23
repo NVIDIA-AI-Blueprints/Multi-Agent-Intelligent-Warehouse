@@ -175,7 +175,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                     size="small"
                     sx={{
                       backgroundColor: '#76B900',
-                      color: '#000000',
+                      color: 'text.primary',
                       fontSize: '10px',
                       height: '18px',
                     }}

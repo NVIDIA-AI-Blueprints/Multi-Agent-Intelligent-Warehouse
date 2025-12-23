@@ -48,15 +48,16 @@ const TopBar: React.FC<TopBarProps> = ({
     <AppBar 
       position="static" 
       sx={{ 
-        backgroundColor: '#ffffff',
-        borderBottom: '1px solid #e0e0e0',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+        backgroundColor: 'background.paper',
+        borderBottom: '1px solid',
+        borderColor: 'divider',
+        boxShadow: 1,
       }}
     >
       <Toolbar sx={{ minHeight: '48px !important', gap: 2 }}>
         {/* Warehouse Selector */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="body2" sx={{ color: '#333333', minWidth: '80px', fontWeight: 500 }}>
+          <Typography variant="body2" sx={{ color: 'text.primary', minWidth: '80px', fontWeight: 500 }}>
             Warehouse:
           </Typography>
           <Select
@@ -64,20 +65,8 @@ const TopBar: React.FC<TopBarProps> = ({
             onChange={(e) => onWarehouseChange(e.target.value)}
             size="small"
             sx={{
-              color: '#333333',
-              backgroundColor: '#ffffff',
-              '& .MuiOutlinedInput-notchedOutline': {
-                borderColor: '#e0e0e0',
-              },
-              '&:hover .MuiOutlinedInput-notchedOutline': {
-                borderColor: '#76B900',
-              },
-              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                borderColor: '#76B900',
-              },
-              '& .MuiSvgIcon-root': {
-                color: '#333333',
-              },
+              color: 'text.primary',
+              backgroundColor: 'background.default',
               minWidth: 120,
             }}
           >
@@ -89,7 +78,7 @@ const TopBar: React.FC<TopBarProps> = ({
 
         {/* Role Selector */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="body2" sx={{ color: '#333333', minWidth: '50px', fontWeight: 500 }}>
+          <Typography variant="body2" sx={{ color: 'text.primary', minWidth: '50px', fontWeight: 500 }}>
             Role:
           </Typography>
           <Select
@@ -97,20 +86,8 @@ const TopBar: React.FC<TopBarProps> = ({
             onChange={(e) => onRoleChange(e.target.value)}
             size="small"
             sx={{
-              color: '#333333',
-              backgroundColor: '#ffffff',
-              '& .MuiOutlinedInput-notchedOutline': {
-                borderColor: '#e0e0e0',
-              },
-              '&:hover .MuiOutlinedInput-notchedOutline': {
-                borderColor: '#76B900',
-              },
-              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                borderColor: '#76B900',
-              },
-              '& .MuiSvgIcon-root': {
-                color: '#333333',
-              },
+              color: 'text.primary',
+              backgroundColor: 'background.default',
               minWidth: 120,
             }}
           >
@@ -157,12 +134,12 @@ const TopBar: React.FC<TopBarProps> = ({
         </Box>
 
         {/* Time Window */}
-        <Typography variant="body2" sx={{ color: '#666666', minWidth: '100px' }}>
+        <Typography variant="body2" sx={{ color: 'text.secondary', minWidth: '100px' }}>
           {new Date().toLocaleTimeString()}
         </Typography>
 
         {/* Settings */}
-        <IconButton size="small" sx={{ color: '#333333', '&:hover': { color: '#76B900' } }}>
+        <IconButton size="small" sx={{ color: 'text.primary' }}>
           <SettingsIcon />
         </IconButton>
       </Toolbar>
