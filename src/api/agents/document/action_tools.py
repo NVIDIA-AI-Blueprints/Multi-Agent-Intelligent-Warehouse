@@ -988,13 +988,35 @@ class DocumentActionTools:
                             )
                         )
 
-                    # Quality Score from validation
+                    # Validation/Judge Results (49B Model)
                     quality_score = None
                     if "validation" in results and results["validation"]:
                         validation_data = results["validation"]
 
                         # Handle both JudgeEvaluation object and dictionary
                         quality_score = self._create_quality_score_from_validation(validation_data)
+                        
+                        # Add validation stage as ExtractionResult to show judge model was used
+                        extraction_results.append(
+                            ExtractionResult(
+                                stage="validation",
+                                raw_data={
+                                    "judge_evaluation": validation_data if isinstance(validation_data, dict) else validation_data.__dict__ if hasattr(validation_data, "__dict__") else {},
+                                },
+                                processed_data={
+                                    "overall_score": quality_score.overall_score if quality_score else 0.0,
+                                    "decision": quality_score.decision.value if quality_score and hasattr(quality_score.decision, "value") else str(quality_score.decision) if quality_score else "REVIEW",
+                                    "confidence": quality_score.confidence if quality_score else 0.0,
+                                },
+                                confidence_score=quality_score.confidence if quality_score else 0.0,
+                                processing_time_ms=0,  # Validation doesn't track processing time yet
+                                model_used=self.MODEL_LARGE_JUDGE,  # Llama 3.3 Nemotron Super 49B
+                                metadata={
+                                    "judge_model": self.MODEL_LARGE_JUDGE,
+                                    "timestamp": datetime.now().isoformat(),
+                                },
+                            )
+                        )
 
                     # Routing Decision
                     routing_decision = None

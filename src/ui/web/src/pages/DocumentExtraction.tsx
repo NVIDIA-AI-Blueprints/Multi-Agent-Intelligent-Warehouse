@@ -1378,6 +1378,14 @@ const DocumentExtraction: React.FC = () => {
                       }
                     }
                     
+                    // Also check quality_score for judge_model
+                    if (documentResults.extracted_data.quality_score && documentResults.extracted_data.quality_score.judge_model) {
+                      const judgeModel = documentResults.extracted_data.quality_score.judge_model;
+                      if (!allModels.includes(judgeModel)) {
+                        allModels.push(judgeModel);
+                      }
+                    }
+                    
                     // Combine all processing information
                     const combinedInfo = {
                       ...metadata,
