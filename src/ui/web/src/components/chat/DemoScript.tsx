@@ -188,20 +188,20 @@ const DemoScript: React.FC<DemoScriptProps> = ({ onScenarioSelect }) => {
                 <Typography variant="h6" sx={{ color: 'text.primary', fontSize: '16px', fontWeight: 500 }}>
                   {flow.title}
                 </Typography>
-                <Typography variant="body2" sx={{ color: '#666666' }}>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                   {flow.description}
                 </Typography>
                 {currentFlow === flow.id && (
                   <Box sx={{ mt: 1 }}>
-                    <Typography variant="caption" sx={{ color: '#76B900', fontWeight: 500 }}>
+                    <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 500 }}>
                       Progress: {completedSteps.length} / {flow.steps.length} steps completed
                     </Typography>
-                    <Box sx={{ width: '100%', height: 4, backgroundColor: '#e0e0e0', borderRadius: 2, mt: 0.5 }}>
+                    <Box sx={{ width: '100%', height: 4, backgroundColor: 'grey.700', borderRadius: 2, mt: 0.5 }}>
                       <Box 
                         sx={{ 
                           width: `${(completedSteps.length / flow.steps.length) * 100}%`, 
                           height: '100%', 
-                          backgroundColor: '#76B900', 
+                          backgroundColor: 'primary.main', 
                           borderRadius: 2,
                           transition: 'width 0.3s ease'
                         }} 

@@ -174,8 +174,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
                     label={`${reasoningChain.steps?.length || 0} steps`}
                     size="small"
                     sx={{
-                      backgroundColor: '#76B900',
-                      color: 'text.primary',
+                      backgroundColor: 'primary.main',
+                      color: 'primary.contrastText',
                       fontSize: '10px',
                       height: '18px',
                     }}
