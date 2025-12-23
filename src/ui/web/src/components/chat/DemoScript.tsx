@@ -173,19 +173,19 @@ const DemoScript: React.FC<DemoScriptProps> = ({ onScenarioSelect }) => {
 
   return (
     <Box sx={{ p: 2, backgroundColor: 'background.default', height: '100%', overflow: 'auto' }}>
-      <Typography variant="h6" sx={{ color: '#333333', mb: 3, textAlign: 'center', fontWeight: 500 }}>
+      <Typography variant="h6" sx={{ color: 'text.primary', mb: 3, textAlign: 'center', fontWeight: 500 }}>
         Demo Scripts
       </Typography>
 
       {demoFlows.map((flow, flowIndex) => (
-        <Card key={flow.id} sx={{ mb: 3, backgroundColor: '#fafafa', border: '1px solid #e0e0e0', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <Card key={flow.id} sx={{ mb: 3, backgroundColor: 'background.paper', border: '1px solid', borderColor: 'divider', boxShadow: 1 }}>
           <CardContent>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <Box sx={{ color: '#76B900', mr: 2 }}>
+              <Box sx={{ color: 'primary.main', mr: 2 }}>
                 {flow.icon}
               </Box>
               <Box sx={{ flex: 1 }}>
-                <Typography variant="h6" sx={{ color: '#333333', fontSize: '16px', fontWeight: 500 }}>
+                <Typography variant="h6" sx={{ color: 'text.primary', fontSize: '16px', fontWeight: 500 }}>
                   {flow.title}
                 </Typography>
                 <Typography variant="body2" sx={{ color: '#666666' }}>

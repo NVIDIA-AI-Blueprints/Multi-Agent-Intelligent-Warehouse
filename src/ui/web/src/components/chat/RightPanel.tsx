@@ -398,7 +398,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                       <Typography variant="caption" sx={{ color: '#666666', mb: 1, display: 'block' }}>
                         Result Sample:
                       </Typography>
-                      <Box sx={{ backgroundColor: '#000000', p: 1, borderRadius: 1, fontFamily: 'monospace', fontSize: '10px' }}>
+                      <Box sx={{ backgroundColor: 'background.default', p: 1, borderRadius: 1, fontFamily: 'monospace', fontSize: '10px', border: '1px solid', borderColor: 'divider', color: 'text.primary' }}>
                         {JSON.stringify(sqlQuery.result_sample, null, 2)}
                       </Box>
                     </Box>
@@ -547,11 +547,11 @@ const RightPanel: React.FC<RightPanelProps> = ({
                         </Typography>
 
                         {tool.result && (
-                          <Box sx={{ mt: 1, backgroundColor: '#000000', p: 1, borderRadius: 1 }}>
-                            <Typography variant="caption" sx={{ color: '#666666' }}>
+                          <Box sx={{ mt: 1, backgroundColor: 'background.default', p: 1, borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                               Result:
                             </Typography>
-                            <Typography variant="caption" sx={{ color: '#ffffff', fontFamily: 'monospace', fontSize: '10px' }}>
+                            <Typography variant="caption" sx={{ color: 'text.primary', fontFamily: 'monospace', fontSize: '10px' }}>
                               {JSON.stringify(tool.result, null, 2)}
                             </Typography>
                           </Box>
