@@ -120,19 +120,25 @@ const Documentation: React.FC = () => {
       step: 2,
       title: "Database Configuration",
       description: "Configure PostgreSQL/TimescaleDB and Milvus connections",
-      code: "cp .env.example .env && # Edit database credentials"
+      code: "cp .env.example .env\n# Edit database credentials in .env"
     },
     {
       step: 3,
       title: "NVIDIA NIMs Setup",
       description: "Configure NVIDIA API keys for LLM and embeddings",
-      code: "export NVIDIA_API_KEY=your_api_key"
+      code: "export NVIDIA_API_KEY=your_api_key\n# Or add to .env file"
     },
     {
       step: 4,
       title: "Start Services",
       description: "Launch the application stack",
       code: "./scripts/setup/dev_up.sh && ./scripts/start_server.sh"
+    },
+    {
+      step: 5,
+      title: "Jupyter Notebook Setup (Recommended)",
+      description: "Use the interactive setup guide for step-by-step setup",
+      code: "jupyter notebook notebooks/setup/complete_setup_guide.ipynb"
     }
   ];
 
@@ -364,7 +370,7 @@ const Documentation: React.FC = () => {
         <AccordionDetails>
           <Grid container spacing={3}>
             {quickStartSteps.map((step) => (
-              <Grid item xs={12} md={6} key={step.step}>
+              <Grid item xs={12} md={step.step === 5 ? 12 : 6} key={step.step}>
                 <Card variant="outlined">
                   <CardContent>
                     <Typography variant="h6" gutterBottom>
@@ -380,7 +386,8 @@ const Documentation: React.FC = () => {
                       fontSize: '0.875rem',
                       border: '1px solid',
                       borderColor: 'divider',
-                      color: 'text.primary'
+                      color: 'text.primary',
+                      whiteSpace: 'pre-wrap'
                     }}>
                       {step.code}
                     </Paper>
