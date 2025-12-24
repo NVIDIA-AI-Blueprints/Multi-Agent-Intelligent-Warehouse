@@ -241,7 +241,7 @@ const Documentation: React.FC = () => {
       endpoints: [
         { method: "GET", path: "/api/v1/mcp/tools", description: "Discover available tools" },
         { method: "POST", path: "/api/v1/mcp/tools/search", description: "Search tools by query" },
-        { method: "POST", path: "/api/v1/mcp/tools/execute", description: "Execute a specific tool" },
+        { method: "POST", path: "/api/v1/mcp/tools/execute", description: "Execute a specific tool (note: endpoint is /tools/execute)" },
         { method: "GET", path: "/api/v1/mcp/status", description: "MCP system status" },
         { method: "POST", path: "/api/v1/mcp/test-workflow", description: "Test MCP workflow execution" },
         { method: "GET", path: "/api/v1/mcp/agents", description: "List MCP agents" },
@@ -278,6 +278,7 @@ const Documentation: React.FC = () => {
         { method: "GET", path: "/api/v1/forecasting/reorder-recommendations", description: "AI-powered reorder recommendations" },
         { method: "GET", path: "/api/v1/forecasting/model-performance", description: "Model performance metrics" },
         { method: "GET", path: "/api/v1/forecasting/business-intelligence", description: "Business intelligence dashboard" },
+        { method: "GET", path: "/api/v1/forecasting/business-intelligence/enhanced", description: "Enhanced business intelligence dashboard" },
         { method: "POST", path: "/api/v1/forecasting/batch-forecast", description: "Batch forecast for multiple SKUs" }
       ]
     },
@@ -313,12 +314,12 @@ const Documentation: React.FC = () => {
     {
       agent: "Forecasting Agent",
       count: 6,
-      tools: ["generate_forecast", "get_reorder_recommendations", "get_model_performance", "train_models", "get_forecast_summary", "get_business_intelligence"]
+      tools: ["get_forecast", "get_batch_forecast", "get_reorder_recommendations", "get_model_performance", "get_business_intelligence", "get_forecast_dashboard"]
     },
     {
       agent: "Document Processing",
-      count: 5,
-      tools: ["upload_document", "get_document_status", "get_document_results", "get_document_analytics", "process_document_background"]
+      count: 4,
+      tools: ["upload_document", "get_document_status", "get_document_results", "get_document_analytics"]
     }
   ];
 
