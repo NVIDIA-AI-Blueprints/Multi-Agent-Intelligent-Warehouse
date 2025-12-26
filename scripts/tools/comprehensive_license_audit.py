@@ -37,6 +37,9 @@ from datetime import datetime
 import csv
 import tempfile
 
+# Import shared utilities to eliminate code duplication
+from .license_utils import run_command
+
 try:
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment
@@ -51,21 +54,6 @@ try:
     HAS_REQUESTS = True
 except ImportError:
     HAS_REQUESTS = False
-
-
-def run_command(cmd: List[str], cwd: Optional[Path] = None, check: bool = False) -> tuple[bool, str, str]:
-    """Run a shell command and return success, stdout, stderr."""
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            cwd=cwd,
-            check=check
-        )
-        return result.returncode == 0, result.stdout, result.stderr
-    except Exception as e:
-        return False, "", str(e)
 
 
 def check_tool_installed(tool_name: str, check_cmd: List[str]) -> bool:
