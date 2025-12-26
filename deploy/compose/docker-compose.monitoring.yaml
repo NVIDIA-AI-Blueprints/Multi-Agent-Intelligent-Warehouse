@@ -118,7 +118,8 @@ services:
     ports:
       - "9187:9187"
     environment:
-      - DATA_SOURCE_NAME=postgresql://${POSTGRES_USER:-warehouse}:${POSTGRES_PASSWORD:-changeme}@host.docker.internal:5435/${POSTGRES_DB:-warehouse}?sslmode=disable
+      # SECURITY: POSTGRES_PASSWORD must be set in .env file (no hardcoded defaults)
+      - DATA_SOURCE_NAME=postgresql://${POSTGRES_USER:-warehouse}:${POSTGRES_PASSWORD}@host.docker.internal:5435/${POSTGRES_DB:-warehouse}?sslmode=disable
     networks:
       - monitoring
     restart: unless-stopped

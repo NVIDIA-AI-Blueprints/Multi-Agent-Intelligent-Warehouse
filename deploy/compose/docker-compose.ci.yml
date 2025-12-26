@@ -18,7 +18,8 @@ services:
       - GIT_SHA=${GIT_SHA:-unknown}
       - BUILD_TIME=${BUILD_TIME:-unknown}
       - ENVIRONMENT=ci
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-warehouse_ops}
+      # SECURITY: POSTGRES_PASSWORD must be set in .env file (no hardcoded defaults)
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-warehouse_ops}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - MILVUS_HOST=milvus
@@ -46,7 +47,8 @@ services:
     environment:
       - POSTGRES_DB=warehouse_ops
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
+      # SECURITY: POSTGRES_PASSWORD must be set in .env file (no hardcoded defaults)
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
       - postgres_data_ci:/var/lib/postgresql/data
       - ./data/postgres:/docker-entrypoint-initdb.d

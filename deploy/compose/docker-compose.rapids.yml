@@ -27,7 +27,8 @@ services:
     environment:
       POSTGRES_DB: warehouse
       POSTGRES_USER: warehouse
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      # SECURITY: POSTGRES_PASSWORD must be set in .env file (no hardcoded defaults)
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5435:5432"
     volumes:
