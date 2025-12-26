@@ -388,10 +388,43 @@ class DatabaseMigrator:
         return str(file_path)
 
 
+def _get_database_url() -> str:
+    """
+    Get database URL from environment variables.
+    
+    Constructs DATABASE_URL from individual components if not directly set.
+    Requires POSTGRES_PASSWORD to be set (no hardcoded defaults).
+    
+    Returns:
+        str: Database connection URL
+        
+    Raises:
+        ValueError: If required environment variables are not set
+    """
+    # First, try to get DATABASE_URL directly
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        return database_url
+    
+    # If not set, construct from individual environment variables
+    # SECURITY: Do not hardcode passwords - require POSTGRES_PASSWORD to be set
+    postgres_user = os.getenv("POSTGRES_USER", "warehouse")
+    postgres_password = os.getenv("POSTGRES_PASSWORD")
+    postgres_db = os.getenv("POSTGRES_DB", "warehouse")
+    postgres_host = os.getenv("DB_HOST", "localhost")
+    postgres_port = os.getenv("DB_PORT", "5435")
+    
+    if not postgres_password:
+        raise ValueError(
+            "POSTGRES_PASSWORD environment variable is required. "
+            "Set it in your .env file or environment."
+        )
+    
+    return f"postgresql://{postgres_user}:{postgres_password}@{postgres_host}:{postgres_port}/{postgres_db}"
+
+
 # Global migrator instance
 migrator = DatabaseMigrator(
-    database_url=os.getenv(
-        "DATABASE_URL", "postgresql://postgres:postgres@localhost:5435/warehouse_ops"
-    ),
+    database_url=_get_database_url(),
     migrations_dir="data/postgres/migrations",
 )

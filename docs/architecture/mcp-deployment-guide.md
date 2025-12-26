@@ -490,7 +490,7 @@ metadata:
   name: mcp-config
   namespace: warehouse-mcp
 data:
-  DATABASE_URL: "postgresql://warehouse:warehousepw@postgres-service:5432/warehouse"
+  DATABASE_URL: "postgresql://${POSTGRES_USER:-warehouse}:${POSTGRES_PASSWORD}@postgres-service:5432/${POSTGRES_DB:-warehouse}"
   REDIS_URL: "redis://redis-service:6379/0"
   MCP_SERVER_HOST: "0.0.0.0"
   MCP_SERVER_PORT: "8000"
