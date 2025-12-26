@@ -4,19 +4,11 @@ import {
   Typography,
   Paper,
   Grid,
-  Card,
-  CardContent,
   Button,
   Chip,
-  Divider,
   List,
   ListItem,
-  ListItemIcon,
   ListItemText,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  Link,
   Alert,
   AlertTitle,
   Breadcrumbs,
@@ -28,25 +20,17 @@ import {
   TableRow,
 } from '@mui/material';
 import {
-  ExpandMore as ExpandMoreIcon,
   Code as CodeIcon,
-  Architecture as ArchitectureIcon,
-  Security as SecurityIcon,
-  Speed as SpeedIcon,
-  Storage as StorageIcon,
   Cloud as CloudIcon,
   BugReport as BugReportIcon,
-  Rocket as RocketIcon,
-  School as SchoolIcon,
-  GitHub as GitHubIcon,
-  Article as ArticleIcon,
-  Build as BuildIcon,
   Api as ApiIcon,
   Dashboard as DashboardIcon,
   ArrowBack as ArrowBackIcon,
   CheckCircle as CheckCircleIcon,
+  GitHub as GitHubIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { CodeBlock, SectionAccordion, InfoCard, MethodChip, StatusChip } from '../components/common';
 
 const APIReference: React.FC = () => {
   const navigate = useNavigate();
@@ -278,223 +262,176 @@ const APIReference: React.FC = () => {
       </Alert>
 
       {/* Base URL */}
-      <Accordion expanded={expandedSection === 'base'} onChange={handleChange('base')}>
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <CloudIcon color="primary" />
-            Base URL & Authentication
-          </Typography>
-        </AccordionSummary>
-        <AccordionDetails>
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
-              <Card variant="outlined">
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    🌐 Base URLs
-                  </Typography>
-                  <List>
-                    <ListItem>
-                      <ListItemText 
-                        primary="Development" 
-                        secondary="http://localhost:8002"
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText 
-                        primary="Staging" 
-                        secondary="https://staging-api.warehouse-assistant.com"
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText 
-                        primary="Production" 
-                        secondary="https://api.warehouse-assistant.com"
-                      />
-                    </ListItem>
-                  </List>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Card variant="outlined">
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    🔐 Authentication
-                  </Typography>
-                  <Typography variant="body2" sx={{ mb: 2 }}>
-                    All API requests require JWT authentication via Authorization header:
-                  </Typography>
-                  <Paper sx={{ p: 2, bgcolor: 'grey.100', fontFamily: 'monospace', fontSize: '0.875rem' }}>
+      <SectionAccordion
+        id="base"
+        expanded={expandedSection}
+        onChange={handleChange}
+        icon={CloudIcon}
+        title="Base URL & Authentication"
+      >
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={6}>
+            <InfoCard title="🌐 Base URLs">
+              <List>
+                <ListItem>
+                  <ListItemText 
+                    primary="Development" 
+                    secondary="http://localhost:8002"
+                  />
+                </ListItem>
+                <ListItem>
+                  <ListItemText 
+                    primary="Staging" 
+                    secondary="https://staging-api.warehouse-assistant.com"
+                  />
+                </ListItem>
+                <ListItem>
+                  <ListItemText 
+                    primary="Production" 
+                    secondary="https://api.warehouse-assistant.com"
+                  />
+                </ListItem>
+              </List>
+            </InfoCard>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <InfoCard title="🔐 Authentication">
+              <Typography variant="body2" sx={{ mb: 2 }}>
+                All API requests require JWT authentication via Authorization header:
+              </Typography>
+              <CodeBlock>
 {`Authorization: Bearer <jwt_token>
 
 # Example
 curl -H "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
   -H "Content-Type: application/json"
   https://api.warehouse-assistant.com/api/v1/chat`}
-                  </Paper>
-                </CardContent>
-              </Card>
-            </Grid>
+              </CodeBlock>
+            </InfoCard>
           </Grid>
-        </AccordionDetails>
-      </Accordion>
+        </Grid>
+      </SectionAccordion>
 
       {/* API Categories */}
-      <Accordion expanded={expandedSection === 'endpoints'} onChange={handleChange('endpoints')}>
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <ApiIcon color="primary" />
-            API Endpoints
-          </Typography>
-        </AccordionSummary>
-        <AccordionDetails>
-          <Grid container spacing={3}>
-            {apiCategories.map((category, index) => (
-              <Grid item xs={12} md={6} key={index}>
-                <Card variant="outlined" sx={{ height: '100%' }}>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      {category.name}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      {category.description}
-                    </Typography>
-                    <List dense>
-                      {category.endpoints.map((endpoint, epIndex) => (
-                        <ListItem key={epIndex} sx={{ px: 0 }}>
-                          <ListItemText
-                            primary={
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Chip 
-                                  label={endpoint.method} 
-                                  size="small" 
-                                  color={endpoint.method === 'GET' ? 'success' : 'primary'}
-                                />
-                                <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                                  {endpoint.path}
-                                </Typography>
-                                <Chip 
-                                  label={endpoint.status} 
-                                  size="small" 
-                                  color={endpoint.status.includes('✅') ? 'success' : 'warning'}
-                                />
-                              </Box>
-                            }
-                            secondary={endpoint.description}
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
-        </AccordionDetails>
-      </Accordion>
+      <SectionAccordion
+        id="endpoints"
+        expanded={expandedSection}
+        onChange={handleChange}
+        icon={ApiIcon}
+        title="API Endpoints"
+      >
+        <Grid container spacing={3}>
+          {apiCategories.map((category, index) => (
+            <Grid item xs={12} md={6} key={index}>
+              <InfoCard title={category.name} description={category.description} sx={{ height: '100%' }}>
+                <List dense>
+                  {category.endpoints.map((endpoint, epIndex) => (
+                    <ListItem key={epIndex} sx={{ px: 0 }}>
+                      <ListItemText
+                        primary={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <MethodChip method={endpoint.method} />
+                            <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                              {endpoint.path}
+                            </Typography>
+                            <StatusChip status={endpoint.status} />
+                          </Box>
+                        }
+                        secondary={endpoint.description}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              </InfoCard>
+            </Grid>
+          ))}
+        </Grid>
+      </SectionAccordion>
 
       {/* Request Examples */}
-      <Accordion expanded={expandedSection === 'examples'} onChange={handleChange('examples')}>
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <CodeIcon color="primary" />
-            Request Examples
-          </Typography>
-        </AccordionSummary>
-        <AccordionDetails>
-          <Grid container spacing={3}>
-            {requestExamples.map((example, index) => (
-              <Grid item xs={12} key={index}>
-                <Card variant="outlined">
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      {example.title}
+      <SectionAccordion
+        id="examples"
+        expanded={expandedSection}
+        onChange={handleChange}
+        icon={CodeIcon}
+        title="Request Examples"
+      >
+        <Grid container spacing={3}>
+          {requestExamples.map((example, index) => (
+            <Grid item xs={12} key={index}>
+              <InfoCard title={example.title} description={example.description}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Request ({example.method} {example.path})
                     </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      {example.description}
+                    <CodeBlock>
+                      {example.request ? JSON.stringify(example.request, null, 2) : 'No request body'}
+                    </CodeBlock>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Response
                     </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} md={6}>
-                        <Typography variant="subtitle2" gutterBottom>
-                          Request ({example.method} {example.path})
-                        </Typography>
-                        <Paper sx={{ p: 2, bgcolor: 'grey.100', fontFamily: 'monospace', fontSize: '0.875rem' }}>
-{example.request ? JSON.stringify(example.request, null, 2) : 'No request body'}
-                        </Paper>
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <Typography variant="subtitle2" gutterBottom>
-                          Response
-                        </Typography>
-                        <Paper sx={{ p: 2, bgcolor: 'grey.100', fontFamily: 'monospace', fontSize: '0.875rem' }}>
-{JSON.stringify(example.response, null, 2)}
-                        </Paper>
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
-        </AccordionDetails>
-      </Accordion>
+                    <CodeBlock>
+                      {JSON.stringify(example.response, null, 2)}
+                    </CodeBlock>
+                  </Grid>
+                </Grid>
+              </InfoCard>
+            </Grid>
+          ))}
+        </Grid>
+      </SectionAccordion>
 
       {/* Status Codes */}
-      <Accordion expanded={expandedSection === 'status'} onChange={handleChange('status')}>
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <CheckCircleIcon color="primary" />
-            HTTP Status Codes
-          </Typography>
-        </AccordionSummary>
-        <AccordionDetails>
-          <TableContainer component={Paper}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Code</TableCell>
-                  <TableCell>Description</TableCell>
-                  <TableCell>Meaning</TableCell>
+      <SectionAccordion
+        id="status"
+        expanded={expandedSection}
+        onChange={handleChange}
+        icon={CheckCircleIcon}
+        title="HTTP Status Codes"
+      >
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Code</TableCell>
+                <TableCell>Description</TableCell>
+                <TableCell>Meaning</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {statusCodes.map((status, index) => (
+                <TableRow key={index}>
+                  <TableCell>
+                    <Chip 
+                      label={status.code} 
+                      color={status.code < 300 ? 'success' : status.code < 400 ? 'warning' : 'error'}
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>{status.description}</TableCell>
+                  <TableCell>{status.meaning}</TableCell>
                 </TableRow>
-              </TableHead>
-              <TableBody>
-                {statusCodes.map((status, index) => (
-                  <TableRow key={index}>
-                    <TableCell>
-                      <Chip 
-                        label={status.code} 
-                        color={status.code < 300 ? 'success' : status.code < 400 ? 'warning' : 'error'}
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell>{status.description}</TableCell>
-                    <TableCell>{status.meaning}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </AccordionDetails>
-      </Accordion>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </SectionAccordion>
 
       {/* Error Handling */}
-      <Accordion expanded={expandedSection === 'errors'} onChange={handleChange('errors')}>
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <BugReportIcon color="primary" />
-            Error Handling
-          </Typography>
-        </AccordionSummary>
-        <AccordionDetails>
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
-              <Card variant="outlined">
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    🚨 Error Response Format
-                  </Typography>
-                  <Paper sx={{ p: 2, bgcolor: 'grey.100', fontFamily: 'monospace', fontSize: '0.875rem', mb: 2 }}>
+      <SectionAccordion
+        id="errors"
+        expanded={expandedSection}
+        onChange={handleChange}
+        icon={BugReportIcon}
+        title="Error Handling"
+      >
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={6}>
+            <InfoCard title="🚨 Error Response Format">
+              <CodeBlock sx={{ mb: 2 }}>
 {`{
   "error": {
     "code": "VALIDATION_ERROR",
@@ -507,54 +444,47 @@ curl -H "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
     "request_id": "req_123456"
   }
 }`}
-                  </Paper>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Card variant="outlined">
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    🔧 Common Error Codes
-                  </Typography>
-                  <List dense>
-                    <ListItem>
-                      <ListItemText 
-                        primary="VALIDATION_ERROR" 
-                        secondary="Request validation failed"
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText 
-                        primary="AUTHENTICATION_REQUIRED" 
-                        secondary="Valid JWT token required"
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText 
-                        primary="INSUFFICIENT_PERMISSIONS" 
-                        secondary="User lacks required permissions"
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText 
-                        primary="RESOURCE_NOT_FOUND" 
-                        secondary="Requested resource doesn't exist"
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText 
-                        primary="RATE_LIMIT_EXCEEDED" 
-                        secondary="Too many requests"
-                      />
-                    </ListItem>
-                  </List>
-                </CardContent>
-              </Card>
-            </Grid>
+              </CodeBlock>
+            </InfoCard>
           </Grid>
-        </AccordionDetails>
-      </Accordion>
+          <Grid item xs={12} md={6}>
+            <InfoCard title="🔧 Common Error Codes">
+              <List dense>
+                <ListItem>
+                  <ListItemText 
+                    primary="VALIDATION_ERROR" 
+                    secondary="Request validation failed"
+                  />
+                </ListItem>
+                <ListItem>
+                  <ListItemText 
+                    primary="AUTHENTICATION_REQUIRED" 
+                    secondary="Valid JWT token required"
+                  />
+                </ListItem>
+                <ListItem>
+                  <ListItemText 
+                    primary="INSUFFICIENT_PERMISSIONS" 
+                    secondary="User lacks required permissions"
+                  />
+                </ListItem>
+                <ListItem>
+                  <ListItemText 
+                    primary="RESOURCE_NOT_FOUND" 
+                    secondary="Requested resource doesn't exist"
+                  />
+                </ListItem>
+                <ListItem>
+                  <ListItemText 
+                    primary="RATE_LIMIT_EXCEEDED" 
+                    secondary="Too many requests"
+                  />
+                </ListItem>
+              </List>
+            </InfoCard>
+          </Grid>
+        </Grid>
+      </SectionAccordion>
 
       {/* Footer */}
       <Box sx={{ mt: 4, pt: 3, borderTop: 1, borderColor: 'divider' }}>

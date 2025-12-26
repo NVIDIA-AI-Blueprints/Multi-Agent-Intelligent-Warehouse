@@ -15,4 +15,9 @@
 
 export { TabPanel, type TabPanelProps } from './TabPanel';
 export { useDialogForm } from './useDialogForm';
+export { CodeBlock } from './CodeBlock';
+export { SectionAccordion } from './SectionAccordion';
+export { InfoCard } from './InfoCard';
+export { MethodChip } from './MethodChip';
+export { StatusChip } from './StatusChip';
 
