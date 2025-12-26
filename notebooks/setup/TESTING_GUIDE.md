@@ -237,11 +237,14 @@ docker run -it --rm \
 
 ## Automated Test Script
 
-Run this script to perform automated validation:
+For automated validation, you can use:
 
 ```bash
-# Run automated notebook tests
-python notebooks/setup/test_notebook.py
+# Validate notebook JSON structure
+python -c "import json; json.load(open('notebooks/setup/complete_setup_guide.ipynb'))"
+
+# Check Python syntax in code cells
+jupyter nbconvert --to python notebooks/setup/complete_setup_guide.ipynb --stdout | python -m py_compile -
 ```
 
 ---
