@@ -21,7 +21,7 @@ The following NVIDIA NGC API keys were exposed in the `.env.backup` file and mus
    - Used for: NeMo OCR service
 
 4. **NEMO_PARSE_API_KEY** (Line 39)
-   - Key: `nvapi-xB777sxDLhhDDUtNfL3rHnV_jON7VI3KccDGEp43`
+   - Key: `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`
    - Used for: NeMo Parse service
 
 5. **LLAMA_NANO_VL_API_KEY** (Line 40)
