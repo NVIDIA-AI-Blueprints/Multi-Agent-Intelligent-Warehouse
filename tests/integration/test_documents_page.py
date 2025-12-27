@@ -25,6 +25,11 @@ import time
 import sys
 from pathlib import Path
 
+# Security: HTTP protocol is acceptable for localhost in test environments
+# For production deployments, HTTPS must be used to encrypt API communications
+# SonarQube may flag HTTP usage, but it's acceptable for:
+# - localhost (127.0.0.1, 0.0.0.0) - development/testing only
+# Production external services must use HTTPS
 BASE_URL = "http://localhost:8001/api/v1/document"
 
 def test_document_analytics():

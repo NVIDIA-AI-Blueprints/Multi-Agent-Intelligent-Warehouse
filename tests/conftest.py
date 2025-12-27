@@ -37,7 +37,14 @@ def project_root() -> Path:
 
 @pytest.fixture(scope="session")
 def api_base_url() -> str:
-    """Get API base URL from environment."""
+    """
+    Get API base URL from environment.
+    
+    Security: HTTP protocol is acceptable for localhost in test environments.
+    For production deployments, HTTPS must be used to encrypt API communications.
+    """
+    # Security: HTTP is acceptable for localhost (development/testing only)
+    # Production external services must use HTTPS
     return os.getenv("API_BASE_URL", "http://localhost:8001")
 
 

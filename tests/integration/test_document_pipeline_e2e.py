@@ -27,6 +27,11 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Security: HTTP protocol is acceptable for localhost in test environments
+# For production deployments, HTTPS must be used to encrypt API communications
+# SonarQube may flag HTTP usage, but it's acceptable for:
+# - localhost (127.0.0.1, 0.0.0.0) - development/testing only
+# Production external services must use HTTPS
 BASE_URL = "http://localhost:8001"
 TEST_FILE = Path("data/sample/test_documents/test_invoice.png")
 

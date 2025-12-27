@@ -27,6 +27,11 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime
 
 # Configuration
+# Security: HTTP protocol is acceptable for localhost in test environments
+# For production deployments, HTTPS must be used to encrypt API communications
+# SonarQube may flag HTTP usage, but it's acceptable for:
+# - localhost (127.0.0.1, 0.0.0.0) - development/testing only
+# Production external services must use HTTPS
 BACKEND_URL = "http://localhost:8001"
 FRONTEND_URL = "http://localhost:3001"
 BASE_API = f"{BACKEND_URL}/api/v1"

@@ -151,6 +151,23 @@ class NIMClient:
                 f"   URL must start with http:// or https://"
             )
         
+        # Security: HTTP protocol is only acceptable for localhost/development environments
+        # For production deployments, HTTPS must be used to encrypt API communications
+        # SonarQube may flag HTTP usage, but it's acceptable for:
+        # - localhost (127.0.0.1, 0.0.0.0) - development/testing only
+        # - Internal network services in trusted environments
+        # Production external services must use HTTPS
+        if self.config.llm_base_url.startswith("http://") and not (
+            "localhost" in self.config.llm_base_url or 
+            "127.0.0.1" in self.config.llm_base_url or
+            "0.0.0.0" in self.config.llm_base_url
+        ):
+            logger.warning(
+                f"⚠️  SECURITY WARNING: LLM_NIM_URL uses HTTP protocol (insecure). "
+                f"Use HTTPS for production deployments to encrypt API communications. "
+                f"HTTP is only acceptable for localhost/development environments."
+            )
+        
         # Log configuration (without exposing API key)
         # Note: api.brev.dev is valid for certain models (e.g., 49B), 
         # while integrate.api.nvidia.com is used for other NIM endpoints

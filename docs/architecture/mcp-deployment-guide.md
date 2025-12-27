@@ -119,10 +119,14 @@ MCP_DISCOVERY_INTERVAL=60
 
 # Service Discovery
 SERVICE_DISCOVERY_ENABLED=true
+# Security: Use HTTPS for external-facing services in production
+# HTTP is acceptable for internal Docker service URLs (same network)
 SERVICE_REGISTRY_URL=http://staging-registry:8001
 
 # Monitoring
 MONITORING_ENABLED=true
+# Security: Use HTTPS for external-facing services in production
+# HTTP is acceptable for internal Docker service URLs (same network)
 PROMETHEUS_ENDPOINT=http://staging-prometheus:9090
 GRAFANA_ENDPOINT=http://staging-grafana:3000
 
@@ -149,10 +153,14 @@ MCP_DISCOVERY_INTERVAL=120
 
 # Service Discovery
 SERVICE_DISCOVERY_ENABLED=true
+# Security: Use HTTPS for external-facing services in production
+# HTTP is acceptable for internal Docker service URLs (same network)
 SERVICE_REGISTRY_URL=http://prod-registry:8001
 
 # Monitoring
 MONITORING_ENABLED=true
+# Security: Use HTTPS for external-facing services in production
+# HTTP is acceptable for internal Docker service URLs (same network)
 PROMETHEUS_ENDPOINT=http://prod-prometheus:9090
 GRAFANA_ENDPOINT=http://prod-grafana:3000
 

@@ -26,6 +26,11 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 
 # API Configuration
+# Security: HTTP protocol is acceptable for localhost in test environments
+# For production deployments, HTTPS must be used to encrypt API communications
+# SonarQube may flag HTTP usage, but it's acceptable for:
+# - localhost (127.0.0.1, 0.0.0.0) - development/testing only
+# Production external services must use HTTPS
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8001")
 CHAT_ENDPOINT = f"{API_BASE_URL}/api/v1/chat"
 HEALTH_ENDPOINT = f"{API_BASE_URL}/api/v1/health/simple"
