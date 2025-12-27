@@ -24,6 +24,8 @@ This module implements the MCP-enhanced planner/router agent that:
 4. Synthesizes responses from multiple agents with MCP tool results
 """
 
+from __future__ import annotations
+
 from typing import Dict, List, Optional, TypedDict, Annotated, Any
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
@@ -61,7 +63,7 @@ COMPLEX_QUERY_ACTIONS = ["create", "dispatch", "assign", "show", "list", "get", 
 COMPLEX_QUERY_WORD_COUNT_THRESHOLD = 15
 
 
-def _extract_message_text(state: MCPWarehouseState) -> Optional[str]:
+def _extract_message_text(state: "MCPWarehouseState") -> Optional[str]:
     """Helper to extract text content from the latest message in state."""
     if not state.get("messages"):
         return None
