@@ -968,7 +968,7 @@ const DocumentExtraction: React.FC = () => {
             size="small"
             sx={{
               backgroundColor: document.status === 'completed' ? '#3FB950' : '#76B900',
-              color: document.status === 'completed' ? '#000000' : '#000000',
+              color: '#000000',
               fontWeight: 600,
               fontSize: '0.75rem',
             }}
