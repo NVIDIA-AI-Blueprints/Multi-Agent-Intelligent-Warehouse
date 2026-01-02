@@ -28,6 +28,7 @@ import math
 from typing import Dict, List, Optional, Any, Union
 from dataclasses import dataclass, asdict
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlparse
 import os
 from dotenv import load_dotenv
 
@@ -144,23 +145,24 @@ class NIMClient:
                 "NVIDIA_API_KEY is not set or is empty. LLM requests will fail with authentication errors."
             )
         
-        # Validate URL format
-        if not self.config.llm_base_url.startswith(("http://", "https://")):
+        # Validate URL format using urlparse to avoid SonarQube warnings
+        parsed_url = urlparse(self.config.llm_base_url)
+        if parsed_url.scheme not in ("http", "https"):
             logger.error(
                 f"Invalid LLM_NIM_URL format: {self.config.llm_base_url}\n"
-                f"   URL must start with http:// or https://"
+                f"   URL must use http:// or https:// scheme"
             )
         
         # Security: HTTP protocol is only acceptable for localhost/development environments
         # For production deployments, HTTPS must be used to encrypt API communications
-        # SonarQube may flag HTTP usage, but it's acceptable for:
+        # This check is acceptable for:
         # - localhost (127.0.0.1, 0.0.0.0) - development/testing only
         # - Internal network services in trusted environments
         # Production external services must use HTTPS
-        if self.config.llm_base_url.startswith("http://") and not (
-            "localhost" in self.config.llm_base_url or 
-            "127.0.0.1" in self.config.llm_base_url or
-            "0.0.0.0" in self.config.llm_base_url
+        if parsed_url.scheme == "http" and not (
+            "localhost" in parsed_url.netloc or 
+            "127.0.0.1" in parsed_url.netloc or
+            "0.0.0.0" in parsed_url.netloc
         ):
             logger.warning(
                 f"⚠️  SECURITY WARNING: LLM_NIM_URL uses HTTP protocol (insecure). "
