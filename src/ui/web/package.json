@@ -92,7 +92,10 @@
     "@types/react-copy-to-clipboard": "^5.0.7",
     "http-proxy-middleware": "^3.0.5",
     "identity-obj-proxy": "^3.0.0",
-    "license-checker": "^25.0.1"
+    "license-checker": "^25.0.1",
+    "babel-plugin-istanbul": "^6.1.1",
+    "@babel/core": "^7.23.0",
+    "@babel/preset-env": "^7.23.0"
   },
   "overrides": {
     "webpack-dev-server": "^5.2.1",

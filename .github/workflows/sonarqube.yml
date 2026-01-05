@@ -66,7 +66,12 @@ jobs:
         
         echo "===== Frontend tests + coverage ====="
         cd src/ui/web
-        npm ci
+        
+        # Clean install to ensure compatibility
+        rm -rf node_modules package-lock.json
+        npm install
+        
+        # Run tests with coverage
         npm test -- --coverage --watchAll=false
         
         echo "===== Verify Frontend coverage ====="
