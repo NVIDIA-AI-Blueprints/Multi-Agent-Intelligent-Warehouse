@@ -73,8 +73,7 @@
       "text",
       "lcov",
       "html"
-    ],
-    "coverageDirectory": "coverage"
+    ]
   },
   "browserslist": {
     "production": [
