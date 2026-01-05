@@ -710,8 +710,4 @@ See [LICENSE](LICENSE) for license information.
 
 ---
 
-For detailed documentation, see:
-- [DEPLOYMENT.md](DEPLOYMENT.md) - Complete deployment guide 
-- [docs/](docs/) - Architecture and technical documentation
-
 This project will download and install additional 3rd party open source software projects. Review the license terms for these open source projects before use. 
