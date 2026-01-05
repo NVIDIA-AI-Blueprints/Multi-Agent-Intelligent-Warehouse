@@ -457,7 +457,7 @@ const ForecastingPage: React.FC = () => {
               <Card sx={{ 
                 border: model.model_name === 'XGBoost' ? '2px solid' : '1px solid',
                 borderColor: model.model_name === 'XGBoost' ? 'primary.main' : 'divider',
-                backgroundColor: model.model_name === 'XGBoost' ? 'background.paper' : 'background.paper'
+                backgroundColor: 'background.paper'
               }}>
                 <CardContent>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
