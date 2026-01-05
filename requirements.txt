@@ -44,7 +44,7 @@ xgboost>=1.6.0
 # Document Processing
 Pillow>=10.3.0  # Fixed buffer overflow in _imagingcms.c (CVE-2024-28219)
 pdf2image==1.17.0  # MIT License - PDF to image conversion (requires poppler-utils system package)
-pdfplumber==0.11.8  # MIT License - PDF text extraction (latest version)
+pdfplumber==0.11.9  # MIT License - PDF text extraction (latest version)
 # NeMo Guardrails SDK (Phase 1 - Migration)
 # Note: nemoguardrails automatically installs transitive dependencies including:
 # langchain, langchain-community, fastembed, annoy, jinja2, lark, nest-asyncio,
