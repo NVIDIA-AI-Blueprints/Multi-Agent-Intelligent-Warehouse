@@ -14,8 +14,31 @@ jobs:
       # Language and test configuration
       language: python
       languageVersion: '3.11'
-      # testCommand not needed - workflow auto-detects requirements.txt and runs:
-      # uv run pytest tests/ --cov=src --cov-report=xml
+      
+      # Override test execution to generate both Python and frontend coverage
+      testCommand: |
+        set -euxo pipefail
+        
+        echo "===== Python tests + coverage ====="
+        uv run pytest tests/ \
+          --cov=src \
+          --cov-report=xml:coverage.xml \
+          --cov-report=term-missing
+        
+        echo "===== Verify Python coverage ====="
+        test -f coverage.xml
+        head -n 5 coverage.xml || true
+        
+        echo "===== Frontend tests + coverage ====="
+        cd src/ui/web
+        npm ci
+        npm test -- --coverage --watchAll=false
+        
+        echo "===== Verify Frontend coverage ====="
+        test -f coverage/lcov.info
+        head -n 5 coverage/lcov.info || true
+        
+        cd ../../..
 
       # Project creation parameters
       organization: TEGRASW
