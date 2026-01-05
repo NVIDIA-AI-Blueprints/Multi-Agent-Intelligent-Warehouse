@@ -43,6 +43,21 @@ jobs:
         test -f coverage.xml
         head -n 5 coverage.xml || true
         
+        echo "===== Setting up Node.js ====="
+        # Install Node.js 20 (LTS) using nvm (Node Version Manager)
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" || \
+          (curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash && \
+           export NVM_DIR="$HOME/.nvm" && \
+           [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh")
+        
+        nvm install 20
+        nvm use 20
+        
+        # Verify Node.js installation
+        node --version || (echo "Node.js installation failed" && exit 1)
+        npm --version || (echo "npm installation failed" && exit 1)
+        
         echo "===== Frontend tests + coverage ====="
         cd src/ui/web
         npm ci
