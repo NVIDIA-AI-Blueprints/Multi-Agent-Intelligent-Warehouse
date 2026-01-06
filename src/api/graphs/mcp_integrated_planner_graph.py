@@ -41,6 +41,7 @@ from src.api.services.mcp.tool_binding import ToolBindingService
 from src.api.services.mcp.tool_routing import ToolRoutingService, RoutingStrategy
 from src.api.services.mcp.tool_validation import ToolValidationService
 from src.api.services.mcp.base import MCPManager
+from src.api.utils.log_utils import sanitize_log_data
 
 logger = logging.getLogger(__name__)
 
@@ -775,11 +776,13 @@ class MCPPlannerGraph:
                     for tool in available_tools
                 ]
 
+            # Sanitize user-controlled message before logging
+            safe_message_text = sanitize_log_data(message_text, max_length=100)
             logger.info(
-                f"🔀 MCP Intent classified as: {intent} for message: {message_text[:100]}..."
+                f"🔀 MCP Intent classified as: {intent} for message: {safe_message_text}..."
             )
             logger.debug(
-                f"Routing decision details - Intent: {intent}, Message: {message_text}, "
+                f"Routing decision details - Intent: {intent}, Message: {safe_message_text}, "
                 f"Safety keywords found: {sum(1 for kw in MCPIntentClassifier.SAFETY_KEYWORDS if kw in message_text.lower())}, "
                 f"Equipment keywords found: {sum(1 for kw in MCPIntentClassifier.EQUIPMENT_KEYWORDS if kw in message_text.lower())}"
             )
@@ -1556,9 +1559,11 @@ class MCPPlannerGraph:
                 )
                 logger.info(f"✅ Graph execution completed in time: timeout={graph_timeout}s")
             except asyncio.TimeoutError:
+                # Sanitize user-controlled message before logging
+                safe_message = sanitize_log_data(message, max_length=100)
                 logger.error(
                     f"⏱️ TIMEOUT: Graph execution timed out after {graph_timeout}s | "
-                    f"Message: {message[:100]} | Complex: {is_complex_query} | Reasoning: {enable_reasoning}"
+                    f"Message: {safe_message} | Complex: {is_complex_query} | Reasoning: {enable_reasoning}"
                 )
                 return self._create_fallback_response(message, session_id)
 

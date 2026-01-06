@@ -28,6 +28,8 @@ from src.api.services.mcp.tool_discovery import ToolDiscoveryService
 from src.api.services.mcp.tool_binding import ToolBindingService
 from src.api.services.mcp.tool_routing import ToolRoutingService, RoutingStrategy
 from src.api.services.mcp.tool_validation import ToolValidationService
+from src.api.utils.log_utils import sanitize_log_data
+from src.api.utils.error_handler import sanitize_error_message
 
 logger = logging.getLogger(__name__)
 
@@ -230,8 +232,12 @@ async def execute_tool(tool_id: str, parameters: Dict[str, Any] = None):
             "status": "success",
         }
     except Exception as e:
-        logger.error(f"Error executing tool {tool_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to execute tool: {str(e)}")
+        # Sanitize user-controlled data before logging
+        safe_tool_id = sanitize_log_data(tool_id, max_length=100)
+        logger.error(f"Error executing tool {safe_tool_id}: {sanitize_log_data(str(e))}")
+        # Use sanitized error message for HTTP response
+        error_msg = sanitize_error_message(e, "Tool execution")
+        raise HTTPException(status_code=500, detail=error_msg)
 
 
 @router.post("/test-workflow")
@@ -253,10 +259,12 @@ async def test_mcp_workflow(message: str, session_id: str = "test"):
             "status": "success",
         }
     except Exception as e:
-        logger.error(f"Error testing MCP workflow: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to test MCP workflow: {str(e)}"
-        )
+        # Sanitize user-controlled data before logging
+        safe_message = sanitize_log_data(message, max_length=200)
+        logger.error(f"Error testing MCP workflow: {sanitize_log_data(str(e))}")
+        # Use sanitized error message for HTTP response
+        error_msg = sanitize_error_message(e, "MCP workflow testing")
+        raise HTTPException(status_code=500, detail=error_msg)
 
 
 @router.get("/agents")
