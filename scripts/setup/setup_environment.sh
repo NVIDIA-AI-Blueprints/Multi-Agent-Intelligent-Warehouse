@@ -63,6 +63,59 @@ else
     echo "✅ Found npm $NPM_VERSION"
 fi
 
+# Check for poppler-utils (required for PDF document processing)
+echo ""
+echo "🔍 Checking for system dependencies..."
+if ! command -v pdfinfo &> /dev/null; then
+    echo "⚠️  poppler-utils is not installed (required for PDF document processing)"
+    
+    # Detect OS and provide installation instructions
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        # Linux - check if we can use apt-get
+        if command -v apt-get &> /dev/null; then
+            echo "💡 To install poppler-utils, run: sudo apt-get install poppler-utils"
+            read -p "❓ Would you like to install poppler-utils now? (requires sudo) [y/N]: " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                echo "📦 Installing poppler-utils..."
+                sudo apt-get update && sudo apt-get install -y poppler-utils
+                echo "✅ poppler-utils installed"
+            else
+                echo "⚠️  Skipping poppler-utils installation. You can install it later with: sudo apt-get install poppler-utils"
+            fi
+        elif command -v yum &> /dev/null; then
+            echo "💡 To install poppler-utils, run: sudo yum install poppler-utils"
+        elif command -v dnf &> /dev/null; then
+            echo "💡 To install poppler-utils, run: sudo dnf install poppler-utils"
+        else
+            echo "💡 Please install poppler-utils using your system's package manager"
+        fi
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS
+        if command -v brew &> /dev/null; then
+            echo "💡 To install poppler, run: brew install poppler"
+            read -p "❓ Would you like to install poppler now? [y/N]: " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                echo "📦 Installing poppler..."
+                brew install poppler
+                echo "✅ poppler installed"
+            else
+                echo "⚠️  Skipping poppler installation. You can install it later with: brew install poppler"
+            fi
+        else
+            echo "💡 Please install Homebrew first, then run: brew install poppler"
+        fi
+    else
+        echo "💡 Please install poppler-utils using your system's package manager"
+        echo "   Ubuntu/Debian: sudo apt-get install poppler-utils"
+        echo "   macOS: brew install poppler"
+        echo "   Windows: Download from http://blog.alivate.com.au/poppler-windows/"
+    fi
+else
+    echo "✅ poppler-utils is installed ($(pdfinfo --version 2>/dev/null | head -n1 || echo 'version unknown'))"
+fi
+
 # Create virtual environment if it doesn't exist
 if [ ! -d "env" ]; then
     echo "📦 Creating virtual environment..."
