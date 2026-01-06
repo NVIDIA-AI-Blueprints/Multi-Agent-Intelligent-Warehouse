@@ -40,15 +40,59 @@ except ImportError:
     logger.warning("pdf2image not available. PDF processing will be limited. Install with: pip install pdf2image")
 
 
-def _check_poppler_available() -> bool:
+def _check_poppler_available() -> tuple[bool, str]:
     """
-    Check if poppler-utils is installed and available in PATH.
+    Check if poppler-utils is installed and available.
     
     Returns:
-        True if poppler-utils is available, False otherwise
+        Tuple of (is_available: bool, diagnostic_message: str)
     """
     import shutil
-    return shutil.which("pdfinfo") is not None
+    from pathlib import Path
+    
+    # Check for pdfinfo in PATH
+    pdfinfo_path = shutil.which("pdfinfo")
+    if pdfinfo_path:
+        return True, f"Found pdfinfo at: {pdfinfo_path}"
+    
+    # Check for pdftoppm as alternative
+    pdftoppm_path = shutil.which("pdftoppm")
+    if pdftoppm_path:
+        return True, f"Found pdftoppm at: {pdftoppm_path}"
+    
+    # Check common installation locations
+    common_paths = [
+        "/usr/bin/pdfinfo",
+        "/usr/local/bin/pdfinfo",
+        "/opt/homebrew/bin/pdfinfo",  # macOS Homebrew on Apple Silicon
+        "/usr/local/opt/poppler/bin/pdfinfo",  # macOS Homebrew
+    ]
+    
+    for path in common_paths:
+        if Path(path).exists():
+            return True, f"Found pdfinfo at: {path} (not in PATH)"
+    
+    # Check if we're in a virtual environment and poppler might be elsewhere
+    python_path = shutil.which("python3") or shutil.which("python")
+    if python_path:
+        python_dir = Path(python_path).parent
+        # Check parent directories
+        for parent in [python_dir.parent, python_dir.parent.parent]:
+            potential_path = parent / "bin" / "pdfinfo"
+            if potential_path.exists():
+                return True, f"Found pdfinfo at: {potential_path} (not in PATH)"
+    
+    # Diagnostic information
+    path_env = os.getenv("PATH", "")
+    diagnostic = (
+        f"poppler-utils not found in PATH. "
+        f"PATH contains: {len(path_env.split(':'))} directories. "
+        f"Install with: sudo apt-get install poppler-utils (Ubuntu/Debian) "
+        f"or brew install poppler (macOS). "
+        f"If already installed, ensure it's in your PATH environment variable."
+    )
+    
+    return False, diagnostic
 
 
 class NeMoRetrieverPreprocessor:
@@ -217,13 +261,14 @@ class NeMoRetrieverPreprocessor:
                 )
             
             # Check if poppler-utils is available before attempting conversion
-            if not _check_poppler_available():
-                raise RuntimeError(
-                    "poppler-utils is not installed or not in PATH. "
-                    "Install it with: sudo apt-get install poppler-utils (Ubuntu/Debian) "
-                    "or brew install poppler (macOS). "
-                    "This is required for PDF to image conversion."
-                )
+            poppler_available, diagnostic_msg = _check_poppler_available()
+            if not poppler_available:
+                logger.warning(f"Poppler check failed: {diagnostic_msg}")
+                # Still try to proceed - pdf2image might work if poppler is in a non-standard location
+                # or the check might be too strict. pdf2image will raise a clearer error if it fails.
+                logger.info("Attempting PDF conversion anyway - pdf2image will provide detailed error if poppler is truly missing")
+            else:
+                logger.debug(f"Poppler check passed: {diagnostic_msg}")
             
             logger.info(f"Converting PDF to images: {file_path}")
             
@@ -233,13 +278,30 @@ class NeMoRetrieverPreprocessor:
             # Convert PDF pages to PIL Images
             # dpi=150 provides good quality for OCR processing
             # first_page and last_page limit the number of pages processed
-            pdf_images = convert_from_path(
-                file_path,
-                dpi=150,
-                first_page=1,
-                last_page=max_pages,
-                fmt='png'
-            )
+            try:
+                pdf_images = convert_from_path(
+                    file_path,
+                    dpi=150,
+                    first_page=1,
+                    last_page=max_pages,
+                    fmt='png'
+                )
+            except Exception as pdf_error:
+                # Check if it's a poppler-related error
+                error_str = str(pdf_error).lower()
+                if "poppler" in error_str or "pdfinfo" in error_str or "not installed" in error_str:
+                    raise RuntimeError(
+                        f"poppler-utils is required for PDF processing but is not available. "
+                        f"Error: {pdf_error}\n\n"
+                        f"Installation instructions:\n"
+                        f"  Ubuntu/Debian: sudo apt-get install poppler-utils\n"
+                        f"  macOS: brew install poppler\n"
+                        f"  Windows: Download from http://blog.alivate.com.au/poppler-windows/ or use: choco install poppler\n\n"
+                        f"After installation, ensure poppler-utils binaries are in your PATH. "
+                        f"You may need to restart your application or terminal."
+                    ) from pdf_error
+                # Re-raise other errors as-is
+                raise
             
             total_pages = len(pdf_images)
             logger.info(f"Converted {total_pages} pages from PDF")
@@ -248,6 +310,9 @@ class NeMoRetrieverPreprocessor:
             images = pdf_images
             logger.info(f"Extracted {len(images)} pages from PDF")
 
+        except RuntimeError:
+            # Re-raise RuntimeError (our improved poppler error) as-is
+            raise
         except Exception as e:
             logger.error(f"PDF image extraction failed: {e}", exc_info=True)
             raise
