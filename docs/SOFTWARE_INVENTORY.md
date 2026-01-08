@@ -43,8 +43,8 @@ The script automatically:
 | httpx | 0.27.0 | BSD License | https://pypi.org/project/httpx/ | Tom Christie <tom@tomchristie.com> | PyPI | pip | https://pypi.org/project/httpx/ |
 | isort | 5.12.0 | MIT | https://pycqa.github.io/isort/ | Timothy Crosley <timothy.crosley@gmail.com> | PyPI | pip | https://pypi.org/project/isort/ |
 | langchain | 0.1.0 | MIT | https://github.com/langchain-ai/langchain | N/A | PyPI | pip | https://pypi.org/project/langchain/ |
-| langchain-core | 0.3.80 | MIT | https://pypi.org/project/langchain-core/ | N/A | PyPI | pip | https://pypi.org/project/langchain-core/ |
-| langgraph | 0.2.30 | MIT | https://www.github.com/langchain-ai/langgraph | N/A | PyPI | pip | https://pypi.org/project/langgraph/ |
+| langchain-core | 1.2.6 | MIT | https://pypi.org/project/langchain-core/ | N/A | PyPI | pip | https://pypi.org/project/langchain-core/ |
+| langgraph | 1.0.5 | MIT | https://www.github.com/langchain-ai/langgraph | N/A | PyPI | pip | https://pypi.org/project/langgraph/ |
 | loguru | 0.7.0 | MIT license | https://github.com/Delgan/loguru | Delgan <delgan.py@gmail.com> | PyPI | pip | https://pypi.org/project/loguru/ |
 | mypy | 1.5.0 | MIT License | https://www.mypy-lang.org/ | Jukka Lehtosalo <jukka.lehtosalo@iki.fi> | PyPI | pip | https://pypi.org/project/mypy/ |
 | nemoguardrails | 0.19.0 | LICENSE.md | https://pypi.org/project/nemoguardrails/ | NVIDIA <nemoguardrails@nvidia.com> | PyPI | pip | https://pypi.org/project/nemoguardrails/ |

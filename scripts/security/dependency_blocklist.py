@@ -50,7 +50,7 @@ BLOCKED_PACKAGES: Dict[str, str] = {
     "langchain": (
         "CVE-2024-28088: Directory traversal in load_chain/load_prompt/load_agent. "
         "Affected versions: langchain <= 0.1.10, langchain-core < 0.1.29. "
-        "This codebase uses langchain-core>=0.3.80 (safe). "
+        "This codebase uses langchain-core>=1.2.6 (safe, includes CVE-2025-68664 fix). "
         "Blocking old langchain package to prevent accidental installation."
     ),
     # Other potentially dangerous packages

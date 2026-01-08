@@ -27,7 +27,7 @@ This document provides security guidelines for handling Python REPL (Read-Eval-P
 
 ✅ **This codebase does NOT use `langchain-experimental`**
 
-- Only `langchain-core>=0.3.80` is installed (patched for template injection)
+- Only `langchain-core>=1.2.6` is installed (patched for template injection and CVE-2025-68664)
 - No Python REPL or PALChain components are used
 - MCP tool discovery system includes security checks to block code execution tools
 
