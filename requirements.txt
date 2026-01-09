@@ -12,7 +12,7 @@ anyio>=4.0.0  # Async file I/O for asyncio compatibility
 pymilvus>=2.3.0
 numpy>=1.24.0
 langchain-core>=1.2.6  # Security: Fixed CVE-2025-68664 (serialization injection) and CVE-2024-28088 (directory traversal). We use 1.2.6 (latest, includes fixes). Note: We use json.dumps(), not LangChain serialization, as additional defense.
-aiohttp>=3.8.0  # CVE-2024-52304: Patched in 3.10.11+, CVE-2024-30251: Patched in 3.9.4+, CVE-2023-37276: Patched in 3.8.5+, CVE-2024-23829: Patched in 3.8.5+. We use 3.13.2. Client-only usage (not server) = no risk. C extensions enabled (not vulnerable pure Python parser). AIOHTTP_NO_EXTENSIONS not set (required for CVE-2024-23829)
+aiohttp>=3.13.3  # Security: Fixed zip bomb DoS (BDSA) in 3.13.3+ (DEFAULT_MAX_DECOMPRESS_SIZE=32MiB). Also fixes: CVE-2024-52304 (3.10.11+), CVE-2024-30251 (3.9.4+), CVE-2023-37276 (3.8.5+), CVE-2024-23829 (3.8.5+). Client-only usage (not server) = additional defense. C extensions enabled. See docs/security/VULNERABILITY_MITIGATIONS.md
 PyJWT>=2.8.0  # CVE-2025-45768 (disputed): Mitigated via application-level key validation enforcing 32+ byte keys (RFC 7518) in jwt_handler.py. Currently using 2.10.1. See docs/security/VULNERABILITY_MITIGATIONS.md
 passlib[bcrypt]>=1.7.4
 email-validator>=2.0.0
