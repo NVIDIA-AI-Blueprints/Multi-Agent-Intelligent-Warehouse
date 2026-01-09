@@ -5,6 +5,7 @@ httpx>=0.27
 python-dotenv>=1.0
 loguru>=0.7
 langgraph>=1.0.5  # Security: Fixed CVE-2025-8709 (SQL injection in langgraph-checkpoint-sqlite). We use 1.0.5+ (includes fix). Note: We use in-memory state (no SQLite checkpoint) as additional defense.
+langgraph-checkpoint>=3.0.0  # Security: Fixed CVE-2025-64439 (RCE in JsonPlusSerializer). Version 3.0.0+ fixes RCE vulnerability. Note: We use in-memory state (no checkpoint backend), but pinning secure version for transitive dependencies.
 asyncpg>=0.29.0
 pymilvus>=2.3.0
 numpy>=1.24.0
