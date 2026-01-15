@@ -279,13 +279,13 @@ class NeMoRetrieverPreprocessor:
             # dpi=150 provides good quality for OCR processing
             # first_page and last_page limit the number of pages processed
             try:
-            pdf_images = convert_from_path(
-                file_path,
-                dpi=150,
-                first_page=1,
-                last_page=max_pages,
-                fmt='png'
-            )
+                pdf_images = convert_from_path(
+                    file_path,
+                    dpi=150,
+                    first_page=1,
+                    last_page=max_pages,
+                    fmt='png'
+                )
             except Exception as pdf_error:
                 # Check if it's a poppler-related error
                 error_str = str(pdf_error).lower()
