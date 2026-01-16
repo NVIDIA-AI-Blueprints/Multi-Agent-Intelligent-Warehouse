@@ -1,12 +1,12 @@
 # Multi-Agent-Intelligent-Warehouse 
 *NVIDIA Blueprint–aligned multi-agent assistant for warehouse operations.*
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
-[![React](https://img.shields.io/badge/React-18+-61dafb.svg)](https://reactjs.org/)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.120+-green.svg)](https://fastapi.tiangolo.com/)
+[![React](https://img.shields.io/badge/React-19+-61dafb.svg)](https://reactjs.org/)
 [![NVIDIA NIMs](https://img.shields.io/badge/NVIDIA-NIMs-76B900.svg)](https://www.nvidia.com/en-us/ai-data-science/nim/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-336791.svg)](https://www.postgresql.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-336791.svg)](https://www.postgresql.org/)
 [![Milvus](https://img.shields.io/badge/Milvus-GPU%20Accelerated-00D4AA.svg)](https://milvus.io/)
 [![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED.svg)](https://www.docker.com/)
 [![Prometheus](https://img.shields.io/badge/Prometheus-Monitoring-E6522C.svg)](https://prometheus.io/)
@@ -206,7 +206,7 @@ See the [Local Development Setup](#local-development-setup) section below for ma
 
 ### Prerequisites
 
-- **Python 3.9+** (check with `python3 --version`)
+- **Python 3.11+** (check with `python3 --version`)
 - **Node.js 20.0.0+** (LTS recommended) and npm (check with `node --version` and `npm --version`)
   - **Minimum**: Node.js 18.17.0+ (required for `node:path` protocol support)
   - **Recommended**: Node.js 20.x LTS for best compatibility
@@ -359,7 +359,7 @@ python setup_nvidia_api.py
 
 **API Server Won't Start:**
 - Ensure virtual environment is activated: `source env/bin/activate`
-- Check Python version: `python3 --version` (must be 3.9+)
+- Check Python version: `python3 --version` (must be 3.11+)
 - Use the startup script: `./scripts/start_server.sh`
 - See [DEPLOYMENT.md](DEPLOYMENT.md) troubleshooting section
 
