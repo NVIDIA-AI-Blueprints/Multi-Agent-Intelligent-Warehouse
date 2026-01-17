@@ -172,23 +172,7 @@ EMBEDDINGS_CONFIG = {
 4. **Advanced Caching**: Implement more sophisticated caching strategies
 5. **Cost Optimization**: Implement cost optimization strategies
 
-### Migration Strategy
 
-If we need to migrate away from NVIDIA NIMs:
-
-1. **Abstraction Layer**: Implement abstraction layer for AI services
-2. **Multi-Provider Support**: Support multiple AI providers
-3. **Gradual Migration**: Phased migration to new provider
-4. **Data Preservation**: Ensure all AI-generated data is preserved
-
-### Deprecation Strategy
-
-If NVIDIA NIMs is deprecated:
-
-1. **Early Warning**: Monitor for deprecation announcements
-2. **Migration Plan**: Develop migration plan to alternative services
-3. **Data Export**: Export all AI-generated data
-4. **Service Replacement**: Replace with alternative services
 
 ## References
 
