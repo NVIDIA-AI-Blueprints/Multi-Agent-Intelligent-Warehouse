@@ -28,14 +28,14 @@ langchain<0.1.11
 
 # LangGraph Checkpoint - RCE vulnerability in JsonPlusSerializer
 # CVE-2025-64439: Remote Code Execution in JsonPlusSerializer when deserializing payloads
-# Affected: langgraph-checkpoint < 3.0.0 (versions 2.1.2 and below)
+# Affected: langgraph-checkpoint < 4.0.0 (versions 2.1.2 and below)
 # Note: This codebase uses langgraph-checkpoint>=3.0.0 (safe), but blocking vulnerable versions
 # prevents accidental installation of old versions
 langgraph-checkpoint<3.0.0
 
 # LangGraph SQLite Checkpoint - RCE vulnerability (uses vulnerable langgraph-checkpoint)
 # CVE-2025-64439: Remote Code Execution in JsonPlusSerializer
-# Affected: langgraph-checkpoint-sqlite < 3.0.0 (depends on langgraph-checkpoint < 3.0.0)
+# Affected: langgraph-checkpoint-sqlite < 3.0.0 (depends on langgraph-checkpoint < 4.0.0)
 # Note: We don't use SQLite checkpoint (we use in-memory state), but blocking prevents
 # accidental installation. The vulnerability is in the base langgraph-checkpoint package.
 langgraph-checkpoint-sqlite<3.0.0
