@@ -107,6 +107,7 @@
     "glob": "^10.3.10",
     "babel-plugin-istanbul": "^6.1.1",
     "@babel/core": "^7.23.0",
+    "eslint": "^9.26.0",
     "react-copy-to-clipboard": {
       "react": "^19.2.3",
       "react-dom": "^19.2.3"
