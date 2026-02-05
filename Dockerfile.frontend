@@ -1,0 +1,22 @@
+# Frontend Development Dockerfile
+# Runs React development server with hot reload
+
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY src/ui/web/package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy frontend source
+COPY src/ui/web/ ./
+
+# Expose port
+EXPOSE 3001
+
+# Start development server
+CMD ["npm", "start"]
+

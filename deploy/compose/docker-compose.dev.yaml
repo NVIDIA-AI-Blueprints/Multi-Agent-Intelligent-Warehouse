@@ -90,5 +90,73 @@ services:
       - "9091:9091"     # HTTP
     depends_on: [etcd, minio]
 
+  # Backend API Service
+  backend:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    container_name: wosa-backend
+    ports:
+      - "8001:8001"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - DB_HOST=timescaledb
+      - DB_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MILVUS_HOST=milvus
+      - MILVUS_PORT=19530
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - ENVIRONMENT=development
+    depends_on:
+      - timescaledb
+      - redis
+      - milvus
+      - kafka
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend Service (React Development Server)
+  frontend:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.frontend
+    container_name: wosa-frontend
+    ports:
+      - "3001:3001"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8001
+      - PORT=3001
+      - HOST=0.0.0.0
+      - CHOKIDAR_USEPOLLING=true
+    volumes:
+      - ../../src/ui/web:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:1.25.3-alpine
+    container_name: wosa-nginx
+    ports:
+      - "3000:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+
 volumes:
   kafka_data:
