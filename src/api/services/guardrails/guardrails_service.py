@@ -123,8 +123,8 @@ class GuardrailsService:
             # Handle both absolute and relative paths
             rails_path = Path(self.config.rails_file)
             if not rails_path.is_absolute():
-                # If relative, try to resolve from project root
-                project_root = Path(__file__).parent.parent.parent.parent
+                # If relative, resolve from repo root (parent of ``src``)
+                project_root = Path(__file__).resolve().parents[4]
                 rails_path = project_root / rails_path
                 # Also try resolving from current working directory
                 if not rails_path.exists():

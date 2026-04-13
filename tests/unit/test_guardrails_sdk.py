@@ -22,8 +22,8 @@ Tests the SDK implementation independently and compares with pattern-based appro
 import pytest
 import asyncio
 import os
-from unittest.mock import Mock, patch, AsyncMock
-from typing import Dict, Any
+from unittest.mock import MagicMock, patch, AsyncMock
+from typing import Any, Dict, List
 
 # Set environment to use SDK for these tests
 os.environ["USE_NEMO_GUARDRAILS_SDK"] = "true"
@@ -37,6 +37,46 @@ from src.api.services.guardrails.guardrails_service import (
     GuardrailsConfig,
     GuardrailsResult,
 )
+
+
+@pytest.fixture(autouse=True)
+def _mock_nemo_llm_rails() -> None:
+    """Mock LLMRails so tests do not load the ``nvidia_nim`` provider."""
+    if not NEMO_SDK_AVAILABLE:
+        yield
+        return
+
+    mock_rails = MagicMock()
+    mock_rails.initialize = AsyncMock()
+
+    async def _generate_async(*args: Any, **kwargs: Any) -> MagicMock:
+        messages: List[Dict[str, Any]] = kwargs.get("messages") or []
+        combined = " ".join(
+            (m.get("content") or "").lower()
+            for m in messages
+            if isinstance(m, dict)
+        )
+        if "ignore previous" in combined:
+            text = "I cannot ignore my safety instructions."
+        elif "operate forklift" in combined:
+            text = "I cannot assist with unsafe operations."
+        else:
+            text = "Inventory query confirmed."
+        out = MagicMock()
+        out.content = text
+        return out
+
+    mock_rails.generate_async = AsyncMock(side_effect=_generate_async)
+    fake_config = MagicMock()
+
+    with patch(
+        "src.api.services.guardrails.nemo_sdk_service.RailsConfig.from_path",
+        return_value=fake_config,
+    ), patch(
+        "src.api.services.guardrails.nemo_sdk_service.LLMRails",
+        return_value=mock_rails,
+    ):
+        yield
 
 
 @pytest.fixture

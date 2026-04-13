@@ -19,10 +19,17 @@ Pytest configuration and fixtures for unit tests.
 Provides shared fixtures and configuration for pytest-based tests.
 """
 
+import sys
+from pathlib import Path
+
+# Ensure project root wins over site-packages ``tests`` (e.g. from bacpypes3).
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
 import pytest
 import asyncio
 import os
-from pathlib import Path
 from typing import Generator
 
 # Project root directory
