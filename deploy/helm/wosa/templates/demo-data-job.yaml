@@ -1,0 +1,74 @@
+{{- if .Values.demoData.enabled }}
+---
+# Job: seeds demo inventory, tasks, incidents, telemetry, and audit log.
+# post-install only - demo data should not re-run on upgrades.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "wosa.fullname" . }}-demo-data
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "2"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "wosa.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- include "wosa.podSecurityContext" . | nindent 6 }}
+      {{- include "wosa.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "wosa.serviceAccountName" . }}
+      restartPolicy: OnFailure
+      containers:
+        - name: demo-data
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- include "wosa.containerSecurityContext" . | nindent 10 }}
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for TimescaleDB to be ready..."
+              until python -c "
+              import asyncio, psycopg, os
+              async def check():
+                  conn = await psycopg.AsyncConnection.connect(os.environ['DATABASE_URL'])
+                  await conn.close()
+              asyncio.run(check())
+              " 2>/dev/null; do
+                echo "  not ready, retrying in 5s..."
+                sleep 5
+              done
+              echo "Running quick_demo_data.py..."
+              python scripts/data/quick_demo_data.py
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: postgres-user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: postgres-password
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: postgres-db
+            - name: DATABASE_URL
+              value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@{{ include "wosa.timescaledb.name" . }}:{{ .Values.timescaledb.port }}/$(POSTGRES_DB)"
+            - name: DEFAULT_USER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: default-user-password
+            - name: PYTHONPATH
+              value: /app
+{{- end }}

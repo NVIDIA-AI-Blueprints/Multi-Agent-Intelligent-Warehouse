@@ -1,0 +1,108 @@
+{{- if .Values.monitoring.enabled }}
+# Backend
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "wosa.backend.name" . }}
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      {{- include "wosa.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: backend
+  endpoints:
+    - port: http
+      path: {{ .Values.monitoring.serviceMonitor.metricsPath }}
+      interval: {{ .Values.monitoring.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.monitoring.serviceMonitor.scrapeTimeout }}
+      scheme: http
+      relabelings:
+        - targetLabel: job
+          replacement: warehouse-api
+      metricRelabelings:
+        - sourceLabels: [exported_endpoint]
+          regex: (.+)
+          targetLabel: endpoint
+          action: replace
+        - action: labeldrop
+          regex: exported_endpoint
+
+# TimescaleDB
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "wosa.timescaledb.name" . }}
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      {{- include "wosa.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: timescaledb
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      scheme: http
+      relabelings:
+        - targetLabel: job
+          replacement: postgres
+
+# Redis
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "wosa.redis.name" . }}
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      {{- include "wosa.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: redis
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      scheme: http
+      relabelings:
+        - targetLabel: job
+          replacement: redis
+
+# Milvus
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "wosa.milvus.name" . }}
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      {{- include "wosa.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: milvus
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      scheme: http
+      relabelings:
+        - targetLabel: job
+          replacement: milvus
+{{- end }}

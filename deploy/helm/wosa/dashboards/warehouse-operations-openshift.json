@@ -1,0 +1,243 @@
+{
+  "dashboard": {
+    "id": null,
+    "panels": [
+      {
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        },
+        "id": 1,
+        "targets": [
+          {
+            "expr": "sum(rate(warehouse_tasks_completed_total[5m])) / sum(rate(warehouse_tasks_created_total[5m])) * 100",
+            "legendFormat": "Completion Rate %",
+            "refId": "A"
+          }
+        ],
+        "title": "Task Completion Rate",
+        "type": "graph",
+        "yAxes": [
+          {
+            "label": "Percentage",
+            "max": 100,
+            "min": 0
+          }
+        ]
+      },
+      {
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        },
+        "id": 2,
+        "targets": [
+          {
+            "expr": "sum(warehouse_tasks_by_status) by (status)",
+            "legendFormat": "{{status}}",
+            "refId": "A"
+          }
+        ],
+        "title": "Task Status Distribution",
+        "type": "piechart"
+      },
+      {
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 8
+        },
+        "id": 3,
+        "targets": [
+          {
+            "expr": "sum(rate(warehouse_tasks_completed_total{worker_id!=\"\"}[1h])) by (worker_id)",
+            "legendFormat": "{{worker_id}}",
+            "refId": "A"
+          }
+        ],
+        "title": "Worker Productivity",
+        "type": "graph",
+        "yAxes": [
+          {
+            "label": "Tasks/hour",
+            "min": 0
+          }
+        ]
+      },
+      {
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 16
+        },
+        "id": 4,
+        "targets": [
+          {
+            "expr": "sum(warehouse_equipment_utilization_percent) by (equipment_id, equipment_type)",
+            "legendFormat": "{{equipment_id}} - {{equipment_type}}",
+            "refId": "A"
+          }
+        ],
+        "title": "Equipment Utilization",
+        "type": "graph",
+        "yAxes": [
+          {
+            "label": "Utilization %",
+            "max": 100,
+            "min": 0
+          }
+        ]
+      },
+      {
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 16
+        },
+        "id": 5,
+        "targets": [
+          {
+            "expr": "sum(warehouse_equipment_status{status=\"operational\"})",
+            "legendFormat": "Operational",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(warehouse_equipment_status{status=\"maintenance\"})",
+            "legendFormat": "Maintenance",
+            "refId": "B"
+          },
+          {
+            "expr": "sum(warehouse_equipment_status{status=\"offline\"})",
+            "legendFormat": "Offline",
+            "refId": "C"
+          }
+        ],
+        "title": "Equipment Status",
+        "type": "stat"
+      },
+      {
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 24
+        },
+        "id": 6,
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(warehouse_order_processing_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "95th percentile",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(warehouse_order_processing_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "50th percentile",
+            "refId": "B"
+          }
+        ],
+        "title": "Order Processing Time",
+        "type": "graph",
+        "yAxes": [
+          {
+            "label": "Seconds",
+            "min": 0
+          }
+        ]
+      },
+      {
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 32
+        },
+        "id": 7,
+        "targets": [
+          {
+            "expr": "sum(rate(warehouse_inventory_movements_total[1h])) by (movement_type)",
+            "legendFormat": "{{movement_type}}",
+            "refId": "A"
+          }
+        ],
+        "title": "Inventory Turnover Rate",
+        "type": "graph",
+        "yAxes": [
+          {
+            "label": "Movements/hour",
+            "min": 0
+          }
+        ]
+      },
+      {
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": 0
+                },
+                {
+                  "color": "yellow",
+                  "value": 90
+                },
+                {
+                  "color": "green",
+                  "value": 95
+                }
+              ]
+            },
+            "unit": "percent"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 32
+        },
+        "id": 8,
+        "targets": [
+          {
+            "expr": "avg(warehouse_pick_accuracy_percent)",
+            "legendFormat": "Accuracy %",
+            "refId": "A"
+          }
+        ],
+        "title": "Pick Accuracy Rate",
+        "type": "stat"
+      }
+    ],
+    "refresh": "30s",
+    "style": "dark",
+    "tags": [
+      "warehouse",
+      "operations",
+      "detailed"
+    ],
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "timezone": "browser",
+    "title": "Warehouse Operations - Detailed View"
+  }
+}

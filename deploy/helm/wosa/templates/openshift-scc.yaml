@@ -1,0 +1,89 @@
+{{- if and .Values.openshift.enabled .Values.openshift.scc.create }}
+
+# Custom SCC: allows runAsUser for NIM pods and skips recursive SELinux
+# relabeling on NIM model PVCs.
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: {{ .Release.Name }}-nim
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+  annotations:
+    kubernetes.io/description: >-
+      Custom SCC for WOSA pods. Allows containers to run as the UID defined
+      in their images and skips recursive SELinux relabeling on volume mounts.
+priority: {{ .Values.openshift.scc.priority }}
+allowHostDirVolumePlugin: false
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowPrivilegeEscalation: true
+allowPrivilegedContainer: false
+allowedCapabilities: null
+defaultAddCapabilities: null
+fsGroup:
+  type: RunAsAny
+readOnlyRootFilesystem: false
+requiredDropCapabilities:
+  - KILL
+  - MKNOD
+  - SETUID
+  - SETGID
+runAsUser:
+  type: RunAsAny
+seLinuxContext:
+  type: RunAsAny
+supplementalGroups:
+  type: RunAsAny
+users:
+  - system:serviceaccount:{{ .Release.Namespace }}:default
+  - system:serviceaccount:{{ .Release.Namespace }}:{{ include "wosa.serviceAccountName" . }}
+  - system:serviceaccount:{{ .Release.Namespace }}:nim-cache-sa
+  {{- range $nimKey, $nimVal := .Values.nimOperator }}
+  {{- if and (kindIs "map" $nimVal) (hasKey $nimVal "service") }}
+  - system:serviceaccount:{{ $.Release.Namespace }}:{{ $nimVal.service.name }}
+  {{- end }}
+  {{- end }}
+volumes:
+  - configMap
+  - csi
+  - downwardAPI
+  - emptyDir
+  - ephemeral
+  - persistentVolumeClaim
+  - projected
+  - secret
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Release.Name }}-nim-scc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:{{ .Release.Name }}-nim
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: {{ .Release.Namespace }}
+  - kind: ServiceAccount
+    name: {{ include "wosa.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+  - kind: ServiceAccount
+    name: nim-cache-sa
+    namespace: {{ .Release.Namespace }}
+  {{- range $nimKey, $nimVal := .Values.nimOperator }}
+  {{- if and (kindIs "map" $nimVal) (hasKey $nimVal "service") }}
+  - kind: ServiceAccount
+    name: {{ $nimVal.service.name }}
+    namespace: {{ $.Release.Namespace }}
+  {{- end }}
+  {{- end }}
+
+{{- end }}

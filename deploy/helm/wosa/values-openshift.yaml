@@ -1,0 +1,181 @@
+# values-openshift.yaml — OpenShift overlay for Multi-Agent Intelligent Warehouse (WOSA).
+#
+# Usage:
+#   helm install wosa ./deploy/helm/wosa \
+#     -n wosa --create-namespace \
+#     -f ./deploy/helm/wosa/values-openshift.yaml \
+#     --set openshift.ngcSecret.password="$NVIDIA_API_KEY"
+#
+# This file enables OpenShift-specific resources (Route, SCC, nginx proxy,
+# credential Secrets) and switches from hosted NVIDIA API endpoints to NIM
+# Operator managed services.  Cluster-specific values (tolerations,
+# storageClass, NGC keys) should be passed via --set at install time.
+
+# ---------------------------------------------------------------------------
+# OpenShift features
+# ---------------------------------------------------------------------------
+openshift:
+  enabled: true
+  route:
+    enabled: true
+    host: ""
+    tls:
+      termination: edge
+      insecureEdgeTerminationPolicy: Redirect
+    timeout: "5m"
+  scc:
+    create: true
+    priority: 10
+  imageRegistryPull: true
+
+# ---------------------------------------------------------------------------
+# Application images
+# ---------------------------------------------------------------------------
+image:
+  repository: image-registry.openshift-image-registry.svc:5000/wosa/wosa-backend
+
+frontend:
+  image:
+    repository: image-registry.openshift-image-registry.svc:5000/wosa/wosa-frontend
+
+service:
+  type: ClusterIP
+
+# ---------------------------------------------------------------------------
+# Backend timeout overrides for self-hosted NIM inference
+# Self-hosted models have higher latency than the hosted NVIDIA API;
+# increase agent/graph/chat timeouts to prevent premature timeouts.
+# ---------------------------------------------------------------------------
+backend:
+  env:
+    agentTimeoutSimple: "90"
+    agentTimeoutComplex: "120"
+    agentTimeoutReasoning: "180"
+    graphTimeoutSimple: "120"
+    graphTimeoutComplex: "180"
+    chatTimeoutSimple: "120"
+    chatTimeoutComplex: "180"
+
+# ---------------------------------------------------------------------------
+# NIM Operator integration — deploys LLM and embedding NIMs via NIMCache +
+# NIMService.  The NIM Operator handles model downloading, caching, and GPU
+# scheduling.
+# Requires: NIM Operator installed, NGC image-pull and API secrets in namespace.
+# ---------------------------------------------------------------------------
+nimOperator:
+  llm:
+    enabled: true
+    replicas: 1
+    service:
+      name: "nim-llm"
+    image:
+      repository: nvcr.io/nim/nvidia/llama-3.3-nemotron-super-49b-v1.5
+      tag: "latest"
+      pullPolicy: Always
+    # Profile filter — avoids downloading all 24 profiles (~2.4 TB).
+    # fp8/tp=2 fits L40S, A100-80GB, H100. Override: bf16 (max accuracy), nvfp4 (A100-40GB).
+    model:
+      precision: "fp8"
+      tensorParallelism: "2"
+      profile: ""
+    resources:
+      limits:
+        nvidia.com/gpu: 2
+      requests:
+        nvidia.com/gpu: 2
+    storage:
+      pvc:
+        create: true
+        size: "500Gi"
+        volumeAccessMode: ReadWriteOnce
+        storageClass: ""
+    nodeSelector: {}
+    tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      # Add cluster-specific tolerations as needed:
+      # - key: <your-gpu-taint-key>
+      #   operator: Equal
+      #   value: "true"
+      #   effect: NoSchedule
+    env:
+      - name: NIM_HTTP_API_PORT
+        value: "8000"
+      - name: TOKENIZERS_PARALLELISM
+        value: "false"
+    expose:
+      service:
+        name: http
+        type: ClusterIP
+        port: 8000
+    startupProbe:
+      enabled: true
+      probe:
+        httpGet:
+          path: /v1/health/ready
+          port: 8000
+        initialDelaySeconds: 60
+        periodSeconds: 30
+        failureThreshold: 120
+
+  embedding:
+    enabled: true
+    replicas: 1
+    service:
+      name: "nim-embedding"
+    image:
+      repository: nvcr.io/nim/nvidia/llama-nemotron-embed-vl-1b-v2
+      tag: "1.12.0"
+      pullPolicy: Always
+    resources:
+      limits:
+        nvidia.com/gpu: 1
+      requests:
+        nvidia.com/gpu: 1
+    storage:
+      pvc:
+        create: true
+        size: "100Gi"
+        volumeAccessMode: ReadWriteOnce
+        storageClass: ""
+    nodeSelector: {}
+    tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      # Add cluster-specific tolerations as needed:
+      # - key: <your-gpu-taint-key>
+      #   operator: Equal
+      #   value: "true"
+      #   effect: NoSchedule
+    env:
+      - name: NIM_HTTP_API_PORT
+        value: "8000"
+      - name: TOKENIZERS_PARALLELISM
+        value: "false"
+    expose:
+      service:
+        name: http
+        type: ClusterIP
+        port: 8000
+    startupProbe:
+      enabled: true
+      probe:
+        httpGet:
+          path: /v1/health/ready
+          port: 8000
+        initialDelaySeconds: 60
+        periodSeconds: 30
+        failureThreshold: 120
+
+# ---------------------------------------------------------------------------
+# Milvus GPU acceleration (optional)
+# ---------------------------------------------------------------------------
+milvus:
+  gpu:
+    enabled: false
+    # tolerations:
+    #   - key: "nvidia.com/gpu"
+    #     operator: Exists
+    #     effect: NoSchedule

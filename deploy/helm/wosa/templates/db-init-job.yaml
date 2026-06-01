@@ -1,0 +1,86 @@
+{{- if .Values.dbInit.enabled }}
+---
+# Job: runs SQL init scripts against TimescaleDB after install/upgrade.
+# SQL files are copied from the backend image (single source of truth).
+# All scripts use CREATE TABLE IF NOT EXISTS — safe to run on every upgrade.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "wosa.fullname" . }}-db-init
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 5
+  template:
+    metadata:
+      labels:
+        {{- include "wosa.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- include "wosa.podSecurityContext" . | nindent 6 }}
+      {{- include "wosa.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "wosa.serviceAccountName" . }}
+      restartPolicy: OnFailure
+      initContainers:
+        - name: copy-sql
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          {{- include "wosa.containerSecurityContext" . | nindent 10 }}
+          command:
+            - sh
+            - -c
+            - |
+              cp /app/data/postgres/[0-9]*.sql /sql/
+              cp /app/scripts/setup/create_model_tracking_tables.sql /sql/
+          volumeMounts:
+            - name: sql
+              mountPath: /sql
+      containers:
+        - name: db-init
+          image: "{{ .Values.timescaledb.image.repository }}:{{ .Values.timescaledb.image.tag }}"
+          {{- include "wosa.containerSecurityContext" . | nindent 10 }}
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for TimescaleDB to be ready..."
+              until pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB"; do
+                echo "  not ready, retrying in 5s..."
+                sleep 5
+              done
+              echo "Running init scripts..."
+              for f in $(ls /sql/*.sql | sort); do
+                echo "  Applying $f..."
+                psql -h "$DB_HOST" -p "$DB_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f "$f" || true
+              done
+              echo "DB init complete."
+          env:
+            - name: DB_HOST
+              value: {{ include "wosa.timescaledb.name" . | quote }}
+            - name: DB_PORT
+              value: {{ .Values.timescaledb.port | quote }}
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: postgres-user
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: postgres-db
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: postgres-password
+          volumeMounts:
+            - name: sql
+              mountPath: /sql
+      volumes:
+        - name: sql
+          emptyDir: {}
+{{- end }}

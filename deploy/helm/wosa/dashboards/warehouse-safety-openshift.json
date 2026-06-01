@@ -1,0 +1,307 @@
+{
+  "dashboard": {
+    "id": null,
+    "panels": [
+      {
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        },
+        "id": 1,
+        "targets": [
+          {
+            "expr": "sum(increase(warehouse_safety_incidents_total[1h])) by (incident_type)",
+            "legendFormat": "{{incident_type}}",
+            "refId": "A"
+          }
+        ],
+        "title": "Safety Incidents by Type",
+        "type": "graph",
+        "yAxes": [
+          {
+            "label": "Incidents/hour",
+            "min": 0
+          }
+        ]
+      },
+      {
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        },
+        "id": 2,
+        "targets": [
+          {
+            "expr": "avg(warehouse_safety_score)",
+            "legendFormat": "Safety Score",
+            "refId": "A"
+          }
+        ],
+        "title": "Safety Score Trend",
+        "type": "graph",
+        "yAxes": [
+          {
+            "label": "Score",
+            "max": 100,
+            "min": 0
+          }
+        ]
+      },
+      {
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short"
+          }
+        },
+        "gridPos": {
+          "h": 4,
+          "w": 24,
+          "x": 0,
+          "y": 8
+        },
+        "id": 3,
+        "targets": [
+          {
+            "expr": "sum(warehouse_compliance_checks_passed)",
+            "legendFormat": "Passed",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(warehouse_compliance_checks_failed)",
+            "legendFormat": "Failed",
+            "refId": "B"
+          },
+          {
+            "expr": "sum(warehouse_compliance_checks_pending)",
+            "legendFormat": "Pending",
+            "refId": "C"
+          }
+        ],
+        "title": "Compliance Checklist Status",
+        "type": "stat"
+      },
+      {
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": 0
+                },
+                {
+                  "color": "yellow",
+                  "value": 80
+                },
+                {
+                  "color": "green",
+                  "value": 95
+                }
+              ]
+            },
+            "unit": "percent"
+          }
+        },
+        "gridPos": {
+          "h": 4,
+          "w": 8,
+          "x": 0,
+          "y": 12
+        },
+        "id": 4,
+        "targets": [
+          {
+            "expr": "avg(warehouse_ppe_compliance_percent)",
+            "legendFormat": "PPE Compliance %",
+            "refId": "A"
+          }
+        ],
+        "title": "PPE Compliance Rate",
+        "type": "stat"
+      },
+      {
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": 0
+                },
+                {
+                  "color": "yellow",
+                  "value": 70
+                },
+                {
+                  "color": "green",
+                  "value": 90
+                }
+              ]
+            },
+            "unit": "percent"
+          }
+        },
+        "gridPos": {
+          "h": 4,
+          "w": 8,
+          "x": 8,
+          "y": 12
+        },
+        "id": 5,
+        "targets": [
+          {
+            "expr": "avg(warehouse_training_completion_percent)",
+            "legendFormat": "Training Completion %",
+            "refId": "A"
+          }
+        ],
+        "title": "Training Completion Rate",
+        "type": "stat"
+      },
+      {
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": 0
+                },
+                {
+                  "color": "yellow",
+                  "value": 3
+                },
+                {
+                  "color": "red",
+                  "value": 5
+                }
+              ]
+            },
+            "unit": "short"
+          }
+        },
+        "gridPos": {
+          "h": 4,
+          "w": 8,
+          "x": 16,
+          "y": 12
+        },
+        "id": 6,
+        "targets": [
+          {
+            "expr": "sum(increase(warehouse_near_miss_events_total[24h]))",
+            "legendFormat": "Near Misses (24h)",
+            "refId": "A"
+          }
+        ],
+        "title": "Near Miss Events",
+        "type": "stat"
+      },
+      {
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 16
+        },
+        "id": 7,
+        "targets": [
+          {
+            "expr": "avg(warehouse_temperature_celsius) by (zone)",
+            "legendFormat": "Temperature (\u00b0C)",
+            "refId": "A"
+          },
+          {
+            "expr": "avg(warehouse_humidity_percent) by (zone)",
+            "legendFormat": "Humidity (%)",
+            "refId": "B"
+          }
+        ],
+        "title": "Environmental Conditions",
+        "type": "graph",
+        "yAxes": [
+          {
+            "label": "Value",
+            "min": 0
+          }
+        ]
+      },
+      {
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 16
+        },
+        "id": 8,
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(warehouse_emergency_response_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "95th percentile",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(warehouse_emergency_response_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "50th percentile",
+            "refId": "B"
+          }
+        ],
+        "title": "Emergency Response Time",
+        "type": "graph",
+        "yAxes": [
+          {
+            "label": "Seconds",
+            "min": 0
+          }
+        ]
+      },
+      {
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 24
+        },
+        "id": 9,
+        "targets": [
+          {
+            "expr": "sum(warehouse_safety_violations_by_category) by (category)",
+            "legendFormat": "{{category}}",
+            "refId": "A"
+          }
+        ],
+        "title": "Safety Violations by Category",
+        "type": "piechart"
+      }
+    ],
+    "refresh": "30s",
+    "style": "dark",
+    "tags": [
+      "warehouse",
+      "safety",
+      "compliance"
+    ],
+    "time": {
+      "from": "now-24h",
+      "to": "now"
+    },
+    "timezone": "browser",
+    "title": "Warehouse Safety & Compliance"
+  }
+}

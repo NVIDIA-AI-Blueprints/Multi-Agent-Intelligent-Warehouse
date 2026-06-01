@@ -18,6 +18,7 @@ from pydantic import BaseModel
 from typing import Optional, Dict, Any, List, Union
 import logging
 import asyncio
+import os
 import re
 import time
 from src.api.graphs.mcp_integrated_planner_graph import get_mcp_planner_graph
@@ -716,10 +717,7 @@ async def chat(req: ChatRequest):
             # For non-complex reasoning queries, set to 115s (slightly less than frontend 120s)
             MAIN_QUERY_TIMEOUT = 230 if is_complex_query else 115  # 230s for complex, 115s for regular reasoning
         else:
-            # Regular queries: Increased timeouts to prevent premature timeouts
-            # Simple queries: 60s (was 30s) - allows time for LLM processing
-            # Complex queries: 90s (was 60s) - allows time for complex analysis
-            MAIN_QUERY_TIMEOUT = 90 if is_complex_query else 60
+            MAIN_QUERY_TIMEOUT = int(os.getenv("CHAT_TIMEOUT_COMPLEX", "90")) if is_complex_query else int(os.getenv("CHAT_TIMEOUT_SIMPLE", "60"))
         
         # Initialize result to None to avoid UnboundLocalError
         result = None

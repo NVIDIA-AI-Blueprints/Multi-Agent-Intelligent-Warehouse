@@ -1,0 +1,31 @@
+{{- if and .Values.openshift.enabled .Values.openshift.route.enabled }}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ include "wosa.fullname" . }}
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: nginx
+  annotations:
+    haproxy.router.openshift.io/timeout: {{ .Values.openshift.route.timeout | quote }}
+    {{- with .Values.openshift.route.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- if .Values.openshift.route.host }}
+  host: {{ .Values.openshift.route.host | quote }}
+  {{- end }}
+  to:
+    kind: Service
+    name: {{ include "wosa.nginx.name" . }}
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: {{ .Values.openshift.route.tls.termination }}
+    {{- if ne .Values.openshift.route.tls.termination "passthrough" }}
+    insecureEdgeTerminationPolicy: {{ .Values.openshift.route.tls.insecureEdgeTerminationPolicy }}
+    {{- end }}
+  wildcardPolicy: None
+{{- end }}

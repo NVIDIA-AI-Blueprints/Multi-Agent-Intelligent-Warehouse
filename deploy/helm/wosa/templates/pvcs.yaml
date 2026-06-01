@@ -1,0 +1,114 @@
+{{/* TimescaleDB Data PVC */}}
+{{- if and .Values.timescaledb.enabled .Values.timescaledb.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "wosa.timescaledb.name" . }}-data
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: timescaledb
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.timescaledb.persistence.size }}
+  {{- include "wosa.storageClass" . | nindent 2 }}
+{{- end }}
+{{/* Redis Data PVC */}}
+{{- if and .Values.redis.enabled .Values.redis.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "wosa.redis.name" . }}-data
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.redis.persistence.size }}
+  {{- include "wosa.storageClass" . | nindent 2 }}
+{{- end }}
+{{/* Kafka Data PVC */}}
+{{- if and .Values.kafka.enabled .Values.kafka.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "wosa.kafka.name" . }}-data
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kafka
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.kafka.persistence.size }}
+  {{- include "wosa.storageClass" . | nindent 2 }}
+{{- end }}
+{{/* MinIO Data PVC */}}
+{{- if and .Values.minio.enabled .Values.minio.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "wosa.minio.name" . }}-data
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.minio.persistence.size }}
+  {{- include "wosa.storageClass" . | nindent 2 }}
+{{- end }}
+{{/* etcd Data PVC */}}
+{{- if and .Values.etcd.enabled .Values.etcd.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "wosa.etcd.name" . }}-data
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: etcd
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.etcd.persistence.size }}
+  {{- include "wosa.storageClass" . | nindent 2 }}
+{{- end }}
+{{/* Milvus Data PVC */}}
+{{- if and .Values.milvus.enabled .Values.milvus.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "wosa.milvus.name" . }}-data
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: milvus
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.milvus.persistence.size }}
+  {{- include "wosa.storageClass" . | nindent 2 }}
+{{- end }}

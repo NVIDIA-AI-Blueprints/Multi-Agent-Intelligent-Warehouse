@@ -689,6 +689,7 @@ pytest tests/integration/
 - **MCP Integration**: [docs/architecture/mcp-integration.md](docs/architecture/mcp-integration.md)
 - **Forecasting**: [docs/forecasting/](docs/forecasting/)
 - **Deployment**: [DEPLOYMENT.md](DEPLOYMENT.md) - Complete deployment guide with Docker and Kubernetes options
+- **OpenShift Deployment**: [docs/deployment/openshift-deployment.md](docs/deployment/openshift-deployment.md) - Red Hat OpenShift AI deployment
 
 ## Contributing
 

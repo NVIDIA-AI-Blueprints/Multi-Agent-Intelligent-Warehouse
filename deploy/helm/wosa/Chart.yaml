@@ -1,0 +1,28 @@
+apiVersion: v2
+name: wosa
+description: |
+  A Helm chart for deploying the Multi-Agent Intelligent Warehouse (WOSA)
+  on Kubernetes and OpenShift. This AI-powered application provides intelligent
+  warehouse operations, safety monitoring, equipment tracking, document
+  processing, and demand forecasting using NVIDIA NIM services.
+
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+keywords:
+  - nvidia
+  - ai
+  - warehouse
+  - multi-agent
+  - langgraph
+  - milvus
+  - openshift
+
+home: https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse
+sources:
+  - https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse
+
+maintainers:
+  - name: NVIDIA
+    url: https://nvidia.com

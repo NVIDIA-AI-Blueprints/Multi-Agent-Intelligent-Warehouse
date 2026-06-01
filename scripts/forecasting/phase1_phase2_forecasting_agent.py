@@ -526,8 +526,9 @@ class RAPIDSForecastingAgent:
             results_summary = self._create_forecast_summary(forecasts)
             
             # Save to both root (for runtime) and data/sample/forecasts/ (for reference)
-            output_file = 'phase1_phase2_forecasts.json'
-            sample_file = Path("data/sample/forecasts") / "phase1_phase2_forecasts.json"
+            output_file = os.path.join(os.getenv("FORECAST_OUTPUT_DIR", ""), "phase1_phase2_forecasts.json")
+            sample_dir = Path(os.getenv("FORECAST_OUTPUT_DIR", "data/sample/forecasts"))
+            sample_file = sample_dir / "phase1_phase2_forecasts.json"
             
             self._save_forecast_results(results_summary, output_file, sample_file)
             

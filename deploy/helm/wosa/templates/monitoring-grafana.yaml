@@ -1,0 +1,148 @@
+{{- if and .Values.monitoring.enabled .Values.monitoring.grafana.enabled }}
+
+# OperatorGroup - set monitoring.grafana.createOperatorGroup=false if one already exists.
+{{- if not (eq (.Values.monitoring.grafana.createOperatorGroup | toString) "false") }}
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: {{ include "wosa.fullname" . }}-grafana-og
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: monitoring
+spec:
+  targetNamespaces:
+    - {{ include "wosa.namespace" . }}
+{{- end }}
+
+# OLM Subscription
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: grafana-operator
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: monitoring
+spec:
+  channel: {{ .Values.monitoring.grafana.channel }}
+  installPlanApproval: Automatic
+  name: grafana-operator
+  source: {{ .Values.monitoring.grafana.catalogSource }}
+  sourceNamespace: {{ .Values.monitoring.grafana.catalogSourceNamespace }}
+
+# Grafana ServiceAccount
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "wosa.fullname" . }}-grafana
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: monitoring
+
+# ClusterRoleBinding - cluster-monitoring-view access
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "wosa.fullname" . }}-{{ include "wosa.namespace" . }}-grafana-monitoring-view
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: monitoring
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-monitoring-view
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "wosa.fullname" . }}-grafana
+    namespace: {{ include "wosa.namespace" . }}
+
+# Grafana instance
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: Grafana
+metadata:
+  name: {{ include "wosa.fullname" . }}-grafana
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: monitoring
+    dashboards: {{ include "wosa.fullname" . }}
+spec:
+  deployment:
+    spec:
+      replicas: {{ .Values.monitoring.grafana.replicas }}
+      template:
+        spec:
+          containers:
+            - name: grafana
+              resources:
+                {{- toYaml .Values.monitoring.grafana.resources | nindent 16 }}
+  route:
+    spec:
+      tls:
+        termination: edge
+        insecureEdgeTerminationPolicy: Redirect
+  config:
+    log:
+      mode: "console"
+    auth.anonymous:
+      enabled: "false"
+    security:
+      admin_user: admin
+      admin_password: {{ .Values.monitoring.grafana.adminPassword | default "changeme" | quote }}
+    users:
+      allow_sign_up: "false"
+
+# GrafanaDatasource - Thanos Querier
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: {{ include "wosa.fullname" . }}-prometheus
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: monitoring
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: {{ include "wosa.fullname" . }}
+  datasource:
+    name: Prometheus
+    type: prometheus
+    access: proxy
+    url: {{ .Values.monitoring.grafana.datasource.url }}
+    isDefault: true
+    jsonData:
+      httpHeaderName1: Authorization
+      timeInterval: "5s"
+      tlsSkipVerify: true
+    secureJsonData:
+      httpHeaderValue1: "Bearer ${token}"
+  valuesFrom:
+    - targetPath: secureJsonData.httpHeaderValue1
+      valueFrom:
+        secretKeyRef:
+          name: {{ include "wosa.fullname" . }}-grafana-sa-token
+          key: token
+
+# SA token Secret
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "wosa.fullname" . }}-grafana-sa-token
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: monitoring
+  annotations:
+    kubernetes.io/service-account.name: {{ include "wosa.fullname" . }}-grafana
+type: kubernetes.io/service-account-token
+{{- end }}

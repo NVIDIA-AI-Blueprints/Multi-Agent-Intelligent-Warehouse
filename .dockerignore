@@ -172,8 +172,9 @@ deploy/
 monitoring/
 nginx.conf
 
-# Scripts (not needed in runtime, only source code)
+# Scripts (not copied by upstream Dockerfile, but needed by OpenShift Dockerfile)
 scripts/
+!scripts/
 
 # Type checking and linting
 .mypy_cache/
@@ -194,6 +195,8 @@ setup.cfg
 MANIFEST.in
 requirements*.txt
 !requirements.docker.txt
+# requirements.txt is needed by openshift/Dockerfile.backend (full dependency list)
+!requirements.txt
 
 # Celery
 celerybeat-schedule

@@ -139,18 +139,18 @@ class AdvancedForecastingService:
         try:
             # PostgreSQL connection
             self.pg_conn = await asyncpg.connect(
-                host="localhost",
-                port=5435,
-                user="warehouse",
+                host=os.getenv("PGHOST", "localhost"),
+                port=int(os.getenv("PGPORT", "5435")),
+                user=os.getenv("POSTGRES_USER", "warehouse"),
                 password=os.getenv("POSTGRES_PASSWORD", ""),
-                database="warehouse"
+                database=os.getenv("POSTGRES_DB", "warehouse")
             )
             
             # Set db_pool to pg_conn for compatibility with model performance methods
             self.db_pool = self.pg_conn
             
             # Redis connection for caching
-            self.redis_client = redis.Redis(host='localhost', port=6379, db=0)
+            self.redis_client = redis.Redis(host=os.getenv('REDIS_HOST','localhost'), port=int(os.getenv('REDIS_PORT','6379')), db=0)
             
             logger.info("✅ Advanced forecasting service initialized")
         except Exception as e:

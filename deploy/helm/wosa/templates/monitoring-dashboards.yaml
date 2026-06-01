@@ -1,0 +1,27 @@
+{{- if and .Values.monitoring.enabled .Values.monitoring.grafana.enabled .Values.monitoring.grafana.dashboards.enabled }}
+{{- range $path, $_ := .Files.Glob "dashboards/*.json" }}
+{{- $rawJson := $.Files.Get $path }}
+{{- $name := trimSuffix ".json" (base $path) }}
+{{- $parsed := fromJson $rawJson -}}
+{{- $dashboard := $parsed -}}
+{{- if hasKey $parsed "dashboard" -}}
+{{-   $dashboard = $parsed.dashboard -}}
+{{- end }}
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: {{ include "wosa.fullname" $ }}-{{ $name }}
+  namespace: {{ include "wosa.namespace" $ }}
+  labels:
+    {{- include "wosa.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: monitoring
+spec:
+  resyncPeriod: 5m
+  instanceSelector:
+    matchLabels:
+      dashboards: {{ include "wosa.fullname" $ }}
+  json: |
+    {{ toJson $dashboard | nindent 4 }}
+{{ end }}
+{{- end }}

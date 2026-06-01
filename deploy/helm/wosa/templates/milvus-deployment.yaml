@@ -1,0 +1,184 @@
+{{- if .Values.milvus.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "wosa.milvus.name" . }}
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: milvus
+spec:
+  replicas: {{ .Values.milvus.replicas }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "wosa.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: milvus
+  template:
+    metadata:
+      labels:
+        {{- include "wosa.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: milvus
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "wosa.serviceAccountName" . }}
+      {{- include "wosa.imagePullSecrets" . | nindent 6 }}
+      {{- if or (and .Values.milvus.gpu.enabled .Values.milvus.gpu.tolerations) .Values.tolerations }}
+      tolerations:
+        {{- if .Values.tolerations }}
+        {{- toYaml .Values.tolerations | nindent 8 }}
+        {{- end }}
+        {{- if and .Values.milvus.gpu.enabled .Values.milvus.gpu.tolerations }}
+        {{- toYaml .Values.milvus.gpu.tolerations | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+        fsGroupChangePolicy: OnRootMismatch
+      {{- if .Values.milvus.persistence.enabled }}
+      initContainers:
+        - name: volume-permissions
+          image: busybox:1.36
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - |
+              mkdir -p /var/lib/milvus/data
+              mkdir -p /var/lib/milvus/logs
+              mkdir -p /var/lib/milvus/wal
+              mkdir -p /var/lib/milvus/rdb_data
+              mkdir -p /var/lib/milvus/rdb_data_meta_kv
+              echo "Milvus directories created"
+              ls -la /var/lib/milvus/
+          volumeMounts:
+            - name: milvus-data
+              mountPath: /var/lib/milvus
+          {{- include "wosa.containerSecurityContext" . | nindent 10 }}
+      {{- end }}
+      containers:
+        - name: milvus
+          {{- if .Values.milvus.gpu.enabled }}
+          image: "{{ .Values.milvus.image.repository }}:{{ .Values.milvus.image.tag }}-gpu"
+          {{- else }}
+          image: "{{ .Values.milvus.image.repository }}:{{ .Values.milvus.image.tag }}"
+          {{- end }}
+          imagePullPolicy: {{ .Values.milvus.image.pullPolicy }}
+          args: ["milvus", "run", "standalone"]
+          ports:
+            - name: grpc
+              containerPort: {{ .Values.milvus.port }}
+              protocol: TCP
+            - name: http
+              containerPort: {{ .Values.milvus.httpPort }}
+              protocol: TCP
+          resources:
+            {{- if .Values.milvus.gpu.enabled }}
+            requests:
+              {{- toYaml .Values.milvus.resources.requests | nindent 14 }}
+              nvidia.com/gpu: "1"
+            limits:
+              {{- toYaml .Values.milvus.resources.limits | nindent 14 }}
+              nvidia.com/gpu: "1"
+            {{- else }}
+            {{- toYaml .Values.milvus.resources | nindent 12 }}
+            {{- end }}
+          {{- include "wosa.containerSecurityContext" . | nindent 10 }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          env:
+            - name: ETCD_ENDPOINTS
+              value: {{ printf "%s:%v" (include "wosa.etcd.name" .) .Values.etcd.port | quote }}
+            - name: MINIO_ADDRESS
+              value: {{ printf "%s:%v" (include "wosa.minio.name" .) .Values.minio.service.apiPort | quote }}
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: minio-access-key
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: minio-secret-key
+            - name: MINIO_USE_SSL
+              value: "false"
+            - name: COMMON_STORAGETYPE
+              value: "local"
+            {{- if .Values.milvus.gpu.enabled }}
+            - name: CUDA_VISIBLE_DEVICES
+              value: {{ .Values.milvus.gpu.deviceId | quote }}
+            - name: MILVUS_USE_GPU
+              value: "true"
+            - name: MILVUS_GPU_DEVICE_ID
+              value: {{ .Values.milvus.gpu.deviceId | quote }}
+            {{- end }}
+            # Explicit path configurations for OpenShift compatibility
+            - name: MILVUS_LOG_PATH
+              value: "/var/lib/milvus/logs/milvus.log"
+            - name: ROCKSMQ_PATH
+              value: "/var/lib/milvus/rdb_data"
+            - name: COMMON_STORAGEROOTPATH
+              value: "/var/lib/milvus/data"
+          {{- if .Values.milvus.persistence.enabled }}
+          volumeMounts:
+            - name: milvus-data
+              mountPath: /var/lib/milvus
+          {{- end }}
+      {{- if .Values.milvus.persistence.enabled }}
+      volumes:
+        - name: milvus-data
+          persistentVolumeClaim:
+            claimName: {{ include "wosa.milvus.name" . }}-data
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "wosa.milvus.name" . }}
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: milvus
+spec:
+  selector:
+    {{- include "wosa.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: milvus
+  ports:
+    - name: grpc
+      port: {{ .Values.milvus.port }}
+      targetPort: grpc
+      protocol: TCP
+    - name: http
+      port: {{ .Values.milvus.httpPort }}
+      targetPort: http
+      protocol: TCP
+{{- end }}

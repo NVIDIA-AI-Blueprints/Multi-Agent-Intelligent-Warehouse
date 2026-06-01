@@ -125,11 +125,11 @@ class RAPIDSForecastingAgent:
         """Initialize database connection"""
         try:
             self.pg_conn = await asyncpg.connect(
-                host="localhost",
-                port=5435,
-                user="warehouse",
+                host=os.getenv("PGHOST", "localhost"),
+                port=int(os.getenv("PGPORT", "5435")),
+                user=os.getenv("POSTGRES_USER", "warehouse"),
                 password=os.getenv("POSTGRES_PASSWORD", ""),
-                database="warehouse"
+                database=os.getenv("POSTGRES_DB", "warehouse")
             )
             logger.info("✅ Database connection established")
         except Exception as e:
@@ -714,12 +714,12 @@ class RAPIDSForecastingAgent:
         from pathlib import Path
         
         # Save to root for runtime use
-        output_file = "rapids_gpu_forecasts.json"
+        output_file = os.path.join(os.getenv("FORECAST_OUTPUT_DIR", ""), "rapids_gpu_forecasts.json")
         async with await anyio.open_file(output_file, 'w') as f:
             await f.write(json.dumps(forecasts, indent=2))
-        
+
         # Also save to data/sample/forecasts/ for reference
-        sample_dir = Path("data/sample/forecasts")
+        sample_dir = Path(os.getenv("FORECAST_OUTPUT_DIR", "data/sample/forecasts"))
         sample_dir.mkdir(parents=True, exist_ok=True)
         sample_file = sample_dir / "rapids_gpu_forecasts.json"
         async with await anyio.open_file(sample_file, 'w') as f:

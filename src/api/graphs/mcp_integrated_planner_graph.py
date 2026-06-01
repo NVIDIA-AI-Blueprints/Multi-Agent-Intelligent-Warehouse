@@ -34,6 +34,7 @@ from langchain_core.tools import tool
 from dataclasses import asdict
 import logging
 import asyncio
+import os
 import threading
 
 from src.api.services.mcp.tool_discovery import ToolDiscoveryService
@@ -46,11 +47,11 @@ from src.api.utils.log_utils import sanitize_log_data
 logger = logging.getLogger(__name__)
 
 
-# Constants for agent timeouts
+# Agent timeouts (configurable via env vars for self-hosted NIM deployments)
 AGENT_INIT_TIMEOUT = 5.0  # 5 seconds for agent initialization
-AGENT_TIMEOUT_REASONING = 90.0  # 90s for reasoning queries
-AGENT_TIMEOUT_COMPLEX = 50.0  # 50s for complex queries
-AGENT_TIMEOUT_SIMPLE = 45.0  # 45s for simple queries
+AGENT_TIMEOUT_REASONING = float(os.getenv("AGENT_TIMEOUT_REASONING", "90"))
+AGENT_TIMEOUT_COMPLEX = float(os.getenv("AGENT_TIMEOUT_COMPLEX", "50"))
+AGENT_TIMEOUT_SIMPLE = float(os.getenv("AGENT_TIMEOUT_SIMPLE", "45"))
 
 # Constants for complex query detection
 COMPLEX_QUERY_KEYWORDS = [
@@ -1552,8 +1553,7 @@ class MCPPlannerGraph:
                 # Match the timeout in chat.py: 230s for complex, 115s for regular reasoning
                 graph_timeout = 230.0 if is_complex_query else 115.0  # 230s for complex, 115s for regular reasoning
             else:
-                # Regular queries: Match chat.py timeouts (60s for simple, 90s for complex)
-                graph_timeout = 90.0 if is_complex_query else 60.0  # Increased from 30s to 60s for simple queries
+                graph_timeout = float(os.getenv("GRAPH_TIMEOUT_COMPLEX", "90")) if is_complex_query else float(os.getenv("GRAPH_TIMEOUT_SIMPLE", "60"))
             logger.info(f"Graph timeout set to {graph_timeout}s (complex: {is_complex_query}, reasoning: {enable_reasoning})")
             try:
                 result = await asyncio.wait_for(

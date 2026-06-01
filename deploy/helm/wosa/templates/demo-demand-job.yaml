@@ -1,0 +1,81 @@
+{{- if .Values.demoDemand.enabled }}
+---
+# Job: seeds 180 days of historical demand data for the Forecasting page.
+# post-install only - historical data should not re-run on upgrades.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "wosa.fullname" . }}-demo-demand
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "3"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "wosa.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- include "wosa.podSecurityContext" . | nindent 6 }}
+      {{- include "wosa.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "wosa.serviceAccountName" . }}
+      restartPolicy: OnFailure
+      containers:
+        - name: demo-demand
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- include "wosa.containerSecurityContext" . | nindent 10 }}
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for TimescaleDB to be ready..."
+              until python -c "
+              import asyncio, asyncpg, os
+              async def check():
+                  conn = await asyncpg.connect(
+                      host=os.environ['PGHOST'], port=int(os.environ['PGPORT']),
+                      user=os.environ['POSTGRES_USER'], password=os.environ['POSTGRES_PASSWORD'],
+                      database=os.environ['POSTGRES_DB'])
+                  await conn.close()
+              asyncio.run(check())
+              " 2>/dev/null; do
+                echo "  not ready, retrying in 5s..."
+                sleep 5
+              done
+              echo "Running generate_historical_demand.py..."
+              python /app/scripts/data/generate_historical_demand.py
+          env:
+            - name: PGHOST
+              value: {{ include "wosa.timescaledb.name" . | quote }}
+            - name: PGPORT
+              value: {{ .Values.timescaledb.port | quote }}
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: postgres-user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: postgres-password
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: postgres-db
+            - name: PYTHONPATH
+              value: /app
+          volumeMounts:
+            - name: scratch
+              mountPath: /app/output
+          workingDir: /app/output
+      volumes:
+        - name: scratch
+          emptyDir: {}
+{{- end }}

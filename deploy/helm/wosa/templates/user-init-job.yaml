@@ -1,0 +1,80 @@
+{{- if .Values.userInit.enabled }}
+---
+# Job: creates default admin + test users in PostgreSQL.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "wosa.fullname" . }}-user-init
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 5
+  template:
+    metadata:
+      labels:
+        {{- include "wosa.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- include "wosa.podSecurityContext" . | nindent 6 }}
+      {{- include "wosa.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "wosa.serviceAccountName" . }}
+      restartPolicy: OnFailure
+      containers:
+        - name: user-init
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- include "wosa.containerSecurityContext" . | nindent 10 }}
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for TimescaleDB to be ready..."
+              until python -c "
+              import asyncio, asyncpg, os
+              async def check():
+                  conn = await asyncpg.connect(
+                      host=os.environ['PGHOST'], port=int(os.environ['PGPORT']),
+                      user=os.environ['POSTGRES_USER'], password=os.environ['POSTGRES_PASSWORD'],
+                      database=os.environ['POSTGRES_DB'])
+                  await conn.close()
+              asyncio.run(check())
+              " 2>/dev/null; do
+                echo "  not ready, retrying in 5s..."
+                sleep 5
+              done
+              echo "Running create_default_users.py..."
+              python scripts/setup/create_default_users.py
+          env:
+            - name: PGHOST
+              value: {{ include "wosa.timescaledb.name" . | quote }}
+            - name: PGPORT
+              value: {{ .Values.timescaledb.port | quote }}
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: postgres-user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: postgres-password
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: postgres-db
+            - name: DEFAULT_ADMIN_PASSWORD
+              value: {{ .Values.backend.env.defaultAdminPassword | quote }}
+            - name: DEFAULT_USER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: default-user-password
+            - name: PYTHONPATH
+              value: /app
+{{- end }}

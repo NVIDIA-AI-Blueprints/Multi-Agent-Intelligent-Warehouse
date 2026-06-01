@@ -1,0 +1,67 @@
+# Backend Dockerfile for OpenShift
+# Builds the Python/FastAPI backend only (no frontend).
+#
+# OpenShift fixes vs root Dockerfile.backend:
+#   1. requirements.txt instead of requirements.docker.txt (14 missing packages)
+#   2. Explicit COPYs for data/, scripts/, README.md (missing from upstream)
+
+# =============================================================================
+# Backend Dependencies Stage
+# =============================================================================
+FROM python:3.11-slim AS backend-deps
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+    g++ \
+    gcc \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Fix: requirements.docker.txt is missing tiktoken, psycopg, pandas, nemoguardrails, etc.
+COPY requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# =============================================================================
+# Final Runtime Stage
+# =============================================================================
+FROM python:3.11-slim AS final
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=backend-deps /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=backend-deps /usr/local/bin /usr/local/bin
+
+# Fix: upstream Dockerfile only copies src/ and data/config/guardrails/, missing
+# data/config/agents/ (agent personas), data/postgres/migrations/, scripts/,
+# and README.md. Docker Compose bind-mounts the entire repo (volumes: [".:/app"]),
+# so we must COPY everything the backend needs at runtime.
+COPY src/ ./src/
+COPY data/ ./data/
+COPY scripts/ ./scripts/
+COPY README.md ./
+
+ARG VERSION=0.0.0
+ARG GIT_SHA=unknown
+ARG BUILD_TIME=unknown
+
+ENV VERSION=$VERSION
+ENV GIT_SHA=$GIT_SHA
+ENV BUILD_TIME=$BUILD_TIME
+ENV DOCKER_IMAGE=warehouse-assistant:$VERSION
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+# No USER directive - OpenShift restricted-v2 assigns a random UID with GID 0.
+# Writable paths (data/uploads/) are mounted as emptyDir volumes in the
+# Helm chart, so no chown/chmod needed on the image filesystem.
+
+EXPOSE 8001
+
+CMD ["uvicorn", "src.api.app:app", "--host", "0.0.0.0", "--port", "8001"]

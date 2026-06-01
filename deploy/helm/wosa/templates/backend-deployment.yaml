@@ -1,0 +1,303 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "wosa.backend.name" . }}
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  replicas: {{ .Values.backend.replicas }}
+  selector:
+    matchLabels:
+      {{- include "wosa.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: backend
+  template:
+    metadata:
+      labels:
+        {{- include "wosa.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: backend
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "wosa.serviceAccountName" . }}
+      {{- include "wosa.imagePullSecrets" . | nindent 6 }}
+      {{- include "wosa.podSecurityContext" . | nindent 6 }}
+      containers:
+        - name: backend
+          image: "{{ required "image.repository is required" .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.backend.port }}
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+          {{- include "wosa.containerSecurityContext" . | nindent 10 }}
+          volumeMounts:
+            - name: uploads
+              mountPath: /app/data/uploads
+            - name: forecast-output
+              mountPath: /app/output
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.backend.healthCheck.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.backend.healthCheck.initialDelaySeconds }}
+            periodSeconds: {{ .Values.backend.healthCheck.periodSeconds }}
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.backend.healthCheck.path }}
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+          env:
+            # POSTGRES_* must come first - DATABASE_URL below uses $(VAR) substitution
+            # which is order-dependent in Kubernetes (only earlier env entries are expanded).
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: postgres-user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: postgres-password
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: postgres-db
+            # --- Service discovery ---
+            - name: DB_HOST
+              value: {{ include "wosa.timescaledb.name" . | quote }}
+            - name: DB_PORT
+              value: {{ .Values.backend.env.dbPort | quote }}
+            # sql_retriever uses PGHOST/PGPORT (defaults to localhost:5435)
+            - name: PGHOST
+              value: {{ include "wosa.timescaledb.name" . | quote }}
+            - name: PGPORT
+              value: {{ .Values.backend.env.dbPort | quote }}
+            # health.py builds its own asyncpg URL ignoring DB_HOST/DB_PORT (falls back to
+            # localhost:5435). Set DATABASE_URL explicitly so the health check connects correctly.
+            - name: DATABASE_URL
+              value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@{{ include "wosa.timescaledb.name" . }}:{{ .Values.backend.env.dbPort }}/$(POSTGRES_DB)"
+            - name: REDIS_HOST
+              value: {{ include "wosa.redis.name" . | quote }}
+            - name: REDIS_PORT
+              value: {{ .Values.backend.env.redisPort | quote }}
+            - name: REDIS_DB
+              value: {{ .Values.backend.env.redisDb | quote }}
+            - name: REDIS_PASSWORD
+              value: ""
+            - name: MILVUS_HOST
+              value: {{ include "wosa.milvus.name" . | quote }}
+            - name: MILVUS_PORT
+              value: {{ .Values.backend.env.milvusPort | quote }}
+            - name: MILVUS_USER
+              value: {{ .Values.backend.env.milvusUser | quote }}
+            - name: MILVUS_PASSWORD
+              value: {{ .Values.backend.env.milvusPassword | quote }}
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: {{ printf "%s:%v" (include "wosa.kafka.name" .) .Values.kafka.port | quote }}
+            - name: FORECAST_OUTPUT_DIR
+              value: "/app/output"
+            # --- Non-secret config ---
+            - name: ENVIRONMENT
+              value: {{ .Values.backend.env.environment | quote }}
+            - name: LLM_NIM_URL
+              {{- if .Values.nimOperator.llm.enabled }}
+              value: "http://{{ .Values.nimOperator.llm.service.name }}.{{ include "wosa.namespace" . }}.svc.cluster.local:{{ .Values.nimOperator.llm.expose.service.port }}/v1"
+              {{- else }}
+              value: {{ .Values.backend.env.llmNimUrl | quote }}
+              {{- end }}
+            - name: LLM_MODEL
+              {{- if .Values.nimOperator.llm.enabled }}
+              value: {{ trimPrefix "nvcr.io/nim/" .Values.nimOperator.llm.image.repository | quote }}
+              {{- else }}
+              value: {{ .Values.backend.env.llmModel | quote }}
+              {{- end }}
+            - name: LLM_TEMPERATURE
+              value: {{ .Values.backend.env.llmTemperature | quote }}
+            - name: LLM_MAX_TOKENS
+              value: {{ .Values.backend.env.llmMaxTokens | quote }}
+            - name: LLM_TOP_P
+              value: {{ .Values.backend.env.llmTopP | quote }}
+            - name: LLM_FREQUENCY_PENALTY
+              value: {{ .Values.backend.env.llmFrequencyPenalty | quote }}
+            - name: LLM_PRESENCE_PENALTY
+              value: {{ .Values.backend.env.llmPresencePenalty | quote }}
+            - name: LLM_CLIENT_TIMEOUT
+              value: {{ .Values.backend.env.llmClientTimeout | quote }}
+            - name: LLM_CACHE_ENABLED
+              value: {{ .Values.backend.env.llmCacheEnabled | quote }}
+            - name: LLM_CACHE_TTL_SECONDS
+              value: {{ .Values.backend.env.llmCacheTtlSeconds | quote }}
+            - name: EMBEDDING_NIM_URL
+              {{- if .Values.nimOperator.embedding.enabled }}
+              value: "http://{{ .Values.nimOperator.embedding.service.name }}.{{ include "wosa.namespace" . }}.svc.cluster.local:{{ .Values.nimOperator.embedding.expose.service.port }}/v1"
+              {{- else }}
+              value: {{ .Values.backend.env.embeddingNimUrl | quote }}
+              {{- end }}
+            - name: RAIL_API_URL
+              {{- if .Values.nimOperator.llm.enabled }}
+              value: "http://{{ .Values.nimOperator.llm.service.name }}.{{ include "wosa.namespace" . }}.svc.cluster.local:{{ .Values.nimOperator.llm.expose.service.port }}/v1"
+              {{- else }}
+              value: {{ .Values.backend.env.railApiUrl | quote }}
+              {{- end }}
+            - name: CORS_ORIGINS
+              {{- if .Values.backend.env.corsOrigins }}
+              value: {{ .Values.backend.env.corsOrigins | quote }}
+              {{- else if and .Values.openshift.enabled .Values.openshift.route.enabled .Values.openshift.route.host }}
+              value: "https://{{ .Values.openshift.route.host }}"
+              {{- else }}
+              value: ""
+              {{- end }}
+            - name: MAX_REQUEST_SIZE
+              value: {{ .Values.backend.env.maxRequestSize | quote }}
+            - name: MAX_UPLOAD_SIZE
+              value: {{ .Values.backend.env.maxUploadSize | quote }}
+            - name: MAX_PDF_PAGES_TO_PROCESS
+              value: {{ .Values.backend.env.maxPdfPagesToProcess | quote }}
+            - name: MAX_PDF_PAGES_TO_EXTRACT
+              value: {{ .Values.backend.env.maxPdfPagesToExtract | quote }}
+            - name: MILVUS_COLLECTION_NAME
+              value: {{ .Values.backend.env.milvusCollectionName | quote }}
+            - name: DEFAULT_ADMIN_PASSWORD
+              value: {{ .Values.backend.env.defaultAdminPassword | quote }}
+            # --- NeMo document processing endpoints ---
+            - name: NEMO_RETRIEVER_URL
+              value: {{ .Values.backend.env.nemoRetrieverUrl | quote }}
+            - name: NEMO_OCR_URL
+              value: {{ .Values.backend.env.nemoOcrUrl | quote }}
+            - name: NEMO_PARSE_URL
+              value: {{ .Values.backend.env.nemoParseUrl | quote }}
+            - name: LLAMA_NANO_VL_URL
+              value: {{ .Values.backend.env.llamaNanoVlUrl | quote }}
+            # --- Guardrails config ---
+            - name: GUARDRAILS_TIMEOUT
+              value: {{ .Values.backend.env.guardrailsTimeout | quote }}
+            - name: GUARDRAILS_USE_API
+              value: {{ .Values.backend.env.guardrailsUseApi | quote }}
+            - name: USE_NEMO_GUARDRAILS_SDK
+              value: {{ .Values.backend.env.useNemoGuardrailsSdk | quote }}
+            - name: GUARDRAILS_MODEL
+              value: {{ .Values.backend.env.guardrailsModel | quote }}
+            # --- Embedding & LLM Judge ---
+            - name: EMBEDDING_MODEL
+              value: {{ .Values.backend.env.embeddingModel | quote }}
+            - name: LLAMA_70B_TIMEOUT
+              value: {{ .Values.backend.env.llama70bTimeout | quote }}
+            # --- Agent/graph timeouts (override for self-hosted NIM) ---
+            {{- with .Values.backend.env.agentTimeoutSimple }}
+            - name: AGENT_TIMEOUT_SIMPLE
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.backend.env.agentTimeoutComplex }}
+            - name: AGENT_TIMEOUT_COMPLEX
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.backend.env.agentTimeoutReasoning }}
+            - name: AGENT_TIMEOUT_REASONING
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.backend.env.graphTimeoutSimple }}
+            - name: GRAPH_TIMEOUT_SIMPLE
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.backend.env.graphTimeoutComplex }}
+            - name: GRAPH_TIMEOUT_COMPLEX
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.backend.env.chatTimeoutSimple }}
+            - name: CHAT_TIMEOUT_SIMPLE
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.backend.env.chatTimeoutComplex }}
+            - name: CHAT_TIMEOUT_COMPLEX
+              value: {{ . | quote }}
+            {{- end }}
+            # --- Secrets ---
+            - name: NVIDIA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: nvidia-api-key
+            - name: EMBEDDING_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: embedding-api-key
+            - name: RAIL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: rail-api-key
+            - name: NEMO_RETRIEVER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: nemo-retriever-api-key
+            - name: NEMO_OCR_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: nemo-ocr-api-key
+            - name: NEMO_PARSE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: nemo-parse-api-key
+            - name: LLAMA_NANO_VL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: llama-nano-vl-api-key
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wosa.secret.name" . }}
+                  key: jwt-secret-key
+      volumes:
+        # restricted-v2: image dirs are root-owned, random UID cannot write
+        - name: uploads
+          emptyDir: {}
+        - name: forecast-output
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "wosa.backend.name" . }}
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  selector:
+    {{- include "wosa.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+  ports:
+    - name: http
+      port: {{ .Values.backend.port }}
+      targetPort: http
+      protocol: TCP

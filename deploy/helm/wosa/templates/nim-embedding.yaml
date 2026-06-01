@@ -1,0 +1,66 @@
+{{- $nim := .Values.nimOperator.embedding -}}
+{{- if and (.Capabilities.APIVersions.Has "apps.nvidia.com/v1alpha1") (eq $nim.enabled true) }}
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: {{ $nim.service.name }}-cache
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  source:
+    ngc:
+      modelPuller: "{{ $nim.image.repository }}:{{ $nim.image.tag }}"
+      pullSecret: {{ .Values.openshift.ngcSecret.name }}
+      authSecret: {{ .Values.openshift.ngcSecret.apiName }}
+  storage:
+    pvc:
+      create: {{ $nim.storage.pvc.create | default true }}
+      {{- if $nim.storage.pvc.storageClass }}
+      storageClass: {{ $nim.storage.pvc.storageClass }}
+      {{- end }}
+      size: {{ $nim.storage.pvc.size | default "50Gi" }}
+      volumeAccessMode: {{ $nim.storage.pvc.volumeAccessMode | default "ReadWriteOnce" }}
+  {{- with $nim.tolerations }}
+  tolerations:
+{{ toYaml . | nindent 4 }}
+  {{- end }}
+---
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: {{ $nim.service.name }}
+spec:
+  image:
+    repository: {{ $nim.image.repository }}
+    tag: "{{ $nim.image.tag }}"
+    pullPolicy: {{ $nim.image.pullPolicy | default "Always" }}
+    pullSecrets:
+      - {{ .Values.openshift.ngcSecret.name }}
+  authSecret: {{ .Values.openshift.ngcSecret.apiName }}
+  storage:
+    nimCache:
+      name: {{ $nim.service.name }}-cache
+  replicas: {{ $nim.replicas | default 1 }}
+  resources:
+{{ toYaml $nim.resources | nindent 4 }}
+  expose:
+{{ toYaml $nim.expose | nindent 4 }}
+  env:
+{{ toYaml $nim.env | nindent 4 }}
+  {{- with $nim.startupProbe }}
+  {{- if .enabled }}
+  startupProbe:
+    enabled: true
+    probe:
+{{ toYaml .probe | nindent 6 }}
+  {{- end }}
+  {{- end }}
+  {{- with $nim.tolerations }}
+  tolerations:
+{{ toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $nim.nodeSelector }}
+  nodeSelector:
+{{ toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,73 @@
+{{- if and .Values.monitoring.enabled .Values.monitoring.alertmanager.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: {{ include "wosa.fullname" . }}
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: monitoring
+spec:
+  route:
+    groupBy:
+      - alertname
+    groupWait: {{ .Values.monitoring.alertmanager.groupWait }}
+    groupInterval: {{ .Values.monitoring.alertmanager.groupInterval }}
+    repeatInterval: {{ .Values.monitoring.alertmanager.repeatInterval }}
+    receiver: web-hook
+    routes:
+      - matchers:
+          - name: severity
+            value: critical
+        receiver: critical-alerts
+      - matchers:
+          - name: severity
+            value: warning
+        receiver: warning-alerts
+  receivers:
+    - name: web-hook
+      webhookConfigs:
+        - url: {{ .Values.monitoring.alertmanager.receivers.default.webhookUrl | quote }}
+    - name: critical-alerts
+      emailConfigs:
+        - to: {{ .Values.monitoring.alertmanager.receivers.critical.email | quote }}
+          from: {{ .Values.monitoring.alertmanager.smtp.from | quote }}
+          smarthost: {{ .Values.monitoring.alertmanager.smtp.smarthost | quote }}
+          headers:
+            - key: Subject
+              value: {{ .Values.monitoring.alertmanager.receivers.critical.subject | quote }}
+          text: |
+            {{ "{{ range .Alerts }}" }}
+            Alert: {{ "{{ .Annotations.summary }}" }}
+            Description: {{ "{{ .Annotations.description }}" }}
+            {{ "{{ end }}" }}
+      webhookConfigs:
+        - url: {{ .Values.monitoring.alertmanager.receivers.critical.webhookUrl | quote }}
+    - name: warning-alerts
+      emailConfigs:
+        - to: {{ .Values.monitoring.alertmanager.receivers.warning.email | quote }}
+          from: {{ .Values.monitoring.alertmanager.smtp.from | quote }}
+          smarthost: {{ .Values.monitoring.alertmanager.smtp.smarthost | quote }}
+          headers:
+            - key: Subject
+              value: {{ .Values.monitoring.alertmanager.receivers.warning.subject | quote }}
+          text: |
+            {{ "{{ range .Alerts }}" }}
+            Alert: {{ "{{ .Annotations.summary }}" }}
+            Description: {{ "{{ .Annotations.description }}" }}
+            {{ "{{ end }}" }}
+      webhookConfigs:
+        - url: {{ .Values.monitoring.alertmanager.receivers.warning.webhookUrl | quote }}
+  inhibitRules:
+    - sourceMatch:
+        - name: severity
+          value: critical
+      targetMatch:
+        - name: severity
+          value: warning
+      equal:
+        - alertname
+        - dev
+        - instance
+{{- end }}

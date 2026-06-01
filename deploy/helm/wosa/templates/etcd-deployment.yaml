@@ -1,0 +1,116 @@
+{{- if .Values.etcd.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "wosa.etcd.name" . }}
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: etcd
+spec:
+  replicas: {{ .Values.etcd.replicas }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "wosa.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: etcd
+  template:
+    metadata:
+      labels:
+        {{- include "wosa.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: etcd
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "wosa.serviceAccountName" . }}
+      {{- include "wosa.imagePullSecrets" . | nindent 6 }}
+      {{- include "wosa.podSecurityContext" . | nindent 6 }}
+      containers:
+        - name: etcd
+          image: "{{ .Values.etcd.image.repository }}:{{ .Values.etcd.image.tag }}"
+          imagePullPolicy: {{ .Values.etcd.image.pullPolicy }}
+          ports:
+            - name: client
+              containerPort: {{ .Values.etcd.port }}
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.etcd.resources | nindent 12 }}
+          {{- include "wosa.containerSecurityContext" . | nindent 10 }}
+          livenessProbe:
+            exec:
+              command: ["etcdctl", "endpoint", "health"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command: ["etcdctl", "endpoint", "health"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+          env:
+            - name: ETCD_DATA_DIR
+              value: /var/etcd/data
+            - name: ETCD_AUTO_COMPACTION_MODE
+              value: revision
+            - name: ETCD_AUTO_COMPACTION_RETENTION
+              value: "1000"
+            - name: ETCD_QUOTA_BACKEND_BYTES
+              value: "4294967296"
+            - name: ETCD_SNAPSHOT_COUNT
+              value: "50000"
+            - name: ETCD_HEARTBEAT_INTERVAL
+              value: "500"
+            - name: ETCD_ELECTION_TIMEOUT
+              value: "2500"
+            - name: ETCD_LISTEN_CLIENT_URLS
+              value: {{ printf "http://0.0.0.0:%v" .Values.etcd.port | quote }}
+            - name: ETCD_ADVERTISE_CLIENT_URLS
+              value: {{ printf "http://%s:%v" (include "wosa.etcd.name" .) .Values.etcd.port | quote }}
+          {{- if .Values.etcd.persistence.enabled }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/etcd/data
+          {{- end }}
+      {{- if .Values.etcd.persistence.enabled }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "wosa.etcd.name" . }}-data
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "wosa.etcd.name" . }}
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: etcd
+spec:
+  selector:
+    {{- include "wosa.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: etcd
+  ports:
+    - name: client
+      port: {{ .Values.etcd.port }}
+      targetPort: client
+      protocol: TCP
+{{- end }}

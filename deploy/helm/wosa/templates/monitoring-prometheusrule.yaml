@@ -1,0 +1,153 @@
+{{- if and .Values.monitoring.enabled .Values.monitoring.prometheusRules.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "wosa.fullname" . }}-alerts
+  namespace: {{ include "wosa.namespace" . }}
+  labels:
+    {{- include "wosa.labels" . | nindent 4 }}
+    app.kubernetes.io/component: monitoring
+spec:
+  groups:
+    - name: warehouse-operational-assistant
+      rules:
+        # API Health Checks
+        - alert: APIDown
+          expr: up{namespace="{{ include "wosa.namespace" . }}",job="warehouse-api"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Warehouse API is down"
+            description: "Warehouse Operational Assistant API has been down for more than 1 minute."
+
+        - alert: APIHighErrorRate
+          expr: rate(http_requests_total{namespace="{{ include "wosa.namespace" . }}",job="warehouse-api",status=~"5.."}[5m]) > 0.1
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High API error rate"
+            description: "API error rate is {{ "{{ $value }}" }} errors per second."
+
+        - alert: APIHighLatency
+          expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{namespace="{{ include "wosa.namespace" . }}",job="warehouse-api"}[5m])) > 2
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High API latency"
+            description: "95th percentile latency is {{ "{{ $value }}" }} seconds."
+
+        # Database Health Checks
+        - alert: DatabaseDown
+          expr: up{namespace="{{ include "wosa.namespace" . }}",job="postgres"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "PostgreSQL database is down"
+            description: "PostgreSQL database has been down for more than 1 minute."
+
+        - alert: DatabaseHighConnections
+          expr: pg_stat_database_numbackends{namespace="{{ include "wosa.namespace" . }}"} / pg_settings_max_connections{namespace="{{ include "wosa.namespace" . }}"} > 0.8
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High database connection usage"
+            description: "Database connection usage is {{ "{{ $value | humanizePercentage }}" }}."
+
+        # Redis Health Checks
+        - alert: RedisDown
+          expr: up{namespace="{{ include "wosa.namespace" . }}",job="redis"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Redis is down"
+            description: "Redis cache has been down for more than 1 minute."
+
+        - alert: RedisHighMemoryUsage
+          expr: redis_memory_used_bytes{namespace="{{ include "wosa.namespace" . }}"} / redis_memory_max_bytes{namespace="{{ include "wosa.namespace" . }}"} > 0.9
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High Redis memory usage"
+            description: "Redis memory usage is {{ "{{ $value | humanizePercentage }}" }}."
+
+        # Milvus Health Checks
+        - alert: MilvusDown
+          expr: up{namespace="{{ include "wosa.namespace" . }}",job="milvus"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Milvus vector database is down"
+            description: "Milvus vector database has been down for more than 1 minute."
+
+        # System Resource Alerts (pod-level - scoped to WOSA namespace)
+        # Replaces node_cpu/node_memory/node_filesystem from the original
+        # docker-compose monitoring. On OpenShift, node-level alerts are
+        # handled by platform monitoring. These use process_* metrics
+        # exposed by prometheus_client and the exporter sidecars.
+        - alert: HighCPUUsage
+          expr: rate(process_cpu_seconds_total{namespace="{{ include "wosa.namespace" . }}"}[5m]) > 0.8
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High CPU usage"
+            description: "Process CPU usage is {{ "{{ $value }}" }} cores in {{ "{{ $labels.job }}" }}."
+
+        - alert: HighMemoryUsage
+          expr: process_resident_memory_bytes{namespace="{{ include "wosa.namespace" . }}"} / 1024 / 1024 / 1024 > {{ .Values.monitoring.alerts.highMemoryThresholdGiB | default 3.2 }}
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High memory usage"
+            description: "Process memory is {{ "{{ $value }}" }} GiB in {{ "{{ $labels.job }}" }}."
+
+        # DiskSpaceLow - uses pg_database_size_bytes from postgres-exporter.
+        # kubelet_volume_stats is platform-only (not available in user workload monitoring).
+        # This fires when the database exceeds 8 GiB (80% of the default 10Gi PVC).
+        - alert: DiskSpaceLow
+          expr: pg_database_size_bytes{namespace="{{ include "wosa.namespace" . }}"} > 8589934592
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Database disk usage high"
+            description: "Database {{ "{{ $labels.datname }}" }} size is {{ "{{ $value | humanize1024 }}" }}B, approaching PVC capacity."
+
+        # Business Logic Alerts
+        - alert: HighInventoryAlerts
+          expr: increase(warehouse_inventory_alerts_total{namespace="{{ include "wosa.namespace" . }}"}[1h]) > 10
+          for: 0m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High number of inventory alerts"
+            description: "{{ "{{ $value }}" }} inventory alerts in the last hour."
+
+        - alert: SafetyIncidentDetected
+          expr: increase(warehouse_safety_incidents_total{namespace="{{ include "wosa.namespace" . }}"}[1h]) > 0
+          for: 0m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Safety incident detected"
+            description: "{{ "{{ $value }}" }} safety incidents in the last hour."
+
+        - alert: LowTaskCompletionRate
+          expr: rate(warehouse_tasks_completed_total{namespace="{{ include "wosa.namespace" . }}"}[1h]) / rate(warehouse_tasks_created_total{namespace="{{ include "wosa.namespace" . }}"}[1h]) < 0.8
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Low task completion rate"
+            description: "Task completion rate is {{ "{{ $value | humanizePercentage }}" }}."
+{{- end }}

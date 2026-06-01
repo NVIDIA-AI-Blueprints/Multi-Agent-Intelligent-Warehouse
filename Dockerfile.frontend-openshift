@@ -1,0 +1,43 @@
+# Frontend Dockerfile for OpenShift
+# Builds React app and serves with nginx-unprivileged.
+#
+# OpenShift fixes vs root Dockerfile.frontend:
+#   1. Production build (npm run build) instead of dev server (npm start)
+#   2. nginx-unprivileged on port 8080 (OpenShift restricted-v2 compatible)
+#   3. npm install instead of npm ci (unresolvable peer dep conflicts)
+
+# =============================================================================
+# Build Stage
+# =============================================================================
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+COPY src/ui/web/package*.json ./
+
+# npm install instead of npm ci - react-scripts has unresolvable peer dep
+# conflicts (ajv@6 vs ajv@8, picomatch@2 vs picomatch@4) that make npm ci
+# fail regardless of lock file state. See docs/deployment/openshift-deployment.md for details.
+RUN npm install
+
+COPY src/ui/web/ ./
+
+ARG VERSION=0.0.0
+ARG GIT_SHA=unknown
+ARG BUILD_TIME=unknown
+
+ENV REACT_APP_VERSION=$VERSION
+ENV REACT_APP_GIT_SHA=$GIT_SHA
+ENV REACT_APP_BUILD_TIME=$BUILD_TIME
+
+RUN npm run build
+
+# =============================================================================
+# Production Stage - nginx-unprivileged (OpenShift compatible)
+# =============================================================================
+FROM nginxinc/nginx-unprivileged:1.25-alpine
+
+COPY --from=builder /app/build /usr/share/nginx/html
+
+# nginx-unprivileged listens on 8080 by default - no config change needed
+EXPOSE 8080
