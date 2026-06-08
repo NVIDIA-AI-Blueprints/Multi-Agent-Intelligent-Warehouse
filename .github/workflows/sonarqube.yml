@@ -1,16 +1,10 @@
 name: SonarQube Analysis
 
 on:
-  push:
-    branches: [ main, develop, add-sonarqube-integration ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:
   sonarqube:
-    # Reusable workflow lives in NVIDIA org; skip on personal mirrors.
-    if: github.repository == 'NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse'
     uses: NVIDIA-AI-Blueprints/sonarqube-workflows/.github/workflows/sonarqube-reusable-template.yml@main
     with:
       # Language and test configuration
