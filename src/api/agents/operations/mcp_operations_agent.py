@@ -296,6 +296,43 @@ class MCPOperationsCoordinationAgent:
     ) -> MCPOperationsQuery:
         """Parse operations query and extract intent and entities."""
         try:
+            query_lower = query.lower()
+
+            # Fast path: keyword parsing for common operational commands (skip slow LLM)
+            wave_keywords = ["wave", "orders", "order"]
+            dispatch_keywords = ["dispatch", "forklift", "equipment", "assign equipment"]
+            if any(keyword in query_lower for keyword in wave_keywords) or any(
+                keyword in query_lower for keyword in dispatch_keywords
+            ):
+                entities: Dict[str, Any] = {}
+                context_data = dict(context or {})
+
+                import re
+
+                order_match = re.search(r"orders?\s+(\d+(?:-\d+)?)", query_lower)
+                if order_match:
+                    entities["order_range"] = order_match.group(1)
+                zone_match = re.search(r"zone\s+([a-z0-9]+)", query_lower)
+                if zone_match:
+                    entities["zone"] = zone_match.group(1).upper()
+
+                intent = "wave_creation"
+                if any(keyword in query_lower for keyword in dispatch_keywords):
+                    entities["dispatch_requested"] = True
+                    if "forklift" in query_lower:
+                        entities["equipment_type"] = "forklift"
+
+                logger.info(
+                    "Using fast keyword-based parsing for operations query: %s",
+                    query[:80],
+                )
+                return MCPOperationsQuery(
+                    intent=intent,
+                    entities=entities,
+                    context=context_data,
+                    user_query=query,
+                )
+
             # Use LLM to parse the query
             parse_prompt = [
                 {
@@ -324,7 +361,7 @@ Return only valid JSON.""",
                 },
             ]
 
-            response = await self.nim_client.generate_response(parse_prompt)
+            response = await self.nim_client.generate_response(parse_prompt, temperature=0.0, max_tokens=256)
 
             # Parse JSON response
             try:

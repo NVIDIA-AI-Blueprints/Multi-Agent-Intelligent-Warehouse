@@ -303,11 +303,14 @@ Deploy NIMs on your own infrastructure for data privacy, cost control, and custo
 1. **Deploy NIMs on your infrastructure** (using NVIDIA NGC containers):
    ```bash
    # Example: Deploy LLM NIM on port 8000
+   # NGC_API_KEY is required for manifest download (get from org.ngc.nvidia.com/setup/api-keys)
    docker run --gpus all -p 8000:8000 \
+     -e NGC_API_KEY=$NGC_API_KEY \
      nvcr.io/nim/nvidia/llama-3.3-nemotron-super-49b-v1.5:latest
    
    # Example: Deploy Embedding NIM on port 8001
    docker run --gpus all -p 8001:8001 \
+     -e NGC_API_KEY=$NGC_API_KEY \
      nvcr.io/nvidia/nim/llama-nemotron-embed-vl-1b-v2:latest
    ```
 
@@ -330,7 +333,10 @@ Deploy NIMs on your own infrastructure for data privacy, cost control, and custo
    # Self-hosted NeMo Guardrails
    RAIL_API_URL=https://your-nim-host:8007/v1  # Use https:// for production
    
-   # API Key (if your self-hosted NIMs require authentication)
+   # NGC API Key (required for self-hosted NIM manifest download)
+   NGC_API_KEY=your-ngc-api-key-here
+
+   # API Key for inference requests to self-hosted NIMs (if authentication is enabled)
    NVIDIA_API_KEY=your-api-key-here
    ```
 
