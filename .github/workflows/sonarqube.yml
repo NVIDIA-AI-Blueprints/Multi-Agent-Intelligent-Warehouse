@@ -1,44 +1,19 @@
 name: SonarQube Analysis
 
+# Upstream uses NVIDIA-AI-Blueprints/sonarqube-workflows (not callable from T-DevH).
+# SonarCloud "Code Analysis" on pushes is the SonarCloud GitHub App, not this workflow.
+# To stop failed SonarCloud checks: GitHub repo Settings → Integrations → SonarCloud
+# → Configure → remove this repository (or create the project on sonarcloud.io).
+
 on:
   workflow_dispatch:
 
 jobs:
-  sonarqube:
-    uses: NVIDIA-AI-Blueprints/sonarqube-workflows/.github/workflows/sonarqube-reusable-template.yml@main
-    with:
-      # Language and test configuration
-      language: python
-      languageVersion: '3.11'
-      
-      # Override test execution to generate Python coverage (unit tests only)
-      # Running only unit tests since integration/perf/quality tests are currently failing
-      # Excluding problematic test files that cause collection errors
-      # If tests error out, coverage.xml never gets created → Sonar sees 0%
-      testCommand: |
-        set -euxo pipefail
-        uv run pytest tests/unit \
-          --ignore=tests/unit/test_chunking_demo.py \
-          --ignore=tests/unit/test_db_connection.py \
-          --ignore=tests/unit/test_document_pipeline.py \
-          --ignore=tests/unit/test_enhanced_retrieval.py \
-          --ignore=tests/unit/test_evidence_scoring_demo.py \
-          --ignore=tests/unit/test_mcp_planner_integration.py \
-          --ignore=tests/unit/test_mcp_system.py \
-          --ignore=tests/unit/test_migration_system.py \
-          --cov=src \
-          --cov-report=xml:coverage.xml \
-          --cov-report=term-missing
-        test -f coverage.xml
-        echo "coverage.xml created ✅"
-
-      # Project creation parameters
-      organization: TEGRASW
-      team: Blueprints-SRE
-      product: warehouse-operational-assistant
-      scmRepoName: Multi-Agent-Intelligent-Warehouse
-
-      # Optional parameters
-      projectTags: ai-blueprint,warehouse,multi-agent
-
-    secrets: inherit
+  sonarqube-fork-notice:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SonarQube not configured on this mirror
+        run: |
+          echo "SonarQube reusable workflows are only wired on NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse."
+          echo "This T-DevH mirror does not call sonarqube-workflows to avoid workflow startup failures."
+          echo "For quality scans here, either disconnect the SonarCloud GitHub App or onboard the repo at https://sonarcloud.io"
