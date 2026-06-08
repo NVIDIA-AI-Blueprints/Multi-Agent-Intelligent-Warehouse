@@ -2,7 +2,9 @@
 
 ## Quick Answer
 
-**Best Practice:** Create the virtual environment **BEFORE** starting Jupyter.
+**Best Practice:** Create the virtual environment **BEFORE** starting Jupyter, at the **project root** (`warehouse-operational-assistant/env/`), using **Python 3.11+** (see `pyproject.toml`).
+
+> **Avoid** a separate venv under `notebooks/setup/env/` — that path is easy to create accidentally when the notebook cwd is `notebooks/setup/`, and it may pin an older Python (e.g. 3.9). Use the project-root `env/` instead.
 
 ## Why?
 
@@ -25,8 +27,8 @@ source env/bin/activate  # Linux/Mac
 # or
 env\Scripts\activate  # Windows
 
-# 3. Install Jupyter and ipykernel
-pip install jupyter ipykernel
+# 3. Install Jupyter and ipykernel (or use requirements-notebook.txt)
+pip install -r notebooks/setup/requirements-notebook.txt
 
 # 4. Register the venv as a Jupyter kernel
 python -m ipykernel install --user --name=warehouse-assistant

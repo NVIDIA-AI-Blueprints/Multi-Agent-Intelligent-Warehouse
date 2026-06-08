@@ -20,7 +20,7 @@ import logging
 import asyncio
 import re
 import time
-from src.api.graphs.mcp_integrated_planner_graph import get_mcp_planner_graph
+from src.api.graphs.mcp_integrated_planner_graph import get_mcp_planner_graph, _detect_complex_query
 from src.api.services.guardrails.guardrails_service import guardrails_service
 from src.api.services.evidence.evidence_integration import (
     get_evidence_integration_service,
@@ -704,10 +704,7 @@ async def chat(req: ChatRequest):
         # Increase timeout when reasoning is enabled (reasoning takes longer)
         # Detect complex queries that need even more time
         query_lower = req.message.lower()
-        is_complex_query = any(keyword in query_lower for keyword in [
-            "analyze", "relationship", "between", "compare", "evaluate", 
-            "optimize", "calculate", "correlation", "impact", "effect"
-        ]) or len(req.message.split()) > 15
+        is_complex_query = _detect_complex_query(req.message)
         
         if req.enable_reasoning:
             # Very complex queries with reasoning need up to 4 minutes
@@ -716,10 +713,8 @@ async def chat(req: ChatRequest):
             # For non-complex reasoning queries, set to 115s (slightly less than frontend 120s)
             MAIN_QUERY_TIMEOUT = 230 if is_complex_query else 115  # 230s for complex, 115s for regular reasoning
         else:
-            # Regular queries: Increased timeouts to prevent premature timeouts
-            # Simple queries: 60s (was 30s) - allows time for LLM processing
-            # Complex queries: 90s (was 60s) - allows time for complex analysis
-            MAIN_QUERY_TIMEOUT = 90 if is_complex_query else 60
+            # Regular queries: allow multi-step agent flows (parse + tools + response)
+            MAIN_QUERY_TIMEOUT = 130 if is_complex_query else 100
         
         # Initialize result to None to avoid UnboundLocalError
         result = None

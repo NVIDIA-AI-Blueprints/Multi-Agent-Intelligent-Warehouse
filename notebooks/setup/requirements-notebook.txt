@@ -1,0 +1,6 @@
+# Minimal dependencies to run the setup notebook (use with Python 3.11+).
+# Recommended: create the project venv first (see VENV_BEST_PRACTICES.md), then:
+#   pip install -r requirements-notebook.txt
+jupyter>=1.0.0
+ipykernel>=6.0.0
+nbconvert>=7.0.0

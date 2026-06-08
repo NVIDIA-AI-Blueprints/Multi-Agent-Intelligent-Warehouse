@@ -44,8 +44,6 @@ class EmbeddingService:
     ):
         self.model_name = model_name or os.getenv("EMBEDDING_MODEL", "nvidia/llama-nemotron-embed-vl-1b-v2")
         self.dimension = dimension if dimension is not None else int(os.getenv("EMBEDDING_DIMENSION", "2048"))
-        self.model_name = model_name
-        self.dimension = dimension
         self._initialized = False
         self.nim_client = None
     

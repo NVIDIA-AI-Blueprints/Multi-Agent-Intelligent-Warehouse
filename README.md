@@ -196,9 +196,12 @@ The interactive notebook provides:
 - ✅ Comprehensive error handling and troubleshooting
 
 **To use the notebook:**
-1. Open `notebooks/setup/complete_setup_guide.ipynb` in Jupyter Lab/Notebook
-2. Follow the interactive cells step by step
-3. The notebook will guide you through the entire setup process
+1. Install Jupyter deps: `pip install -r notebooks/setup/requirements-notebook.txt` (Python 3.11+; see [VENV_BEST_PRACTICES.md](notebooks/setup/VENV_BEST_PRACTICES.md))
+2. Open `notebooks/setup/complete_setup_guide.ipynb` in Jupyter Lab/Notebook
+3. Follow the interactive cells step by step
+4. The notebook will guide you through the entire setup process
+
+For validation and testing strategies, see [TESTING_GUIDE.md](notebooks/setup/TESTING_GUIDE.md).
 
 **Option 2: Command-Line Setup (For Experienced Users)**
 
