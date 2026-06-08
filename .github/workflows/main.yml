@@ -37,6 +37,8 @@ concurrency:
 jobs:
   # Full Stack Deployment - Following DEPLOYMENT.md 13-Step Procedure
   deploy-and-test:
+    # GPU ARC runners exist only in NVIDIA-AI-Blueprints; avoid infinite queue on forks.
+    if: github.repository == 'NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse'
     #runs-on: ubuntu-latest
     runs-on: arc-runners-org-nvidia-ai-bp-4-gpu
 
