@@ -22,7 +22,9 @@ def test_notebook_structure() -> None:
 
     assert notebook["cells"], "Notebook should have cells"
 
-    markdown_cells = [cell for cell in notebook["cells"] if cell["cell_type"] == "markdown"]
+    markdown_cells = [
+        cell for cell in notebook["cells"] if cell["cell_type"] == "markdown"
+    ]
     code_cells = [cell for cell in notebook["cells"] if cell["cell_type"] == "code"]
     assert markdown_cells, "Notebook should have markdown cells"
     assert code_cells, "Notebook should have code cells"
