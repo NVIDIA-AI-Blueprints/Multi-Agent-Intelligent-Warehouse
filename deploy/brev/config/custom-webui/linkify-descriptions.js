@@ -6,6 +6,7 @@ export default function startLinkifyDescriptions() {
   window.__maiwLinkifyDescriptionsStarted = true;
 
   var urlPattern = /https:\/\/[^\s<>"')]+/g;
+  var trailingPunctuationPattern = /[.,;:!?]+$/;
 
   function linkifyElement(element) {
     if (!element || element.dataset.maiwLinkified === "true") {
@@ -22,7 +23,12 @@ export default function startLinkifyDescriptions() {
     var cursor = 0;
 
     matches.forEach(function (match) {
-      var url = match[0];
+      var rawUrl = match[0];
+      var trailingPunctuationMatch = rawUrl.match(trailingPunctuationPattern);
+      var trailingPunctuation = trailingPunctuationMatch ? trailingPunctuationMatch[0] : "";
+      var url = trailingPunctuation
+        ? rawUrl.slice(0, rawUrl.length - trailingPunctuation.length)
+        : rawUrl;
       var index = match.index || 0;
 
       if (index > cursor) {
@@ -36,7 +42,11 @@ export default function startLinkifyDescriptions() {
       link.textContent = url;
       fragment.appendChild(link);
 
-      cursor = index + url.length;
+      if (trailingPunctuation) {
+        fragment.appendChild(document.createTextNode(trailingPunctuation));
+      }
+
+      cursor = index + rawUrl.length;
     });
 
     if (cursor < text.length) {
