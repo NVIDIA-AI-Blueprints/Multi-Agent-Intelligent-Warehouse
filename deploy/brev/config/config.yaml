@@ -1,0 +1,170 @@
+logLevel: INFO
+listenAddressSingleHTTPFrontend: 0.0.0.0:1337
+pageTitle: NVIDIA Blueprints
+showFooter: false
+enableCustomJs: true
+themeName: nvidia-dark
+themeCacheDisabled: true
+
+actions:
+    - title: blueprint status
+      id: blueprint status
+      icon: key
+      hidden: true
+      shell: /scripts/status.sh
+      timeout: 5
+      popupOnStart: background
+      execOnStartup: true
+      execOnCron:
+          - "*/1 * * * *"
+
+    - title: container status
+      id: container status
+      icon: box
+      hidden: true
+      shell: /scripts/container-status.sh
+      timeout: 10
+      popupOnStart: background
+      execOnStartup: true
+      execOnCron:
+          - "*/1 * * * *"
+
+    - title: Configure Blueprint
+      id: configure-blueprint
+      icon: ⚙️
+      exec:
+          - /scripts/configure-blueprint.sh
+      timeout: 60
+      popupOnStart: execution-dialog
+      triggers:
+          - blueprint status
+          - container status
+      arguments:
+          - name: nvidia_api_key
+            title: NVIDIA API key
+            type: password
+            description: "[nvapi-...] Used for nvcr.io Docker login and all NVIDIA service keys."
+
+    - title: Start Blueprint
+      id: Start Blueprint
+      icon: ▶️
+      shell: /scripts/deploy-blueprint.sh
+      timeout: 3600
+      popupOnStart: execution-dialog
+      arguments:
+          - type: confirmation
+            title: Confirm start blueprint
+      triggers:
+          - container status
+
+    - title: Stop Blueprint
+      id: Stop Blueprint
+      icon: ⏹️
+      shell: /scripts/stop-blueprint.sh
+      timeout: 300
+      popupOnStart: execution-dialog
+      arguments:
+          - type: confirmation
+            title: Confirm stop blueprint
+      triggers:
+          - container status
+
+    - title: Restart Blueprint
+      id: Restart Blueprint
+      icon: 🔄
+      shell: /scripts/restart-blueprint.sh
+      timeout: 600
+      popupOnStart: execution-dialog
+      arguments:
+          - type: confirmation
+            title: Confirm restart blueprint
+      triggers:
+          - container status
+
+    - title: Install Demo Data
+      id: Install Demo Data
+      icon: 📀
+      shell: /scripts/stage-demo-data.sh
+      timeout: 5400
+      popupOnStart: execution-dialog
+      arguments:
+          - type: confirmation
+            title: Confirm destructive demo data install
+            description: "This will destroy all existing application data before reinstalling demo data. NIM model/cache directories are preserved."
+      triggers:
+          - container status
+
+    - title: Set Account Passwords
+      id: Set Account Passwords
+      icon: 🔑
+      exec:
+          - /scripts/set-default-passwords.sh
+      timeout: 300
+      popupOnStart: execution-dialog
+      arguments:
+          - name: admin_password
+            title: Admin password
+            type: password
+            description: "Printable ASCII only. Maximum 72 bytes. Leave blank to keep the admin password unchanged."
+          - name: user_password
+            title: User password
+            type: password
+            description: "Printable ASCII only. Maximum 72 bytes. Leave blank to keep the user password unchanged."
+      triggers:
+          - container status
+
+dashboards:
+    - title: Multi-Agent Intelligent Warehouse Launcher
+      contents:
+          - title: Blueprint Status
+            type: fieldset
+            contents:
+                - type: stdout-most-recent-execution
+                  title: blueprint status
+                - type: stdout-most-recent-execution
+                  title: container status
+
+          - title: Control Panel
+            type: fieldset
+            contents:
+                - type: link
+                  title: Configure Blueprint
+                  action:
+                      bindingId: configure-blueprint
+                      canExec: true
+                      popupOnStart: execution-dialog
+
+                - type: link
+                  title: Start Blueprint
+                  action:
+                      bindingId: Start Blueprint
+                      canExec: false
+
+                - type: link
+                  title: Stop Blueprint
+                  action:
+                      bindingId: Stop Blueprint
+                      canExec: false
+
+                - type: link
+                  title: Restart Blueprint
+                  action:
+                      bindingId: Restart Blueprint
+                      canExec: false
+
+          - title: Demo Data
+            type: fieldset
+            contents:
+                - type: link
+                  title: Set Account Passwords
+                  action:
+                      bindingId: Set Account Passwords
+                      canExec: true
+                      popupOnStart: execution-dialog
+
+                - type: link
+                  title: Install Demo Data
+                  action:
+                      bindingId: Install Demo Data
+                      canExec: true
+                      popupOnStart: execution-dialog

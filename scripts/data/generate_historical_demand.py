@@ -162,13 +162,17 @@ class FritoLayDemandGenerator:
     async def initialize_connection(self):
         """Initialize database connection"""
         try:
-            self.pg_conn = await asyncpg.connect(
-                host="localhost",
-                port=5435,
-                user="warehouse",
-                password=os.getenv("POSTGRES_PASSWORD", ""),
-                database="warehouse"
-            )
+            database_url = os.getenv("DATABASE_URL")
+            if database_url:
+                self.pg_conn = await asyncpg.connect(database_url)
+            else:
+                self.pg_conn = await asyncpg.connect(
+                    host=os.getenv("PGHOST", "localhost"),
+                    port=int(os.getenv("PGPORT", "5435")),
+                    user=os.getenv("POSTGRES_USER", "warehouse"),
+                    password=os.getenv("POSTGRES_PASSWORD", ""),
+                    database=os.getenv("POSTGRES_DB", "warehouse")
+                )
             logger.info("✅ Connected to PostgreSQL")
         except Exception as e:
             logger.error(f"❌ Failed to connect to PostgreSQL: {e}")
