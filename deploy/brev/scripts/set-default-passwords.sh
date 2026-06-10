@@ -6,6 +6,8 @@ brev_dir="${repo_root}/deploy/brev"
 compose_file="${brev_dir}/docker-compose.maiw.yaml"
 env_file="${brev_dir}/.env"
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+state_dir="${brev_dir}/generated/setup-state"
+user_marker="${state_dir}/user-created-at"
 
 admin_password="${ADMIN_PASSWORD:-}"
 user_password="${USER_PASSWORD:-}"
@@ -56,7 +58,7 @@ compose() {
 }
 
 echo "Checking container status before setting account passwords..."
-MAIW_ROOT="$repo_root" "$script_dir/container-status.sh"
+MAIW_ROOT="$repo_root" "$script_dir/container-status.sh" || true
 
 timescaledb_container="$(compose ps -q timescaledb 2>/dev/null | head -n 1 || true)"
 if [ -z "$timescaledb_container" ] || [ "$(docker inspect -f '{{.State.Status}}' "$timescaledb_container" 2>/dev/null || true)" != "running" ]; then
@@ -79,5 +81,10 @@ compose run --rm --no-deps \
 
 unset ADMIN_PASSWORD USER_PASSWORD
 
+mkdir -p "$state_dir"
+date -u +"%Y-%m-%dT%H:%M:%SZ" > "$user_marker"
+chmod 0644 "$user_marker"
+
 echo ""
 echo "Account passwords updated."
+MAIW_ROOT="$repo_root" "$script_dir/update-pipeline-status.sh" >/dev/null || true

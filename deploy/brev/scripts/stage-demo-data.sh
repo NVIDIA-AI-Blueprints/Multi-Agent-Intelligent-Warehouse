@@ -1,11 +1,24 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
+
+on_error() {
+  local status="$?"
+  echo "" >&2
+  echo "ERROR: Install Demo Data failed near line ${BASH_LINENO[0]}: ${BASH_COMMAND}" >&2
+  echo "Exit code: ${status}" >&2
+  exit "$status"
+}
+
+trap on_error ERR
 
 repo_root="${MAIW_ROOT:-/maiw}"
 brev_dir="${repo_root}/deploy/brev"
 compose_file="${brev_dir}/docker-compose.maiw.yaml"
 env_file="${brev_dir}/.env"
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+state_dir="${brev_dir}/generated/setup-state"
+data_marker="${state_dir}/data-installed-at"
+user_marker="${state_dir}/user-created-at"
 
 if [ ! -f "$env_file" ]; then
   echo "Missing deploy/brev/.env. Run Configure Blueprint first." >&2
@@ -64,8 +77,33 @@ psql_exec() {
       -d "$postgres_db" "$@"
 }
 
+wait_for_postgres() {
+  local timeout_seconds="${1:-120}"
+  local elapsed=0
+
+  echo "Waiting for TimescaleDB to accept connections..."
+
+  until docker exec wosa-timescaledb \
+      pg_isready -U "$postgres_user" -d "$postgres_db" >/dev/null 2>&1; do
+    if [ "$elapsed" -ge "$timeout_seconds" ]; then
+      echo "TimescaleDB did not become ready within ${timeout_seconds} seconds." >&2
+      echo "Recent TimescaleDB logs:" >&2
+      docker logs --tail 80 wosa-timescaledb >&2 || true
+      return 1
+    fi
+
+    sleep 2
+    elapsed=$((elapsed + 2))
+  done
+
+  echo "TimescaleDB is ready."
+}
+
 echo "Checking container status before installing demo data..."
 MAIW_ROOT="$repo_root" "$script_dir/container-status.sh" --require-healthy
+
+mkdir -p "$state_dir"
+rm -f "$data_marker" "$user_marker"
 
 echo ""
 echo "WARNING: Install Demo Data will destroy all existing application data."
@@ -86,8 +124,8 @@ chmod 777 /ephemeral/maiw/kafka || true
 
 echo ""
 echo "Starting infrastructure services..."
-compose up -d --wait --wait-timeout "${STAGE_INFRA_WAIT_TIMEOUT_SECONDS:-900}" \
-  timescaledb redis kafka etcd minio milvus
+compose up -d timescaledb redis kafka etcd minio milvus
+wait_for_postgres "${STAGE_INFRA_WAIT_TIMEOUT_SECONDS:-300}"
 
 echo ""
 echo "Applying database migrations..."
@@ -134,7 +172,7 @@ unset DEFAULT_ADMIN_PASSWORD DEFAULT_USER_PASSWORD
 
 echo ""
 echo "Starting full blueprint stack..."
-compose up -d --remove-orphans --wait --wait-timeout "${DEPLOY_WAIT_TIMEOUT_SECONDS:-3600}"
+compose up -d --remove-orphans
 
 echo ""
 echo "Demo data staging complete."
@@ -151,4 +189,7 @@ psql_exec -tAc "
 echo ""
 compose ps
 
+date -u +"%Y-%m-%dT%H:%M:%SZ" > "$data_marker"
+chmod 0644 "$data_marker"
 MAIW_ROOT="$repo_root" "$script_dir/container-status.sh" >/dev/null || true
+MAIW_ROOT="$repo_root" "$script_dir/update-pipeline-status.sh" >/dev/null || true

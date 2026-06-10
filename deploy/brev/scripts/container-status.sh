@@ -6,30 +6,60 @@ brev_dir="${repo_root}/deploy/brev"
 compose_file="${brev_dir}/docker-compose.maiw.yaml"
 env_file="${brev_dir}/.env"
 require_healthy=false
+allow_health_starting=false
+status_code=0
+always_zero=false
 
-if [ "${1:-}" = "--require-healthy" ]; then
-  require_healthy=true
-fi
+for arg in "$@"; do
+  case "$arg" in
+    --allow-health-starting)
+      allow_health_starting=true
+      ;;
+    --require-healthy)
+      require_healthy=true
+      ;;
+    --always-zero)
+      always_zero=true
+      ;;
+    *)
+      echo "Unknown argument: ${arg}" >&2
+      exit 2
+      ;;
+  esac
+done
+
+mark_starting() {
+  if [ "$status_code" -eq 0 ]; then
+    status_code=2
+  fi
+}
+
+mark_stopped() {
+  status_code=1
+}
 
 finish() {
-  if [ "$require_healthy" = true ] && [ "${all_healthy:-false}" != true ]; then
+  if [ "$require_healthy" = true ] && [ "$status_code" -ne 0 ]; then
     echo ""
     echo "Container status is not healthy." >&2
-    exit 1
   fi
 
-  exit 0
+  if [ "$always_zero" = true ]; then
+    exit 0
+  fi
+
+  exit "$status_code"
 }
 
 if [ ! -f "$env_file" ]; then
-  all_healthy=false
+  mark_stopped
   echo "⚪ Blueprint containers not deployed"
   echo "Run Configure Blueprint first."
   finish
 fi
 
 if [ ! -f "$compose_file" ]; then
-  all_healthy=false
+  mark_starting
   echo "🟡 Container status unavailable"
   echo "Missing ${compose_file}."
   finish
@@ -44,7 +74,7 @@ compose() {
 services="$(compose config --services 2>/dev/null || true)"
 
 if [ -z "$services" ]; then
-  all_healthy=false
+  mark_starting
   echo "🟡 Container status unavailable"
   echo "Could not read Compose services."
   finish
@@ -70,8 +100,6 @@ image_exists() {
   docker image inspect "$image" >/dev/null 2>&1
 }
 
-all_healthy=true
-
 while IFS= read -r service; do
   [ -n "$service" ] || continue
 
@@ -86,7 +114,7 @@ while IFS= read -r service; do
       echo "🔘 ${service}: container not created, image not pulled"
     fi
 
-    all_healthy=false
+    mark_stopped
     continue
   fi
 
@@ -98,15 +126,22 @@ while IFS= read -r service; do
       icon="🟢"
       detail="running"
       ;;
-    running:starting|restarting:*)
+    running:starting)
       icon="🟡"
-      detail="running / starting"
-      all_healthy=false
+      detail="running / health starting"
+      if [ "$allow_health_starting" != true ]; then
+        mark_starting
+      fi
+      ;;
+    restarting:*)
+      icon="🟡"
+      detail="restarting"
+      mark_starting
       ;;
     running:unhealthy|dead:*)
       icon="🚨"
       detail="unhealthy/dead"
-      all_healthy=false
+      mark_stopped
       ;;
     running:*)
       icon="🟢"
@@ -115,7 +150,7 @@ while IFS= read -r service; do
     *)
       icon="⛔️"
       detail="stopped"
-      all_healthy=false
+      mark_stopped
       ;;
   esac
 

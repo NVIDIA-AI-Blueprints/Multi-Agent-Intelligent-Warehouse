@@ -58,7 +58,8 @@ fi
 
 # START SERVICES
 cd "$BREV_DIR"
+mkdir -p generated/entities generated/setup-state
 # pull all public containers for the blueprint
 docker compose -f docker-compose.maiw.yaml pull --ignore-buildable || true
 # run the olivetin dashboard
-docker compose -f docker-compose.olivetin.yaml up -d --wait --wait-timeout 120
+docker compose -f docker-compose.olivetin.yaml up -d

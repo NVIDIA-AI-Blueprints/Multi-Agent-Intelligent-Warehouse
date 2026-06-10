@@ -18,10 +18,13 @@ if [ ! -f "$compose_file" ]; then
 fi
 
 echo "Checking blueprint status..."
+set +e
 status_output="$(MAIW_ROOT="$repo_root" "$script_dir/status.sh")"
+status_code="$?"
+set -e
 printf '%s\n' "$status_output"
 
-if ! printf '%s\n' "$status_output" | grep -q "NVIDIA API key verified"; then
+if [ "$status_code" -ne 0 ]; then
   echo "Cannot deploy until blueprint status verifies the NVIDIA API key." >&2
   exit 1
 fi
@@ -42,7 +45,7 @@ compose build
 
 echo ""
 echo "Starting containers..."
-compose up -d --remove-orphans --wait --wait-timeout "${DEPLOY_WAIT_TIMEOUT_SECONDS:-3600}"
+compose up -d --remove-orphans
 
 echo ""
 echo "Deployment complete. Containers are configured with restart: unless-stopped."
@@ -50,4 +53,4 @@ compose ps
 
 echo ""
 echo "Refreshing container status..."
-MAIW_ROOT="$repo_root" "$script_dir/container-status.sh"
+MAIW_ROOT="$repo_root" "$script_dir/container-status.sh" || true

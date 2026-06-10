@@ -25,7 +25,7 @@ compose() {
 
 echo "Restarting blueprint containers..."
 compose restart
-compose up -d --remove-orphans --wait --wait-timeout "${RESTART_WAIT_TIMEOUT_SECONDS:-600}"
+compose up -d --remove-orphans
 
 echo ""
 echo "Restart complete."
@@ -33,4 +33,4 @@ compose ps
 
 echo ""
 echo "Refreshing container status..."
-MAIW_ROOT="$repo_root" "$script_dir/container-status.sh"
+MAIW_ROOT="$repo_root" "$script_dir/container-status.sh" || true

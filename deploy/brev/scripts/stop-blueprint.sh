@@ -32,4 +32,4 @@ compose ps -a
 
 echo ""
 echo "Refreshing container status..."
-MAIW_ROOT="$repo_root" "$script_dir/container-status.sh"
+MAIW_ROOT="$repo_root" "$script_dir/container-status.sh" || true

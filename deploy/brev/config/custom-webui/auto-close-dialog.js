@@ -1,12 +1,9 @@
 export default function startAutoCloseDialog() {
   var dashboardPath = "/";
-  var autoReturnActions = {
-    "configure-blueprint": true
-  };
 
   function onExecutionFinished(event) {
     var entry = event && event.payload && event.payload.logEntry;
-    if (!entry || !autoReturnActions[entry.bindingId]) {
+    if (!entry) {
       return;
     }
 

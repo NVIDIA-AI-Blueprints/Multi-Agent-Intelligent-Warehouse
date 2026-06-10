@@ -59,8 +59,8 @@ The NVIDIA API key field is a password argument and the action uses OliveTin
 `exec`, so the key is passed via process environment instead of shell command
 interpolation.
 
-Account passwords are not stored in `.env`. Use the `Set Account Passwords`
-dashboard action after demo data is installed. Blank password fields are ignored
+Account passwords are not stored in `.env`. Use the `Reset Passwords` dashboard
+action after demo data is installed. Blank password fields are ignored
 so operators can update only one account at a time.
 
 If adding more config inputs, add arguments to the `configure-blueprint` action
@@ -77,18 +77,8 @@ enableCustomJs: true
 ```
 
 `config/custom-webui/auto-close-dialog.js` listens for
-`EventExecutionFinished`. For actions listed in `autoReturnActions`, it
-redirects from `/logs/<executionTrackingId>` back to `/` after successful
-completion. Failed actions stay on the log page so the operator can read the
-error.
-
-To add another auto-closing action, edit `autoReturnActions`:
-
-```js
-var autoReturnActions = {
-  "configure-blueprint": true,
-  "another-action-id": true
-};
-```
+`EventExecutionFinished`. It redirects from `/logs/<executionTrackingId>` back
+to `/` after successful completion. Failed actions stay on the log page so the
+operator can read the error.
 
 Restart OliveTin and refresh the browser after changing custom web UI files.

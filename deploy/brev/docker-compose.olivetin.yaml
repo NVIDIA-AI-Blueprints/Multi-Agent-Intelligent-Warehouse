@@ -19,6 +19,7 @@ services:
       - ./scripts:/scripts:ro
       - ../..:/maiw
       - ./generated/docker-config:/root/.docker
+      - ./generated/entities:/entities
       - /ephemeral:/ephemeral
       - /var/run/docker.sock:/var/run/docker.sock
       - /usr/bin/docker:/usr/bin/docker:ro

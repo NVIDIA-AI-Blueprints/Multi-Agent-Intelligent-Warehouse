@@ -33,8 +33,7 @@ export default function startContentClickScrollTop() {
       "[role='button']",
       "[role='link']",
       ".button",
-      ".action-button",
-      ".mre-container"
+      ".action-button"
     ].join(","))) {
       return false;
     }
