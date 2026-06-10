@@ -187,9 +187,9 @@ psql_exec -tAc "
 "
 
 echo ""
-compose ps
+echo "Refreshing container status..."
+MAIW_ROOT="$repo_root" "$script_dir/container-status.sh" || true
 
 date -u +"%Y-%m-%dT%H:%M:%SZ" > "$data_marker"
 chmod 0644 "$data_marker"
-MAIW_ROOT="$repo_root" "$script_dir/container-status.sh" >/dev/null || true
 MAIW_ROOT="$repo_root" "$script_dir/update-pipeline-status.sh" >/dev/null || true

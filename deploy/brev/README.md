@@ -15,6 +15,8 @@ Brev machine assumptions: 4x H100 GPUs, local NIM, persistent data under
 - `config/custom-webui/custom.js` loads small browser-side OliveTin UI tweaks.
 - `config/custom-webui/blueprint-app-url.js` promotes blueprint app links into
   the OliveTin header and opens them in new windows.
+- `config/custom-webui/pipeline-entity-refresh.js` reloads the dashboard only
+  when OliveTin reports an entity change and the rendered Pipeline state differs.
 - `config/custom-webui/themes/nvidia-dark/theme.css` contains the custom layout
   and visual treatment for the OliveTin UI.
 - `scripts/` contains action implementations.
@@ -66,6 +68,8 @@ the launcher:
 - `config/entities/blueprint-links.yaml` owns the list of sibling app links.
 - `config/custom-webui/blueprint-app-url.js` owns browser-side app-link URL
   resolution, new-window click handling, and header placement.
+- `config/custom-webui/pipeline-entity-refresh.js` owns event-driven Pipeline
+  refresh behavior.
 - `config/custom-webui/themes/nvidia-dark/theme.css` owns visual styling only.
 
 ### Pipeline Status Row
@@ -122,6 +126,14 @@ To add, remove, or rename a pipeline step, update both
 `scripts/update-pipeline-status.sh` and the `Pipeline` fieldset in
 `config/config.yaml`. CSS should not need a pipeline-specific change unless a
 new status value is introduced.
+
+`pipeline-entity-refresh.js` listens for OliveTin's `EventEntityChanged`
+websocket event. When an entity changes, it fetches the current dashboard through
+`window.client.getDashboard(...)`, computes a signature from the returned
+Pipeline button text/classes/hrefs, compares it to the currently rendered
+Pipeline signature, and reloads the page only when the Pipeline signature
+changes. This is intentionally not tied to the `container status` cron or any
+fixed browser timer.
 
 ### Blueprint App Header Links
 
@@ -217,6 +229,20 @@ so operators can update only one account at a time.
 If adding more config inputs, add arguments to the `configure-blueprint` action
 and update `scripts/configure-blueprint.sh`. Prefer narrow validators in the
 script for secrets and `regex:` validators for non-secret IDs.
+
+## Compose Action Output
+
+`Start` runs `scripts/deploy-blueprint.sh`, which pulls images, builds local
+images, starts the Compose stack, and then refreshes status. `Stop` and
+`Restart` also call Docker Compose operations that can emit progress frames. Keep
+Docker Compose progress quiet in these action scripts. OliveTin forwards action
+output over its event websocket, and verbose Docker progress can fill OliveTin's
+internal per-client event channel during long runs, causing the browser
+websocket to disconnect and reconnect.
+
+Do not print `docker compose ps` tables from OliveTin actions. The table is
+wide and can arrive as a large burst in the browser. Use
+`scripts/container-status.sh` for the final action summary instead.
 
 ## Auto-Closing Execution Dialogs
 

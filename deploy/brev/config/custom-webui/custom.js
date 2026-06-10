@@ -7,6 +7,14 @@
       console.error("Failed to load OliveTin blueprint app URL helper", error);
     });
 
+  import("/custom-webui/pipeline-entity-refresh.js")
+    .then(function (pipelineEntityRefresh) {
+      pipelineEntityRefresh.default();
+    })
+    .catch(function (error) {
+      console.error("Failed to load OliveTin pipeline entity refresh behavior", error);
+    });
+
   import("/custom-webui/auto-close-dialog.js")
     .then(function (autoCloseDialog) {
       autoCloseDialog.default();

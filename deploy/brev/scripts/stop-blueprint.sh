@@ -23,12 +23,31 @@ compose() {
   docker compose --env-file "$env_file" -f "$compose_file" "$@"
 }
 
+run_quiet() {
+  local label="$1"
+  local output_file
+  local status
+
+  shift
+  output_file="$(mktemp)"
+  if "$@" >"$output_file" 2>&1; then
+    rm -f "$output_file"
+    return 0
+  fi
+
+  status="$?"
+  echo "" >&2
+  echo "${label} failed. Captured output:" >&2
+  cat "$output_file" >&2
+  rm -f "$output_file"
+  return "$status"
+}
+
 echo "Stopping blueprint containers..."
-compose stop
+run_quiet "Stopping blueprint containers" compose stop
 
 echo ""
 echo "Blueprint containers stopped. They will stay stopped until deployed or restarted."
-compose ps -a
 
 echo ""
 echo "Refreshing container status..."

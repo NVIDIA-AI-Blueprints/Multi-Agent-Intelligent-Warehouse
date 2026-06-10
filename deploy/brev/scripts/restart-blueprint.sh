@@ -23,13 +23,32 @@ compose() {
   docker compose --env-file "$env_file" -f "$compose_file" "$@"
 }
 
+run_quiet() {
+  local label="$1"
+  local output_file
+  local status
+
+  shift
+  output_file="$(mktemp)"
+  if "$@" >"$output_file" 2>&1; then
+    rm -f "$output_file"
+    return 0
+  fi
+
+  status="$?"
+  echo "" >&2
+  echo "${label} failed. Captured output:" >&2
+  cat "$output_file" >&2
+  rm -f "$output_file"
+  return "$status"
+}
+
 echo "Restarting blueprint containers..."
-compose restart
-compose up -d --remove-orphans
+run_quiet "Restarting blueprint containers" compose restart
+run_quiet "Reconciling blueprint containers" compose up -d --quiet-pull --quiet-build --remove-orphans
 
 echo ""
 echo "Restart complete."
-compose ps
 
 echo ""
 echo "Refreshing container status..."

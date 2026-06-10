@@ -37,19 +37,18 @@ compose() {
 
 echo ""
 echo "Pulling container images..."
-compose pull --ignore-buildable
+compose pull --quiet --ignore-buildable
 
 echo ""
 echo "Building application images..."
-compose build
+compose build --quiet
 
 echo ""
 echo "Starting containers..."
-compose up -d --remove-orphans
+compose up -d --quiet-pull --quiet-build --remove-orphans
 
 echo ""
 echo "Deployment complete. Containers are configured with restart: unless-stopped."
-compose ps
 
 echo ""
 echo "Refreshing container status..."
