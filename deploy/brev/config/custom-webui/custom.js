@@ -1,4 +1,12 @@
 (function () {
+  import("/custom-webui/blueprint-app-url.js")
+    .then(function (blueprintAppUrl) {
+      blueprintAppUrl.default();
+    })
+    .catch(function (error) {
+      console.error("Failed to load OliveTin blueprint app URL helper", error);
+    });
+
   import("/custom-webui/auto-close-dialog.js")
     .then(function (autoCloseDialog) {
       autoCloseDialog.default();

@@ -131,10 +131,15 @@ main {
 }
 
 header {
+    align-items: center !important;
     background: rgba(5, 5, 5, 0.9) !important;
     border-bottom: 1px solid #242b24 !important;
     box-shadow: none !important;
     backdrop-filter: blur(10px);
+    display: flex !important;
+    gap: 0.75rem !important;
+    min-height: 3.15rem !important;
+    padding-right: 0.85rem !important;
 }
 
 header h1 {
@@ -149,6 +154,8 @@ header img.logo {
 }
 
 header .logo-and-title {
+    flex: 0 1 auto !important;
+    min-width: 0 !important;
     padding-left: 1rem !important;
 }
 
@@ -185,6 +192,81 @@ header .button:hover {
     background: var(--hover-background-color) !important;
     color: #ffffff !important;
     text-decoration: none !important;
+}
+
+.maiw-header-apps {
+    align-items: center;
+    display: flex;
+    flex: 0 0 auto;
+    gap: 0.55rem;
+    margin-left: 0.85rem;
+}
+
+.maiw-header-app-link,
+.maiw-header-app-link:visited {
+    align-items: center;
+    background:
+        linear-gradient(
+            180deg,
+            rgba(143, 212, 0, 0.2),
+            rgba(118, 185, 0, 0.08) 48%,
+            rgba(0, 0, 0, 0.16)
+        ),
+        rgba(18, 25, 17, 0.96) !important;
+    border: 1px solid rgba(143, 212, 0, 0.58);
+    border-radius: 4px;
+    box-shadow:
+        inset 0 1px 0 rgba(216, 246, 177, 0.18),
+        inset 0 -2px 0 rgba(0, 0, 0, 0.36),
+        0 8px 20px rgba(0, 0, 0, 0.24),
+        0 0 0 1px rgba(118, 185, 0, 0.08);
+    color: #eef5ec !important;
+    display: inline-flex;
+    font-size: 0.84rem;
+    font-weight: 800;
+    gap: 0.42rem;
+    justify-content: center;
+    line-height: 1;
+    min-height: 2.18rem;
+    padding: 0 0.84rem;
+    text-decoration: none !important;
+    white-space: nowrap;
+}
+
+.maiw-header-app-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.maiw-header-app-icon {
+    flex: 0 0 auto;
+    height: 0.86rem;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+    width: 0.86rem;
+}
+
+.maiw-header-app-icon path {
+    fill: none;
+}
+
+.maiw-header-app-link:hover {
+    background:
+        linear-gradient(
+            180deg,
+            rgba(143, 212, 0, 0.28),
+            rgba(118, 185, 0, 0.12)
+        ),
+        rgba(22, 32, 18, 0.98) !important;
+    border-color: rgba(143, 212, 0, 0.86);
+    box-shadow:
+        inset 0 1px 0 rgba(216, 246, 177, 0.24),
+        inset 0 -2px 0 rgba(0, 0, 0, 0.32),
+        0 10px 22px rgba(0, 0, 0, 0.28),
+        0 0 18px rgba(118, 185, 0, 0.16);
+    color: #ffffff !important;
 }
 
 a,
@@ -355,16 +437,17 @@ section .section-headers::after {
     margin: 0 !important;
 }
 
-.dashboard-row:has(.pipeline-status-button) {
-    background: transparent !important;
-    border: 0 !important;
-    box-shadow: none !important;
-    overflow: visible !important;
+.dashboard-row:has(.pipeline-status-button) > h2 {
+    display: none !important;
 }
 
-.dashboard-row:has(.pipeline-status-button)::before,
-.dashboard-row:has(.pipeline-status-button)::after,
-.dashboard-row:has(.pipeline-status-button) > h2 {
+.dashboard-row:has(.pipeline-status-button):not(
+        :has(.pipeline-status-button:not(.pipeline-status-button--complete))
+    ) {
+    display: none !important;
+}
+
+.dashboard-row:has(a[data-blueprint-app-slug]) {
     display: none !important;
 }
 
@@ -470,42 +553,38 @@ main fieldset legend {
     padding: 0 0.4rem !important;
 }
 
-main fieldset:has(.pipeline-status-button) {
+main fieldset:has(.pipeline-status-button),
+main fieldset:has(a[data-blueprint-app-slug]) {
     align-items: stretch !important;
-    background: transparent !important;
-    border-left: 0 !important;
-    border-radius: 0 !important;
-    border-right: 0 !important;
     box-sizing: border-box !important;
-    gap: 1.15rem !important;
-    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-    padding: 1rem !important;
     width: 100% !important;
 }
 
-main fieldset:has(.pipeline-status-button) legend {
-    color: #f7faf7 !important;
-    font-size: 0.82rem !important;
-    letter-spacing: 0.08em !important;
-    text-transform: uppercase !important;
+main fieldset:has(.pipeline-status-button) {
+    gap: 1.15rem !important;
+    grid-template-columns: repeat(auto-fit, minmax(min(10rem, 100%), 1fr)) !important;
+    padding: 1rem var(--rack-content-inset) !important;
 }
 
-main fieldset:has(.pipeline-status-button) :is(div.display, .display) {
-    align-items: stretch !important;
+main fieldset:has(a[data-blueprint-app-slug]) {
+    grid-template-columns: repeat(auto-fit, minmax(190px, 280px)) !important;
+    padding: 1rem var(--rack-content-inset) !important;
+}
+
+main fieldset:has(.pipeline-status-button) :is(div.display, .display),
+main fieldset:has(a[data-blueprint-app-slug]) :is(div.display, .display) {
     background: transparent !important;
     border: 0 !important;
     border-radius: 0 !important;
     box-shadow: none !important;
-    display: flex !important;
     margin: 0 !important;
-    min-width: 0 !important;
     padding: 0 !important;
-    width: 100% !important;
 }
 
-main fieldset:has(.pipeline-status-button) :is(div.content, .content) {
+main fieldset:has(.pipeline-status-button) :is(div.display, .display),
+main fieldset:has(.pipeline-status-button) :is(div.content, .content),
+main fieldset:has(a[data-blueprint-app-slug]) :is(div.display, .display),
+main fieldset:has(a[data-blueprint-app-slug]) :is(div.content, .content) {
     align-items: stretch !important;
     display: flex !important;
     min-width: 0 !important;
@@ -1230,13 +1309,7 @@ label:has(input:checked) {
     --pipeline-lit-soft: 255, 174, 174;
 }
 
-.pipeline-status-button--configure.pipeline-status-button--stopped,
-main fieldset:has(.pipeline-status-button--configure.pipeline-status-button--complete)
-    .pipeline-status-button--running.pipeline-status-button--stopped,
-main fieldset:has(.pipeline-status-button--running.pipeline-status-button--complete)
-    .pipeline-status-button--data.pipeline-status-button--stopped,
-main fieldset:has(.pipeline-status-button--data.pipeline-status-button--complete)
-    .pipeline-status-button--user.pipeline-status-button--stopped {
+.pipeline-status-button--stopped {
     animation: pipeline-red-pulse 2.8s ease-in-out infinite;
 }
 

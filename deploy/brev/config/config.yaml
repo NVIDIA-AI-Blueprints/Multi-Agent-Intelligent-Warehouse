@@ -11,6 +11,8 @@ themeCacheDisabled: true
 entities:
     - file: /entities/pipeline-status.yaml
       name: pipelineStatus
+    - file: /config/entities/blueprint-links.yaml
+      name: blueprintLink
 
 actions:
     - title: setup pipeline status
@@ -153,6 +155,13 @@ dashboards:
                   title: '<a class="pipeline-status-button pipeline-status-button--data pipeline-status-button--{{ pipelineStatus.data_status }}" href="/actionBinding/{{ pipelineStatus.data_action }}/argumentForm">{{ pipelineStatus.data_display }}</a>'
                 - type: display
                   title: '<a class="pipeline-status-button pipeline-status-button--user pipeline-status-button--{{ pipelineStatus.user_status }}" href="/actionBinding/{{ pipelineStatus.user_action }}/argumentForm">{{ pipelineStatus.user_display }}</a>'
+
+          - title: Pipeline Apps
+            type: fieldset
+            entity: blueprintLink
+            contents:
+                - type: display
+                  title: '<a href="#" data-blueprint-app-slug="{{ blueprintLink.slug }}" onclick="return window.maiw && window.maiw.openBlueprintApp ? window.maiw.openBlueprintApp(this) : false">{{ blueprintLink.title }}</a>'
 
           - title: Detailed Status
             type: fieldset
