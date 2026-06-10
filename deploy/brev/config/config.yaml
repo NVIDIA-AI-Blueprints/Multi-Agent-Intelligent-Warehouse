@@ -43,7 +43,7 @@ actions:
           - name: nvidia_api_key
             title: NVIDIA API key
             type: password
-            description: "[nvapi-...] Used for nvcr.io Docker login and all NVIDIA service keys."
+            description: "[nvapi-...] Used for nvcr.io Docker login and all NVIDIA service keys. Create a key at https://build.nvidia.com/settings/api-keys."
 
     - title: Start Blueprint
       id: Start Blueprint
