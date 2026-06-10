@@ -304,10 +304,63 @@ section.with-header-and-content {
     background: transparent !important;
 }
 
-section .section-header {
-    background: var(--surface-2) !important;
+section .section-header,
+section .section-headers {
+    background:
+        linear-gradient(
+            90deg,
+            rgba(5, 7, 5, 0.9),
+            rgba(5, 7, 5, 0.66) 48%,
+            rgba(5, 7, 5, 0.82)
+        ),
+        linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.09),
+            rgba(255, 255, 255, 0.015) 48%,
+            rgba(0, 0, 0, 0.26)
+        ),
+        rgba(18, 22, 18, 0.88) !important;
     border-bottom: 1px solid var(--border-color) !important;
+    overflow: hidden !important;
     padding: 0.8rem 1rem !important;
+    position: relative !important;
+}
+
+section .section-header::after,
+section .section-headers::after {
+    background:
+        linear-gradient(
+            90deg,
+            rgba(5, 7, 5, 0.08),
+            rgba(5, 7, 5, 0.22)
+        ),
+        url("/custom-webui/assets/dgx-spark-support-bg.jpg");
+    background-position: right center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    bottom: 0;
+    content: "";
+    opacity: 0.82;
+    pointer-events: none;
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 500px;
+    z-index: 0;
+    -webkit-mask-image: linear-gradient(
+        90deg,
+        transparent 0,
+        rgba(0, 0, 0, 0.18) 18%,
+        #000 48%,
+        #000 100%
+    );
+    mask-image: linear-gradient(
+        90deg,
+        transparent 0,
+        rgba(0, 0, 0, 0.18) 18%,
+        #000 48%,
+        #000 100%
+    );
 }
 
 section .section-header h2 {
@@ -315,6 +368,8 @@ section .section-header h2 {
     display: flex;
     gap: 0.6rem;
     margin: 0 !important;
+    position: relative;
+    z-index: 1;
 }
 
 section .section-header h2::before {
@@ -618,7 +673,6 @@ section:has(form) {
 }
 
 section:has(form) .section-header {
-    background: rgba(18, 22, 18, 0.9) !important;
     border-bottom: 1px solid rgba(171, 190, 171, 0.14) !important;
 }
 
@@ -672,6 +726,17 @@ section:has(form) form .argument-description {
     grid-row: auto !important;
     line-height: 1.35 !important;
     margin-top: -0.35rem !important;
+}
+
+section:has(form) form .argument-description a,
+section:has(form) form .argument-description a:visited {
+    color: var(--nvidia-green-hover) !important;
+    text-decoration: underline !important;
+    text-underline-offset: 0.16em;
+}
+
+section:has(form) form .argument-description a:hover {
+    color: #ffffff !important;
 }
 
 section:has(form) form .buttons {

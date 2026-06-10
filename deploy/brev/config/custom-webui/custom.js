@@ -22,4 +22,12 @@
     .catch(function (error) {
       console.error("Failed to load OliveTin content click scroll behavior", error);
     });
+
+  import("/custom-webui/linkify-descriptions.js")
+    .then(function (linkifyDescriptions) {
+      linkifyDescriptions.default();
+    })
+    .catch(function (error) {
+      console.error("Failed to load OliveTin description linkifier", error);
+    });
 })();
