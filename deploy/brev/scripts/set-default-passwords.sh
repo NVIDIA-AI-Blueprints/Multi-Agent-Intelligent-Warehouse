@@ -72,12 +72,12 @@ export USER_PASSWORD="$user_password"
 
 echo ""
 echo "Updating account passwords..."
-compose run --rm --no-deps \
+compose run --rm --no-deps -T \
   -e PGHOST=timescaledb \
   -e PGPORT=5432 \
   -e ADMIN_PASSWORD \
   -e USER_PASSWORD \
-  backend python scripts/setup/set_default_passwords.py
+  backend python - < "$script_dir/set-default-passwords.py"
 
 unset ADMIN_PASSWORD USER_PASSWORD
 

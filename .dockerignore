@@ -177,7 +177,6 @@ scripts/*
 !scripts/setup/
 scripts/setup/*
 !scripts/setup/create_default_users.py
-!scripts/setup/set_default_passwords.py
 !scripts/data/
 scripts/data/*
 !scripts/data/quick_demo_data.py
