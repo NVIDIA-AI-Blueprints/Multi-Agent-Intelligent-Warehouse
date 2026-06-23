@@ -7,6 +7,7 @@ loguru>=0.7
 langgraph>=1.0.5  # Security: Fixed CVE-2025-8709 (SQL injection in langgraph-checkpoint-sqlite). We use 1.0.5+ (includes fix). Note: We use in-memory state (no SQLite checkpoint) as additional defense.
 langgraph-checkpoint>=3.0.0  # Security: Fixed CVE-2025-64439 (RCE in JsonPlusSerializer). Version 3.0.0+ fixes RCE vulnerability. Note: We use in-memory state (no checkpoint backend), but pinning secure version for transitive dependencies.
 asyncpg>=0.29.0
+psycopg[binary]>=3.0.0
 pymilvus>=2.3.0
 numpy>=1.24.0
 langchain-core>=1.2.6  # Security: Fixed CVE-2025-68664 (serialization injection) and CVE-2024-28088 (directory traversal). We use 1.2.6 (latest, includes fixes). Note: We use json.dumps(), not LangChain serialization, as additional defense.
@@ -23,3 +24,4 @@ bacpypes3>=0.0.100  # BACnet protocol library for IoT safety sensors (optional -
 requests>=2.31.0
 pyserial>=3.5
 redis>=4.0.0
+tiktoken

@@ -1,0 +1,217 @@
+logLevel: INFO
+listenAddressSingleHTTPFrontend: 0.0.0.0:1337
+cronSupportForSeconds: true
+pageTitle: NVIDIA Blueprints
+showFooter: false
+showNavigateOnStartIcons: false
+enableCustomJs: true
+themeName: nvidia-dark
+themeCacheDisabled: true
+
+entities:
+    - file: /entities/pipeline-status.yaml
+      name: pipelineStatus
+    - file: /config/entities/blueprint-links.yaml
+      name: blueprintLink
+
+actions:
+    - title: setup pipeline status
+      id: setup pipeline status
+      icon: list-check
+      hidden: true
+      shell: /scripts/update-pipeline-status.sh
+      timeout: 25
+      popupOnStart: background
+      execOnStartup: true
+
+    - title: blueprint status
+      id: blueprint status
+      icon: key
+      hidden: true
+      shell: /scripts/status.sh --always-zero
+      timeout: 5
+      popupOnStart: background
+      execOnStartup: true
+      execOnCron:
+          - "0 * * * * *"
+
+    - title: container status
+      id: container status
+      icon: box
+      hidden: true
+      shell: /scripts/container-status.sh --always-zero
+      timeout: 10
+      popupOnStart: background
+      execOnStartup: true
+      execOnCron:
+          - "*/10 * * * * *"
+
+    - title: Configure
+      id: configure-blueprint
+      icon: ⚙️
+      exec:
+          - /scripts/configure-blueprint.sh
+      timeout: 60
+      popupOnStart: execution-dialog
+      triggers:
+          - blueprint status
+          - container status
+          - setup pipeline status
+      arguments:
+          - name: nvidia_api_key
+            title: NVIDIA API key
+            type: password
+            description: "[nvapi-...] Used for nvcr.io Docker login and all NVIDIA service keys. Create a key at https://build.nvidia.com/settings/api-keys."
+
+    - title: Start
+      id: Start Blueprint
+      icon: ▶️
+      shell: /scripts/deploy-blueprint.sh
+      timeout: 3600
+      maxConcurrent: 1
+      popupOnStart: execution-dialog
+      arguments:
+          - type: confirmation
+            title: Confirm start blueprint
+      triggers:
+          - container status
+          - setup pipeline status
+
+    - title: Stop
+      id: Stop Blueprint
+      icon: ⏹️
+      shell: /scripts/stop-blueprint.sh
+      timeout: 300
+      maxConcurrent: 1
+      popupOnStart: execution-dialog
+      arguments:
+          - type: confirmation
+            title: Confirm stop blueprint
+      triggers:
+          - container status
+          - setup pipeline status
+
+    - title: Restart
+      id: Restart Blueprint
+      icon: 🔄
+      shell: /scripts/restart-blueprint.sh
+      timeout: 600
+      maxConcurrent: 1
+      popupOnStart: execution-dialog
+      arguments:
+          - type: confirmation
+            title: Confirm restart blueprint
+      triggers:
+          - container status
+          - setup pipeline status
+
+    - title: Install Demo Data
+      id: Install Demo Data
+      icon: 📀
+      shell: /scripts/stage-demo-data.sh
+      timeout: 5400
+      maxConcurrent: 1
+      popupOnStart: execution-dialog
+      arguments:
+          - type: confirmation
+            title: Confirm destructive demo data install
+            description: "This will destroy all existing application data before reinstalling demo data. NIM model/cache directories are preserved."
+      triggers:
+          - container status
+          - setup pipeline status
+
+    - title: Reset Passwords
+      id: Set Account Passwords
+      icon: 🔑
+      exec:
+          - /scripts/set-default-passwords.sh
+      timeout: 300
+      popupOnStart: execution-dialog
+      arguments:
+          - name: admin_password
+            title: Admin password
+            type: password
+            description: "Printable ASCII only. Maximum 72 bytes. Leave blank to keep the admin password unchanged."
+          - name: user_password
+            title: User password
+            type: password
+            description: "Printable ASCII only. Maximum 72 bytes. Leave blank to keep the user password unchanged."
+      triggers:
+          - container status
+          - setup pipeline status
+
+dashboards:
+    - title: Multi-Agent Intelligent Warehouse Launcher
+      contents:
+          - title: Pipeline
+            type: fieldset
+            entity: pipelineStatus
+            contents:
+                - type: display
+                  title: '<a class="pipeline-status-button pipeline-status-button--configure pipeline-status-button--{{ pipelineStatus.configure_status }}" href="/actionBinding/{{ pipelineStatus.configure_action }}/argumentForm">{{ pipelineStatus.configure_display }}</a>'
+                - type: display
+                  title: '<a class="pipeline-status-button pipeline-status-button--running pipeline-status-button--{{ pipelineStatus.running_status }}" href="/actionBinding/{{ pipelineStatus.running_action }}/argumentForm">{{ pipelineStatus.running_display }}</a>'
+                - type: display
+                  title: '<a class="pipeline-status-button pipeline-status-button--data pipeline-status-button--{{ pipelineStatus.data_status }}" href="/actionBinding/{{ pipelineStatus.data_action }}/argumentForm">{{ pipelineStatus.data_display }}</a>'
+                - type: display
+                  title: '<a class="pipeline-status-button pipeline-status-button--user pipeline-status-button--{{ pipelineStatus.user_status }}" href="/actionBinding/{{ pipelineStatus.user_action }}/argumentForm">{{ pipelineStatus.user_display }}</a>'
+
+          - title: Pipeline Apps
+            type: fieldset
+            entity: blueprintLink
+            contents:
+                - type: display
+                  title: '<a href="#" data-blueprint-app-slug="{{ blueprintLink.slug }}" onclick="return window.maiw && window.maiw.openBlueprintApp ? window.maiw.openBlueprintApp(this) : false">{{ blueprintLink.title }}</a>'
+
+          - title: Detailed Status
+            type: fieldset
+            contents:
+                - type: stdout-most-recent-execution
+                  title: blueprint status
+                - type: stdout-most-recent-execution
+                  title: container status
+
+          - title: Control Panel
+            type: fieldset
+            contents:
+                - type: link
+                  title: Configure
+                  action:
+                      bindingId: configure-blueprint
+                      canExec: true
+                      popupOnStart: execution-dialog
+
+                - type: link
+                  title: Start
+                  action:
+                      bindingId: Start Blueprint
+                      canExec: false
+
+                - type: link
+                  title: Stop
+                  action:
+                      bindingId: Stop Blueprint
+                      canExec: false
+
+                - type: link
+                  title: Restart
+                  action:
+                      bindingId: Restart Blueprint
+                      canExec: false
+
+          - title: Demo Data
+            type: fieldset
+            contents:
+                - type: link
+                  title: Install Demo Data
+                  action:
+                      bindingId: Install Demo Data
+                      canExec: true
+                      popupOnStart: execution-dialog
+
+                - type: link
+                  title: Reset Passwords
+                  action:
+                      bindingId: Set Account Passwords
+                      canExec: true
+                      popupOnStart: execution-dialog

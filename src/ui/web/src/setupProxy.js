@@ -1,6 +1,8 @@
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
 module.exports = function(app) {
+  const backendUrl = process.env.BACKEND_URL || 'http://backend:8001';
+
   console.log('Setting up proxy middleware...');
   
   // Use pathRewrite to add /api prefix back when forwarding
@@ -13,7 +15,7 @@ module.exports = function(app) {
   app.use(
     '/api',
     createProxyMiddleware({
-      target: 'http://localhost:8001',
+      target: backendUrl,
       changeOrigin: true,
       secure: false,
       logLevel: 'debug',
@@ -41,5 +43,5 @@ module.exports = function(app) {
     })
   );
   
-  console.log('Proxy middleware configured for /api -> http://localhost:8001');
+  console.log(`Proxy middleware configured for /api -> ${backendUrl}`);
 };
