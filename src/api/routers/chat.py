@@ -517,6 +517,34 @@ def _create_fallback_chat_response(
     )
 
 
+def _create_error_chat_response(
+    user_message: str,
+    error_message: str,
+    error_type: str,
+    session_id: str,
+    confidence: float,
+) -> ChatResponse:
+    """Create a standardized ChatResponse for handled chat errors."""
+    suggestions = [
+        "Try rephrasing your question",
+        "Try again in a moment",
+        "Contact support if the issue persists",
+    ]
+    return ChatResponse(
+        reply=user_message,
+        route="error",
+        intent="error",
+        session_id=session_id,
+        context={
+            "error": error_message,
+            "error_type": error_type,
+            "suggestions": suggestions,
+        },
+        confidence=confidence,
+        recommendations=suggestions,
+    )
+
+
 def _create_safety_violation_response(
     violations: List[str],
     confidence: float,

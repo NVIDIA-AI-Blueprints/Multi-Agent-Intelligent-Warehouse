@@ -173,7 +173,7 @@ const Login: React.FC = () => {
                 fontSize: '0.875rem',
               }}
             >
-              Password: (set via DEFAULT_ADMIN_PASSWORD env var)
+              Password: configured during setup
             </Typography>
           </Box>
         </CardContent>

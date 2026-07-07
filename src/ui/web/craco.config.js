@@ -175,6 +175,7 @@ module.exports = {
     if (!devServerConfig.setupMiddlewares) {
       console.warn('⚠️  CRACO: setupMiddlewares not found, setting it up with proxy...');
       const { createProxyMiddleware } = require('http-proxy-middleware');
+      const backendUrl = process.env.BACKEND_URL || 'http://backend:8001';
       
       devServerConfig.setupMiddlewares = (middlewares, devServer) => {
         // Add proxy middleware FIRST (before other middlewares)
@@ -186,7 +187,7 @@ module.exports = {
         devServer.app.use(
           '/api',
           createProxyMiddleware({
-            target: 'http://localhost:8001',
+            target: backendUrl,
             changeOrigin: true,
             secure: false,
             logLevel: 'debug',
@@ -213,7 +214,7 @@ module.exports = {
           })
         );
         
-        console.log('✅ CRACO: Proxy middleware configured for /api -> http://localhost:8001');
+        console.log(`✅ CRACO: Proxy middleware configured for /api -> ${backendUrl}`);
         return middlewares;
       };
     } else {
@@ -223,4 +224,3 @@ module.exports = {
     return devServerConfig;
   },
 };
-
