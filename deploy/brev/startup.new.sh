@@ -1,4 +1,23 @@
 #!/usr/bin/env bash
+
+# Started by the Brev launchables' startup script below. Production sets
+# BRANCH_NAME to "main"; staging sets it to "staging". Brev clones the Git
+# repository into ~/Multi-Agent-Intelligent-Warehouse before this runs, so this
+# script executes from that checked-out repository.
+#
+#   #!/bin/bash
+#   set -euo pipefail
+#
+#   readonly PROJECT_NAME="Multi-Agent-Intelligent-Warehouse"
+#   readonly BRANCH_NAME="main" # "staging" in the staging launchable
+#
+#   cd "${HOME}/${PROJECT_NAME}"
+#   git fetch origin \
+#     "refs/heads/${BRANCH_NAME}:refs/remotes/origin/${BRANCH_NAME}"
+#   git switch -C "${BRANCH_NAME}" "origin/${BRANCH_NAME}"
+#
+#   exec bash deploy/brev/startup.new.sh
+
 set -euo pipefail
 
 BREV_DIR="$(cd "$(dirname "$0")" && pwd)"
