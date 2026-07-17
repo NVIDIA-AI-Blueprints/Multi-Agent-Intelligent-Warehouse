@@ -23,7 +23,6 @@ set -euo pipefail
 BREV_DIR="$(cd "$(dirname "$0")" && pwd)"
 COMPOSE_FILE="${BREV_DIR}/docker-compose.maiw.yaml"
 ENV_FILE="${BREV_DIR}/.env"
-STARTUP_TIMEOUT_SECONDS="${STARTUP_TIMEOUT_SECONDS:-1800}"
 
 if [ -z "${NVIDIA_API_KEY:-}" ]; then
   echo "Missing required NVIDIA_API_KEY environment variable." >&2
@@ -32,11 +31,6 @@ fi
 
 if ! LC_ALL=C printf '%s' "$NVIDIA_API_KEY" | grep -Eq '^nvapi-[A-Za-z0-9._-]+$'; then
   echo "NVIDIA_API_KEY must begin with nvapi- and contain only letters, numbers, dots, underscores, or hyphens." >&2
-  exit 2
-fi
-
-if ! printf '%s' "$STARTUP_TIMEOUT_SECONDS" | grep -Eq '^[1-9][0-9]*$'; then
-  echo "STARTUP_TIMEOUT_SECONDS must be a positive integer." >&2
   exit 2
 fi
 
@@ -243,7 +237,6 @@ compose up \
   --quiet-pull \
   --quiet-build \
   --remove-orphans \
-  --wait \
-  --wait-timeout "$STARTUP_TIMEOUT_SECONDS"
+  --wait
 
 echo "Multi Agent Intelligent Warehouse is ready on port 3001."
