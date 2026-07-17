@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BREV_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+BREV_DIR="$(cd "$(dirname "$0")" && pwd)"
 COMPOSE_FILE="${BREV_DIR}/docker-compose.maiw.yaml"
 ENV_FILE="${BREV_DIR}/.env"
 STARTUP_TIMEOUT_SECONDS="${STARTUP_TIMEOUT_SECONDS:-1800}"
