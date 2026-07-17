@@ -265,45 +265,10 @@ run_backend_with_default_passwords() {
     backend "$@"
 }
 
-# Persistent database data survives VM restarts, so only seed when any required
-# schema or demo dataset is absent. A partial prior run is repaired by reseeding.
-default_data_is_loaded() {
-  local required_tables_exist
-  local required_rows_exist
-
-  required_tables_exist="$(psql_exec -tAc "
-    SELECT CASE WHEN
-      to_regclass('public.users') IS NOT NULL AND
-      to_regclass('public.inventory_items') IS NOT NULL AND
-      to_regclass('public.tasks') IS NOT NULL AND
-      to_regclass('public.safety_incidents') IS NOT NULL AND
-      to_regclass('public.equipment_telemetry') IS NOT NULL AND
-      to_regclass('public.inventory_movements') IS NOT NULL
-    THEN 1 ELSE 0 END;
-  ")"
-
-  if [ "${required_tables_exist//[[:space:]]/}" != "1" ]; then
-    return 1
-  fi
-
-  required_rows_exist="$(psql_exec -tAc "
-    SELECT CASE WHEN
-      EXISTS (SELECT 1 FROM users WHERE username = 'admin') AND
-      EXISTS (SELECT 1 FROM users WHERE username = 'user') AND
-      EXISTS (SELECT 1 FROM inventory_items) AND
-      EXISTS (SELECT 1 FROM tasks) AND
-      EXISTS (SELECT 1 FROM safety_incidents) AND
-      EXISTS (SELECT 1 FROM equipment_telemetry) AND
-      EXISTS (SELECT 1 FROM inventory_movements)
-    THEN 1 ELSE 0 END;
-  ")"
-
-  [ "${required_rows_exist//[[:space:]]/}" = "1" ]
-}
-
+# Every launchable provisions a fresh VM, so initialize its empty database once.
 initialize_default_data() {
-  local migration
-  local migrations=(
+  local schema_file
+  local schema_files=(
     "${REPO_ROOT}/data/postgres/000_schema.sql"
     "${REPO_ROOT}/data/postgres/001_equipment_schema.sql"
     "${REPO_ROOT}/data/postgres/002_document_schema.sql"
@@ -311,15 +276,15 @@ initialize_default_data() {
     "${REPO_ROOT}/scripts/setup/create_model_tracking_tables.sql"
   )
 
-  echo "Applying database schemas..."
-  for migration in "${migrations[@]}"; do
-    if [ ! -f "$migration" ]; then
-      echo "Missing database migration ${migration}." >&2
+  echo "Creating the database schema..."
+  for schema_file in "${schema_files[@]}"; do
+    if [ ! -f "$schema_file" ]; then
+      echo "Missing database schema ${schema_file}." >&2
       return 1
     fi
 
-    echo "Applying $(basename "$migration")..."
-    psql_exec < "$migration"
+    echo "Applying $(basename "$schema_file")..."
+    psql_exec < "$schema_file"
   done
 
   echo "Loading default warehouse demo data..."
@@ -342,11 +307,7 @@ compose build --quiet
 echo "Starting the database..."
 compose up -d --wait timescaledb
 
-if default_data_is_loaded; then
-  echo "Default users and warehouse demo data are already loaded."
-else
-  initialize_default_data
-fi
+initialize_default_data
 
 echo "Starting the blueprint..."
 compose up \
