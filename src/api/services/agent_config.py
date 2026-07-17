@@ -28,6 +28,8 @@ from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
+_DEFAULT_CONFIG_DIR = Path(__file__).resolve().parents[3] / "data" / "config" / "agents"
+
 
 @dataclass
 class AgentPersona:
@@ -63,26 +65,11 @@ class AgentConfigLoader:
             config_dir: Directory containing agent config files. 
                        Defaults to data/config/agents/ relative to project root.
         """
-        if config_dir is None:
-            # Find project root (look for pyproject.toml or README.md)
-            current = Path(__file__).resolve()
-            project_root = None
-            for parent in [current] + list(current.parents):
-                if (parent / "pyproject.toml").exists() or (parent / "README.md").exists():
-                    project_root = parent
-                    break
-            
-            if project_root is None:
-                raise ValueError("Could not find project root directory")
-            
-            config_dir = project_root / "data" / "config" / "agents"
-        
-        self.config_dir = Path(config_dir)
+        self.config_dir = config_dir or _DEFAULT_CONFIG_DIR
         self._cache: Dict[str, AgentConfig] = {}
-        
-        if not self.config_dir.exists():
-            logger.warning(f"Agent config directory does not exist: {self.config_dir}")
-            self.config_dir.mkdir(parents=True, exist_ok=True)
+
+        if not self.config_dir.is_dir():
+            raise FileNotFoundError(f"Agent config directory does not exist: {self.config_dir}")
     
     def load_agent_config(self, agent_name: str) -> AgentConfig:
         """
@@ -208,4 +195,3 @@ def load_agent_config(agent_name: str) -> AgentConfig:
         AgentConfig object
     """
     return get_agent_config_loader().load_agent_config(agent_name)
-
