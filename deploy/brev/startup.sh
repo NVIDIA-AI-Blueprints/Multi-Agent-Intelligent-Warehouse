@@ -1,46 +1,104 @@
 #!/usr/bin/env bash
+
+# Started by the Brev launchables' startup script below. Production sets
+# BRANCH_NAME to "main"; staging sets it to "staging". Brev clones the Git
+# repository into ~/Multi-Agent-Intelligent-Warehouse before this runs, so this
+# script executes from that checked-out repository.
+#
+#   #!/bin/bash
+#   set -euo pipefail
+#
+#   readonly PROJECT_NAME="Multi-Agent-Intelligent-Warehouse"
+#   readonly BRANCH_NAME="main" # "staging" in the staging launchable
+#
+#   cd "${HOME}/${PROJECT_NAME}"
+#   git fetch origin \
+#     "refs/heads/${BRANCH_NAME}:refs/remotes/origin/${BRANCH_NAME}"
+#   git switch -C "${BRANCH_NAME}" "origin/${BRANCH_NAME}"
+#
+#   exec bash deploy/brev/startup.sh
+
 set -euo pipefail
 
-# Brev clones the launchable's source repository before running this script.
-# TARGET_BRANCH supports the launchable environment; the first argument is
-# convenient when running the script directly.
-readonly PROJECT_NAME="Multi-Agent-Intelligent-Warehouse"
-TARGET_BRANCH="${TARGET_BRANCH:-${1:-main}}"
-PROJECT_DIR="${HOME}/${PROJECT_NAME}"
-BREV_DIR="${PROJECT_DIR}/deploy/brev"
+# Resolve all deployment files relative to this script inside the cloned repo.
+readonly BREV_DIR="$(cd "$(dirname "$0")" && pwd)"
+readonly REPO_ROOT="$(cd "${BREV_DIR}/../.." && pwd)"
+readonly COMPOSE_FILE="${BREV_DIR}/docker-compose.maiw.yaml"
+readonly ENV_FILE="${BREV_DIR}/.env"
+readonly DEFAULT_ADMIN_PASSWORD="${DEFAULT_ADMIN_PASSWORD:-changeme}"
+readonly DEFAULT_USER_PASSWORD="${DEFAULT_USER_PASSWORD:-changeme}"
+export DEFAULT_ADMIN_PASSWORD DEFAULT_USER_PASSWORD
 
-if [ ! -d "${PROJECT_DIR}/.git" ]; then
-  echo "Expected Brev's pre-cloned repository at ${PROJECT_DIR}." >&2
-  exit 1
-fi
-
-if ! git check-ref-format --branch "$TARGET_BRANCH" >/dev/null; then
-  echo "Invalid target branch: ${TARGET_BRANCH}" >&2
+# Validate launch parameters and Brev-provided storage before changing the VM.
+if [ -z "${NVIDIA_API_KEY:-}" ]; then
+  echo "Missing required NVIDIA_API_KEY environment variable." >&2
   exit 2
 fi
 
-# SWITCH THE PRE-CLONED REPOSITORY TO THE REQUESTED BRANCH
-cd "$PROJECT_DIR"
-git fetch origin \
-  "refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}"
-git switch -C "$TARGET_BRANCH" "origin/${TARGET_BRANCH}"
+if ! LC_ALL=C printf '%s' "$NVIDIA_API_KEY" | grep -Eq '^nvapi-[A-Za-z0-9._-]+$'; then
+  echo "NVIDIA_API_KEY must begin with nvapi- and contain only letters, numbers, dots, underscores, or hyphens." >&2
+  exit 2
+fi
 
-if [ ! -d "$BREV_DIR" ]; then
-  echo "Branch ${TARGET_BRANCH} does not contain deploy/brev." >&2
+if [ ! -f "$COMPOSE_FILE" ]; then
+  echo "Missing ${COMPOSE_FILE}." >&2
   exit 1
 fi
 
-# RECONFIGURE DOCKER STORAGE TO EPHEMERAL DRIVE
-if [ -d /ephemeral ]; then
-  sudo systemctl stop docker.socket || true
-  sudo systemctl stop docker || true
-  sudo systemctl stop containerd || true
+if [ ! -d /ephemeral ]; then
+  echo "Expected Brev's persistent /ephemeral mount." >&2
+  exit 1
+fi
 
-  sudo mkdir -p /ephemeral/docker /ephemeral/containerd
+# Generate local service secrets without requiring another repository script.
+random_hex() {
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -hex 32
+  else
+    date +%s%N | sha256sum | awk '{print $1}'
+  fi
+}
 
-  # conigure docker
-  if [ -d /etc/docker ]; then
-    sudo tee /etc/docker/daemon.json >/dev/null <<'EOF'
+# Reuse secrets from the previous run so persistent service data stays usable.
+read_existing() {
+  local key="$1"
+  if [ -f "$ENV_FILE" ]; then
+    grep -E "^${key}=" "$ENV_FILE" | tail -n 1 | cut -d= -f2- || true
+  fi
+}
+
+postgres_password="$(read_existing POSTGRES_PASSWORD)"
+jwt_secret_key="$(read_existing JWT_SECRET_KEY)"
+
+if [ -z "$postgres_password" ]; then
+  postgres_password="$(random_hex)"
+fi
+
+if [ -z "$jwt_secret_key" ]; then
+  jwt_secret_key="$(random_hex)$(random_hex)"
+fi
+
+# Put container images and service data on Brev's persistent /ephemeral volume.
+echo "Configuring Docker and containerd storage under /ephemeral..."
+sudo systemctl stop docker.socket || true
+sudo systemctl stop docker || true
+sudo systemctl stop containerd || true
+
+sudo mkdir -p \
+  /ephemeral/docker \
+  /ephemeral/containerd \
+  /ephemeral/maiw/postgres \
+  /ephemeral/maiw/redis \
+  /ephemeral/maiw/kafka \
+  /ephemeral/maiw/etcd \
+  /ephemeral/maiw/minio \
+  /ephemeral/maiw/milvus \
+  /ephemeral/maiw/nim-cache \
+  /ephemeral/maiw/nim-models \
+  /etc/docker \
+  /etc/containerd
+
+sudo tee /etc/docker/daemon.json >/dev/null <<'EOF'
 {
   "data-root": "/ephemeral/docker",
   "default-runtime": "nvidia",
@@ -53,29 +111,211 @@ if [ -d /ephemeral ]; then
   }
 }
 EOF
-  fi
 
-  # configure containerd
-  if [ -d /etc/containerd ]; then
-    sudo tee /etc/containerd/config.toml >/dev/null <<'EOF'
+sudo tee /etc/containerd/config.toml >/dev/null <<'EOF'
 disabled_plugins = ["cri"]
 
 root = "/ephemeral/containerd"
 EOF
+
+# Replace containerd's default state directory with the persistent location.
+sudo rm -rf /var/lib/containerd
+sudo ln -sfn /ephemeral/containerd /var/lib/containerd
+
+sudo systemctl start containerd
+sudo systemctl start docker.socket
+sudo systemctl start docker
+
+# Do not continue until the restarted Docker daemon is ready to accept commands.
+for _ in $(seq 1 30); do
+  if docker info >/dev/null 2>&1; then
+    break
   fi
+  sleep 2
+done
 
-  sudo rm -rf /var/lib/containerd
-  sudo ln -sfn /ephemeral/containerd /var/lib/containerd
-
-  sudo systemctl start containerd || true
-  sudo systemctl start docker.socket || true
-  sudo systemctl start docker
+if ! docker info >/dev/null 2>&1; then
+  echo "Docker did not become ready." >&2
+  exit 1
 fi
 
-# START SERVICES
+# Build the complete Compose environment locally, including generated secrets.
+echo "Generating blueprint environment configuration..."
+umask 077
+tmp_env="$(mktemp "${BREV_DIR}/.env.tmp.XXXXXX")"
+login_output="$(mktemp)"
+
+cleanup() {
+  rm -f -- "$tmp_env" "$login_output"
+}
+trap cleanup EXIT
+
+{
+  printf '%s\n' '# Generated by deploy/brev/startup.sh.'
+  printf '%s\n' '# Do not commit this file.'
+  printf '%s\n' ''
+  printf '%s\n' 'ENVIRONMENT=development'
+  printf '%s\n' ''
+  printf '%s\n' 'POSTGRES_USER=warehouse'
+  printf 'POSTGRES_PASSWORD=%s\n' "$postgres_password"
+  printf '%s\n' 'POSTGRES_DB=warehouse'
+  printf '%s\n' 'DB_HOST=timescaledb'
+  printf '%s\n' 'DB_PORT=5432'
+  printf '%s\n' 'PGPORT=5435'
+  printf '%s\n' ''
+  printf 'JWT_SECRET_KEY=%s\n' "$jwt_secret_key"
+  printf '%s\n' 'REDIS_HOST=redis'
+  printf '%s\n' 'REDIS_PORT=6379'
+  printf '%s\n' 'REDIS_PASSWORD='
+  printf '%s\n' 'REDIS_DB=0'
+  printf '%s\n' ''
+  printf '%s\n' 'MILVUS_HOST=milvus'
+  printf '%s\n' 'MILVUS_PORT=19530'
+  printf '%s\n' 'MILVUS_USER=root'
+  printf '%s\n' 'MILVUS_PASSWORD=Milvus'
+  printf '%s\n' 'MILVUS_USE_GPU=true'
+  printf '%s\n' 'MILVUS_GPU_DEVICE_ID=0'
+  printf '%s\n' 'CUDA_VISIBLE_DEVICES=0,1,2,3'
+  printf '%s\n' 'MILVUS_INDEX_TYPE=GPU_CAGRA'
+  printf '%s\n' 'MILVUS_COLLECTION_NAME=warehouse_docs_gpu'
+  printf '%s\n' ''
+  printf '%s\n' 'KAFKA_BOOTSTRAP_SERVERS=kafka:9092'
+  printf '%s\n' ''
+  printf '%s\n' 'MINIO_ROOT_USER=minioadmin'
+  printf '%s\n' 'MINIO_ROOT_PASSWORD=minioadmin'
+  printf '%s\n' 'MINIO_ACCESS_KEY=minioadmin'
+  printf '%s\n' 'MINIO_SECRET_KEY=minioadmin'
+  printf '%s\n' ''
+  printf 'NVIDIA_API_KEY=%s\n' "$NVIDIA_API_KEY"
+  printf 'EMBEDDING_API_KEY=%s\n' "$NVIDIA_API_KEY"
+  printf 'RAIL_API_KEY=%s\n' "$NVIDIA_API_KEY"
+  printf 'NEMO_RETRIEVER_API_KEY=%s\n' "$NVIDIA_API_KEY"
+  printf 'NEMO_OCR_API_KEY=%s\n' "$NVIDIA_API_KEY"
+  printf 'NEMO_PARSE_API_KEY=%s\n' "$NVIDIA_API_KEY"
+  printf 'LLAMA_NANO_VL_API_KEY=%s\n' "$NVIDIA_API_KEY"
+  printf 'LLAMA_49B_API_KEY=%s\n' "$NVIDIA_API_KEY"
+  printf '%s\n' ''
+  printf '%s\n' 'LLM_NIM_IMAGE=nvcr.io/nim/nvidia/llama-3.3-nemotron-super-49b-v1.5:2.0.6'
+  printf '%s\n' 'LLM_NIM_URL=http://llm-nim:8000/v1'
+  printf '%s\n' 'LLM_NIM_PORT=8000'
+  printf '%s\n' 'LLM_MODEL=nvidia/llama-3.3-nemotron-super-49b-v1.5'
+  printf '%s\n' 'LLM_TEMPERATURE=0.1'
+  printf '%s\n' 'LLM_MAX_TOKENS=2000'
+  printf '%s\n' 'LLM_TOP_P=1.0'
+  printf '%s\n' 'LLM_FREQUENCY_PENALTY=0.0'
+  printf '%s\n' 'LLM_PRESENCE_PENALTY=0.0'
+  printf '%s\n' 'LLM_CLIENT_TIMEOUT=120'
+  printf '%s\n' 'LLM_CACHE_ENABLED=true'
+  printf '%s\n' 'LLM_CACHE_TTL_SECONDS=300'
+  printf '%s\n' ''
+  printf '%s\n' 'EMBEDDING_NIM_URL=https://integrate.api.nvidia.com/v1'
+  printf '%s\n' 'EMBEDDING_MODEL=nvidia/llama-nemotron-embed-vl-1b-v2'
+  printf '%s\n' 'EMBEDDING_DIMENSION=2048'
+  printf '%s\n' ''
+  printf '%s\n' 'RAIL_API_URL=https://integrate.api.nvidia.com/v1'
+  printf '%s\n' 'LLAMA_49B_TIMEOUT=120'
+  printf '%s\n' ''
+  printf '%s\n' 'CORS_ORIGINS=http://localhost:3001,http://localhost:3000,http://127.0.0.1:3001,http://127.0.0.1:3000'
+  printf '%s\n' 'MAX_REQUEST_SIZE=10485760'
+  printf '%s\n' 'MAX_UPLOAD_SIZE=52428800'
+} > "$tmp_env"
+
+# Replace the environment file atomically and keep its secrets private.
+mv "$tmp_env" "$ENV_FILE"
+chmod 600 "$ENV_FILE"
+
+# Authenticate through stdin so the API key never appears in the process list.
+echo "Authenticating Docker with nvcr.io..."
+if ! printf '%s' "$NVIDIA_API_KEY" \
+  | docker login nvcr.io -u '$oauthtoken' --password-stdin >"$login_output" 2>&1; then
+  echo "Could not authenticate with nvcr.io using NVIDIA_API_KEY." >&2
+  sed 's/^/  /' "$login_output" >&2
+  exit 1
+fi
+
+# Run Compose with the repository definition and generated environment.
 cd "$BREV_DIR"
-mkdir -p generated/entities generated/setup-state
-# pull all public containers for the blueprint
-docker compose -f docker-compose.maiw.yaml pull --ignore-buildable || true
-# run the olivetin dashboard
-docker compose -f docker-compose.olivetin.yaml up -d
+
+compose() {
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
+}
+
+# Run SQL through the database container so the VM needs no local psql client.
+psql_exec() {
+  docker exec -i wosa-timescaledb \
+    psql -v ON_ERROR_STOP=1 \
+      -U warehouse \
+      -d warehouse "$@"
+}
+
+# Run the repository's data utilities in the backend image built above.
+run_backend() {
+  compose run --rm --no-deps \
+    -e PGHOST=timescaledb \
+    -e PGPORT=5432 \
+    backend "$@"
+}
+
+run_backend_with_default_passwords() {
+  compose run --rm --no-deps \
+    -e PGHOST=timescaledb \
+    -e PGPORT=5432 \
+    -e DEFAULT_ADMIN_PASSWORD \
+    -e DEFAULT_USER_PASSWORD \
+    backend "$@"
+}
+
+# Every launchable provisions a fresh VM, so initialize its empty database once.
+initialize_default_data() {
+  local schema_file
+  local schema_files=(
+    "${REPO_ROOT}/data/postgres/000_schema.sql"
+    "${REPO_ROOT}/data/postgres/001_equipment_schema.sql"
+    "${REPO_ROOT}/data/postgres/002_document_schema.sql"
+    "${REPO_ROOT}/data/postgres/004_inventory_movements_schema.sql"
+    "${REPO_ROOT}/scripts/setup/create_model_tracking_tables.sql"
+  )
+
+  echo "Creating the database schema..."
+  for schema_file in "${schema_files[@]}"; do
+    if [ ! -f "$schema_file" ]; then
+      echo "Missing database schema ${schema_file}." >&2
+      return 1
+    fi
+
+    echo "Applying $(basename "$schema_file")..."
+    psql_exec < "$schema_file"
+  done
+
+  echo "Loading default warehouse demo data..."
+  run_backend_with_default_passwords python scripts/data/quick_demo_data.py
+
+  echo "Loading historical demand data..."
+  run_backend python scripts/data/generate_historical_demand.py
+
+  echo "Creating default application users..."
+  run_backend_with_default_passwords python scripts/setup/create_default_users.py
+}
+
+echo "Pulling blueprint images..."
+compose pull --quiet --ignore-buildable
+
+echo "Building blueprint application images..."
+compose build --quiet
+
+# Start the database first so schema and demo data exist before the app starts.
+echo "Starting the database..."
+compose up -d --wait timescaledb
+
+initialize_default_data
+
+echo "Starting the blueprint..."
+compose up \
+  -d \
+  --quiet-pull \
+  --quiet-build \
+  --remove-orphans \
+  --wait
+
+echo "Multi Agent Intelligent Warehouse is ready on port 3001."
+echo "Default users: admin and user. Password: changeme unless overridden."
