@@ -1,17 +1,33 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
-TARGET_BRANCH="${TARGET_BRANCH:-main}"
-PROJECT_DIR="${HOME}/Multi-Agent-Intelligent-Warehouse"
+# Brev clones the launchable's source repository before running this script.
+# TARGET_BRANCH supports the launchable environment; the first argument is
+# convenient when running the script directly.
+readonly PROJECT_NAME="Multi-Agent-Intelligent-Warehouse"
+TARGET_BRANCH="${TARGET_BRANCH:-${1:-main}}"
+PROJECT_DIR="${HOME}/${PROJECT_NAME}"
 BREV_DIR="${PROJECT_DIR}/deploy/brev"
 
-# SWITCH TO TARGET BRANCH
+if [ ! -d "${PROJECT_DIR}/.git" ]; then
+  echo "Expected Brev's pre-cloned repository at ${PROJECT_DIR}." >&2
+  exit 1
+fi
+
+if ! git check-ref-format --branch "$TARGET_BRANCH" >/dev/null; then
+  echo "Invalid target branch: ${TARGET_BRANCH}" >&2
+  exit 2
+fi
+
+# SWITCH THE PRE-CLONED REPOSITORY TO THE REQUESTED BRANCH
 cd "$PROJECT_DIR"
-git fetch origin "$TARGET_BRANCH" || true
-if git rev-parse --verify "origin/${TARGET_BRANCH}" >/dev/null 2>&1; then
-  git switch -C "$TARGET_BRANCH" "origin/${TARGET_BRANCH}"
-else
-  git switch "$TARGET_BRANCH"
+git fetch origin \
+  "refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}"
+git switch -C "$TARGET_BRANCH" "origin/${TARGET_BRANCH}"
+
+if [ ! -d "$BREV_DIR" ]; then
+  echo "Branch ${TARGET_BRANCH} does not contain deploy/brev." >&2
+  exit 1
 fi
 
 # RECONFIGURE DOCKER STORAGE TO EPHEMERAL DRIVE
