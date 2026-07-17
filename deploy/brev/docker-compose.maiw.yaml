@@ -7,7 +7,7 @@ services:
         restart: unless-stopped
         environment:
             POSTGRES_USER: ${POSTGRES_USER:-warehouse}
-            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run the OliveTin API key setup first to generate deploy/brev/.env}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run deploy/brev/startup.sh to generate deploy/brev/.env}
             POSTGRES_DB: ${POSTGRES_DB:-warehouse}
         ports:
             - "5435:5432"
@@ -127,8 +127,8 @@ services:
         ports:
             - "${LLM_NIM_PORT:-8000}:8000"
         environment:
-            NVIDIA_API_KEY: ${NVIDIA_API_KEY:?Run the OliveTin API key setup first to generate deploy/brev/.env}
-            NGC_API_KEY: ${NVIDIA_API_KEY:?Run the OliveTin API key setup first to generate deploy/brev/.env}
+            NVIDIA_API_KEY: ${NVIDIA_API_KEY:?Run deploy/brev/startup.sh to generate deploy/brev/.env}
+            NGC_API_KEY: ${NVIDIA_API_KEY:?Run deploy/brev/startup.sh to generate deploy/brev/.env}
             CUDA_VISIBLE_DEVICES: ${CUDA_VISIBLE_DEVICES:-0,1,2,3}
             NVIDIA_VISIBLE_DEVICES: all
             NVIDIA_DRIVER_CAPABILITIES: compute,utility
@@ -161,7 +161,7 @@ services:
             DB_PORT: 5432
             PGHOST: timescaledb
             PGPORT: 5432
-            DATABASE_URL: postgresql://${POSTGRES_USER:-warehouse}:${POSTGRES_PASSWORD:?Run the OliveTin API key setup first to generate deploy/brev/.env}@timescaledb:5432/${POSTGRES_DB:-warehouse}
+            DATABASE_URL: postgresql://${POSTGRES_USER:-warehouse}:${POSTGRES_PASSWORD:?Run deploy/brev/startup.sh to generate deploy/brev/.env}@timescaledb:5432/${POSTGRES_DB:-warehouse}
             REDIS_HOST: redis
             REDIS_PORT: 6379
             MILVUS_HOST: milvus
