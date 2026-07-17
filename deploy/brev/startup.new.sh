@@ -20,10 +20,12 @@
 
 set -euo pipefail
 
+# Resolve all deployment files relative to this script inside the cloned repo.
 BREV_DIR="$(cd "$(dirname "$0")" && pwd)"
 COMPOSE_FILE="${BREV_DIR}/docker-compose.maiw.yaml"
 ENV_FILE="${BREV_DIR}/.env"
 
+# Validate launch parameters and Brev-provided storage before changing the VM.
 if [ -z "${NVIDIA_API_KEY:-}" ]; then
   echo "Missing required NVIDIA_API_KEY environment variable." >&2
   exit 2
@@ -44,6 +46,7 @@ if [ ! -d /ephemeral ]; then
   exit 1
 fi
 
+# Generate local service secrets without requiring another repository script.
 random_hex() {
   if command -v openssl >/dev/null 2>&1; then
     openssl rand -hex 32
@@ -52,6 +55,7 @@ random_hex() {
   fi
 }
 
+# Reuse secrets from the previous run so persistent service data stays usable.
 read_existing() {
   local key="$1"
   if [ -f "$ENV_FILE" ]; then
@@ -70,6 +74,7 @@ if [ -z "$jwt_secret_key" ]; then
   jwt_secret_key="$(random_hex)$(random_hex)"
 fi
 
+# Put container images and service data on Brev's persistent /ephemeral volume.
 echo "Configuring Docker and containerd storage under /ephemeral..."
 sudo systemctl stop docker.socket || true
 sudo systemctl stop docker || true
@@ -109,6 +114,7 @@ disabled_plugins = ["cri"]
 root = "/ephemeral/containerd"
 EOF
 
+# Replace containerd's default state directory with the persistent location.
 sudo rm -rf /var/lib/containerd
 sudo ln -sfn /ephemeral/containerd /var/lib/containerd
 
@@ -116,6 +122,7 @@ sudo systemctl start containerd
 sudo systemctl start docker.socket
 sudo systemctl start docker
 
+# Do not continue until the restarted Docker daemon is ready to accept commands.
 for _ in $(seq 1 30); do
   if docker info >/dev/null 2>&1; then
     break
@@ -128,6 +135,7 @@ if ! docker info >/dev/null 2>&1; then
   exit 1
 fi
 
+# Build the complete Compose environment locally, including generated secrets.
 echo "Generating blueprint environment configuration..."
 umask 077
 tmp_env="$(mktemp "${BREV_DIR}/.env.tmp.XXXXXX")"
@@ -208,9 +216,11 @@ trap cleanup EXIT
   printf '%s\n' 'MAX_UPLOAD_SIZE=52428800'
 } > "$tmp_env"
 
+# Replace the environment file atomically and keep its secrets private.
 mv "$tmp_env" "$ENV_FILE"
 chmod 600 "$ENV_FILE"
 
+# Authenticate through stdin so the API key never appears in the process list.
 echo "Authenticating Docker with nvcr.io..."
 if ! printf '%s' "$NVIDIA_API_KEY" \
   | docker login nvcr.io -u '$oauthtoken' --password-stdin >"$login_output" 2>&1; then
@@ -219,6 +229,7 @@ if ! printf '%s' "$NVIDIA_API_KEY" \
   exit 1
 fi
 
+# Run Compose from the deployment directory with the generated environment.
 cd "$BREV_DIR"
 
 compose() {
