@@ -21,9 +21,13 @@
 set -euo pipefail
 
 # Resolve all deployment files relative to this script inside the cloned repo.
-BREV_DIR="$(cd "$(dirname "$0")" && pwd)"
-COMPOSE_FILE="${BREV_DIR}/docker-compose.maiw.yaml"
-ENV_FILE="${BREV_DIR}/.env"
+readonly BREV_DIR="$(cd "$(dirname "$0")" && pwd)"
+readonly REPO_ROOT="$(cd "${BREV_DIR}/../.." && pwd)"
+readonly COMPOSE_FILE="${BREV_DIR}/docker-compose.maiw.yaml"
+readonly ENV_FILE="${BREV_DIR}/.env"
+readonly DEFAULT_ADMIN_PASSWORD="${DEFAULT_ADMIN_PASSWORD:-changeme}"
+readonly DEFAULT_USER_PASSWORD="${DEFAULT_USER_PASSWORD:-changeme}"
+export DEFAULT_ADMIN_PASSWORD DEFAULT_USER_PASSWORD
 
 # Validate launch parameters and Brev-provided storage before changing the VM.
 if [ -z "${NVIDIA_API_KEY:-}" ]; then
@@ -236,11 +240,74 @@ compose() {
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
 }
 
+# Run SQL through the database container so the VM needs no local psql client.
+psql_exec() {
+  docker exec -i wosa-timescaledb \
+    psql -v ON_ERROR_STOP=1 \
+      -U warehouse \
+      -d warehouse "$@"
+}
+
+# Run the repository's data utilities in the backend image built above.
+run_backend() {
+  compose run --rm --no-deps \
+    -e PGHOST=timescaledb \
+    -e PGPORT=5432 \
+    backend "$@"
+}
+
+run_backend_with_default_passwords() {
+  compose run --rm --no-deps \
+    -e PGHOST=timescaledb \
+    -e PGPORT=5432 \
+    -e DEFAULT_ADMIN_PASSWORD \
+    -e DEFAULT_USER_PASSWORD \
+    backend "$@"
+}
+
+# Every launchable provisions a fresh VM, so initialize its empty database once.
+initialize_default_data() {
+  local schema_file
+  local schema_files=(
+    "${REPO_ROOT}/data/postgres/000_schema.sql"
+    "${REPO_ROOT}/data/postgres/001_equipment_schema.sql"
+    "${REPO_ROOT}/data/postgres/002_document_schema.sql"
+    "${REPO_ROOT}/data/postgres/004_inventory_movements_schema.sql"
+    "${REPO_ROOT}/scripts/setup/create_model_tracking_tables.sql"
+  )
+
+  echo "Creating the database schema..."
+  for schema_file in "${schema_files[@]}"; do
+    if [ ! -f "$schema_file" ]; then
+      echo "Missing database schema ${schema_file}." >&2
+      return 1
+    fi
+
+    echo "Applying $(basename "$schema_file")..."
+    psql_exec < "$schema_file"
+  done
+
+  echo "Loading default warehouse demo data..."
+  run_backend_with_default_passwords python scripts/data/quick_demo_data.py
+
+  echo "Loading historical demand data..."
+  run_backend python scripts/data/generate_historical_demand.py
+
+  echo "Creating default application users..."
+  run_backend_with_default_passwords python scripts/setup/create_default_users.py
+}
+
 echo "Pulling blueprint images..."
 compose pull --quiet --ignore-buildable
 
 echo "Building blueprint application images..."
 compose build --quiet
+
+# Start the database first so schema and demo data exist before the app starts.
+echo "Starting the database..."
+compose up -d --wait timescaledb
+
+initialize_default_data
 
 echo "Starting the blueprint..."
 compose up \
@@ -251,3 +318,4 @@ compose up \
   --wait
 
 echo "Multi Agent Intelligent Warehouse is ready on port 3001."
+echo "Default users: admin and user. Password: changeme unless overridden."
