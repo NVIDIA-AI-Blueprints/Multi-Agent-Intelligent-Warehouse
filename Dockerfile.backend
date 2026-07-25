@@ -45,6 +45,13 @@ COPY --from=backend-deps /usr/local/bin /usr/local/bin
 COPY src/ ./src/
 # Copy guardrails configuration (required for NeMo Guardrails)
 COPY data/config/guardrails/ ./data/config/guardrails/
+# Copy agent personas and prompts loaded by the backend at runtime.
+COPY data/config/agents/ ./data/config/agents/
+# Copy setup/data utilities used by Brev staging actions.
+RUN mkdir -p ./scripts/setup ./scripts/data
+COPY scripts/setup/create_default_users.py ./scripts/setup/create_default_users.py
+COPY scripts/data/quick_demo_data.py ./scripts/data/quick_demo_data.py
+COPY scripts/data/generate_historical_demand.py ./scripts/data/generate_historical_demand.py
 
 # Build arguments for version injection
 ARG VERSION=0.0.0
@@ -74,4 +81,3 @@ EXPOSE 8001
 
 # Start command
 CMD ["uvicorn", "src.api.app:app", "--host", "0.0.0.0", "--port", "8001"]
-

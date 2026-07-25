@@ -1,0 +1,211 @@
+name: maiw-brev
+
+services:
+    timescaledb:
+        image: timescale/timescaledb:2.15.2-pg16
+        container_name: wosa-timescaledb
+        restart: unless-stopped
+        environment:
+            POSTGRES_USER: ${POSTGRES_USER:-warehouse}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run deploy/brev/startup.sh to generate deploy/brev/.env}
+            POSTGRES_DB: ${POSTGRES_DB:-warehouse}
+        ports:
+            - "5435:5432"
+        volumes:
+            - /ephemeral/maiw/postgres:/var/lib/postgresql/data
+        healthcheck:
+            test:
+                [
+                    "CMD-SHELL",
+                    "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}",
+                ]
+            interval: 5s
+            timeout: 3s
+            retries: 20
+
+    redis:
+        image: redis:7
+        container_name: wosa-redis
+        restart: unless-stopped
+        command: ["redis-server", "--appendonly", "yes"]
+        ports:
+            - "6379:6379"
+        volumes:
+            - /ephemeral/maiw/redis:/data
+
+    kafka:
+        image: apache/kafka:3.7.0
+        container_name: wosa-kafka
+        restart: unless-stopped
+        user: root
+        environment:
+            KAFKA_NODE_ID: 1
+            KAFKA_PROCESS_ROLES: broker,controller
+            KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+            KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+            KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+            KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+            KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+            KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+            KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+            KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+            KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+            KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+            CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+        ports:
+            - "9092:9092"
+        volumes:
+            - /ephemeral/maiw/kafka:/tmp/kraft-combined-logs
+        command:
+            - sh
+            - -c
+            - |
+                chmod 777 /tmp/kraft-combined-logs || true
+                if [ ! -f /tmp/kraft-combined-logs/.formatted ]; then
+                  /opt/kafka/bin/kafka-storage.sh format -t $${CLUSTER_ID} -c /opt/kafka/config/kraft/server.properties
+                  touch /tmp/kraft-combined-logs/.formatted
+                fi
+                exec /opt/kafka/bin/kafka-server-start.sh /opt/kafka/config/kraft/server.properties
+
+    etcd:
+        image: quay.io/coreos/etcd:v3.5.9
+        container_name: wosa-etcd
+        restart: unless-stopped
+        environment:
+            ETCD_AUTO_COMPACTION_MODE: revision
+            ETCD_AUTO_COMPACTION_RETENTION: 1000
+            ETCD_QUOTA_BACKEND_BYTES: 4294967296
+            ETCD_HEARTBEAT_INTERVAL: 500
+            ETCD_ELECTION_TIMEOUT: 2500
+            ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+            ETCD_ADVERTISE_CLIENT_URLS: http://etcd:2379
+        ports:
+            - "2379:2379"
+        volumes:
+            - /ephemeral/maiw/etcd:/etcd
+
+    minio:
+        image: minio/minio:RELEASE.2024-03-15T01-07-19Z
+        container_name: wosa-minio
+        restart: unless-stopped
+        environment:
+            MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+            MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+        command: server /data --console-address ":9001"
+        ports:
+            - "9000:9000"
+            - "9001:9001"
+        volumes:
+            - /ephemeral/maiw/minio:/data
+
+    milvus:
+        image: milvusdb/milvus:v2.4.3
+        container_name: wosa-milvus
+        restart: unless-stopped
+        command: ["milvus", "run", "standalone"]
+        environment:
+            ETCD_ENDPOINTS: etcd:2379
+            MINIO_ADDRESS: minio:9000
+            MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+            MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+            MINIO_USE_SSL: "false"
+        ports:
+            - "19530:19530"
+            - "9091:9091"
+        volumes:
+            - /ephemeral/maiw/milvus:/var/lib/milvus
+        depends_on:
+            - etcd
+            - minio
+
+    llm-nim:
+        image: ${LLM_NIM_IMAGE:-nvcr.io/nim/nvidia/llama-3.3-nemotron-super-49b-v1.5:2.0.6}
+        container_name: wosa-llm-nim
+        env_file:
+            - path: ./.env
+              required: false
+        ports:
+            - "${LLM_NIM_PORT:-8000}:8000"
+        environment:
+            NVIDIA_API_KEY: ${NVIDIA_API_KEY:?Run deploy/brev/startup.sh to generate deploy/brev/.env}
+            NGC_API_KEY: ${NVIDIA_API_KEY:?Run deploy/brev/startup.sh to generate deploy/brev/.env}
+            CUDA_VISIBLE_DEVICES: ${CUDA_VISIBLE_DEVICES:-0,1,2,3}
+            NVIDIA_VISIBLE_DEVICES: all
+            NVIDIA_DRIVER_CAPABILITIES: compute,utility
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                        - driver: nvidia
+                          count: all
+                          capabilities: [gpu]
+        ipc: host
+        ulimits:
+            memlock: -1
+            stack: 67108864
+        volumes:
+            - /ephemeral/maiw/nim-cache:/root/.cache
+            - /ephemeral/maiw/nim-models:/models
+        restart: unless-stopped
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8000/v1/health/ready"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 600s
+
+    backend:
+        build:
+            context: ../..
+            dockerfile: Dockerfile.backend
+        container_name: wosa-backend
+        env_file:
+            - path: ./.env
+              required: false
+        environment:
+            DB_HOST: timescaledb
+            DB_PORT: 5432
+            PGHOST: timescaledb
+            PGPORT: 5432
+            DATABASE_URL: postgresql://${POSTGRES_USER:-warehouse}:${POSTGRES_PASSWORD:?Run deploy/brev/startup.sh to generate deploy/brev/.env}@timescaledb:5432/${POSTGRES_DB:-warehouse}
+            REDIS_HOST: redis
+            REDIS_PORT: 6379
+            MILVUS_HOST: milvus
+            MILVUS_PORT: 19530
+            KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+            LLM_NIM_URL: http://llm-nim:8000/v1
+            ENVIRONMENT: development
+        ports:
+            - "8001:8001"
+        depends_on:
+            - timescaledb
+            - redis
+            - milvus
+            - kafka
+            - llm-nim
+        restart: unless-stopped
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8001/api/v1/health"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 40s
+
+    frontend:
+        build:
+            context: ../..
+            dockerfile: Dockerfile.frontend
+        container_name: wosa-frontend
+        environment:
+            BACKEND_URL: http://backend:8001
+            REACT_APP_API_URL: /api/v1
+            PORT: 3001
+            HOST: 0.0.0.0
+            CHOKIDAR_USEPOLLING: "true"
+        ports:
+            - "3001:3001"
+        depends_on:
+            - backend
+        restart: unless-stopped
+        stdin_open: true
+        tty: true

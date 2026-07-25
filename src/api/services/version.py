@@ -27,6 +27,7 @@ import os
 import subprocess
 import sys
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, Any, Optional
 import logging
 
@@ -45,8 +46,28 @@ class VersionService:
         """Initialize the version service."""
         self.version = self._get_version()
         self.git_sha = self._get_git_sha()
-        self.build_time = datetime.utcnow().isoformat()
+        self.build_time = os.getenv("BUILD_TIME") or datetime.utcnow().isoformat()
         self.build_info = self._get_build_info()
+
+    @staticmethod
+    def _env_value(name: str) -> Optional[str]:
+        """Return a meaningful environment value, ignoring empty/unknown defaults."""
+        value = os.getenv(name)
+        if value and value.strip() and value.strip().lower() != "unknown":
+            return value.strip()
+        return None
+
+    @staticmethod
+    def _has_git_metadata() -> bool:
+        """Check whether git metadata exists before invoking git commands."""
+        if os.getenv("GIT_DIR"):
+            return True
+
+        current = Path.cwd()
+        for path in (current, *current.parents):
+            if (path / ".git").exists():
+                return True
+        return False
 
     def _get_version(self) -> str:
         """
@@ -55,6 +76,15 @@ class VersionService:
         Returns:
             str: Version string (e.g., "1.0.0", "1.0.0-dev")
         """
+        env_version = self._env_value("VERSION")
+        if env_version:
+            logger.info(f"Build version: {env_version}")
+            return env_version
+
+        if not self._has_git_metadata():
+            logger.info("Git metadata unavailable; using default version")
+            return "0.0.0-dev"
+
         try:
             # Try to get version from git tag
             result = subprocess.run(
@@ -83,6 +113,16 @@ class VersionService:
         Returns:
             str: Short git SHA (8 characters)
         """
+        env_sha = self._env_value("GIT_SHA")
+        if env_sha:
+            sha = env_sha[:8]
+            logger.info(f"Build Git SHA: {sha}")
+            return sha
+
+        if not self._has_git_metadata():
+            logger.info("Git metadata unavailable; using unknown Git SHA")
+            return "unknown"
+
         try:
             result = subprocess.run(
                 ["git", "rev-parse", "HEAD"],
@@ -109,6 +149,10 @@ class VersionService:
         Returns:
             int: Number of commits
         """
+        if not self._has_git_metadata():
+            logger.info("Git metadata unavailable; using commit count 0")
+            return 0
+
         try:
             result = subprocess.run(
                 ["git", "rev-list", "--count", "HEAD"],
@@ -136,6 +180,15 @@ class VersionService:
         Returns:
             str: Branch name
         """
+        env_branch = self._env_value("GIT_BRANCH")
+        if env_branch:
+            logger.info(f"Build Git branch: {env_branch}")
+            return env_branch
+
+        if not self._has_git_metadata():
+            logger.info("Git metadata unavailable; using unknown Git branch")
+            return "unknown"
+
         try:
             result = subprocess.run(
                 ["git", "rev-parse", "--abbrev-ref", "HEAD"],

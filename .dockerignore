@@ -172,8 +172,15 @@ deploy/
 monitoring/
 nginx.conf
 
-# Scripts (not needed in runtime, only source code)
-scripts/
+# Scripts (most are not needed in runtime, only source code)
+scripts/*
+!scripts/setup/
+scripts/setup/*
+!scripts/setup/create_default_users.py
+!scripts/data/
+scripts/data/*
+!scripts/data/quick_demo_data.py
+!scripts/data/generate_historical_demand.py
 
 # Type checking and linting
 .mypy_cache/
@@ -219,4 +226,3 @@ __pypackages__/
 local_settings.py
 local_config.py
 config.local.*
-

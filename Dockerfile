@@ -76,6 +76,8 @@ COPY --from=backend-deps /usr/local/bin /usr/local/bin
 COPY src/ ./src/
 # Copy guardrails configuration (required for NeMo Guardrails)
 COPY data/config/guardrails/ ./data/config/guardrails/
+# Copy agent personas and prompts loaded by the backend at runtime.
+COPY data/config/agents/ ./data/config/agents/
 
 # Build arguments for version injection
 ARG VERSION=0.0.0

@@ -164,6 +164,9 @@ services:
     ports:
       - "${LLM_NIM_PORT:-8000}:8000"
     environment:
+      # NIM containers require NGC_API_KEY for startup/model download auth.
+      # Fall back to NVIDIA_API_KEY for older .env files created by the setup notebook.
+      - NGC_API_KEY=${NGC_API_KEY:-${NVIDIA_API_KEY:-}}
       - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
       - CUDA_VISIBLE_DEVICES=0,1,2,3
       - NVIDIA_VISIBLE_DEVICES=all

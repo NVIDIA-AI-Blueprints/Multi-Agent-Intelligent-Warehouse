@@ -66,7 +66,7 @@ class NeMoGuardrailsSDKService:
         # Determine config path
         if config_path is None:
             # Default to data/config/guardrails/
-            project_root = Path(__file__).parent.parent.parent.parent
+            project_root = Path(__file__).resolve().parents[4]
             config_path = project_root / "data" / "config" / "guardrails"
         else:
             config_path = Path(config_path)
@@ -264,4 +264,3 @@ class NeMoGuardrailsSDKService:
             # Clean up resources if needed
             pass
         self._initialized = False
-
