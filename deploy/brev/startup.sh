@@ -313,7 +313,6 @@ echo "Starting the blueprint..."
 compose up \
   -d \
   --quiet-pull \
-  --quiet-build \
   --remove-orphans \
   --wait
 
