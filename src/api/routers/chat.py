@@ -613,6 +613,24 @@ def _create_simple_fallback_response(message: str, session_id: str) -> ChatRespo
     )
 
 
+def _create_error_chat_response(
+    user_message: str,
+    error_message: str,
+    error_type: str,
+    session_id: str,
+    confidence: float,
+) -> ChatResponse:
+    """Create a ChatResponse for error conditions."""
+    return ChatResponse(
+        reply=user_message,
+        route="error",
+        intent="error",
+        session_id=session_id,
+        confidence=confidence,
+        structured_data={"error": error_message, "error_type": error_type},
+    )
+
+
 class ConversationSummaryRequest(BaseModel):
     session_id: str
 
