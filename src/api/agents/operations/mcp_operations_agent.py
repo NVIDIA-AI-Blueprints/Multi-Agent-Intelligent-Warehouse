@@ -34,7 +34,8 @@ from src.api.services.mcp.tool_discovery import (
     ToolDiscoveryService,
     DiscoveredTool,
     ToolCategory,
-)
+
+    get_tool_discovery_service,)
 from src.api.services.mcp.base import MCPManager
 from src.api.services.reasoning import (
     get_reasoning_engine,
@@ -113,7 +114,7 @@ class MCPOperationsCoordinationAgent:
 
             # Initialize MCP components
             self.mcp_manager = MCPManager()
-            self.tool_discovery = ToolDiscoveryService()
+            self.tool_discovery = get_tool_discovery_service()
 
             # Start tool discovery
             await self.tool_discovery.start_discovery()

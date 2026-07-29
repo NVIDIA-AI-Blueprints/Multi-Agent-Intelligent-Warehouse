@@ -369,8 +369,14 @@ class PerformanceMonitor:
             m for m in self.metrics
             if m.name == "timeout_occurred" and m.timestamp.timestamp() >= cutoff_time
         ]
-        if timeout_metrics and len(recent_requests) > 0:
-            timeout_rate = len(timeout_metrics) / len(recent_requests)
+        # `recent_requests` is local to get_performance_stats(); referencing it here
+        # raised `NameError: name 'recent_requests' is not defined` on EVERY alert
+        # check, so the timeout-rate alert never fired and the alert loop logged an
+        # error each cycle. `stats` is already in scope above and carries the same
+        # count for the requested window.
+        total_requests = stats.get("total_requests", 0)
+        if timeout_metrics and total_requests > 0:
+            timeout_rate = len(timeout_metrics) / total_requests
             if timeout_rate > 0.10:  # 10% timeout rate
                 # Group timeouts by location
                 timeout_locations = defaultdict(int)

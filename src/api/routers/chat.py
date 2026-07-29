@@ -517,6 +517,34 @@ def _create_fallback_chat_response(
     )
 
 
+def _create_error_chat_response(
+    user_message: str,
+    error_message: str,
+    error_type: str,
+    session_id: str,
+    confidence: float = 0.0,
+) -> ChatResponse:
+    """Create a ChatResponse for an unrecoverable error.
+
+    Two call sites (the generic error handler and the asyncio.TimeoutError
+    handler) already invoked this helper, but it was never defined -- so the
+    error path itself raised `NameError: name '_create_error_chat_response' is
+    not defined` and the request returned HTTP 500 instead of the intended
+    graceful message.
+
+    The technical detail is surfaced in structured_data rather than in `reply`,
+    so users see the friendly text while clients can still inspect the cause.
+    """
+    return ChatResponse(
+        reply=user_message,
+        route="error",
+        intent="error",
+        session_id=session_id,
+        confidence=confidence,
+        structured_data={"error": error_type, "message": error_message},
+    )
+
+
 def _create_safety_violation_response(
     violations: List[str],
     confidence: float,

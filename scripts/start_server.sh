@@ -30,12 +30,23 @@ fi
 # Set default port if not set
 PORT=${PORT:-8001}
 
-# Check if port is already in use
+# Check if port is already in use.
+#
+# This previously ran `lsof -ti:$PORT | xargs kill -9` unconditionally, which
+# SIGKILLs whatever owns the port -- not necessarily a previous run of this
+# server. On a developer machine port 8001 is commonly held by an unrelated
+# service, and that process was destroyed without warning or confirmation.
+# Refuse to start instead, and tell the user how to proceed.
 if lsof -Pi :$PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
-    echo "⚠️  Port $PORT is already in use"
-    echo "   Stopping existing process..."
-    lsof -ti:$PORT | xargs kill -9 2>/dev/null || true
-    sleep 2
+    OWNER_PID=$(lsof -ti:$PORT | head -1)
+    OWNER_CMD=$(ps -p "$OWNER_PID" -o comm= 2>/dev/null || echo "unknown")
+    echo "❌ Port $PORT is already in use by PID $OWNER_PID ($OWNER_CMD)"
+    echo ""
+    echo "   This script will not kill it -- it may not belong to this project."
+    echo "   Either:"
+    echo "     • run on another port:  PORT=8011 $0"
+    echo "     • or stop it yourself:  kill $OWNER_PID"
+    exit 1
 fi
 
 echo "🚀 Starting Warehouse Operational Assistant API server..."

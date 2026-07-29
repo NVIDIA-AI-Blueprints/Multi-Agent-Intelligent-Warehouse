@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname=timescaledb) THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname='timescaledb') THEN
     CREATE EXTENSION IF NOT EXISTS timescaledb;
   END IF;
 EXCEPTION WHEN OTHERS THEN NULL;
@@ -91,7 +91,7 @@ END $$;
 
 DO $$
 BEGIN
-  PERFORM create_hypertable(equipment_telemetry,ts, if_not_exists=>TRUE);
+  PERFORM create_hypertable('equipment_telemetry','ts', if_not_exists=>TRUE);
 EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 

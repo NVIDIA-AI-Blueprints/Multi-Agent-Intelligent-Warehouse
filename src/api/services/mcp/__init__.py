@@ -44,7 +44,12 @@ from .base import (
     AdapterType,
     ToolCategory,
 )
-from .tool_discovery import ToolDiscoveryService, DiscoveredTool, ToolDiscoveryConfig
+from .tool_discovery import (
+    ToolDiscoveryService,
+    DiscoveredTool,
+    ToolDiscoveryConfig,
+    get_tool_discovery_service,
+)
 from .tool_binding import (
     ToolBindingService,
     ToolBinding,
@@ -97,6 +102,7 @@ __all__ = [
     "ToolCategory",
     # Tool Discovery
     "ToolDiscoveryService",
+    "get_tool_discovery_service",
     "DiscoveredTool",
     "ToolDiscoveryConfig",
     # Tool Binding

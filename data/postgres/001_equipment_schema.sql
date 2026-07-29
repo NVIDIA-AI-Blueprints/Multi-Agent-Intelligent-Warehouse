@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS equipment_telemetry (
 -- Create Timescale hypertable for telemetry
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname=timescaledb) THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname='timescaledb') THEN
     CREATE EXTENSION IF NOT EXISTS timescaledb;
   END IF;
 EXCEPTION WHEN OTHERS THEN NULL;

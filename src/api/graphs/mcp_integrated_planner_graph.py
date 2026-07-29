@@ -36,7 +36,7 @@ import logging
 import asyncio
 import threading
 
-from src.api.services.mcp.tool_discovery import ToolDiscoveryService
+from src.api.services.mcp.tool_discovery import ToolDiscoveryService, get_tool_discovery_service
 from src.api.services.mcp.tool_binding import ToolBindingService
 from src.api.services.mcp.tool_routing import ToolRoutingService, RoutingStrategy
 from src.api.services.mcp.tool_validation import ToolValidationService
@@ -623,7 +623,7 @@ class MCPPlannerGraph:
         """Initialize MCP components and create the graph."""
         try:
             # Initialize MCP services (simplified for Phase 2 Step 3)
-            self.tool_discovery = ToolDiscoveryService()
+            self.tool_discovery = get_tool_discovery_service()
             self.tool_binding = ToolBindingService(self.tool_discovery)
             # Skip complex routing for now - will implement in next step
             self.tool_routing = None

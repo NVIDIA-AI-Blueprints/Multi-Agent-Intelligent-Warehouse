@@ -34,6 +34,7 @@ from dataclasses import asdict
 
 from src.api.services.mcp import (
     ToolDiscoveryService,
+    get_tool_discovery_service,
     ToolBindingService,
     ToolRoutingService,
     ToolValidationService,
@@ -347,7 +348,7 @@ class MCPPlannerGraph:
         """Initialize MCP components and create the graph."""
         try:
             # Initialize MCP services (simplified for Phase 2 Step 1)
-            self.tool_discovery = ToolDiscoveryService()
+            self.tool_discovery = get_tool_discovery_service()
             self.tool_binding = ToolBindingService(self.tool_discovery)
             # Skip complex routing for now - will implement in next step
             self.tool_routing = None

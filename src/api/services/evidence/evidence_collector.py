@@ -32,7 +32,7 @@ import json
 from src.api.services.llm.nim_client import get_nim_client, LLMResponse
 from src.retrieval.hybrid_retriever import get_hybrid_retriever, SearchContext
 from src.memory.memory_manager import get_memory_manager
-from src.api.services.mcp.tool_discovery import ToolDiscoveryService, ToolCategory
+from src.api.services.mcp.tool_discovery import ToolDiscoveryService, ToolCategory, get_tool_discovery_service
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +132,7 @@ class EvidenceCollector:
             self.nim_client = await get_nim_client()
             self.hybrid_retriever = await get_hybrid_retriever()
             self.memory_manager = await get_memory_manager()
-            self.tool_discovery = ToolDiscoveryService()
+            self.tool_discovery = get_tool_discovery_service()
             await self.tool_discovery.start_discovery()
 
             logger.info("Evidence Collector initialized successfully")

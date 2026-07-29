@@ -522,8 +522,10 @@ class TestMCPPlannerGraph:
     @pytest.mark.asyncio
     async def test_planner_graph_initialization_failure(self, planner_graph):
         """Test planner graph initialization with complete failure."""
+        # The graph now resolves the shared registry via get_tool_discovery_service()
+        # instead of constructing its own ToolDiscoveryService, so patch that symbol.
         with patch(
-            "src.api.graphs.mcp_integrated_planner_graph.ToolDiscoveryService",
+            "src.api.graphs.mcp_integrated_planner_graph.get_tool_discovery_service",
             side_effect=Exception("Init failed"),
         ):
             await planner_graph.initialize()

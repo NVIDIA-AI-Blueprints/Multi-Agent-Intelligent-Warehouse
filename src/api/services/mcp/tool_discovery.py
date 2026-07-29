@@ -23,6 +23,8 @@ tools from various MCP servers and adapters.
 
 import asyncio
 import logging
+import threading
+import weakref
 from typing import Dict, List, Any, Optional, Set, Callable
 from dataclasses import dataclass, field
 from enum import Enum
@@ -372,7 +374,24 @@ class ToolDiscoveryService:
 
     async def _register_discovered_tool(self, tool: DiscoveredTool) -> None:
         """Register a discovered tool with security validation."""
+        # `tool_id` defaults to a fresh uuid4 per DiscoveredTool construction, and
+        # _discover_from_mcp_adapter rebuilds these every cycle -- so the registry
+        # gained a duplicate entry on every 30s discovery pass (the update-in-place
+        # branch below could never match), which _cleanup_old_data then reaped 300s
+        # later: the observed "Cleaned up N old tools" churn.
+        #
+        # Make the id DETERMINISTIC from (source, name) rather than re-keying the
+        # dict: tool_binding, tool_routing and tool_validation all look tools up via
+        # `discovered_tools.get(<tool_id>)`, so the dict must stay keyed by tool_id.
+        tool.tool_id = f"{tool.source}:{tool.name}"
         tool_key = tool.tool_id
+
+        # Preserve usage across re-discovery -- _cleanup_old_data only evicts
+        # entries whose usage_count is still 0.
+        existing = self.discovered_tools.get(tool_key)
+        if existing is not None:
+            tool.usage_count = existing.usage_count
+            tool.last_used = existing.last_used
 
         # Security check: Validate tool before registration
         try:
@@ -837,3 +856,61 @@ class ToolDiscoveryService:
                 cat.value: len(tools) for cat, tools in self.tool_categories.items()
             },
         }
+
+
+# ---------------------------------------------------------------------------
+# Shared service accessor
+#
+# BUG CONTEXT (2026-07-28): nine call sites each did `ToolDiscoveryService()`,
+# giving nine independent registries plus nine 30s discovery loops and nine 300s
+# cleanup loops. The planner graph's instance had zero sources registered, so it
+# reported "Retrieved 0 available tools" while the equipment agent's instance
+# held 4 -- and agents that needed the tool list stalled to their 45s timeout.
+#
+# Direct construction stays supported (tests and deliberate isolation rely on
+# it); this accessor is the path production code should use.
+# ---------------------------------------------------------------------------
+
+# Keyed by event loop rather than a single module global: this service owns
+# background tasks (_discovery_loop, _cleanup_loop) that bind to the loop running
+# when start_discovery() is called. A plain global created under one loop and
+# reused under another (uvicorn --reload, test suites) yields tasks attached to a
+# dead loop -- silent, and worse than the bug being fixed. WeakKeyDictionary lets
+# entries drop when a loop is collected, so ids are never reused.
+_shared_services: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
+_shared_service_no_loop: Optional["ToolDiscoveryService"] = None
+_shared_service_lock = threading.Lock()
+
+
+def get_tool_discovery_service(
+    config: ToolDiscoveryConfig = None,
+) -> "ToolDiscoveryService":
+    """Return the shared ToolDiscoveryService for the current event loop.
+
+    All production consumers (agents, planner graphs, the MCP router, the
+    evidence collector) must go through this so they observe one registry.
+    Constructing ToolDiscoveryService() directly is still valid for tests and
+    deliberate isolation.
+
+    `config` applies only when the instance is first created; it is ignored on
+    subsequent calls, so callers cannot silently reconfigure a live service that
+    other consumers already depend on.
+    """
+    global _shared_service_no_loop
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    with _shared_service_lock:
+        if loop is None:
+            if _shared_service_no_loop is None:
+                _shared_service_no_loop = ToolDiscoveryService(config)
+            return _shared_service_no_loop
+
+        service = _shared_services.get(loop)
+        if service is None:
+            service = ToolDiscoveryService(config)
+            _shared_services[loop] = service
+        return service

@@ -24,7 +24,7 @@ import logging
 import asyncio
 
 from src.api.graphs.mcp_integrated_planner_graph import get_mcp_planner_graph
-from src.api.services.mcp.tool_discovery import ToolDiscoveryService
+from src.api.services.mcp.tool_discovery import ToolDiscoveryService, get_tool_discovery_service
 from src.api.services.mcp.tool_binding import ToolBindingService
 from src.api.services.mcp.tool_routing import ToolRoutingService, RoutingStrategy
 from src.api.services.mcp.tool_validation import ToolValidationService
@@ -45,7 +45,7 @@ async def get_mcp_services():
     if _mcp_services is None:
         try:
             # Initialize MCP services (simplified for testing)
-            tool_discovery = ToolDiscoveryService()
+            tool_discovery = get_tool_discovery_service()
             tool_binding = ToolBindingService(tool_discovery)
             # Skip complex routing for now - will implement in next step
             tool_routing = None
