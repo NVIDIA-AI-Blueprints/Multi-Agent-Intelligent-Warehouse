@@ -45,7 +45,6 @@ from maiw_mcp.errors import (
 )
 from maiw_mcp.testing.fixtures import make_inventory_result
 
-
 # ── Contract: CapabilityMetadata ──────────────────────────────────────────────
 
 
@@ -72,6 +71,7 @@ class TestCapabilityMetadata:
 
     def test_metadata_name_follows_namespace_pattern(self):
         import re
+
         pattern = re.compile(r"^warehouse\.[a-z_]+\.[a-z_]+$")
         assert pattern.match(INVENTORY_GET_METADATA.name)
         assert pattern.match(INVENTORY_LOCATE_METADATA.name)
@@ -180,9 +180,7 @@ class TestInventoryLookupSkill:
 
         mock_client = MagicMock()
         fixture = result or make_inventory_result()
-        mock_client.invoke = AsyncMock(
-            return_value=fixture.model_dump(mode="json")
-        )
+        mock_client.invoke = AsyncMock(return_value=fixture.model_dump(mode="json"))
         return InventoryLookupSkill(mock_client), mock_client
 
     def test_execute_returns_typed_result(self):
@@ -257,7 +255,10 @@ class TestMockInventoryProvider:
         assert result.total_available == 42
 
     def test_is_inventory_provider_protocol(self):
-        from mcp_servers.inventory.provider import MockInventoryProvider, InventoryProvider
+        from mcp_servers.inventory.provider import (
+            MockInventoryProvider,
+            InventoryProvider,
+        )
 
         provider = MockInventoryProvider()
         assert isinstance(provider, InventoryProvider)

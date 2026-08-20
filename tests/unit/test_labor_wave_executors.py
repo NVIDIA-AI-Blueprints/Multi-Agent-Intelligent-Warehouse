@@ -28,7 +28,6 @@ from src.api.agents.inventory.action_executor import (
 from src.api.agents.operations.labor_executor import LaborActionExecutor
 from src.api.agents.operations.wave_executor import WaveActionExecutor
 
-
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 
@@ -170,7 +169,9 @@ class TestLaborActionExecutorGuards:
 
     def test_expired_decision_raises(self):
         skill = _mock_allocate_skill()
-        executor = LaborActionExecutor(allocate_skill=skill, max_decision_age_seconds=60)
+        executor = LaborActionExecutor(
+            allocate_skill=skill, max_decision_age_seconds=60
+        )
         proposal = _labor_proposal()
         stale = _approved(proposal.proposal_id, age_seconds=120)
 
@@ -180,7 +181,9 @@ class TestLaborActionExecutorGuards:
 
     def test_fresh_decision_within_window_does_not_expire(self):
         skill = _mock_allocate_skill()
-        executor = LaborActionExecutor(allocate_skill=skill, max_decision_age_seconds=300)
+        executor = LaborActionExecutor(
+            allocate_skill=skill, max_decision_age_seconds=300
+        )
         proposal = _labor_proposal()
         decision = _approved(proposal.proposal_id, age_seconds=10)
 
@@ -188,7 +191,9 @@ class TestLaborActionExecutorGuards:
         assert result.success is True
 
     def test_allowed_actions_frozenset(self):
-        assert LaborActionExecutor._ALLOWED_ACTIONS == frozenset({"warehouse.labor.allocate"})
+        assert LaborActionExecutor._ALLOWED_ACTIONS == frozenset(
+            {"warehouse.labor.allocate"}
+        )
 
 
 # ── WaveActionExecutor ─────────────────────────────────────────────────────────
@@ -260,7 +265,9 @@ class TestWaveActionExecutorGuards:
 
     def test_expired_decision_raises(self):
         skill = _mock_reprioritize_skill()
-        executor = WaveActionExecutor(reprioritize_skill=skill, max_decision_age_seconds=60)
+        executor = WaveActionExecutor(
+            reprioritize_skill=skill, max_decision_age_seconds=60
+        )
         proposal = _wave_proposal()
         stale = _approved(proposal.proposal_id, age_seconds=120)
 
@@ -270,7 +277,9 @@ class TestWaveActionExecutorGuards:
 
     def test_fresh_decision_within_window_does_not_expire(self):
         skill = _mock_reprioritize_skill()
-        executor = WaveActionExecutor(reprioritize_skill=skill, max_decision_age_seconds=300)
+        executor = WaveActionExecutor(
+            reprioritize_skill=skill, max_decision_age_seconds=300
+        )
         proposal = _wave_proposal()
         decision = _approved(proposal.proposal_id, age_seconds=5)
 
@@ -278,4 +287,6 @@ class TestWaveActionExecutorGuards:
         assert result.success is True
 
     def test_allowed_actions_frozenset(self):
-        assert WaveActionExecutor._ALLOWED_ACTIONS == frozenset({"warehouse.wave.reprioritize"})
+        assert WaveActionExecutor._ALLOWED_ACTIONS == frozenset(
+            {"warehouse.wave.reprioritize"}
+        )

@@ -213,7 +213,9 @@ class TestWarehouseStateSnapshotMultiDomain:
         assert snapshot.state.waves is not None
 
     def test_snapshot_warehouse_id_matches_state(self):
-        state = _make_warehouse_state("WH-SNAP", equipment=_make_equipment_state("WH-SNAP"))
+        state = _make_warehouse_state(
+            "WH-SNAP", equipment=_make_equipment_state("WH-SNAP")
+        )
         snapshot = WarehouseStateSnapshot.seal(state)
         assert snapshot.warehouse_id == "WH-SNAP"
 

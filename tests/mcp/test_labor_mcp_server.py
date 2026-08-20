@@ -68,7 +68,9 @@ class TestLaborServerToolDiscovery:
             async with Client(mcp_server) as client:
                 result = await client.list_tools()
                 tools = {t.name: t for t in result.tools}
-                props = tools["warehouse.labor.allocate"].input_schema.get("properties", {})
+                props = tools["warehouse.labor.allocate"].input_schema.get(
+                    "properties", {}
+                )
                 return props
 
         props = asyncio.run(run())
@@ -182,6 +184,7 @@ class TestLaborAllocateExecutionTool:
 
     def test_allocate_result_has_no_action_proposal(self):
         """Result of execute tool must not contain an ActionProposal."""
+
         async def run():
             async with Client(mcp_server) as client:
                 raw = await client.call_tool(

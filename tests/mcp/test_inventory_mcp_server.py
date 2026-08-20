@@ -38,7 +38,6 @@ from maiw_mcp.testing.mock_server import MockInventoryServer
 from maiw_mcp.testing.fixtures import make_inventory_result
 from mcp.client import Client
 
-
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 
@@ -59,18 +58,21 @@ class TestMCPV2Protocol:
 
     def test_mcp_sdk_version_is_v2(self):
         from importlib.metadata import version
+
         sdk_ver = version("mcp")
         major = int(sdk_ver.split(".")[0])
         assert major >= 2, f"Expected MCP SDK v2+, got {sdk_ver}"
 
     def test_protocol_version_is_2026(self):
         from mcp.types import LATEST_PROTOCOL_VERSION
-        assert "2026" in LATEST_PROTOCOL_VERSION, (
-            f"Expected 2026-07-28 protocol, got {LATEST_PROTOCOL_VERSION}"
-        )
+
+        assert (
+            "2026" in LATEST_PROTOCOL_VERSION
+        ), f"Expected 2026-07-28 protocol, got {LATEST_PROTOCOL_VERSION}"
 
     def test_mcp_server_import_from_v2_path(self):
         from mcp.server import MCPServer
+
         assert MCPServer is not None
 
     def test_fastmcp_not_importable(self):
@@ -80,6 +82,7 @@ class TestMCPV2Protocol:
 
     def test_telemetry_records_sdk_version(self):
         from maiw_mcp.telemetry.telemetry import CapabilityCallRecord, _MCP_SDK_VERSION
+
         record = CapabilityCallRecord(
             trace_id=None,
             capability_name="warehouse.inventory.get",
@@ -97,6 +100,7 @@ class TestMCPV2Protocol:
 
     def test_telemetry_records_protocol_version(self):
         from maiw_mcp.telemetry.telemetry import CapabilityCallRecord
+
         record = CapabilityCallRecord(
             trace_id=None,
             capability_name="warehouse.inventory.get",
@@ -150,9 +154,9 @@ class TestMCPToolDiscovery:
                 return [t.name for t in tools.tools]
 
         tool_names = asyncio.run(run())
-        assert "warehouse.inventory.get" in tool_names, (
-            f"Expected 'warehouse.inventory.get' in {tool_names}"
-        )
+        assert (
+            "warehouse.inventory.get" in tool_names
+        ), f"Expected 'warehouse.inventory.get' in {tool_names}"
 
     def test_tools_list_returns_inventory_locate(self):
         server = _get_configured_server()
@@ -180,7 +184,9 @@ class TestMCPToolDiscovery:
         assert tool is not None
         # v2: input_schema (snake_case), not inputSchema (camelCase)
         props = tool.input_schema.get("properties", {})
-        assert "sku" in props, f"'sku' not in input_schema.properties: {list(props.keys())}"
+        assert (
+            "sku" in props
+        ), f"'sku' not in input_schema.properties: {list(props.keys())}"
 
     def test_inventory_get_has_description(self):
         server = _get_configured_server()
@@ -245,7 +251,14 @@ class TestMCPInventoryGetTool:
                 return json.loads(result.content[0].text)
 
         data = asyncio.run(run())
-        required = {"sku", "name", "locations", "total_available", "is_low_stock", "source"}
+        required = {
+            "sku",
+            "name",
+            "locations",
+            "total_available",
+            "is_low_stock",
+            "source",
+        }
         missing = required - set(data.keys())
         assert not missing, f"Missing required fields: {missing}"
 
@@ -335,9 +348,9 @@ class TestMCPErrorHandling:
 
         result = asyncio.run(run())
         # v2: is_error (snake_case)
-        assert result.is_error is True, (
-            "BackendUnavailable should produce is_error=True in CallToolResult"
-        )
+        assert (
+            result.is_error is True
+        ), "BackendUnavailable should produce is_error=True in CallToolResult"
 
     def test_empty_sku_handled_gracefully(self):
         """Server does not crash when sku is empty string."""
@@ -400,9 +413,7 @@ class TestMCPStatelessBehavior:
         async def single_request(sku: str) -> dict:
             """Simulates a stateless handler: open client, call tool, close."""
             async with Client(server) as client:
-                result = await client.call_tool(
-                    "warehouse.inventory.get", {"sku": sku}
-                )
+                result = await client.call_tool("warehouse.inventory.get", {"sku": sku})
             return json.loads(result.content[0].text)
 
         async def run():
@@ -422,9 +433,11 @@ class TestMCPStatelessBehavior:
         from mcp_servers.inventory.provider import MockInventoryProvider
 
         # First request: provider returns quantity 10
-        configure_server(MockInventoryProvider(data={
-            "SKU-STATE": make_inventory_result(sku="SKU-STATE", quantity=10)
-        }))
+        configure_server(
+            MockInventoryProvider(
+                data={"SKU-STATE": make_inventory_result(sku="SKU-STATE", quantity=10)}
+            )
+        )
 
         async def run():
             async with Client(mcp_server) as client:
@@ -433,9 +446,13 @@ class TestMCPStatelessBehavior:
                 )
 
             # Provider updated between requests — second client sees new state
-            configure_server(MockInventoryProvider(data={
-                "SKU-STATE": make_inventory_result(sku="SKU-STATE", quantity=99)
-            }))
+            configure_server(
+                MockInventoryProvider(
+                    data={
+                        "SKU-STATE": make_inventory_result(sku="SKU-STATE", quantity=99)
+                    }
+                )
+            )
 
             async with Client(mcp_server) as client:
                 r2 = await client.call_tool(

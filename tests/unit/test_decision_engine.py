@@ -43,7 +43,6 @@ from maiw_state import (
     WarehouseStateSnapshot,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -181,7 +180,9 @@ class TestLowRisk:
 
 
 class TestHighRisk:
-    @pytest.mark.parametrize("risk", [RiskLevel.MEDIUM, RiskLevel.HIGH, RiskLevel.CRITICAL])
+    @pytest.mark.parametrize(
+        "risk", [RiskLevel.MEDIUM, RiskLevel.HIGH, RiskLevel.CRITICAL]
+    )
     def test_medium_high_critical_requires_human_approval(self, risk):
         engine = DecisionEngine()
         snap = _make_snapshot()

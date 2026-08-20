@@ -42,7 +42,6 @@ from maiw_mcp.contracts.equipment import EquipmentAssignmentRequest
 from mcp_servers.equipment.provider import MockEquipmentProvider
 from mcp_servers.equipment.server import mcp_server
 
-
 # ── Invariant 1 & 2: Proposal generation — no MCP call, no mutation ───────────
 
 
@@ -118,6 +117,7 @@ class TestDecisionEngineIsIsolated:
 
     def _make_sealed_snapshot(self):
         from maiw_state import WarehouseState, WarehouseStateSnapshot
+
         state = WarehouseState(
             warehouse_id="wh-test",
             observed_at=datetime.now(timezone.utc),
@@ -137,7 +137,10 @@ class TestDecisionEngineIsIsolated:
             result, audit = engine.evaluate(req)
             assert mock_invoke.call_count == 0, "DecisionEngine must never call MCP"
 
-        assert result.outcome in {DecisionOutcome.APPROVED, DecisionOutcome.REQUIRES_FRESH_STATE}
+        assert result.outcome in {
+            DecisionOutcome.APPROVED,
+            DecisionOutcome.REQUIRES_FRESH_STATE,
+        }
 
     def test_low_risk_no_approval_auto_approves(self):
         engine = DecisionEngine()
@@ -149,7 +152,10 @@ class TestDecisionEngineIsIsolated:
         req = DecisionRequest(proposal=proposal, state=snapshot, requested_by="test")
         result, _ = engine.evaluate(req)
         # May be APPROVED or REQUIRES_FRESH_STATE (equipment not in snapshot)
-        assert result.outcome in {DecisionOutcome.APPROVED, DecisionOutcome.REQUIRES_FRESH_STATE}
+        assert result.outcome in {
+            DecisionOutcome.APPROVED,
+            DecisionOutcome.REQUIRES_FRESH_STATE,
+        }
 
     def test_medium_risk_never_auto_approves(self):
         """MEDIUM risk must never produce APPROVED regardless of state contents."""
@@ -198,10 +204,15 @@ class TestExecutorGuards:
         )
 
     def test_non_approved_decision_raises_before_mcp(self):
-        from src.api.agents.inventory.action_executor import ActionNotApproved, EquipmentActionExecutor
+        from src.api.agents.inventory.action_executor import (
+            ActionNotApproved,
+            EquipmentActionExecutor,
+        )
 
         executor, mock_skill = self._make_executor_with_mock_skill()
-        proposal = ActionProposal.for_equipment_release(asset_id="FL-001", released_by="op-1")
+        proposal = ActionProposal.for_equipment_release(
+            asset_id="FL-001", released_by="op-1"
+        )
         rejected = DecisionResult(
             request_id="req-test",
             outcome=DecisionOutcome.REQUIRES_HUMAN_APPROVAL,
@@ -216,7 +227,10 @@ class TestExecutorGuards:
         mock_skill.execute.assert_not_called()
 
     def test_unknown_action_blocked_by_allowlist(self):
-        from src.api.agents.inventory.action_executor import ActionUnsupported, EquipmentActionExecutor
+        from src.api.agents.inventory.action_executor import (
+            ActionUnsupported,
+            EquipmentActionExecutor,
+        )
 
         executor, mock_skill = self._make_executor_with_mock_skill()
         proposal = ActionProposal(
@@ -236,10 +250,15 @@ class TestExecutorGuards:
         mock_skill.execute.assert_not_called()
 
     def test_expired_decision_blocked_before_mcp(self):
-        from src.api.agents.inventory.action_executor import ActionExpired, EquipmentActionExecutor
+        from src.api.agents.inventory.action_executor import (
+            ActionExpired,
+            EquipmentActionExecutor,
+        )
 
         executor, mock_skill = self._make_executor_with_mock_skill()
-        proposal = ActionProposal.for_equipment_release(asset_id="FL-001", released_by="op-1")
+        proposal = ActionProposal.for_equipment_release(
+            asset_id="FL-001", released_by="op-1"
+        )
         stale = DecisionResult(
             request_id="req-test",
             outcome=DecisionOutcome.APPROVED,
@@ -255,10 +274,15 @@ class TestExecutorGuards:
         mock_skill.execute.assert_not_called()
 
     def test_proposal_decision_mismatch_blocked(self):
-        from src.api.agents.inventory.action_executor import ActionDecisionMismatch, EquipmentActionExecutor
+        from src.api.agents.inventory.action_executor import (
+            ActionDecisionMismatch,
+            EquipmentActionExecutor,
+        )
 
         executor, mock_skill = self._make_executor_with_mock_skill()
-        proposal = ActionProposal.for_equipment_release(asset_id="FL-001", released_by="op-1")
+        proposal = ActionProposal.for_equipment_release(
+            asset_id="FL-001", released_by="op-1"
+        )
         wrong_decision = DecisionResult(
             request_id="req-test",
             outcome=DecisionOutcome.APPROVED,
@@ -338,9 +362,9 @@ class TestWarehouseIdPropagation:
             await executor._check_state_drift(proposal)
 
         asyncio.run(run())
-        assert "WH-CUSTOM" in captured_warehouse_ids, (
-            "_check_state_drift must use proposal.parameters['warehouse_id'] not 'default'"
-        )
+        assert (
+            "WH-CUSTOM" in captured_warehouse_ids
+        ), "_check_state_drift must use proposal.parameters['warehouse_id'] not 'default'"
 
 
 # ── Invariant 9: MCP server exposes only execution tools ──────────────────────
@@ -399,9 +423,15 @@ class TestMCPCapabilityBoundary:
             async with Client(mcp_server) as client:
                 result = await client.list_tools()
                 tools = {t.name: t for t in result.tools}
-                assign_props = tools["warehouse.equipment.assign"].input_schema.get("properties", {})
-                release_props = tools["warehouse.equipment.release"].input_schema.get("properties", {})
-                maint_props = tools["warehouse.equipment.schedule_maintenance"].input_schema.get("properties", {})
+                assign_props = tools["warehouse.equipment.assign"].input_schema.get(
+                    "properties", {}
+                )
+                release_props = tools["warehouse.equipment.release"].input_schema.get(
+                    "properties", {}
+                )
+                maint_props = tools[
+                    "warehouse.equipment.schedule_maintenance"
+                ].input_schema.get("properties", {})
                 return assign_props, release_props, maint_props
 
         a, r, m = asyncio.run(run())

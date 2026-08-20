@@ -35,7 +35,6 @@ from src.api.agents.inventory.action_executor import (
     NoOpActionExecutor,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -94,37 +93,43 @@ def _maintenance_proposal(asset_id: str = "FL-001") -> ActionProposal:
 
 def _assign_skill_mock(success: bool = True) -> MagicMock:
     skill = MagicMock()
-    skill.execute = AsyncMock(return_value=EquipmentExecuteAssignResult(
-        assignment_id=42 if success else None,
-        success=success,
-        proposal_id="p-1",
-        decision_id="d-1",
-        source="mock",
-        message="ok" if success else "failed",
-    ))
+    skill.execute = AsyncMock(
+        return_value=EquipmentExecuteAssignResult(
+            assignment_id=42 if success else None,
+            success=success,
+            proposal_id="p-1",
+            decision_id="d-1",
+            source="mock",
+            message="ok" if success else "failed",
+        )
+    )
     return skill
 
 
 def _release_skill_mock(success: bool = True) -> MagicMock:
     skill = MagicMock()
-    skill.execute = AsyncMock(return_value=EquipmentExecuteReleaseResult(
-        success=success,
-        proposal_id="p-1",
-        decision_id="d-1",
-        source="mock",
-    ))
+    skill.execute = AsyncMock(
+        return_value=EquipmentExecuteReleaseResult(
+            success=success,
+            proposal_id="p-1",
+            decision_id="d-1",
+            source="mock",
+        )
+    )
     return skill
 
 
 def _maintenance_skill_mock(success: bool = True) -> MagicMock:
     skill = MagicMock()
-    skill.execute = AsyncMock(return_value=EquipmentExecuteMaintenanceResult(
-        maintenance_id=99 if success else None,
-        success=success,
-        proposal_id="p-1",
-        decision_id="d-1",
-        source="mock",
-    ))
+    skill.execute = AsyncMock(
+        return_value=EquipmentExecuteMaintenanceResult(
+            maintenance_id=99 if success else None,
+            success=success,
+            proposal_id="p-1",
+            decision_id="d-1",
+            source="mock",
+        )
+    )
     return skill
 
 
@@ -257,7 +262,10 @@ class TestStaleDecision:
 
 class TestStateDrift:
     def test_offline_asset_raises_conflict(self):
-        from maiw_mcp.contracts.equipment import EquipmentAssetInfo, EquipmentStatusResult
+        from maiw_mcp.contracts.equipment import (
+            EquipmentAssetInfo,
+            EquipmentStatusResult,
+        )
         from maiw_state import WarehouseStateProvider
 
         offline_asset = EquipmentAssetInfo(
@@ -363,7 +371,9 @@ class TestBackendError:
         decision = _approved_decision(proposal.proposal_id)
 
         failing_skill = MagicMock()
-        failing_skill.execute = AsyncMock(side_effect=RuntimeError("DB connection lost"))
+        failing_skill.execute = AsyncMock(
+            side_effect=RuntimeError("DB connection lost")
+        )
         executor = EquipmentActionExecutor(assign_skill=failing_skill)
 
         async def run():

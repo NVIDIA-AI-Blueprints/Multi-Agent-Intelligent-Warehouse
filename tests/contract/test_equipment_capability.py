@@ -37,7 +37,6 @@ from maiw_mcp.contracts.equipment import (
 from maiw_mcp.errors import BackendUnavailable, MCPContractError
 from mcp_servers.equipment.provider import MockEquipmentProvider
 
-
 # ── Contract: CapabilityMetadata ──────────────────────────────────────────────
 
 
@@ -46,7 +45,9 @@ class TestEquipmentCapabilityMetadata:
         assert EQUIPMENT_GET_STATUS_METADATA.name == "warehouse.equipment.get_status"
 
     def test_get_telemetry_name_is_semantic(self):
-        assert EQUIPMENT_GET_TELEMETRY_METADATA.name == "warehouse.equipment.get_telemetry"
+        assert (
+            EQUIPMENT_GET_TELEMETRY_METADATA.name == "warehouse.equipment.get_telemetry"
+        )
 
     def test_assign_name_is_semantic(self):
         assert EQUIPMENT_ASSIGN_METADATA.name == "warehouse.equipment.assign"
@@ -72,6 +73,7 @@ class TestEquipmentCapabilityMetadata:
 
     def test_all_names_match_warehouse_domain_pattern(self):
         import re
+
         pattern = re.compile(r"^warehouse\.[a-z_]+\.[a-z_]+$")
         for meta in [
             EQUIPMENT_GET_STATUS_METADATA,
@@ -86,7 +88,13 @@ class TestEquipmentCapabilityMetadata:
 
 class TestActionProposal:
     def test_risk_levels_ordered(self):
-        levels = [RiskLevel.READ_ONLY, RiskLevel.LOW, RiskLevel.MEDIUM, RiskLevel.HIGH, RiskLevel.CRITICAL]
+        levels = [
+            RiskLevel.READ_ONLY,
+            RiskLevel.LOW,
+            RiskLevel.MEDIUM,
+            RiskLevel.HIGH,
+            RiskLevel.CRITICAL,
+        ]
         assert len(levels) == 5
 
     def test_proposal_has_uuid(self):
@@ -245,6 +253,7 @@ class TestMockEquipmentProvider:
         async def run():
             provider = MockEquipmentProvider()
             return await provider.get_equipment_status(EquipmentStatusRequest())
+
         result = asyncio.run(run())
         assert result.total_count == 0
         assert result.equipment == []
@@ -254,6 +263,7 @@ class TestMockEquipmentProvider:
         async def run():
             provider = self._make_provider_with_data()
             return await provider.get_equipment_status(EquipmentStatusRequest())
+
         result = asyncio.run(run())
         assert result.total_count == 2
         assert result.source == "mock"
@@ -261,7 +271,10 @@ class TestMockEquipmentProvider:
     def test_get_status_filter_by_asset_id(self):
         async def run():
             provider = self._make_provider_with_data()
-            return await provider.get_equipment_status(EquipmentStatusRequest(asset_id="FL-001"))
+            return await provider.get_equipment_status(
+                EquipmentStatusRequest(asset_id="FL-001")
+            )
+
         result = asyncio.run(run())
         assert result.total_count == 1
         assert result.equipment[0].asset_id == "FL-001"
@@ -269,7 +282,10 @@ class TestMockEquipmentProvider:
     def test_get_status_filter_by_type(self):
         async def run():
             provider = self._make_provider_with_data()
-            return await provider.get_equipment_status(EquipmentStatusRequest(equipment_type="amr"))
+            return await provider.get_equipment_status(
+                EquipmentStatusRequest(equipment_type="amr")
+            )
+
         result = asyncio.run(run())
         assert result.total_count == 1
         assert result.equipment[0].equipment_type == "amr"
@@ -277,7 +293,10 @@ class TestMockEquipmentProvider:
     def test_get_status_filter_by_status(self):
         async def run():
             provider = self._make_provider_with_data()
-            return await provider.get_equipment_status(EquipmentStatusRequest(status_filter="available"))
+            return await provider.get_equipment_status(
+                EquipmentStatusRequest(status_filter="available")
+            )
+
         result = asyncio.run(run())
         assert result.total_count == 1
         assert result.equipment[0].status == "available"
@@ -286,6 +305,7 @@ class TestMockEquipmentProvider:
         async def run():
             provider = self._make_provider_with_data()
             return await provider.get_equipment_status(EquipmentStatusRequest())
+
         result = asyncio.run(run())
         assert "forklift" in result.summary
         assert "amr" in result.summary
@@ -295,7 +315,10 @@ class TestMockEquipmentProvider:
     def test_get_status_unknown_asset_returns_synthetic(self):
         async def run():
             provider = MockEquipmentProvider()
-            return await provider.get_equipment_status(EquipmentStatusRequest(asset_id="UNKNOWN-999"))
+            return await provider.get_equipment_status(
+                EquipmentStatusRequest(asset_id="UNKNOWN-999")
+            )
+
         result = asyncio.run(run())
         assert result.total_count == 1
         assert result.equipment[0].asset_id == "UNKNOWN-999"
@@ -303,7 +326,10 @@ class TestMockEquipmentProvider:
     def test_get_telemetry_returns_points(self):
         async def run():
             provider = self._make_provider_with_data()
-            return await provider.get_equipment_telemetry(EquipmentTelemetryRequest(asset_id="FL-001"))
+            return await provider.get_equipment_telemetry(
+                EquipmentTelemetryRequest(asset_id="FL-001")
+            )
+
         result = asyncio.run(run())
         assert result.asset_id == "FL-001"
         assert result.data_points == 2
@@ -315,6 +341,7 @@ class TestMockEquipmentProvider:
             return await provider.get_equipment_telemetry(
                 EquipmentTelemetryRequest(asset_id="FL-001", metric="battery_level")
             )
+
         result = asyncio.run(run())
         assert result.data_points == 1
         assert result.telemetry_data[0].metric == "battery_level"
@@ -322,7 +349,10 @@ class TestMockEquipmentProvider:
     def test_get_telemetry_missing_asset_returns_empty(self):
         async def run():
             provider = MockEquipmentProvider()
-            return await provider.get_equipment_telemetry(EquipmentTelemetryRequest(asset_id="NO-ASSET"))
+            return await provider.get_equipment_telemetry(
+                EquipmentTelemetryRequest(asset_id="NO-ASSET")
+            )
+
         result = asyncio.run(run())
         assert result.asset_id == "NO-ASSET"
         assert result.data_points == 0
@@ -341,6 +371,7 @@ class TestMockEquipmentProvider:
                     requested_by="operations-agent",
                 )
             )
+
         result = asyncio.run(run())
         assert isinstance(result, EquipmentAssignmentResult)
         assert result.proposal.action == "warehouse.equipment.assign"
@@ -353,12 +384,17 @@ class TestMockEquipmentProvider:
         async def run():
             provider = MockEquipmentProvider()
             r1 = await provider.propose_equipment_assignment(
-                EquipmentAssignmentRequest(asset_id="FL-001", assignee="op-1", reason="r1", requested_by="a")
+                EquipmentAssignmentRequest(
+                    asset_id="FL-001", assignee="op-1", reason="r1", requested_by="a"
+                )
             )
             r2 = await provider.propose_equipment_assignment(
-                EquipmentAssignmentRequest(asset_id="FL-001", assignee="op-1", reason="r1", requested_by="a")
+                EquipmentAssignmentRequest(
+                    asset_id="FL-001", assignee="op-1", reason="r1", requested_by="a"
+                )
             )
             return r1.proposal.proposal_id, r2.proposal.proposal_id
+
         id1, id2 = asyncio.run(run())
         assert id1 != id2
 
@@ -417,7 +453,9 @@ class TestEquipmentResultContracts:
 class TestMAIWEquipmentAdapterMapping:
     """Tests the adapter's translation of raw EquipmentAssetTools dicts → contracts."""
 
-    def _make_raw_status(self, asset_id: str = "FL-001", status: str = "available") -> dict:
+    def _make_raw_status(
+        self, asset_id: str = "FL-001", status: str = "available"
+    ) -> dict:
         return {
             "equipment": [
                 {
@@ -446,7 +484,9 @@ class TestMAIWEquipmentAdapterMapping:
                 return_value=self._make_raw_status("FL-001", "available")
             )
             adapter = MAIWEquipmentAdapter(mock_tools)
-            return await adapter.get_equipment_status(EquipmentStatusRequest(asset_id="FL-001"))
+            return await adapter.get_equipment_status(
+                EquipmentStatusRequest(asset_id="FL-001")
+            )
 
         result = asyncio.run(run())
         assert isinstance(result, EquipmentStatusResult)
@@ -461,7 +501,11 @@ class TestMAIWEquipmentAdapterMapping:
         async def run():
             mock_tools = MagicMock()
             mock_tools.get_equipment_status = AsyncMock(
-                return_value={"error": "DB unreachable", "equipment": [], "total_count": 0}
+                return_value={
+                    "error": "DB unreachable",
+                    "equipment": [],
+                    "total_count": 0,
+                }
             )
             adapter = MAIWEquipmentAdapter(mock_tools)
             return await adapter.get_equipment_status(EquipmentStatusRequest())
@@ -501,13 +545,17 @@ class TestMAIWEquipmentAdapterMapping:
                             "quality_score": 0.98,
                         }
                     ],
-                    "available_metrics": [{"metric": "battery_level", "unit": "percent"}],
+                    "available_metrics": [
+                        {"metric": "battery_level", "unit": "percent"}
+                    ],
                     "hours_back": 24,
                     "data_points": 1,
                 }
             )
             adapter = MAIWEquipmentAdapter(mock_tools)
-            return await adapter.get_equipment_telemetry(EquipmentTelemetryRequest(asset_id="FL-001"))
+            return await adapter.get_equipment_telemetry(
+                EquipmentTelemetryRequest(asset_id="FL-001")
+            )
 
         result = asyncio.run(run())
         assert isinstance(result, EquipmentTelemetryResult)

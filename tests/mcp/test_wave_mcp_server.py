@@ -68,7 +68,9 @@ class TestWaveServerToolDiscovery:
             async with Client(mcp_server) as client:
                 result = await client.list_tools()
                 tools = {t.name: t for t in result.tools}
-                props = tools["warehouse.wave.reprioritize"].input_schema.get("properties", {})
+                props = tools["warehouse.wave.reprioritize"].input_schema.get(
+                    "properties", {}
+                )
                 return props
 
         props = asyncio.run(run())
@@ -135,6 +137,7 @@ class TestWaveRiskTool:
 
     def test_mock_has_unassigned_tasks_causing_risk(self):
         """MockWaveProvider has unassigned pending tasks → otif_at_risk=True."""
+
         async def run():
             async with Client(mcp_server) as client:
                 raw = await client.call_tool(

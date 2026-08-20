@@ -93,6 +93,7 @@ class TestProposeWaveReprioritizationSkill:
 
     def test_proposal_skill_makes_no_mcp_call(self):
         """Architecture invariant: proposal skill must not call MCP."""
+
         async def run():
             mock_client = MagicMock()
             mock_client.invoke = AsyncMock()

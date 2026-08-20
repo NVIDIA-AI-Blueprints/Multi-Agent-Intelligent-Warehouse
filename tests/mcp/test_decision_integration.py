@@ -50,22 +50,20 @@ from maiw_state import (
     WarehouseStateSnapshot,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _make_equipment_status_result(assets: list[EquipmentAssetInfo]) -> EquipmentStatusResult:
+def _make_equipment_status_result(
+    assets: list[EquipmentAssetInfo],
+) -> EquipmentStatusResult:
     """Build a real EquipmentStatusResult from a list of assets."""
     return EquipmentStatusResult(
         equipment=assets,
         total_count=len(assets),
         source="mock",
-        summary={
-            a.equipment_type: {a.status: 1}
-            for a in assets
-        },
+        summary={a.equipment_type: {a.status: 1} for a in assets},
     )
 
 
@@ -153,12 +151,12 @@ class TestEquipmentAssignmentVerticalSlice:
         engine = DecisionEngine()
 
         async def run():
-            state = await provider.get_state(
-                "wh-1", StateRequirements(equipment=True)
-            )
+            state = await provider.get_state("wh-1", StateRequirements(equipment=True))
             snapshot = WarehouseStateSnapshot.seal(state)
             proposal = _make_proposal(asset_id="FL-001")
-            req = DecisionRequest(proposal=proposal, state=snapshot, trace_id="trace-e2e")
+            req = DecisionRequest(
+                proposal=proposal, state=snapshot, trace_id="trace-e2e"
+            )
             result, audit = engine.evaluate(req)
             return snapshot, result, audit
 
@@ -185,9 +183,7 @@ class TestEquipmentAssignmentVerticalSlice:
         engine = DecisionEngine()
 
         async def run():
-            state = await provider.get_state(
-                "wh-1", StateRequirements(equipment=True)
-            )
+            state = await provider.get_state("wh-1", StateRequirements(equipment=True))
             snapshot = WarehouseStateSnapshot.seal(state)
             proposal = _make_proposal(asset_id="FL-001")  # FL-001 not in snapshot
             req = DecisionRequest(proposal=proposal, state=snapshot)
@@ -222,9 +218,7 @@ class TestEquipmentAssignmentVerticalSlice:
         engine = DecisionEngine()
 
         async def run():
-            state = await provider.get_state(
-                "wh-1", StateRequirements(equipment=True)
-            )
+            state = await provider.get_state("wh-1", StateRequirements(equipment=True))
             snapshot = WarehouseStateSnapshot.seal(state)
             proposal = _make_proposal(asset_id="FL-001")
             req = DecisionRequest(proposal=proposal, state=snapshot)
@@ -341,4 +335,6 @@ class TestMultipleEvaluations:
         assert len(ids) == 3
 
         # All have the same outcome (REQUIRES_HUMAN_APPROVAL)
-        assert all(r.outcome == DecisionOutcome.REQUIRES_HUMAN_APPROVAL for r in results)
+        assert all(
+            r.outcome == DecisionOutcome.REQUIRES_HUMAN_APPROVAL for r in results
+        )

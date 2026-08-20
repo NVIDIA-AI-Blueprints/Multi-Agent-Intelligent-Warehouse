@@ -122,7 +122,9 @@ class TestForbiddenDependencies:
 
     HEAVY_DEPS = {"asyncpg", "pymilvus", "redis", "fastapi", "uvicorn"}
 
-    def _check_no_forbidden_imports(self, package_dir: Path, forbidden: set[str], label: str):
+    def _check_no_forbidden_imports(
+        self, package_dir: Path, forbidden: set[str], label: str
+    ):
         imports = _source_imports(package_dir)
         violations = imports & forbidden
         assert not violations, (
@@ -143,7 +145,9 @@ class TestForbiddenDependencies:
     def test_maiw_decision_no_api_import(self):
         pkg = PROJECT_ROOT / "packages" / "maiw-decision" / "maiw_decision"
         imports = _source_imports(pkg)
-        assert "src" not in imports, "maiw_decision must not import from src (API layer)"
+        assert (
+            "src" not in imports
+        ), "maiw_decision must not import from src (API layer)"
 
     def test_maiw_models_no_api_import(self):
         pkg = PROJECT_ROOT / "packages" / "maiw-models" / "maiw_models"
@@ -198,35 +202,46 @@ class TestCompatibilityShims:
             ReasoningLevel,
             get_model_gateway,
         )
+
         assert ModelGateway is not None
 
     def test_old_model_gateway_models_path_still_works(self):
         from src.api.services.model_gateway.models import ReasoningLevel, RiskLevel
+
         assert ReasoningLevel is not None
 
     def test_old_skills_inventory_path_still_works(self):
         from src.api.skills.inventory import InventoryLookupSkill
+
         assert InventoryLookupSkill is not None
 
     def test_old_skills_equipment_path_still_works(self):
-        from src.api.skills.equipment import EquipmentAssignmentSkill, EquipmentStatusSkill
+        from src.api.skills.equipment import (
+            EquipmentAssignmentSkill,
+            EquipmentStatusSkill,
+        )
+
         assert EquipmentAssignmentSkill is not None
 
     def test_old_skills_labor_path_still_works(self):
         from src.api.skills.labor import ProposeLaborAllocationSkill
+
         assert ProposeLaborAllocationSkill is not None
 
     def test_old_skills_wave_path_still_works(self):
         from src.api.skills.wave import ProposeWaveReprioritizationSkill
+
         assert ProposeWaveReprioritizationSkill is not None
 
     def test_shim_and_canonical_are_same_class(self):
         """The shim re-exports the exact same class, not a copy."""
         from src.api.skills.labor import ProposeLaborAllocationSkill as OldPath
         from maiw_skills.labor import ProposeLaborAllocationSkill as NewPath
+
         assert OldPath is NewPath
 
     def test_model_gateway_shim_and_canonical_same_class(self):
         from src.api.services.model_gateway import ModelGateway as OldPath
         from maiw_models import ModelGateway as NewPath
+
         assert OldPath is NewPath

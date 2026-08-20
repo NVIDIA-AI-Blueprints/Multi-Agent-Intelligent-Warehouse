@@ -47,7 +47,6 @@ from src.api.agents.inventory.action_executor import (
     NoOpActionExecutor,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -147,7 +146,11 @@ class TestApprovedExecution:
         # Use a LOW risk proposal that will auto-approve
         low_risk_proposal = ActionProposal(
             action="warehouse.equipment.assign",
-            parameters={"asset_id": "FL-001", "assignee": "w", "assignment_type": "task"},
+            parameters={
+                "asset_id": "FL-001",
+                "assignee": "w",
+                "assignment_type": "task",
+            },
             domain="equipment",
             risk_level=RiskLevel.LOW,
             requested_by="test",
@@ -183,7 +186,11 @@ class TestApprovedExecution:
         )
         low_risk_proposal = ActionProposal(
             action="warehouse.equipment.assign",
-            parameters={"asset_id": "FL-001", "assignee": "w", "assignment_type": "task"},
+            parameters={
+                "asset_id": "FL-001",
+                "assignee": "w",
+                "assignment_type": "task",
+            },
             domain="equipment",
             risk_level=RiskLevel.LOW,
             requested_by="test",
@@ -215,7 +222,11 @@ class TestApprovedExecution:
         )
         low_risk_proposal = ActionProposal(
             action="warehouse.equipment.assign",
-            parameters={"asset_id": "FL-001", "assignee": "w", "assignment_type": "task"},
+            parameters={
+                "asset_id": "FL-001",
+                "assignee": "w",
+                "assignment_type": "task",
+            },
             domain="equipment",
             risk_level=RiskLevel.LOW,
             requested_by="test",
@@ -298,7 +309,12 @@ class TestReleaseProposal:
 
     def test_release_stale_state_requires_fresh(self):
         from datetime import timedelta
-        from maiw_state import EquipmentAssetSummary, EquipmentState, StateFreshness, WarehouseState
+        from maiw_state import (
+            EquipmentAssetSummary,
+            EquipmentState,
+            StateFreshness,
+            WarehouseState,
+        )
 
         old_ts = datetime.now(timezone.utc) - timedelta(seconds=60)
         stale_eq = EquipmentState(
@@ -415,7 +431,9 @@ class TestWarehouseIdPropagation:
 
         async def spy_get_state(warehouse_id, requirements, *, trace_id=None):
             captured_warehouse_id.append(warehouse_id)
-            return await original_get_state(warehouse_id, requirements, trace_id=trace_id)
+            return await original_get_state(
+                warehouse_id, requirements, trace_id=trace_id
+            )
 
         real_provider.get_state = spy_get_state
 
