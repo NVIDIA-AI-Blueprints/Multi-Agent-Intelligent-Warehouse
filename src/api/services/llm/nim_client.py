@@ -103,7 +103,7 @@ class NIMConfig:
     )
     llm_model: str = os.getenv("LLM_MODEL", "nvidia/llama-3.3-nemotron-super-49b-v1.5")
     embedding_model: str = os.getenv("EMBEDDING_MODEL", "nvidia/llama-nemotron-embed-vl-1b-v2")
-    timeout: int = _getenv_int("LLM_CLIENT_TIMEOUT", 120)  # Increased from 60s to 120s to prevent premature timeouts
+    timeout: int = _getenv_int("LLM_CLIENT_TIMEOUT", 240)  # 240s code default (doubled) to prevent premature timeouts
     # LLM generation parameters (configurable via environment variables)
     default_temperature: float = _getenv_float("LLM_TEMPERATURE", 0.1)
     default_max_tokens: int = _getenv_int("LLM_MAX_TOKENS", 2000)

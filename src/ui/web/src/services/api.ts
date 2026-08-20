@@ -82,7 +82,7 @@ export function validatePathParam(param: string, paramName: string = 'parameter'
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 60000, // Increased to 60 seconds for complex reasoning
+  timeout: 120000, // 120 seconds (doubled) for complex reasoning
   headers: {
     'Content-Type': 'application/json',
   },
@@ -319,11 +319,11 @@ export const chatAPI = {
     const isComplexQuery = complexKeywords.some(keyword => messageLower.includes(keyword)) || 
                           request.message.split(' ').length > 15;
     
-    let timeout = 60000; // Default 60s
+    let timeout = 120000; // Default 120s (doubled)
     if (request.enable_reasoning) {
-      timeout = isComplexQuery ? 240000 : 120000; // 240s (4min) for complex reasoning, 120s for regular reasoning
+      timeout = isComplexQuery ? 480000 : 240000; // 480s (8min) for complex reasoning, 240s for regular reasoning
     } else if (isComplexQuery) {
-      timeout = 120000; // 120s for complex queries without reasoning
+      timeout = 240000; // 240s for complex queries without reasoning
     }
     
     // Log timeout for debugging

@@ -714,12 +714,12 @@ async def chat(req: ChatRequest):
             # Set to 230s (slightly less than frontend 240s) to ensure backend responds before frontend times out
             # Complex queries like "Analyze the relationship between..." can take longer
             # For non-complex reasoning queries, set to 115s (slightly less than frontend 120s)
-            MAIN_QUERY_TIMEOUT = 230 if is_complex_query else 115  # 230s for complex, 115s for regular reasoning
+            MAIN_QUERY_TIMEOUT = 460 if is_complex_query else 230  # 460s for complex, 230s for regular reasoning (doubled)
         else:
             # Regular queries: Increased timeouts to prevent premature timeouts
-            # Simple queries: 60s (was 30s) - allows time for LLM processing
-            # Complex queries: 90s (was 60s) - allows time for complex analysis
-            MAIN_QUERY_TIMEOUT = 90 if is_complex_query else 60
+            # Simple queries: 120s - allows time for LLM processing
+            # Complex queries: 180s - allows time for complex analysis
+            MAIN_QUERY_TIMEOUT = 180 if is_complex_query else 120
         
         # Initialize result to None to avoid UnboundLocalError
         result = None

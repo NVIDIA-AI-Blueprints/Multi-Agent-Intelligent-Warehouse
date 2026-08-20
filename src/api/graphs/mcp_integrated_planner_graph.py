@@ -47,10 +47,10 @@ logger = logging.getLogger(__name__)
 
 
 # Constants for agent timeouts
-AGENT_INIT_TIMEOUT = 5.0  # 5 seconds for agent initialization
-AGENT_TIMEOUT_REASONING = 90.0  # 90s for reasoning queries
-AGENT_TIMEOUT_COMPLEX = 50.0  # 50s for complex queries
-AGENT_TIMEOUT_SIMPLE = 45.0  # 45s for simple queries
+AGENT_INIT_TIMEOUT = 10.0  # 10 seconds for agent initialization (doubled)
+AGENT_TIMEOUT_REASONING = 180.0  # 180s for reasoning queries (doubled)
+AGENT_TIMEOUT_COMPLEX = 100.0  # 100s for complex queries (doubled)
+AGENT_TIMEOUT_SIMPLE = 90.0  # 90s for simple queries (doubled)
 
 # Constants for complex query detection
 COMPLEX_QUERY_KEYWORDS = [
@@ -1550,10 +1550,10 @@ class MCPPlannerGraph:
             if enable_reasoning:
                 # Very complex queries with reasoning need up to 4 minutes
                 # Match the timeout in chat.py: 230s for complex, 115s for regular reasoning
-                graph_timeout = 230.0 if is_complex_query else 115.0  # 230s for complex, 115s for regular reasoning
+                graph_timeout = 460.0 if is_complex_query else 230.0  # 460s for complex, 230s for regular reasoning (doubled)
             else:
-                # Regular queries: Match chat.py timeouts (60s for simple, 90s for complex)
-                graph_timeout = 90.0 if is_complex_query else 60.0  # Increased from 30s to 60s for simple queries
+                # Regular queries: Match chat.py timeouts (120s for simple, 180s for complex)
+                graph_timeout = 180.0 if is_complex_query else 120.0  # Doubled simple/complex query timeouts
             logger.info(f"Graph timeout set to {graph_timeout}s (complex: {is_complex_query}, reasoning: {enable_reasoning})")
             try:
                 result = await asyncio.wait_for(
