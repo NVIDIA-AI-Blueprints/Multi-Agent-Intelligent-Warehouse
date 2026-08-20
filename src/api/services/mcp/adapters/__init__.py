@@ -16,11 +16,10 @@
 """
 MCP Adapters for Warehouse Operational Assistant
 
-This package contains MCP-enabled adapters for various external systems
-including ERP, WMS, IoT, RFID, Time Attendance, and Forecasting systems.
+This package contains MCP-enabled adapters for various external systems.
+Dead-code adapters removed in Phase 3 (wms_adapter, iot_adapter, erp_adapter).
 """
 
-from .erp_adapter import MCPERPAdapter
 from .forecasting_adapter import (
     ForecastingMCPAdapter,
     ForecastingAdapterConfig,
@@ -28,7 +27,6 @@ from .forecasting_adapter import (
 )
 
 __all__ = [
-    "MCPERPAdapter",
     "ForecastingMCPAdapter",
     "ForecastingAdapterConfig",
     "get_forecasting_adapter",

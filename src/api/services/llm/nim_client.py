@@ -101,7 +101,7 @@ class NIMConfig:
     embedding_base_url: str = os.getenv(
         "EMBEDDING_NIM_URL", "https://integrate.api.nvidia.com/v1"
     )
-    llm_model: str = os.getenv("LLM_MODEL", "nvidia/llama-3.3-nemotron-super-49b-v1.5")
+    llm_model: str = os.getenv("LLM_MODEL", "nvidia/nemotron-3-super-120b-a12b")
     embedding_model: str = os.getenv("EMBEDDING_MODEL", "nvidia/llama-nemotron-embed-vl-1b-v2")
     timeout: int = _getenv_int("LLM_CLIENT_TIMEOUT", 240)  # 240s code default (doubled) to prevent premature timeouts
     # LLM generation parameters (configurable via environment variables)
@@ -358,6 +358,7 @@ class NIMClient:
         max_retries: int = 3,
         reasoning_budget: Optional[int] = None,
         enable_thinking: Optional[bool] = None,
+        model_override: Optional[str] = None,
     ) -> LLMResponse:
         """
         Generate response using NVIDIA NIM LLM with retry logic.
@@ -398,12 +399,13 @@ class NIMClient:
             if enable_thinking is None
             else enable_thinking
         )
+        effective_model = model_override or self.config.llm_model
         request_messages = messages
-        if "nemotron" in self.config.llm_model.lower() and not resolved_enable_thinking:
+        if "nemotron" in effective_model.lower() and not resolved_enable_thinking:
             request_messages = _ensure_no_think_system_prompt(messages)
 
         payload = {
-            "model": self.config.llm_model,
+            "model": effective_model,
             "messages": request_messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
@@ -419,7 +421,7 @@ class NIMClient:
         if not math.isclose(presence_penalty, 0.0, abs_tol=1e-09):
             payload["presence_penalty"] = presence_penalty
 
-        if "nemotron" in self.config.llm_model.lower():
+        if "nemotron" in effective_model.lower():
             if resolved_enable_thinking:
                 resolved_reasoning_budget = (
                     self.config.default_reasoning_budget

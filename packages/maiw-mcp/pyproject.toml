@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "maiw-mcp"
+version = "0.1.0"
+description = "Shared MCP v2 client infrastructure for MAIW warehouse agents"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=2.0.0,<3",
+    "pydantic>=2.0.0",
+    "anyio>=4.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["maiw_mcp*"]
