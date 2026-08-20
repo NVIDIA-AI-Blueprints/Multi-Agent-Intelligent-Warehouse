@@ -2,6 +2,19 @@
 requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
+# ── uv workspace ───────────────────────────────────────────────────────────────
+# Phase 8: declares the package workspace so `uv sync` can resolve all members
+# together. The root project remains the API application entry point.
+# Run: uv sync --all-packages
+[tool.uv.workspace]
+members = [
+    "packages/maiw-mcp",
+    "packages/maiw-state",
+    "packages/maiw-decision",
+    "packages/maiw-models",
+    "packages/maiw-skills",
+]
+
 [project]
 name = "warehouse-operational-assistant"
 version = "1.0.0"
