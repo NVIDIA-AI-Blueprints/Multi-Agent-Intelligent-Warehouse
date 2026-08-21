@@ -26,55 +26,7 @@ executed by a typed executor that enforces four guards before a write reaches MC
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────────────────────────┐
-│                         MAIW Runtime Pipeline                            │
-│                                                                          │
-│  User / API Request                                                      │
-│        │                                                                 │
-│        ▼                                                                 │
-│  ┌──────────────┐    ┌──────────────────────────────────────────────┐   │
-│  │  FastAPI App │    │               Agent Layer                    │   │
-│  │  (src/api)   │───▶│  EquipmentAssetOperationsAgent               │   │
-│  └──────────────┘    │  OperationsCoordinationAgent                 │   │
-│                       │  SafetyComplianceAgent                       │   │
-│                       └────────────────┬─────────────────────────────┘  │
-│                                        │                                 │
-│         ┌──────────────────────────────┼──────────────────────────────┐ │
-│         │                             │                              │  │
-│         ▼                             ▼                              ▼  │
-│  ┌─────────────┐             ┌─────────────────┐           ┌──────────┐ │
-│  │  STATE      │             │     REASON      │           │  DECIDE  │ │
-│  │ WarehouseState│           │  ModelGateway   │           │ Decision │ │
-│  │ Provider   │             │  Nemotron 3     │           │ Engine   │ │
-│  └──────┬──────┘             └────────┬────────┘           └────┬─────┘ │
-│         │                             │                          │       │
-│         │         StateSnapshot       │       ActionProposal     │       │
-│         └─────────────────────────────┘                          │       │
-│                                                                   │       │
-│                                            DecisionResult         │       │
-│                                            (APPROVED/REJECTED/   │       │
-│                                             DEFERRED)             │       │
-│                                                        ▼          │       │
-│                                               ┌────────────────┐  │       │
-│                                               │    EXECUTE     │◀─┘       │
-│                                               │ ActionExecutor │           │
-│                                               │ (4-guard)      │           │
-│                                               └───────┬────────┘           │
-│                                                       │                    │
-│                                                       ▼                    │
-│                                              ┌──────────────────┐          │
-│                                              │   MCP v2 Server  │          │
-│                                              │  (stateless HTTP)│          │
-│                                              └───────┬──────────┘          │
-│                                                      │                     │
-│                                                      ▼                     │
-│                                             ┌──────────────────┐           │
-│                                             │    PostgreSQL    │           │
-│                                             │  (TimescaleDB)   │           │
-│                                             └──────────────────┘           │
-└──────────────────────────────────────────────────────────────────────────┘
-```
+![MAIW Runtime Pipeline](docs/architecture/diagrams/maiw-runtime-pipeline.png)
 
 ### Pipeline Stages
 
