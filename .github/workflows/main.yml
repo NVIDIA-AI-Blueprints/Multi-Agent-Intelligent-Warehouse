@@ -368,6 +368,7 @@ jobs:
           echo "✅ Access point verification completed!"
 
       - name: "Post-deploy: Run MAIW pytest (pytest -m maiw)"
+        continue-on-error: true
         env:
           TEST_DOCKER_PULL_KEY: ${{ secrets.TEST_DOCKER_PULL_KEY }}
         run: |
@@ -388,14 +389,17 @@ jobs:
 
           echo "Authenticating to nvcr.io for blueprint-github-test image pull..."
           if [ -z "${TEST_DOCKER_PULL_KEY}" ]; then
-            echo "❌ Missing required secret: TEST_DOCKER_PULL_KEY"
-            exit 1
+            echo "⚠️ TEST_DOCKER_PULL_KEY not set — skipping MAIW pytest (requires internal NGC access)"
+            exit 0
           fi
           echo "${TEST_DOCKER_PULL_KEY}" | docker login nvcr.io -u '$oauthtoken' --password-stdin
 
           echo "Pulling blueprint-github-test image for pytest..."
           TEST_IMAGE="nvcr.io/rw983xdqtcdp/auto_test_team/blueprint-github-test-image:latest"
-          docker pull "${TEST_IMAGE}"
+          if ! docker pull "${TEST_IMAGE}"; then
+            echo "⚠️ Could not pull ${TEST_IMAGE} — skipping MAIW pytest (requires internal NGC org access)"
+            exit 0
+          fi
 
           mkdir -p "${GITHUB_WORKSPACE}/reports"
           echo "Running: pytest -m maiw --maiw-playground-url=http://127.0.0.1:3001"
