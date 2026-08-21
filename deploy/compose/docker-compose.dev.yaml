@@ -159,12 +159,15 @@ services:
     restart: unless-stopped
 
   llm-nim:
-    image: nvcr.io/nim/nvidia/llama-3.3-nemotron-super-49b-v1.5:latest
+    image: nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b:latest
     container_name: wosa-llm-nim
+    profiles:
+      - gpu
     ports:
       - "${LLM_NIM_PORT:-8000}:8000"
     environment:
       - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
+      - NGC_API_KEY=${NVIDIA_API_KEY:-}
       - CUDA_VISIBLE_DEVICES=0,1,2,3
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
@@ -179,6 +182,7 @@ services:
                 - "2"
                 - "3"
               capabilities: [gpu]
+    shm_size: '2gb'
     volumes:
       - nim_cache:/root/.cache
       - nim_models:/models

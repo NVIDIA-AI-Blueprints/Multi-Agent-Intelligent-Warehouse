@@ -51,6 +51,15 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.docker.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Install local MAIW packages
+COPY packages/ ./packages/
+RUN pip install --no-cache-dir \
+    packages/maiw-mcp \
+    packages/maiw-state \
+    packages/maiw-decision \
+    packages/maiw-models \
+    packages/maiw-skills
+
 # =============================================================================
 # Final Runtime Stage
 # =============================================================================

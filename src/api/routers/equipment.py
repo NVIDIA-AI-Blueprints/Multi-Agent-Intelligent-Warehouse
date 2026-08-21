@@ -87,12 +87,14 @@ class AssignmentRequest(BaseModel):
     task_id: Optional[str] = None
     duration_hours: Optional[int] = None
     notes: Optional[str] = None
+    warehouse_id: Optional[str] = None
 
 
 class ReleaseRequest(BaseModel):
     asset_id: str
     released_by: str
     notes: Optional[str] = None
+    warehouse_id: Optional[str] = None
 
 
 class MaintenanceRequest(BaseModel):
@@ -103,6 +105,7 @@ class MaintenanceRequest(BaseModel):
     scheduled_for: str
     estimated_duration_minutes: int = 60
     priority: str = "medium"
+    warehouse_id: Optional[str] = None
 
 
 @router.get("/equipment", response_model=List[EquipmentAsset])
@@ -327,25 +330,39 @@ async def get_equipment_by_id(asset_id: str):
 
 @router.get("/equipment/{asset_id}/status", response_model=Dict[str, Any])
 async def get_equipment_status(asset_id: str):
-    """Get live equipment status including telemetry data."""
+    """
+    Get live equipment status including telemetry data and state snapshot context.
+
+    When the equipment MCP server is configured the response includes a
+    ``state_snapshot`` block with provenance and freshness metadata from
+    ``WarehouseStateProvider``.  When not configured the block is omitted.
+    """
     try:
         equipment_agent = await get_equipment_agent()
 
-        # Get equipment status
-        status_result = await equipment_agent.asset_tools.get_equipment_status(
+        # Read path: assemble WarehouseStateSnapshot for provenance context.
+        # This is a read-only operation — no DecisionEngine involved.
+        state_context = await equipment_agent.get_equipment_state_snapshot(
             asset_id=asset_id
         )
 
-        # Get recent telemetry data
+        # Legacy direct status/telemetry calls — always present
+        status_result = await equipment_agent.asset_tools.get_equipment_status(
+            asset_id=asset_id
+        )
         telemetry_result = await equipment_agent.asset_tools.get_equipment_telemetry(
             asset_id=asset_id, hours_back=1
         )
 
-        return {
+        response: Dict[str, Any] = {
             "equipment_status": status_result,
             "telemetry_data": telemetry_result,
             "timestamp": datetime.now().isoformat(),
         }
+        if state_context:
+            response["state_snapshot"] = state_context
+
+        return response
 
     except Exception as e:
         logger.error(f"Failed to get equipment status for {asset_id}: {e}")
@@ -356,51 +373,87 @@ async def get_equipment_status(asset_id: str):
 
 @router.post("/equipment/assign", response_model=Dict[str, Any])
 async def assign_equipment(request: AssignmentRequest):
-    """Assign equipment to a user, task, or zone."""
+    """
+    Propose an equipment assignment.
+
+    All assignment requests are evaluated by the DecisionEngine before
+    any write occurs.  The response includes the decision outcome and a
+    ``proposal_id`` / ``decision_id`` pair for audit tracing.
+
+    Response shape::
+
+        {
+            "status": "requires_human_approval" | "approved" | "rejected"
+                      | "requires_fresh_state" | "error",
+            "action": "warehouse.equipment.assign",
+            "proposal_id": "<uuid>",
+            "decision_id": "<uuid>",
+            "reason": "<human-readable explanation>",
+            "executed": false,
+            "snapshot_id": "<uuid>",
+        }
+
+    ``executed`` is always ``false`` in Phase 5 — no write occurs through
+    this endpoint until an approval workflow surfaces a confirmed APPROVED
+    decision.
+    """
     try:
         equipment_agent = await get_equipment_agent()
 
-        result = await equipment_agent.asset_tools.assign_equipment(
+        decision_response = await equipment_agent.propose_equipment_assignment(
             asset_id=request.asset_id,
             assignee=request.assignee,
             assignment_type=request.assignment_type,
             task_id=request.task_id,
-            duration_hours=request.duration_hours,
+            duration_hours=float(request.duration_hours) if request.duration_hours else None,
             notes=request.notes,
+            warehouse_id=request.warehouse_id or "default",
         )
 
-        if not result.get("success", False):
+        # Surface errors as HTTP 400 but keep decision outcomes (approval-required,
+        # rejected, fresh-state-needed) as HTTP 200 with structured body — they
+        # are not server errors, they are classification results.
+        if decision_response.get("status") == "error":
             raise HTTPException(
-                status_code=400, detail=result.get("error", "Assignment failed")
+                status_code=400,
+                detail=decision_response.get("reason", "Assignment proposal failed"),
             )
 
-        return result
+        return decision_response
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to assign equipment {request.asset_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to assign equipment")
+        logger.error(f"Failed to propose assignment for {request.asset_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to process assignment proposal")
 
 
 @router.post("/equipment/release", response_model=Dict[str, Any])
 async def release_equipment(request: ReleaseRequest):
-    """Release equipment from current assignment."""
+    """
+    Propose and (if approved) execute releasing equipment from its current assignment.
+
+    LOW risk: DecisionEngine auto-approves unless equipment state is stale/absent.
+    Response includes status, proposal_id, decision_id, and (when executed)
+    execution_id with executed=true.
+    """
     try:
         equipment_agent = await get_equipment_agent()
 
-        result = await equipment_agent.asset_tools.release_equipment(
+        decision_response = await equipment_agent.propose_equipment_release(
             asset_id=request.asset_id,
             released_by=request.released_by,
             notes=request.notes,
+            warehouse_id=request.warehouse_id or "default",
         )
 
-        if not result.get("success", False):
+        if decision_response.get("status") == "error":
             raise HTTPException(
-                status_code=400, detail=result.get("error", "Release failed")
+                status_code=400,
+                detail=decision_response.get("reason", "Release failed"),
             )
 
-        return result
+        return decision_response
 
     except HTTPException:
         raise
@@ -448,32 +501,33 @@ async def get_equipment_telemetry(
 
 @router.post("/equipment/maintenance", response_model=Dict[str, Any])
 async def schedule_maintenance(request: MaintenanceRequest):
-    """Schedule maintenance for equipment."""
+    """
+    Propose scheduling maintenance for equipment.
+
+    MEDIUM risk: DecisionEngine always returns requires_human_approval.
+    Response includes status, proposal_id, decision_id, and executed=false.
+    """
     try:
         equipment_agent = await get_equipment_agent()
 
-        # Parse scheduled_for datetime
-        scheduled_for = datetime.fromisoformat(
-            request.scheduled_for.replace("Z", "+00:00")
-        )
-
-        result = await equipment_agent.asset_tools.schedule_maintenance(
+        decision_response = await equipment_agent.propose_schedule_maintenance(
             asset_id=request.asset_id,
             maintenance_type=request.maintenance_type,
             description=request.description,
             scheduled_by=request.scheduled_by,
-            scheduled_for=scheduled_for,
+            scheduled_for=request.scheduled_for,
             estimated_duration_minutes=request.estimated_duration_minutes,
             priority=request.priority,
+            warehouse_id=request.warehouse_id or "default",
         )
 
-        if not result.get("success", False):
+        if decision_response.get("status") == "error":
             raise HTTPException(
                 status_code=400,
-                detail=result.get("error", "Maintenance scheduling failed"),
+                detail=decision_response.get("reason", "Maintenance scheduling failed"),
             )
 
-        return result
+        return decision_response
 
     except HTTPException:
         raise

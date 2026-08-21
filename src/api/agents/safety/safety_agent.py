@@ -28,6 +28,13 @@ from datetime import datetime, timedelta
 import asyncio
 
 from src.api.services.llm.nim_client import get_nim_client, LLMResponse
+from src.api.services.model_gateway import (
+    get_model_gateway,
+    is_model_gateway_enabled,
+    ModelRequest,
+    ModelGatewayError,
+)
+from src.api.services.model_gateway.models import ReasoningLevel, RiskLevel as GWRiskLevel
 from src.retrieval.hybrid_retriever import get_hybrid_retriever, SearchContext
 from src.retrieval.structured.sql_retriever import get_sql_retriever
 from src.api.services.reasoning import (
@@ -96,6 +103,7 @@ class SafetyComplianceAgent:
 
     def __init__(self):
         self.nim_client = None
+        self.model_gateway = None
         self.hybrid_retriever = None
         self.sql_retriever = None
         self.action_tools = None
@@ -110,7 +118,12 @@ class SafetyComplianceAgent:
             self.config = load_agent_config("safety")
             logger.info(f"Loaded agent configuration: {self.config.name}")
             
-            self.nim_client = await get_nim_client()
+            if is_model_gateway_enabled():
+                self.model_gateway = await get_model_gateway()
+                self.nim_client = None
+            else:
+                # DEPRECATED: direct NIM path — remove after endpoint validation.
+                self.nim_client = await get_nim_client()
             self.hybrid_retriever = await get_hybrid_retriever()
             self.sql_retriever = await get_sql_retriever()
             self.action_tools = await get_safety_action_tools()
@@ -144,7 +157,7 @@ class SafetyComplianceAgent:
         """
         try:
             # Initialize if needed
-            if not self.nim_client or not self.hybrid_retriever:
+            if not (self.model_gateway or self.nim_client) or not self.hybrid_retriever:
                 await self.initialize()
 
             # Update conversation context
@@ -251,13 +264,23 @@ class SafetyComplianceAgent:
                 {"role": "user", "content": prompt},
             ]
 
-            response = await self.nim_client.generate_response(
-                messages, temperature=0.1
-            )
+            if self.model_gateway:
+                _gw = await self.model_gateway.generate(ModelRequest(
+                    task="warehouse.safety.understand_query",
+                    messages=messages,
+                    reasoning=ReasoningLevel.LOW,
+                    risk_level=GWRiskLevel.LOW,
+                    temperature=0.1,
+                ))
+                _response_content = _gw.content
+            else:
+                # DEPRECATED: direct NIM path — remove after endpoint validation.
+                _llm = await self.nim_client.generate_response(messages, temperature=0.1)
+                _response_content = _llm.content
 
             # Parse LLM response
             try:
-                parsed_response = json.loads(response.content)
+                parsed_response = json.loads(_response_content)
                 return SafetyQuery(
                     intent=parsed_response.get("intent", "general"),
                     entities=parsed_response.get("entities", {}),
@@ -863,13 +886,37 @@ class SafetyComplianceAgent:
                 {"role": "user", "content": prompt},
             ]
 
-            response = await self.nim_client.generate_response(
-                messages, temperature=0.2
+            # Safety incidents and corrective actions carry HIGH risk.
+            _high_risk_intents = {"incident_report", "broadcast_alert", "lockout_tagout", "corrective_action", "near_miss"}
+            _critical_intents = {"broadcast_alert", "lockout_tagout"}
+            _intent = safety_query.intent if hasattr(safety_query, "intent") else "general"
+            _gw_risk = (
+                GWRiskLevel.CRITICAL if _intent in _critical_intents
+                else GWRiskLevel.HIGH if _intent in _high_risk_intents
+                else GWRiskLevel.MEDIUM
             )
+            _gw_reasoning = (
+                ReasoningLevel.HIGH if _intent in _high_risk_intents
+                else ReasoningLevel.MEDIUM
+            )
+
+            if self.model_gateway:
+                _gw = await self.model_gateway.generate(ModelRequest(
+                    task=f"warehouse.safety.{_intent}",
+                    messages=messages,
+                    reasoning=_gw_reasoning,
+                    risk_level=_gw_risk,
+                    temperature=0.2,
+                ))
+                _gen_response_content = _gw.content
+            else:
+                # DEPRECATED: direct NIM path — remove after endpoint validation.
+                _llm = await self.nim_client.generate_response(messages, temperature=0.2)
+                _gen_response_content = _llm.content
 
             # Parse LLM response
             try:
-                parsed_response = json.loads(response.content)
+                parsed_response = json.loads(_gen_response_content)
 
                 # Prepare reasoning steps for response
                 reasoning_steps = None

@@ -21,6 +21,7 @@ dynamic tool discovery and execution for equipment and asset operations.
 """
 
 import logging
+import os
 from typing import Dict, List, Optional, Any, Union
 from dataclasses import dataclass, asdict
 import json
@@ -29,6 +30,12 @@ import asyncio
 import re
 
 from src.api.services.llm.nim_client import get_nim_client, LLMResponse
+from src.api.services.model_gateway import (
+    get_model_gateway,
+    is_model_gateway_enabled,
+    ModelRequest,
+)
+from src.api.services.model_gateway.models import ReasoningLevel, RiskLevel as MGRiskLevel
 from src.retrieval.hybrid_retriever import get_hybrid_retriever, SearchContext
 from src.memory.memory_manager import get_memory_manager
 from src.api.services.mcp.tool_discovery import (
@@ -98,8 +105,15 @@ class MCPEquipmentAssetOperationsAgent:
     - Comprehensive error handling and fallback mechanisms
     """
 
-    def __init__(self):
+    def __init__(
+        self,
+        *,
+        state_provider=None,
+        decision_engine=None,
+        action_executor=None,
+    ):
         self.nim_client = None
+        self.model_gateway = None
         self.hybrid_retriever = None
         self.asset_tools = None
         self.mcp_manager = None
@@ -108,7 +122,10 @@ class MCPEquipmentAssetOperationsAgent:
         self.conversation_context = {}
         self.mcp_tools_cache = {}
         self.tool_execution_history = []
-        self.config: Optional[AgentConfig] = None  # Agent configuration
+        self.config: Optional[AgentConfig] = None
+        self._state_provider = state_provider
+        self._decision_engine = decision_engine
+        self._action_executor = action_executor
 
     async def initialize(self) -> None:
         """Initialize the agent with required services including MCP."""
@@ -117,9 +134,17 @@ class MCPEquipmentAssetOperationsAgent:
             self.config = load_agent_config("equipment")
             logger.info(f"Loaded agent configuration: {self.config.name}")
             
-            self.nim_client = await get_nim_client()
+            if is_model_gateway_enabled():
+                self.model_gateway = await get_model_gateway()
+                self.nim_client = None
+            else:
+                self.nim_client = await get_nim_client()
+                self.model_gateway = None
             self.hybrid_retriever = await get_hybrid_retriever()
             self.asset_tools = await get_equipment_asset_tools()
+
+            if os.environ.get("MAIW_MCP_SERVER_EQUIPMENT_URL"):
+                await self._initialize_state_path()
 
             # Initialize MCP components
             self.mcp_manager = MCPManager()
@@ -142,6 +167,70 @@ class MCPEquipmentAssetOperationsAgent:
                 f"Failed to initialize MCP Equipment & Asset Operations Agent: {e}"
             )
             raise
+
+    async def _initialize_state_path(self) -> None:
+        """Wire WarehouseStateProvider, DecisionEngine, and EquipmentActionExecutor."""
+        try:
+            from maiw_state import WarehouseStateProvider
+            from maiw_decision import DecisionEngine
+            from src.api.skills.equipment import (
+                get_equipment_status_skill,
+                get_execute_equipment_assignment_skill,
+                get_execute_equipment_release_skill,
+                get_execute_equipment_maintenance_skill,
+            )
+            from src.api.agents.inventory.action_executor import EquipmentActionExecutor
+
+            if self._state_provider is None:
+                status_skill = await get_equipment_status_skill()
+                self._state_provider = WarehouseStateProvider(equipment_status_skill=status_skill)
+
+            if self._decision_engine is None:
+                self._decision_engine = DecisionEngine()
+
+            if self._action_executor is None:
+                assign_exec = await get_execute_equipment_assignment_skill()
+                release_exec = await get_execute_equipment_release_skill()
+                maintenance_exec = await get_execute_equipment_maintenance_skill()
+                self._action_executor = EquipmentActionExecutor(
+                    assign_skill=assign_exec,
+                    release_skill=release_exec,
+                    maintenance_skill=maintenance_exec,
+                    state_provider=self._state_provider,
+                )
+
+            logger.info("MCPEquipmentAgent: state-aware path initialized")
+        except Exception as exc:
+            logger.warning("MCPEquipmentAgent: state-aware path init failed: %s", exc)
+
+    async def _llm_generate(
+        self,
+        messages: list,
+        task: str = "warehouse.equipment.query",
+        temperature: float = 0.3,
+        max_tokens: int = 1000,
+        reasoning: str = "medium",
+    ) -> str:
+        """Unified LLM call — uses ModelGateway when enabled, NIM otherwise."""
+        if self.model_gateway:
+            _reasoning = {
+                "low": ReasoningLevel.LOW,
+                "medium": ReasoningLevel.MEDIUM,
+                "high": ReasoningLevel.HIGH,
+            }.get(reasoning, ReasoningLevel.MEDIUM)
+            response = await self.model_gateway.generate(ModelRequest(
+                task=task,
+                messages=messages,
+                reasoning=_reasoning,
+                risk_level=MGRiskLevel.LOW,
+                temperature=temperature,
+            ))
+            return response.content
+        else:
+            response = await self.nim_client.generate_response(
+                messages, temperature=temperature, max_tokens=max_tokens
+            )
+            return response.content
 
     async def _register_mcp_sources(self) -> None:
         """Register MCP sources for tool discovery."""
@@ -396,11 +485,13 @@ Return only valid JSON.""",
                 },
             ]
 
-            response = await self.nim_client.generate_response(parse_prompt)
+            response_text = await self._llm_generate(
+                parse_prompt, task="warehouse.equipment.parse_query", temperature=0.1
+            )
 
             # Parse JSON response
             try:
-                parsed_data = json.loads(response.content)
+                parsed_data = json.loads(response_text)
             except json.JSONDecodeError:
                 # Fallback parsing
                 parsed_data = {
@@ -992,15 +1083,13 @@ ABSOLUTELY CRITICAL:
                 },
             ]
 
-            # Use lower temperature for more deterministic JSON responses
-            response = await self.nim_client.generate_response(
+            response_text = await self._llm_generate(
                 response_prompt,
-                temperature=0.0,  # Lower temperature for more consistent JSON format
-                max_tokens=2000  # Allow more tokens for detailed responses
+                task="warehouse.equipment.generate_response",
+                temperature=0.0,
+                max_tokens=2000,
             )
-
-            # Parse JSON response - try to extract JSON from response if it contains extra text
-            response_text = response.content.strip()
+            response_text = response_text.strip()
             
             # Try to extract JSON if response contains extra text
             # Use brace counting instead of regex to avoid catastrophic backtracking
@@ -1184,12 +1273,12 @@ Write in a way that sounds natural and human, not robotic or template-like. Retu
                 ]
                 
                 try:
-                    generation_response = await self.nim_client.generate_response(
+                    natural_language = (await self._llm_generate(
                         generation_prompt,
-                        temperature=0.4,  # Higher temperature for more natural, fluent language
-                        max_tokens=1000
-                    )
-                    natural_language = generation_response.content.strip()
+                        task="warehouse.equipment.generate_nl",
+                        temperature=0.4,
+                        max_tokens=1000,
+                    )).strip()
                     logger.info(f"LLM generated natural_language: {natural_language[:200]}...")
                 except Exception as e:
                     logger.error(f"Failed to generate natural_language from LLM: {e}", exc_info=True)
@@ -1255,12 +1344,12 @@ Do not include any other text, just the JSON array."""
                 ]
                 
                 try:
-                    rec_response = await self.nim_client.generate_response(
+                    rec_text = (await self._llm_generate(
                         recommendations_prompt,
+                        task="warehouse.equipment.generate_recommendations",
                         temperature=0.3,
-                        max_tokens=500
-                    )
-                    rec_text = rec_response.content.strip()
+                        max_tokens=500,
+                    )).strip()
                     # Try to extract JSON array - use bounded pattern to avoid quadratic runtime
                     # Find first '[' and last ']' to extract JSON array safely
                     start_idx = rec_text.find('[')

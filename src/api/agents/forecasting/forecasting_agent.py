@@ -27,6 +27,13 @@ import json
 from datetime import datetime
 
 from src.api.services.llm.nim_client import get_nim_client, LLMResponse
+from src.api.services.model_gateway import (
+    get_model_gateway,
+    is_model_gateway_enabled,
+    ModelRequest,
+    ModelGatewayError,
+)
+from src.api.services.model_gateway.models import ReasoningLevel, RiskLevel
 from src.retrieval.hybrid_retriever import get_hybrid_retriever, SearchContext
 from src.memory.memory_manager import get_memory_manager
 from src.api.services.mcp.tool_discovery import (
@@ -87,7 +94,8 @@ class ForecastingAgent:
     """
 
     def __init__(self):
-        self.nim_client = None
+        self.model_gateway = None  # preferred: ModelGateway
+        self.nim_client = None     # DEPRECATED: legacy fallback when MODEL_GATEWAY_ENABLED=false
         self.hybrid_retriever = None
         self.forecasting_tools = None
         self.mcp_manager = None
@@ -104,8 +112,19 @@ class ForecastingAgent:
             # Load agent configuration
             self.config = load_agent_config("forecasting")
             logger.info(f"Loaded agent configuration: {self.config.name}")
-            
-            self.nim_client = await get_nim_client()
+
+            # ModelGateway is the preferred path; fall back to NIMClient only when
+            # MODEL_GATEWAY_ENABLED=false (emergency rollback).
+            if is_model_gateway_enabled():
+                self.model_gateway = await get_model_gateway()
+                logger.info("ForecastingAgent: using ModelGateway for LLM calls")
+            else:
+                self.nim_client = await get_nim_client()
+                logger.warning(
+                    "ForecastingAgent: MODEL_GATEWAY_ENABLED=false — using legacy NIMClient. "
+                    "Set MODEL_GATEWAY_ENABLED=true to enable routing."
+                )
+
             self.hybrid_retriever = await get_hybrid_retriever()
             self.forecasting_tools = await get_forecasting_action_tools()
 
@@ -171,7 +190,7 @@ class ForecastingAgent:
         try:
             # Initialize if needed
             if (
-                not self.nim_client
+                not (self.model_gateway or self.nim_client)
                 or not self.hybrid_retriever
                 or not self.tool_discovery
             ):
@@ -267,8 +286,21 @@ class ForecastingAgent:
                 },
             ]
 
-            llm_response = await self.nim_client.generate_response(parse_prompt)
-            parsed = json.loads(llm_response.content)
+            if self.model_gateway:
+                _gw_response = await self.model_gateway.generate(
+                    ModelRequest(
+                        task="warehouse.forecasting.parse_query",
+                        messages=parse_prompt,
+                        reasoning=ReasoningLevel.LOW,
+                        risk_level=RiskLevel.LOW,
+                    )
+                )
+                _content = _gw_response.content
+            else:
+                # DEPRECATED: remove when MODEL_GATEWAY_ENABLED is always true
+                _llm_response = await self.nim_client.generate_response(parse_prompt)
+                _content = _llm_response.content
+            parsed = json.loads(_content)
 
             return MCPForecastingQuery(
                 intent=parsed.get("intent", "forecast"),
@@ -496,8 +528,20 @@ class ForecastingAgent:
                 },
             ]
 
-            llm_response = await self.nim_client.generate_response(response_prompt)
-            natural_language = llm_response.content
+            if self.model_gateway:
+                _gw_response = await self.model_gateway.generate(
+                    ModelRequest(
+                        task="warehouse.forecasting.generate_response",
+                        messages=response_prompt,
+                        reasoning=ReasoningLevel.MEDIUM,
+                        risk_level=RiskLevel.LOW,
+                    )
+                )
+                natural_language = _gw_response.content
+            else:
+                # DEPRECATED: remove when MODEL_GATEWAY_ENABLED is always true
+                _llm_response = await self.nim_client.generate_response(response_prompt)
+                natural_language = _llm_response.content
 
             # Extract recommendations
             recommendations = []

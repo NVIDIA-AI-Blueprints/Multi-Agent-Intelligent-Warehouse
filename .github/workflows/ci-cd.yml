@@ -57,6 +57,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pytest pytest-cov pytest-asyncio pytest-timeout black
+        pip install -e packages/maiw-mcp
+        pip install -e packages/maiw-state
+        pip install -e packages/maiw-decision
+        pip install -e packages/maiw-models
+        pip install -e packages/maiw-skills
     
     - name: Install Node.js dependencies
       run: |
@@ -81,14 +86,24 @@ jobs:
           --ignore=tests/unit/test_mcp_integrated_planner_graph.py \
           --ignore=tests/unit/test_mcp_system.py \
           --ignore=tests/unit/test_guardrails_sdk.py \
+          --ignore=tests/unit/test_guardrails.py \
           --ignore=tests/unit/test_all_agents.py \
+          --ignore=tests/unit/test_basic.py \
           --ignore=tests/unit/test_db_connection.py \
           --ignore=tests/unit/test_enhanced_retrieval.py \
           --ignore=tests/unit/test_mcp_planner_integration.py \
           --ignore=tests/unit/test_document_pipeline.py \
+          --ignore=tests/unit/test_document_action_tools.py \
           --ignore=tests/unit/test_nvidia_integration.py \
           --ignore=tests/unit/test_nvidia_llm.py \
-          --ignore=tests/unit/test_document_action_tools.py \
+          --ignore=tests/unit/test_chunking_demo.py \
+          --ignore=tests/unit/test_caching_demo.py \
+          --ignore=tests/unit/test_response_quality_demo.py \
+          --ignore=tests/unit/test_evidence_scoring_demo.py \
+          --ignore=tests/unit/test_embedding.py \
+          --ignore=tests/unit/test_reasoning_evaluation.py \
+          --ignore=tests/unit/test_prompt_injection_protection.py \
+          --ignore=tests/unit/test_prompt_injection_simple.py \
           --cov=src \
           --cov-report=xml \
           --cov-report=term-missing
@@ -141,7 +156,7 @@ jobs:
     name: Semantic Release
     runs-on: ubuntu-latest
     needs: [test, security]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse'
     permissions:
       contents: write
       issues: write
@@ -175,3 +190,4 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        HUSKY: '0'

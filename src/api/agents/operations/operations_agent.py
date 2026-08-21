@@ -28,11 +28,26 @@ from datetime import datetime, timedelta
 import asyncio
 
 from src.api.services.llm.nim_client import get_nim_client, LLMResponse
+from src.api.services.model_gateway import (
+    get_model_gateway,
+    is_model_gateway_enabled,
+    ModelRequest,
+    ModelGatewayError,
+)
+from src.api.services.model_gateway.models import ReasoningLevel, RiskLevel
 from src.retrieval.hybrid_retriever import get_hybrid_retriever, SearchContext
 from src.retrieval.structured.task_queries import TaskQueries, Task
 from src.retrieval.structured.telemetry_queries import TelemetryQueries
 from src.api.utils.log_utils import sanitize_prompt_input
 from src.api.services.agent_config import load_agent_config, AgentConfig
+from src.api.skills.inventory import InventoryLookupSkill
+from src.api.skills.equipment import (
+    EquipmentStatusSkill,
+    EquipmentTelemetrySkill,
+)
+from maiw_mcp.contracts.inventory import InventoryLookupRequest
+from maiw_mcp.contracts.equipment import EquipmentStatusRequest, EquipmentTelemetryRequest
+from maiw_mcp.errors import MAIWMCPError
 from .action_tools import get_operations_action_tools, OperationsActionTools
 
 logger = logging.getLogger(__name__)
@@ -97,10 +112,14 @@ class OperationsCoordinationAgent:
 
     def __init__(self):
         self.nim_client = None
+        self.model_gateway = None
         self.hybrid_retriever = None
         self.task_queries = None
         self.telemetry_queries = None
         self.action_tools = None
+        self.inventory_skill: Optional[InventoryLookupSkill] = None
+        self.equipment_status_skill: Optional[EquipmentStatusSkill] = None
+        self.equipment_telemetry_skill: Optional[EquipmentTelemetrySkill] = None
         self.conversation_context = {}  # Maintain conversation context
         self.config: Optional[AgentConfig] = None  # Agent configuration
 
@@ -111,7 +130,13 @@ class OperationsCoordinationAgent:
             self.config = load_agent_config("operations")
             logger.info(f"Loaded agent configuration: {self.config.name}")
             
-            self.nim_client = await get_nim_client()
+            if is_model_gateway_enabled():
+                self.model_gateway = await get_model_gateway()
+                self.nim_client = None
+            else:
+                # DEPRECATED: remove after all agents migrated and endpoints validated.
+                # Technical debt: direct NIM path retained for emergency rollback only.
+                self.nim_client = await get_nim_client()
             self.hybrid_retriever = await get_hybrid_retriever()
 
             # Initialize task and telemetry queries
@@ -121,6 +146,40 @@ class OperationsCoordinationAgent:
             self.task_queries = TaskQueries(sql_retriever)
             self.telemetry_queries = TelemetryQueries(sql_retriever)
             self.action_tools = await get_operations_action_tools()
+
+            # Phase 2: wire inventory skill through MCP v2 when the server URL is configured.
+            # Falls back gracefully (skill stays None) when MAIW_MCP_SERVER_INVENTORY_URL is absent
+            # so existing deployments are not broken.
+            import os
+            if os.getenv("MAIW_MCP_SERVER_INVENTORY_URL"):
+                try:
+                    from src.api.skills.inventory import get_inventory_skill
+                    self.inventory_skill = await get_inventory_skill()
+                    logger.info("OperationsAgent: InventoryLookupSkill wired via MCP v2")
+                except Exception as skill_exc:
+                    logger.warning(
+                        "OperationsAgent: InventoryLookupSkill initialisation failed; "
+                        "inventory lookups will fall back to direct SQL. Error: %s",
+                        skill_exc,
+                    )
+
+            # Phase 3: wire equipment skills through MCP v2 when the server URL is configured.
+            # Falls back gracefully (skills stay None) when MAIW_MCP_SERVER_EQUIPMENT_URL is absent.
+            if os.getenv("MAIW_MCP_SERVER_EQUIPMENT_URL"):
+                try:
+                    from src.api.skills.equipment import (
+                        get_equipment_status_skill,
+                        get_equipment_telemetry_skill,
+                    )
+                    self.equipment_status_skill = await get_equipment_status_skill()
+                    self.equipment_telemetry_skill = await get_equipment_telemetry_skill()
+                    logger.info("OperationsAgent: Equipment skills wired via MCP v2")
+                except Exception as skill_exc:
+                    logger.warning(
+                        "OperationsAgent: Equipment skill initialisation failed; "
+                        "equipment queries will fall back to direct tools. Error: %s",
+                        skill_exc,
+                    )
 
             logger.info("Operations Coordination Agent initialized successfully")
         except Exception as e:
@@ -146,7 +205,7 @@ class OperationsCoordinationAgent:
         """
         try:
             # Initialize if needed
-            if not self.nim_client or not self.hybrid_retriever:
+            if not (self.model_gateway or self.nim_client) or not self.hybrid_retriever:
                 await self.initialize()
 
             # Update conversation context
@@ -187,6 +246,146 @@ class OperationsCoordinationAgent:
                 actions_taken=[],
             )
 
+    async def _lookup_inventory_sku(
+        self,
+        sku: str,
+        warehouse_id: str = "default",
+        trace_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Look up inventory for a SKU via the MCP v2 inventory skill.
+
+        Returns a dict with inventory data when the skill is configured, or
+        None when the MCP server URL is not set (graceful degradation).
+
+        The agent does not know or act on the ``source`` field in the result —
+        it only uses warehouse semantics (quantity, location, low_stock flag).
+        """
+        if self.inventory_skill is None:
+            return None
+        try:
+            result = await self.inventory_skill.execute(
+                InventoryLookupRequest(warehouse_id=warehouse_id, sku=sku),
+                trace_id=trace_id,
+            )
+            return {
+                "sku": result.sku,
+                "name": result.name,
+                "total_available": result.total_available,
+                "is_low_stock": result.is_low_stock,
+                "locations": [
+                    {
+                        "location_id": loc.location_id,
+                        "quantity_available": loc.quantity_available,
+                        "reorder_point": loc.reorder_point,
+                    }
+                    for loc in result.locations
+                ],
+                "observed_at": result.observed_at.isoformat(),
+            }
+        except MAIWMCPError as exc:
+            logger.warning(
+                "OperationsAgent: inventory skill call failed for SKU=%s: %s", sku, exc
+            )
+            return None
+
+    async def _get_equipment_status(
+        self,
+        asset_id: Optional[str] = None,
+        equipment_type: Optional[str] = None,
+        zone: Optional[str] = None,
+        status_filter: Optional[str] = None,
+        trace_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Query equipment status via the MCP v2 equipment skill.
+
+        Returns a dict with fleet status when the skill is configured, or
+        None when the MCP server URL is not set (graceful degradation).
+        """
+        if self.equipment_status_skill is None:
+            return None
+        try:
+            result = await self.equipment_status_skill.execute(
+                EquipmentStatusRequest(
+                    asset_id=asset_id,
+                    equipment_type=equipment_type,
+                    zone=zone,
+                    status_filter=status_filter,
+                ),
+                trace_id=trace_id,
+            )
+            return {
+                "equipment": [
+                    {
+                        "asset_id": a.asset_id,
+                        "equipment_type": a.equipment_type,
+                        "model": a.model,
+                        "zone": a.zone,
+                        "status": a.status,
+                        "owner_user": a.owner_user,
+                    }
+                    for a in result.equipment
+                ],
+                "summary": result.summary,
+                "total_count": result.total_count,
+            }
+        except MAIWMCPError as exc:
+            logger.warning(
+                "OperationsAgent: equipment status skill call failed: %s", exc
+            )
+            return None
+
+    async def _get_equipment_telemetry(
+        self,
+        asset_id: str,
+        metric: Optional[str] = None,
+        hours_back: int = 24,
+        trace_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve equipment telemetry via the MCP v2 equipment skill.
+
+        Returns a dict with telemetry data when the skill is configured, or
+        None when the MCP server URL is not set (graceful degradation).
+        """
+        if self.equipment_telemetry_skill is None:
+            return None
+        try:
+            result = await self.equipment_telemetry_skill.execute(
+                EquipmentTelemetryRequest(
+                    asset_id=asset_id,
+                    metric=metric,
+                    hours_back=hours_back,
+                ),
+                trace_id=trace_id,
+            )
+            return {
+                "asset_id": result.asset_id,
+                "data_points": result.data_points,
+                "hours_back": result.hours_back,
+                "telemetry_data": [
+                    {
+                        "timestamp": p.timestamp.isoformat(),
+                        "metric": p.metric,
+                        "value": p.value,
+                        "unit": p.unit,
+                    }
+                    for p in result.telemetry_data
+                ],
+                "available_metrics": [
+                    {"metric": m.metric, "unit": m.unit}
+                    for m in result.available_metrics
+                ],
+            }
+        except MAIWMCPError as exc:
+            logger.warning(
+                "OperationsAgent: equipment telemetry skill call failed for %s: %s",
+                asset_id,
+                exc,
+            )
+            return None
+
     async def _understand_query(
         self, query: str, session_id: str, context: Optional[Dict[str, Any]]
     ) -> OperationsQuery:
@@ -223,13 +422,23 @@ class OperationsCoordinationAgent:
                 {"role": "user", "content": prompt},
             ]
 
-            response = await self.nim_client.generate_response(
-                messages, temperature=0.1
-            )
+            if self.model_gateway:
+                _gw = await self.model_gateway.generate(ModelRequest(
+                    task="warehouse.operations.understand_query",
+                    messages=messages,
+                    reasoning=ReasoningLevel.LOW,
+                    risk_level=RiskLevel.LOW,
+                    temperature=0.1,
+                ))
+                response_content = _gw.content
+            else:
+                # DEPRECATED: direct NIM path — remove after endpoint validation.
+                _llm = await self.nim_client.generate_response(messages, temperature=0.1)
+                response_content = _llm.content
 
             # Parse LLM response
             try:
-                parsed_response = json.loads(response.content)
+                parsed_response = json.loads(response_content)
                 return OperationsQuery(
                     intent=parsed_response.get("intent", "general"),
                     entities=parsed_response.get("entities", {}),
@@ -702,13 +911,27 @@ IMPORTANT FOR EQUIPMENT DISPATCH:
                 {"role": "user", "content": prompt},
             ]
 
-            response = await self.nim_client.generate_response(
-                messages, temperature=0.2
-            )
+            # Wave recovery and workload rebalancing are HIGH-risk operational decisions.
+            _is_high_risk = operations_query.intent in {"pick_wave", "workload_rebalance", "shift_management"}
+            _risk = RiskLevel.HIGH if _is_high_risk else RiskLevel.LOW
+
+            if self.model_gateway:
+                _gw = await self.model_gateway.generate(ModelRequest(
+                    task="warehouse.operations.generate_response",
+                    messages=messages,
+                    reasoning=ReasoningLevel.MEDIUM,
+                    risk_level=_risk,
+                    temperature=0.2,
+                ))
+                response_content = _gw.content
+            else:
+                # DEPRECATED: direct NIM path — remove after endpoint validation.
+                _llm = await self.nim_client.generate_response(messages, temperature=0.2)
+                response_content = _llm.content
 
             # Parse LLM response
             try:
-                parsed_response = json.loads(response.content)
+                parsed_response = json.loads(response_content)
                 return OperationsResponse(
                     response_type=parsed_response.get("response_type", "general"),
                     data=parsed_response.get("data", {}),
