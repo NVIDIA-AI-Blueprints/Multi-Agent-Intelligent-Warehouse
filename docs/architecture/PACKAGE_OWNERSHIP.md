@@ -91,6 +91,19 @@ Remove by Phase 9.
 | `MCPEquipmentAgent`, `MCPOperationsAgent`, `MCPSafetyAgent` | `src/api/agents/*/mcp_*.py` | DEPRECATED | NIM-primary paths; never migrated to ModelGateway; marked with DEPRECATED comment |
 | `ForecastingAgent` | `src/api/agents/forecasting/` | EXTERNAL INTEGRATION | Uses ModelGateway but not core transactional; classify as integration |
 | Document agents | `src/api/agents/document/` | EXTERNAL INTEGRATION | Large external dependency surface (OCR, embeddings); not core |
+## Batch 3: Agents → `packages/maiw-agents/`
+
+| Module | Current path | Target package | Status | Notes |
+|--------|-------------|----------------|--------|-------|
+| `EquipmentActionExecutor` | `src/api/agents/inventory/action_executor.py` | `maiw-agents/equipment/` | `MOVE NOW` | Path is misleading; Equipment lives under "inventory" dir — fix during move |
+| `EquipmentAssetOperationsAgent`, `MCPEquipmentAgent` | `src/api/agents/inventory/` | `maiw-agents/equipment/` | `MOVE NOW` | Domain: Equipment, not Inventory |
+| `LaborActionExecutor` | `src/api/agents/operations/labor_executor.py` | `maiw-agents/labor/` | `MOVE NOW` | |
+| `WaveActionExecutor` | `src/api/agents/operations/wave_executor.py` | `maiw-agents/wave/` | `MOVE NOW` | |
+| `OperationsAgent`, `MCPOperationsAgent` | `src/api/agents/operations/` | `maiw-agents/operations/` | `MOVE NOW` | |
+| `SafetyAgent`, `MCPSafetyAgent` | `src/api/agents/safety/` | `maiw-agents/safety/` | `MOVE NOW` | |
+| `ForecastingAgent` | `src/api/agents/forecasting/` | `integrations/forecasting/` | `EXTERNAL INTEGRATION` | Uses ModelGateway but is not core transactional; classify as integration |
+| Document agents | `src/api/agents/document/` | `integrations/document/` | `EXTERNAL INTEGRATION` | Large external dependency surface (OCR, embeddings); not core |
+| `state_aware_ops.py` | `src/api/agents/inventory/state_aware_ops.py` | `maiw-agents/equipment/` | `MOVE NOW` | Belongs with equipment executor |
 
 ---
 
@@ -148,6 +161,19 @@ The new canonical path is `packages/maiw-mcp/` + `mcp_servers/`.
 | `src/api/services/mcp/adapters/time_attendance_adapter.py` | ✅ DELETED (Phase 9A) | Hardware adapter, no active callers |
 
 **Phase 9A status:** Remaining DEPRECATE items are still used by `mcp_equipment_agent.py`, `forecasting_agent.py`, `src/api/routers/mcp.py`, and `evidence_collector.py`. These will be cleaned up in Phase 9B when those callers are migrated to the MCP 2.0 path.
+| `src/api/services/mcp/monitoring.py` | `DEPRECATE` | Monitoring for old MCP |
+| `src/api/services/mcp/rollback.py` | `DEPRECATE` | |
+| `src/api/services/mcp/security.py` | `DEPRECATE` | Security for old MCP |
+| `src/api/services/mcp/service_discovery.py` | `DEPRECATE` | |
+| `src/api/services/mcp/tool_binding.py` | `DEPRECATE` | |
+| `src/api/services/mcp/tool_routing.py` | `DEPRECATE` | |
+| `src/api/services/mcp/tool_validation.py` | `DEPRECATE` | |
+| `src/api/services/mcp/adapters/rfid_barcode_adapter.py` | `DELETE` | Hardware adapter, no active callers |
+| `src/api/services/mcp/adapters/time_attendance_adapter.py` | `DELETE` | Hardware adapter, no active callers |
+
+**Decision:** Do not delete DEPRECATE items in Phase 8 because `mcp_equipment_agent.py` and
+`forecasting_agent.py` still reference them. These will be cleaned up when those agents are migrated
+to the MCP 2.0 path in a future phase.
 
 ---
 

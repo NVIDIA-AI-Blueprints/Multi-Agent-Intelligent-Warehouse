@@ -35,6 +35,8 @@ All final phase reports MUST use this command. Any regression against the baseli
 
 > **Note:** `ci-cd.yml` previously ran only `tests/unit/` (327 tests). As of Phase 9A it has been corrected to run `tests/unit/ tests/contract/ tests/mcp/` (528 tests), matching this canonical definition.
 
+All final phase reports MUST use this command. Any regression against the baseline is a blocker.
+
 ---
 
 ## Why the Count Varies Across Reports
