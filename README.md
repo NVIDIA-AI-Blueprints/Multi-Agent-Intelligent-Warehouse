@@ -1,728 +1,644 @@
-# Multi-Agent-Intelligent-Warehouse 
-*NVIDIA Blueprint–aligned multi-agent assistant for warehouse operations.*
+# Multi-Agent Intelligent Warehouse (MAIW)
+
+*An NVIDIA AI Blueprint for agentic warehouse operations powered by Nemotron 3 and MCP v2.*
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.120+-green.svg)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-19+-61dafb.svg)](https://reactjs.org/)
 [![NVIDIA NIMs](https://img.shields.io/badge/NVIDIA-NIMs-76B900.svg)](https://www.nvidia.com/en-us/ai-data-science/nim/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-336791.svg)](https://www.postgresql.org/)
-[![Milvus](https://img.shields.io/badge/Milvus-GPU%20Accelerated-00D4AA.svg)](https://milvus.io/)
-[![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED.svg)](https://www.docker.com/)
-[![Prometheus](https://img.shields.io/badge/Prometheus-Monitoring-E6522C.svg)](https://prometheus.io/)
-[![Grafana](https://img.shields.io/badge/Grafana-Dashboards-F46800.svg)](https://grafana.com/)
 
-## Table of Contents
+---
 
-- [Overview](#overview)
-- [Acronyms & Abbreviations](#acronyms--abbreviations)
-- [System Architecture](#system-architecture)
-- [Key Features](#key-features)
-- [Quick Start](#quick-start)
-- [Multi-Agent System](#multi-agent-system)
-- [API Reference](#api-reference)
-- [Monitoring & Observability](#monitoring--observability)
-- [NeMo Guardrails](#nemo-guardrails)
-- [Development Guide](#development-guide)
-- [Contributing](#contributing)
-- [License](#license)
+## What MAIW Is
 
-## Acronyms & Abbreviations
+MAIW is a multi-agent system that lets warehouse operators ask natural-language questions and issue
+structured commands against live warehouse data. It does not answer from static knowledge. Instead,
+each agent assembles real-time state, reasons over it with a Nemotron model, proposes a concrete
+action, passes the proposal through a local decision engine, and — if approved — executes it
+through an MCP v2 capability server that writes to the backend database.
 
-| Acronym | Definition |
-|---------|------------|
-| **ADR** | Architecture Decision Record |
-| **API** | Application Programming Interface |
-| **BOL** | Bill of Lading |
-| **cuML** | CUDA Machine Learning |
-| **cuVS** | CUDA Vector Search |
-| **EAO** | Equipment & Asset Operations (Agent) |
-| **ERP** | Enterprise Resource Planning |
-| **GPU** | Graphics Processing Unit |
-| **HTTP/HTTPS** | Hypertext Transfer Protocol (Secure) |
-| **IoT** | Internet of Things |
-| **JSON** | JavaScript Object Notation |
-| **JWT** | JSON Web Token |
-| **KPI** | Key Performance Indicator |
-| **LLM** | Large Language Model |
-| **LOTO** | Lockout/Tagout |
-| **MAPE** | Mean Absolute Percentage Error |
-| **MCP** | Model Context Protocol |
-| **NeMo** | NVIDIA NeMo |
-| **NIM/NIMs** | NVIDIA Inference Microservices |
-| **OCR** | Optical Character Recognition |
-| **PPE** | Personal Protective Equipment |
-| **QPS** | Queries Per Second |
-| **RAG** | Retrieval-Augmented Generation |
-| **RAPIDS** | Rapid Analytics Platform for Interactive Data Science |
-| **RBAC** | Role-Based Access Control |
-| **RFID** | Radio Frequency Identification |
-| **RMSE** | Root Mean Square Error |
-| **REST** | Representational State Transfer |
-| **SDS** | Safety Data Sheet |
-| **SKU** | Stock Keeping Unit |
-| **SLA** | Service Level Agreement |
-| **SOP** | Standard Operating Procedure |
-| **SQL** | Structured Query Language |
-| **UI** | User Interface |
-| **UX** | User Experience |
-| **WMS** | Warehouse Management System |
+The system is designed around a single non-negotiable invariant: **the LLM never touches a write
+path directly**. Every mutation is proposed, evaluated by a deterministic policy engine, and
+executed by a typed executor that enforces four guards before a write reaches MCP.
 
-## Overview
+---
 
-This repository implements a production-grade Multi-Agent-Intelligent-Warehouse patterned on NVIDIA's AI Blueprints, featuring:
+## Architecture
 
-- **Multi-Agent AI System** - LangGraph-orchestrated Planner/Router + 5 Specialized Agents (Equipment, Operations, Safety, Forecasting, Document)
-- **NVIDIA NeMo Integration** - Complete document processing pipeline with OCR, structured data extraction, and vision models
-- **MCP Framework** - Model Context Protocol with dynamic tool discovery, execution, and adapter system
-- **Hybrid RAG Stack** - PostgreSQL/TimescaleDB + Milvus vector database with intelligent query routing (90%+ accuracy)
-- **Production-Grade Vector Search** - Llama Nemotron Embed VL 1B v2 embeddings (2048-dim) with NVIDIA cuVS GPU acceleration (19x performance)
-- **AI-Powered Demand Forecasting** - Multi-model ensemble (XGBoost, Random Forest, Gradient Boosting, Ridge, SVR) with NVIDIA RAPIDS GPU acceleration
-- **Real-Time Monitoring** - Equipment status, telemetry, Prometheus metrics, Grafana dashboards, and system health
-- **Enterprise Security** - JWT authentication + RBAC with 5 user roles, NeMo Guardrails for content safety, and comprehensive user management
-- **System Integrations** - WMS (SAP EWM, Manhattan, Oracle), ERP (SAP ECC, Oracle), IoT sensors, RFID/Barcode scanners, Time Attendance systems
-- **Advanced Features** - Redis caching, conversation memory, evidence scoring, intelligent query classification, automated reorder recommendations, business intelligence dashboards
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│                         MAIW Runtime Pipeline                            │
+│                                                                          │
+│  User / API Request                                                      │
+│        │                                                                 │
+│        ▼                                                                 │
+│  ┌──────────────┐    ┌──────────────────────────────────────────────┐   │
+│  │  FastAPI App │    │               Agent Layer                    │   │
+│  │  (src/api)   │───▶│  EquipmentAssetOperationsAgent               │   │
+│  └──────────────┘    │  OperationsCoordinationAgent                 │   │
+│                       │  SafetyComplianceAgent                       │   │
+│                       └────────────────┬─────────────────────────────┘  │
+│                                        │                                 │
+│         ┌──────────────────────────────┼──────────────────────────────┐ │
+│         │                             │                              │  │
+│         ▼                             ▼                              ▼  │
+│  ┌─────────────┐             ┌─────────────────┐           ┌──────────┐ │
+│  │  STATE      │             │     REASON      │           │  DECIDE  │ │
+│  │ WarehouseState│           │  ModelGateway   │           │ Decision │ │
+│  │ Provider   │             │  Nemotron 3     │           │ Engine   │ │
+│  └──────┬──────┘             └────────┬────────┘           └────┬─────┘ │
+│         │                             │                          │       │
+│         │         StateSnapshot       │       ActionProposal     │       │
+│         └─────────────────────────────┘                          │       │
+│                                                                   │       │
+│                                            DecisionResult         │       │
+│                                            (APPROVED/REJECTED/   │       │
+│                                             DEFERRED)             │       │
+│                                                        ▼          │       │
+│                                               ┌────────────────┐  │       │
+│                                               │    EXECUTE     │◀─┘       │
+│                                               │ ActionExecutor │           │
+│                                               │ (4-guard)      │           │
+│                                               └───────┬────────┘           │
+│                                                       │                    │
+│                                                       ▼                    │
+│                                              ┌──────────────────┐          │
+│                                              │   MCP v2 Server  │          │
+│                                              │  (stateless HTTP)│          │
+│                                              └───────┬──────────┘          │
+│                                                      │                     │
+│                                                      ▼                     │
+│                                             ┌──────────────────┐           │
+│                                             │    PostgreSQL    │           │
+│                                             │  (TimescaleDB)   │           │
+│                                             └──────────────────┘           │
+└──────────────────────────────────────────────────────────────────────────┘
+```
 
-## System Architecture
+### Pipeline Stages
 
-![Warehouse Operational Assistant Architecture](docs/architecture/diagrams/warehouse-assistant-architecture.png)
+| Stage | Component | What it does |
+|-------|-----------|--------------|
+| **STATE** | `WarehouseStateProvider` | Assembles live snapshot of inventory, equipment, labor, and wave data via MCP read tools |
+| **REASON** | `ModelGateway` → Nemotron 3 | Generates a structured action proposal — no raw text, no direct tool calls |
+| **PROPOSE** | `ActionProposal` factory | Constructs a typed, immutable proposal locally; zero MCP calls at this stage |
+| **DECIDE** | `DecisionEngine` | Evaluates the proposal against deterministic constraints → `APPROVED / REJECTED / DEFERRED` |
+| **EXECUTE** | `BaseActionExecutor` | Enforces 4 guards, then calls the MCP write tool if all pass |
+| **MCP** | `mcp_servers.<domain>.server` | Independently deployable MCP v2 server; single entry point to backend writes |
+| **BACKEND** | PostgreSQL / TimescaleDB | Source of truth; no agent writes directly here |
 
-The architecture consists of:
+---
 
-1. **User/External Interaction Layer** - Entry point for users and external systems
-2. **Warehouse Operational Assistant** - Central orchestrator managing specialized AI agents
-3. **Agent Orchestration Framework** - LangGraph for workflow orchestration + MCP (Model Context Protocol) for tool discovery
-4. **Multi-Agent System** - Five specialized agents:
-   - **Equipment & Asset Operations Agent** - Equipment assets, assignments, maintenance, and telemetry
-   - **Operations Coordination Agent** - Task planning and workflow management  
-   - **Safety & Compliance Agent** - Safety monitoring, incident response, and compliance tracking
-   - **Forecasting Agent** - Demand forecasting, reorder recommendations, and model performance monitoring
-   - **Document Processing Agent** - OCR, structured data extraction, and document management
-5. **API Services Layer** - Standardized interfaces for business logic and data access
-6. **Data Retrieval & Processing** - SQL, Vector, and Knowledge Graph retrievers
-7. **LLM Integration & Orchestration** - NVIDIA NIMs with LangGraph orchestration
-8. **Data Storage Layer** - PostgreSQL, Vector DB, Knowledge Graph, and Telemetry databases
-9. **Infrastructure Layer** - Kubernetes, NVIDIA GPU infrastructure, Edge devices, and Cloud
+## Core Design Principles
 
-### Key Architectural Components
+1. **LLMs propose, policy decides.** The `DecisionEngine` is synchronous, deterministic, and
+   performs no I/O. It cannot be overridden by a model-generated argument.
 
-- **Multi-Agent Coordination**: LangGraph orchestrates complex workflows between specialized agents
-- **MCP Integration**: Model Context Protocol enables seamless tool discovery and execution
-- **Hybrid Data Processing**: Combines structured (PostgreSQL/TimescaleDB) and vector (Milvus) data
-- **NVIDIA NIMs Integration**: LLM inference and embedding services for intelligent processing
-- **Real-time Monitoring**: Comprehensive telemetry and equipment status tracking
-- **Scalable Infrastructure**: Kubernetes orchestration with GPU acceleration
+2. **Every write passes through a typed executor.** `BaseActionExecutor` checks four guards in
+   order before any MCP write tool is called: (1) decision outcome is `APPROVED`, (2) decision
+   binds to the exact proposal ID, (3) action name is in the executor's static allowlist,
+   (4) the decision is not stale.
 
-## Key Features
+3. **State is immutable once sealed.** `WarehouseStateSnapshot.seal()` assigns a UUID and freezes
+   the snapshot. Proposals reference the snapshot ID; the executor performs a best-effort state
+   drift check before executing.
 
-### Multi-Agent AI System
-- **Planner/Router** - Intelligent query routing and workflow orchestration
-- **Equipment & Asset Operations Agent** - Equipment management, maintenance, and telemetry
-- **Operations Coordination Agent** - Task planning and workflow management
-- **Safety & Compliance Agent** - Safety monitoring and incident response
-- **Forecasting Agent** - Demand forecasting, reorder recommendations, and model performance monitoring
-- **Document Processing Agent** - OCR, structured data extraction, and document management
-- **MCP Integration** - Model Context Protocol with dynamic tool discovery
+4. **Packages have one-way dependency flow.** `maiw-models` and `maiw-mcp` have no upstream
+   dependencies. `maiw-state` and `maiw-skills` depend only on those. `maiw-decision` and
+   `maiw-execution` depend on skills and state. `maiw-agents` depends on all of them. Nothing
+   in any canonical package imports from `src.*`.
 
-### Document Processing Pipeline
-- **Multi-Format Support** - PDF, PNG, JPG, JPEG, TIFF, BMP files
-- **5-Stage NVIDIA NeMo Pipeline** - Complete OCR and structured data extraction
-- **Real-Time Processing** - Background processing with status tracking
-- **Intelligent OCR** - `meta/llama-3.2-11b-vision-instruct` for text extraction
-- **Structured Data Extraction** - Entity recognition and quality validation
+5. **MCP is the write plane, not a chat interface.** MCP tools are not exposed to the LLM's tool
+   registry. The LLM produces a proposal; the executor translates that proposal to an MCP call.
 
-### Advanced Search & Retrieval
-- **Hybrid RAG Stack** - PostgreSQL/TimescaleDB + Milvus vector database
-- **Production-Grade Vector Search** - Llama Nemotron Embed VL 1B v2 embeddings (2048-dim)
-- **GPU-Accelerated Search** - NVIDIA cuVS-powered vector search (19x performance)
-- **Intelligent Query Routing** - Automatic SQL vs Vector vs Hybrid classification (90%+ accuracy)
-- **Evidence Scoring** - Multi-factor confidence assessment with clarifying questions
-- **Redis Caching** - Intelligent caching with 85%+ hit rate
+---
 
-### Demand Forecasting & Inventory Intelligence
-- **🚀 GPU-Accelerated Forecasting** - **NVIDIA RAPIDS cuML** integration for enterprise-scale performance
-  - **10-100x faster** training and inference compared to CPU-only
-  - **Automatic GPU detection** - Falls back to CPU if GPU not available
-  - **Full GPU acceleration** for Random Forest, Linear Regression, SVR via cuML
-  - **XGBoost GPU support** via CUDA when RAPIDS is available
-  - **Seamless integration** - No code changes needed, works out of the box
-- **AI-Powered Demand Forecasting** - Multi-model ensemble with Random Forest, XGBoost, Gradient Boosting, Linear Regression, Ridge Regression, SVR
-- **Advanced Feature Engineering** - Lag features, rolling statistics, seasonal patterns, promotional impacts
-- **Hyperparameter Optimization** - Optuna-based tuning with Time Series Cross-Validation
-- **Real-Time Predictions** - Live demand forecasts with confidence intervals
-- **Automated Reorder Recommendations** - AI-suggested stock orders with urgency levels
-- **Business Intelligence Dashboard** - Comprehensive analytics and performance monitoring
+## Nemotron Model Gateway
 
-### System Integrations
-- **WMS Integration** - SAP EWM, Manhattan, Oracle WMS
-- **ERP Integration** - SAP ECC, Oracle ERP
-- **IoT Integration** - Equipment monitoring, environmental sensors, safety systems
-- **RFID/Barcode Scanning** - Honeywell, Zebra, generic scanners
-- **Time Attendance** - Biometric systems, card readers, mobile apps
+All inference is routed through a centralized `ModelGateway`. Agents specify what they need
+(reasoning depth, risk level, task type) — never a physical model ID.
 
-### Enterprise Security & Monitoring
-- **Authentication** - JWT authentication + RBAC with 5 user roles
-- **Real-Time Monitoring** - Prometheus metrics + Grafana dashboards
-- **Equipment Telemetry** - Battery, temperature, charging analytics
-- **System Health** - Comprehensive observability and alerting
-- **NeMo Guardrails** - Content safety and compliance protection (see [NeMo Guardrails](#nemo-guardrails) section below)
+### Model Roles
 
-#### Security Notes
+| Role | Default model | Active params | Use case |
+|------|--------------|--------------|----------|
+| `lightning` | `nvidia/nemotron-3.5-lightning-30b-a3b` | 3B | Fast chat, intent classification |
+| `nano` | `nvidia/nemotron-3-nano-30b-a3b` | 3B | Low-latency reads, summaries |
+| `super` | `nvidia/nemotron-3-super-120b-a12b` | 12B | Standard operational reasoning |
+| `ultra` | `nvidia/nemotron-3-ultra-550b-a55b` | 55B | Deep analytical tasks (opt-in, slow) |
 
-**JWT Secret Key Configuration:**
-- **Development**: If `JWT_SECRET_KEY` is not set, the application uses a default development key with warnings. This allows for easy local development.
-- **Production**: The application **requires** `JWT_SECRET_KEY` to be set. If not set or using the default placeholder, the application will fail to start. Set `ENVIRONMENT=production` and provide a strong, unique `JWT_SECRET_KEY` in your `.env` file.
-- **Best Practice**: Always set `JWT_SECRET_KEY` explicitly, even in development, using a strong random string (minimum 32 characters).
+All four models are confirmed live on `integrate.api.nvidia.com/v1` (validated 2026-08-20).
+The suffix `a3b / a12b / a55b` is active parameter count under the MoE architecture.
 
-For more security information, see [docs/secrets.md](docs/secrets.md) and [SECURITY_REVIEW.md](SECURITY_REVIEW.md).
+Agents use `ReasoningLevel` (`FAST / STANDARD / DEEP / ANALYTICAL`) and `RiskLevel`; the
+`ModelRouter` resolves the appropriate role. Override any role via environment variable
+(see [Configuration](#configuration)).
+
+**Legacy models retired:** All `nvidia/llama-*` Nemotron model IDs return 404 or broken
+responses and are no longer used. Their identifiers are preserved as `LEGACY_*` constants in
+`packages/maiw-models/maiw_models/registry.py` for audit purposes only.
+
+See [docs/architecture/MODEL_GATEWAY.md](docs/architecture/MODEL_GATEWAY.md) for full routing
+policy, telemetry schema, and role-to-model override documentation.
+
+---
+
+## Warehouse State
+
+`WarehouseState` aggregates live data from four domains. State assembly always precedes
+proposal generation.
+
+```python
+# Agents never construct state manually — they call the provider:
+state = await state_provider.get_state(
+    StateRequirements(equipment=True, asset_id="FORKLIFT-07")
+)
+snapshot = WarehouseStateSnapshot.seal(state)  # immutable, UUID-stamped
+```
+
+| Domain | State type | Key fields |
+|--------|-----------|------------|
+| Inventory | `InventoryState` | SKU levels, locations, reorder flags |
+| Equipment | `EquipmentState` | status, battery, assignment, location |
+| Labor | `LaborState` | capacity, allocations, shift info |
+| Wave | `WaveState` | active waves, priorities, risk scores |
+
+`StateFreshness` tracks age per domain. `StateProvenance` records which MCP tool provided each
+value. Stale state triggers `DEFERRED` decisions rather than silent execution with bad data.
+
+See [docs/architecture/WAREHOUSE_STATE.md](docs/architecture/WAREHOUSE_STATE.md).
+
+---
+
+## Skills and Capability Contracts
+
+Skills are stateless, typed units of work. Each skill has a defined input schema, output type,
+and declared capability name. They are the only layer that generates `ActionProposal` objects.
+
+```python
+# Read skill — calls MCP, returns typed result
+result = await EquipmentStatusSkill(mcp_client=client).execute(asset_id="FORKLIFT-07")
+
+# Write skill — builds proposal locally, NO MCP call
+proposal = await EquipmentAssignmentSkill().execute(asset_id="FORKLIFT-07", task_id="TASK-42")
+# proposal is an ActionProposal — it describes intent, does not perform it
+```
+
+Skills live in `packages/maiw-skills/`. They do not import `src.*`, do not hold infrastructure
+connections, and can be instantiated in tests without database or network access.
+
+---
+
+## Decision and Execution Architecture
+
+### DecisionEngine
+
+`DecisionEngine` takes a `DecisionRequest` (proposal + state snapshot) and returns a
+`DecisionResult` with outcome `APPROVED`, `REJECTED`, or `DEFERRED`. It is synchronous and
+performs no I/O. Constraint rules are deterministic Python — not LLM-evaluated.
+
+```
+DecisionRequest(proposal, snapshot)
+    │
+    ├── Rule 1: Proposal is structurally valid
+    ├── Rule 2: Action is in the allowed capability set for this agent
+    ├── Rule 3: Risk level is within domain policy
+    ├── Rule 4: State is within freshness bounds
+    ├── Rule 5: LOW risk + requires_approval=False → APPROVED immediately
+    └── ...
+    │
+    ▼
+DecisionResult(outcome=APPROVED|REJECTED|DEFERRED, violations=[...], rationale=...)
+```
+
+See [docs/architecture/DECISION_ENGINE.md](docs/architecture/DECISION_ENGINE.md).
+
+### BaseActionExecutor (4-Guard Pattern)
+
+All three domain executors (`EquipmentActionExecutor`, `LaborActionExecutor`,
+`WaveActionExecutor`) inherit from `BaseActionExecutor`. Before any MCP write tool is invoked,
+the executor runs four mandatory guards in order:
+
+1. **APPROVED gate** — `decision.outcome == DecisionOutcome.APPROVED` → else `ActionNotApproved`
+2. **Binding check** — `decision.proposal_id == proposal.proposal_id` → else `ActionDecisionMismatch`
+3. **Action allowlist** — `proposal.action in _ALLOWED_ACTIONS` (frozenset, static) → else `ActionUnsupported`
+4. **Staleness check** — decision age ≤ `max_decision_age_seconds` → else `ActionExpired`
+
+A best-effort state-drift check follows guard 4.
+
+### Read vs. Write Workflow
+
+**Read (no approval required):**
+```
+GET /api/v1/equipment/status/{asset_id}
+  → EquipmentStatusSkill → MCP read tool → PostgreSQL → JSON response
+```
+
+**Write (MEDIUM risk, requires human approval):**
+```
+POST /api/v1/equipment/assign
+  → Agent: get_state → seal snapshot → build proposal
+  → DecisionEngine: evaluate → REQUIRES_HUMAN_APPROVAL
+  → Response: {executed: false, proposal_id: ..., decision_id: ...}
+  # Human posts approval → executor runs guards → MCP write → executed: true
+```
+
+**Write (LOW risk, auto-executes):**
+```
+POST /api/v1/equipment/release
+  → Agent: get_state → seal snapshot → build proposal (risk=LOW)
+  → DecisionEngine: APPROVED immediately
+  → EquipmentActionExecutor: 4 guards pass → MCP write
+  → Response: {executed: true, execution_id: ...}
+```
+
+See [docs/architecture/RUNTIME_EXECUTION_FLOW.md](docs/architecture/RUNTIME_EXECUTION_FLOW.md)
+for full sequence diagrams of all implemented paths.
+
+---
+
+## MCP v2 Capability Plane
+
+MAIW uses the official MCP Python SDK (`mcp>=2.0.0,<3`, protocol version `2026-07-28`). Each
+warehouse domain runs as an independently deployable MCP server.
+
+### Architecture
+
+```
+ActionExecutor
+    │
+    └── MAIWMCPClient.invoke("warehouse.equipment.assign", params)
+              │
+              └── EquipmentMCPServer  (mcp_servers/equipment/server.py)
+                        │
+                        ├── MAIWEquipmentAdapter  (adapters/)
+                        │
+                        └── EquipmentAssetTools  → PostgreSQL
+```
+
+- Servers are **stateless HTTP** in production (`streamable-http` transport)
+- Each server exposes exactly the tools in its domain contract
+- MCP write tools are **not exposed to the LLM** — only the executor layer calls them
+- Read tools are called by skills during state assembly
+
+See [docs/architecture/MCP_V2_ARCHITECTURE.md](docs/architecture/MCP_V2_ARCHITECTURE.md).
+
+---
+
+## Implemented Warehouse Domains
+
+MAIW implements 12 capabilities across 4 domains (7 read, 5 write):
+
+| Domain | Capability | Name | Type |
+|--------|-----------|------|------|
+| **Inventory** | Get item metadata | `warehouse.inventory.get_metadata` | read |
+| **Inventory** | Get stock levels | `warehouse.inventory.get_stock_levels` | read |
+| **Equipment** | Get equipment status | `warehouse.equipment.get_status` | read |
+| **Equipment** | Assign equipment | `warehouse.equipment.assign` | write |
+| **Equipment** | Release equipment | `warehouse.equipment.release` | write |
+| **Equipment** | Schedule maintenance | `warehouse.equipment.schedule_maintenance` | write |
+| **Labor** | Get labor capacity | `warehouse.labor.get_capacity` | read |
+| **Labor** | Get labor allocation | `warehouse.labor.get_allocation` | read |
+| **Labor** | Allocate labor | `warehouse.labor.allocate` | write |
+| **Wave** | Get wave status | `warehouse.wave.get` | read |
+| **Wave** | Get wave risk | `warehouse.wave.get_risk` | read |
+| **Wave** | Reprioritize wave | `warehouse.wave.reprioritize` | write |
+
+See [docs/architecture/CAPABILITY_MATRIX.md](docs/architecture/CAPABILITY_MATRIX.md).
+
+---
+
+## Repository Structure
+
+```
+Multi-Agent-Intelligent-Warehouse/
+│
+├── packages/                      # Canonical Python packages (uv workspace)
+│   ├── maiw-models/               # ModelGateway, NIMProvider, NIMClient, enums
+│   ├── maiw-mcp/                  # Capability contracts, ActionProposal, MCP client
+│   ├── maiw-state/                # WarehouseState, StateSnapshot, StateFreshness
+│   ├── maiw-skills/               # Domain skills (read + write proposal factories)
+│   ├── maiw-decision/             # DecisionEngine, DecisionResult, constraints
+│   ├── maiw-execution/            # BaseActionExecutor, domain executors, error types
+│   └── maiw-agents/               # EquipmentAssetOperationsAgent, OperationsCoordinationAgent,
+│                                  #   SafetyComplianceAgent
+│
+├── mcp_servers/                   # Independently deployable MCP v2 servers
+│   ├── inventory/                 # Inventory capability server
+│   ├── equipment/                 # Equipment capability server
+│   ├── labor/                     # Labor capability server
+│   └── wave/                      # Wave capability server
+│
+├── src/api/                       # FastAPI application (current production entrypoint)
+│   ├── app.py                     # ASGI entrypoint: uvicorn src.api.app:app
+│   ├── routers/                   # HTTP route handlers
+│   ├── agents/                    # Legacy agent layer (being migrated to packages/)
+│   └── services/                  # Services: model_gateway shim, skills shim, auth, DB
+│
+├── apps/api/maiw_api/             # Future application entrypoint (composition root)
+│   └── bootstrap.py               # MAIWRuntime dataclass, get_runtime() factory
+│
+├── connectors/                    # Data source adapters
+│   └── generic/                   # Generic WMS connector (implemented)
+│
+├── integrations/                  # Non-core optional subsystems
+│   ├── forecasting/               # Demand forecasting (partially implemented)
+│   └── document/                  # Document processing / OCR (partially implemented)
+│
+├── tests/
+│   ├── unit/                      # Pure Python, no infrastructure (CORE CI)
+│   ├── contract/                  # MCP capability contract tests (CORE CI)
+│   ├── mcp/                       # MCP protocol tests, in-memory server (CORE CI)
+│   └── integration/               # Requires running MAIW server + PostgreSQL
+│
+├── docs/architecture/             # Architecture decision records and guides
+└── deploy/compose/                # Docker Compose deployment stack
+```
+
+### Package Responsibilities
+
+| Package | Canonical import | Owns |
+|---------|----------------|------|
+| `maiw-models` | `from maiw_models import ModelGateway` | LLM gateway, routing, NIM provider, telemetry |
+| `maiw-mcp` | `from maiw_mcp.contracts.equipment import ...` | Capability contracts, ActionProposal, MCP client |
+| `maiw-state` | `from maiw_state import WarehouseState` | State assembly, snapshots, freshness, provenance |
+| `maiw-skills` | `from maiw_skills.equipment import EquipmentAssignmentSkill` | Read skills, write proposal factories |
+| `maiw-decision` | `from maiw_decision import DecisionEngine` | Constraint evaluation, DecisionResult |
+| `maiw-execution` | `from maiw_execution import EquipmentActionExecutor` | 4-guard executor, error hierarchy, NoOp executor |
+| `maiw-agents` | `from maiw_agents.equipment import EquipmentAssetOperationsAgent` | Agent orchestration, state assembly coordination |
+
+---
+
+## MCP Servers
+
+Each MCP server is independently deployable and stateless.
+
+```
+mcp_servers/<domain>/
+├── server.py      # FastMCP app, tool registration
+├── provider.py    # Domain data provider (queries PostgreSQL)
+└── adapters/      # Data adapters and transformation
+```
+
+### Starting MCP Servers
+
+**Development (stdio transport):**
+
+```bash
+python -m mcp_servers.inventory.server
+python -m mcp_servers.equipment.server
+python -m mcp_servers.labor.server
+python -m mcp_servers.wave.server
+```
+
+**Production (stateless HTTP):**
+
+```bash
+MAIW_MCP_TRANSPORT=streamable-http MAIW_MCP_EQUIPMENT_PORT=8766 \
+    python -m mcp_servers.equipment.server
+
+MAIW_MCP_TRANSPORT=streamable-http MAIW_MCP_LABOR_PORT=8767 \
+    python -m mcp_servers.labor.server
+
+MAIW_MCP_TRANSPORT=streamable-http MAIW_MCP_WAVE_PORT=8768 \
+    python -m mcp_servers.wave.server
+```
+
+---
 
 ## Quick Start
 
-**For complete deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).**
-
-### Setup Options
-
-**Option 1: Interactive Jupyter Notebook Setup (Recommended for First-Time Users)**
-
-📓 **[Complete Setup Guide (Jupyter Notebook)](notebooks/setup/complete_setup_guide.ipynb)**
-
-The interactive notebook provides:
-- ✅ Automated environment validation and checks
-- ✅ Step-by-step guided setup with explanations
-- ✅ Interactive API key configuration
-- ✅ Database setup and migration automation
-- ✅ User creation and demo data generation
-- ✅ Backend and frontend startup from within the notebook
-- ✅ Comprehensive error handling and troubleshooting
-
-**To use the notebook:**
-1. Open `notebooks/setup/complete_setup_guide.ipynb` in Jupyter Lab/Notebook
-2. Follow the interactive cells step by step
-3. The notebook will guide you through the entire setup process
-
-**Option 2: Command-Line Setup (For Experienced Users)**
-
-See the [Local Development Setup](#local-development-setup) section below for manual command-line setup.
-
 ### Prerequisites
 
-- **Python 3.11+** (check with `python3 --version`)
-- **Node.js** and npm (check with `node --version` and `npm --version`)
-  - **Minimum**: Node.js 18.17.0+ (required for `node:path` protocol support)
-  - **Recommended**: Node.js 20.x LTS for best compatibility and performance
-  - **Note**: Node.js 18.0.0 - 18.16.x will fail with `Cannot find module 'node:path'` error
-- **Docker** and Docker Compose
-- **Git** (to clone the repository)
-- **PostgreSQL client** (`psql`) - Required for running database migrations
-  - **Ubuntu/Debian**: `sudo apt-get install postgresql-client`
-  - **macOS**: `brew install postgresql` or `brew install libpq`
-  - **Windows**: Install from [PostgreSQL downloads](https://www.postgresql.org/download/windows/)
-  - **Alternative**: Use Docker (see [DEPLOYMENT.md](DEPLOYMENT.md))
-- **Poppler utilities** (`poppler-utils`) - Required for PDF document processing
-  - **Ubuntu/Debian**: `sudo apt-get install poppler-utils`
-  - **macOS**: `brew install poppler`
-  - **Windows**: Install from [Poppler for Windows](http://blog.alivate.com.au/poppler-windows/) or use Chocolatey: `choco install poppler`
-  - **Note**: Required by `pdf2image` package for converting PDF pages to images
-- **CUDA (for GPU acceleration)** - Optional but recommended for RAPIDS GPU-accelerated forecasting
-  - **Recommended**: CUDA 12.x (default for RAPIDS packages)
-  - **Supported**: CUDA 11.x (via `install_rapids.sh` auto-detection)
-  - **Note**: CUDA version is auto-detected during RAPIDS installation. If you have CUDA 13.x, it will install CUDA 12.x packages (backward compatible). For best results, ensure your CUDA driver version matches or exceeds the toolkit version.
+- Python 3.11+
+- PostgreSQL 14+ (or Docker)
+- NVIDIA API key — get one at [build.nvidia.com](https://build.nvidia.com/)
+- [uv](https://docs.astral.sh/uv/) (recommended) or pip
 
-### Local Development Setup
-
-For the fastest local development setup:
+### Install
 
 ```bash
-# 1. Clone repository
 git clone https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse.git
 cd Multi-Agent-Intelligent-Warehouse
 
-# 2. Verify Node.js version (recommended before setup)
-./scripts/setup/check_node_version.sh
+# Install all workspace packages in editable mode
+pip install -r requirements.txt
+pip install -e packages/maiw-models
+pip install -e packages/maiw-mcp
+pip install -e packages/maiw-state
+pip install -e packages/maiw-skills
+pip install -e packages/maiw-decision
+pip install -e packages/maiw-execution
+pip install -e packages/maiw-agents
+```
 
-# 3. Setup environment
-./scripts/setup/setup_environment.sh
+Or with uv (workspace-aware):
 
-# 4. Configure environment variables (REQUIRED before starting services)
-# Create .env file for Docker Compose (recommended location)
+```bash
+uv sync
+```
+
+### Docker (full stack)
+
+```bash
 cp .env.example deploy/compose/.env
-# Or create in project root: cp .env.example .env
-# Edit with your values: nano deploy/compose/.env
+# Edit deploy/compose/.env — set NVIDIA_API_KEY and POSTGRES_PASSWORD at minimum
+docker compose -f deploy/compose/docker-compose.yml up
+```
 
-# 5. Start infrastructure services
-./scripts/setup/dev_up.sh
+The stack brings up: TimescaleDB, Redis, Kafka, etcd, MinIO, Milvus, nginx, and the MAIW API.
+A NIM inference server (`nvidia/nemotron-3-super-120b-a12b`) is started when a GPU profile is
+active.
 
-# 6. Run database migrations
-source env/bin/activate
+---
 
-# Load environment variables from .env file (REQUIRED before running migrations)
-# This ensures $POSTGRES_PASSWORD is available for the psql commands below
-# If .env is in deploy/compose/ (recommended):
-set -a && source deploy/compose/.env && set +a
-# OR if .env is in project root:
-# set -a && source .env && set +a
+## Configuration
 
-# Docker Compose: Using Docker Compose (Recommended - no psql client needed)
-docker compose -f deploy/compose/docker-compose.dev.yaml exec -T timescaledb psql -U warehouse -d warehouse < data/postgres/000_schema.sql
-docker compose -f deploy/compose/docker-compose.dev.yaml exec -T timescaledb psql -U warehouse -d warehouse < data/postgres/001_equipment_schema.sql
-docker compose -f deploy/compose/docker-compose.dev.yaml exec -T timescaledb psql -U warehouse -d warehouse < data/postgres/002_document_schema.sql
-docker compose -f deploy/compose/docker-compose.dev.yaml exec -T timescaledb psql -U warehouse -d warehouse < data/postgres/004_inventory_movements_schema.sql
-docker compose -f deploy/compose/docker-compose.dev.yaml exec -T timescaledb psql -U warehouse -d warehouse < scripts/setup/create_model_tracking_tables.sql
+Copy `.env.example` to `.env` and set the required variables:
 
+```bash
+cp .env.example .env
+```
 
-# 7. Create default users
-python scripts/setup/create_default_users.py
+### Required
 
-# 8. Generate demo data (optional but recommended)
-python scripts/data/quick_demo_data.py
+| Variable | Description |
+|----------|-------------|
+| `NVIDIA_API_KEY` | NVIDIA API key (`nvapi-...`), from [build.nvidia.com](https://build.nvidia.com/) |
+| `POSTGRES_PASSWORD` | PostgreSQL password |
+| `JWT_SECRET_KEY` | JWT signing secret (min 32 chars) |
 
-# 9. Generate historical demand data for forecasting (optional, required for Forecasting page)
-python scripts/data/generate_historical_demand.py
+### Model Configuration
 
-# 10. (Optional) Install RAPIDS GPU acceleration for forecasting
-# This enables 10-100x faster forecasting with NVIDIA GPUs
-# Requires: NVIDIA GPU with CUDA 12.x support
-./scripts/setup/install_rapids.sh
-# Or manually: pip install --extra-index-url=https://pypi.nvidia.com cudf-cu12 cuml-cu12
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LLM_NIM_URL` | `https://integrate.api.nvidia.com/v1` | NIM inference endpoint |
+| `LLM_MODEL` | `nvidia/nemotron-3-super-120b-a12b` | Default model ID |
+| `MAIW_MODEL_LIGHTNING` | `nvidia/nemotron-3.5-lightning-30b-a3b` | Lightning role override |
+| `MAIW_MODEL_NANO` | `nvidia/nemotron-3-nano-30b-a3b` | Nano role override |
+| `MAIW_MODEL_SUPER` | `nvidia/nemotron-3-super-120b-a12b` | Super role override |
+| `MAIW_MODEL_ULTRA` | `nvidia/nemotron-3-ultra-550b-a55b` | Ultra role override (slow, opt-in) |
 
-# 11. Start API server
-./scripts/start_server.sh
+### Infrastructure
 
-# 12. Start frontend (in another terminal)
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DB_HOST` | `localhost` | PostgreSQL host |
+| `DB_PORT` | `5435` | PostgreSQL port |
+| `REDIS_HOST` | `localhost` | Redis host |
+| `MILVUS_HOST` | `localhost` | Milvus vector DB host |
+
+---
+
+## Running MAIW
+
+### API Server
+
+```bash
+uvicorn src.api.app:app --reload --port 8001
+```
+
+The API is available at `http://localhost:8001`. Key endpoints:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/v1/health` | System health |
+| `POST` | `/api/v1/chat` | Natural-language chat interface |
+| `GET` | `/api/v1/equipment/status/{id}` | Equipment status (read) |
+| `POST` | `/api/v1/equipment/assign` | Assign equipment (write, may require approval) |
+| `POST` | `/api/v1/equipment/release` | Release equipment (write, auto-executes) |
+| `POST` | `/api/v1/equipment/maintenance` | Schedule maintenance (write) |
+| `GET` | `/api/v1/inventory/{sku}` | Inventory lookup (read) |
+| `GET` | `/api/v1/labor/capacity` | Labor capacity (read) |
+| `POST` | `/api/v1/labor/allocate` | Labor allocation (write) |
+| `GET` | `/api/v1/wave/status` | Wave status (read) |
+| `POST` | `/api/v1/wave/reprioritize` | Wave reprioritization (write) |
+
+### React UI
+
+```bash
 cd src/ui/web
 npm install
 npm start
 ```
 
-**Access:**
-- Frontend: http://localhost:3001 (login: `admin` / `changeme`)
-- API: http://localhost:8001
-- API Docs: http://localhost:8001/docs
+---
 
-**Service Endpoints:**
-- **Postgres/Timescale**: `postgresql://warehouse:changeme@localhost:5435/warehouse`
-- **Redis**: `localhost:6379`
-- **Milvus gRPC**: `localhost:19530`
-- **Kafka**: `localhost:9092`
+## Testing
 
-### Environment Configuration
-
-**⚠️ Important:** For Docker Compose deployments, the `.env` file location matters!
-
-Docker Compose looks for `.env` files in this order:
-1. Same directory as the compose file (`deploy/compose/.env`)
-2. Current working directory (project root `.env`)
-
-**Recommended:** Create `.env` in the same directory as your compose file for consistency:
+MAIW uses a three-tier test structure. **CORE CI** requires no running services:
 
 ```bash
-# Option 1: In deploy/compose/ (recommended for Docker Compose)
-cp .env.example deploy/compose/.env
-nano deploy/compose/.env  # or your preferred editor
-
-# Option 2: In project root (works if running commands from project root)
-cp .env.example .env
-nano .env  # or your preferred editor
+python -m pytest tests/unit/ tests/contract/ tests/mcp/ \
+  --ignore=tests/unit/test_all_agents.py \
+  --ignore=tests/unit/test_basic.py \
+  --ignore=tests/unit/test_nvidia_llm.py \
+  --ignore=tests/unit/test_caching_demo.py \
+  --ignore=tests/unit/test_response_quality_demo.py \
+  --ignore=tests/unit/test_mcp_integrated_planner_graph.py \
+  --ignore=tests/unit/test_chunking_demo.py \
+  --ignore=tests/unit/test_db_connection.py \
+  --ignore=tests/unit/test_enhanced_retrieval.py \
+  --ignore=tests/unit/test_evidence_scoring_demo.py \
+  --ignore=tests/unit/test_mcp_system.py \
+  --ignore=tests/unit/test_guardrails.py \
+  --ignore=tests/unit/test_guardrails_sdk.py \
+  --ignore=tests/unit/test_mcp_planner_integration.py \
+  --ignore=tests/unit/test_nvidia_integration.py \
+  --ignore=tests/unit/test_document_action_tools.py \
+  --ignore=tests/unit/test_document_pipeline.py \
+  --ignore=tests/unit/test_embedding.py \
+  --ignore=tests/unit/test_reasoning_evaluation.py \
+  --ignore=tests/unit/test_prompt_injection_protection.py \
+  --ignore=tests/unit/test_prompt_injection_simple.py
 ```
 
-**Critical Variables:**
-- Database connection settings (POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, DB_HOST, DB_PORT)
-- Redis connection (REDIS_HOST, REDIS_PORT)
-- Milvus connection (MILVUS_HOST, MILVUS_PORT)
-- JWT secret key (JWT_SECRET_KEY) - **Required in production**. In development, a default is used with warnings. See [Security Notes](#security-notes) below.
-- Admin password (DEFAULT_ADMIN_PASSWORD)
-
-**For AI Features (Optional):**
-- NVIDIA API keys (NVIDIA_API_KEY, NEMO_*_API_KEY, LLAMA_*_API_KEY)
-
-**Quick Setup for NVIDIA API Keys:**
-```bash
-python setup_nvidia_api.py
-```
-
-### Troubleshooting
-
-**Node.js Version Issues:**
-- **Error: "Cannot find module 'node:path'"**: Your Node.js version is too old
-  - Check version: `node --version`
-  - Minimum required: Node.js 18.17.0+
-  - Recommended: Node.js 20.x LTS
-  - Run version check: `./scripts/setup/check_node_version.sh`
-  - Upgrade: `nvm install 20 && nvm use 20` (if using nvm)
-  - Or download from: https://nodejs.org/
-  - After upgrading, clear and reinstall: `cd src/ui/web && rm -rf node_modules package-lock.json && npm install`
-
-**Database Connection Issues:**
-- Ensure Docker containers are running: `docker ps`
-- Check TimescaleDB logs: `docker logs wosa-timescaledb`
-- Verify port 5435 is not in use
-
-**API Server Won't Start:**
-- Ensure virtual environment is activated: `source env/bin/activate`
-- Check Python version: `python3 --version` (must be 3.11+)
-- Use the startup script: `./scripts/start_server.sh`
-- See [DEPLOYMENT.md](DEPLOYMENT.md) troubleshooting section
-
-**Frontend Build Issues:**
-- Verify Node.js version: `./scripts/setup/check_node_version.sh`
-- Clear node_modules: `cd src/ui/web && rm -rf node_modules package-lock.json && npm install`
-- Check for port conflicts: Ensure port 3001 is available
-
-**For more help:** See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed troubleshooting or open an issue on GitHub.
-
-## Multi-Agent System
-
-The Warehouse Operational Assistant uses a sophisticated multi-agent architecture with specialized AI agents for different aspects of warehouse operations.
-
-### Equipment & Asset Operations Agent (EAO)
-
-**Mission**: Ensure equipment is available, safe, and optimally used for warehouse workflows.
-
-**Key Capabilities:**
-- Equipment assignment and tracking
-- Real-time telemetry monitoring (battery, temperature, charging status)
-- Maintenance management and scheduling
-- Asset tracking and location monitoring
-- Equipment utilization analytics
-
-**Action Tools:** `assign_equipment`, `get_equipment_status`, `create_maintenance_request`, `get_equipment_telemetry`, `update_equipment_location`, `get_equipment_utilization`, `create_equipment_reservation`, `get_equipment_history`
-
-### Operations Coordination Agent
-
-**Mission**: Coordinate warehouse operations, task planning, and workflow optimization.
-
-**Key Capabilities:**
-- Task management and assignment
-- Workflow optimization (pick paths, resource allocation)
-- Performance monitoring and KPIs
-- Resource planning and allocation
-
-**Action Tools:** `create_task`, `assign_task`, `optimize_pick_path`, `get_task_status`, `update_task_progress`, `get_performance_metrics`, `create_work_order`, `get_task_history`
-
-### Safety & Compliance Agent
-
-**Mission**: Ensure warehouse safety compliance and incident management.
-
-**Key Capabilities:**
-- Incident management and logging
-- Safety procedures and checklists
-- Compliance monitoring and training
-- Emergency response coordination
-
-**Action Tools:** `log_incident`, `start_checklist`, `broadcast_alert`, `create_corrective_action`, `lockout_tagout_request`, `near_miss_capture`, `retrieve_sds`
-
-### Forecasting Agent
-
-**Mission**: Provide AI-powered demand forecasting, reorder recommendations, and model performance monitoring.
-
-**Key Capabilities:**
-- Demand forecasting using multiple ML models
-- Automated reorder recommendations with urgency levels
-- Model performance monitoring (accuracy, MAPE, drift scores)
-- Business intelligence and trend analysis
-- Real-time predictions with confidence intervals
-
-**Action Tools:** `get_forecast`, `get_batch_forecast`, `get_reorder_recommendations`, `get_model_performance`, `get_forecast_dashboard`, `get_business_intelligence`
-
-**Forecasting Models:**
-- Random Forest (82% accuracy, 15.8% MAPE)
-- XGBoost (79.5% accuracy, 15.0% MAPE)
-- Gradient Boosting (78% accuracy, 14.2% MAPE)
-- Linear Regression, Ridge Regression, SVR
-
-**Model Availability by Phase:**
-
-| Model | Phase 1 & 2 | Phase 3 |
-|-------|-------------|---------|
-| Random Forest | ✅ | ✅ |
-| XGBoost | ✅ | ✅ |
-| Time Series | ✅ | ❌ |
-| Gradient Boosting | ❌ | ✅ |
-| Ridge Regression | ❌ | ✅ |
-| SVR | ❌ | ✅ |
-| Linear Regression | ❌ | ✅ |
-
-### Document Processing Agent
-
-**Mission**: Process warehouse documents with OCR and structured data extraction.
-
-**Key Capabilities:**
-- Multi-format document support (PDF, PNG, JPG, JPEG, TIFF, BMP)
-- Intelligent OCR with NVIDIA NeMo
-- Structured data extraction (invoices, receipts, BOLs)
-- Quality assessment and validation
-
-### MCP Integration
-
-All agents are integrated with the **Model Context Protocol (MCP)** framework:
-- **Dynamic Tool Discovery** - Real-time tool registration and discovery
-- **Cross-Agent Communication** - Seamless tool sharing between agents
-- **Intelligent Routing** - MCP-enhanced intent classification
-- **Tool Execution Planning** - Context-aware tool execution
-
-See [docs/architecture/mcp-integration.md](docs/architecture/mcp-integration.md) for detailed MCP documentation.
-
-## API Reference
-
-### Health & Status
-- `GET /api/v1/health` - System health check
-- `GET /api/v1/health/simple` - Simple health status
-- `GET /api/v1/version` - API version information
-
-### Authentication
-- `POST /api/v1/auth/login` - User authentication
-- `GET /api/v1/auth/me` - Get current user information
-- `GET /api/v1/auth/users/public` - Get list of users for dropdown selection (public, no auth required)
-- `GET /api/v1/auth/users` - Get all users (admin only)
-
-### Chat
-- `POST /api/v1/chat` - Chat with multi-agent system (requires NVIDIA API keys)
-
-### Equipment & Assets
-- `GET /api/v1/equipment` - List all equipment
-- `GET /api/v1/equipment/{asset_id}` - Get equipment details
-- `GET /api/v1/equipment/{asset_id}/status` - Get equipment status
-- `GET /api/v1/equipment/{asset_id}/telemetry` - Get equipment telemetry
-- `GET /api/v1/equipment/assignments` - Get equipment assignments
-- `GET /api/v1/equipment/maintenance/schedule` - Get maintenance schedule
-- `POST /api/v1/equipment/assign` - Assign equipment
-- `POST /api/v1/equipment/release` - Release equipment
-- `POST /api/v1/equipment/maintenance` - Schedule maintenance
-
-### Forecasting
-- `GET /api/v1/forecasting/dashboard` - Comprehensive forecasting dashboard
-- `GET /api/v1/forecasting/real-time` - Real-time demand predictions
-- `GET /api/v1/forecasting/reorder-recommendations` - Automated reorder suggestions
-- `GET /api/v1/forecasting/model-performance` - Model performance metrics
-- `GET /api/v1/forecasting/business-intelligence` - Business analytics
-- `POST /api/v1/forecasting/batch-forecast` - Batch forecast for multiple SKUs
-- `GET /api/v1/training/history` - Training history
-- `POST /api/v1/training/start` - Start model training
-
-### Document Processing
-- `POST /api/v1/document/upload` - Upload document for processing
-- `GET /api/v1/document/status/{document_id}` - Check processing status
-- `GET /api/v1/document/results/{document_id}` - Get extraction results
-- `GET /api/v1/document/analytics` - Document analytics
-
-### Operations
-- `GET /api/v1/operations/tasks` - List tasks
-- `GET /api/v1/safety/incidents` - List safety incidents
-
-**Full API Documentation:** http://localhost:8001/docs (Swagger UI)
-
-## Monitoring & Observability
-
-### Prometheus & Grafana Stack
-
-The system includes comprehensive monitoring with Prometheus metrics collection and Grafana dashboards.
-
-**Quick Start:**
-```bash
-# Start monitoring stack
-./scripts/setup/setup_monitoring.sh
-```
-
-See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed monitoring setup instructions.
-
-**Access URLs:**
-- **Grafana**: http://localhost:3000 (admin/changeme)
-- **Prometheus**: http://localhost:9090
-- **Alertmanager**: http://localhost:9093
-
-**Key Metrics Tracked:**
-- API request rates and latencies
-- Equipment telemetry and status
-- Agent performance and response times
-- Database query performance
-- Vector search performance
-- Cache hit rates and memory usage
-
-See [monitoring/](monitoring/) for dashboard configurations and alerting rules.
-
-## NeMo Guardrails
-
-The system implements **NVIDIA NeMo Guardrails** for content safety, security, and compliance protection. All user inputs and AI responses are validated through a comprehensive guardrails system to ensure safe and compliant interactions.
-
-### Overview
-
-The guardrails system provides **dual implementation support** with automatic fallback:
-
-- **NeMo Guardrails SDK** (with Colang) - Intelligent, programmable guardrails using NVIDIA's official SDK
-  - ✅ **Already included** in `requirements.txt` (`nemoguardrails>=0.19.0`)
-  - Installed automatically when you run `pip install -r requirements.txt`
-- **Pattern-Based Matching** - Fast, lightweight fallback using keyword/phrase matching
-- **Feature Flag Control** - Runtime switching between implementations via `USE_NEMO_GUARDRAILS_SDK`
-- **Automatic Fallback** - Seamlessly switches to pattern-based if SDK unavailable
-- **Input & Output Validation** - Checks both user queries and AI responses
-- **Timeout Protection** - Prevents hanging requests (3s input, 5s output)
-- **Comprehensive Monitoring** - Metrics tracking for method usage and performance
-
-### Protection Categories
-
-The guardrails system protects against **88 patterns** across 5 categories:
-
-1. **Jailbreak Attempts** (17 patterns) - Prevents instruction override attempts
-2. **Safety Violations** (13 patterns) - Blocks unsafe operational guidance
-3. **Security Violations** (15 patterns) - Prevents security information requests
-4. **Compliance Violations** (12 patterns) - Ensures regulatory adherence
-5. **Off-Topic Queries** (13 patterns) - Redirects non-warehouse queries
-
-### Quick Configuration
-
-```bash
-# Enable SDK implementation (recommended)
-USE_NEMO_GUARDRAILS_SDK=true
-
-# NVIDIA API key (required for SDK)
-NVIDIA_API_KEY=your-api-key-here
-
-# Optional: Guardrails-specific configuration
-RAIL_API_KEY=your-api-key-here  # Falls back to NVIDIA_API_KEY if not set
-RAIL_API_URL=https://integrate.api.nvidia.com/v1
-GUARDRAILS_TIMEOUT=10
-GUARDRAILS_USE_API=true
-```
-
-### Integration
-
-Guardrails are automatically integrated into the chat endpoint:
-- **Input Safety Check** - Validates user queries before processing (3s timeout)
-- **Output Safety Check** - Validates AI responses before returning (5s timeout)
-- **Metrics Tracking** - Logs method used, performance, and safety status
-
-### Testing
-
-```bash
-# Unit tests
-pytest tests/unit/test_guardrails_sdk.py -v
-
-# Integration tests (compares both implementations)
-pytest tests/integration/test_guardrails_comparison.py -v -s
-
-# Performance benchmarks
-pytest tests/integration/test_guardrails_comparison.py::test_performance_benchmark -v -s
-```
-
-### Documentation
-
-**📖 For comprehensive documentation, see: [Guardrails Implementation Guide](docs/architecture/guardrails-implementation.md)**
-
-The detailed guide includes:
-- Complete architecture overview
-- Implementation details (SDK vs Pattern-based)
-- All 88 guardrails patterns
-- API interface documentation
-- Configuration reference
-- Monitoring & metrics
-- Testing instructions
-- Troubleshooting guide
-- Future roadmap
-
-**Key Files:**
-- Service: `src/api/services/guardrails/guardrails_service.py`
-- SDK Wrapper: `src/api/services/guardrails/nemo_sdk_service.py`
-- Colang Config: `data/config/guardrails/rails.co`
-- NeMo Config: `data/config/guardrails/config.yml`
-- Legacy YAML: `data/config/guardrails/rails.yaml`
-
-## Development Guide
-
-### Repository Layout
-
-```
-.
-├─ packages/               # Canonical Python packages (import from these, not src.*)
-│  ├─ maiw-mcp/            # MCP contracts, capability registry, action proposals
-│  ├─ maiw-state/          # WarehouseState, domain state models (Equipment/Labor/Wave)
-│  ├─ maiw-decision/       # DecisionEngine — APPROVED/REJECTED/DEFERRED outcomes
-│  ├─ maiw-models/         # ModelGateway, NIM provider, ModelRequest/ReasoningLevel
-│  ├─ maiw-skills/         # Inventory, Equipment, Labor, Wave skill implementations
-│  ├─ maiw-execution/      # BaseActionExecutor (4-guard pattern), domain executors
-│  └─ maiw-agents/         # Equipment, Operations, Safety reasoning agents
-├─ apps/api/               # FastAPI application composition root (bootstrap.py)
-├─ mcp_servers/            # Standalone MCP 2.0 servers (Inventory, Equipment, Labor, Wave)
-├─ src/                    # Legacy source code (being migrated to packages/ above)
-│  ├─ api/                 # FastAPI application (routers, agents, services)
-│  ├─ retrieval/           # Retrieval services
-│  ├─ memory/              # Memory services
-│  ├─ adapters/            # External system adapters
-│  └─ ui/                  # React web dashboard
-├─ data/                   # SQL DDL/migrations, sample data
-├─ deploy/                 # Deployment configurations
-│  ├─ compose/             # Docker Compose files
-│  ├─ helm/                # Helm charts
-│  └─ scripts/             # Deployment scripts
-├─ scripts/                # Utility scripts
-│  ├─ setup/               # Setup scripts
-│  ├─ forecasting/         # Forecasting scripts
-│  └─ data/                # Data generation scripts
-├─ tests/                  # Test suite
-├─ docs/                   # Documentation
-│  └─ architecture/        # Architecture documentation
-└─ monitoring/             # Prometheus/Grafana configs
-```
-
-### Running Locally
-
-**API Server:**
-```bash
-source env/bin/activate
-./scripts/start_server.sh
-```
-
-**Frontend:**
-```bash
-cd src/ui/web
-npm start
-```
-
-**Infrastructure:**
-```bash
-./scripts/setup/dev_up.sh
-```
-
-### Testing
-
-```bash
-# Run all tests
-pytest tests/
-
-# Run specific test suite
-pytest tests/unit/
-pytest tests/integration/
-```
-
-### Documentation
-
-- **Architecture**: [docs/architecture/](docs/architecture/)
-- **MCP Integration**: [docs/architecture/mcp-integration.md](docs/architecture/mcp-integration.md)
-- **Forecasting**: [docs/forecasting/](docs/forecasting/)
-- **Deployment**: [DEPLOYMENT.md](DEPLOYMENT.md) - Complete deployment guide with Docker and Kubernetes options
-
-## Contributing
-
-Contributions are welcome! Please see our contributing guidelines and code of conduct.
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-**Commit Message Format:** We use [Conventional Commits](https://www.conventionalcommits.org/):
-- `feat:` - New feature
-- `fix:` - Bug fix
-- `docs:` - Documentation changes
-- `refactor:` - Code refactoring
-- `test:` - Test additions/changes
-
-## License
-
-See [LICENSE](LICENSE) for license information.
-
-**Governing Terms:** The Blueprint scripts are governed by Apache License, Version 2.0, and enables use of separate open source and proprietary software governed by their respective licenses: [Llama-3.3-nemotron-super-49b-v1.5](https://catalog.ngc.nvidia.com/orgs/nim/teams/nvidia/containers/llama-3.3-nemotron-super-49b-v1.5?version=1), [Llama Nemotron Embed VL 1B v2](https://build.nvidia.com/nvidia/llama-nemotron-embed-vl-1b-v2/modelcard), [NeMo Retriever Extraction](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo-microservices/containers/nv-ingest?version=25.9.0), [Nemotron Page Elements v3](https://catalog.ngc.nvidia.com/orgs/nim/teams/nvidia/containers/nemotron-page-elements-v3?version=1.7), [Nemotron OCR v1](https://catalog.ngc.nvidia.com/orgs/nim/teams/nvidia/containers/nemotron-ocr-v1?version=1.2.1), [Nemotron Parse](https://catalog.ngc.nvidia.com/orgs/nim/teams/nvidia/containers/nemotron-parse?version=1), [NVIDIA-Nemotron-Nano-12B-v2-VL](https://catalog.ngc.nvidia.com/orgs/nim/teams/nvidia/containers/nemotron-nano-12b-v2-vl?version=1), [NeMo Guardrails](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo-microservices/containers/guardrails?version=25.12), and [RAPIDS cuML](https://github.com/rapidsai/cuml/blob/main/LICENSE).
+**Baseline (Phase 9A): 528 passed, 1 skipped, 0 failed**
+
+| Test tier | Command | Requires |
+|-----------|---------|---------|
+| CORE CI | Command above | Python packages only |
+| Integration | `pytest tests/integration/` | Running MAIW server + PostgreSQL |
+| External service | Set `NVIDIA_API_KEY`, remove `--ignore` flags | NVIDIA API key + NIM endpoint |
+
+See [docs/architecture/TEST_STRATEGY.md](docs/architecture/TEST_STRATEGY.md) for per-file
+exclusion rationale and historical baselines by phase.
 
 ---
 
-This project will download and install additional 3rd party open source software projects. Review the license terms for these open source projects before use. 
+## Architecture Invariants
+
+These invariants are enforced by the test suite and must not be broken:
+
+| Invariant | Enforcement |
+|-----------|------------|
+| LLM cannot call MCP write tools directly | No MCP write tool in any agent tool registry |
+| Proposals are built locally, never via MCP | `ActionProposal` factories have no MCP client |
+| DecisionEngine is synchronous, no I/O | `evaluate()` has no `await`, no client dependencies |
+| Only `ActionExecutor.execute()` reaches MCP writes | Single call-site per domain executor |
+| Action names are statically allowlisted | `_ALLOWED_ACTIONS` is a `frozenset` literal |
+| No canonical package imports from `src.*` | AST scanner in `test_package_imports.py` |
+| No canonical package imports heavy infra deps | AST scanner: `asyncpg`, `pymilvus`, `redis`, `fastapi` forbidden |
+| `maiw-execution` does not import `maiw-agents` | Cycle prevention enforced in test suite |
+
+---
+
+## Modernization Status
+
+MAIW is in active modernization from a legacy LangGraph/monolith architecture to a typed,
+package-based, MCP v2 system.
+
+| Area | Status | Notes |
+|------|--------|-------|
+| **ModelGateway** (`maiw-models`) | ✅ Done | Nemotron 3 roles, routing policy, NIM provider, telemetry |
+| **WarehouseState** (`maiw-state`) | ✅ Done | Snapshot sealing, freshness, provenance, all 4 domains |
+| **Skills** (`maiw-skills`) | ✅ Done | Read skills, write proposal factories, all 4 domains |
+| **DecisionEngine** (`maiw-decision`) | ✅ Done | All constraint rules, APPROVED/REJECTED/DEFERRED |
+| **Executors** (`maiw-execution`) | ✅ Done | 4-guard BaseActionExecutor, Equipment + Labor + Wave |
+| **Agents** (`maiw-agents`) | ✅ Done | Equipment, Operations, Safety agents in canonical packages |
+| **MCP v2 servers** | ✅ Done | Inventory, Equipment, Labor, Wave — stateless HTTP |
+| **Capability contracts** | ✅ Done | All 12 capabilities defined, contract-tested |
+| **Compatibility shims** | ⚠️ Remove in 9B | `src/api/services/model_gateway/__init__.py`, `src/api/skills/*.py` |
+| **Forecasting integration** | 🔄 Partial | `integrations/forecasting/` — multi-model ensemble, not wired to agents |
+| **Document processing** | 🔄 Partial | `integrations/document/` — OCR + extraction, not wired to agents |
+| **Simulation** | 🔲 Future | `integrations/simulation/` — placeholder only |
+| **Optimization** | 🔲 Future | `integrations/optimization/` — placeholder only |
+| **Training / flywheel** | 🔲 Future | `integrations/training/` — placeholder only |
+| **SAP EWM connector** | 🔲 Future | `connectors/` — generic connector implemented; SAP planned |
+| **Manhattan / Blue Yonder** | 🔲 Future | Planned WMS connectors |
+| **apps/api as entrypoint** | 🔲 Future | `apps/api/maiw_api/bootstrap.py` composition root exists; `src/api/app.py` is current production entrypoint |
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|------------|
+| [MODEL_GATEWAY.md](docs/architecture/MODEL_GATEWAY.md) | Nemotron roles, routing policy, telemetry |
+| [WAREHOUSE_STATE.md](docs/architecture/WAREHOUSE_STATE.md) | State assembly, freshness, provenance |
+| [CAPABILITY_MATRIX.md](docs/architecture/CAPABILITY_MATRIX.md) | All 12 capabilities, read/write classification |
+| [DECISION_ENGINE.md](docs/architecture/DECISION_ENGINE.md) | Constraint rules, outcome model |
+| [RUNTIME_EXECUTION_FLOW.md](docs/architecture/RUNTIME_EXECUTION_FLOW.md) | Full pipeline sequence diagrams |
+| [MCP_V2_ARCHITECTURE.md](docs/architecture/MCP_V2_ARCHITECTURE.md) | MCP SDK, protocol version, deployment |
+| [DEPENDENCY_BOUNDARIES.md](docs/architecture/DEPENDENCY_BOUNDARIES.md) | Package boundary rules |
+| [PACKAGE_OWNERSHIP.md](docs/architecture/PACKAGE_OWNERSHIP.md) | Module-to-package ownership map |
+| [TEST_STRATEGY.md](docs/architecture/TEST_STRATEGY.md) | CORE CI command, exclusion rationale, baselines |
+
+---
+
+## Contributing
+
+1. Fork the repository and create a feature branch.
+2. All changes must keep CORE CI green: 528 passed, 1 skipped.
+3. New canonical code goes in `packages/`, never in `src.*` for business logic.
+4. No `src.*` imports in any `packages/` code — enforced by the test suite.
+5. Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/).
+
+---
+
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE) for full text.
+
+Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
