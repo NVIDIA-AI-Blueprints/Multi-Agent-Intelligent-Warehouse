@@ -30,6 +30,11 @@ python -m pytest tests/unit/ tests/contract/ tests/mcp/ \
 **Phase 6B baseline:** 386 passed, 1 skipped, 0 failed  
 **Phase 7 baseline:** 483 passed, 1 skipped, 0 failed (+97 new tests: Labor/Wave MCP, contract, state, executor, invariant)  
 **Phase 8 baseline:** 512 passed, 1 skipped, 0 failed (+29 new tests: package import smoke, forbidden-dependency guards, compatibility shim verification)  
+**Phase 9A baseline:** 528 passed, 1 skipped, 0 failed (+16 net: 20 new Phase 9A package import and invariant tests; −4 from deletion of dead MCP files whose callers were integration tests only)  
+All final phase reports MUST use this command. Any regression against the baseline is a blocker.
+
+> **Note:** `ci-cd.yml` previously ran only `tests/unit/` (327 tests). As of Phase 9A it has been corrected to run `tests/unit/ tests/contract/ tests/mcp/` (528 tests), matching this canonical definition.
+
 All final phase reports MUST use this command. Any regression against the baseline is a blocker.
 
 ---

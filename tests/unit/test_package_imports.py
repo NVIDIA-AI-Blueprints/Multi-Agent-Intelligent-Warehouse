@@ -185,6 +185,98 @@ class TestForbiddenDependencies:
         imports = _source_imports(pkg)
         assert "maiw_agents" not in imports, "maiw_state must not depend on maiw_agents"
 
+    def test_maiw_execution_no_src_import(self):
+        pkg = PROJECT_ROOT / "packages" / "maiw-execution" / "maiw_execution"
+        imports = _source_imports(pkg)
+        assert "src" not in imports, "maiw_execution must not import from src (API layer)"
+
+    def test_maiw_agents_no_src_import(self):
+        pkg = PROJECT_ROOT / "packages" / "maiw-agents" / "maiw_agents"
+        imports = _source_imports(pkg)
+        assert "src" not in imports, "maiw_agents must not import from src (API layer)"
+
+    def test_maiw_execution_no_heavy_deps(self):
+        pkg = PROJECT_ROOT / "packages" / "maiw-execution" / "maiw_execution"
+        self._check_no_forbidden_imports(pkg, self.HEAVY_DEPS, "maiw_execution")
+
+    def test_maiw_agents_no_heavy_deps(self):
+        pkg = PROJECT_ROOT / "packages" / "maiw-agents" / "maiw_agents"
+        self._check_no_forbidden_imports(pkg, self.HEAVY_DEPS, "maiw_agents")
+
+    def test_maiw_execution_no_agents_import(self):
+        pkg = PROJECT_ROOT / "packages" / "maiw-execution" / "maiw_execution"
+        imports = _source_imports(pkg)
+        assert "maiw_agents" not in imports, "maiw_execution must not depend on maiw_agents (would create cycle)"
+
+
+# ── Phase 9A smoke tests: new packages importable ─────────────────────────────
+
+
+class TestPhase9AImportSmoke:
+    """maiw_execution and maiw_agents must be importable without infrastructure."""
+
+    def test_maiw_execution_importable(self):
+        import maiw_execution  # noqa: F401
+
+    def test_maiw_agents_importable(self):
+        import maiw_agents  # noqa: F401
+
+    def test_maiw_execution_base_executor(self):
+        from maiw_execution import BaseActionExecutor, ActionExecutionResult, NoOpActionExecutor
+        assert BaseActionExecutor is not None
+        assert ActionExecutionResult is not None
+        assert NoOpActionExecutor is not None
+
+    def test_maiw_execution_domain_executors(self):
+        from maiw_execution import EquipmentActionExecutor, LaborActionExecutor, WaveActionExecutor
+        assert EquipmentActionExecutor is not None
+        assert LaborActionExecutor is not None
+        assert WaveActionExecutor is not None
+
+    def test_maiw_execution_error_hierarchy(self):
+        from maiw_execution import (
+            ActionNotApproved,
+            ActionDecisionMismatch,
+            ActionUnsupported,
+            ActionExpired,
+            ActionConflict,
+            ActionExecutionError,
+        )
+        # Guard errors subclass ValueError; wrap error subclasses RuntimeError
+        assert issubclass(ActionNotApproved, ValueError)
+        assert issubclass(ActionDecisionMismatch, ValueError)
+        assert issubclass(ActionUnsupported, ValueError)
+        assert issubclass(ActionExpired, ValueError)
+        assert issubclass(ActionConflict, RuntimeError)
+        assert issubclass(ActionExecutionError, RuntimeError)
+
+    def test_maiw_agents_equipment(self):
+        from maiw_agents.equipment import EquipmentAssetOperationsAgent
+        assert EquipmentAssetOperationsAgent is not None
+
+    def test_maiw_agents_operations(self):
+        from maiw_agents.operations import OperationsCoordinationAgent
+        assert OperationsCoordinationAgent is not None
+
+    def test_maiw_agents_safety(self):
+        from maiw_agents.safety import SafetyComplianceAgent
+        assert SafetyComplianceAgent is not None
+
+    def test_equipment_executor_allowed_actions(self):
+        from maiw_execution import EquipmentActionExecutor
+        allowed = EquipmentActionExecutor._ALLOWED_ACTIONS
+        assert "warehouse.equipment.assign" in allowed
+        assert "warehouse.equipment.release" in allowed
+        assert "warehouse.equipment.schedule_maintenance" in allowed
+
+    def test_labor_executor_allowed_actions(self):
+        from maiw_execution import LaborActionExecutor
+        assert "warehouse.labor.allocate" in LaborActionExecutor._ALLOWED_ACTIONS
+
+    def test_wave_executor_allowed_actions(self):
+        from maiw_execution import WaveActionExecutor
+        assert "warehouse.wave.reprioritize" in WaveActionExecutor._ALLOWED_ACTIONS
+
 
 # ── Compatibility shim tests ───────────────────────────────────────────────────
 

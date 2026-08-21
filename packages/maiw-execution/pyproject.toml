@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "maiw-execution"
+version = "0.1.0"
+description = "MAIW execution boundary — BaseActionExecutor, shared guard logic, typed errors"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.0.0",
+    "maiw-decision>=0.1.0",
+    "maiw-mcp>=0.1.0",
+    "maiw-state>=0.1.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["maiw_execution*"]

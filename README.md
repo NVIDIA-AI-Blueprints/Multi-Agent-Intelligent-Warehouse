@@ -632,8 +632,18 @@ The detailed guide includes:
 
 ```
 .
-├─ src/                    # Source code
-│  ├─ api/                 # FastAPI application
+├─ packages/               # Canonical Python packages (import from these, not src.*)
+│  ├─ maiw-mcp/            # MCP contracts, capability registry, action proposals
+│  ├─ maiw-state/          # WarehouseState, domain state models (Equipment/Labor/Wave)
+│  ├─ maiw-decision/       # DecisionEngine — APPROVED/REJECTED/DEFERRED outcomes
+│  ├─ maiw-models/         # ModelGateway, NIM provider, ModelRequest/ReasoningLevel
+│  ├─ maiw-skills/         # Inventory, Equipment, Labor, Wave skill implementations
+│  ├─ maiw-execution/      # BaseActionExecutor (4-guard pattern), domain executors
+│  └─ maiw-agents/         # Equipment, Operations, Safety reasoning agents
+├─ apps/api/               # FastAPI application composition root (bootstrap.py)
+├─ mcp_servers/            # Standalone MCP 2.0 servers (Inventory, Equipment, Labor, Wave)
+├─ src/                    # Legacy source code (being migrated to packages/ above)
+│  ├─ api/                 # FastAPI application (routers, agents, services)
 │  ├─ retrieval/           # Retrieval services
 │  ├─ memory/              # Memory services
 │  ├─ adapters/            # External system adapters

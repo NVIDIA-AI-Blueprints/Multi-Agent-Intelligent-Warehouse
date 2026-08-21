@@ -13,6 +13,8 @@ members = [
     "packages/maiw-decision",
     "packages/maiw-models",
     "packages/maiw-skills",
+    "packages/maiw-execution",
+    "packages/maiw-agents",
 ]
 
 [project]

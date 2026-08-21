@@ -74,6 +74,23 @@ Remove by Phase 9.
 
 ---
 
+## Batch 3: Agents → `packages/maiw-agents/` + `packages/maiw-execution/`
+
+> **Phase 9A status:** Executors moved to `maiw-execution` (shared guard layer); agents moved to `maiw-agents` (domain reasoning). All src.* imports eliminated from both packages.
+
+| Module | Canonical path (Phase 9A) | Status | Notes |
+|--------|--------------------------|--------|-------|
+| `BaseActionExecutor`, error hierarchy | `packages/maiw-execution/maiw_execution/base.py` | ✅ DONE | 4-guard pattern: APPROVED, binding, allowlist, staleness |
+| `EquipmentActionExecutor` | `packages/maiw-execution/maiw_execution/equipment.py` | ✅ DONE | Moved from `src/api/agents/inventory/action_executor.py` |
+| `LaborActionExecutor` | `packages/maiw-execution/maiw_execution/labor.py` | ✅ DONE | Moved from `src/api/agents/operations/labor_executor.py` |
+| `WaveActionExecutor` | `packages/maiw-execution/maiw_execution/wave.py` | ✅ DONE | Moved from `src/api/agents/operations/wave_executor.py` |
+| `EquipmentAssetOperationsAgent` | `packages/maiw-agents/maiw_agents/equipment/agent.py` | ✅ DONE | Migrated from `src/api/agents/inventory/equipment_agent.py` |
+| `OperationsCoordinationAgent` | `packages/maiw-agents/maiw_agents/operations/agent.py` | ✅ DONE | Migrated from `src/api/agents/operations/operations_agent.py` |
+| `SafetyComplianceAgent` | `packages/maiw-agents/maiw_agents/safety/agent.py` | ✅ DONE | Migrated from `src/api/agents/safety/safety_agent.py` |
+| `state_aware_ops.py` | `packages/maiw-agents/maiw_agents/equipment/state_aware_ops.py` | ✅ DONE | Copied from `src/api/agents/inventory/state_aware_ops.py` |
+| `MCPEquipmentAgent`, `MCPOperationsAgent`, `MCPSafetyAgent` | `src/api/agents/*/mcp_*.py` | DEPRECATED | NIM-primary paths; never migrated to ModelGateway; marked with DEPRECATED comment |
+| `ForecastingAgent` | `src/api/agents/forecasting/` | EXTERNAL INTEGRATION | Uses ModelGateway but not core transactional; classify as integration |
+| Document agents | `src/api/agents/document/` | EXTERNAL INTEGRATION | Large external dependency surface (OCR, embeddings); not core |
 ## Batch 3: Agents → `packages/maiw-agents/`
 
 | Module | Current path | Target package | Status | Notes |
@@ -133,6 +150,17 @@ The new canonical path is `packages/maiw-mcp/` + `mcp_servers/`.
 | `src/api/services/mcp/adapters/operations_adapter.py` | `DEPRECATE` | Old MCP adapter for operations |
 | `src/api/services/mcp/adapters/safety_adapter.py` | `DEPRECATE` | Old MCP adapter for safety |
 | `src/api/services/mcp/parameter_validator.py` | `DEPRECATE` | |
+| `src/api/services/mcp/monitoring.py` | ✅ DELETED (Phase 9A) | Zero production callers confirmed before deletion |
+| `src/api/services/mcp/rollback.py` | ✅ DELETED (Phase 9A) | Zero production callers confirmed before deletion |
+| `src/api/services/mcp/security.py` | `DEPRECATE` | Security for old MCP |
+| `src/api/services/mcp/service_discovery.py` | ✅ DELETED (Phase 9A) | Zero production callers confirmed before deletion |
+| `src/api/services/mcp/tool_binding.py` | `DEPRECATE` | |
+| `src/api/services/mcp/tool_routing.py` | `DEPRECATE` | |
+| `src/api/services/mcp/tool_validation.py` | `DEPRECATE` | |
+| `src/api/services/mcp/adapters/rfid_barcode_adapter.py` | ✅ DELETED (Phase 9A) | Hardware adapter, no active callers |
+| `src/api/services/mcp/adapters/time_attendance_adapter.py` | ✅ DELETED (Phase 9A) | Hardware adapter, no active callers |
+
+**Phase 9A status:** Remaining DEPRECATE items are still used by `mcp_equipment_agent.py`, `forecasting_agent.py`, `src/api/routers/mcp.py`, and `evidence_collector.py`. These will be cleaned up in Phase 9B when those callers are migrated to the MCP 2.0 path.
 | `src/api/services/mcp/monitoring.py` | `DEPRECATE` | Monitoring for old MCP |
 | `src/api/services/mcp/rollback.py` | `DEPRECATE` | |
 | `src/api/services/mcp/security.py` | `DEPRECATE` | Security for old MCP |
