@@ -50,6 +50,10 @@ class MAIWRuntime:
     equipment_agent: Any = None  # maiw_agents.equipment.EquipmentAssetOperationsAgent
     operations_agent: Any = None  # maiw_agents.operations.OperationsCoordinationAgent
     safety_agent: Any = None  # maiw_agents.safety.SafetyComplianceAgent
+    equipment_executor: Any = None  # EquipmentActionExecutor
+    labor_executor: Any = None  # LaborActionExecutor
+    wave_executor: Any = None  # WaveActionExecutor
+    state_provider: Any = None  # WarehouseStateProvider
 
 
 async def get_runtime() -> MAIWRuntime:
@@ -84,6 +88,9 @@ async def get_runtime() -> MAIWRuntime:
     # EquipmentActionExecutor (Phase 9A: migrated to maiw_execution)
     try:
         from maiw_execution import EquipmentActionExecutor
+    # EquipmentActionExecutor
+    try:
+        from src.api.agents.inventory.action_executor import EquipmentActionExecutor
         from maiw_skills.equipment import (
             get_execute_equipment_assignment_skill,
             get_execute_equipment_release_skill,
@@ -102,6 +109,9 @@ async def get_runtime() -> MAIWRuntime:
     # LaborActionExecutor (Phase 9A: migrated to maiw_execution)
     try:
         from maiw_execution import LaborActionExecutor
+    # LaborActionExecutor
+    try:
+        from src.api.agents.operations.labor_executor import LaborActionExecutor
         from maiw_skills.labor import get_execute_labor_allocation_skill
         runtime.labor_executor = LaborActionExecutor(
             allocate_skill=await get_execute_labor_allocation_skill(),
@@ -113,6 +123,9 @@ async def get_runtime() -> MAIWRuntime:
     # WaveActionExecutor (Phase 9A: migrated to maiw_execution)
     try:
         from maiw_execution import WaveActionExecutor
+    # WaveActionExecutor
+    try:
+        from src.api.agents.operations.wave_executor import WaveActionExecutor
         from maiw_skills.wave import get_execute_wave_reprioritization_skill
         runtime.wave_executor = WaveActionExecutor(
             reprioritize_skill=await get_execute_wave_reprioritization_skill(),

@@ -490,6 +490,38 @@ cp .env.example .env
 | `MILVUS_HOST` | `localhost` | Milvus vector DB host |
 
 ---
+```
+.
+├─ packages/               # Canonical Python packages (import from these, not src.*)
+│  ├─ maiw-mcp/            # MCP contracts, capability registry, action proposals
+│  ├─ maiw-state/          # WarehouseState, domain state models (Equipment/Labor/Wave)
+│  ├─ maiw-decision/       # DecisionEngine — APPROVED/REJECTED/DEFERRED outcomes
+│  ├─ maiw-models/         # ModelGateway, NIM provider, ModelRequest/ReasoningLevel
+│  ├─ maiw-skills/         # Inventory, Equipment, Labor, Wave skill implementations
+│  ├─ maiw-execution/      # BaseActionExecutor (4-guard pattern), domain executors
+│  └─ maiw-agents/         # Equipment, Operations, Safety reasoning agents
+├─ apps/api/               # FastAPI application composition root (bootstrap.py)
+├─ mcp_servers/            # Standalone MCP 2.0 servers (Inventory, Equipment, Labor, Wave)
+├─ src/                    # Legacy source code (being migrated to packages/ above)
+│  ├─ api/                 # FastAPI application (routers, agents, services)
+│  ├─ retrieval/           # Retrieval services
+│  ├─ memory/              # Memory services
+│  ├─ adapters/            # External system adapters
+│  └─ ui/                  # React web dashboard
+├─ data/                   # SQL DDL/migrations, sample data
+├─ deploy/                 # Deployment configurations
+│  ├─ compose/             # Docker Compose files
+│  ├─ helm/                # Helm charts
+│  └─ scripts/             # Deployment scripts
+├─ scripts/                # Utility scripts
+│  ├─ setup/               # Setup scripts
+│  ├─ forecasting/         # Forecasting scripts
+│  └─ data/                # Data generation scripts
+├─ tests/                  # Test suite
+├─ docs/                   # Documentation
+│  └─ architecture/        # Architecture documentation
+└─ monitoring/             # Prometheus/Grafana configs
+```
 
 ## Running MAIW
 
