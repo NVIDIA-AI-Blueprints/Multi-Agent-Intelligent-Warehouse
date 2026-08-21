@@ -188,7 +188,9 @@ class TestForbiddenDependencies:
     def test_maiw_execution_no_src_import(self):
         pkg = PROJECT_ROOT / "packages" / "maiw-execution" / "maiw_execution"
         imports = _source_imports(pkg)
-        assert "src" not in imports, "maiw_execution must not import from src (API layer)"
+        assert (
+            "src" not in imports
+        ), "maiw_execution must not import from src (API layer)"
 
     def test_maiw_agents_no_src_import(self):
         pkg = PROJECT_ROOT / "packages" / "maiw-agents" / "maiw_agents"
@@ -206,7 +208,9 @@ class TestForbiddenDependencies:
     def test_maiw_execution_no_agents_import(self):
         pkg = PROJECT_ROOT / "packages" / "maiw-execution" / "maiw_execution"
         imports = _source_imports(pkg)
-        assert "maiw_agents" not in imports, "maiw_execution must not depend on maiw_agents (would create cycle)"
+        assert (
+            "maiw_agents" not in imports
+        ), "maiw_execution must not depend on maiw_agents (would create cycle)"
 
 
 # ── Phase 9A smoke tests: new packages importable ─────────────────────────────
@@ -222,13 +226,23 @@ class TestPhase9AImportSmoke:
         import maiw_agents  # noqa: F401
 
     def test_maiw_execution_base_executor(self):
-        from maiw_execution import BaseActionExecutor, ActionExecutionResult, NoOpActionExecutor
+        from maiw_execution import (
+            BaseActionExecutor,
+            ActionExecutionResult,
+            NoOpActionExecutor,
+        )
+
         assert BaseActionExecutor is not None
         assert ActionExecutionResult is not None
         assert NoOpActionExecutor is not None
 
     def test_maiw_execution_domain_executors(self):
-        from maiw_execution import EquipmentActionExecutor, LaborActionExecutor, WaveActionExecutor
+        from maiw_execution import (
+            EquipmentActionExecutor,
+            LaborActionExecutor,
+            WaveActionExecutor,
+        )
+
         assert EquipmentActionExecutor is not None
         assert LaborActionExecutor is not None
         assert WaveActionExecutor is not None
@@ -242,6 +256,7 @@ class TestPhase9AImportSmoke:
             ActionConflict,
             ActionExecutionError,
         )
+
         # Guard errors subclass ValueError; wrap error subclasses RuntimeError
         assert issubclass(ActionNotApproved, ValueError)
         assert issubclass(ActionDecisionMismatch, ValueError)
@@ -252,18 +267,22 @@ class TestPhase9AImportSmoke:
 
     def test_maiw_agents_equipment(self):
         from maiw_agents.equipment import EquipmentAssetOperationsAgent
+
         assert EquipmentAssetOperationsAgent is not None
 
     def test_maiw_agents_operations(self):
         from maiw_agents.operations import OperationsCoordinationAgent
+
         assert OperationsCoordinationAgent is not None
 
     def test_maiw_agents_safety(self):
         from maiw_agents.safety import SafetyComplianceAgent
+
         assert SafetyComplianceAgent is not None
 
     def test_equipment_executor_allowed_actions(self):
         from maiw_execution import EquipmentActionExecutor
+
         allowed = EquipmentActionExecutor._ALLOWED_ACTIONS
         assert "warehouse.equipment.assign" in allowed
         assert "warehouse.equipment.release" in allowed
@@ -271,10 +290,12 @@ class TestPhase9AImportSmoke:
 
     def test_labor_executor_allowed_actions(self):
         from maiw_execution import LaborActionExecutor
+
         assert "warehouse.labor.allocate" in LaborActionExecutor._ALLOWED_ACTIONS
 
     def test_wave_executor_allowed_actions(self):
         from maiw_execution import WaveActionExecutor
+
         assert "warehouse.wave.reprioritize" in WaveActionExecutor._ALLOWED_ACTIONS
 
 
