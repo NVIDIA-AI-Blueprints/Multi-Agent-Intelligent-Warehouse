@@ -153,7 +153,10 @@ jobs:
           echo "✅ Infrastructure services started"
 
       # Step 6: Ensure wosa-llm-nim (LLM NIM) is ready
+      # Skipped in CI: llm-nim runs under the 'gpu' profile and is not started here.
+      # CI uses LLM_NIM_URL=https://integrate.api.nvidia.com/v1 (hosted Nemotron API).
       - name: "Step 6: Wait for wosa-llm-nim ready"
+        if: false
         run: |
           set -e
           NIM_HEALTH_URL="http://127.0.0.1:8000/v1/health/ready"
