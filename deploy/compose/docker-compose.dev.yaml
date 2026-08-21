@@ -179,6 +179,7 @@ services:
                 - "2"
                 - "3"
               capabilities: [gpu]
+    shm_size: '2gb'
     volumes:
       - nim_cache:/root/.cache
       - nim_models:/models
