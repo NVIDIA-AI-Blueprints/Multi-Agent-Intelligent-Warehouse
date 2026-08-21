@@ -30,7 +30,6 @@ RUN pip install --no-cache-dir \
     packages/maiw-skills \
     packages/maiw-execution \
     packages/maiw-agents
-    packages/maiw-skills
 
 # =============================================================================
 # Final Runtime Stage
