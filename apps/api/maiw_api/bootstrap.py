@@ -43,10 +43,13 @@ class MAIWRuntime:
 
     model_gateway: Any = None  # maiw_models.ModelGateway
     decision_engine: Any = None  # maiw_decision.DecisionEngine
-    equipment_executor: Any = None  # EquipmentActionExecutor
-    labor_executor: Any = None  # LaborActionExecutor
-    wave_executor: Any = None  # WaveActionExecutor
+    equipment_executor: Any = None  # maiw_execution.EquipmentActionExecutor
+    labor_executor: Any = None  # maiw_execution.LaborActionExecutor
+    wave_executor: Any = None  # maiw_execution.WaveActionExecutor
     state_provider: Any = None  # WarehouseStateProvider
+    equipment_agent: Any = None  # maiw_agents.equipment.EquipmentAssetOperationsAgent
+    operations_agent: Any = None  # maiw_agents.operations.OperationsCoordinationAgent
+    safety_agent: Any = None  # maiw_agents.safety.SafetyComplianceAgent
 
 
 async def get_runtime() -> MAIWRuntime:
@@ -78,9 +81,9 @@ async def get_runtime() -> MAIWRuntime:
     except Exception as exc:
         logger.warning("MAIW bootstrap: DecisionEngine unavailable — %s", exc)
 
-    # EquipmentActionExecutor
+    # EquipmentActionExecutor (Phase 9A: migrated to maiw_execution)
     try:
-        from src.api.agents.inventory.action_executor import EquipmentActionExecutor
+        from maiw_execution import EquipmentActionExecutor
         from maiw_skills.equipment import (
             get_execute_equipment_assignment_skill,
             get_execute_equipment_release_skill,
@@ -90,14 +93,15 @@ async def get_runtime() -> MAIWRuntime:
             assign_skill=await get_execute_equipment_assignment_skill(),
             release_skill=await get_execute_equipment_release_skill(),
             maintenance_skill=await get_execute_equipment_maintenance_skill(),
+            state_provider=runtime.state_provider,
         )
         logger.info("MAIW bootstrap: EquipmentActionExecutor ready")
     except Exception as exc:
         logger.warning("MAIW bootstrap: EquipmentActionExecutor unavailable — %s", exc)
 
-    # LaborActionExecutor
+    # LaborActionExecutor (Phase 9A: migrated to maiw_execution)
     try:
-        from src.api.agents.operations.labor_executor import LaborActionExecutor
+        from maiw_execution import LaborActionExecutor
         from maiw_skills.labor import get_execute_labor_allocation_skill
         runtime.labor_executor = LaborActionExecutor(
             allocate_skill=await get_execute_labor_allocation_skill(),
@@ -106,9 +110,9 @@ async def get_runtime() -> MAIWRuntime:
     except Exception as exc:
         logger.warning("MAIW bootstrap: LaborActionExecutor unavailable — %s", exc)
 
-    # WaveActionExecutor
+    # WaveActionExecutor (Phase 9A: migrated to maiw_execution)
     try:
-        from src.api.agents.operations.wave_executor import WaveActionExecutor
+        from maiw_execution import WaveActionExecutor
         from maiw_skills.wave import get_execute_wave_reprioritization_skill
         runtime.wave_executor = WaveActionExecutor(
             reprioritize_skill=await get_execute_wave_reprioritization_skill(),
@@ -116,6 +120,39 @@ async def get_runtime() -> MAIWRuntime:
         logger.info("MAIW bootstrap: WaveActionExecutor ready")
     except Exception as exc:
         logger.warning("MAIW bootstrap: WaveActionExecutor unavailable — %s", exc)
+
+    # EquipmentAssetOperationsAgent (Phase 9A: new maiw_agents package)
+    try:
+        from maiw_agents.equipment import EquipmentAssetOperationsAgent
+        runtime.equipment_agent = EquipmentAssetOperationsAgent(
+            model_gateway=runtime.model_gateway,
+            decision_engine=runtime.decision_engine,
+            action_executor=runtime.equipment_executor,
+            state_provider=runtime.state_provider,
+        )
+        logger.info("MAIW bootstrap: EquipmentAssetOperationsAgent ready")
+    except Exception as exc:
+        logger.warning("MAIW bootstrap: EquipmentAssetOperationsAgent unavailable — %s", exc)
+
+    # OperationsCoordinationAgent (Phase 9A: new maiw_agents package)
+    try:
+        from maiw_agents.operations import OperationsCoordinationAgent
+        runtime.operations_agent = OperationsCoordinationAgent(
+            model_gateway=runtime.model_gateway,
+        )
+        logger.info("MAIW bootstrap: OperationsCoordinationAgent ready")
+    except Exception as exc:
+        logger.warning("MAIW bootstrap: OperationsCoordinationAgent unavailable — %s", exc)
+
+    # SafetyComplianceAgent (Phase 9A: new maiw_agents package)
+    try:
+        from maiw_agents.safety import SafetyComplianceAgent
+        runtime.safety_agent = SafetyComplianceAgent(
+            model_gateway=runtime.model_gateway,
+        )
+        logger.info("MAIW bootstrap: SafetyComplianceAgent ready")
+    except Exception as exc:
+        logger.warning("MAIW bootstrap: SafetyComplianceAgent unavailable — %s", exc)
 
     _runtime = runtime
     logger.info("MAIW bootstrap: runtime assembly complete")

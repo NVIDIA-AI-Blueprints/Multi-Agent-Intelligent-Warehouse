@@ -27,7 +27,9 @@ RUN pip install --no-cache-dir \
     packages/maiw-state \
     packages/maiw-decision \
     packages/maiw-models \
-    packages/maiw-skills
+    packages/maiw-skills \
+    packages/maiw-execution \
+    packages/maiw-agents
 
 # =============================================================================
 # Final Runtime Stage
