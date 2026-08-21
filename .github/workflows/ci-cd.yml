@@ -82,8 +82,9 @@ jobs:
       env:
         DATABASE_URL: postgresql://warehouse:ci_placeholder@localhost:5435/warehouse
       run: |
-        # Unit scope only; integration/e2e live in main.yml. Ignores: drift vs current APIs / missing fixtures.
-        pytest tests/unit \
+        # CORE CI: unit + contract + mcp — no infrastructure required. Integration/e2e live in main.yml.
+        # Canonical command matches docs/architecture/TEST_STRATEGY.md CORE CI definition.
+        pytest tests/unit tests/contract tests/mcp \
           --timeout=120 \
           --ignore=tests/unit/test_mcp_integrated_planner_graph.py \
           --ignore=tests/unit/test_mcp_system.py \
