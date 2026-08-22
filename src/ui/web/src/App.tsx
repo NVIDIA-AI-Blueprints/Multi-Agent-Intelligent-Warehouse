@@ -20,6 +20,14 @@ import DeploymentGuide from './pages/DeploymentGuide';
 import ArchitectureDiagrams from './pages/ArchitectureDiagrams';
 import MCPTest from './pages/MCPTest';
 import VersionFooter from './components/VersionFooter';
+// Command Center v2 pages
+import CommandCenter from './pages/CommandCenter';
+import WarehouseStatePage from './pages/WarehouseStatePage';
+import DecisionCenter from './pages/DecisionCenter';
+import ModelGateway from './pages/ModelGateway';
+import CapabilityPlane from './pages/CapabilityPlane';
+import ActivityFeed from './pages/ActivityFeed';
+import SystemHealth from './pages/SystemHealth';
 
 function App() {
   return (
@@ -33,7 +41,15 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <Routes>
-                    <Route path="/" element={<Dashboard />} />
+                    {/* Command Center v2 primary nav */}
+                    <Route path="/command" element={<CommandCenter />} />
+                    <Route path="/state" element={<WarehouseStatePage />} />
+                    <Route path="/decisions" element={<DecisionCenter />} />
+                    <Route path="/models" element={<ModelGateway />} />
+                    <Route path="/capabilities" element={<CapabilityPlane />} />
+                    <Route path="/activity" element={<ActivityFeed />} />
+                    <Route path="/health" element={<SystemHealth />} />
+                    {/* Secondary nav / legacy pages */}
                     <Route path="/chat" element={<ChatInterfaceNew />} />
                     <Route path="/equipment" element={<Equipment />} />
                     <Route path="/forecasting" element={<Forecasting />} />
@@ -47,7 +63,9 @@ function App() {
                     <Route path="/documentation/deployment" element={<DeploymentGuide />} />
                     <Route path="/documentation/architecture" element={<ArchitectureDiagrams />} />
                     <Route path="/mcp-test" element={<MCPTest />} />
-                    <Route path="*" element={<Navigate to="/" replace />} />
+                    {/* Legacy root → Command Center */}
+                    <Route path="/" element={<Navigate to="/command" replace />} />
+                    <Route path="*" element={<Navigate to="/command" replace />} />
                   </Routes>
                 </Layout>
               </ProtectedRoute>

@@ -295,7 +295,12 @@ export const mcpAPI = {
   refreshDiscovery: async (): Promise<any> => {
     const response = await api.post('/mcp/discovery/refresh');
     return response.data;
-  }
+  },
+
+  getCapabilities: async (): Promise<any> => {
+    const response = await api.get('/mcp/capabilities');
+    return response.data;
+  },
 };
 
 export const chatAPI = {
@@ -543,6 +548,41 @@ export const healthAPI = {
     // Increased timeout for health check to handle slow backend responses
     // Health check includes database connection, so it may take longer
     const response = await api.get('/health/simple', { timeout: 30000 }); // 30 seconds (increased from 15s)
+    return response.data;
+  },
+
+  getLive: async (): Promise<{ status: string }> => {
+    const response = await api.get('/live', { timeout: 5000 });
+    return response.data;
+  },
+
+  getFull: async (): Promise<any> => {
+    const response = await api.get('/health', { timeout: 15000 });
+    return response.data;
+  },
+};
+
+export interface RuntimeStatus {
+  runtime_initialized: boolean;
+  uptime_seconds?: number;
+  model_gateway_available: boolean;
+  decision_engine_available: boolean;
+  state_provider_available: boolean;
+  inventory_mcp_configured: boolean;
+  equipment_mcp_configured: boolean;
+  labor_mcp_configured: boolean;
+  wave_mcp_configured: boolean;
+  equipment_agent_available: boolean;
+  operations_agent_available: boolean;
+  safety_agent_available: boolean;
+  equipment_executor_available: boolean;
+  labor_executor_available: boolean;
+  wave_executor_available: boolean;
+}
+
+export const runtimeAPI = {
+  getStatus: async (): Promise<RuntimeStatus> => {
+    const response = await api.get('/runtime/status', { timeout: 10000 });
     return response.data;
   },
 };

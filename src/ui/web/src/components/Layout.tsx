@@ -3,6 +3,7 @@ import {
   AppBar,
   Box,
   CssBaseline,
+  Divider,
   Drawer,
   IconButton,
   List,
@@ -23,18 +24,22 @@ import {
   Dashboard as DashboardIcon,
   Chat as ChatIcon,
   Build as EquipmentIcon,
-  Inventory as InventoryIcon,
   Work as OperationsIcon,
   Security as SafetyIcon,
-  TrendingUp as ForecastingIcon,
   Analytics as AnalyticsIcon,
   Settings as SettingsIcon,
   Article as DocumentationIcon,
-  Description as DocumentIcon,
   Logout,
+  Inventory2 as StateIcon,
+  Gavel as DecisionIcon,
+  Psychology as ModelIcon,
+  Hub as CapabilityIcon,
+  Timeline as ActivityIcon,
+  MonitorHeart as HealthIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import StatusBar from './StatusBar';
 
 const drawerWidth = 240;
 
@@ -42,17 +47,24 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
-const menuItems = [
-  { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
+const primaryNavItems = [
+  { text: 'COMMAND', icon: <DashboardIcon />, path: '/command' },
+  { text: 'STATE', icon: <StateIcon />, path: '/state' },
+  { text: 'DECISIONS', icon: <DecisionIcon />, path: '/decisions' },
+  { text: 'MODELS', icon: <ModelIcon />, path: '/models' },
+  { text: 'CAPABILITIES', icon: <CapabilityIcon />, path: '/capabilities' },
+  { text: 'ACTIVITY', icon: <ActivityIcon />, path: '/activity' },
+  { text: 'HEALTH', icon: <HealthIcon />, path: '/health' },
+];
+
+const secondaryNavItems = [
   { text: 'Chat Assistant', icon: <ChatIcon />, path: '/chat' },
   { text: 'Equipment & Assets', icon: <EquipmentIcon />, path: '/equipment' },
-  { text: 'Forecasting', icon: <ForecastingIcon />, path: '/forecasting' },
   { text: 'Operations', icon: <OperationsIcon />, path: '/operations' },
   { text: 'Safety', icon: <SafetyIcon />, path: '/safety' },
-  { text: 'Document Extraction', icon: <DocumentIcon />, path: '/documents' },
   { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics' },
-  { text: 'Documentation', icon: <DocumentationIcon />, path: '/documentation' },
   { text: 'MCP Testing', icon: <SettingsIcon />, path: '/mcp-test' },
+  { text: 'Documentation', icon: <DocumentationIcon />, path: '/documentation' },
 ];
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
@@ -89,77 +101,66 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     handleUserMenuClose();
   };
 
+  const navItemSx = (path: string, mono = false) => ({
+    mx: 1,
+    borderRadius: 2,
+    minHeight: 40,
+    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+    '&.Mui-selected': {
+      backgroundColor: 'primary.main',
+      color: 'primary.contrastText',
+      '&:hover': { backgroundColor: 'primary.light' },
+      '& .MuiListItemIcon-root': { color: 'primary.contrastText' },
+    },
+    '&:hover': { backgroundColor: 'rgba(118, 185, 0, 0.08)' },
+    '& .MuiListItemIcon-root': {
+      color: location.pathname === path ? 'primary.contrastText' : 'text.secondary',
+      minWidth: 36,
+    },
+    '& .MuiListItemText-primary': {
+      fontWeight: location.pathname === path ? 700 : 500,
+      fontSize: mono ? '0.8rem' : '0.82rem',
+      letterSpacing: mono ? '0.06em' : '0.01em',
+      fontFamily: mono ? 'monospace' : 'inherit',
+    },
+  });
+
   const drawer = (
-    <div>
-      <Toolbar sx={{ 
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <Toolbar sx={{
         borderBottom: '1px solid',
         borderColor: 'divider',
         minHeight: '64px !important',
         px: 2,
+        flexShrink: 0,
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%' }}>
           <Box
             component="img"
             src="/nvidia-logo.svg"
             alt="NVIDIA"
-            sx={{
-              height: 28,
-              width: 'auto',
-              display: { xs: 'none', sm: 'block' },
-            }}
-            onError={(e: any) => {
-              // Fallback if logo doesn't exist
-              e.target.style.display = 'none';
-            }}
+            sx={{ height: 22, width: 'auto', display: { xs: 'none', sm: 'block' } }}
+            onError={(e: any) => { e.target.style.display = 'none'; }}
           />
-          <Typography 
-            variant="h6" 
-            noWrap 
-            component="div" 
-            sx={{ 
-              fontWeight: 600,
-              fontSize: '1rem',
-              color: 'text.primary',
-              letterSpacing: '0.01em',
-            }}
-          >
-            Warehouse Assistant
-          </Typography>
+          <Box>
+            <Typography variant="body2" sx={{ fontWeight: 700, color: 'primary.main', fontFamily: 'monospace', fontSize: '0.7rem', letterSpacing: '0.08em' }}>
+              MAIW v2
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.65rem' }}>
+              Command Center
+            </Typography>
+          </Box>
         </Box>
       </Toolbar>
-      <List sx={{ pt: 2 }}>
-        {menuItems.map((item) => (
-          <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
+
+      {/* Primary nav */}
+      <List sx={{ pt: 1.5, flexShrink: 0 }}>
+        {primaryNavItems.map((item) => (
+          <ListItem key={item.text} disablePadding sx={{ mb: 0.25 }}>
             <ListItemButton
               selected={location.pathname === item.path}
               onClick={() => handleNavigation(item.path)}
-              sx={{
-                mx: 1,
-                borderRadius: 2,
-                minHeight: 44,
-                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                '&.Mui-selected': {
-                  backgroundColor: 'primary.main',
-                  color: 'primary.contrastText',
-                  '&:hover': {
-                    backgroundColor: 'primary.light',
-                  },
-                  '& .MuiListItemIcon-root': {
-                    color: 'primary.contrastText',
-                  },
-                },
-                '&:hover': {
-                  backgroundColor: 'rgba(118, 185, 0, 0.08)',
-                },
-                '& .MuiListItemIcon-root': {
-                  color: location.pathname === item.path ? 'primary.contrastText' : 'text.secondary',
-                  minWidth: 40,
-                },
-                '& .MuiListItemText-primary': {
-                  fontWeight: location.pathname === item.path ? 600 : 500,
-                  fontSize: '0.875rem',
-                },
-              }}
+              sx={navItemSx(item.path, true)}
             >
               <ListItemIcon>{item.icon}</ListItemIcon>
               <ListItemText primary={item.text} />
@@ -167,7 +168,25 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </ListItem>
         ))}
       </List>
-    </div>
+
+      <Divider sx={{ mx: 2, my: 1 }} />
+
+      {/* Secondary nav */}
+      <List sx={{ flexShrink: 0 }}>
+        {secondaryNavItems.map((item) => (
+          <ListItem key={item.text} disablePadding sx={{ mb: 0.25 }}>
+            <ListItemButton
+              selected={location.pathname === item.path}
+              onClick={() => handleNavigation(item.path)}
+              sx={navItemSx(item.path, false)}
+            >
+              <ListItemIcon>{item.icon}</ListItemIcon>
+              <ListItemText primary={item.text} />
+            </ListItemButton>
+          </ListItem>
+        ))}
+      </List>
+    </Box>
   );
 
   return (
@@ -332,10 +351,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         }}
       >
         <Toolbar />
-        <Box sx={{ flex: 1, width: '100%', minWidth: 0, pb: 3 }}>
+        <Box sx={{ flex: 1, width: '100%', minWidth: 0, pb: 6 }}>
           {children}
         </Box>
       </Box>
+      <StatusBar />
     </Box>
   );
 };
