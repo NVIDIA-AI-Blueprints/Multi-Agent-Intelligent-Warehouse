@@ -282,14 +282,22 @@ jobs:
           source env/bin/activate
           set -a && source deploy/compose/.env && set +a
 
-          echo "Running start_server.sh in background..."
-          chmod +x ./scripts/start_server.sh
-          ./scripts/start_server.sh &
+          PORT=${PORT:-8001}
 
-          # Wait for server to start
-          echo "Waiting for API server to start..."
-          sleep 20
-          echo "✅ API server started"
+          # dev_up.sh (Step 5) may have already started wosa-backend on this port
+          # via Docker Compose.  If something is already listening, the running
+          # service is used for health checks; no second process is started.
+          if lsof -Pi :"$PORT" -sTCP:LISTEN -t >/dev/null 2>&1; then
+            echo "Port $PORT is already in use (wosa-backend Docker container)."
+            echo "Skipping local API server startup — using the running service."
+          else
+            echo "Running start_server.sh in background..."
+            chmod +x ./scripts/start_server.sh
+            ./scripts/start_server.sh &
+            echo "Waiting for API server to start..."
+            sleep 20
+          fi
+          echo "✅ API server ready"
 
       # Step 13: Start frontend
       - name: "Step 13: Start frontend"
@@ -438,6 +446,7 @@ jobs:
         with:
           name: production-deployment-checklist
           path: production-checklist.md
+          if-no-files-found: ignore
           retention-days: 90
   
       - name: Set result output

@@ -33,9 +33,9 @@ PORT=${PORT:-8001}
 # Check if port is already in use
 if lsof -Pi :$PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
     echo "⚠️  Port $PORT is already in use"
-    echo "   Stopping existing process..."
-    lsof -ti:$PORT | xargs kill -9 2>/dev/null || true
-    sleep 2
+    echo "   Another process (or Docker container) is already serving on this port."
+    echo "   Use 'lsof -ti:$PORT | xargs kill -9' to stop it manually if you want to restart."
+    exit 0
 fi
 
 echo "🚀 Starting Warehouse Operational Assistant API server..."
