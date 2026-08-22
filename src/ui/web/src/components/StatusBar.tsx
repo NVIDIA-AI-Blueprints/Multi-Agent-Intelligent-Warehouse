@@ -1,24 +1,16 @@
 import React from 'react';
-import { Box, Typography, Chip, Tooltip } from '@mui/material';
-import {
-  Circle as CircleIcon,
-  Memory as MemoryIcon,
-  Storage as StorageIcon,
-  Hub as HubIcon,
-} from '@mui/icons-material';
+import { Box, Typography, Tooltip } from '@mui/material';
 import { useRuntimeStatus } from '../hooks/useRuntimeStatus';
 import { useQuery } from '@tanstack/react-query';
 import { healthAPI } from '../services/api';
 
-function StatusDot({ ok, label }: { ok: boolean | undefined; label: string }) {
-  const color = ok === undefined ? '#484F58' : ok ? '#3FB950' : '#F85149';
+function Dot({ ok, label }: { ok: boolean | undefined; label: string }) {
+  const color = ok === undefined ? '#30363D' : ok ? '#3FB950' : '#F85149';
   return (
     <Tooltip title={`${label}: ${ok === undefined ? 'unknown' : ok ? 'ok' : 'unavailable'}`} arrow>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'default' }}>
-        <CircleIcon sx={{ fontSize: 8, color }} />
-        <Typography variant="caption" sx={{ color: '#8B949E', fontSize: '0.7rem', lineHeight: 1 }}>
-          {label}
-        </Typography>
+        <Box sx={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: color, boxShadow: ok ? `0 0 3px ${color}` : 'none' }} />
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.63rem', color: '#484F58' }}>{label}</Typography>
       </Box>
     </Tooltip>
   );
@@ -45,59 +37,47 @@ const StatusBar: React.FC = () => {
   return (
     <Box
       sx={{
-        position: 'fixed',
-        bottom: 0,
-        right: 0,
-        left: { xs: 0, md: 240 },
-        height: 28,
+        height: 24,
+        minHeight: 24,
         backgroundColor: '#0D1117',
-        borderTop: '1px solid #21262D',
+        borderTop: '1px solid #1C2128',
         display: 'flex',
         alignItems: 'center',
         px: 2,
         gap: 2,
-        zIndex: 1200,
+        flexShrink: 0,
         overflow: 'hidden',
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-        <HubIcon sx={{ fontSize: 11, color: '#58A6FF' }} />
-        <Typography variant="caption" sx={{ color: '#58A6FF', fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.05em' }}>
-          MAIW v2
-        </Typography>
-      </Box>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: '#76B900', fontWeight: 700, letterSpacing: '0.06em' }}>
+        MAIW v2
+      </Typography>
 
-      <Box sx={{ width: '1px', height: 14, backgroundColor: '#21262D' }} />
+      <Box sx={{ width: '1px', height: 10, backgroundColor: '#1C2128' }} />
 
-      <StatusDot ok={apiOk} label="API" />
-      <StatusDot ok={runtime?.runtime_initialized} label="Runtime" />
-      <StatusDot ok={runtime?.model_gateway_available} label="ModelGateway" />
-      <StatusDot ok={runtime?.decision_engine_available} label="DecisionEngine" />
+      <Dot ok={apiOk} label="API" />
+      <Dot ok={runtime?.runtime_initialized} label="Runtime" />
+      <Dot ok={runtime?.model_gateway_available} label="Gateway" />
+      <Dot ok={runtime?.decision_engine_available} label="Engine" />
 
-      <Box sx={{ width: '1px', height: 14, backgroundColor: '#21262D' }} />
+      <Box sx={{ width: '1px', height: 10, backgroundColor: '#1C2128' }} />
 
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-        <StorageIcon sx={{ fontSize: 11, color: '#8B949E' }} />
-        <Typography variant="caption" sx={{ color: '#8B949E', fontSize: '0.7rem' }}>
-          MCP {mcpCount}/4
-        </Typography>
-      </Box>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: '#484F58' }}>
+        MCP {mcpCount}/4
+      </Typography>
 
       {runtime?.uptime_seconds !== undefined && (
         <>
-          <Box sx={{ width: '1px', height: 14, backgroundColor: '#21262D' }} />
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <MemoryIcon sx={{ fontSize: 11, color: '#8B949E' }} />
-            <Typography variant="caption" sx={{ color: '#8B949E', fontSize: '0.7rem' }}>
-              up {Math.floor(runtime.uptime_seconds / 60)}m
-            </Typography>
-          </Box>
+          <Box sx={{ width: '1px', height: 10, backgroundColor: '#1C2128' }} />
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: '#484F58' }}>
+            up {Math.floor(runtime.uptime_seconds / 60)}m {runtime.uptime_seconds % 60}s
+          </Typography>
         </>
       )}
 
       <Box sx={{ flexGrow: 1 }} />
 
-      <Typography variant="caption" sx={{ color: '#484F58', fontSize: '0.65rem' }}>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#30363D' }}>
         STATE → REASON → PROPOSE → DECIDE → EXECUTE → MCP → BACKEND
       </Typography>
     </Box>
