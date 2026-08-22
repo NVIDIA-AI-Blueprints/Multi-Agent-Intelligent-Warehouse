@@ -1,46 +1,37 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  Box,
-  Typography,
-  Card,
-  CardContent,
-  Chip,
-  Button,
-  Switch,
-  FormControlLabel,
-  Divider,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-} from '@mui/material';
-import {
-  Circle as DotIcon,
-  DeleteOutline as ClearIcon,
-  FiberManualRecord as RecordIcon,
-} from '@mui/icons-material';
+import { Box, Typography } from '@mui/material';
 import { format } from 'date-fns';
 import { useRuntimeStatus } from '../hooks/useRuntimeStatus';
 import { useQuery } from '@tanstack/react-query';
 import { healthAPI, mcpAPI } from '../services/api';
 
+type Category = 'STATE' | 'AGENT' | 'MODEL' | 'SKILL' | 'PROPOSE' | 'DECIDE' | 'EXECUTE' | 'MCP' | 'API';
+
 interface LogEntry {
   id: string;
   ts: string;
-  level: 'INFO' | 'WARN' | 'ERROR' | 'OK';
-  source: string;
+  category: Category;
   message: string;
+  detail?: string;
 }
 
 const STORAGE_KEY = 'maiw_activity_feed';
 const MAX_ENTRIES = 200;
 
-function levelColor(level: LogEntry['level']) {
-  return { INFO: '#58A6FF', WARN: '#D29922', ERROR: '#F85149', OK: '#3FB950' }[level];
-}
+const CAT_COLOR: Record<Category, string> = {
+  STATE: '#58A6FF',
+  AGENT: '#76B900',
+  MODEL: '#58A6FF',
+  SKILL: '#76B900',
+  PROPOSE: '#D29922',
+  DECIDE: '#D29922',
+  EXECUTE: '#3FB950',
+  MCP: '#8B949E',
+  API: '#484F58',
+};
 
-function makeEntry(level: LogEntry['level'], source: string, message: string): LogEntry {
-  return { id: `${Date.now()}-${Math.random()}`, ts: new Date().toISOString(), level, source, message };
+function makeEntry(category: Category, message: string, detail?: string): LogEntry {
+  return { id: `${Date.now()}-${Math.random()}`, ts: new Date().toISOString(), category, message, detail };
 }
 
 function usePersistentLog() {
@@ -69,16 +60,20 @@ function usePersistentLog() {
   return { entries, add, clear };
 }
 
+type FilterCat = 'ALL' | Category;
+const FILTERS: FilterCat[] = ['ALL', 'STATE', 'AGENT', 'MODEL', 'PROPOSE', 'DECIDE', 'EXECUTE', 'MCP', 'API'];
+
 const ActivityFeed: React.FC = () => {
   const { entries, add, clear } = usePersistentLog();
-  const [autoScroll, setAutoScroll] = useState(true);
-  const [filter, setFilter] = useState<'ALL' | 'INFO' | 'WARN' | 'ERROR' | 'OK'>('ALL');
+  const [filter, setFilter] = useState<FilterCat>('ALL');
   const [live, setLive] = useState(true);
   const feedRef = useRef<HTMLDivElement>(null);
   const prevRuntimeRef = useRef<any>(null);
+  const liveRef = useRef<any>(null);
+  const mcpRef = useRef<any>(null);
 
   const { data: runtime } = useRuntimeStatus();
-  const { data: live_ } = useQuery({
+  const { data: liveData } = useQuery({
     queryKey: ['live'],
     queryFn: healthAPI.getLive,
     refetchInterval: live ? 15000 : false,
@@ -93,148 +88,157 @@ const ActivityFeed: React.FC = () => {
     staleTime: 15000,
   });
 
-  // Log when live probe returns
-  const liveRef = useRef<any>(null);
   useEffect(() => {
-    if (live_ && live_?.status !== liveRef.current?.status) {
-      const ok = live_.status === 'alive';
-      add(makeEntry(ok ? 'OK' : 'ERROR', '/api/v1/live', ok ? 'API liveness probe: alive' : `API liveness probe: ${live_.status}`));
-      liveRef.current = live_;
+    if (liveData && liveData?.status !== liveRef.current?.status) {
+      const ok = liveData.status === 'alive';
+      add(makeEntry('API', `liveness probe → ${ok ? 'alive' : liveData.status}`, ok ? undefined : 'OFFLINE'));
+      liveRef.current = liveData;
     }
-  }, [live_, add]);
+  }, [liveData, add]);
 
-  // Log runtime status changes
   useEffect(() => {
     if (!runtime) return;
     const prev = prevRuntimeRef.current;
     if (!prev) {
-      add(makeEntry('INFO', 'runtime/status', `Runtime initialized: ${runtime.runtime_initialized} · ModelGateway: ${runtime.model_gateway_available} · DecisionEngine: ${runtime.decision_engine_available}`));
+      const mcpUp = [runtime.inventory_mcp_configured, runtime.equipment_mcp_configured, runtime.labor_mcp_configured, runtime.wave_mcp_configured].filter(Boolean).length;
+      add(makeEntry('STATE', `runtime snapshot assembled`, `MCP ${mcpUp}/4 · model:${runtime.model_gateway_available ? 'up' : 'down'}`));
     } else {
-      if (prev.runtime_initialized !== runtime.runtime_initialized) {
-        add(makeEntry(runtime.runtime_initialized ? 'OK' : 'WARN', 'runtime/status', `Runtime initialized changed → ${runtime.runtime_initialized}`));
-      }
       if (prev.model_gateway_available !== runtime.model_gateway_available) {
-        add(makeEntry(runtime.model_gateway_available ? 'OK' : 'WARN', 'runtime/status', `ModelGateway available changed → ${runtime.model_gateway_available}`));
+        add(makeEntry('MODEL', `gateway ${runtime.model_gateway_available ? 'available' : 'unavailable'}`));
+      }
+      if (prev.decision_engine_available !== runtime.decision_engine_available) {
+        add(makeEntry('STATE', `decision engine → ${runtime.decision_engine_available ? 'UP' : 'DOWN'}`));
       }
     }
     prevRuntimeRef.current = runtime;
   }, [runtime, add]);
 
-  // Log MCP status changes
-  const mcpRef = useRef<any>(null);
   useEffect(() => {
     if (!mcpStatus) return;
     if (JSON.stringify(mcpStatus) !== JSON.stringify(mcpRef.current)) {
       const domains = mcpStatus.domains ?? {};
-      const domainSummary = Object.entries(domains)
-        .map(([k, v]: [string, any]) => `${k}:${v.available ? 'up' : 'down'}`)
-        .join(' ');
-      add(makeEntry('INFO', 'mcp/status', `MCP domain poll · ${domainSummary || 'no domains reported'}`));
+      const up = Object.entries(domains).filter(([, v]: [string, any]) => v.available).map(([k]) => k);
+      const down = Object.entries(domains).filter(([, v]: [string, any]) => !v.available).map(([k]) => k);
+      const detail = up.length > 0 ? `up: ${up.join(' ')}` : undefined;
+      add(makeEntry('MCP', `domain poll · ${up.length}/${Object.keys(domains).length} available`, down.length > 0 ? `down: ${down.join(' ')}` : detail));
       mcpRef.current = mcpStatus;
     }
   }, [mcpStatus, add]);
 
   useEffect(() => {
-    if (autoScroll && feedRef.current) {
-      feedRef.current.scrollTop = 0;
-    }
-  }, [entries, autoScroll]);
+    if (feedRef.current) feedRef.current.scrollTop = 0;
+  }, [entries]);
 
-  const filtered = filter === 'ALL' ? entries : entries.filter((e) => e.level === filter);
+  const filtered = filter === 'ALL' ? entries : entries.filter((e) => e.category === filter);
 
   return (
-    <Box sx={{ pb: 4 }}>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700, color: 'text.primary', letterSpacing: '-0.02em' }}>
-          Activity Feed
-        </Typography>
-        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-          Live session log of API probe results and runtime state changes
-        </Typography>
-      </Box>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', p: 1.5, gap: 1.5 }}>
 
-      {/* Controls */}
-      <Card sx={{ backgroundColor: 'background.paper', mb: 2 }}>
-        <CardContent sx={{ py: 1.5, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-            <RecordIcon sx={{ fontSize: 10, color: live ? '#F85149' : '#484F58', animation: live ? 'pulse 1.5s ease infinite' : 'none',
-              '@keyframes pulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.3 } } }} />
-            <FormControlLabel
-              control={<Switch checked={live} onChange={(e) => setLive(e.target.checked)} size="small" />}
-              label={<Typography variant="caption" sx={{ fontFamily: 'monospace', color: 'text.secondary' }}>LIVE</Typography>}
-              sx={{ m: 0 }}
-            />
-          </Box>
-          <FormControlLabel
-            control={<Switch checked={autoScroll} onChange={(e) => setAutoScroll(e.target.checked)} size="small" />}
-            label={<Typography variant="caption" sx={{ color: 'text.secondary' }}>Auto-scroll</Typography>}
-            sx={{ m: 0 }}
-          />
-          <FormControl size="small" sx={{ minWidth: 100 }}>
-            <InputLabel sx={{ fontSize: '0.8rem' }}>Level</InputLabel>
-            <Select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value as any)}
-              label="Level"
-              sx={{ fontSize: '0.8rem' }}
-            >
-              {(['ALL', 'OK', 'INFO', 'WARN', 'ERROR'] as const).map((l) => (
-                <MenuItem key={l} value={l} sx={{ fontSize: '0.8rem', fontFamily: 'monospace' }}>{l}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <Box sx={{ flexGrow: 1 }} />
-          <Typography variant="caption" sx={{ color: '#484F58', fontFamily: 'monospace' }}>
-            {filtered.length} / {MAX_ENTRIES} entries
+      {/* Controls bar */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0 }}>
+        {/* Live toggle */}
+        <Box
+          onClick={() => setLive(!live)}
+          sx={{ display: 'flex', alignItems: 'center', gap: 0.75, cursor: 'pointer' }}
+        >
+          <Box sx={{
+            width: 7, height: 7, borderRadius: '50%',
+            backgroundColor: live ? '#F85149' : '#30363D',
+            animation: live ? 'pulse 1.5s ease infinite' : 'none',
+            '@keyframes pulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.3 } },
+          }} />
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', fontWeight: 700, color: live ? '#F85149' : '#30363D', letterSpacing: '0.08em' }}>
+            {live ? 'LIVE' : 'PAUSED'}
           </Typography>
-          <Button size="small" startIcon={<ClearIcon />} onClick={clear} sx={{ color: 'text.secondary', fontSize: '0.75rem' }}>
-            Clear
-          </Button>
-        </CardContent>
-      </Card>
+        </Box>
+
+        <Box sx={{ width: 1, height: 14, backgroundColor: '#1C2128', flexShrink: 0 }} />
+
+        {/* Category filters */}
+        {FILTERS.map(f => (
+          <Box
+            key={f}
+            onClick={() => setFilter(f)}
+            sx={{
+              fontFamily: 'monospace', fontSize: '0.65rem', fontWeight: 700,
+              letterSpacing: '0.08em', cursor: 'pointer',
+              color: filter === f ? (f === 'ALL' ? '#C9D1D9' : CAT_COLOR[f as Category] ?? '#C9D1D9') : '#30363D',
+              '&:hover': { color: f === 'ALL' ? '#8B949E' : CAT_COLOR[f as Category] ?? '#8B949E' },
+              pb: 0.25,
+              borderBottom: filter === f ? `1px solid ${f === 'ALL' ? '#C9D1D9' : CAT_COLOR[f as Category] ?? '#C9D1D9'}` : '1px solid transparent',
+            }}
+          >
+            {f}
+          </Box>
+        ))}
+
+        <Box sx={{ flexGrow: 1 }} />
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.63rem', color: '#30363D' }}>
+          {filtered.length} events
+        </Typography>
+        <Box
+          onClick={clear}
+          sx={{ fontFamily: 'monospace', fontSize: '0.63rem', color: '#484F58', cursor: 'pointer', '&:hover': { color: '#8B949E' } }}
+        >
+          [CLEAR]
+        </Box>
+      </Box>
 
       {/* Terminal feed */}
       <Box
         ref={feedRef}
         sx={{
+          flex: 1,
           backgroundColor: '#0D1117',
-          border: '1px solid #21262D',
-          borderRadius: 2,
+          border: '1px solid #1C2128',
+          borderRadius: 1,
+          overflow: 'auto',
           p: 1.5,
-          height: 'calc(100vh - 340px)',
-          minHeight: 300,
-          overflowY: 'auto',
           fontFamily: 'monospace',
-          fontSize: '0.78rem',
-          lineHeight: 1.7,
+          '&::-webkit-scrollbar': { width: 3 },
+          '&::-webkit-scrollbar-track': { background: 'transparent' },
+          '&::-webkit-scrollbar-thumb': { background: '#21262D' },
         }}
       >
         {filtered.length === 0 ? (
-          <Typography sx={{ color: '#484F58', fontFamily: 'monospace', fontSize: '0.8rem', p: 1 }}>
-            — no activity yet — polling will begin automatically when live probes complete —
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#30363D' }}>
+            — no activity yet — probe events will appear as the system polls —
           </Typography>
         ) : (
           filtered.map((entry) => (
-            <Box key={entry.id} sx={{ display: 'flex', gap: 1.5, py: 0.15, '&:hover': { backgroundColor: 'rgba(255,255,255,0.02)' }, borderRadius: 0.5 }}>
-              <Typography component="span" sx={{ color: '#484F58', fontFamily: 'monospace', fontSize: '0.73rem', flexShrink: 0, lineHeight: 1.7 }}>
-                {format(new Date(entry.ts), 'HH:mm:ss.SSS')}
+            <Box
+              key={entry.id}
+              sx={{
+                display: 'flex', gap: 1.5, lineHeight: 1.85,
+                '&:hover': { backgroundColor: 'rgba(255,255,255,0.02)' },
+                borderRadius: 0.5,
+              }}
+            >
+              <Typography component="span" sx={{ fontFamily: 'monospace', fontSize: '0.7rem', color: '#30363D', flexShrink: 0, userSelect: 'none' }}>
+                {format(new Date(entry.ts), 'HH:mm:ss')}
               </Typography>
-              <Typography component="span" sx={{ color: levelColor(entry.level), fontFamily: 'monospace', fontSize: '0.73rem', flexShrink: 0, fontWeight: 700, width: 40, lineHeight: 1.7 }}>
-                {entry.level}
+              <Typography component="span" sx={{
+                fontFamily: 'monospace', fontSize: '0.7rem',
+                color: CAT_COLOR[entry.category] ?? '#484F58',
+                fontWeight: 700, width: 60, flexShrink: 0,
+              }}>
+                {entry.category}
               </Typography>
-              <Typography component="span" sx={{ color: '#58A6FF', fontFamily: 'monospace', fontSize: '0.73rem', flexShrink: 0, width: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.7 }}>
-                {entry.source}
-              </Typography>
-              <Typography component="span" sx={{ color: '#E6EDF3', fontFamily: 'monospace', fontSize: '0.73rem', lineHeight: 1.7, flexGrow: 1 }}>
+              <Typography component="span" sx={{ fontFamily: 'monospace', fontSize: '0.7rem', color: '#8B949E', flexGrow: 1 }}>
                 {entry.message}
               </Typography>
+              {entry.detail && (
+                <Typography component="span" sx={{ fontFamily: 'monospace', fontSize: '0.67rem', color: '#484F58', flexShrink: 0 }}>
+                  {entry.detail}
+                </Typography>
+              )}
             </Box>
           ))
         )}
       </Box>
 
-      <Typography variant="caption" sx={{ color: '#484F58', mt: 1, display: 'block' }}>
-        Activity is session-scoped — clears on page refresh. Events are sourced from API probe polling, not a WebSocket stream.
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.63rem', color: '#21262D' }}>
+        Session-scoped · clears on refresh · events from API polling (not WebSocket)
       </Typography>
     </Box>
   );
