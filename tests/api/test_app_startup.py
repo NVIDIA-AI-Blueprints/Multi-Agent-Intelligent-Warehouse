@@ -71,30 +71,17 @@ def test_app():
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
-def _collect_paths(node, _pfx: str = "") -> set:
+def _collect_paths(app) -> set:
     """
-    Recursively collect all fully-qualified route paths from a Starlette app
-    or router node.
+    Collect all registered route paths via FastAPI's OpenAPI schema.
 
-    Modern Starlette/FastAPI flattens ``include_router()`` calls so that every
-    item in ``app.routes`` is an ``APIRoute(path="/api/v1/equipment")``.
-    Older Starlette versions leave ``_IncludedRouter`` wrapper objects whose
-    own ``.path`` is the router prefix (e.g. ``"/api/v1"``) and whose
-    ``.routes`` children carry only the relative path (e.g. ``"/equipment"``).
-
-    This helper handles both layouts by walking the tree and accumulating
-    the prefix at each level before yielding a leaf path.
+    Walking ``app.routes`` directly is fragile: different Starlette versions
+    wrap ``include_router()`` results in different internal types
+    (``_IncludedRouter``, ``Mount``, etc.) with varying attribute layouts.
+    FastAPI always computes the OpenAPI schema correctly regardless of the
+    underlying Starlette version, so this approach is version-independent.
     """
-    node_path: str = getattr(node, "path", None) or ""
-    current: str = (_pfx.rstrip("/") + node_path) if _pfx else node_path
-
-    sub_routes = getattr(node, "routes", None)
-    if sub_routes is not None:
-        result: set = set()
-        for child in sub_routes:
-            result.update(_collect_paths(child, current))
-        return result
-    return {current} if current else set()
+    return set(app.openapi().get("paths", {}).keys())
 
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
