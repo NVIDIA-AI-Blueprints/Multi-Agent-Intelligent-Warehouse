@@ -68,6 +68,29 @@ def test_app():
         return app
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+
+def _collect_paths(app) -> set:
+    """
+    Collect all route paths from the app.
+
+    Newer Starlette flattens include_router() calls so every item in
+    app.routes is an APIRoute with a .path attribute.  Older versions
+    (and some edge cases) leave _IncludedRouter wrapper objects that
+    expose .routes but not .path.  This helper handles both.
+    """
+    paths: set = set()
+    for route in app.routes:
+        if hasattr(route, "path"):
+            paths.add(route.path)
+        if hasattr(route, "routes"):
+            for subroute in route.routes:
+                if hasattr(subroute, "path"):
+                    paths.add(subroute.path)
+    return paths
+
+
 # ── Tests ─────────────────────────────────────────────────────────────────────
 
 
@@ -79,7 +102,7 @@ def test_app_is_fastapi_instance(test_app):
 
 def test_canonical_routes_registered(test_app):
     """Canonical routers must register their paths on the app."""
-    paths = {route.path for route in test_app.routes}
+    paths = _collect_paths(test_app)
 
     expected = {
         "/api/v1/live",
@@ -103,14 +126,13 @@ def test_canonical_routes_registered(test_app):
 
 
 def test_root_endpoint(test_app):
-    paths = {route.path for route in test_app.routes}
+    paths = _collect_paths(test_app)
     assert "/" in paths
 
 
 def test_legacy_mcp_router_not_registered(test_app):
     """The retired legacy MCP router must NOT appear in the new app."""
-    paths = {route.path for route in test_app.routes}
-    # Legacy routes that must be absent
+    paths = _collect_paths(test_app)
     assert "/api/v1/mcp/plan" not in paths
     assert "/api/v1/mcp/bind" not in paths
     assert "/api/v1/mcp/route" not in paths
