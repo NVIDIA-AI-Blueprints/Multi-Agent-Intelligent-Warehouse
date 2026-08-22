@@ -588,7 +588,7 @@ package-based, MCP v2 system.
 | **Agents** (`maiw-agents`) | ✅ Done | Equipment, Operations, Safety agents in canonical packages |
 | **MCP v2 servers** | ✅ Done | Inventory, Equipment, Labor, Wave — stateless HTTP |
 | **Capability contracts** | ✅ Done | All 12 capabilities defined, contract-tested |
-| **Compatibility shims** | ⚠️ Remove in 9B | `src/api/services/model_gateway/__init__.py`, `src/api/skills/*.py` |
+| **Compatibility shims** | ⚠️ Remove in Phase 10 | `src/api/services/model_gateway/__init__.py`, `src/api/skills/*.py` |
 | **Forecasting integration** | 🔄 Partial | `integrations/forecasting/` — multi-model ensemble, not wired to agents |
 | **Document processing** | 🔄 Partial | `integrations/document/` — OCR + extraction, not wired to agents |
 | **Simulation** | 🔲 Future | `integrations/simulation/` — placeholder only |
