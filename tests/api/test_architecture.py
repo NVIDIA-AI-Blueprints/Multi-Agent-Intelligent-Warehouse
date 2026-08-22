@@ -146,3 +146,64 @@ def test_pyproject_lists_execution_and_agents():
     content = pyproject.read_text()
     assert "maiw-execution" in content, "pyproject.toml must declare maiw-execution"
     assert "maiw-agents" in content, "pyproject.toml must declare maiw-agents"
+
+
+def test_canonical_entrypoint_in_dockerfile_backend():
+    """Dockerfile.backend must use maiw_api.app:app, not src.api.app:app."""
+    dockerfile = REPO_ROOT / "Dockerfile.backend"
+    if not dockerfile.exists():
+        pytest.skip("Dockerfile.backend not found")
+    content = dockerfile.read_text()
+    assert "maiw_api.app:app" in content, "Dockerfile.backend must use maiw_api.app:app"
+    assert "src.api.app:app" not in content, "Dockerfile.backend must not reference src.api.app:app"
+
+
+def test_no_load_dotenv_at_import_time_in_app():
+    """load_dotenv() must not appear at module level in app.py (import-time side effect)."""
+    app_py = REPO_ROOT / "apps" / "api" / "maiw_api" / "app.py"
+    if not app_py.exists():
+        pytest.skip("app.py not found")
+    # Parse the AST and look for a bare Call to load_dotenv at module scope
+    tree = ast.parse(app_py.read_text(encoding="utf-8"))
+    module_level_calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Expr)
+        and isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Name)
+        and node.value.func.id == "load_dotenv"
+    ]
+    assert not module_level_calls, (
+        "load_dotenv() must not be called at module level in app.py; "
+        "move it to lifespan startup"
+    )
+
+
+def test_diagnostic_stub_removed():
+    """GET /equipment/assignments/test must not exist in the equipment router."""
+    equipment_router = REPO_ROOT / "apps" / "api" / "maiw_api" / "routers" / "equipment.py"
+    if not equipment_router.exists():
+        pytest.skip("equipment router not found")
+    content = equipment_router.read_text()
+    assert "/equipment/assignments/test" not in content, (
+        "Diagnostic stub GET /equipment/assignments/test must be removed "
+        "from the equipment router"
+    )
+
+
+def test_runtime_status_router_exists():
+    """runtime_status.py must exist and define the /api/v1/runtime/status route."""
+    router_path = REPO_ROOT / "apps" / "api" / "maiw_api" / "routers" / "runtime_status.py"
+    assert router_path.exists(), "maiw_api/routers/runtime_status.py must exist"
+    content = router_path.read_text()
+    assert "/runtime/status" in content, "runtime_status.py must define /runtime/status"
+
+
+def test_mcp_server_containers_in_compose():
+    """docker-compose.dev.yaml must define containers for all 4 MCP domains."""
+    compose = REPO_ROOT / "deploy" / "compose" / "docker-compose.dev.yaml"
+    if not compose.exists():
+        pytest.skip("docker-compose.dev.yaml not found")
+    content = compose.read_text()
+    for domain in ("mcp-inventory", "mcp-equipment", "mcp-labor", "mcp-wave"):
+        assert domain in content, f"docker-compose.dev.yaml must define {domain} service"
