@@ -274,6 +274,10 @@ jobs:
           chmod +x ./scripts/setup/install_rapids.sh
           ./scripts/setup/install_rapids.sh || echo "⚠️ RAPIDS installation failed (will use CPU fallback)"
 
+          # RAPIDS may upgrade pandas to ≥3.0, which breaks nemoguardrails 0.23
+          # (requires pandas<3).  Re-pin after installation.
+          pip install --quiet 'pandas<3' || true
+
           echo "✅ RAPIDS GPU acceleration setup completed"
 
       # Step 12: Start API server
@@ -284,14 +288,15 @@ jobs:
 
           PORT=${PORT:-8001}
 
-          # dev_up.sh (Step 5) may have already started wosa-backend on this port
-          # via Docker Compose.  If something is already listening, the running
-          # service is used for health checks; no second process is started.
-          if lsof -Pi :"$PORT" -sTCP:LISTEN -t >/dev/null 2>&1; then
-            echo "Port $PORT is already in use (wosa-backend Docker container)."
-            echo "Skipping local API server startup — using the running service."
+          # dev_up.sh (Step 5) builds and starts wosa-backend via Docker Compose
+          # on port 8001.  Check for the named container first; fall back to a
+          # port-level check if the container name is unexpected.
+          if docker ps --format '{{.Names}}' | grep -q '^wosa-backend$'; then
+            echo "wosa-backend Docker container is running — using it for health checks."
+          elif lsof -Pi :"$PORT" -sTCP:LISTEN -t >/dev/null 2>&1; then
+            echo "Port $PORT is already occupied by another process — using it."
           else
-            echo "Running start_server.sh in background..."
+            echo "No existing API server found; starting local server..."
             chmod +x ./scripts/start_server.sh
             ./scripts/start_server.sh &
             echo "Waiting for API server to start..."
@@ -327,12 +332,13 @@ jobs:
       # Post-Deployment: Verify health checks and access points
       - name: "Verify: API health checks"
         run: |
-          # Wait for API to be fully ready
+          # Poll /api/v1/live (liveness probe — no DB/Redis/Milvus deps, always fast).
+          # The legacy /health path does not exist in maiw_api.app:app.
           max_retries=30
           retry_count=0
 
-          echo "Waiting for API server to be ready..."
-          until curl -f http://localhost:8001/health &>/dev/null || [ $retry_count -eq $max_retries ]; do
+          echo "Waiting for API server to be ready (polling /api/v1/live)..."
+          until curl -fsS http://localhost:8001/api/v1/live >/dev/null 2>&1 || [ $retry_count -eq $max_retries ]; do
             echo "Attempt $((retry_count + 1))/$max_retries: API not ready yet..."
             sleep 2
             retry_count=$((retry_count + 1))
@@ -340,20 +346,24 @@ jobs:
 
           if [ $retry_count -eq $max_retries ]; then
             echo "❌ API failed to start after $max_retries attempts"
+            echo "Docker status:"
+            docker ps --all --filter "name=wosa-backend"
+            echo "Docker logs (wosa-backend, last 50 lines):"
+            docker logs --tail 50 wosa-backend 2>&1 || true
             exit 1
           fi
 
           echo "✅ API is ready!"
 
-          # Test all health check endpoints (per DEPLOYMENT.md)
-          echo "Testing /health endpoint..."
-          curl -f http://localhost:8001/health || (echo "❌ /health failed" && exit 1)
+          # Test canonical health endpoints
+          echo "Testing /api/v1/live..."
+          curl -fsS http://localhost:8001/api/v1/live | python3 -m json.tool
 
-          echo "Testing /api/v1/health endpoint..."
-          curl -f http://localhost:8001/api/v1/health || (echo "❌ /api/v1/health failed" && exit 1)
+          echo "Testing /api/v1/health..."
+          curl -fsS http://localhost:8001/api/v1/health | python3 -m json.tool
 
-          echo "Testing /api/v1/health/simple endpoint..."
-          curl -f http://localhost:8001/api/v1/health/simple || (echo "❌ /api/v1/health/simple failed" && exit 1)
+          echo "Testing /api/v1/health/simple..."
+          curl -fsS http://localhost:8001/api/v1/health/simple | python3 -m json.tool
 
           echo "✅ All health checks passed!"
 
