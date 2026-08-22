@@ -64,6 +64,8 @@ jobs:
         pip install -e packages/maiw-skills
         pip install -e packages/maiw-execution
         pip install -e packages/maiw-agents
+        pip install -e apps/api
+        pip install httpx
     
     - name: Install Node.js dependencies
       run: |
@@ -82,9 +84,9 @@ jobs:
       env:
         DATABASE_URL: postgresql://warehouse:ci_placeholder@localhost:5435/warehouse
       run: |
-        # CORE CI: unit + contract + mcp — no infrastructure required. Integration/e2e live in main.yml.
+        # CORE CI: unit + contract + mcp + api — no infrastructure required. Integration/e2e live in main.yml.
         # Canonical command matches docs/architecture/TEST_STRATEGY.md CORE CI definition.
-        pytest tests/unit tests/contract tests/mcp \
+        pytest tests/unit tests/contract tests/mcp tests/api \
           --timeout=120 \
           --ignore=tests/unit/test_mcp_integrated_planner_graph.py \
           --ignore=tests/unit/test_mcp_system.py \

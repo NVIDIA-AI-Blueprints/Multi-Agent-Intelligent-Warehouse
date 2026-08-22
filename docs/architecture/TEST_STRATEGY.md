@@ -3,7 +3,7 @@
 ## Canonical CORE CI Command
 
 ```bash
-python -m pytest tests/unit/ tests/contract/ tests/mcp/ \
+python -m pytest tests/unit/ tests/contract/ tests/mcp/ tests/api/ \
   --ignore=tests/unit/test_all_agents.py \
   --ignore=tests/unit/test_basic.py \
   --ignore=tests/unit/test_nvidia_llm.py \
@@ -31,9 +31,10 @@ python -m pytest tests/unit/ tests/contract/ tests/mcp/ \
 **Phase 7 baseline:** 483 passed, 1 skipped, 0 failed (+97 new tests: Labor/Wave MCP, contract, state, executor, invariant)  
 **Phase 8 baseline:** 512 passed, 1 skipped, 0 failed (+29 new tests: package import smoke, forbidden-dependency guards, compatibility shim verification)  
 **Phase 9A baseline:** 528 passed, 1 skipped, 0 failed (+16 net: 20 new Phase 9A package import and invariant tests; −4 from deletion of dead MCP files whose callers were integration tests only)  
+**Phase 9B baseline:** 551 passed, 1 skipped, 0 failed (+23 new tests/api/ tests: app startup, router registration, equipment pipeline, architecture invariants)  
 All final phase reports MUST use this command. Any regression against the baseline is a blocker.
 
-> **Note:** `ci-cd.yml` previously ran only `tests/unit/` (327 tests). As of Phase 9A it has been corrected to run `tests/unit/ tests/contract/ tests/mcp/` (528 tests), matching this canonical definition.
+> **Note:** `ci-cd.yml` previously ran only `tests/unit/` (327 tests). As of Phase 9A it was corrected to run `tests/unit/ tests/contract/ tests/mcp/` (528 tests). Phase 9B adds `tests/api/` to the canonical command.
 
 All final phase reports MUST use this command. Any regression against the baseline is a blocker.
 
@@ -62,6 +63,7 @@ The 386 count is the canonical baseline from Phase 7 onward.
 tests/unit/          ← pure Python, no DB/API/GPU required
 tests/contract/      ← MCP capability contract tests (in-memory MockProvider)
 tests/mcp/           ← MCP protocol tests (in-memory FastMCP server)
+tests/api/           ← infrastructure-free API app/router tests (httpx ASGI transport)
 ```
 
 These tests run in < 10 seconds total. They require only the Python packages installed in the venv and no environment variables.

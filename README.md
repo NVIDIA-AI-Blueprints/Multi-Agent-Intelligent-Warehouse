@@ -282,14 +282,19 @@ Multi-Agent-Intelligent-Warehouse/
 │   ├── labor/                     # Labor capability server
 │   └── wave/                      # Wave capability server
 │
-├── src/api/                       # FastAPI application (current production entrypoint)
-│   ├── app.py                     # ASGI entrypoint: uvicorn src.api.app:app
-│   ├── routers/                   # HTTP route handlers
-│   ├── agents/                    # Legacy agent layer (being migrated to packages/)
-│   └── services/                  # Services: model_gateway shim, skills shim, auth, DB
+├── src/api/                       # Legacy FastAPI layer (routers being migrated to apps/api)
+│   ├── app.py                     # Legacy entrypoint (superseded by maiw_api.app)
+│   ├── routers/                   # HTTP route handlers (canonical ones moved to apps/api)
+│   ├── agents/                    # Legacy agent layer (superseded by packages/maiw-agents)
+│   └── services/                  # Services: auth, DB, monitoring, legacy shims
 │
-├── apps/api/maiw_api/             # Future application entrypoint (composition root)
-│   └── bootstrap.py               # MAIWRuntime dataclass, get_runtime() factory
+├── apps/api/maiw_api/             # Canonical FastAPI entrypoint (Phase 9B)
+│   ├── app.py                     # ASGI entrypoint: uvicorn maiw_api.app:app
+│   ├── bootstrap.py               # MAIWRuntime composition root
+│   ├── config.py                  # Application settings
+│   ├── dependencies.py            # FastAPI dependency helpers
+│   ├── lifespan.py                # Startup / shutdown
+│   └── routers/                   # Canonical routers (health, equipment, operations, safety, mcp)
 │
 ├── connectors/                    # Data source adapters
 │   └── generic/                   # Generic WMS connector (implemented)
@@ -480,7 +485,7 @@ cp .env.example .env
 ### API Server
 
 ```bash
-uvicorn src.api.app:app --reload --port 8001
+uvicorn maiw_api.app:app --reload --port 8001
 ```
 
 The API is available at `http://localhost:8001`. Key endpoints:
@@ -583,7 +588,7 @@ package-based, MCP v2 system.
 | **Agents** (`maiw-agents`) | ✅ Done | Equipment, Operations, Safety agents in canonical packages |
 | **MCP v2 servers** | ✅ Done | Inventory, Equipment, Labor, Wave — stateless HTTP |
 | **Capability contracts** | ✅ Done | All 12 capabilities defined, contract-tested |
-| **Compatibility shims** | ⚠️ Remove in 9B | `src/api/services/model_gateway/__init__.py`, `src/api/skills/*.py` |
+| **Compatibility shims** | ⚠️ Remove in Phase 10 | `src/api/services/model_gateway/__init__.py`, `src/api/skills/*.py` |
 | **Forecasting integration** | 🔄 Partial | `integrations/forecasting/` — multi-model ensemble, not wired to agents |
 | **Document processing** | 🔄 Partial | `integrations/document/` — OCR + extraction, not wired to agents |
 | **Simulation** | 🔲 Future | `integrations/simulation/` — placeholder only |
@@ -591,7 +596,7 @@ package-based, MCP v2 system.
 | **Training / flywheel** | 🔲 Future | `integrations/training/` — placeholder only |
 | **SAP EWM connector** | 🔲 Future | `connectors/` — generic connector implemented; SAP planned |
 | **Manhattan / Blue Yonder** | 🔲 Future | Planned WMS connectors |
-| **apps/api as entrypoint** | 🔲 Future | `apps/api/maiw_api/bootstrap.py` composition root exists; `src/api/app.py` is current production entrypoint |
+| **apps/api as entrypoint** | ✅ Phase 9B | `maiw_api.app:app` is the canonical entrypoint; `MAIWRuntime` is the composition root |
 
 ---
 

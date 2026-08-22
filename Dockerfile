@@ -116,4 +116,4 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
 EXPOSE 8001
 
 # Start command
-CMD ["uvicorn", "src.api.app:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["uvicorn", "maiw_api.app:app", "--host", "0.0.0.0", "--port", "8001"]

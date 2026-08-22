@@ -54,8 +54,12 @@ COPY --from=backend-deps /usr/local/bin /usr/local/bin
 # Security: Explicitly copy only required source code to prevent sensitive data exposure
 # .dockerignore provides additional protection as a defense-in-depth measure
 COPY src/ ./src/
+COPY apps/ ./apps/
 # Copy guardrails configuration (required for NeMo Guardrails)
 COPY data/config/guardrails/ ./data/config/guardrails/
+
+# Install the canonical API package
+RUN pip install --no-cache-dir -e apps/api
 
 # Build arguments for version injection
 ARG VERSION=0.0.0
@@ -84,5 +88,5 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
 EXPOSE 8001
 
 # Start command
-CMD ["uvicorn", "src.api.app:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["uvicorn", "maiw_api.app:app", "--host", "0.0.0.0", "--port", "8001"]
 

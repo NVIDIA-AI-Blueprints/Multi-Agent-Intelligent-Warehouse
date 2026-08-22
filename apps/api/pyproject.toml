@@ -17,6 +17,8 @@ dependencies = [
     "maiw-state>=0.1.0",
     "maiw-decision>=0.1.0",
     "maiw-mcp>=0.1.0",
+    "maiw-execution>=0.1.0",
+    "maiw-agents>=0.1.0",
 ]
 
 [tool.setuptools.packages.find]

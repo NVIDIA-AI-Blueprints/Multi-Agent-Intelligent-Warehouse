@@ -111,12 +111,19 @@ Remove by Phase 9.
 
 | Module | Current path | Target | Status | Notes |
 |--------|-------------|--------|--------|-------|
-| `app.py` | `src/api/app.py` | `apps/api/maiw_api/app.py` | `MOVE NOW` | FastAPI application entry point |
-| All routers | `src/api/routers/` | `apps/api/maiw_api/routers/` | `MOVE NOW` | API-layer only |
-| `bootstrap.py` | *(does not exist)* | `apps/api/maiw_api/bootstrap.py` | `CREATE` | Composition root |
+| `app.py` | `src/api/app.py` | `apps/api/maiw_api/app.py` | `DONE (Phase 9B)` | Canonical FastAPI entrypoint: `uvicorn maiw_api.app:app` |
+| health router | `src/api/routers/health.py` | `apps/api/maiw_api/routers/health.py` | `DONE (Phase 9B)` | Adds MAIWRuntime status block to /health |
+| equipment router | `src/api/routers/equipment.py` | `apps/api/maiw_api/routers/equipment.py` | `DONE (Phase 9B)` | Write paths use canonical pipeline |
+| operations router | `src/api/routers/operations.py` | `apps/api/maiw_api/routers/operations.py` | `DONE (Phase 9B)` | SQL CRUD (bug-fixed); canonical agent via chat |
+| safety router | `src/api/routers/safety.py` | `apps/api/maiw_api/routers/safety.py` | `DONE (Phase 9B)` | SQL CRUD; static policies |
+| mcp router | `src/api/routers/mcp.py` | `apps/api/maiw_api/routers/mcp_status.py` | `REPLACED (Phase 9B)` | Legacy custom MCP replaced with canonical MCP v2 status endpoint |
+| `bootstrap.py` | (broken, Phase 8) | `apps/api/maiw_api/bootstrap.py` | `REWRITTEN (Phase 9B)` | MAIWRuntime composition root; correct full wiring |
+| `config.py` | (new) | `apps/api/maiw_api/config.py` | `DONE (Phase 9B)` | Application settings |
+| `dependencies.py` | (new) | `apps/api/maiw_api/dependencies.py` | `DONE (Phase 9B)` | FastAPI dependency helpers |
+| `lifespan.py` | (new) | `apps/api/maiw_api/lifespan.py` | `DONE (Phase 9B)` | Startup/shutdown |
 | Auth services | `src/api/services/auth/` | `apps/api/maiw_api/services/auth/` | `KEEP TEMPORARILY` | API-specific |
 | DB service | `src/api/services/database.py` | `apps/api/maiw_api/services/` | `KEEP TEMPORARILY` | Infrastructure |
-| Middleware | `src/api/middleware/` | `apps/api/maiw_api/middleware/` | `KEEP TEMPORARILY` | |
+| Middleware | `src/api/middleware/` | `apps/api/maiw_api/middleware/` | `KEEP TEMPORARILY` | Imported from src.api in Phase 9B |
 
 ---
 
