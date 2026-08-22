@@ -47,7 +47,6 @@ async def _noop_lifespan(app: FastAPI):
 @pytest.fixture()
 def test_app():
     """MAIW app with a no-op lifespan and mocked middleware deps."""
-    # Patch lifespan before importing app so the module-level object picks it up
     with (
         patch("maiw_api.app.lifespan", _noop_lifespan),
         patch(
@@ -58,12 +57,15 @@ def test_app():
             "src.api.services.monitoring.metrics.record_request_metrics",
         ),
     ):
-        # Import here so patches are active
         import importlib
         import maiw_api.app as app_module
 
         importlib.reload(app_module)
-        return app_module.app
+        app = app_module.app
+        # ASGITransport does not run the ASGI lifespan events, so set state
+        # directly so that get_runtime(request) can find it.
+        app.state.runtime = _make_mock_runtime()
+        return app
 
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
@@ -118,7 +120,7 @@ def test_app_title_set(test_app):
     assert "Warehouse" in test_app.title or "MAIW" in test_app.title
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_health_live_without_infrastructure(test_app):
     """GET /api/v1/live must return 200 without any external connections."""
     import httpx
@@ -134,7 +136,7 @@ async def test_health_live_without_infrastructure(test_app):
     assert body["status"] == "alive"
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_mcp_status_without_server(test_app):
     """GET /api/v1/mcp/status must return 200 even when no MCP server is configured."""
     import httpx

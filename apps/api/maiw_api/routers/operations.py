@@ -21,14 +21,30 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from src.retrieval.structured import SQLRetriever, TaskQueries
-
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["Operations"])
 
-_sql = SQLRetriever()
-_task_queries = TaskQueries()
+_sql = None
+_task_queries = None
+
+
+def _get_sql():
+    global _sql
+    if _sql is None:
+        from src.retrieval.structured import SQLRetriever
+
+        _sql = SQLRetriever()
+    return _sql
+
+
+def _get_task_queries():
+    global _task_queries
+    if _task_queries is None:
+        from src.retrieval.structured import TaskQueries
+
+        _task_queries = TaskQueries()
+    return _task_queries
 
 
 class Task(BaseModel):
@@ -89,8 +105,9 @@ def _row_to_task(row: dict) -> Task:
 async def get_tasks():
     """List all tasks ordered by creation time."""
     try:
-        await _sql.initialize()
-        rows = await _sql.fetch_all(
+        sql = _get_sql()
+        await sql.initialize()
+        rows = await sql.fetch_all(
             "SELECT id, kind, status, assignee, payload, created_at, updated_at "
             "FROM tasks ORDER BY created_at DESC"
         )
@@ -104,8 +121,9 @@ async def get_tasks():
 async def get_task(task_id: int):
     """Get a specific task by ID."""
     try:
-        await _sql.initialize()
-        task = await _task_queries.get_task_by_id(_sql, task_id)
+        sql = _get_sql()
+        await sql.initialize()
+        task = await _get_task_queries().get_task_by_id(sql, task_id)
         if not task:
             raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
         return _row_to_task(task)
@@ -120,8 +138,9 @@ async def get_task(task_id: int):
 async def create_task(task: TaskCreate):
     """Create a new task."""
     try:
-        await _sql.initialize()
-        result = await _sql.fetch_one(
+        sql = _get_sql()
+        await sql.initialize()
+        result = await sql.fetch_one(
             """
             INSERT INTO tasks (kind, status, assignee, payload, created_at, updated_at)
             VALUES ($1, $2, $3, $4, NOW(), NOW())
@@ -142,8 +161,9 @@ async def create_task(task: TaskCreate):
 async def update_task(task_id: int, update: TaskUpdate):
     """Update status, assignee, or payload of an existing task."""
     try:
-        await _sql.initialize()
-        current = await _task_queries.get_task_by_id(_sql, task_id)
+        sql = _get_sql()
+        await sql.initialize()
+        current = await _get_task_queries().get_task_by_id(sql, task_id)
         if not current:
             raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
@@ -159,7 +179,7 @@ async def update_task(task_id: int, update: TaskUpdate):
         elif new_payload is None:
             new_payload = json.dumps({})
 
-        result = await _sql.fetch_one(
+        result = await sql.fetch_one(
             """
             UPDATE tasks
             SET status = $1, assignee = $2, payload = $3, updated_at = NOW()
@@ -183,9 +203,11 @@ async def update_task(task_id: int, update: TaskUpdate):
 async def assign_task(task_id: int, assignee: str):
     """Assign a task to a worker."""
     try:
-        await _sql.initialize()
-        await _task_queries.assign_task(_sql, task_id, assignee)
-        task = await _task_queries.get_task_by_id(_sql, task_id)
+        sql = _get_sql()
+        await sql.initialize()
+        tq = _get_task_queries()
+        await tq.assign_task(sql, task_id, assignee)
+        task = await tq.get_task_by_id(sql, task_id)
         return _row_to_task(task)
     except Exception as exc:
         logger.error("Failed to assign task %s: %s", task_id, exc)
@@ -196,16 +218,17 @@ async def assign_task(task_id: int, assignee: str):
 async def get_workforce_status():
     """Get aggregate workforce and task statistics."""
     try:
-        await _sql.initialize()
+        sql = _get_sql()
+        await sql.initialize()
 
-        task_stats = await _sql.fetch_one("""
+        task_stats = await sql.fetch_one("""
             SELECT
                 COUNT(*) AS total_tasks,
                 COUNT(CASE WHEN status = 'in_progress' THEN 1 END) AS in_progress,
                 COUNT(CASE WHEN status = 'pending' THEN 1 END) AS pending
             FROM tasks
             """)
-        user_stats = await _sql.fetch_one("""
+        user_stats = await sql.fetch_one("""
             SELECT
                 COUNT(*) AS total_users,
                 COUNT(CASE WHEN status = 'active' THEN 1 END) AS active_users,

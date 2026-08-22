@@ -87,8 +87,6 @@ async def _lifespan(app, *, with_agent: bool = True):
 
 @pytest.fixture()
 def app_with_agent():
-    from contextlib import asynccontextmanager
-
     @asynccontextmanager
     async def ls(app):
         async with _lifespan(app, with_agent=True):
@@ -111,6 +109,8 @@ def app_with_agent():
         import maiw_api.app as m
 
         importlib.reload(m)
+        # ASGITransport does not trigger ASGI lifespan events; set state directly.
+        m.app.state.runtime = _make_runtime(with_agent=True)
         yield m.app
 
 
@@ -138,13 +138,15 @@ def app_no_agent():
         import maiw_api.app as m
 
         importlib.reload(m)
+        # ASGITransport does not trigger ASGI lifespan events; set state directly.
+        m.app.state.runtime = _make_runtime(with_agent=False)
         yield m.app
 
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_get_all_equipment_returns_list(app_with_agent):
     import httpx
     from httpx import ASGITransport
@@ -157,7 +159,7 @@ async def test_get_all_equipment_returns_list(app_with_agent):
     assert isinstance(resp.json(), list)
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_assign_equipment_returns_decision(app_with_agent):
     import httpx
     from httpx import ASGITransport
@@ -179,7 +181,7 @@ async def test_assign_equipment_returns_decision(app_with_agent):
     assert "decision_id" in body
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_release_equipment_approved(app_with_agent):
     import httpx
     from httpx import ASGITransport
@@ -195,7 +197,7 @@ async def test_release_equipment_approved(app_with_agent):
     assert body["executed"] is True
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_write_endpoint_returns_503_without_agent(app_no_agent):
     """Write endpoints must return 503 when equipment_agent is None."""
     import httpx
@@ -209,7 +211,7 @@ async def test_write_endpoint_returns_503_without_agent(app_no_agent):
     assert resp.status_code == 503
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_schedule_maintenance_returns_decision(app_with_agent):
     import httpx
     from httpx import ASGITransport

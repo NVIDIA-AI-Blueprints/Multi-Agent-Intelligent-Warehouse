@@ -17,13 +17,20 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from src.retrieval.structured import SQLRetriever
-
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["Safety"])
 
-_sql = SQLRetriever()
+_sql = None
+
+
+def _get_sql():
+    global _sql
+    if _sql is None:
+        from src.retrieval.structured import SQLRetriever
+
+        _sql = SQLRetriever()
+    return _sql
 
 
 class SafetyIncident(BaseModel):
@@ -97,8 +104,9 @@ _POLICIES: List[SafetyPolicy] = [
 async def get_incidents():
     """List all safety incidents ordered by occurrence time."""
     try:
-        await _sql.initialize()
-        rows = await _sql.fetch_all(
+        sql = _get_sql()
+        await sql.initialize()
+        rows = await sql.fetch_all(
             "SELECT id, severity, description, reported_by, occurred_at "
             "FROM safety_incidents ORDER BY occurred_at DESC"
         )
@@ -123,8 +131,9 @@ async def get_incidents():
 async def get_incident(incident_id: int):
     """Get a specific safety incident by ID."""
     try:
-        await _sql.initialize()
-        row = await _sql.fetch_one(
+        sql = _get_sql()
+        await sql.initialize()
+        row = await sql.fetch_one(
             "SELECT id, severity, description, reported_by, occurred_at "
             "FROM safety_incidents WHERE id = $1",
             incident_id,
@@ -154,8 +163,9 @@ async def get_incident(incident_id: int):
 async def create_incident(incident: SafetyIncidentCreate):
     """Create a new safety incident record."""
     try:
-        await _sql.initialize()
-        result = await _sql.fetch_one(
+        sql = _get_sql()
+        await sql.initialize()
+        result = await sql.fetch_one(
             """
             INSERT INTO safety_incidents (severity, description, reported_by, occurred_at)
             VALUES ($1, $2, $3, NOW())

@@ -32,10 +32,18 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["Equipment"])
 
-# Module-level SQL retriever — no async state, safe to share
-from src.retrieval.structured import SQLRetriever
+# Lazy-init: deferred import so importing this module does not require asyncpg.
+# asyncpg is only pulled in when the first request initialises the connection.
+_sql = None
 
-_sql = SQLRetriever()
+
+def _get_sql():
+    global _sql
+    if _sql is None:
+        from src.retrieval.structured import SQLRetriever
+
+        _sql = SQLRetriever()
+    return _sql
 
 
 # ── Request / Response models ─────────────────────────────────────────────────
@@ -171,7 +179,8 @@ async def get_all_equipment(
 ):
     """List equipment assets with optional filtering."""
     try:
-        await _sql.initialize()
+        sql = _get_sql()
+        await sql.initialize()
 
         conditions, params, n = [], [], 1
         if equipment_type:
@@ -195,7 +204,7 @@ async def get_all_equipment(
             WHERE {where}
             ORDER BY asset_id
         """
-        rows = await _sql.execute_query(query, tuple(params))
+        rows = await sql.execute_query(query, tuple(params))
         return [_row_to_asset(r) for r in rows]
     except Exception as exc:
         logger.error("Failed to list equipment assets: %s", exc)
@@ -217,7 +226,8 @@ async def get_equipment_assignments(
 ):
     """List equipment assignments with optional filters."""
     try:
-        await _sql.initialize()
+        sql = _get_sql()
+        await sql.initialize()
 
         parts = [
             "SELECT id, asset_id, task_id, assignee, assignment_type, "
@@ -238,7 +248,7 @@ async def get_equipment_assignments(
             parts.append("WHERE " + " AND ".join(conditions))
         parts.append("ORDER BY assigned_at DESC")
 
-        rows = await _sql.execute_query(" ".join(parts), tuple(params))
+        rows = await sql.execute_query(" ".join(parts), tuple(params))
         return [
             EquipmentAssignment(
                 id=r["id"],
@@ -304,8 +314,9 @@ async def get_maintenance_schedule(
 async def get_equipment_by_id(asset_id: str):
     """Get a single equipment asset by ID."""
     try:
-        await _sql.initialize()
-        rows = await _sql.execute_query(
+        sql = _get_sql()
+        await sql.initialize()
+        rows = await sql.execute_query(
             """
             SELECT asset_id, type, model, zone, status, owner_user,
                    next_pm_due, last_maintenance, created_at, updated_at, metadata
