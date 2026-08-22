@@ -47,5 +47,5 @@ echo "   Press Ctrl+C to stop the server"
 echo ""
 
 # Start the server
-python -m uvicorn src.api.app:app --reload --port $PORT --host 0.0.0.0
+python -m uvicorn maiw_api.app:app --reload --port $PORT --host 0.0.0.0
 
