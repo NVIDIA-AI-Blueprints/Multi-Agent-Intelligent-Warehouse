@@ -71,24 +71,30 @@ def test_app():
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
-def _collect_paths(app) -> set:
+def _collect_paths(node, _pfx: str = "") -> set:
     """
-    Collect all route paths from the app.
+    Recursively collect all fully-qualified route paths from a Starlette app
+    or router node.
 
-    Newer Starlette flattens include_router() calls so every item in
-    app.routes is an APIRoute with a .path attribute.  Older versions
-    (and some edge cases) leave _IncludedRouter wrapper objects that
-    expose .routes but not .path.  This helper handles both.
+    Modern Starlette/FastAPI flattens ``include_router()`` calls so that every
+    item in ``app.routes`` is an ``APIRoute(path="/api/v1/equipment")``.
+    Older Starlette versions leave ``_IncludedRouter`` wrapper objects whose
+    own ``.path`` is the router prefix (e.g. ``"/api/v1"``) and whose
+    ``.routes`` children carry only the relative path (e.g. ``"/equipment"``).
+
+    This helper handles both layouts by walking the tree and accumulating
+    the prefix at each level before yielding a leaf path.
     """
-    paths: set = set()
-    for route in app.routes:
-        if hasattr(route, "path"):
-            paths.add(route.path)
-        if hasattr(route, "routes"):
-            for subroute in route.routes:
-                if hasattr(subroute, "path"):
-                    paths.add(subroute.path)
-    return paths
+    node_path: str = getattr(node, "path", None) or ""
+    current: str = (_pfx.rstrip("/") + node_path) if _pfx else node_path
+
+    sub_routes = getattr(node, "routes", None)
+    if sub_routes is not None:
+        result: set = set()
+        for child in sub_routes:
+            result.update(_collect_paths(child, current))
+        return result
+    return {current} if current else set()
 
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
