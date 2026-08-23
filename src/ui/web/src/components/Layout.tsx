@@ -76,7 +76,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   );
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#080C10', overflow: 'hidden' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100%', backgroundColor: '#080C10', overflow: 'hidden' }}>
 
       {/* Top bar */}
       <Box

@@ -28,7 +28,7 @@ import SystemHealth from './pages/SystemHealth';
 function App() {
   return (
     <AuthProvider>
-      <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+      <Box sx={{ display: 'flex', minHeight: '100vh', width: '100%' }}>
         <Routes>
           <Route
             path="/*"

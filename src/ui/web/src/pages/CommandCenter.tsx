@@ -185,8 +185,8 @@ const CommandCenter: React.FC = () => {
   // ── derived metrics ──────────────────────────────────────────────────────
 
   const totalAssets = equipment?.length ?? 0;
-  const activeAssets = equipment?.filter(a => a.status === 'active' || a.status === 'operational').length ?? 0;
-  const maintenanceAssets = equipment?.filter(a => a.status === 'maintenance' || (a.next_pm_due && new Date(a.next_pm_due) <= new Date())).length ?? 0;
+  const activeAssets = equipment?.filter(a => a.status === 'available' || a.status === 'assigned' || a.status === 'active' || a.status === 'operational').length ?? 0;
+  const maintenanceAssets = equipment?.filter(a => a.status === 'maintenance' || a.status === 'offline' || (a.next_pm_due && new Date(a.next_pm_due) <= new Date())).length ?? 0;
   const equipPct = totalAssets ? Math.round((activeAssets / totalAssets) * 100) : 0;
 
   const totalWorkers = workforce?.total_workers ?? workforce?.total ?? 0;
