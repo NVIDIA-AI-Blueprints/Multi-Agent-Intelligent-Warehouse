@@ -91,15 +91,16 @@ function Btn({
       onClick={disabled || loading ? undefined : onClick}
       sx={{
         fontFamily: 'monospace', fontSize: '0.63rem', fontWeight: 700,
-        letterSpacing: '0.06em', px: 1, py: 0.4,
-        border: `1px solid ${disabled ? '#21262D' : color}`,
+        letterSpacing: '0.06em', px: 1.25, py: 0.5,
+        border: `1px solid ${color}`,
         borderRadius: 0.5,
-        color: disabled ? '#30363D' : color,
+        color,
         cursor: disabled ? 'default' : 'pointer',
         userSelect: 'none',
         display: 'flex', alignItems: 'center', gap: 0.5,
-        opacity: disabled ? 0.4 : 1,
+        opacity: disabled ? 0.28 : 1,
         '&:hover': disabled ? {} : { backgroundColor: `${color}18` },
+        transition: 'opacity 0.15s',
       }}
     >
       {loading && <CircularProgress size={8} sx={{ color }} />}
@@ -193,7 +194,7 @@ const DemoControlBar: React.FC<Props> = ({ status, onStatusChange }) => {
   const simMeta = status?.scenario;
   const world = status?.world;
   const runLabel = active ? (paused ? 'PAUSED' : 'RUNNING') : 'STOPPED';
-  const runColor = active ? (paused ? '#D29922' : '#3FB950') : '#484F58';
+  const runColor = active ? (paused ? '#D29922' : '#3FB950') : '#6E7681';
 
   const clockDisplay = world?.clock_iso
     ? format(new Date(world.clock_iso), 'HH:mm:ss')
@@ -244,10 +245,12 @@ const DemoControlBar: React.FC<Props> = ({ status, onStatusChange }) => {
           data-testid="scenario-selector"
           sx={{
             fontFamily: 'monospace', fontSize: '0.68rem', color: '#C9D1D9',
-            height: 26, minWidth: 180,
-            '& .MuiOutlinedInput-notchedOutline': { borderColor: '#21262D' },
-            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#30363D' },
-            '& .MuiSelect-select': { py: 0.3, px: 1 },
+            height: 28, minWidth: 200,
+            '& .MuiOutlinedInput-notchedOutline': { borderColor: '#484F58' },
+            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#8B949E' },
+            '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#76B900' },
+            '& .MuiSelect-select': { py: 0.4, px: 1.25 },
+            '& .MuiSvgIcon-root': { color: '#484F58' },
             backgroundColor: '#0D1117',
           }}
         >
