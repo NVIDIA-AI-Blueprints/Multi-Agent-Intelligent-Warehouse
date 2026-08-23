@@ -2,68 +2,159 @@ import React, { useState } from 'react';
 import {
   Box,
   Typography,
-  Tabs,
-  Tab,
-  Card,
-  CardContent,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Chip,
-  Alert,
-  CircularProgress,
   Tooltip,
+  CircularProgress,
 } from '@mui/material';
-import {
-  Warning as StaleIcon,
-  CheckCircle as FreshIcon,
-} from '@mui/icons-material';
 import { useQuery } from '@tanstack/react-query';
 import { format, parseISO, differenceInMinutes } from 'date-fns';
 import { equipmentAPI, operationsAPI, safetyAPI } from '../services/api';
 
+// ── design tokens (match CommandCenter) ───────────────────────────────────
+
+const C = {
+  bg: '#080C10',
+  panel: '#0D1117',
+  border: '#1C2128',
+  borderMid: '#30363D',
+  text: '#E6EDF3',
+  textSub: '#C9D1D9',
+  textMuted: '#8B949E',
+  textDim: '#484F58',
+  green: '#3FB950',
+  yellow: '#D29922',
+  red: '#F85149',
+  blue: '#58A6FF',
+  nvidia: '#76B900',
+};
+
 const STALE_THRESHOLD_MINUTES = 10;
 
-function freshnessChip(updatedAt: string | undefined) {
-  if (!updatedAt) return null;
+// ── shared primitives ─────────────────────────────────────────────────────
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <Typography sx={{
+      fontFamily: 'monospace', fontWeight: 700, fontSize: '0.6rem',
+      color: C.textDim, letterSpacing: '0.12em', textTransform: 'uppercase',
+    }}>
+      {children}
+    </Typography>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const s = status.toLowerCase();
+  let color = C.textMuted;
+  let bg = 'rgba(139,148,158,0.08)';
+  let border = C.borderMid;
+
+  if (['active', 'available', 'operational', 'resolved', 'online'].includes(s)) {
+    color = C.green; bg = 'rgba(63,185,80,0.08)'; border = 'rgba(63,185,80,0.3)';
+  } else if (['maintenance', 'pending', 'charging', 'assigned'].includes(s)) {
+    color = C.yellow; bg = 'rgba(210,153,34,0.08)'; border = 'rgba(210,153,34,0.3)';
+  } else if (['critical', 'open', 'offline', 'error', 'on_leave'].includes(s)) {
+    color = C.red; bg = 'rgba(248,81,73,0.08)'; border = 'rgba(248,81,73,0.3)';
+  } else if (['inactive'].includes(s)) {
+    color = C.textDim; bg = 'transparent'; border = C.border;
+  }
+
+  return (
+    <Box component="span" sx={{
+      display: 'inline-block',
+      px: 0.75, py: '2px',
+      fontFamily: 'monospace', fontSize: '0.65rem', fontWeight: 700,
+      letterSpacing: '0.04em',
+      color, backgroundColor: bg,
+      border: '1px solid', borderColor: border,
+      borderRadius: '3px',
+      lineHeight: 1.6,
+    }}>
+      {status}
+    </Box>
+  );
+}
+
+function FreshnessTag({ updatedAt }: { updatedAt: string | undefined }) {
+  if (!updatedAt) return <span style={{ color: C.textDim, fontFamily: 'monospace', fontSize: '0.65rem' }}>—</span>;
   const ageMin = differenceInMinutes(new Date(), parseISO(updatedAt));
   const isStale = ageMin > STALE_THRESHOLD_MINUTES;
   return (
     <Tooltip title={`Last updated ${ageMin}m ago`} arrow>
-      <Chip
-        icon={isStale ? <StaleIcon sx={{ fontSize: '12px !important' }} /> : <FreshIcon sx={{ fontSize: '12px !important' }} />}
-        label={isStale ? `${ageMin}m ago` : 'Fresh'}
-        size="small"
-        sx={{
-          backgroundColor: isStale ? 'rgba(210, 153, 34, 0.15)' : 'rgba(63, 185, 80, 0.1)',
-          color: isStale ? 'warning.main' : 'success.main',
-          border: '1px solid',
-          borderColor: isStale ? 'warning.main' : 'success.main',
-          fontSize: '0.65rem',
-          height: 20,
-        }}
-      />
+      <Box component="span" sx={{
+        display: 'inline-flex', alignItems: 'center', gap: 0.4,
+        px: 0.75, py: '2px',
+        fontFamily: 'monospace', fontSize: '0.65rem', fontWeight: 600,
+        color: isStale ? C.yellow : C.green,
+        backgroundColor: isStale ? 'rgba(210,153,34,0.08)' : 'rgba(63,185,80,0.08)',
+        border: '1px solid', borderColor: isStale ? 'rgba(210,153,34,0.3)' : 'rgba(63,185,80,0.3)',
+        borderRadius: '3px',
+        lineHeight: 1.6,
+      }}>
+        {isStale ? `⚠ ${ageMin}m ago` : '✓ Fresh'}
+      </Box>
     </Tooltip>
   );
 }
 
-function statusChip(status: string) {
-  const colors: Record<string, 'success' | 'error' | 'warning' | 'info' | 'default'> = {
-    active: 'success',
-    available: 'success',
-    operational: 'success',
-    maintenance: 'warning',
-    pending: 'warning',
-    critical: 'error',
-    inactive: 'default',
-    resolved: 'success',
-    open: 'error',
-  };
-  return <Chip label={status} size="small" color={colors[status.toLowerCase()] ?? 'default'} variant="outlined" />;
+// ── table chrome ──────────────────────────────────────────────────────────
+
+const TH = ({ children }: { children: React.ReactNode }) => (
+  <TableCell sx={{
+    fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
+    color: C.textDim, letterSpacing: '0.1em', textTransform: 'uppercase',
+    borderBottom: `1px solid ${C.border}`,
+    py: 0.75, px: 1.5,
+    whiteSpace: 'nowrap',
+    backgroundColor: C.panel,
+  }}>
+    {children}
+  </TableCell>
+);
+
+const TD = ({ children, mono, muted, warn }: {
+  children: React.ReactNode;
+  mono?: boolean;
+  muted?: boolean;
+  warn?: boolean;
+}) => (
+  <TableCell sx={{
+    fontFamily: mono ? 'monospace' : 'inherit',
+    fontSize: '0.78rem',
+    color: warn ? C.yellow : muted ? C.textMuted : C.textSub,
+    borderBottom: `1px solid ${C.border}`,
+    py: 0.75, px: 1.5,
+  }}>
+    {children}
+  </TableCell>
+);
+
+function EmptyRow({ cols, message }: { cols: number; message: string }) {
+  return (
+    <TableRow>
+      <TableCell colSpan={cols} sx={{ textAlign: 'center', py: 4, color: C.textDim, fontFamily: 'monospace', fontSize: '0.75rem', borderBottom: 'none' }}>
+        {message}
+      </TableCell>
+    </TableRow>
+  );
 }
+
+function LoadingRow({ cols }: { cols: number }) {
+  return (
+    <TableRow>
+      <TableCell colSpan={cols} sx={{ textAlign: 'center', py: 4, borderBottom: 'none' }}>
+        <CircularProgress size={18} sx={{ color: C.textDim }} />
+      </TableCell>
+    </TableRow>
+  );
+}
+
+// ── tab panels ────────────────────────────────────────────────────────────
 
 function EquipmentTab() {
   const { data, isLoading, error } = useQuery({
@@ -72,46 +163,47 @@ function EquipmentTab() {
     staleTime: 30000,
   });
 
-  if (isLoading) return <CircularProgress sx={{ m: 3 }} />;
-  if (error) return <Alert severity="error" sx={{ m: 2 }}>Failed to load equipment state</Alert>;
-  if (!data?.length) return <Alert severity="info" sx={{ m: 2 }}>No equipment assets found</Alert>;
+  const pmOverdue = (asset: any) => {
+    const d = asset.next_pm_due ? parseISO(asset.next_pm_due) : null;
+    return d && d <= new Date();
+  };
 
   return (
     <TableContainer>
-      <Table size="small">
+      <Table size="small" sx={{ tableLayout: 'fixed' }}>
         <TableHead>
           <TableRow>
-            <TableCell>Asset ID</TableCell>
-            <TableCell>Type</TableCell>
-            <TableCell>Status</TableCell>
-            <TableCell>Zone</TableCell>
-            <TableCell>Assignee</TableCell>
-            <TableCell>Next PM</TableCell>
-            <TableCell>Freshness</TableCell>
+            <TH>Asset ID</TH>
+            <TH>Type</TH>
+            <TH>Status</TH>
+            <TH>Zone</TH>
+            <TH>Assignee</TH>
+            <TH>Next PM</TH>
+            <TH>Freshness</TH>
           </TableRow>
         </TableHead>
         <TableBody>
-          {data.map((asset) => {
+          {isLoading && <LoadingRow cols={7} />}
+          {error && <EmptyRow cols={7} message="Failed to load equipment" />}
+          {!isLoading && !error && !data?.length && <EmptyRow cols={7} message="No equipment assets found" />}
+          {data?.map((asset) => {
+            const overdue = pmOverdue(asset);
             const pmDue = asset.next_pm_due ? parseISO(asset.next_pm_due) : null;
-            const pmOverdue = pmDue && pmDue <= new Date();
             return (
               <TableRow
                 key={asset.asset_id}
                 sx={{
-                  '&:hover': { backgroundColor: 'rgba(255,255,255,0.03)' },
-                  borderLeft: pmOverdue ? '3px solid' : '3px solid transparent',
-                  borderLeftColor: pmOverdue ? 'warning.main' : 'transparent',
+                  '&:hover': { backgroundColor: 'rgba(255,255,255,0.025)' },
+                  borderLeft: overdue ? `2px solid ${C.yellow}` : `2px solid transparent`,
                 }}
               >
-                <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{asset.asset_id}</TableCell>
-                <TableCell>{asset.type}</TableCell>
-                <TableCell>{statusChip(asset.status)}</TableCell>
-                <TableCell>{asset.zone ?? '—'}</TableCell>
-                <TableCell>{asset.owner_user ?? '—'}</TableCell>
-                <TableCell sx={{ color: pmOverdue ? 'warning.main' : 'text.secondary', fontSize: '0.8rem' }}>
-                  {pmDue ? format(pmDue, 'MM/dd HH:mm') : '—'}
-                </TableCell>
-                <TableCell>{freshnessChip(asset.updated_at)}</TableCell>
+                <TD mono>{asset.asset_id}</TD>
+                <TD muted>{asset.type}</TD>
+                <TD><StatusBadge status={asset.status} /></TD>
+                <TD muted>{asset.zone ?? '—'}</TD>
+                <TD muted>{asset.owner_user ?? '—'}</TD>
+                <TD mono warn={!!overdue}>{pmDue ? format(pmDue, 'MM/dd HH:mm') : '—'}</TD>
+                <TD><FreshnessTag updatedAt={asset.updated_at} /></TD>
               </TableRow>
             );
           })}
@@ -128,34 +220,31 @@ function TasksTab() {
     staleTime: 30000,
   });
 
-  if (isLoading) return <CircularProgress sx={{ m: 3 }} />;
-  if (error) return <Alert severity="error" sx={{ m: 2 }}>Failed to load operations tasks</Alert>;
-  if (!data?.length) return <Alert severity="info" sx={{ m: 2 }}>No tasks found</Alert>;
-
   return (
     <TableContainer>
       <Table size="small">
         <TableHead>
           <TableRow>
-            <TableCell>ID</TableCell>
-            <TableCell>Type</TableCell>
-            <TableCell>Status</TableCell>
-            <TableCell>Assignee</TableCell>
-            <TableCell>Created</TableCell>
-            <TableCell>Freshness</TableCell>
+            <TH>ID</TH>
+            <TH>Type</TH>
+            <TH>Status</TH>
+            <TH>Assignee</TH>
+            <TH>Created</TH>
+            <TH>Freshness</TH>
           </TableRow>
         </TableHead>
         <TableBody>
-          {data.map((task) => (
-            <TableRow key={task.id} sx={{ '&:hover': { backgroundColor: 'rgba(255,255,255,0.03)' } }}>
-              <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{task.id}</TableCell>
-              <TableCell>{task.kind}</TableCell>
-              <TableCell>{statusChip(task.status)}</TableCell>
-              <TableCell>{task.assignee || '—'}</TableCell>
-              <TableCell sx={{ color: 'text.secondary', fontSize: '0.8rem' }}>
-                {task.created_at ? format(parseISO(task.created_at), 'MM/dd HH:mm') : '—'}
-              </TableCell>
-              <TableCell>{freshnessChip(task.updated_at)}</TableCell>
+          {isLoading && <LoadingRow cols={6} />}
+          {error && <EmptyRow cols={6} message="Failed to load tasks" />}
+          {!isLoading && !error && !data?.length && <EmptyRow cols={6} message="No tasks found" />}
+          {data?.map((task) => (
+            <TableRow key={task.id} sx={{ '&:hover': { backgroundColor: 'rgba(255,255,255,0.025)' } }}>
+              <TD mono>{task.id}</TD>
+              <TD muted>{task.kind}</TD>
+              <TD><StatusBadge status={task.status} /></TD>
+              <TD muted>{task.assignee || '—'}</TD>
+              <TD mono muted>{task.created_at ? format(parseISO(task.created_at), 'MM/dd HH:mm') : '—'}</TD>
+              <TD><FreshnessTag updatedAt={task.updated_at} /></TD>
             </TableRow>
           ))}
         </TableBody>
@@ -171,35 +260,57 @@ function WorkforceTab() {
     staleTime: 30000,
   });
 
-  if (isLoading) return <CircularProgress sx={{ m: 3 }} />;
-  if (error) return <Alert severity="error" sx={{ m: 2 }}>Failed to load workforce status</Alert>;
-  if (!data) return <Alert severity="info" sx={{ m: 2 }}>No workforce data available</Alert>;
+  if (isLoading) return (
+    <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+      <CircularProgress size={18} sx={{ color: C.textDim }} />
+    </Box>
+  );
+  if (error) return (
+    <Box sx={{ p: 2 }}>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.75rem', color: C.red }}>Failed to load workforce</Typography>
+    </Box>
+  );
+  if (!data) return (
+    <Box sx={{ p: 2 }}>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.75rem', color: C.textDim }}>No workforce data</Typography>
+    </Box>
+  );
+
+  const metrics = [
+    { label: 'Total', value: data.total_workers ?? data.total },
+    { label: 'Active', value: data.active_workers ?? data.active },
+    { label: 'Available', value: data.available_workers ?? data.available },
+    { label: 'Shift', value: data.shift },
+  ];
 
   return (
     <Box sx={{ p: 2 }}>
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2 }}>
-        {[
-          { label: 'Total Workers', value: data.total_workers ?? data.total },
-          { label: 'Active', value: data.active_workers ?? data.active },
-          { label: 'Available', value: data.available_workers ?? data.available },
-          { label: 'Shift', value: data.shift ?? '—' },
-        ].map(({ label, value }) => (
-          <Card key={label} sx={{ minWidth: 120, backgroundColor: '#0D1117' }}>
-            <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-              <Typography variant="h5" sx={{ fontWeight: 700, color: 'text.primary' }}>{value ?? '—'}</Typography>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>{label}</Typography>
-            </CardContent>
-          </Card>
+      <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+        {metrics.map(({ label, value }) => (
+          <Box key={label} sx={{
+            px: 2, py: 1.5, minWidth: 100,
+            backgroundColor: C.panel,
+            border: `1px solid ${C.border}`,
+            borderRadius: '4px',
+          }}>
+            <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '1.4rem', color: C.text, lineHeight: 1.2 }}>
+              {value ?? '—'}
+            </Typography>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: C.textDim, textTransform: 'uppercase', letterSpacing: '0.1em', mt: 0.25 }}>
+              {label}
+            </Typography>
+          </Box>
         ))}
       </Box>
+
       {data.zone_allocations && (
         <>
-          <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 1, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Zone Allocations
-          </Typography>
-          <pre style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: '#8B949E', margin: 0 }}>
-            {JSON.stringify(data.zone_allocations, null, 2)}
-          </pre>
+          <SectionLabel>Zone Allocations</SectionLabel>
+          <Box sx={{ mt: 1, p: 1.5, backgroundColor: C.panel, border: `1px solid ${C.border}`, borderRadius: '4px' }}>
+            <pre style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: C.textMuted, margin: 0, whiteSpace: 'pre-wrap' }}>
+              {JSON.stringify(data.zone_allocations, null, 2)}
+            </pre>
+          </Box>
         </>
       )}
     </Box>
@@ -213,32 +324,38 @@ function IncidentsTab() {
     staleTime: 30000,
   });
 
-  if (isLoading) return <CircularProgress sx={{ m: 3 }} />;
-  if (error) return <Alert severity="error" sx={{ m: 2 }}>Failed to load safety incidents</Alert>;
-  if (!data?.length) return <Alert severity="success" sx={{ m: 2 }}>No safety incidents on record</Alert>;
-
   return (
     <TableContainer>
       <Table size="small">
         <TableHead>
           <TableRow>
-            <TableCell>ID</TableCell>
-            <TableCell>Severity</TableCell>
-            <TableCell>Description</TableCell>
-            <TableCell>Reported By</TableCell>
-            <TableCell>Occurred At</TableCell>
+            <TH>ID</TH>
+            <TH>Severity</TH>
+            <TH>Description</TH>
+            <TH>Reported By</TH>
+            <TH>Occurred At</TH>
           </TableRow>
         </TableHead>
         <TableBody>
-          {data.map((incident) => (
-            <TableRow key={incident.id} sx={{ '&:hover': { backgroundColor: 'rgba(255,255,255,0.03)' } }}>
-              <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{incident.id}</TableCell>
-              <TableCell>{statusChip(incident.severity)}</TableCell>
-              <TableCell sx={{ maxWidth: 300 }}>{incident.description}</TableCell>
-              <TableCell>{incident.reported_by}</TableCell>
-              <TableCell sx={{ color: 'text.secondary', fontSize: '0.8rem' }}>
-                {incident.occurred_at ? format(parseISO(incident.occurred_at), 'MM/dd HH:mm') : '—'}
+          {isLoading && <LoadingRow cols={5} />}
+          {error && <EmptyRow cols={5} message="Failed to load incidents" />}
+          {!isLoading && !error && !data?.length && (
+            <TableRow>
+              <TableCell colSpan={5} sx={{ textAlign: 'center', py: 4, borderBottom: 'none' }}>
+                <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
+                  <Box component="span" sx={{ color: C.green, fontSize: '0.8rem' }}>✓</Box>
+                  <Typography sx={{ fontFamily: 'monospace', fontSize: '0.75rem', color: C.textMuted }}>No safety incidents on record</Typography>
+                </Box>
               </TableCell>
+            </TableRow>
+          )}
+          {data?.map((incident) => (
+            <TableRow key={incident.id} sx={{ '&:hover': { backgroundColor: 'rgba(255,255,255,0.025)' } }}>
+              <TD mono>{incident.id}</TD>
+              <TD><StatusBadge status={incident.severity} /></TD>
+              <TD muted>{incident.description}</TD>
+              <TD muted>{incident.reported_by}</TD>
+              <TD mono muted>{incident.occurred_at ? format(parseISO(incident.occurred_at), 'MM/dd HH:mm') : '—'}</TD>
             </TableRow>
           ))}
         </TableBody>
@@ -254,28 +371,25 @@ function PoliciesTab() {
     staleTime: 60000,
   });
 
-  if (isLoading) return <CircularProgress sx={{ m: 3 }} />;
-  if (error) return <Alert severity="error" sx={{ m: 2 }}>Failed to load safety policies</Alert>;
-  if (!data?.length) return <Alert severity="info" sx={{ m: 2 }}>No safety policies found</Alert>;
-
   return (
     <TableContainer>
       <Table size="small">
         <TableHead>
           <TableRow>
-            <TableCell>Domain</TableCell>
-            <TableCell>Rule</TableCell>
-            <TableCell>Active</TableCell>
+            <TH>Domain</TH>
+            <TH>Rule</TH>
+            <TH>Status</TH>
           </TableRow>
         </TableHead>
         <TableBody>
-          {data.map((policy: any, i: number) => (
-            <TableRow key={i} sx={{ '&:hover': { backgroundColor: 'rgba(255,255,255,0.03)' } }}>
-              <TableCell>{policy.domain}</TableCell>
-              <TableCell sx={{ maxWidth: 400 }}>{policy.rule}</TableCell>
-              <TableCell>
-                <Chip label={policy.active ? 'Active' : 'Inactive'} size="small" color={policy.active ? 'success' : 'default'} variant="outlined" />
-              </TableCell>
+          {isLoading && <LoadingRow cols={3} />}
+          {error && <EmptyRow cols={3} message="Failed to load policies" />}
+          {!isLoading && !error && !data?.length && <EmptyRow cols={3} message="No safety policies found" />}
+          {data?.map((policy: any, i: number) => (
+            <TableRow key={i} sx={{ '&:hover': { backgroundColor: 'rgba(255,255,255,0.025)' } }}>
+              <TD mono muted>{policy.domain}</TD>
+              <TD>{policy.rule}</TD>
+              <TD><StatusBadge status={policy.active ? 'active' : 'inactive'} /></TD>
             </TableRow>
           ))}
         </TableBody>
@@ -283,6 +397,8 @@ function PoliciesTab() {
     </TableContainer>
   );
 }
+
+// ── page ──────────────────────────────────────────────────────────────────
 
 const TABS = [
   { label: 'Equipment', component: EquipmentTab },
@@ -297,30 +413,81 @@ const WarehouseStatePage: React.FC = () => {
   const Component = TABS[tab].component;
 
   return (
-    <Box sx={{ pb: 4 }}>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700, color: 'text.primary', letterSpacing: '-0.02em' }}>
+    <Box sx={{
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden',
+      backgroundColor: C.bg,
+    }}>
+      {/* Page header */}
+      <Box sx={{
+        px: 2.5, py: 1.5,
+        borderBottom: `1px solid ${C.border}`,
+        flexShrink: 0,
+        display: 'flex',
+        alignItems: 'baseline',
+        gap: 2,
+      }}>
+        <Typography sx={{
+          fontFamily: 'monospace', fontWeight: 700, fontSize: '0.72rem',
+          color: C.text, letterSpacing: '0.06em', textTransform: 'uppercase',
+        }}>
           Warehouse State
         </Typography>
-        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-          Live operational state across all domains · Amber border = stale data ({STALE_THRESHOLD_MINUTES}+ min)
+        <Typography sx={{
+          fontFamily: 'monospace', fontSize: '0.65rem', color: C.textDim,
+        }}>
+          live operational state across all domains · amber = stale (&gt;{STALE_THRESHOLD_MINUTES}min)
         </Typography>
       </Box>
 
-      <Card sx={{ backgroundColor: 'background.paper' }}>
-        <Box sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
-          <Tabs
-            value={tab}
-            onChange={(_, v) => setTab(v)}
-            sx={{ px: 2 }}
-          >
-            {TABS.map(({ label }) => (
-              <Tab key={label} label={label} sx={{ textTransform: 'none', fontWeight: 600, fontSize: '0.875rem' }} />
-            ))}
-          </Tabs>
-        </Box>
+      {/* Domain tabs */}
+      <Box sx={{
+        display: 'flex',
+        alignItems: 'stretch',
+        borderBottom: `1px solid ${C.border}`,
+        flexShrink: 0,
+        px: 1,
+        backgroundColor: C.panel,
+      }}>
+        {TABS.map(({ label }, i) => {
+          const active = tab === i;
+          return (
+            <Box
+              key={label}
+              onClick={() => setTab(i)}
+              sx={{
+                px: 2, py: 1,
+                cursor: 'pointer',
+                position: 'relative',
+                fontFamily: 'monospace',
+                fontSize: '0.68rem',
+                fontWeight: active ? 700 : 500,
+                letterSpacing: '0.07em',
+                textTransform: 'uppercase',
+                color: active ? C.text : C.textDim,
+                transition: 'color 0.15s',
+                '&:hover': { color: active ? C.text : C.textMuted },
+                '&::after': active ? {
+                  content: '""',
+                  position: 'absolute',
+                  bottom: 0, left: 0, right: 0,
+                  height: '2px',
+                  backgroundColor: C.nvidia,
+                } : {},
+              }}
+            >
+              {label}
+            </Box>
+          );
+        })}
+      </Box>
+
+      {/* Content */}
+      <Box sx={{ flex: 1, overflow: 'auto' }}>
         <Component />
-      </Card>
+      </Box>
     </Box>
   );
 };
