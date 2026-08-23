@@ -63,6 +63,9 @@ _INVENTORY_CAPABILITIES = [
 ]
 
 
+_DEMO_MODE = os.getenv("MAIW_DEMO_MODE", "false").lower() in ("1", "true", "yes")
+
+
 @dataclass
 class MAIWRuntime:
     """
@@ -72,6 +75,9 @@ class MAIWRuntime:
     constructing their own.  All fields default to None; routers guard against
     None values and return 503 when a required component is unavailable.
     """
+
+    # Demo / simulation controller (only set when MAIW_DEMO_MODE=true)
+    demo_controller: Any = None  # maiw_api.demo.controller.DemoScenarioController
 
     # MCP layer
     mcp_registry: Any = None  # maiw_mcp.CapabilityRegistry
@@ -114,6 +120,30 @@ async def get_runtime() -> MAIWRuntime:
 
     logger.info("MAIW bootstrap: assembling runtime...")
     runtime = MAIWRuntime()
+
+    # ── 0. Demo mode — SimulationProviders replace DB-backed providers ─────────
+    if _DEMO_MODE:
+        try:
+            from maiw_api.demo.controller import get_demo_controller
+            from mcp_servers.inventory.server import configure_server as _cfg_inv
+            from mcp_servers.equipment.server import configure_server as _cfg_eq
+            from mcp_servers.labor.server import configure_server as _cfg_lab
+            from mcp_servers.wave.server import configure_server as _cfg_wave
+
+            ctrl = get_demo_controller()
+            _cfg_inv(ctrl.providers.inventory)
+            _cfg_eq(ctrl.providers.equipment)
+            _cfg_lab(ctrl.providers.labor)
+            _cfg_wave(ctrl.providers.wave)
+            runtime.demo_controller = ctrl
+            logger.info(
+                "MAIW bootstrap: DEMO MODE active — "
+                "SimulationProviders wired into all four MCP servers"
+            )
+        except Exception as exc:
+            logger.error(
+                "MAIW bootstrap: DEMO MODE requested but failed to wire providers — %s", exc
+            )
 
     # ── 1. CapabilityRegistry ──────────────────────────────────────────────────
     try:

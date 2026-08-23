@@ -1,0 +1,184 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+name: equipment_failure
+display_name: "Equipment Failure"
+description: >
+  AGV-01 fails mid-wave in zone A1 with a motor fault.  FKL-01 is already
+  in scheduled maintenance.  The equipment agent must detect the degraded
+  fleet, propose reassignment or maintenance scheduling, and route through
+  the full PROPOSE → DECIDE → EXECUTE pipeline.
+tags: [failure, equipment, demo, chaos]
+rng_seed: 42
+clock_offset_seconds: 1800  # 30 min into shift
+
+initial_state:
+  inventory:
+    - sku: "SKU-1001"
+      name: "Lay's Classic Chips 1.5oz"
+      zone: "A1"
+      location_id: "A-01-01"
+      quantity_available: 2400
+      quantity_reserved: 120
+      reorder_point: 500
+
+    - sku: "SKU-1002"
+      name: "Doritos Nacho Cheese 1.75oz"
+      zone: "A1"
+      location_id: "A-01-02"
+      quantity_available: 1800
+      quantity_reserved: 200
+      reorder_point: 400
+
+    - sku: "SKU-2001"
+      name: "Gatorade Blue 32oz"
+      zone: "B1"
+      location_id: "B-01-01"
+      quantity_available: 3200
+      quantity_reserved: 400
+      reorder_point: 600
+
+  equipment:
+    - asset_id: "AGV-01"
+      equipment_type: "agv"
+      model: "Locus Origin"
+      zone: "A1"
+      status: "offline"         # Failed — motor fault
+      fault_code: "E_MOTOR_OVERTEMP"
+      battery_pct: 34.0
+
+    - asset_id: "AGV-02"
+      equipment_type: "agv"
+      model: "Locus Origin"
+      zone: "A2"
+      status: "available"
+      battery_pct: 87.0
+
+    - asset_id: "AMR-01"
+      equipment_type: "amr"
+      model: "Boston Dynamics Spot"
+      zone: "B1"
+      status: "available"
+      battery_pct: 78.0
+
+    - asset_id: "AMR-02"
+      equipment_type: "amr"
+      model: "Boston Dynamics Spot"
+      zone: "B2"
+      status: "assigned"
+      owner_user: "w-005"
+      battery_pct: 55.0
+
+    - asset_id: "FKL-01"
+      equipment_type: "forklift"
+      model: "Toyota 8FBE15"
+      zone: "C1"
+      status: "maintenance"     # Already in PM
+      next_pm_due: "2026-08-23T08:00:00+00:00"
+      last_maintenance: "2026-08-23T08:00:00+00:00"
+      battery_pct: 100.0
+
+    - asset_id: "FKL-02"
+      equipment_type: "forklift"
+      model: "Toyota 8FBE15"
+      zone: "C1"
+      status: "available"
+      battery_pct: 100.0
+
+    - asset_id: "SCN-01"
+      equipment_type: "scanner"
+      model: "Zebra TC52"
+      zone: "A1"
+      status: "available"
+      battery_pct: 88.0
+
+    - asset_id: "SCN-02"
+      equipment_type: "scanner"
+      model: "Zebra TC52"
+      zone: "A2"
+      status: "available"
+      battery_pct: 72.0
+
+  workers:
+    - worker_id: "w-001"
+      username: "alice"
+      full_name: "Alice Chen"
+      role: "operator"
+      status: "active"
+      zone: "A1"
+      current_task_id: "task-001"
+
+    - worker_id: "w-002"
+      username: "bob"
+      full_name: "Bob Smith"
+      role: "operator"
+      status: "active"
+      zone: "A1"
+
+    - worker_id: "w-003"
+      username: "carol"
+      full_name: "Carol Liu"
+      role: "supervisor"
+      status: "active"
+      zone: "A2"
+
+    - worker_id: "w-004"
+      username: "david"
+      full_name: "David Park"
+      role: "operator"
+      status: "active"
+      zone: "B1"
+
+    - worker_id: "w-005"
+      username: "eva"
+      full_name: "Eva Rodriguez"
+      role: "operator"
+      status: "active"
+      zone: "B2"
+      current_task_id: "task-003"
+
+    - worker_id: "w-006"
+      username: "frank"
+      full_name: "Frank Osei"
+      role: "manager"
+      status: "active"
+      zone: "C1"
+
+  tasks:
+    - task_id: "task-001"
+      task_type: "PICK"
+      zone: "A1"
+      status: "in_progress"
+      assigned_to: "w-001"
+      priority: "high"
+      deadline: "2026-08-23T10:00:00+00:00"
+
+    - task_id: "task-002"
+      task_type: "PICK"
+      zone: "A1"
+      status: "pending"         # Blocked — AGV-01 was assigned, now failed
+      priority: "high"
+      deadline: "2026-08-23T10:00:00+00:00"
+
+    - task_id: "task-003"
+      task_type: "PACK"
+      zone: "B2"
+      status: "in_progress"
+      assigned_to: "w-005"
+      priority: "medium"
+
+    - task_id: "task-004"
+      task_type: "SHIP"
+      zone: "C1"
+      status: "pending"
+      priority: "high"
+      deadline: "2026-08-23T11:00:00+00:00"
+
+timed_events:
+  - offset_seconds: 60
+    type: equipment_fault
+    payload:
+      asset_id: "AGV-02"
+      fault: "battery_critical"
+      new_status: "offline"
+      fault_code: "E_BATT_LOW"
+      battery_pct: 8.0

@@ -42,6 +42,7 @@ from maiw_api.routers.operations import router as operations_router
 from maiw_api.routers.safety import router as safety_router
 from maiw_api.routers.mcp_status import router as mcp_status_router
 from maiw_api.routers.runtime_status import router as runtime_status_router
+from maiw_api.routers.demo import router as demo_router
 
 # ── Legacy routers (keep temporarily) ────────────────────────────────────────
 from src.api.routers.auth import router as auth_router
@@ -237,6 +238,7 @@ app.include_router(operations_router)
 app.include_router(safety_router)
 app.include_router(mcp_status_router)
 app.include_router(runtime_status_router)
+app.include_router(demo_router)
 
 # Legacy (keep temporarily)
 app.include_router(auth_router)
