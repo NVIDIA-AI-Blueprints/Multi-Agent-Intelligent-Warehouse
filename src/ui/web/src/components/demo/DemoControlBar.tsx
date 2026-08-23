@@ -236,7 +236,7 @@ const DemoControlBar: React.FC<Props> = ({ status, onStatusChange }) => {
           </Typography>
         </Box>
 
-        <Box sx={{ width: 1, height: 20, backgroundColor: '#30363D', flexShrink: 0 }} />
+        <Box sx={{ width: '1px', height: 20, backgroundColor: '#30363D', flexShrink: 0 }} />
 
         {/* Scenario selector */}
         <Select
