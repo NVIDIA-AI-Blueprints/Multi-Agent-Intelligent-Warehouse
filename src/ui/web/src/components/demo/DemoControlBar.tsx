@@ -98,7 +98,7 @@ function Btn({
         cursor: disabled ? 'default' : 'pointer',
         userSelect: 'none',
         display: 'flex', alignItems: 'center', gap: 0.5,
-        opacity: disabled ? 0.28 : 1,
+        opacity: disabled ? 0.5 : 1,
         '&:hover': disabled ? {} : { backgroundColor: `${color}18` },
         transition: 'opacity 0.15s',
       }}
@@ -215,10 +215,12 @@ const DemoControlBar: React.FC<Props> = ({ status, onStatusChange }) => {
     >
       {/* ── Header row ─────────────────────────────────────────────────────── */}
       <Box sx={{
-        display: 'flex', alignItems: 'center', gap: 1.5,
-        px: 1.5, py: 0.6,
+        display: 'flex', alignItems: 'center', gap: 2,
+        px: 1.5, py: 1,
         borderBottom: '1px solid #1C2128',
         backgroundColor: '#0A110A',
+        flexWrap: 'nowrap',
+        minHeight: 44,
       }}>
         {/* Badge */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
@@ -234,7 +236,7 @@ const DemoControlBar: React.FC<Props> = ({ status, onStatusChange }) => {
           </Typography>
         </Box>
 
-        <Box sx={{ width: 1, height: 14, backgroundColor: '#1C2128', flexShrink: 0 }} />
+        <Box sx={{ width: 1, height: 20, backgroundColor: '#30363D', flexShrink: 0 }} />
 
         {/* Scenario selector */}
         <Select
@@ -244,13 +246,13 @@ const DemoControlBar: React.FC<Props> = ({ status, onStatusChange }) => {
           displayEmpty
           data-testid="scenario-selector"
           sx={{
-            fontFamily: 'monospace', fontSize: '0.68rem', color: '#C9D1D9',
-            height: 28, minWidth: 200,
-            '& .MuiOutlinedInput-notchedOutline': { borderColor: '#484F58' },
-            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#8B949E' },
+            fontFamily: 'monospace', fontSize: '0.68rem', color: '#E6EDF3',
+            height: 30, minWidth: 220,
+            '& .MuiOutlinedInput-notchedOutline': { borderColor: selectedScenario ? '#484F58' : '#76B900', borderWidth: selectedScenario ? 1 : 1 },
+            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#76B900' },
             '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#76B900' },
-            '& .MuiSelect-select': { py: 0.4, px: 1.25 },
-            '& .MuiSvgIcon-root': { color: '#484F58' },
+            '& .MuiSelect-select': { py: 0.5, px: 1.5 },
+            '& .MuiSvgIcon-root': { color: '#76B900' },
             backgroundColor: '#0D1117',
           }}
         >
