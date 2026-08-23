@@ -171,6 +171,33 @@ async def get_runtime() -> MAIWRuntime:
             registry.register_domain(_WAVE_CAPABILITIES, wave_url)
             runtime.mcp_wave_available = True
 
+        # Demo mode: register MCPServer instances for in-memory transport.
+        # The MCP client's Client(server) accepts either a URL string (HTTP)
+        # or an MCPServer instance (in-memory) — no extra HTTP servers needed.
+        if _DEMO_MODE and runtime.demo_controller is not None:
+            try:
+                from mcp_servers.equipment.server import mcp_server as _eq_srv
+                from mcp_servers.inventory.server import mcp_server as _inv_srv
+                from mcp_servers.labor.server import mcp_server as _lab_srv
+                from mcp_servers.wave.server import mcp_server as _wave_srv
+
+                registry.register_domain(_EQUIPMENT_CAPABILITIES, _eq_srv)
+                registry.register_domain(_INVENTORY_CAPABILITIES, _inv_srv)
+                registry.register_domain(_LABOR_CAPABILITIES, _lab_srv)
+                registry.register_domain(_WAVE_CAPABILITIES, _wave_srv)
+
+                runtime.mcp_equipment_available = True
+                runtime.mcp_inventory_available = True
+                runtime.mcp_labor_available = True
+                runtime.mcp_wave_available = True
+
+                logger.info(
+                    "MAIW bootstrap: DEMO MODE — four MCPServer instances registered "
+                    "(in-memory transport, no HTTP servers required)"
+                )
+            except Exception as exc:
+                logger.error("MAIW bootstrap: DEMO MODE MCP registration failed — %s", exc)
+
         runtime.mcp_registry = registry
         logger.info(
             "MAIW bootstrap: CapabilityRegistry ready — %d capabilities registered",

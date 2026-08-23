@@ -31,34 +31,39 @@ logger = logging.getLogger(__name__)
 
 class CapabilityRegistry:
     """
-    Maps semantic warehouse capability names to MCP server Streamable HTTP URLs.
+    Maps semantic warehouse capability names to MCP server endpoints.
+
+    In production, endpoints are Streamable HTTP URLs (strings).
+    In demo/test mode, endpoints may be MCPServer instances which the MCP
+    client handles via in-memory transport — no extra HTTP servers needed.
 
     Thread-safe for read after construction (no mutation post-init in production).
     Call ``register()`` only during startup.
     """
 
     def __init__(self) -> None:
-        self._routes: dict[str, str] = {}
+        self._routes: dict[str, object] = {}
 
     # ── Registration ──────────────────────────────────────────────────────────
 
-    def register(self, capability: str, server_url: str) -> None:
-        """Register a capability → server URL mapping."""
+    def register(self, capability: str, server_url: object) -> None:
+        """Register a capability → server URL or MCPServer instance mapping."""
         self._routes[capability] = server_url
+        label = server_url if isinstance(server_url, str) else type(server_url).__name__
         logger.info(
             "CapabilityRegistry: %s → %s",
             capability,
-            server_url,
+            label,
         )
 
-    def register_domain(self, capabilities: list[str], server_url: str) -> None:
+    def register_domain(self, capabilities: list[str], server_url: object) -> None:
         """Register multiple capabilities to the same server."""
         for cap in capabilities:
             self.register(cap, server_url)
 
     # ── Resolution ────────────────────────────────────────────────────────────
 
-    def resolve(self, capability: str) -> str:
+    def resolve(self, capability: str) -> object:
         """
         Return the server URL for a capability.
 
