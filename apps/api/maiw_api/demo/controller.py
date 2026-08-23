@@ -375,7 +375,7 @@ class DemoScenarioController:
             for t in tasks:
                 if deadline:
                     t.deadline = deadline
-                t.priority = payload.get("new_priority", "high")
+                t.priority = payload.get("new_priority", "low")
             return {"tasks_affected": len(tasks), "zone": zone}
 
         raise ValueError(f"Unknown event type: '{event_type}'")
@@ -387,9 +387,19 @@ _controller: DemoScenarioController | None = None
 
 
 def get_demo_controller() -> DemoScenarioController:
-    """Return the process-level DemoScenarioController singleton."""
+    """
+    Return the process-level DemoScenarioController singleton.
+
+    Raises RuntimeError when MAIW_DEMO_MODE is not set so the router
+    returns 503, which the UI interprets as demo mode off.
+    """
     global _controller
     if _controller is None:
+        demo_mode = os.getenv("MAIW_DEMO_MODE", "false").lower() in ("1", "true", "yes")
+        if not demo_mode:
+            raise RuntimeError(
+                "MAIW_DEMO_MODE is not enabled; demo endpoints are inactive"
+            )
         _controller = DemoScenarioController()
     return _controller
 

@@ -210,6 +210,10 @@ class TestDemoScenarioControllerInject:
 
 
 class TestGetDemoControllerSingleton:
+    @pytest.fixture(autouse=True)
+    def enable_demo_mode(self, monkeypatch):
+        monkeypatch.setenv("MAIW_DEMO_MODE", "true")
+
     def test_returns_same_instance(self):
         c1 = get_demo_controller()
         c2 = get_demo_controller()
