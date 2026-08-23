@@ -2,10 +2,12 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Box, Typography } from '@mui/material';
 import { format } from 'date-fns';
 import { useRuntimeStatus } from '../hooks/useRuntimeStatus';
+import { useDemoStatus } from '../hooks/useDemoStatus';
+import { useDemoSSE, SSEEvent } from '../hooks/useDemoSSE';
 import { useQuery } from '@tanstack/react-query';
 import { healthAPI, mcpAPI } from '../services/api';
 
-type Category = 'STATE' | 'AGENT' | 'MODEL' | 'SKILL' | 'PROPOSE' | 'DECIDE' | 'EXECUTE' | 'MCP' | 'API';
+type Category = 'STATE' | 'AGENT' | 'MODEL' | 'SKILL' | 'PROPOSE' | 'DECIDE' | 'EXECUTE' | 'MCP' | 'API' | 'INJECT' | 'TICK';
 
 interface LogEntry {
   id: string;
@@ -18,7 +20,7 @@ interface LogEntry {
 const STORAGE_KEY = 'maiw_activity_feed';
 const MAX_ENTRIES = 200;
 
-const CAT_COLOR: Record<Category, string> = {
+const CAT_COLOR: Record<string, string> = {
   STATE: '#58A6FF',
   AGENT: '#76B900',
   MODEL: '#58A6FF',
@@ -28,6 +30,8 @@ const CAT_COLOR: Record<Category, string> = {
   EXECUTE: '#3FB950',
   MCP: '#8B949E',
   API: '#484F58',
+  INJECT: '#F85149',
+  TICK: '#484F58',
 };
 
 function makeEntry(category: Category, message: string, detail?: string): LogEntry {
@@ -61,7 +65,7 @@ function usePersistentLog() {
 }
 
 type FilterCat = 'ALL' | Category;
-const FILTERS: FilterCat[] = ['ALL', 'STATE', 'AGENT', 'MODEL', 'PROPOSE', 'DECIDE', 'EXECUTE', 'MCP', 'API'];
+const FILTERS: FilterCat[] = ['ALL', 'STATE', 'INJECT', 'TICK', 'AGENT', 'MODEL', 'PROPOSE', 'DECIDE', 'EXECUTE', 'MCP', 'API'];
 
 const ActivityFeed: React.FC = () => {
   const { entries, add, clear } = usePersistentLog();
@@ -71,8 +75,11 @@ const ActivityFeed: React.FC = () => {
   const prevRuntimeRef = useRef<any>(null);
   const liveRef = useRef<any>(null);
   const mcpRef = useRef<any>(null);
+  const sseSeenRef = useRef<Set<string>>(new Set());
 
   const { data: runtime } = useRuntimeStatus();
+  const { isDemoMode } = useDemoStatus();
+  const { events: sseEvents, connected: sseConnected, error: sseError } = useDemoSSE(isDemoMode && live);
   const { data: liveData } = useQuery({
     queryKey: ['live'],
     queryFn: healthAPI.getLive,
@@ -125,6 +132,17 @@ const ActivityFeed: React.FC = () => {
     }
   }, [mcpStatus, add]);
 
+  // SSE events → persistent log (deduplicated by event id)
+  useEffect(() => {
+    for (const ev of sseEvents) {
+      if (sseSeenRef.current.has(ev.id)) continue;
+      sseSeenRef.current.add(ev.id);
+      const category = (ev.category as Category) ?? 'API';
+      const detail = [ev.asset_id, ev.task_id, ev.worker_id].filter(Boolean).join(' ') || ev.detail || undefined;
+      add({ id: ev.id, ts: ev.ts, category, message: ev.message, detail });
+    }
+  }, [sseEvents, add]);
+
   useEffect(() => {
     if (feedRef.current) feedRef.current.scrollTop = 0;
   }, [entries]);
@@ -151,6 +169,19 @@ const ActivityFeed: React.FC = () => {
             {live ? 'LIVE' : 'PAUSED'}
           </Typography>
         </Box>
+
+        {/* SSE indicator (demo mode only) */}
+        {isDemoMode && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Box sx={{
+              width: 5, height: 5, borderRadius: '50%',
+              backgroundColor: sseError ? '#F85149' : sseConnected ? '#76B900' : '#484F58',
+            }} />
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: sseError ? '#F85149' : sseConnected ? '#76B900' : '#484F58', fontWeight: 700 }}>
+              {sseError ? 'SSE ERR' : sseConnected ? 'SSE' : 'SSE…'}
+            </Typography>
+          </Box>
+        )}
 
         <Box sx={{ width: 1, height: 14, backgroundColor: '#1C2128', flexShrink: 0 }} />
 
@@ -238,7 +269,9 @@ const ActivityFeed: React.FC = () => {
       </Box>
 
       <Typography sx={{ fontFamily: 'monospace', fontSize: '0.63rem', color: '#21262D' }}>
-        Session-scoped · clears on refresh · events from API polling (not WebSocket)
+        {isDemoMode
+          ? 'Demo mode · SSE stream from /api/v1/events/stream · falls back to polling'
+          : 'Session-scoped · clears on refresh · events from API polling'}
       </Typography>
     </Box>
   );

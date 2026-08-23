@@ -1,9 +1,12 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Box, Typography, Grid } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRuntimeStatus } from '../hooks/useRuntimeStatus';
+import { useDemoStatus } from '../hooks/useDemoStatus';
 import { equipmentAPI, operationsAPI, safetyAPI, mcpAPI } from '../services/api';
+import DemoControlBar from '../components/demo/DemoControlBar';
+import DecisionLifecycle from '../components/demo/DecisionLifecycle';
 import { format } from 'date-fns';
 
 // ── shared primitives ──────────────────────────────────────────────────────
@@ -142,10 +145,18 @@ function readActivity(): LogEntry[] {
 
 const CommandCenter: React.FC = () => {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const { data: runtime } = useRuntimeStatus();
+  const { isDemoMode, status: demoStatus } = useDemoStatus();
   const [decisions, setDecisions] = useState<DecisionRecord[]>([]);
   const [activity, setActivity] = useState<LogEntry[]>([]);
   const activityRef = useRef<HTMLDivElement>(null);
+
+  const handleDemoStatusChange = useCallback(() => {
+    qc.invalidateQueries({ queryKey: ['equipment'] });
+    qc.invalidateQueries({ queryKey: ['tasks'] });
+    qc.invalidateQueries({ queryKey: ['workforce'] });
+  }, [qc]);
 
   const { data: equipment } = useQuery({ queryKey: ['equipment'], queryFn: equipmentAPI.getAllAssets, retry: 1, staleTime: 30000 });
   const { data: tasks } = useQuery({ queryKey: ['tasks'], queryFn: operationsAPI.getTasks, retry: 1, staleTime: 30000 });
@@ -232,75 +243,80 @@ const CommandCenter: React.FC = () => {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', p: 1.5, gap: 1.5 }}>
 
+      {/* ── SYNTHETIC DEMO CONTROL BAR (only in demo mode) ── */}
+      {isDemoMode && (
+        <DemoControlBar status={demoStatus} onStatusChange={handleDemoStatusChange} />
+      )}
+
       {/* Main 3-column area */}
       <Box sx={{ display: 'flex', gap: 1.5, flex: 1, overflow: 'hidden', minHeight: 0 }}>
 
         {/* ── LEFT COLUMN ── */}
-        <Box sx={{ width: 190, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'auto' }}>
+        <Box sx={{ flex: '0 0 22%', minWidth: 200, maxWidth: 280, display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'auto' }}>
 
-          {/* Warehouse domains */}
-          <Box sx={panelSx}>
-            <Box sx={panelHeaderSx}>
-              <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.65rem', color: '#8B949E', letterSpacing: '0.1em' }}>
-                WAREHOUSE
-              </Typography>
+          {/* Row 1: Warehouse + MCP side by side */}
+          <Box sx={{ display: 'flex', gap: 1.5 }}>
+            <Box sx={{ ...panelSx, flex: 1 }}>
+              <Box sx={panelHeaderSx}>
+                <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.6rem', color: '#8B949E', letterSpacing: '0.1em' }}>
+                  WAREHOUSE
+                </Typography>
+              </Box>
+              <Box sx={{ p: 1 }}>
+                <DomainRow label="Inventory" ok={runtime?.inventory_mcp_configured !== false} />
+                <DomainRow label="Equipment" ok={!!equipment?.length} />
+                <DomainRow label="Labor" ok={!!workforce} />
+                <DomainRow label="Waves" ok={!!tasks?.length} />
+              </Box>
             </Box>
-            <Box sx={{ p: 1.25 }}>
-              <DomainRow label="Inventory" ok={runtime?.inventory_mcp_configured !== false} />
-              <DomainRow label="Equipment" ok={!!equipment?.length} />
-              <DomainRow label="Labor" ok={!!workforce} />
-              <DomainRow label="Waves" ok={!!tasks?.length} />
-            </Box>
-          </Box>
-
-          {/* MCP Services */}
-          <Box sx={panelSx}>
-            <Box sx={panelHeaderSx}>
-              <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.65rem', color: '#8B949E', letterSpacing: '0.1em' }}>
-                MCP SERVICES
-              </Typography>
-              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: mcpStatus?.client_ready ? '#3FB950' : '#484F58' }}>
-                {mcpStatus?.client_ready ? 'READY' : 'INIT'}
-              </Typography>
-            </Box>
-            <Box sx={{ p: 1.25 }}>
-              <DomainRow label="Inventory" ok={runtime?.inventory_mcp_configured} port="8765" />
-              <DomainRow label="Equipment" ok={runtime?.equipment_mcp_configured} port="8766" />
-              <DomainRow label="Labor" ok={runtime?.labor_mcp_configured} port="8767" />
-              <DomainRow label="Wave" ok={runtime?.wave_mcp_configured} port="8768" />
-            </Box>
-          </Box>
-
-          {/* Model Gateway */}
-          <Box sx={panelSx}>
-            <Box sx={panelHeaderSx}>
-              <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.65rem', color: '#8B949E', letterSpacing: '0.1em' }}>
-                MODEL GATEWAY
-              </Typography>
-            </Box>
-            <Box sx={{ p: 1.25 }}>
-              <DomainRow label="Lightning" ok={runtime?.model_gateway_available} />
-              <DomainRow label="Nano" ok={runtime?.model_gateway_available} />
-              <DomainRow label="Super" ok={runtime?.model_gateway_available} />
-              <DomainRow label="Ultra" ok={runtime?.model_gateway_available} />
-              <Box sx={{ mt: 0.75, pt: 0.75, borderTop: '1px solid #1C2128' }}>
-                <DomainRow label="DecisionEngine" ok={runtime?.decision_engine_available} />
-                <DomainRow label="StateProvider" ok={runtime?.state_provider_available} />
+            <Box sx={{ ...panelSx, flex: 1 }}>
+              <Box sx={panelHeaderSx}>
+                <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.6rem', color: '#8B949E', letterSpacing: '0.1em' }}>
+                  MCP
+                </Typography>
+                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: mcpStatus?.client_ready ? '#3FB950' : '#484F58' }}>
+                  {mcpStatus?.client_ready ? '●' : '○'}
+                </Typography>
+              </Box>
+              <Box sx={{ p: 1 }}>
+                <DomainRow label="Inventory" ok={runtime?.inventory_mcp_configured} port="8765" />
+                <DomainRow label="Equipment" ok={runtime?.equipment_mcp_configured} port="8766" />
+                <DomainRow label="Labor" ok={runtime?.labor_mcp_configured} port="8767" />
+                <DomainRow label="Wave" ok={runtime?.wave_mcp_configured} port="8768" />
               </Box>
             </Box>
           </Box>
 
-          {/* Agents */}
-          <Box sx={panelSx}>
-            <Box sx={panelHeaderSx}>
-              <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.65rem', color: '#8B949E', letterSpacing: '0.1em' }}>
-                AGENTS
-              </Typography>
+          {/* Row 2: Model Gateway + Agents side by side */}
+          <Box sx={{ display: 'flex', gap: 1.5 }}>
+            <Box sx={{ ...panelSx, flex: 1 }}>
+              <Box sx={panelHeaderSx}>
+                <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.6rem', color: '#8B949E', letterSpacing: '0.1em' }}>
+                  MODELS
+                </Typography>
+              </Box>
+              <Box sx={{ p: 1 }}>
+                <DomainRow label="Lightning" ok={runtime?.model_gateway_available} />
+                <DomainRow label="Nano" ok={runtime?.model_gateway_available} />
+                <DomainRow label="Super" ok={runtime?.model_gateway_available} />
+                <DomainRow label="Ultra" ok={runtime?.model_gateway_available} />
+                <Box sx={{ mt: 0.5, pt: 0.5, borderTop: '1px solid #1C2128' }}>
+                  <DomainRow label="Decision" ok={runtime?.decision_engine_available} />
+                  <DomainRow label="State" ok={runtime?.state_provider_available} />
+                </Box>
+              </Box>
             </Box>
-            <Box sx={{ p: 1.25 }}>
-              <DomainRow label="Equipment" ok={runtime?.equipment_agent_available} />
-              <DomainRow label="Operations" ok={runtime?.operations_agent_available} />
-              <DomainRow label="Safety" ok={runtime?.safety_agent_available} />
+            <Box sx={{ ...panelSx, flex: 1 }}>
+              <Box sx={panelHeaderSx}>
+                <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.6rem', color: '#8B949E', letterSpacing: '0.1em' }}>
+                  AGENTS
+                </Typography>
+              </Box>
+              <Box sx={{ p: 1 }}>
+                <DomainRow label="Equipment" ok={runtime?.equipment_agent_available} />
+                <DomainRow label="Operations" ok={runtime?.operations_agent_available} />
+                <DomainRow label="Safety" ok={runtime?.safety_agent_available} />
+              </Box>
             </Box>
           </Box>
         </Box>
@@ -403,7 +419,7 @@ const CommandCenter: React.FC = () => {
         </Box>
 
         {/* ── RIGHT COLUMN ── */}
-        <Box sx={{ width: 210, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'auto' }}>
+        <Box sx={{ flex: '0 0 26%', minWidth: 220, maxWidth: 320, display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'auto' }}>
           <Box sx={panelSx}>
             <Box sx={panelHeaderSx}>
               <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.65rem', color: '#8B949E', letterSpacing: '0.1em' }}>
@@ -481,6 +497,9 @@ const CommandCenter: React.FC = () => {
               )}
             </Box>
           </Box>
+
+          {/* Decision lifecycle pipeline (demo mode highlight) */}
+          <DecisionLifecycle />
 
           {/* Recent decisions mini-queue */}
           {decisions.length > 0 && (
