@@ -2,14 +2,14 @@
  * Tests for demoAPI service layer.
  */
 
+import axios from 'axios';
+import { demoAPI } from '../../services/demoAPI';
+
 jest.mock('axios', () => {
   const mockFns = { get: jest.fn(), post: jest.fn() };
   const create = jest.fn(() => mockFns);
   return { __esModule: true, default: { create, _mockFns: mockFns } };
 });
-
-import { demoAPI } from '../../services/demoAPI';
-import axios from 'axios';
 
 // Retrieve the mocked instance fns
 const { _mockFns: { get: mockGet, post: mockPost } } = axios as any;
