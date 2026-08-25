@@ -7,6 +7,13 @@ import CssBaseline from '@mui/material/CssBaseline';
 import App from './App';
 import { nvidiaTheme } from './theme/nvidiaTheme';
 
+// Proxy-based stub: any property access returns jest.fn().mockResolvedValue(null),
+// so new API methods added to any API object don't break this test.
+const apiStub = () =>
+  new Proxy({} as Record<string, jest.Mock>, {
+    get: (_t, _k) => jest.fn().mockResolvedValue(null),
+  });
+
 jest.mock('./services/api', () => ({
   __esModule: true,
   default: {
@@ -15,6 +22,16 @@ jest.mock('./services/api', () => ({
     put: jest.fn(),
     delete: jest.fn(),
   },
+  healthAPI: apiStub(),
+  runtimeAPI: apiStub(),
+  equipmentAPI: apiStub(),
+  inventoryAPI: apiStub(),
+  operationsAPI: apiStub(),
+  safetyAPI: apiStub(),
+  documentAPI: apiStub(),
+  chatAPI: apiStub(),
+  mcpAPI: apiStub(),
+  userAPI: apiStub(),
 }));
 
 function renderWithProviders(ui: React.ReactElement, initialEntries = ['/login']) {
