@@ -27,6 +27,19 @@ from datetime import datetime, timezone
 from typing import Any
 
 
+# ── Default processing durations per task type ────────────────────────────────
+
+_DEFAULT_PROCESSING_SECONDS: dict[str, int] = {
+    "PICK": 300,
+    "PACK": 180,
+    "SHIP": 120,
+    "RECEIVE": 240,
+    "PUTAWAY": 360,
+    "TRANSFER": 240,
+    "CYCLE_COUNT": 600,
+}
+
+
 # ── Simulation clock ──────────────────────────────────────────────────────────
 
 class SimulationClock:
@@ -118,6 +131,10 @@ class TaskState:
     assigned_to: str | None = None
     priority: str = "medium"
     deadline: str | None = None  # ISO-8601 string
+    # SIMULATION-ONLY progression fields — never passed to MCP contract types
+    started_at_sim_seconds: int | None = None
+    processing_duration_seconds: int = 300  # set at seed time from scenario or defaults
+    work_units: int = 1  # how many simulated work-units this task represents
 
 
 # ── DemoWarehouseWorld ────────────────────────────────────────────────────────
@@ -152,6 +169,10 @@ class DemoWarehouseWorld:
         self.workers: dict[str, WorkerState] = {}          # worker_id → worker
         self.tasks: dict[str, TaskState] = {}              # task_id → task
         self._rng = random.Random(42)
+        # Simulation progression tracking
+        self._completion_log: list[tuple[int, int]] = []   # (sim_time_seconds, work_units)
+        self._disruption_sim_time: int | None = None       # first INJECT event sim clock time
+        self._recovery_sim_time: int | None = None         # first recovery-threshold-met sim clock time
 
     # ── seeding ──────────────────────────────────────────────────────────────
 
@@ -183,8 +204,29 @@ class DemoWarehouseWorld:
             self.workers[w.worker_id] = w
 
         for task_def in data.get("tasks", []):
-            t = TaskState(**task_def)
+            task_def = dict(task_def)
+            # Strip sim-only fields that may appear from snapshot round-trips
+            # but are not in YAML seeds — they have defaults on dataclass
+            t = TaskState(**{
+                k: v for k, v in task_def.items()
+                if k in TaskState.__dataclass_fields__
+            })
             self.tasks[t.task_id] = t
+
+        # Set processing_duration_seconds from scenario data or defaults
+        scenario_processing = data.get("processing_seconds", {})
+        for task in self.tasks.values():
+            task.processing_duration_seconds = scenario_processing.get(
+                task.task_type,
+                _DEFAULT_PROCESSING_SECONDS.get(task.task_type, 300),
+            )
+            if task.status == "in_progress" and task.started_at_sim_seconds is None:
+                task.started_at_sim_seconds = self.clock.elapsed_seconds
+
+        # Reset tracking fields
+        self._completion_log.clear()
+        self._disruption_sim_time = None
+        self._recovery_sim_time = None
 
     # ── snapshot / reset ─────────────────────────────────────────────────────
 
@@ -196,6 +238,9 @@ class DemoWarehouseWorld:
             "equipment": copy.deepcopy(self.equipment),
             "workers": copy.deepcopy(self.workers),
             "tasks": copy.deepcopy(self.tasks),
+            "_completion_log": list(self._completion_log),
+            "_disruption_sim_time": self._disruption_sim_time,
+            "_recovery_sim_time": self._recovery_sim_time,
         }
 
     def reset(self, snap: dict[str, Any]) -> None:
@@ -205,8 +250,20 @@ class DemoWarehouseWorld:
         self.equipment = copy.deepcopy(snap["equipment"])
         self.workers = copy.deepcopy(snap["workers"])
         self.tasks = copy.deepcopy(snap["tasks"])
+        self._completion_log = list(snap.get("_completion_log", []))
+        self._disruption_sim_time = snap.get("_disruption_sim_time")
+        self._recovery_sim_time = snap.get("_recovery_sim_time")
 
     # ── convenience queries ───────────────────────────────────────────────────
+
+    def wave_task_counts(self) -> dict[str, int]:
+        """Count wave tasks by status for KPIEngine."""
+        _WAVE_TYPES = frozenset({"PICK", "PACK", "SHIP", "RECEIVE", "PUTAWAY", "TRANSFER"})
+        counts: dict[str, int] = {"pending": 0, "in_progress": 0, "completed": 0, "failed": 0}
+        for t in self.tasks.values():
+            if t.task_type in _WAVE_TYPES and t.status in counts:
+                counts[t.status] += 1
+        return counts
 
     def equipment_list(
         self,

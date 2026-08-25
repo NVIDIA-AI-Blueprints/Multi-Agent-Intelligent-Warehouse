@@ -7,7 +7,7 @@ import { useDemoSSE, SSEEvent } from '../hooks/useDemoSSE';
 import { useQuery } from '@tanstack/react-query';
 import { healthAPI, mcpAPI } from '../services/api';
 
-type Category = 'STATE' | 'AGENT' | 'MODEL' | 'SKILL' | 'PROPOSE' | 'DECIDE' | 'EXECUTE' | 'MCP' | 'API' | 'INJECT' | 'TICK';
+type Category = 'STATE' | 'AGENT' | 'MODEL' | 'SKILL' | 'PROPOSE' | 'DECIDE' | 'EXECUTE' | 'MCP' | 'API' | 'INJECT' | 'TICK' | 'OBSERVE' | 'REASON' | 'OBSERVE_OUTCOME';
 
 interface LogEntry {
   id: string;
@@ -32,6 +32,9 @@ const CAT_COLOR: Record<string, string> = {
   API: '#484F58',
   INJECT: '#F85149',
   TICK: '#484F58',
+  OBSERVE: '#58A6FF',
+  REASON: '#76B900',
+  OBSERVE_OUTCOME: '#3FB950',
 };
 
 function makeEntry(category: Category, message: string, detail?: string): LogEntry {
@@ -65,7 +68,7 @@ function usePersistentLog() {
 }
 
 type FilterCat = 'ALL' | Category;
-const FILTERS: FilterCat[] = ['ALL', 'STATE', 'INJECT', 'TICK', 'AGENT', 'MODEL', 'PROPOSE', 'DECIDE', 'EXECUTE', 'MCP', 'API'];
+const FILTERS: FilterCat[] = ['ALL', 'STATE', 'INJECT', 'TICK', 'AGENT', 'MODEL', 'OBSERVE', 'REASON', 'PROPOSE', 'DECIDE', 'EXECUTE', 'OBSERVE_OUTCOME', 'MCP', 'API'];
 
 const ActivityFeed: React.FC = () => {
   const { entries, add, clear } = usePersistentLog();

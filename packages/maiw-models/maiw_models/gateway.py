@@ -73,7 +73,7 @@ class ModelGateway:
         Never raises provider-specific exceptions — all errors are
         translated to ModelGatewayError subclasses.
         """
-        trace_id = GatewayTelemetry.new_trace_id()
+        trace_id = request.trace_id or GatewayTelemetry.new_trace_id()
         decision: ModelRouteDecision | None = None
         start = time.monotonic()
 

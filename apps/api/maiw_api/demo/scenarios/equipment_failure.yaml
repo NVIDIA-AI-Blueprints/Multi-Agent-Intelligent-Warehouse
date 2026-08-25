@@ -182,3 +182,7 @@ timed_events:
       new_status: "offline"
       fault_code: "E_BATT_LOW"
       battery_pct: 8.0
+
+recovery:
+  wave_risk_max_score: 25
+  backlog_max: 1

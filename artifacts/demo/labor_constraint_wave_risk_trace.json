@@ -1,0 +1,665 @@
+{
+  "captured_at": "2026-08-24T16:21:53.028065+00:00",
+  "scenario": "labor_constraint_wave_risk",
+  "warehouse_id": "DC-47",
+  "scenario_meta": {
+    "name": "labor_constraint_wave_risk",
+    "display_name": "Labor Constraint + Wave Risk",
+    "description": "Two operators are absent (on_leave).  A high-priority pick wave has seven pending tasks with no assigned workers and a carrier cutoff in 45 minutes. OTIF risk is high.  The operations agent must detect the constraint, reallocate available workers, and reprioritize the wave.\n",
+    "tags": [
+      "labor",
+      "wave",
+      "otif",
+      "risk",
+      "demo"
+    ]
+  },
+  "t0_kpis": {
+    "sim_time_seconds": 5400,
+    "clock_iso": "2026-08-23T09:30:00+00:00",
+    "labor_availability_pct": 66.7,
+    "labor_utilization_pct": 50.0,
+    "pending_backlog": 5,
+    "wave_risk_score": 95.0,
+    "wave_risk_level": "critical",
+    "wave_completion_pct": 0.0,
+    "simulated_throughput": 0.0,
+    "projected_service_level": 0.0,
+    "equipment_operational_pct": 100.0,
+    "state_freshness_seconds": null,
+    "time_to_recovery_seconds": null
+  },
+  "trace_id": "88c56aa3-4a67-450e-b857-6efac6087281",
+  "snapshot_id": "b5807b22-1098-43bb-b287-a93adc99eec4",
+  "maiw_wall_secs": 5.006,
+  "analysis": {
+    "trace_id": "88c56aa3-4a67-450e-b857-6efac6087281",
+    "snapshot_id": "b5807b22-1098-43bb-b287-a93adc99eec4",
+    "observe": {
+      "domains_assembled": [],
+      "freshness": null,
+      "snapshot_id": "b5807b22-1098-43bb-b287-a93adc99eec4"
+    },
+    "reason": {
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "routing_rule": "high_reasoning",
+      "routing_reason": "reasoning=HIGH requires Super",
+      "latency_ms": 3777.101332321763,
+      "severity": "high",
+      "summary": "All 4 workers are idle while 5 pending wave tasks remain unassigned, creating a labor constraint that puts 5 tasks at risk.",
+      "facts_observed": [
+        "Equipment: 4 total, 4 available",
+        "Labor: 4 total, 4 available, 0% utilization",
+        "Wave tasks: 7 total, 5 pending, 2 in_progress, 5 at-risk",
+        "UNASSIGNED PENDING TASKS: 5 pending wave tasks have no worker allocated (assigned_to=null); 4 workers are idle. Use warehouse.labor.allocate to assign workers to these tasks."
+      ],
+      "domains_affected": [
+        "wave",
+        "labor"
+      ],
+      "recommendations_count": 1
+    },
+    "recommendations": [
+      {
+        "domain": "labor",
+        "capability": "warehouse.labor.allocate",
+        "target": "task_id",
+        "objective": "Assign idle workers to pending wave tasks to prevent delays",
+        "rationale": "5 pending wave tasks have no worker allocated (assigned_to=null) while 4 workers are idle; allocating labor will reduce at-risk tasks.",
+        "priority": "high",
+        "subtype": null
+      }
+    ],
+    "skills_consulted": [
+      "warehouse.labor.allocate"
+    ],
+    "proposals": [
+      {
+        "phase": "PROPOSE",
+        "index": 0,
+        "action": "warehouse.labor.allocate",
+        "proposal_id": "c31a23d4-23b8-4aec-93c5-921815530ba0",
+        "risk_level": "medium",
+        "trace_id": "88c56aa3-4a67-450e-b857-6efac6087281"
+      }
+    ],
+    "decisions": [
+      {
+        "phase": "DECIDE",
+        "index": 0,
+        "outcome": "requires_human_approval",
+        "proposal_id": "c31a23d4-23b8-4aec-93c5-921815530ba0",
+        "decision_id": "ee0b1349-9730-4b0a-883d-5c69cfc4b65b",
+        "violations": [
+          {
+            "rule": "approval.required",
+            "message": "risk_level=medium with requires_approval=True requires human approval",
+            "details": {
+              "risk_level": "medium",
+              "requires_approval": true
+            }
+          }
+        ],
+        "trace_id": "88c56aa3-4a67-450e-b857-6efac6087281"
+      }
+    ],
+    "executions": [],
+    "pre_kpis": {
+      "sim_time_seconds": 5400,
+      "clock_iso": "2026-08-23T09:30:00+00:00",
+      "labor_availability_pct": 66.7,
+      "labor_utilization_pct": 50.0,
+      "pending_backlog": 5,
+      "wave_risk_score": 95.0,
+      "wave_risk_level": "critical",
+      "wave_completion_pct": 0.0,
+      "simulated_throughput": 0.0,
+      "projected_service_level": 0.0,
+      "equipment_operational_pct": 100.0,
+      "state_freshness_seconds": null,
+      "time_to_recovery_seconds": null
+    },
+    "post_kpis": {
+      "sim_time_seconds": 5400,
+      "clock_iso": "2026-08-23T09:30:00+00:00",
+      "labor_availability_pct": 66.7,
+      "labor_utilization_pct": 50.0,
+      "pending_backlog": 5,
+      "wave_risk_score": 95.0,
+      "wave_risk_level": "critical",
+      "wave_completion_pct": 0.0,
+      "simulated_throughput": 0.0,
+      "projected_service_level": 0.0,
+      "equipment_operational_pct": 100.0,
+      "state_freshness_seconds": 5.0,
+      "time_to_recovery_seconds": null
+    },
+    "kpi_delta": {
+      "equipment_operational_pct": 0.0,
+      "labor_availability_pct": 0.0,
+      "labor_utilization_pct": 0.0,
+      "pending_backlog": 0,
+      "wave_risk_score": 0.0,
+      "low_stock_count": 0,
+      "service_risk_index": 0.0,
+      "capacity_throughput_proxy": 0,
+      "wave_completion_pct": 0.0,
+      "simulated_throughput": 0.0,
+      "projected_service_level": 0.0
+    },
+    "timing": {
+      "time_to_detect_ms": null,
+      "time_to_decision_ms": 4969.4,
+      "time_to_execution_ms": 24.9
+    }
+  },
+  "tick_trajectory": [
+    {
+      "tick": 1,
+      "tick_seconds": 60,
+      "cumulative_ticked": 60,
+      "elapsed_seconds": 5460,
+      "kpis": {
+        "sim_time_seconds": 5460,
+        "clock_iso": "2026-08-23T09:31:00+00:00",
+        "labor_availability_pct": 50.0,
+        "labor_utilization_pct": 100.0,
+        "pending_backlog": 3,
+        "wave_risk_score": 95.0,
+        "wave_risk_level": "critical",
+        "wave_completion_pct": 0.0,
+        "simulated_throughput": 0.0,
+        "projected_service_level": 0.0,
+        "equipment_operational_pct": 100.0,
+        "state_freshness_seconds": 4.7,
+        "time_to_recovery_seconds": null
+      },
+      "maiw_cycle_run": 2
+    },
+    {
+      "tick": 2,
+      "tick_seconds": 60,
+      "cumulative_ticked": 120,
+      "elapsed_seconds": 5520,
+      "kpis": {
+        "sim_time_seconds": 5520,
+        "clock_iso": "2026-08-23T09:32:00+00:00",
+        "labor_availability_pct": 50.0,
+        "labor_utilization_pct": 100.0,
+        "pending_backlog": 3,
+        "wave_risk_score": 95.0,
+        "wave_risk_level": "critical",
+        "wave_completion_pct": 0.0,
+        "simulated_throughput": 0.0,
+        "projected_service_level": 0.0,
+        "equipment_operational_pct": 100.0,
+        "state_freshness_seconds": 4.3,
+        "time_to_recovery_seconds": null
+      },
+      "maiw_cycle_run": 3
+    },
+    {
+      "tick": 3,
+      "tick_seconds": 60,
+      "cumulative_ticked": 180,
+      "elapsed_seconds": 5580,
+      "kpis": {
+        "sim_time_seconds": 5580,
+        "clock_iso": "2026-08-23T09:33:00+00:00",
+        "labor_availability_pct": 50.0,
+        "labor_utilization_pct": 100.0,
+        "pending_backlog": 3,
+        "wave_risk_score": 95.0,
+        "wave_risk_level": "critical",
+        "wave_completion_pct": 0.0,
+        "simulated_throughput": 0.0,
+        "projected_service_level": 0.0,
+        "equipment_operational_pct": 100.0,
+        "state_freshness_seconds": 0.1,
+        "time_to_recovery_seconds": null
+      },
+      "maiw_cycle_run": 4
+    },
+    {
+      "tick": 4,
+      "tick_seconds": 60,
+      "cumulative_ticked": 240,
+      "elapsed_seconds": 5640,
+      "kpis": {
+        "sim_time_seconds": 5640,
+        "clock_iso": "2026-08-23T09:34:00+00:00",
+        "labor_availability_pct": 50.0,
+        "labor_utilization_pct": 100.0,
+        "pending_backlog": 3,
+        "wave_risk_score": 95.0,
+        "wave_risk_level": "critical",
+        "wave_completion_pct": 0.0,
+        "simulated_throughput": 0.0,
+        "projected_service_level": 0.0,
+        "equipment_operational_pct": 100.0,
+        "state_freshness_seconds": 0.0,
+        "time_to_recovery_seconds": null
+      },
+      "maiw_cycle_run": 5
+    },
+    {
+      "tick": 5,
+      "tick_seconds": 60,
+      "cumulative_ticked": 300,
+      "elapsed_seconds": 5700,
+      "kpis": {
+        "sim_time_seconds": 5700,
+        "clock_iso": "2026-08-23T09:35:00+00:00",
+        "labor_availability_pct": 50.0,
+        "labor_utilization_pct": 100.0,
+        "pending_backlog": 1,
+        "wave_risk_score": 20.0,
+        "wave_risk_level": "low",
+        "wave_completion_pct": 42.9,
+        "simulated_throughput": 3.0,
+        "projected_service_level": 0.0,
+        "equipment_operational_pct": 100.0,
+        "state_freshness_seconds": 9.0,
+        "time_to_recovery_seconds": null
+      },
+      "maiw_cycle_run": 6
+    },
+    {
+      "tick": 6,
+      "tick_seconds": 60,
+      "cumulative_ticked": 360,
+      "elapsed_seconds": 5760,
+      "kpis": {
+        "sim_time_seconds": 5760,
+        "clock_iso": "2026-08-23T09:36:00+00:00",
+        "labor_availability_pct": 50.0,
+        "labor_utilization_pct": 100.0,
+        "pending_backlog": 0,
+        "wave_risk_score": 0.0,
+        "wave_risk_level": "none",
+        "wave_completion_pct": 57.1,
+        "simulated_throughput": 4.0,
+        "projected_service_level": 0.0,
+        "equipment_operational_pct": 100.0,
+        "state_freshness_seconds": 3.9,
+        "time_to_recovery_seconds": 300.0
+      },
+      "maiw_cycle_run": 7,
+      "recovery_detected": true
+    },
+    {
+      "tick": 7,
+      "tick_seconds": 60,
+      "cumulative_ticked": 420,
+      "elapsed_seconds": 5820,
+      "kpis": {
+        "sim_time_seconds": 5820,
+        "clock_iso": "2026-08-23T09:37:00+00:00",
+        "labor_availability_pct": 50.0,
+        "labor_utilization_pct": 66.7,
+        "pending_backlog": 0,
+        "wave_risk_score": 0.0,
+        "wave_risk_level": "none",
+        "wave_completion_pct": 71.4,
+        "simulated_throughput": 5.0,
+        "projected_service_level": 0.0,
+        "equipment_operational_pct": 100.0,
+        "state_freshness_seconds": 3.9,
+        "time_to_recovery_seconds": 300.0
+      }
+    }
+  ],
+  "recovery": {
+    "detected_at_tick": 6,
+    "sim_time_seconds": 5760,
+    "time_to_recovery_secs": 300.0,
+    "wave_risk_level": "none",
+    "wave_risk_score": 0.0,
+    "pending_backlog": 0,
+    "wave_completion_pct": 57.1
+  },
+  "maiw_cycles": [
+    {
+      "cycle": 1,
+      "trace_id": "88c56aa3-4a67-450e-b857-6efac6087281",
+      "snapshot_id": "b5807b22-1098-43bb-b287-a93adc99eec4",
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "severity": "high",
+      "summary": "All 4 workers are idle while 5 pending wave tasks remain unassigned, creating a labor constraint that puts 5 tasks at risk.",
+      "recommendations_count": 1,
+      "approvals": [
+        {
+          "pending_id": "8bcc8e75-4417-442e-8929-9b31b067657c",
+          "capability": "warehouse.labor.allocate",
+          "result": {
+            "ok": true,
+            "status": "executed",
+            "capability": "warehouse.labor.allocate",
+            "proposal_id": "9b9f875d-e824-4837-9873-fe9c39b77bde",
+            "original_decision_id": "ee0b1349-9730-4b0a-883d-5c69cfc4b65b",
+            "approval_id": "3a85606a-06b2-4dab-b6b0-82d763849387",
+            "execution_id": "46fe5731-a689-4c14-b326-5baa22b17044",
+            "success": true
+          }
+        }
+      ],
+      "timing": {
+        "time_to_detect_ms": null,
+        "time_to_decision_ms": 4969.4,
+        "time_to_execution_ms": 24.9
+      },
+      "maiw_wall_secs": 5.006
+    },
+    {
+      "cycle": 2,
+      "trace_id": "555a4bf5-eec7-4142-970d-ebc31de05fc3",
+      "snapshot_id": "71ac2ce5-8b8e-40c7-8376-a8a14be69cb9",
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "severity": "high",
+      "summary": "Four pending wave tasks are unassigned despite three idle workers available, creating a labor allocation gap that risks wave completion.",
+      "recommendations_count": 3,
+      "approvals": [
+        {
+          "pending_id": "8c79e2f8-2461-4ec8-bc31-e48513cf1d9a",
+          "capability": "warehouse.labor.allocate",
+          "result": {
+            "ok": true,
+            "status": "executed",
+            "capability": "warehouse.labor.allocate",
+            "proposal_id": "724ef051-90d7-46da-9f47-a03764800f4c",
+            "original_decision_id": "c20cf22a-7eaf-4b97-a319-763bc5c39771",
+            "approval_id": "a3d03d94-444b-4439-b66f-2d387decca56",
+            "execution_id": "6eac29af-8f81-4e87-a946-71b4b09d80eb",
+            "success": true
+          }
+        },
+        {
+          "pending_id": "73f2e929-058c-4c43-b27b-55d7db8e788d",
+          "capability": "warehouse.labor.allocate",
+          "result": {
+            "ok": false,
+            "status": "CAPACITY_UNAVAILABLE",
+            "capability": "warehouse.labor.allocate",
+            "reason": "CAPACITY_UNAVAILABLE: no idle workers available (3 active workers all occupied)"
+          }
+        },
+        {
+          "pending_id": "f4a52785-be83-42ce-a83e-00cd48e348ac",
+          "capability": "warehouse.labor.allocate",
+          "result": {
+            "ok": false,
+            "status": "CAPACITY_UNAVAILABLE",
+            "capability": "warehouse.labor.allocate",
+            "reason": "CAPACITY_UNAVAILABLE: no idle workers available (3 active workers all occupied)"
+          }
+        }
+      ],
+      "timing": {
+        "time_to_detect_ms": null,
+        "time_to_decision_ms": 3986.1,
+        "time_to_execution_ms": 24.5
+      },
+      "maiw_wall_secs": 4.019
+    },
+    {
+      "cycle": 3,
+      "trace_id": "c6c16642-0201-454c-ae35-946172d7b50a",
+      "snapshot_id": "604ef545-44dc-42a0-b558-ba26a4d94938",
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "severity": "high",
+      "summary": "Three pending wave tasks are unassigned despite three idle workers, creating a labor constraint that risks wave completion.",
+      "recommendations_count": 3,
+      "approvals": [],
+      "timing": {
+        "time_to_detect_ms": null,
+        "time_to_decision_ms": 4259.1,
+        "time_to_execution_ms": 24.8
+      },
+      "maiw_wall_secs": 4.291
+    },
+    {
+      "cycle": 4,
+      "trace_id": "66bd75e4-0c35-4882-b53e-8dd53714aed2",
+      "snapshot_id": "56f06880-2820-49f4-8449-9cab916cdf41",
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "severity": "high",
+      "summary": "Three pending wave tasks are unassigned despite three idle workers, creating a labor constraint that risks wave completion.",
+      "recommendations_count": 3,
+      "approvals": [],
+      "timing": {
+        "time_to_detect_ms": null,
+        "time_to_decision_ms": 24.2,
+        "time_to_execution_ms": 16.3
+      },
+      "maiw_wall_secs": 0.046
+    },
+    {
+      "cycle": 5,
+      "trace_id": "2273532c-08aa-4af4-bd80-812f43518cd8",
+      "snapshot_id": "fa5eb399-e9f7-4d0c-b739-50a721deabd9",
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "severity": "high",
+      "summary": "Three pending wave tasks are unassigned despite three idle workers, creating a labor constraint that risks wave completion.",
+      "recommendations_count": 3,
+      "approvals": [],
+      "timing": {
+        "time_to_detect_ms": null,
+        "time_to_decision_ms": 20.9,
+        "time_to_execution_ms": 14.1
+      },
+      "maiw_wall_secs": 0.041
+    },
+    {
+      "cycle": 6,
+      "trace_id": "4e0aea2e-31a6-4495-9614-9e80d0820fb1",
+      "snapshot_id": "1388355d-ef12-43fc-9ac8-9d8f13ebd6af",
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "severity": "high",
+      "summary": "Three pending wave tasks are unassigned despite three idle workers, creating a labor allocation gap that risks wave completion.",
+      "recommendations_count": 3,
+      "approvals": [
+        {
+          "pending_id": "d23dd551-f9ab-4701-aac7-993c4c7a22ce",
+          "capability": "warehouse.labor.allocate",
+          "result": {
+            "ok": true,
+            "status": "executed",
+            "capability": "warehouse.labor.allocate",
+            "proposal_id": "661eaa42-3524-49dc-bac2-514c85d978c9",
+            "original_decision_id": "d8b9cd2a-ed37-4cc2-8bc5-77e4e3e444ef",
+            "approval_id": "1c30a49e-3117-41ad-bf10-8431a732603a",
+            "execution_id": "8963ff1b-10a3-4a88-8d25-fd5f40f854f6",
+            "success": true
+          }
+        },
+        {
+          "pending_id": "c403eed9-1793-40f1-ba46-d824cc18669e",
+          "capability": "warehouse.labor.allocate",
+          "result": {
+            "ok": true,
+            "status": "executed",
+            "capability": "warehouse.labor.allocate",
+            "proposal_id": "1dcb7197-be27-4f7c-b7ae-e0b09e9de563",
+            "original_decision_id": "74e0d143-29dc-48d1-9ea0-79757de62491",
+            "approval_id": "9153214e-a02a-44d7-9b5e-b4201560f594",
+            "execution_id": "4e3f05ae-bb92-46d4-96e9-e8989e1d17ab",
+            "success": true
+          }
+        },
+        {
+          "pending_id": "914507d5-6d60-49e1-a857-50220fb53b54",
+          "capability": "warehouse.labor.allocate",
+          "result": {
+            "ok": false,
+            "status": "CAPACITY_UNAVAILABLE",
+            "capability": "warehouse.labor.allocate",
+            "reason": "CAPACITY_UNAVAILABLE: no idle workers available (3 active workers all occupied)"
+          }
+        }
+      ],
+      "timing": {
+        "time_to_detect_ms": null,
+        "time_to_decision_ms": 8279.7,
+        "time_to_execution_ms": 26.2
+      },
+      "maiw_wall_secs": 8.314
+    },
+    {
+      "cycle": 7,
+      "trace_id": "fcffacfb-00a4-40c5-95a6-977933660bd8",
+      "snapshot_id": "3cd4b304-61f1-409a-b9c3-14c5cf31407d",
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "severity": "medium",
+      "summary": "One pending wave task remains unassigned despite three idle workers, creating a labor allocation gap that risks wave completion delays.",
+      "recommendations_count": 1,
+      "approvals": [
+        {
+          "pending_id": "fe4eef77-3469-452f-805c-b354de37aedf",
+          "capability": "warehouse.labor.allocate",
+          "result": {
+            "ok": true,
+            "status": "executed",
+            "capability": "warehouse.labor.allocate",
+            "proposal_id": "8beac7c4-ab9e-4807-8e9f-e256ef4aa3aa",
+            "original_decision_id": "58b2d5ee-a4f1-43ff-a53d-103745e7d01b",
+            "approval_id": "b3fa33fb-1dc9-4eb6-a182-ba7ed80d10f3",
+            "execution_id": "d16c2e6a-0fe6-4329-bb7f-03fb067b06f3",
+            "success": true
+          }
+        }
+      ],
+      "timing": {
+        "time_to_detect_ms": null,
+        "time_to_decision_ms": 3624.0,
+        "time_to_execution_ms": 24.6
+      },
+      "maiw_wall_secs": 3.656
+    }
+  ],
+  "approval_results": [
+    {
+      "pending_id": "8bcc8e75-4417-442e-8929-9b31b067657c",
+      "capability": "warehouse.labor.allocate",
+      "result": {
+        "ok": true,
+        "status": "executed",
+        "capability": "warehouse.labor.allocate",
+        "proposal_id": "9b9f875d-e824-4837-9873-fe9c39b77bde",
+        "original_decision_id": "ee0b1349-9730-4b0a-883d-5c69cfc4b65b",
+        "approval_id": "3a85606a-06b2-4dab-b6b0-82d763849387",
+        "execution_id": "46fe5731-a689-4c14-b326-5baa22b17044",
+        "success": true
+      }
+    },
+    {
+      "pending_id": "8c79e2f8-2461-4ec8-bc31-e48513cf1d9a",
+      "capability": "warehouse.labor.allocate",
+      "result": {
+        "ok": true,
+        "status": "executed",
+        "capability": "warehouse.labor.allocate",
+        "proposal_id": "724ef051-90d7-46da-9f47-a03764800f4c",
+        "original_decision_id": "c20cf22a-7eaf-4b97-a319-763bc5c39771",
+        "approval_id": "a3d03d94-444b-4439-b66f-2d387decca56",
+        "execution_id": "6eac29af-8f81-4e87-a946-71b4b09d80eb",
+        "success": true
+      }
+    },
+    {
+      "pending_id": "73f2e929-058c-4c43-b27b-55d7db8e788d",
+      "capability": "warehouse.labor.allocate",
+      "result": {
+        "ok": false,
+        "status": "CAPACITY_UNAVAILABLE",
+        "capability": "warehouse.labor.allocate",
+        "reason": "CAPACITY_UNAVAILABLE: no idle workers available (3 active workers all occupied)"
+      }
+    },
+    {
+      "pending_id": "f4a52785-be83-42ce-a83e-00cd48e348ac",
+      "capability": "warehouse.labor.allocate",
+      "result": {
+        "ok": false,
+        "status": "CAPACITY_UNAVAILABLE",
+        "capability": "warehouse.labor.allocate",
+        "reason": "CAPACITY_UNAVAILABLE: no idle workers available (3 active workers all occupied)"
+      }
+    },
+    {
+      "pending_id": "d23dd551-f9ab-4701-aac7-993c4c7a22ce",
+      "capability": "warehouse.labor.allocate",
+      "result": {
+        "ok": true,
+        "status": "executed",
+        "capability": "warehouse.labor.allocate",
+        "proposal_id": "661eaa42-3524-49dc-bac2-514c85d978c9",
+        "original_decision_id": "d8b9cd2a-ed37-4cc2-8bc5-77e4e3e444ef",
+        "approval_id": "1c30a49e-3117-41ad-bf10-8431a732603a",
+        "execution_id": "8963ff1b-10a3-4a88-8d25-fd5f40f854f6",
+        "success": true
+      }
+    },
+    {
+      "pending_id": "c403eed9-1793-40f1-ba46-d824cc18669e",
+      "capability": "warehouse.labor.allocate",
+      "result": {
+        "ok": true,
+        "status": "executed",
+        "capability": "warehouse.labor.allocate",
+        "proposal_id": "1dcb7197-be27-4f7c-b7ae-e0b09e9de563",
+        "original_decision_id": "74e0d143-29dc-48d1-9ea0-79757de62491",
+        "approval_id": "9153214e-a02a-44d7-9b5e-b4201560f594",
+        "execution_id": "4e3f05ae-bb92-46d4-96e9-e8989e1d17ab",
+        "success": true
+      }
+    },
+    {
+      "pending_id": "914507d5-6d60-49e1-a857-50220fb53b54",
+      "capability": "warehouse.labor.allocate",
+      "result": {
+        "ok": false,
+        "status": "CAPACITY_UNAVAILABLE",
+        "capability": "warehouse.labor.allocate",
+        "reason": "CAPACITY_UNAVAILABLE: no idle workers available (3 active workers all occupied)"
+      }
+    },
+    {
+      "pending_id": "fe4eef77-3469-452f-805c-b354de37aedf",
+      "capability": "warehouse.labor.allocate",
+      "result": {
+        "ok": true,
+        "status": "executed",
+        "capability": "warehouse.labor.allocate",
+        "proposal_id": "8beac7c4-ab9e-4807-8e9f-e256ef4aa3aa",
+        "original_decision_id": "58b2d5ee-a4f1-43ff-a53d-103745e7d01b",
+        "approval_id": "b3fa33fb-1dc9-4eb6-a182-ba7ed80d10f3",
+        "execution_id": "d16c2e6a-0fe6-4329-bb7f-03fb067b06f3",
+        "success": true
+      }
+    }
+  ],
+  "final_kpis": {
+    "sim_time_seconds": 5820,
+    "clock_iso": "2026-08-23T09:37:00+00:00",
+    "labor_availability_pct": 50.0,
+    "labor_utilization_pct": 66.7,
+    "pending_backlog": 0,
+    "wave_risk_score": 0.0,
+    "wave_risk_level": "none",
+    "wave_completion_pct": 71.4,
+    "simulated_throughput": 5.0,
+    "projected_service_level": 0.0,
+    "equipment_operational_pct": 100.0,
+    "state_freshness_seconds": 3.9,
+    "time_to_recovery_seconds": 300.0
+  },
+  "delta_from_disruption": {
+    "pending_backlog": -5,
+    "wave_risk_score": -95.0,
+    "wave_completion_pct": 71.4,
+    "simulated_throughput": 5.0,
+    "projected_service_level": 0.0,
+    "labor_utilization_pct": 16.7
+  },
+  "capture_duration_secs": 27.5
+}

@@ -11,7 +11,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Box, Typography, Select, MenuItem, CircularProgress } from '@mui/material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { demoAPI, ScenarioMeta, InjectEventType, DemoStatus } from '../../services/demoAPI';
+import { demoAPI, ScenarioMeta, InjectEventType, DemoStatus, AnalysisResult } from '../../services/demoAPI';
 import { format } from 'date-fns';
 
 // ── Scenario objectives — demo narrative, not duplicating YAML description ────
@@ -114,13 +114,15 @@ function Btn({
 interface Props {
   status: DemoStatus | null;
   onStatusChange: () => void;
+  onAnalysisComplete?: (result: AnalysisResult) => void;
 }
 
-const DemoControlBar: React.FC<Props> = ({ status, onStatusChange }) => {
+const DemoControlBar: React.FC<Props> = ({ status, onStatusChange, onAnalysisComplete }) => {
   const qc = useQueryClient();
   const [selectedScenario, setSelectedScenario] = useState<string>('');
   const [busy, setBusy] = useState<string | null>(null);
   const [injectMsg, setInjectMsg] = useState<string | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   const { data: scenarios = [] } = useQuery<ScenarioMeta[]>({
     queryKey: ['demo-scenarios'],
@@ -175,6 +177,21 @@ const DemoControlBar: React.FC<Props> = ({ status, onStatusChange }) => {
     catch (e: any) { console.error('demo tick:', e.message); }
     finally { setBusy(null); }
   }, [invalidate]);
+
+  const doAnalyze = useCallback(async () => {
+    setBusy('analyze');
+    setAnalysisError(null);
+    try {
+      const result = await demoAPI.analyze();
+      sessionStorage.setItem('maiw_analysis_result', JSON.stringify(result));
+      onAnalysisComplete?.(result);
+      invalidate();
+    } catch (e: any) {
+      setAnalysisError(e?.response?.data?.detail ?? e.message ?? 'Analysis failed');
+    } finally {
+      setBusy(null);
+    }
+  }, [invalidate, onAnalysisComplete]);
 
   const doInject = useCallback(async (def: InjectDef) => {
     setBusy(`inject:${def.type}`);
@@ -270,6 +287,21 @@ const DemoControlBar: React.FC<Props> = ({ status, onStatusChange }) => {
         <Btn label="RESUME" color="#3FB950" disabled={!active || !paused || !!busy} onClick={doResume} loading={busy === 'resume'} />
         <Btn label="RESET" color="#D29922" disabled={!active || !!busy} onClick={doReset} loading={busy === 'reset'} />
         <Btn label="+60s" color="#58A6FF" disabled={!active || paused || !!busy} onClick={doTick} loading={busy === 'tick'} />
+
+        <Box sx={{ width: '1px', height: 20, backgroundColor: '#30363D', flexShrink: 0 }} />
+
+        <Btn
+          label="RUN MAIW"
+          color="#76B900"
+          disabled={!active || !!busy}
+          onClick={doAnalyze}
+          loading={busy === 'analyze'}
+        />
+        {analysisError && (
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#F85149', ml: 0.5 }}>
+            ✕ {analysisError}
+          </Typography>
+        )}
 
         <Box sx={{ flexGrow: 1 }} />
 
@@ -379,6 +411,7 @@ const DemoControlBar: React.FC<Props> = ({ status, onStatusChange }) => {
           </Box>
         </Box>
       )}
+
     </Box>
   );
 };

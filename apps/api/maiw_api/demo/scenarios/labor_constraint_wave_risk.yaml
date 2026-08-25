@@ -169,3 +169,7 @@ timed_events:
       worker_id: "w-003"
       new_status: "on_leave"
       reason: "unexpected_absence"
+
+recovery:
+  wave_risk_max_score: 25
+  backlog_max: 1

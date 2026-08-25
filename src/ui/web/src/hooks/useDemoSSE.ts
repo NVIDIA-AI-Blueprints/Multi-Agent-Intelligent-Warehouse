@@ -9,6 +9,7 @@ export interface SSEEvent {
   asset_id: string | null;
   task_id: string | null;
   worker_id: string | null;
+  sim_time_seconds?: number;
 }
 
 export interface DemoSSEState {

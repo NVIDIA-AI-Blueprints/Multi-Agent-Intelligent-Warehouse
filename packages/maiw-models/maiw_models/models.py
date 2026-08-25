@@ -158,6 +158,10 @@ class ModelRequest(BaseModel):
     temperature: float | None = None
     max_tokens: int | None = None
     stream: bool = False
+    # Caller-supplied correlation ID.  When set, the gateway emits this value
+    # in telemetry instead of generating its own, enabling end-to-end tracing
+    # across State → Agent → Model → Proposal → Decision → Execution.
+    trace_id: str | None = None
 
 
 # ── Route Decision (embedded in response for observability) ───────────────────

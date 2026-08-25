@@ -25,7 +25,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import uuid as _uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +43,9 @@ from maiw_api.demo.world import DemoWarehouseWorld
 logger = logging.getLogger(__name__)
 
 _SCENARIOS_DIR = Path(__file__).parent / "scenarios"
+
+# Event types that count as disruptions for recovery tracking
+_DISRUPTION_EVENT_TYPES = frozenset({"equipment_fault", "worker_absence", "low_stock", "wave_delay"})
 
 
 # ── Scenario definition ───────────────────────────────────────────────────────
@@ -62,6 +67,7 @@ class ScenarioDefinition:
     clock_offset_seconds: int
     initial_state: dict[str, Any]
     timed_events: list[TimedEvent]
+    recovery: dict  # recovery threshold conditions; empty dict = no recovery tracking
 
     def metadata(self) -> dict[str, Any]:
         return {
@@ -95,6 +101,7 @@ def _load_scenario_file(path: Path) -> ScenarioDefinition:
         clock_offset_seconds=raw.get("clock_offset_seconds", 0),
         initial_state=initial_state,
         timed_events=timed_events,
+        recovery=raw.get("recovery", {}),
     )
 
 
@@ -130,6 +137,8 @@ class DemoScenarioController:
     4. SSE handler streams events from bus.subscribe().
     """
 
+    _MAX_KPI_HISTORY = 120
+
     def __init__(self) -> None:
         self.world = DemoWarehouseWorld()
         self.bus = ScenarioEventBus()
@@ -144,6 +153,11 @@ class DemoScenarioController:
         self._paused: bool = False
         self._tick_task: asyncio.Task | None = None
         self._next_event_idx: int = 0   # Index into scenario.timed_events
+        self._kpi_history: list[dict] = []
+        self._last_inject_wall_time: datetime | None = None
+        self._last_analyze_wall_time: datetime | None = None
+        self._recovery_sim_time: int | None = None
+        self._pending_approvals: list[dict] = []
 
     # ── Properties ───────────────────────────────────────────────────────────
 
@@ -186,6 +200,7 @@ class DemoScenarioController:
         self._scenario = defn
         self._paused = False
         self._next_event_idx = 0
+        self._recovery_sim_time = None
 
         logger.info("Demo: started scenario '%s'", scenario_name)
         await self.bus.publish_scenario(
@@ -219,6 +234,10 @@ class DemoScenarioController:
         self.world.reset(self._snapshot)
         self._paused = False
         self._next_event_idx = 0
+        self._kpi_history = []
+        self._last_inject_wall_time = None
+        self._recovery_sim_time = None
+        self._pending_approvals = []
         await self.bus.publish_scenario(
             message="scenario:reset",
             detail=self._scenario.name if self._scenario else "",
@@ -239,8 +258,35 @@ class DemoScenarioController:
         elapsed = self.world.clock.elapsed_seconds
         clock_iso = self.world.clock.now().isoformat()
 
-        await self.bus.publish_tick(elapsed_seconds=seconds, clock_iso=clock_iso)
+        # 1. Fire due scenario timed events
         await self._fire_due_events(elapsed)
+
+        # 2. Advance task progression and complete eligible tasks
+        completed = self._advance_task_progression(elapsed)
+
+        # 3. Check recovery conditions
+        newly_recovered = self._check_recovery(elapsed)
+
+        # 4. Compute KPI snapshot and publish
+        from maiw_api.demo.kpi import DemoKPIEngine
+        kpi = DemoKPIEngine(self.world, self._last_analyze_wall_time).compute()
+        kpi_dict = kpi.to_dict()
+        self._kpi_history.append(kpi_dict)
+        if len(self._kpi_history) > self._MAX_KPI_HISTORY:
+            self._kpi_history = self._kpi_history[-self._MAX_KPI_HISTORY:]
+
+        # 5. Publish events
+        await self.bus.publish_tick(elapsed_seconds=seconds, clock_iso=clock_iso, sim_time_seconds=elapsed)
+        await self.bus.publish_kpi(kpi_dict, elapsed)
+
+        if newly_recovered:
+            ttr = elapsed - (self.world._disruption_sim_time or elapsed)
+            await self.bus.publish(ScenarioEvent(
+                category="RECOVERY",
+                message="scenario:recovery:detected",
+                detail=f"TTR={ttr}s wave_risk={kpi.wave_risk_level} backlog={kpi.pending_backlog}",
+                sim_time_seconds=elapsed,
+            ))
 
     # ── inject ────────────────────────────────────────────────────────────────
 
@@ -262,23 +308,80 @@ class DemoScenarioController:
             raise RuntimeError("No active scenario")
 
         result = await self._apply_event(event_type, payload)
+        self._last_inject_wall_time = datetime.now(tz=timezone.utc)
+
+        # Record first disruption time (excluding tick/metadata events)
+        if event_type in _DISRUPTION_EVENT_TYPES:
+            if self.world._disruption_sim_time is None:
+                self.world._disruption_sim_time = self.world.clock.elapsed_seconds
+
         await self.bus.publish_inject(
             event_type=event_type,
             detail=str(payload),
             asset_id=payload.get("asset_id"),
+            sim_time_seconds=self.world.clock.elapsed_seconds,
         )
         return result
+
+    # ── pending approvals ─────────────────────────────────────────────────────
+
+    def add_pending_approval(
+        self,
+        *,
+        proposal_id: str,
+        decision_id: str,
+        trace_id: str,
+        capability: str,
+        target: str,
+        domain: str,
+        priority: str,
+        objective: str,
+        rationale: str,
+        risk_level: str,
+    ) -> str:
+        """Store a proposal pending human approval. Returns pending_id."""
+        pending_id = str(_uuid.uuid4())
+        self._pending_approvals.append({
+            "pending_id": pending_id,
+            "proposal_id": proposal_id,
+            "decision_id": decision_id,
+            "trace_id": trace_id,
+            "capability": capability,
+            "target": target,
+            "domain": domain,
+            "priority": priority,
+            "objective": objective,
+            "rationale": rationale,
+            "risk_level": risk_level,
+            "queued_at": datetime.now(tz=timezone.utc).isoformat(),
+        })
+        return pending_id
+
+    def remove_pending_approval(self, pending_id: str) -> dict | None:
+        """Remove and return a pending approval by pending_id."""
+        for i, pa in enumerate(self._pending_approvals):
+            if pa["pending_id"] == pending_id:
+                return self._pending_approvals.pop(i)
+        return None
 
     # ── status ────────────────────────────────────────────────────────────────
 
     def status(self) -> dict[str, Any]:
         """Return current controller + world status for GET /demo/status."""
         world_summary = self.world.status_summary() if self.active else {}
+        from maiw_api.demo.kpi import DemoKPIEngine
+        current_kpis = (
+            DemoKPIEngine(self.world, self._last_analyze_wall_time).compute().to_dict()
+            if self.active else None
+        )
         return {
             "active": self.active,
             "scenario": self._scenario.metadata() if self._scenario else None,
             "paused": self._paused,
             "world": world_summary,
+            "current_kpis": current_kpis,
+            "kpi_history": list(self._kpi_history),
+            "pending_approvals": list(self._pending_approvals),
         }
 
     # ── internal helpers ──────────────────────────────────────────────────────
@@ -287,6 +390,51 @@ class DemoScenarioController:
         if self._tick_task is not None and not self._tick_task.done():
             self._tick_task.cancel()
         self._tick_task = None
+
+    def _advance_task_progression(self, elapsed: int) -> int:
+        """Advance in_progress task completion. Returns count of tasks completed this tick."""
+        completed = 0
+        for task in self.world.tasks.values():
+            if task.status != "in_progress":
+                continue
+            if task.started_at_sim_seconds is None:
+                continue
+            time_worked = elapsed - task.started_at_sim_seconds
+            if time_worked >= task.processing_duration_seconds:
+                task.status = "completed"
+                # Release worker
+                if task.assigned_to:
+                    worker = self.world.workers.get(task.assigned_to)
+                    if worker is not None:
+                        worker.current_task_id = None
+                task.assigned_to = None
+                self.world._completion_log.append((elapsed, task.work_units))
+                completed += 1
+        return completed
+
+    def _check_recovery(self, elapsed: int) -> bool:
+        """Check if recovery conditions are met. Returns True if newly recovered."""
+        if not self._scenario or not self._scenario.recovery:
+            return False
+        if self._recovery_sim_time is not None:
+            return False  # already detected
+        if self.world._disruption_sim_time is None:
+            return False  # no disruption recorded yet
+
+        r = self._scenario.recovery
+        from maiw_api.demo.kpi import DemoKPIEngine
+        kpi = DemoKPIEngine(self.world, self._last_analyze_wall_time).compute()
+
+        if "wave_risk_max_score" in r and kpi.wave_risk_score > r["wave_risk_max_score"]:
+            return False
+        if "backlog_max" in r and kpi.pending_backlog > r["backlog_max"]:
+            return False
+        if "labor_availability_min_pct" in r and kpi.labor_availability_pct < r["labor_availability_min_pct"] * 100:
+            return False
+
+        self.world._recovery_sim_time = elapsed
+        self._recovery_sim_time = elapsed  # also track at controller level
+        return True
 
     async def _fire_due_events(self, elapsed: int) -> None:
         """Process any timed events whose offset_seconds <= current elapsed."""
@@ -301,6 +449,10 @@ class DemoScenarioController:
             self._next_event_idx += 1
             try:
                 await self._apply_event(ev.type, ev.payload)
+                # Record first disruption time for timed disruption events
+                if ev.type in _DISRUPTION_EVENT_TYPES:
+                    if self.world._disruption_sim_time is None:
+                        self.world._disruption_sim_time = elapsed
                 await self.bus.publish_inject(
                     event_type=f"timed:{ev.type}",
                     detail=str(ev.payload),

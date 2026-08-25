@@ -135,7 +135,7 @@ describe('DemoControlBar', () => {
       <QueryClientProvider client={qc}>
         <ThemeProvider theme={nvidiaTheme}>
           <DemoControlBar
-            status={{ active: true, paused: false, scenario: { name: 'healthy_baseline', display_name: 'Healthy Baseline', description: '', tags: [] }, world: null }}
+            status={{ active: true, paused: false, scenario: { name: 'healthy_baseline', display_name: 'Healthy Baseline', description: '', tags: [] }, world: null, current_kpis: null, kpi_history: [], pending_approvals: [] }}
             onStatusChange={onStatusChange}
           />
         </ThemeProvider>

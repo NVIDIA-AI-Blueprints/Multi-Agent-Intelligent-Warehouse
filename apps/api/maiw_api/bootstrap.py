@@ -238,13 +238,22 @@ async def get_runtime() -> MAIWRuntime:
     if runtime.mcp_client is not None:
         try:
             from maiw_skills.equipment.skills import EquipmentStatusSkill
+            from maiw_skills.labor.skills import LaborCapacitySkill
+            from maiw_skills.wave.skills import WaveGetSkill
             from maiw_state import WarehouseStateProvider
 
             equipment_status_skill = EquipmentStatusSkill(runtime.mcp_client)
+            labor_capacity_skill = LaborCapacitySkill(runtime.mcp_client)
+            wave_get_skill = WaveGetSkill(runtime.mcp_client)
             runtime.state_provider = WarehouseStateProvider(
                 equipment_status_skill=equipment_status_skill,
+                labor_capacity_skill=labor_capacity_skill,
+                wave_get_skill=wave_get_skill,
             )
-            logger.info("MAIW bootstrap: WarehouseStateProvider ready")
+            logger.info(
+                "MAIW bootstrap: WarehouseStateProvider ready "
+                "(equipment + labor + wave skills wired)"
+            )
         except Exception as exc:
             logger.warning(
                 "MAIW bootstrap: WarehouseStateProvider unavailable — %s", exc

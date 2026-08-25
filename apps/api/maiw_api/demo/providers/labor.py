@@ -101,10 +101,23 @@ class SimulationLaborProvider:
         self, request: LaborAllocateRequest
     ) -> LaborAllocateResult:
         task = self._world.tasks.get(request.task_id)
-        if task is not None:
-            task.status = "in_progress"
-            if request.worker_ids:
-                task.assigned_to = request.worker_ids[0]
+        if task is None:
+            return LaborAllocateResult(
+                success=False,
+                allocation_id=str(uuid.uuid4()),
+                task_id=request.task_id,
+                worker_ids=request.worker_ids,
+                proposal_id=request.proposal_id,
+                decision_id=request.decision_id,
+                source=self._world.SOURCE,
+                message=f"[SIM] NO_OP: task '{request.task_id}' not found in world state",
+            )
+
+        task.status = "in_progress"
+        if request.worker_ids:
+            task.assigned_to = request.worker_ids[0]
+        # Set simulation start time for task progression
+        task.started_at_sim_seconds = self._world.clock.elapsed_seconds
 
         for worker_id in request.worker_ids:
             worker = self._world.workers.get(worker_id)

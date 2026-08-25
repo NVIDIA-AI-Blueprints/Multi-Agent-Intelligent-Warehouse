@@ -24,11 +24,29 @@ export interface DemoWorldSummary {
   inventory: { total_skus: number; low_stock: number };
 }
 
+export interface PendingApproval {
+  pending_id: string;
+  proposal_id: string;
+  decision_id: string;
+  trace_id: string;
+  capability: string;
+  target: string;
+  domain: string;
+  risk_level: string;
+  objective: string;
+  rationale: string;
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  queued_at: string;
+}
+
 export interface DemoStatus {
   active: boolean;
   paused: boolean;
   scenario: ScenarioMeta | null;
   world: DemoWorldSummary | null;
+  current_kpis: KPISnapshot | null;
+  kpi_history: KPISnapshot[];
+  pending_approvals: PendingApproval[];
 }
 
 export type InjectEventType =
@@ -39,6 +57,93 @@ export type InjectEventType =
   | 'worker_return'
   | 'task_deadline'
   | 'wave_delay';
+
+export interface RecommendedAction {
+  domain: 'equipment' | 'labor' | 'wave' | 'inventory';
+  capability: string;
+  target: string;
+  objective: string;
+  rationale: string;
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  subtype: string | null;
+}
+
+export interface AnalysisAssessment {
+  snapshot_id: string;
+  warehouse_id: string;
+  assessed_at: string;
+  summary: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  domains_affected: string[];
+  facts_observed: string[];
+  recommendations: RecommendedAction[];
+  model_id: string;
+  routing_rule: string;
+  routing_reason: string;
+  latency_ms: number;
+}
+
+export interface LifecycleRecord {
+  phase: 'OBSERVE' | 'REASON' | 'SKILL' | 'PROPOSE' | 'DECIDE' | 'EXECUTE' | 'OBSERVE_OUTCOME';
+  [key: string]: any;
+}
+
+export interface KPISnapshot {
+  sim_time_seconds: number;
+  clock_iso: string;
+  // EXACT metrics
+  equipment_total: number;
+  equipment_operational_pct: number;
+  labor_total: number;
+  labor_availability_pct: number;
+  labor_utilization_pct: number;
+  pending_backlog: number;
+  wave_risk_score: number;
+  wave_risk_level: 'none' | 'low' | 'medium' | 'high' | 'critical';
+  low_stock_count: number;
+  state_freshness_seconds: number | null;
+  // SIMULATION-DERIVED PROXY metrics
+  service_risk_index: number;
+  capacity_throughput_proxy: number;
+  // EXACT WITHIN SIMULATION — new in Increment 2
+  wave_completion_pct: number;        // completed wave tasks / total wave tasks * 100
+  simulated_throughput: number;       // work units completed in last 3600 sim-seconds
+  // SIMULATION-DERIVED — new in Increment 2
+  projected_service_level: number;    // fraction of deadline tasks projected on-time (0-100)
+  time_to_recovery_seconds: number | null;  // null until recovery conditions met
+}
+
+export interface KPIDelta {
+  equipment_operational_pct: number;
+  labor_availability_pct: number;
+  labor_utilization_pct: number;
+  pending_backlog: number;
+  wave_risk_score: number;
+  low_stock_count: number;
+  service_risk_index: number;
+  capacity_throughput_proxy: number;
+  wave_completion_pct: number;
+  simulated_throughput: number;
+  projected_service_level: number;
+}
+
+export interface KPITiming {
+  time_to_detect_ms: number | null;
+  time_to_decision_ms: number;
+  time_to_execution_ms: number;
+}
+
+export interface AnalysisResult {
+  ok: boolean;
+  trace_id: string;
+  assessment: AnalysisAssessment;
+  proposal_results: Array<{ status: string; capability: string; [key: string]: any }>;
+  lifecycle: LifecycleRecord[];
+  pre_kpis?: KPISnapshot;
+  post_kpis?: KPISnapshot;
+  kpi_delta?: KPIDelta;
+  timing?: KPITiming;
+}
 
 // ── Scenario listing ──────────────────────────────────────────────────────────
 
@@ -88,6 +193,99 @@ async function getStatus(): Promise<DemoStatus> {
   return r.data as DemoStatus;
 }
 
+// ── MAIW Analysis ─────────────────────────────────────────────────────────────
+
+async function analyze(): Promise<AnalysisResult> {
+  const r = await http.post('/demo/analyze');
+  return r.data as AnalysisResult;
+}
+
+// ── Approval governance ───────────────────────────────────────────────────────
+
+async function approvePending(pending_id: string, approved_by: string = 'operator'): Promise<any> {
+  const r = await http.post('/demo/approve', { pending_id, approved_by });
+  return r.data;
+}
+
+async function rejectPending(pending_id: string, approved_by: string = 'operator'): Promise<any> {
+  const r = await http.post('/demo/reject', { pending_id, approved_by });
+  return r.data;
+}
+
+// ── Counterfactual ────────────────────────────────────────────────────────────
+
+export interface CounterfactualKPI {
+  sim_time_seconds: number | null;
+  pending_backlog: number | null;
+  wave_risk_score: number | null;
+  wave_risk_level: string | null;
+  wave_completion_pct: number | null;
+  simulated_throughput: number | null;
+  projected_service_level: number | null;
+  labor_availability_pct: number | null;
+  labor_utilization_pct: number | null;
+}
+
+export interface CounterfactualTick {
+  tick: number;
+  elapsed_seconds: number;
+  kpis: CounterfactualKPI;
+  recovery_detected?: boolean;
+  maiw_cycle?: number;
+}
+
+export interface CounterfactualRun {
+  run_type: 'control' | 'maiw';
+  t0_kpis: CounterfactualKPI;
+  final_kpis: CounterfactualKPI;
+  trajectory: CounterfactualTick[];
+  recovery: {
+    detected_at_tick: number;
+    sim_time_seconds: number;
+    time_to_recovery_secs: number;
+    wave_risk_level: string;
+    wave_risk_score: number;
+    pending_backlog: number;
+    wave_completion_pct: number;
+  } | null;
+  peak_backlog: number;
+  peak_wave_risk_score: number;
+  backlog_auc: number;
+  wave_risk_auc: number;
+  maiw_cycles?: Array<{ cycle: number; severity?: string; model_id?: string; approvals: any[] }>;
+}
+
+export interface CounterfactualResult {
+  evaluated_at: string;
+  scenario: string;
+  horizon_seconds: number;
+  tick_seconds: number;
+  label: string;
+  control: CounterfactualRun;
+  maiw: CounterfactualRun;
+  comparison: {
+    control_recovery_seconds: number | null;
+    maiw_recovery_seconds: number | null;
+    recovery_delta_seconds: number | null;
+    control_never_recovered: boolean;
+    peak_backlog_control: number;
+    peak_backlog_maiw: number;
+    backlog_auc_control: number;
+    backlog_auc_maiw: number;
+    backlog_auc_reduction_pct: number | null;
+    wave_risk_auc_control: number;
+    wave_risk_auc_maiw: number;
+    wave_risk_auc_reduction_pct: number | null;
+    at_horizon: Record<string, Record<string, { control: number | null; maiw: number | null }>>;
+  };
+  eval_duration_secs: number;
+}
+
+async function getCounterfactualResult(): Promise<CounterfactualResult> {
+  const r = await http.get('/demo/counterfactual/result');
+  return r.data as CounterfactualResult;
+}
+
 // Returns null if demo mode is not active (503)
 async function getStatusSafe(): Promise<DemoStatus | null> {
   try {
@@ -108,4 +306,8 @@ export const demoAPI = {
   inject,
   getStatus,
   getStatusSafe,
+  analyze,
+  approvePending,
+  rejectPending,
+  getCounterfactualResult,
 };

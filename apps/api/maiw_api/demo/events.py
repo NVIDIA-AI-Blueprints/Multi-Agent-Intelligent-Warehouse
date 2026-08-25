@@ -27,12 +27,23 @@ logger = logging.getLogger(__name__)
 # ── Event types ───────────────────────────────────────────────────────────────
 
 EventCategory = Literal[
-    "STATE",    # Scenario lifecycle (start/pause/resume/reset)
-    "INJECT",   # Manual fault / event injection
-    "TICK",     # Clock tick
-    "EXECUTE",  # Provider write executed (assign/release/maintenance/allocate/reprioritize)
-    "MCP",      # MCP domain read activity
-    "API",      # Demo API calls
+    "STATE",          # Scenario lifecycle (start/pause/resume/reset)
+    "INJECT",         # Manual fault / event injection
+    "TICK",           # Clock tick
+    "EXECUTE",        # Provider write executed (assign/release/maintenance/allocate/reprioritize)
+    "MCP",            # MCP domain read activity
+    "API",            # Demo API calls
+    # MAIW Analysis lifecycle
+    "OBSERVE",        # State assembly from SimulationProviders
+    "REASON",         # ModelGateway call + OperationalAssessment produced
+    "SKILL",          # Proposal builder invoked
+    "PROPOSE",        # ActionProposal constructed
+    "DECIDE",         # DecisionEngine evaluated proposal
+    "OBSERVE_OUTCOME",  # Post-execution state refresh
+    "KPI",            # KPI snapshot
+    "RECOVERY",       # Recovery conditions met after disruption
+    "APPROVE",        # Human approved a pending proposal
+    "REJECT",         # Human rejected a pending proposal
 ]
 
 
@@ -46,6 +57,7 @@ class ScenarioEvent:
     asset_id: str | None = None
     task_id: str | None = None
     worker_id: str | None = None
+    sim_time_seconds: int | None = None
     ts: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
 
     def to_sse_dict(self) -> dict:
@@ -59,6 +71,7 @@ class ScenarioEvent:
             "asset_id": self.asset_id,
             "task_id": self.task_id,
             "worker_id": self.worker_id,
+            "sim_time_seconds": self.sim_time_seconds,
         }
 
 
@@ -131,20 +144,23 @@ class ScenarioEventBus:
         ))
 
     async def publish_inject(
-        self, event_type: str, detail: str = "", asset_id: str | None = None
+        self, event_type: str, detail: str = "", asset_id: str | None = None,
+        sim_time_seconds: int | None = None,
     ) -> None:
         await self.publish(ScenarioEvent(
             category="INJECT",
             message=f"inject:{event_type}",
             detail=detail,
             asset_id=asset_id,
+            sim_time_seconds=sim_time_seconds,
         ))
 
-    async def publish_tick(self, elapsed_seconds: int, clock_iso: str) -> None:
+    async def publish_tick(self, elapsed_seconds: int, clock_iso: str, sim_time_seconds: int | None = None) -> None:
         await self.publish(ScenarioEvent(
             category="TICK",
             message=f"clock tick +{elapsed_seconds}s",
             detail=clock_iso,
+            sim_time_seconds=sim_time_seconds,
         ))
 
     async def publish_equipment_write(
@@ -174,4 +190,130 @@ class ScenarioEventBus:
             category="EXECUTE",
             message="wave.reprioritize",
             detail=f"zone={zone or 'all'} priority={new_priority} tasks={tasks_updated}",
+        ))
+
+    async def publish_observe(
+        self, message: str, detail: str = "", trace_id: str | None = None,
+        sim_time_seconds: int | None = None,
+    ) -> None:
+        await self.publish(ScenarioEvent(
+            category="OBSERVE",
+            message=message,
+            detail=detail if not trace_id else f"{detail} trace={trace_id[:8]}" if detail else f"trace={trace_id[:8]}",
+            sim_time_seconds=sim_time_seconds,
+        ))
+
+    async def publish_reason(
+        self, model_id: str, routing_rule: str, summary: str, trace_id: str | None = None,
+        sim_time_seconds: int | None = None,
+    ) -> None:
+        detail = f"model={model_id} rule={routing_rule}"
+        if trace_id:
+            detail += f" trace={trace_id[:8]}"
+        await self.publish(ScenarioEvent(
+            category="REASON",
+            message=summary[:120],
+            detail=detail,
+            sim_time_seconds=sim_time_seconds,
+        ))
+
+    async def publish_skill(
+        self, capability: str, target: str, trace_id: str | None = None,
+        sim_time_seconds: int | None = None,
+    ) -> None:
+        detail = f"target={target}"
+        if trace_id:
+            detail += f" trace={trace_id[:8]}"
+        await self.publish(ScenarioEvent(
+            category="SKILL",
+            message=capability,
+            detail=detail,
+            sim_time_seconds=sim_time_seconds,
+        ))
+
+    async def publish_propose(
+        self, action: str, proposal_id: str, trace_id: str | None = None,
+        sim_time_seconds: int | None = None,
+    ) -> None:
+        detail = f"proposal={proposal_id[:8]}"
+        if trace_id:
+            detail += f" trace={trace_id[:8]}"
+        await self.publish(ScenarioEvent(
+            category="PROPOSE",
+            message=action,
+            detail=detail,
+            sim_time_seconds=sim_time_seconds,
+        ))
+
+    async def publish_decide(
+        self, outcome: str, proposal_id: str, decision_id: str, trace_id: str | None = None,
+        sim_time_seconds: int | None = None,
+    ) -> None:
+        detail = f"proposal={proposal_id[:8]} decision={decision_id[:8]}"
+        if trace_id:
+            detail += f" trace={trace_id[:8]}"
+        await self.publish(ScenarioEvent(
+            category="DECIDE",
+            message=f"outcome={outcome}",
+            detail=detail,
+            sim_time_seconds=sim_time_seconds,
+        ))
+
+    async def publish_observe_outcome(
+        self, message: str, detail: str = "", trace_id: str | None = None,
+        sim_time_seconds: int | None = None,
+    ) -> None:
+        if trace_id:
+            detail = f"{detail} trace={trace_id[:8]}" if detail else f"trace={trace_id[:8]}"
+        await self.publish(ScenarioEvent(
+            category="OBSERVE_OUTCOME",
+            message=message,
+            detail=detail,
+            sim_time_seconds=sim_time_seconds,
+        ))
+
+    async def publish_approve(
+        self,
+        capability: str,
+        proposal_id: str,
+        approved_by: str,
+        *,
+        trace_id: str | None = None,
+        sim_time_seconds: int | None = None,
+    ) -> None:
+        await self.publish(ScenarioEvent(
+            category="APPROVE",
+            message=f"approved:{capability}",
+            detail=f"proposal={proposal_id[:8]} by={approved_by}",
+            sim_time_seconds=sim_time_seconds,
+        ))
+
+    async def publish_reject(
+        self,
+        capability: str,
+        proposal_id: str,
+        rejected_by: str,
+        *,
+        trace_id: str | None = None,
+        sim_time_seconds: int | None = None,
+    ) -> None:
+        await self.publish(ScenarioEvent(
+            category="REJECT",
+            message=f"rejected:{capability}",
+            detail=f"proposal={proposal_id[:8]} by={rejected_by}",
+            sim_time_seconds=sim_time_seconds,
+        ))
+
+    async def publish_kpi(self, kpi_dict: dict, sim_time_seconds: int) -> None:
+        detail = (
+            f"equip={kpi_dict.get('equipment_operational_pct', 0):.0f}% "
+            f"labor={kpi_dict.get('labor_availability_pct', 0):.0f}% "
+            f"backlog={kpi_dict.get('pending_backlog', 0)} "
+            f"wave={kpi_dict.get('wave_risk_level', '?')}"
+        )
+        await self.publish(ScenarioEvent(
+            category="KPI",
+            message="kpi:snapshot",
+            detail=detail,
+            sim_time_seconds=sim_time_seconds,
         ))
