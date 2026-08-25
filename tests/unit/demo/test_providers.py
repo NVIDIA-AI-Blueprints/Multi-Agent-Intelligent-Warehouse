@@ -20,32 +20,46 @@ from maiw_mcp.contracts.labor import LaborCapacityRequest, LaborAllocateRequest
 from maiw_mcp.contracts.wave import WaveRiskRequest, WaveReprioritizeRequest
 from maiw_mcp.errors import BackendUnavailable
 
-
 _STATE = {
     "clock_offset_seconds": 0,
     "inventory": [
         {
-            "sku": "SKU-001", "name": "Widget A", "zone": "A1",
-            "location_id": "A-01-01", "quantity_available": 100,
-            "quantity_reserved": 10, "reorder_point": 20,
+            "sku": "SKU-001",
+            "name": "Widget A",
+            "zone": "A1",
+            "location_id": "A-01-01",
+            "quantity_available": 100,
+            "quantity_reserved": 10,
+            "reorder_point": 20,
         }
     ],
     "equipment": [
         {
-            "asset_id": "AGV-01", "equipment_type": "agv", "model": "TestAGV",
-            "zone": "A1", "status": "available", "battery_pct": 85.0,
+            "asset_id": "AGV-01",
+            "equipment_type": "agv",
+            "model": "TestAGV",
+            "zone": "A1",
+            "status": "available",
+            "battery_pct": 85.0,
         }
     ],
     "workers": [
         {
-            "worker_id": "w-001", "username": "alice", "full_name": "Alice Smith",
-            "role": "operator", "status": "active", "zone": "A1",
+            "worker_id": "w-001",
+            "username": "alice",
+            "full_name": "Alice Smith",
+            "role": "operator",
+            "status": "active",
+            "zone": "A1",
         }
     ],
     "tasks": [
         {
-            "task_id": "t-001", "task_type": "PICK", "zone": "A1",
-            "status": "pending", "priority": "high",
+            "task_id": "t-001",
+            "task_type": "PICK",
+            "zone": "A1",
+            "status": "pending",
+            "priority": "high",
         }
     ],
 }
@@ -65,11 +79,14 @@ def bus():
 
 # ── SimulationInventoryProvider ───────────────────────────────────────────────
 
+
 class TestSimulationInventoryProvider:
     def test_get_inventory_known_sku(self, world):
         provider = SimulationInventoryProvider(world)
         req = InventoryLookupRequest(sku="SKU-001")
-        result = asyncio.get_event_loop().run_until_complete(provider.get_inventory(req))
+        result = asyncio.get_event_loop().run_until_complete(
+            provider.get_inventory(req)
+        )
         assert result.sku == "SKU-001"
         assert result.total_available == 100
         assert result.warehouse_id == "DC-47"
@@ -80,7 +97,9 @@ class TestSimulationInventoryProvider:
         world.inventory["SKU-001"].quantity_available = 15
         provider = SimulationInventoryProvider(world)
         req = InventoryLookupRequest(sku="SKU-001")
-        result = asyncio.get_event_loop().run_until_complete(provider.get_inventory(req))
+        result = asyncio.get_event_loop().run_until_complete(
+            provider.get_inventory(req)
+        )
         assert result.is_low_stock
 
     def test_get_inventory_unknown_sku_raises(self, world):
@@ -92,11 +111,14 @@ class TestSimulationInventoryProvider:
     def test_get_inventory_observed_at_matches_clock(self, world):
         provider = SimulationInventoryProvider(world)
         req = InventoryLookupRequest(sku="SKU-001")
-        result = asyncio.get_event_loop().run_until_complete(provider.get_inventory(req))
+        result = asyncio.get_event_loop().run_until_complete(
+            provider.get_inventory(req)
+        )
         assert result.observed_at == world.clock.now()
 
 
 # ── SimulationEquipmentProvider ───────────────────────────────────────────────
+
 
 class TestSimulationEquipmentProvider:
     def test_get_equipment_status_all(self, world, bus):
@@ -166,6 +188,7 @@ class TestSimulationEquipmentProvider:
 
 # ── SimulationLaborProvider ───────────────────────────────────────────────────
 
+
 class TestSimulationLaborProvider:
     def test_get_labor_capacity(self, world, bus):
         provider = SimulationLaborProvider(world, bus)
@@ -207,6 +230,7 @@ class TestSimulationLaborProvider:
 
 
 # ── SimulationWaveProvider ────────────────────────────────────────────────────
+
 
 class TestSimulationWaveProvider:
     def test_get_wave_risk_with_unassigned_pending(self, world, bus):

@@ -155,7 +155,9 @@ def test_canonical_entrypoint_in_dockerfile_backend():
         pytest.skip("Dockerfile.backend not found")
     content = dockerfile.read_text()
     assert "maiw_api.app:app" in content, "Dockerfile.backend must use maiw_api.app:app"
-    assert "src.api.app:app" not in content, "Dockerfile.backend must not reference src.api.app:app"
+    assert (
+        "src.api.app:app" not in content
+    ), "Dockerfile.backend must not reference src.api.app:app"
 
 
 def test_no_load_dotenv_at_import_time_in_app():
@@ -181,7 +183,9 @@ def test_no_load_dotenv_at_import_time_in_app():
 
 def test_diagnostic_stub_removed():
     """GET /equipment/assignments/test must not exist in the equipment router."""
-    equipment_router = REPO_ROOT / "apps" / "api" / "maiw_api" / "routers" / "equipment.py"
+    equipment_router = (
+        REPO_ROOT / "apps" / "api" / "maiw_api" / "routers" / "equipment.py"
+    )
     if not equipment_router.exists():
         pytest.skip("equipment router not found")
     content = equipment_router.read_text()
@@ -193,7 +197,9 @@ def test_diagnostic_stub_removed():
 
 def test_runtime_status_router_exists():
     """runtime_status.py must exist and define the /api/v1/runtime/status route."""
-    router_path = REPO_ROOT / "apps" / "api" / "maiw_api" / "routers" / "runtime_status.py"
+    router_path = (
+        REPO_ROOT / "apps" / "api" / "maiw_api" / "routers" / "runtime_status.py"
+    )
     assert router_path.exists(), "maiw_api/routers/runtime_status.py must exist"
     content = router_path.read_text()
     assert "/runtime/status" in content, "runtime_status.py must define /runtime/status"
@@ -206,4 +212,6 @@ def test_mcp_server_containers_in_compose():
         pytest.skip("docker-compose.dev.yaml not found")
     content = compose.read_text()
     for domain in ("mcp-inventory", "mcp-equipment", "mcp-labor", "mcp-wave"):
-        assert domain in content, f"docker-compose.dev.yaml must define {domain} service"
+        assert (
+            domain in content
+        ), f"docker-compose.dev.yaml must define {domain} service"

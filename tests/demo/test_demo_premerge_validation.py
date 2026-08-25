@@ -30,6 +30,7 @@ Checks:
   13. Inventory low_stock inject visible through SimulationInventoryProvider
   14. Scenario listing contains exactly five expected names
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -61,11 +62,11 @@ def _run(coro):
 
 # ── scenario registry ─────────────────────────────────────────────────────────
 SCENARIO_REGISTRY = {
-    "healthy_baseline":           {"rng_seed": 42, "clock_offset_seconds": 0},
-    "equipment_failure":          {"rng_seed": 42, "clock_offset_seconds": 1800},
+    "healthy_baseline": {"rng_seed": 42, "clock_offset_seconds": 0},
+    "equipment_failure": {"rng_seed": 42, "clock_offset_seconds": 1800},
     "labor_constraint_wave_risk": {"rng_seed": 42, "clock_offset_seconds": 5400},
-    "stale_state":                {"rng_seed": 42, "clock_offset_seconds": -2700},
-    "state_drift":                {"rng_seed": 42, "clock_offset_seconds": 3600},
+    "stale_state": {"rng_seed": 42, "clock_offset_seconds": -2700},
+    "state_drift": {"rng_seed": 42, "clock_offset_seconds": 3600},
 }
 
 # Timeline log — printed in the final summary
@@ -89,6 +90,7 @@ def ctrl():
 # 1. All five scenarios load correctly
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.parametrize("name,meta", SCENARIO_REGISTRY.items())
 def test_scenario_loads(name, meta, ctrl):
     _run(ctrl.start(name))
@@ -99,12 +101,12 @@ def test_scenario_loads(name, meta, ctrl):
     assert ctrl._scenario.clock_offset_seconds == meta["clock_offset_seconds"]
 
     s = ctrl.status()
-    eq  = s["world"]["equipment"]["total"]
-    wk  = s["world"]["workers"]["total"]
+    eq = s["world"]["equipment"]["total"]
+    wk = s["world"]["workers"]["total"]
     inv = s["world"]["inventory"]["total_skus"]
 
-    assert eq  > 0, f"{name}: no equipment seeded"
-    assert wk  > 0, f"{name}: no workers seeded"
+    assert eq > 0, f"{name}: no equipment seeded"
+    assert wk > 0, f"{name}: no workers seeded"
     assert inv > 0, f"{name}: no inventory seeded"
 
     clock_iso = s["world"]["clock_iso"]
@@ -115,56 +117,83 @@ def test_scenario_loads(name, meta, ctrl):
 # 2–3. Equipment write/restore propagates through shared world → provider
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def test_equipment_fault_propagates_to_provider(ctrl):
     _run(ctrl.start("healthy_baseline"))
 
     # Find first AGV
-    agv = next((a for a in ctrl.world.equipment.values() if a.equipment_type == "agv"), None)
+    agv = next(
+        (a for a in ctrl.world.equipment.values() if a.equipment_type == "agv"), None
+    )
     assert agv is not None
     asset_id = agv.asset_id
     original_status = agv.status
 
     # Fault inject
-    _run(ctrl.inject("equipment_fault", {
-        "asset_id": asset_id,
-        "fault_code": "E_MOTOR_OVERTEMP",
-        "new_status": "offline",
-    }))
+    _run(
+        ctrl.inject(
+            "equipment_fault",
+            {
+                "asset_id": asset_id,
+                "fault_code": "E_MOTOR_OVERTEMP",
+                "new_status": "offline",
+            },
+        )
+    )
 
     # Read back through provider (same world object)
-    result = _run(ctrl.providers.equipment.get_equipment_status(
-        EquipmentStatusRequest(asset_id=asset_id)
-    ))
+    result = _run(
+        ctrl.providers.equipment.get_equipment_status(
+            EquipmentStatusRequest(asset_id=asset_id)
+        )
+    )
     assert len(result.equipment) == 1
     assert result.equipment[0].status == "offline"
     assert result.equipment[0].metadata.get("fault_code") == "E_MOTOR_OVERTEMP"
 
-    _log("healthy_baseline",
-         f"  equipment_fault: {asset_id} {original_status}→offline (propagated through provider)")
+    _log(
+        "healthy_baseline",
+        f"  equipment_fault: {asset_id} {original_status}→offline (propagated through provider)",
+    )
 
 
 def test_equipment_restore_propagates_to_provider(ctrl):
     _run(ctrl.start("healthy_baseline"))
 
-    agv = next((a for a in ctrl.world.equipment.values() if a.equipment_type == "agv"), None)
+    agv = next(
+        (a for a in ctrl.world.equipment.values() if a.equipment_type == "agv"), None
+    )
     asset_id = agv.asset_id
 
-    _run(ctrl.inject("equipment_fault", {
-        "asset_id": asset_id, "fault_code": "E_TEST", "new_status": "offline",
-    }))
+    _run(
+        ctrl.inject(
+            "equipment_fault",
+            {
+                "asset_id": asset_id,
+                "fault_code": "E_TEST",
+                "new_status": "offline",
+            },
+        )
+    )
     _run(ctrl.inject("equipment_restore", {"asset_id": asset_id}))
 
-    result = _run(ctrl.providers.equipment.get_equipment_status(
-        EquipmentStatusRequest(asset_id=asset_id)
-    ))
+    result = _run(
+        ctrl.providers.equipment.get_equipment_status(
+            EquipmentStatusRequest(asset_id=asset_id)
+        )
+    )
     assert len(result.equipment) == 1
     assert result.equipment[0].status == "available"
-    _log("healthy_baseline", f"  equipment_restore: {asset_id} → available (confirmed via provider)")
+    _log(
+        "healthy_baseline",
+        f"  equipment_restore: {asset_id} → available (confirmed via provider)",
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 4. Wave delay sets pending task priorities to low
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def test_wave_delay_sets_low_priority(ctrl):
     _run(ctrl.start("healthy_baseline"))
@@ -179,17 +208,20 @@ def test_wave_delay_sets_low_priority(ctrl):
     pending_after = [t for t in wave_after.tasks if t.status == "pending"]
 
     for t in pending_after:
-        assert t.priority == "low", (
-            f"Task {t.task_id} priority should be 'low' after wave_delay, got {t.priority}"
-        )
+        assert (
+            t.priority == "low"
+        ), f"Task {t.task_id} priority should be 'low' after wave_delay, got {t.priority}"
 
-    _log("healthy_baseline",
-         f"  wave_delay: {len(pending_after)} pending tasks → priority=low (world mutation visible)")
+    _log(
+        "healthy_baseline",
+        f"  wave_delay: {len(pending_after)} pending tasks → priority=low (world mutation visible)",
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 5. equipment_failure: timed event fires AGV-02 offline at t=60 s
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def test_equipment_failure_timed_event(ctrl):
     _run(ctrl.start("equipment_failure"))
@@ -206,14 +238,17 @@ def test_equipment_failure_timed_event(ctrl):
     assert agv02_after.battery_pct == 8.0
 
     s = ctrl.status()
-    _log("equipment_failure",
-         f"  t=60s: AGV-02 → offline (fault=E_BATT_LOW, battery=8%)  "
-         f"eq_offline={s['world']['equipment']['offline']}")
+    _log(
+        "equipment_failure",
+        f"  t=60s: AGV-02 → offline (fault=E_BATT_LOW, battery=8%)  "
+        f"eq_offline={s['world']['equipment']['offline']}",
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 6. labor_constraint: worker_absence at t=120 s; cross-domain coherence
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def test_labor_constraint_cross_domain(ctrl):
     _run(ctrl.start("labor_constraint_wave_risk"))
@@ -238,14 +273,17 @@ def test_labor_constraint_cross_domain(ctrl):
     wave = _run(ctrl.providers.wave.get_wave(WaveGetRequest()))
     assert len(wave.tasks) > 0
 
-    _log("labor_constraint_wave_risk",
-         f"  t=120s: w-003 on_leave  active={active_before}→{active_after}  "
-         f"wave_tasks_readable={len(wave.tasks)} (cross-domain ✓)")
+    _log(
+        "labor_constraint_wave_risk",
+        f"  t=120s: w-003 on_leave  active={active_before}→{active_after}  "
+        f"wave_tasks_readable={len(wave.tasks)} (cross-domain ✓)",
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 7. stale_state: clock is before shift start (45 min stale)
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def test_stale_state_clock_is_before_shift_start(ctrl):
     _run(ctrl.start("stale_state"))
@@ -255,21 +293,24 @@ def test_stale_state_clock_is_before_shift_start(ctrl):
     elapsed = ctrl.world.clock.elapsed_seconds
 
     # EPOCH=08:00 UTC; offset=-2700 → 07:15:00 UTC
-    assert "07:15" in clock_iso, (
-        f"stale_state clock should show 07:15 UTC (45 min before shift), got {clock_iso}"
-    )
+    assert (
+        "07:15" in clock_iso
+    ), f"stale_state clock should show 07:15 UTC (45 min before shift), got {clock_iso}"
 
     eq_total = s["world"]["equipment"]["total"]
     assert eq_total > 0
 
-    _log("stale_state",
-         f"  clock_iso={clock_iso}  elapsed={elapsed}s  "
-         f"(45 min stale → REQUIRES_FRESH_STATE governance path)  eq={eq_total}")
+    _log(
+        "stale_state",
+        f"  clock_iso={clock_iso}  elapsed={elapsed}s  "
+        f"(45 min stale → REQUIRES_FRESH_STATE governance path)  eq={eq_total}",
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 8. state_drift: initial world has AGVs with declared status mismatches
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def test_state_drift_has_mismatch_statuses(ctrl):
     _run(ctrl.start("state_drift"))
@@ -279,20 +320,23 @@ def test_state_drift_has_mismatch_statuses(ctrl):
 
     # At least one AGV is charging (WMS says available — drift)
     charging = [a for a in agvs if a.status == "charging"]
-    assert len(charging) >= 1, (
-        f"state_drift must have at least one AGV in 'charging' (WMS drift) status"
-    )
+    assert (
+        len(charging) >= 1
+    ), f"state_drift must have at least one AGV in 'charging' (WMS drift) status"
 
     s = ctrl.status()
-    _log("state_drift",
-         f"  AGVs={len(agvs)}  charging(drift)={len(charging)}  "
-         f"eq_total={s['world']['equipment']['total']}  "
-         f"(state_drift → conflict detection path)")
+    _log(
+        "state_drift",
+        f"  AGVs={len(agvs)}  charging(drift)={len(charging)}  "
+        f"eq_total={s['world']['equipment']['total']}  "
+        f"(state_drift → conflict detection path)",
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 9. Reset is deterministic
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def test_reset_is_deterministic(ctrl):
     _run(ctrl.start("healthy_baseline"))
@@ -302,9 +346,16 @@ def test_reset_is_deterministic(ctrl):
     status_at_start = agv.status
 
     # Run 1: inject fault + tick
-    _run(ctrl.inject("equipment_fault", {
-        "asset_id": asset_id, "fault_code": "E_TEST", "new_status": "offline",
-    }))
+    _run(
+        ctrl.inject(
+            "equipment_fault",
+            {
+                "asset_id": asset_id,
+                "fault_code": "E_TEST",
+                "new_status": "offline",
+            },
+        )
+    )
     _run(ctrl.tick(60))
     assert ctrl.world.equipment[asset_id].status == "offline"
     clock_after_run1 = ctrl.world.clock.elapsed_seconds
@@ -317,9 +368,9 @@ def test_reset_is_deterministic(ctrl):
 
     # Faulted asset restored
     agv_reset = ctrl.world.equipment[asset_id]
-    assert agv_reset.status == status_at_start, (
-        f"After reset: expected {status_at_start}, got {agv_reset.status}"
-    )
+    assert (
+        agv_reset.status == status_at_start
+    ), f"After reset: expected {status_at_start}, got {agv_reset.status}"
     assert agv_reset.fault_code is None
 
     # Run 2: same tick sequence — timed events fire identically (equipment_failure scenario
@@ -327,14 +378,17 @@ def test_reset_is_deterministic(ctrl):
     _run(ctrl.tick(60))
     assert ctrl.world.clock.elapsed_seconds == 60
 
-    _log("healthy_baseline",
-         f"  reset: clock 60s→0→60s  {asset_id} offline→{status_at_start}→(tick)  "
-         f"deterministic replay ✓")
+    _log(
+        "healthy_baseline",
+        f"  reset: clock 60s→0→60s  {asset_id} offline→{status_at_start}→(tick)  "
+        f"deterministic replay ✓",
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 10. Pause prevents tick; resume restores
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def test_pause_prevents_tick_resume_allows(ctrl):
     _run(ctrl.start("healthy_baseline"))
@@ -354,6 +408,7 @@ def test_pause_prevents_tick_resume_allows(ctrl):
 # 11–12. MAIW_DEMO_MODE env var controls bootstrap._DEMO_MODE
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def test_demo_mode_off_by_default():
     """Without MAIW_DEMO_MODE set, _DEMO_MODE must be False."""
     env_val = os.environ.get("MAIW_DEMO_MODE", "")
@@ -363,6 +418,7 @@ def test_demo_mode_off_by_default():
     )
 
     import maiw_api.bootstrap as bootstrap_mod
+
     importlib.reload(bootstrap_mod)
     assert bootstrap_mod._DEMO_MODE is False
 
@@ -370,6 +426,7 @@ def test_demo_mode_off_by_default():
 def test_demo_mode_on_with_env(monkeypatch):
     monkeypatch.setenv("MAIW_DEMO_MODE", "true")
     import maiw_api.bootstrap as bootstrap_mod
+
     importlib.reload(bootstrap_mod)
     assert bootstrap_mod._DEMO_MODE is True
 
@@ -377,6 +434,7 @@ def test_demo_mode_on_with_env(monkeypatch):
 # ══════════════════════════════════════════════════════════════════════════════
 # 13. Inventory: low_stock inject visible through SimulationInventoryProvider
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def test_low_stock_inject_propagates_to_inventory_provider(ctrl):
     _run(ctrl.start("healthy_baseline"))
@@ -399,28 +457,34 @@ def test_low_stock_inject_propagates_to_inventory_provider(ctrl):
     assert item_after.is_low_stock
 
     # Provider layer must reflect it
-    inv_result = _run(ctrl.providers.inventory.get_inventory(InventoryLookupRequest(sku=sku)))
+    inv_result = _run(
+        ctrl.providers.inventory.get_inventory(InventoryLookupRequest(sku=sku))
+    )
     assert inv_result.is_low_stock is True
 
-    _log("healthy_baseline",
-         f"  low_stock inject: {sku} qty {qty_before}→{item_after.quantity_available} "
-         f"(is_low_stock=True, visible via InventoryProvider ✓)")
+    _log(
+        "healthy_baseline",
+        f"  low_stock inject: {sku} qty {qty_before}→{item_after.quantity_available} "
+        f"(is_low_stock=True, visible via InventoryProvider ✓)",
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 14. Scenario listing contains exactly five expected names
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def test_all_five_scenarios_registered():
     files = list_scenario_files()
-    assert set(files.keys()) == set(SCENARIO_REGISTRY.keys()), (
-        f"Scenario registry mismatch: {set(files.keys())}"
-    )
+    assert set(files.keys()) == set(
+        SCENARIO_REGISTRY.keys()
+    ), f"Scenario registry mismatch: {set(files.keys())}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Timeline summary (last test — always passes, prints captured timeline)
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def test_zzz_print_timeline_report():
     """Print the scenario timeline captured by all prior tests."""

@@ -47,6 +47,7 @@ class TestScenarioEventBus:
     def test_unsubscribe_nonexistent_is_safe(self):
         bus = ScenarioEventBus()
         import asyncio as _asyncio
+
         fake_q = _asyncio.Queue()
         bus.unsubscribe(fake_q)  # should not raise
 
@@ -87,7 +88,9 @@ class TestScenarioEventBus:
     def test_publish_tick_sets_tick_category(self):
         bus = ScenarioEventBus()
         q = bus.subscribe()
-        self._run(bus.publish_tick(elapsed_seconds=60, clock_iso="2026-08-23T08:01:00+00:00"))
+        self._run(
+            bus.publish_tick(elapsed_seconds=60, clock_iso="2026-08-23T08:01:00+00:00")
+        )
         ev = q.get_nowait()
         assert ev.category == "TICK"
 

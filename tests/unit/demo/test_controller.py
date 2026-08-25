@@ -156,11 +156,16 @@ class TestDemoScenarioControllerInject:
     def test_inject_equipment_fault(self, ctrl):
         _run(ctrl.start("healthy_baseline"))
         asset_id = list(ctrl.world.equipment.keys())[0]
-        result = _run(ctrl.inject("equipment_fault", {
-            "asset_id": asset_id,
-            "fault_code": "E_MOTOR",
-            "new_status": "offline",
-        }))
+        result = _run(
+            ctrl.inject(
+                "equipment_fault",
+                {
+                    "asset_id": asset_id,
+                    "fault_code": "E_MOTOR",
+                    "new_status": "offline",
+                },
+            )
+        )
         assert ctrl.world.equipment[asset_id].status == "offline"
         assert ctrl.world.equipment[asset_id].fault_code == "E_MOTOR"
 

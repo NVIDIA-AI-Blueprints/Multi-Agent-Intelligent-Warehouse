@@ -95,7 +95,9 @@ async def test_nano_vl_8b():
             SmallLLMProcessor,
         )
 
-        print("\n🔧 Testing multimodal VL model (Vision-Language) via SmallLLMProcessor...")
+        print(
+            "\n🔧 Testing multimodal VL model (Vision-Language) via SmallLLMProcessor..."
+        )
         processor = SmallLLMProcessor()
         await processor.initialize()
 

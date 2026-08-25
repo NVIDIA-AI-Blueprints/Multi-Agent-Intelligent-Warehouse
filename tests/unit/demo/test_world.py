@@ -7,8 +7,8 @@ from datetime import datetime, timezone
 
 from maiw_api.demo.world import DemoWarehouseWorld, SimulationClock
 
-
 # ── SimulationClock ───────────────────────────────────────────────────────────
+
 
 class TestSimulationClock:
     def test_initial_epoch(self):
@@ -45,27 +45,42 @@ _MINIMAL_STATE = {
     "clock_offset_seconds": 0,
     "inventory": [
         {
-            "sku": "SKU-001", "name": "Widget A", "zone": "A1",
-            "location_id": "A-01-01", "quantity_available": 100,
-            "quantity_reserved": 10, "reorder_point": 20,
+            "sku": "SKU-001",
+            "name": "Widget A",
+            "zone": "A1",
+            "location_id": "A-01-01",
+            "quantity_available": 100,
+            "quantity_reserved": 10,
+            "reorder_point": 20,
         }
     ],
     "equipment": [
         {
-            "asset_id": "AGV-01", "equipment_type": "agv", "model": "TestAGV",
-            "zone": "A1", "status": "available", "battery_pct": 90.0,
+            "asset_id": "AGV-01",
+            "equipment_type": "agv",
+            "model": "TestAGV",
+            "zone": "A1",
+            "status": "available",
+            "battery_pct": 90.0,
         }
     ],
     "workers": [
         {
-            "worker_id": "w-001", "username": "alice", "full_name": "Alice",
-            "role": "operator", "status": "active", "zone": "A1",
+            "worker_id": "w-001",
+            "username": "alice",
+            "full_name": "Alice",
+            "role": "operator",
+            "status": "active",
+            "zone": "A1",
         }
     ],
     "tasks": [
         {
-            "task_id": "t-001", "task_type": "PICK", "zone": "A1",
-            "status": "pending", "priority": "high",
+            "task_id": "t-001",
+            "task_type": "PICK",
+            "zone": "A1",
+            "status": "pending",
+            "priority": "high",
         }
     ],
 }
