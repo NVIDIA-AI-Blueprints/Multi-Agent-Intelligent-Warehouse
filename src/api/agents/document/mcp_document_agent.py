@@ -335,9 +335,9 @@ class MCPDocumentExtractionAgent:
                     "processing_pipeline": [
                         "Document Preprocessing (NeMo Retriever)",
                         "Intelligent OCR (NeMoRetriever-OCR-v1)",
-                        "Small LLM Processing (Llama Nemotron Nano VL 8B)",
+                        "Small LLM Processing (Nemotron Nano VL, runtime-configured)",
                         "Embedding & Indexing (llama-nemotron-embed-vl-1b-v2)",
-                        "Large LLM Judge (Llama 3.3 Nemotron Super 49B)",
+                        "Large LLM Judge (Nemotron 3 Super 120B)",
                         "Intelligent Routing",
                     ],
                     "estimated_processing_time": "30-60 seconds",

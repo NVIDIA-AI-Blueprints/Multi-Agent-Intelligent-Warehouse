@@ -76,9 +76,9 @@ class DocumentExtractionAgent:
     Pipeline Stages:
     1. Document Preprocessing (NeMo Retriever)
     2. Intelligent OCR (NeMoRetriever-OCR-v1 + Nemotron Parse)
-    3. Small LLM Processing (Llama Nemotron Nano VL 8B)
-    4. Embedding & Indexing (llama-nemotron-embed-vl-1b-v2)
-    5. Large LLM Judge (Llama 3.3 Nemotron Super 49B)
+    3. Small LLM Processing (Nemotron Nano VL, runtime-configured via NEMOTRON_OMNI_API_KEY)
+    4. Embedding & Indexing (llama-nemotron-embed-vl-1b-v2, multimodal — current)
+    5. Large LLM Judge (Nemotron 3 Super 120B)
     6. Intelligent Routing (Quality-based routing)
     """
 
@@ -204,7 +204,7 @@ class DocumentExtractionAgent:
             # STAGE 3: Small LLM Processing
             logger.info(f"Stage 3: Small LLM processing for {document_id}")
 
-            # Process with Llama Nemotron Nano VL 8B
+            # Process with multimodal VL model (Nemotron Nano VL, runtime-configured)
             llm_result = await self.small_llm.process_document(
                 preprocessing_result["images"], ocr_result["text"], document_type
             )
@@ -234,7 +234,7 @@ class DocumentExtractionAgent:
             # STAGE 5: Large LLM Judge & Validator
             logger.info(f"Stage 5: Large LLM judging for {document_id}")
 
-            # Judge with Llama 3.3 Nemotron Super 49B
+            # Judge with Nemotron 3 Super 120B
             judge_result = await self.large_llm_judge.evaluate_document(
                 llm_result["structured_data"], entities, document_type
             )

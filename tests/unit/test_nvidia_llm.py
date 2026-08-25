@@ -89,18 +89,18 @@ async def test_embedding():
 
 @pytest.mark.asyncio
 async def test_nano_vl_8b():
-    """Test Llama Nemotron Nano VL 8B (Vision-Language Model) API."""
+    """Test multimodal VL model (SmallLLMProcessor) API."""
     try:
         from src.api.agents.document.processing.small_llm_processor import (
             SmallLLMProcessor,
         )
 
-        print("\n🔧 Testing Llama Nemotron Nano VL 8B (Vision-Language Model)...")
+        print("\n🔧 Testing multimodal VL model (Vision-Language) via SmallLLMProcessor...")
         processor = SmallLLMProcessor()
         await processor.initialize()
 
         if not processor.api_key:
-            print("⚠️  LLAMA_NANO_VL_API_KEY not found, skipping Nano VL 8B test")
+            print("⚠️  NEMOTRON_OMNI_API_KEY not found, skipping VL processor test")
             return False
 
         # Test with simple text input (text-only mode)

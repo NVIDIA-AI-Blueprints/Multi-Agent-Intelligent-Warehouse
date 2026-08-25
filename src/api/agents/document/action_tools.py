@@ -44,10 +44,12 @@ _sanitize_log_data = sanitize_log_data
 class DocumentActionTools:
     """Document processing action tools for MCP framework."""
     
-    # Model name constants
-    MODEL_SMALL_LLM = "Llama Nemotron Nano VL 8B"
-    MODEL_LARGE_JUDGE = "Llama 3.3 Nemotron Super 49B"
-    MODEL_OCR = "NeMoRetriever-OCR-v1"
+    # Model name constants — used as model_used labels written to Postgres.
+    # MODEL_SMALL_LLM is derived from env at class definition so operators can
+    # override it without a code change when switching VL model deployments.
+    MODEL_SMALL_LLM: str = os.getenv("NEMOTRON_OMNI_MODEL_LABEL", "Nemotron Nano VL")
+    MODEL_LARGE_JUDGE: str = "Nemotron 3 Super 120B"
+    MODEL_OCR: str = "NeMoRetriever-OCR-v1"
 
     def __init__(self):
         self.nim_client = None
@@ -557,9 +559,9 @@ class DocumentActionTools:
                 "processing_stages": [
                     "Preprocessing (NeMo Retriever)",
                     "OCR Extraction (NeMoRetriever-OCR-v1)",
-                    "Small LLM Processing (Llama Nemotron Nano VL 8B)",
+                    f"Small LLM Processing ({self.MODEL_SMALL_LLM})",
                     "Embedding & Indexing (llama-nemotron-embed-vl-1b-v2)",
-                    "Large LLM Judge (Llama 3.3 Nemotron Super 49B)",
+                    f"Large LLM Judge ({self.MODEL_LARGE_JUDGE})",
                     "Intelligent Routing",
                 ],
             }
@@ -1159,7 +1161,7 @@ class DocumentActionTools:
                         processed_data=serialized_llm,
                         confidence_score=llm_result.get("confidence", 0.8),
                         processing_time_ms=llm_result.get("processing_time_ms", 0),
-                        model_used=llm_result.get("model_used", "Llama Nemotron Nano VL 8B"),
+                        model_used=llm_result.get("model_used", self.MODEL_SMALL_LLM),
                     )
                     
                     # Save validation stage extraction result
@@ -1544,7 +1546,7 @@ class DocumentActionTools:
                                 },
                                 confidence_score=quality_score.confidence if quality_score else 0.0,
                                 processing_time_ms=0,  # Validation doesn't track processing time yet
-                                model_used=self.MODEL_LARGE_JUDGE,  # Llama 3.3 Nemotron Super 49B
+                                model_used=self.MODEL_LARGE_JUDGE,
                                 metadata={
                                     "judge_model": self.MODEL_LARGE_JUDGE,
                                     "timestamp": datetime.now().isoformat(),

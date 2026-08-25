@@ -10,7 +10,7 @@
 models:
   - type: main
     engine: openai
-    model: nvidia/llama-3.3-nemotron-super-49b-v1.5
+    model: nvidia/nemotron-3-super-120b-a12b
     parameters:
       api_key: ${NVIDIA_API_KEY}
       api_base: ${RAIL_API_URL:https://integrate.api.nvidia.com/v1}

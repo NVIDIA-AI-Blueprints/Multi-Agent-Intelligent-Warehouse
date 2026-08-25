@@ -237,13 +237,13 @@ The system uses the following NVIDIA NIMs:
 
 | NIM Service | Model | Purpose | Environment Variable | Default Endpoint |
 |-------------|-------|---------|---------------------|------------------|
-| **LLM Service** | Llama 3.3 Nemotron Super 49B | Primary language model for chat, reasoning, and generation | `LLM_NIM_URL` | `https://integrate.api.nvidia.com/v1` |
-| **Embedding Service** | llama-nemotron-embed-vl-1b-v2 | Semantic search embeddings for RAG | `EMBEDDING_NIM_URL` | `https://integrate.api.nvidia.com/v1` |
+| **LLM Service** | Nemotron 3 Super 120B (`nvidia/nemotron-3-super-120b-a12b`) | Primary language model for chat, reasoning, and generation | `LLM_NIM_URL` | `https://integrate.api.nvidia.com/v1` |
+| **Embedding Service** | `nvidia/llama-nemotron-embed-vl-1b-v2` (2048-dim multimodal) | Semantic search embeddings for RAG | `EMBEDDING_NIM_URL` | `https://integrate.api.nvidia.com/v1` |
 | **NeMo Retriever** | NeMo Retriever | Document preprocessing and structure analysis | `NEMO_RETRIEVER_URL` | `https://integrate.api.nvidia.com/v1` |
 | **NeMo OCR** | NeMoRetriever-OCR-v1 | Intelligent OCR with layout understanding | `NEMO_OCR_URL` | `https://integrate.api.nvidia.com/v1` |
 | **Nemotron Parse** | Nemotron Parse | Advanced document parsing and extraction | `NEMO_PARSE_URL` | `https://integrate.api.nvidia.com/v1` |
-| **Small LLM** | nemotron-nano-12b-v2-vl | Structured data extraction and entity recognition | `LLAMA_NANO_VL_URL` | `https://integrate.api.nvidia.com/v1` |
-| **Large LLM Judge** | Llama 3.3 Nemotron Super 49B | Quality validation and confidence scoring | `LLM_NIM_URL` | `https://integrate.api.nvidia.com/v1` |
+| **Small LLM** | Multimodal VL model (runtime-configured via `NEMOTRON_OMNI_API_KEY`) | Structured data extraction and entity recognition | `NEMOTRON_OMNI_URL` | `https://integrate.api.nvidia.com/v1` |
+| **Large LLM Judge** | Nemotron 3 Super 120B (`nvidia/nemotron-3-super-120b-a12b`) | Quality validation and confidence scoring | `LLM_NIM_URL` | `https://integrate.api.nvidia.com/v1` |
 | **NeMo Guardrails** | NeMo Guardrails | Content safety and compliance validation | `RAIL_API_URL` | `https://integrate.api.nvidia.com/v1` |
 
 ### Deployment Options
@@ -254,7 +254,7 @@ NIMs can be deployed in three ways:
 
 Use NVIDIA-hosted cloud endpoints for immediate deployment without infrastructure setup.
 
-**For the 49B LLM Model:**
+**For the Nemotron 3 Super LLM:**
 - **Endpoint**: `https://integrate.api.nvidia.com/v1`
 - **Use Case**: Production deployments, quick setup
 - **Configuration**: Set `LLM_NIM_URL=https://integrate.api.nvidia.com/v1`
@@ -269,9 +269,9 @@ Use NVIDIA-hosted cloud endpoints for immediate deployment without infrastructur
 # NVIDIA API Key (required for all cloud endpoints)
 NVIDIA_API_KEY=your-nvidia-api-key-here
 
-# LLM Service (49B model - NVIDIA public cloud)
+# LLM Service (Nemotron 3 Super 120B - NVIDIA public cloud)
 LLM_NIM_URL=https://integrate.api.nvidia.com/v1
-LLM_MODEL=nvidia/llama-3.3-nemotron-super-49b-v1.5
+LLM_MODEL=nvidia/nemotron-3-super-120b-a12b
 
 # Embedding Service (uses integrate.api.nvidia.com)
 EMBEDDING_NIM_URL=https://integrate.api.nvidia.com/v1
@@ -280,7 +280,7 @@ EMBEDDING_NIM_URL=https://integrate.api.nvidia.com/v1
 NEMO_RETRIEVER_URL=https://integrate.api.nvidia.com/v1
 NEMO_OCR_URL=https://integrate.api.nvidia.com/v1
 NEMO_PARSE_URL=https://integrate.api.nvidia.com/v1
-LLAMA_NANO_VL_URL=https://integrate.api.nvidia.com/v1
+NEMOTRON_OMNI_URL=https://integrate.api.nvidia.com/v1
 LLM_NIM_URL=https://integrate.api.nvidia.com/v1
 
 # NeMo Guardrails
@@ -304,7 +304,7 @@ Deploy NIMs on your own infrastructure for data privacy, cost control, and custo
    ```bash
    # Example: Deploy LLM NIM on port 8000
    docker run --gpus all -p 8000:8000 \
-     nvcr.io/nim/nvidia/llama-3.3-nemotron-super-49b-v1.5:latest
+     nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b:latest
    
    # Example: Deploy Embedding NIM on port 8001
    docker run --gpus all -p 8001:8001 \
@@ -316,7 +316,7 @@ Deploy NIMs on your own infrastructure for data privacy, cost control, and custo
    # Self-hosted LLM NIM
    # Security: Use HTTPS for production deployments. HTTP is only acceptable for localhost/development.
    LLM_NIM_URL=https://your-nim-host:8000/v1  # Use https:// for production (or https://integrate.api.nvidia.com/v1 for cloud)
-   LLM_MODEL=nvidia/llama-3.3-nemotron-super-49b-v1.5
+   LLM_MODEL=nvidia/nemotron-3-super-120b-a12b
    
    # Self-hosted Embedding NIM
    EMBEDDING_NIM_URL=https://your-nim-host:8001/v1  # Use https:// for production
@@ -325,7 +325,7 @@ Deploy NIMs on your own infrastructure for data privacy, cost control, and custo
    NEMO_RETRIEVER_URL=https://your-nim-host:8002/v1  # Use https:// for production
    NEMO_OCR_URL=https://your-nim-host:8003/v1  # Use https:// for production
    NEMO_PARSE_URL=https://your-nim-host:8004/v1  # Use https:// for production
-   LLAMA_NANO_VL_URL=https://your-nim-host:8005/v1  # Use https:// for production
+   NEMOTRON_OMNI_URL=https://your-nim-host:8005/v1  # Use https:// for production
    
    # Self-hosted NeMo Guardrails
    RAIL_API_URL=https://your-nim-host:8007/v1  # Use https:// for production
@@ -341,14 +341,14 @@ Deploy NIMs on your own infrastructure for data privacy, cost control, and custo
    curl -X POST https://your-nim-host:8000/v1/chat/completions \
      -H "Authorization: Bearer $NVIDIA_API_KEY" \
      -H "Content-Type: application/json" \
-     -d '{"model":"nvidia/llama-3.3-nemotron-super-49b-v1.5","messages":[{"role":"user","content":"test"}]}'
+     -d '{"model":"nvidia/nemotron-3-super-120b-a12b","messages":[{"role":"user","content":"test"}]}'
    
    # Test Embedding endpoint
    # Security: Use HTTPS for production. HTTP is only acceptable for localhost/development.
    curl -X POST https://your-nim-host:8001/v1/embeddings \
      -H "Authorization: Bearer $NVIDIA_API_KEY" \
      -H "Content-Type: application/json" \
-     -d '{"model":"nvidia/llama-nemotron-embed-vl-1b-v2","input":"test"}'
+     -d '{"model":"nvidia/llama-nemotron-embed-vl-1b-v2","input":"test"}'  # multimodal embedding — current
    ```
 
 **Important Notes:**
@@ -362,7 +362,7 @@ Deploy NIMs on your own infrastructure for data privacy, cost control, and custo
 Mix cloud and self-hosted NIMs based on your requirements:
 
 ```bash
-# Use cloud for LLM (49B model)
+# Use cloud for LLM (Nemotron 3 Super 120B)
 LLM_NIM_URL=https://integrate.api.nvidia.com/v1
 
 # Use self-hosted for embeddings (for data privacy)
@@ -384,7 +384,7 @@ NEMO_OCR_URL=https://integrate.api.nvidia.com/v1
 LLM_NIM_URL=https://integrate.api.nvidia.com/v1  # or https://your-nim-host:8000/v1 (use https:// for production)
 
 # Required: Model identifier (NVIDIA public cloud or self-hosted)
-LLM_MODEL=nvidia/llama-3.3-nemotron-super-49b-v1.5
+LLM_MODEL=nvidia/nemotron-3-super-120b-a12b
 
 # Required: API key (same key works for all NVIDIA endpoints)
 NVIDIA_API_KEY=your-nvidia-api-key-here
@@ -478,7 +478,7 @@ curl http://localhost:8001/api/v1/health
 3. **Model Not Found (404)**:
    - Verify `LLM_MODEL` matches the model available at your endpoint
    - For cloud endpoints, check model identifier format (e.g., `nvcf:nvidia/...`)
-   - For self-hosted or cloud, use model name (e.g., `nvidia/llama-3.3-nemotron-super-49b-v1.5`)
+   - For self-hosted or cloud, use model name (e.g., `nvidia/nemotron-3-super-120b-a12b`)
 
 4. **Rate Limiting (429)**:
    - Reduce request frequency

@@ -66,8 +66,9 @@ class TestDocumentActionToolsInitialization:
         """Test that model name constants are correctly defined."""
         tools = DocumentActionTools()
 
-        assert tools.MODEL_SMALL_LLM == "Llama Nemotron Nano VL 8B"
-        assert tools.MODEL_LARGE_JUDGE == "Llama 3.3 Nemotron Super 49B"
+        # MODEL_SMALL_LLM is env-configurable (NEMOTRON_OMNI_MODEL_LABEL); default is generic VL label
+        assert "llama" not in tools.MODEL_SMALL_LLM.lower()
+        assert tools.MODEL_LARGE_JUDGE == "Nemotron 3 Super 120B"
         assert tools.MODEL_OCR == "NeMoRetriever-OCR-v1"
 
     @pytest.mark.asyncio

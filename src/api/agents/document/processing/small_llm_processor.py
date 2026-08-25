@@ -14,8 +14,8 @@
 # limitations under the License.
 
 """
-Stage 3: Small LLM Processing with Llama Nemotron Nano VL 8B
-Vision + Language model for multimodal document understanding.
+Stage 3: Small LLM Processing — Multimodal VL model for document understanding.
+Configure via NEMOTRON_OMNI_API_KEY / NEMOTRON_OMNI_URL (LLAMA_NANO_VL_* deprecated).
 """
 
 import asyncio
@@ -35,21 +35,41 @@ logger = logging.getLogger(__name__)
 
 class SmallLLMProcessor:
     """
-    Stage 3: Small LLM Processing using Llama Nemotron Nano VL 8B.
+    Stage 3: Small LLM Processing — multimodal VL model for document understanding.
 
     Features:
     - Native vision understanding (processes doc images directly)
-    - OCRBench v2 leader for document understanding
     - Specialized for invoice/receipt/BOL processing
     - Single GPU deployment (cost-effective)
     - Fast inference (~100-200ms)
+
+    Configure with NEMOTRON_OMNI_API_KEY / NEMOTRON_OMNI_URL.
+    LLAMA_NANO_VL_API_KEY / LLAMA_NANO_VL_URL are deprecated aliases.
     """
 
+    MODEL_LABEL: str = os.getenv("NEMOTRON_OMNI_MODEL_LABEL", "Nemotron VL Processor")
+
     def __init__(self):
-        self.api_key = os.getenv("LLAMA_NANO_VL_API_KEY", "")
-        self.base_url = os.getenv(
-            "LLAMA_NANO_VL_URL", "https://integrate.api.nvidia.com/v1"
-        )
+        import warnings as _warnings
+        _new_key = os.getenv("NEMOTRON_OMNI_API_KEY")
+        _old_key = os.getenv("LLAMA_NANO_VL_API_KEY")
+        if _old_key and not _new_key:
+            _warnings.warn(
+                "LLAMA_NANO_VL_API_KEY is deprecated; use NEMOTRON_OMNI_API_KEY instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        self.api_key = _new_key or _old_key or ""
+
+        _new_url = os.getenv("NEMOTRON_OMNI_URL")
+        _old_url = os.getenv("LLAMA_NANO_VL_URL")
+        if _old_url and not _new_url:
+            _warnings.warn(
+                "LLAMA_NANO_VL_URL is deprecated; use NEMOTRON_OMNI_URL instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        self.base_url = _new_url or _old_url or "https://integrate.api.nvidia.com/v1"
         self.timeout = 60
         self.config: Optional[AgentConfig] = None  # Agent configuration
 
@@ -84,7 +104,7 @@ class SmallLLMProcessor:
         self, images: List[Image.Image], ocr_text: str, document_type: str
     ) -> Dict[str, Any]:
         """
-        Process document using Llama Nemotron Nano VL 8B.
+        Process document using the configured multimodal VL model.
 
         Args:
             images: List of PIL Images
@@ -95,7 +115,7 @@ class SmallLLMProcessor:
             Structured data extracted from the document
         """
         try:
-            logger.info(f"Processing document with Small LLM (Llama Nemotron Nano VL 8B)")
+            logger.info(f"Processing document with Small LLM (multimodal VL)")
 
             # Try multimodal processing first, fallback to text-only if it fails
             if not self.api_key:
@@ -128,7 +148,7 @@ class SmallLLMProcessor:
             return {
                 "structured_data": structured_data,
                 "confidence": result.get("confidence", 0.8),
-                "model_used": "Llama-Nemotron-Nano-VL-8B",
+                "model_used": self.MODEL_LABEL,
                 "processing_timestamp": datetime.now().isoformat(),
                 "multimodal_processed": False,  # Always text-only for now
             }
@@ -215,7 +235,7 @@ class SmallLLMProcessor:
     async def _call_text_only_api(
         self, ocr_text: str, document_type: str
     ) -> Dict[str, Any]:
-        """Call Llama Nemotron Nano VL 8B API with text-only input."""
+        """Call VL model API with text-only input."""
         try:
             # Create a text-only prompt for document processing
             prompt = f"""
@@ -283,7 +303,7 @@ class SmallLLMProcessor:
     async def _call_nano_vl_api(
         self, multimodal_input: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Call Llama Nemotron Nano VL 8B API."""
+        """Call VL model API with multimodal input (vision + text)."""
         try:
             # Prepare API request
             messages = [
@@ -392,7 +412,7 @@ class SmallLLMProcessor:
                     },
                 ),
                 "processing_metadata": {
-                    "model_used": "Llama-Nemotron-Nano-VL-8B",
+                    "model_used": self.MODEL_LABEL,
                     "timestamp": datetime.now().isoformat(),
                     "multimodal": result.get("multimodal_processed", False),
                 },
@@ -423,7 +443,7 @@ class SmallLLMProcessor:
                     "accuracy": 0.5,
                 },
                 "processing_metadata": {
-                    "model_used": "Llama-Nemotron-Nano-VL-8B",
+                    "model_used": self.MODEL_LABEL,
                     "timestamp": datetime.now().isoformat(),
                     "multimodal": False,
                     "error": str(e),
