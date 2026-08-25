@@ -86,6 +86,7 @@ class ActionExecutionResult(BaseModel):
     executed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     error_code: str | None = None
     error_message: str | None = None
+    trace_id: str | None = None
 
 
 # ── Protocol ───────────────────────────────────────────────────────────────────

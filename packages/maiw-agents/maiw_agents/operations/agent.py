@@ -952,3 +952,162 @@ class OperationsCoordinationAgent:
     async def clear_conversation_context(self, session_id: str) -> None:
         if session_id in self.conversation_context:
             del self.conversation_context[session_id]
+
+    async def analyze_disruption(
+        self,
+        *,
+        snapshot: Any,
+        scenario_context: str = "",
+        trace_id: str,
+    ) -> Any:
+        """
+        Observe warehouse state and produce an OperationalAssessment.
+
+        Parameters
+        ----------
+        snapshot:
+            Sealed WarehouseStateSnapshot — the ONLY source of truth for this call.
+            This method never accesses DemoWarehouseWorld or SimulationProviders.
+        scenario_context:
+            One-sentence human hint (e.g. "equipment_failure scenario active").
+        trace_id:
+            Caller-supplied correlation ID propagated through the full lifecycle.
+
+        Returns
+        -------
+        OperationalAssessment
+        """
+        from maiw_models import ModelRequest, ReasoningLevel, RiskLevel
+        from .assessment_prompt import build_analyze_disruption_prompt
+        from ..assessment import OperationalAssessment, RecommendedAction
+
+        state = snapshot.state
+        warehouse_id = snapshot.warehouse_id
+        snapshot_id = snapshot.snapshot_id
+
+        # Build structured facts from the sealed snapshot
+        facts: list[str] = []
+        domains_affected: list[str] = []
+
+        if state.equipment is not None:
+            eq = state.equipment
+            facts.append(f"Equipment: {eq.total_count} total, {eq.available_count} available")
+            offline = [a for a in eq.assets if a.status == "offline"]
+            maintenance = [a for a in eq.assets if a.status == "maintenance"]
+            if offline:
+                facts.append(f"OFFLINE assets: {', '.join(a.asset_id for a in offline)}")
+                domains_affected.append("equipment")
+            if maintenance:
+                facts.append(f"MAINTENANCE assets: {', '.join(a.asset_id for a in maintenance)}")
+                if "equipment" not in domains_affected:
+                    domains_affected.append("equipment")
+
+        if state.labor is not None:
+            lb = state.labor
+            facts.append(
+                f"Labor: {lb.total_workers} total, {lb.available_workers} available, "
+                f"{lb.utilization_pct:.0f}% utilization"
+            )
+            if lb.utilization_pct > 85 or lb.available_workers < 2:
+                domains_affected.append("labor")
+
+        if state.waves is not None:
+            wv = state.waves
+            facts.append(
+                f"Wave tasks: {wv.total_tasks} total, {wv.pending_count} pending, "
+                f"{wv.in_progress_count} in_progress, {wv.at_risk_count} at-risk"
+            )
+            if wv.at_risk_count > 0:
+                domains_affected.append("wave")
+            # Explicitly surface unassigned pending tasks so the model knows
+            # labor.allocate (not wave.reprioritize) is the correct remedy.
+            unassigned = [t for t in wv.tasks if t.status == "pending" and t.assigned_to is None]
+            if unassigned:
+                available_workers = state.labor.available_workers if state.labor else 0
+                facts.append(
+                    f"UNASSIGNED PENDING TASKS: {len(unassigned)} pending wave tasks have no worker "
+                    f"allocated (assigned_to=null); {available_workers} workers are idle. "
+                    f"Use warehouse.labor.allocate to assign workers to these tasks."
+                )
+                if "labor" not in domains_affected:
+                    domains_affected.append("labor")
+
+        # Build system + user messages
+        system_msg, user_msg = build_analyze_disruption_prompt(
+            facts=facts,
+            scenario_context=scenario_context,
+            snapshot_id=snapshot_id,
+            warehouse_id=warehouse_id,
+        )
+
+        if self.model_gateway is None:
+            logger.warning("analyze_disruption: ModelGateway not available; returning stub assessment")
+            return OperationalAssessment(
+                trace_id=trace_id,
+                snapshot_id=snapshot_id,
+                warehouse_id=warehouse_id,
+                summary="ModelGateway unavailable — assessment skipped.",
+                severity="low",
+                domains_affected=domains_affected,
+                facts_observed=facts,
+                skills_consulted=[],
+                recommendations=[],
+                model_id="none",
+                routing_rule="none",
+                routing_reason="ModelGateway not wired",
+                latency_ms=0.0,
+            )
+
+        response = await self.model_gateway.generate(ModelRequest(
+            task="warehouse.operations.analyze_disruption",
+            messages=[
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": user_msg},
+            ],
+            reasoning=ReasoningLevel.HIGH,
+            risk_level=RiskLevel.HIGH,
+            trace_id=trace_id,
+        ))
+
+        # Parse structured response — expect JSON
+        import json as _json
+        parsed: dict = {}
+        try:
+            parsed = _json.loads(response.content)
+        except Exception:
+            # Attempt to extract JSON block if wrapped in markdown
+            import re as _re
+            m = _re.search(r"```(?:json)?\s*(\{.*?\})\s*```", response.content, _re.DOTALL)
+            if m:
+                try:
+                    parsed = _json.loads(m.group(1))
+                except Exception:
+                    pass
+
+        summary = parsed.get("summary", "Assessment produced — see facts_observed.")
+        severity = parsed.get("severity", "medium")
+        raw_recs = parsed.get("recommendations", [])
+
+        recommendations: list[RecommendedAction] = []
+        for r in raw_recs:
+            try:
+                recommendations.append(RecommendedAction(**r))
+            except Exception as exc:
+                logger.warning("analyze_disruption: skipping malformed recommendation %s: %s", r, exc)
+
+        rd = response.route_decision
+        return OperationalAssessment(
+            trace_id=trace_id,
+            snapshot_id=snapshot_id,
+            warehouse_id=warehouse_id,
+            summary=summary,
+            severity=severity,
+            domains_affected=domains_affected or parsed.get("domains_affected", []),
+            facts_observed=facts,
+            skills_consulted=parsed.get("skills_consulted", []),
+            recommendations=recommendations,
+            model_id=response.model_id,
+            routing_rule=rd.routing_rule,
+            routing_reason=rd.routing_reason,
+            latency_ms=response.latency_ms,
+        )

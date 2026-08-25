@@ -556,6 +556,51 @@ exclusion rationale and historical baselines by phase.
 
 ---
 
+## Deterministic Counterfactual Evaluation
+
+### MAIW Evaluation Scenario 001 — Labor Constraint + Wave Risk
+
+Two warehouse worlds were initialized from the same scenario definition (`labor_constraint_wave_risk`) and random seed, then advanced through the same disruption timeline. The control world received no MAIW intervention; the MAIW world executed governed actions through the standard pipeline:
+
+```
+State → Agent → ModelGateway (Nemotron 3 Super) → Proposal → Decision → Approval → ActionExecutor → MCP
+```
+
+Results within the 1,800-second (30 sim-minute) evaluation horizon:
+
+| Metric | Control | MAIW |
+|--------|---------|------|
+| Time to recovery | not reached | 300s (5 sim-min) |
+| Peak backlog | 5 tasks | 5 tasks (pre-action) → 0 |
+| Backlog exposure (AUC) | 9,000 task·sec | 720 task·sec |
+| Wave-risk exposure (AUC) | reduction baseline | **−86.7%** |
+| Backlog AUC reduction | — | **−92%** |
+| MAIW cycles | 0 | 6 |
+
+The control run did not reach the configured recovery threshold (`wave_risk_max_score ≤ 25`, `backlog ≤ 1`) within the 30-minute horizon. The MAIW run recovered after 300 simulated seconds.
+
+> **Caveat:** These results are generated in MAIW's deterministic synthetic warehouse environment and demonstrate comparative behavior under the modeled scenario; they are not measurements from a production warehouse.
+
+Evaluation artifacts (machine-readable, first-class evaluation evidence):
+
+```
+artifacts/demo/
+├── labor_constraint_wave_risk_trace.json   # full MAIW pipeline trace
+├── labor_constraint_wave_risk_trace.md     # human-readable trace
+├── labor_wave_control_vs_maiw.json         # counterfactual comparison data
+└── labor_wave_control_vs_maiw.md           # counterfactual comparison report
+```
+
+Reproduce with:
+
+```bash
+MAIW_DEMO_MODE=true env/bin/python -m uvicorn maiw_api.app:app --port 8001
+env/bin/python scripts/counterfactual_eval.py   # generates artifacts/demo/labor_wave_control_vs_maiw.*
+env/bin/python scripts/trace_capture.py          # generates artifacts/demo/labor_constraint_wave_risk_trace.*
+```
+
+---
+
 ## Architecture Invariants
 
 These invariants are enforced by the test suite and must not be broken:

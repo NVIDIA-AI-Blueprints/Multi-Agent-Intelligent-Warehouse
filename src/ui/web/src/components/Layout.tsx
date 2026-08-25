@@ -1,341 +1,172 @@
 import React, { useState } from 'react';
-import {
-  AppBar,
-  Box,
-  CssBaseline,
-  Drawer,
-  IconButton,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Toolbar,
-  Typography,
-  useTheme,
-  useMediaQuery,
-  Menu,
-  MenuItem,
-  Avatar,
-} from '@mui/material';
-import {
-  Menu as MenuIcon,
-  Dashboard as DashboardIcon,
-  Chat as ChatIcon,
-  Build as EquipmentIcon,
-  Inventory as InventoryIcon,
-  Work as OperationsIcon,
-  Security as SafetyIcon,
-  TrendingUp as ForecastingIcon,
-  Analytics as AnalyticsIcon,
-  Settings as SettingsIcon,
-  Article as DocumentationIcon,
-  Description as DocumentIcon,
-  Logout,
-} from '@mui/icons-material';
+import { Box, Typography, Drawer, IconButton } from '@mui/material';
+import { Menu as MenuIcon } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-
-const drawerWidth = 240;
+import { useQuery } from '@tanstack/react-query';
+import { healthAPI } from '../services/api';
+import StatusBar from './StatusBar';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
-const menuItems = [
-  { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
-  { text: 'Chat Assistant', icon: <ChatIcon />, path: '/chat' },
-  { text: 'Equipment & Assets', icon: <EquipmentIcon />, path: '/equipment' },
-  { text: 'Forecasting', icon: <ForecastingIcon />, path: '/forecasting' },
-  { text: 'Operations', icon: <OperationsIcon />, path: '/operations' },
-  { text: 'Safety', icon: <SafetyIcon />, path: '/safety' },
-  { text: 'Document Extraction', icon: <DocumentIcon />, path: '/documents' },
-  { text: 'Analytics', icon: <AnalyticsIcon />, path: '/analytics' },
-  { text: 'Documentation', icon: <DocumentationIcon />, path: '/documentation' },
-  { text: 'MCP Testing', icon: <SettingsIcon />, path: '/mcp-test' },
+const NAV = [
+  { label: 'COMMAND', path: '/command' },
+  { label: 'STATE', path: '/state' },
+  { label: 'DECISIONS', path: '/decisions' },
+  { label: 'MODELS', path: '/models' },
+  { label: 'CAPABILITIES', path: '/capabilities' },
+  { label: 'ACTIVITY', path: '/activity' },
 ];
 
+const WAREHOUSE_ID = process.env.REACT_APP_WAREHOUSE_ID || 'DC-47';
+
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const { user, logout } = useAuth();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  const handleDrawerToggle = () => {
-    setMobileOpen(!mobileOpen);
-  };
+  const { data: live } = useQuery({
+    queryKey: ['live'],
+    queryFn: healthAPI.getLive,
+    refetchInterval: 15000,
+    retry: 0,
+    staleTime: 10000,
+  });
+  const isLive = live?.status === 'alive';
 
-  const handleNavigation = (path: string) => {
-    navigate(path);
-    if (isMobile) {
-      setMobileOpen(false);
-    }
-  };
+  const NavItems = () => (
+    <>
+      {NAV.map(({ label, path }) => {
+        const active = location.pathname.startsWith(path);
+        return (
+          <Box
+            key={path}
+            onClick={() => { navigate(path); setMobileOpen(false); }}
+            sx={{
+              px: { xs: 1.5, md: 2 },
+              py: 0.5,
+              cursor: 'pointer',
+              position: 'relative',
+              color: active ? '#E6EDF3' : '#484F58',
+              fontFamily: 'monospace',
+              fontWeight: active ? 700 : 500,
+              fontSize: '0.72rem',
+              letterSpacing: '0.07em',
+              textTransform: 'uppercase',
+              whiteSpace: 'nowrap',
+              transition: 'color 0.15s',
+              '&:hover': { color: active ? '#E6EDF3' : '#8B949E' },
+              '&::after': active ? {
+                content: '""',
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: '2px',
+                backgroundColor: '#76B900',
+              } : {},
+            }}
+          >
+            {label}
+          </Box>
+        );
+      })}
+    </>
+  );
 
-  const handleUserMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
-  };
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100%', backgroundColor: '#080C10', overflow: 'hidden' }}>
 
-  const handleUserMenuClose = () => {
-    setAnchorEl(null);
-  };
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-    handleUserMenuClose();
-  };
-
-  const drawer = (
-    <div>
-      <Toolbar sx={{ 
-        borderBottom: '1px solid',
-        borderColor: 'divider',
-        minHeight: '64px !important',
-        px: 2,
-      }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%' }}>
+      {/* Top bar */}
+      <Box
+        sx={{
+          height: 48,
+          minHeight: 48,
+          display: 'flex',
+          alignItems: 'stretch',
+          borderBottom: '1px solid #1C2128',
+          backgroundColor: '#0D1117',
+          flexShrink: 0,
+          px: 2,
+          gap: 0,
+        }}
+      >
+        {/* Brand */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, pr: 3, borderRight: '1px solid #1C2128', mr: 2, flexShrink: 0 }}>
           <Box
             component="img"
             src="/nvidia-logo.svg"
             alt="NVIDIA"
-            sx={{
-              height: 28,
-              width: 'auto',
-              display: { xs: 'none', sm: 'block' },
-            }}
-            onError={(e: any) => {
-              // Fallback if logo doesn't exist
-              e.target.style.display = 'none';
-            }}
+            sx={{ height: 16, width: 'auto' }}
+            onError={(e: any) => { e.target.style.display = 'none'; }}
           />
-          <Typography 
-            variant="h6" 
-            noWrap 
-            component="div" 
-            sx={{ 
-              fontWeight: 600,
-              fontSize: '1rem',
-              color: 'text.primary',
-              letterSpacing: '0.01em',
-            }}
-          >
-            Warehouse Assistant
+          <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.75rem', color: '#E6EDF3', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
+            MAIW COMMAND CENTER
           </Typography>
         </Box>
-      </Toolbar>
-      <List sx={{ pt: 2 }}>
-        {menuItems.map((item) => (
-          <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
-            <ListItemButton
-              selected={location.pathname === item.path}
-              onClick={() => handleNavigation(item.path)}
-              sx={{
-                mx: 1,
-                borderRadius: 2,
-                minHeight: 44,
-                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                '&.Mui-selected': {
-                  backgroundColor: 'primary.main',
-                  color: 'primary.contrastText',
-                  '&:hover': {
-                    backgroundColor: 'primary.light',
-                  },
-                  '& .MuiListItemIcon-root': {
-                    color: 'primary.contrastText',
-                  },
-                },
-                '&:hover': {
-                  backgroundColor: 'rgba(118, 185, 0, 0.08)',
-                },
-                '& .MuiListItemIcon-root': {
-                  color: location.pathname === item.path ? 'primary.contrastText' : 'text.secondary',
-                  minWidth: 40,
-                },
-                '& .MuiListItemText-primary': {
-                  fontWeight: location.pathname === item.path ? 600 : 500,
-                  fontSize: '0.875rem',
-                },
-              }}
-            >
-              <ListItemIcon>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.text} />
-            </ListItemButton>
-          </ListItem>
-        ))}
-      </List>
-    </div>
-  );
 
-  return (
-    <Box sx={{ display: 'flex' }}>
-      <CssBaseline />
-      <AppBar
-        position="fixed"
-        sx={{
-          width: { md: `calc(100% - ${drawerWidth}px)` },
-          ml: { md: `${drawerWidth}px` },
-          backgroundColor: 'background.paper',
-          borderBottom: '1px solid',
-          borderColor: 'divider',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.3)',
-        }}
-      >
-        <Toolbar sx={{ minHeight: '64px !important', px: 3 }}>
-          <IconButton
-            color="inherit"
-            aria-label="open drawer"
-            edge="start"
-            onClick={handleDrawerToggle}
-            sx={{ 
-              mr: 2, 
-              display: { md: 'none' },
-              color: 'text.primary',
-            }}
-          >
-            <MenuIcon />
-          </IconButton>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexGrow: 1 }}>
-            <Box
-              component="img"
-              src="/nvlogo.png"
-              alt="NVIDIA"
-              sx={{
-                height: 24,
-                width: 'auto',
-                display: { xs: 'none', sm: 'block' },
-              }}
-              onError={(e: any) => {
-                e.target.style.display = 'none';
-              }}
-            />
-            <Typography 
-              variant="h6" 
-              noWrap 
-              component="div" 
-              sx={{ 
-                fontWeight: 600,
-                fontSize: '1.125rem',
-                color: 'text.primary',
-                letterSpacing: '0.01em',
-              }}
-            >
-              Multi-Agent-Intelligent-Warehouse (MAIW)
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Typography 
-              variant="body2" 
-              sx={{ 
-                display: { xs: 'none', sm: 'block' },
-                color: 'text.secondary',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-              }}
-            >
-              {user?.full_name || user?.username}
-            </Typography>
-            <IconButton
-              size="small"
-              aria-label="account of current user"
-              aria-controls="user-menu"
-              aria-haspopup="true"
-              onClick={handleUserMenuOpen}
-              sx={{
-                color: 'text.primary',
-              }}
-            >
-              <Avatar 
-                sx={{ 
-                  width: 36, 
-                  height: 36,
-                  backgroundColor: 'primary.main',
-                  color: 'primary.contrastText',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                }}
-              >
-                {user?.full_name?.charAt(0) || user?.username?.charAt(0) || 'U'}
-              </Avatar>
-            </IconButton>
-            <Menu
-              id="user-menu"
-              anchorEl={anchorEl}
-              anchorOrigin={{
-                vertical: 'top',
-                horizontal: 'right',
-              }}
-              keepMounted
-              transformOrigin={{
-                vertical: 'top',
-                horizontal: 'right',
-              }}
-              open={Boolean(anchorEl)}
-              onClose={handleUserMenuClose}
-            >
-              <MenuItem 
-                onClick={handleLogout}
-              >
-                <ListItemIcon>
-                  <Logout fontSize="small" />
-                </ListItemIcon>
-                <Typography variant="body2">Logout</Typography>
-              </MenuItem>
-            </Menu>
-          </Box>
-        </Toolbar>
-      </AppBar>
-      <Box
-        component="nav"
-        sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}
-        aria-label="mailbox folders"
-      >
-        <Drawer
-          variant="temporary"
-          open={mobileOpen}
-          onClose={handleDrawerToggle}
-          ModalProps={{
-            keepMounted: true,
-          }}
-          sx={{
-            display: { xs: 'block', md: 'none' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
-          }}
+        {/* LIVE indicator */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, pr: 2.5, borderRight: '1px solid #1C2128', mr: 2, flexShrink: 0 }}>
+          <Box sx={{
+            width: 7, height: 7, borderRadius: '50%',
+            backgroundColor: isLive ? '#3FB950' : '#484F58',
+            boxShadow: isLive ? '0 0 6px #3FB950' : 'none',
+            animation: isLive ? 'livePulse 2s ease-in-out infinite' : 'none',
+            '@keyframes livePulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.5 } },
+          }} />
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.67rem', fontWeight: 700, color: isLive ? '#3FB950' : '#484F58', letterSpacing: '0.06em' }}>
+            {isLive ? 'LIVE' : 'OFFLINE'}
+          </Typography>
+        </Box>
+
+        {/* Warehouse ID */}
+        <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', pr: 2.5, borderRight: '1px solid #1C2128', mr: 2, flexShrink: 0 }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.67rem', color: '#8B949E', letterSpacing: '0.04em' }}>
+            WAREHOUSE: <Box component="span" sx={{ color: '#C9D1D9', fontWeight: 700 }}>{WAREHOUSE_ID}</Box>
+          </Typography>
+        </Box>
+
+        {/* Desktop nav */}
+        <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'stretch', gap: 0 }}>
+          <NavItems />
+        </Box>
+
+        {/* Right spacer + mobile hamburger */}
+        <Box sx={{ flexGrow: 1 }} />
+        <IconButton
+          onClick={() => setMobileOpen(true)}
+          sx={{ display: { md: 'none' }, color: '#484F58', p: 0.5 }}
+          size="small"
         >
-          {drawer}
-        </Drawer>
-        <Drawer
-          variant="permanent"
-          sx={{
-            display: { xs: 'none', md: 'block' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
-          }}
-          open
-        >
-          {drawer}
-        </Drawer>
+          <MenuIcon sx={{ fontSize: 18 }} />
+        </IconButton>
       </Box>
+
+      {/* Mobile nav drawer */}
+      <Drawer
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        sx={{ '& .MuiDrawer-paper': { backgroundColor: '#0D1117', borderRight: '1px solid #1C2128', width: 200, pt: 2 } }}
+      >
+        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+          <NavItems />
+        </Box>
+      </Drawer>
+
+      {/* Content */}
       <Box
-        component="main"
         sx={{
-          flexGrow: 1,
-          pt: 3,
-          px: 3,
+          flex: 1,
+          overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          minWidth: 0,
-          backgroundColor: 'background.default',
-          minHeight: '100vh',
         }}
       >
-        <Toolbar />
-        <Box sx={{ flex: 1, width: '100%', minWidth: 0, pb: 3 }}>
-          {children}
-        </Box>
+        {children}
       </Box>
+
+      <StatusBar />
     </Box>
   );
 };

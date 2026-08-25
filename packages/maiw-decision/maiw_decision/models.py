@@ -117,3 +117,29 @@ class DecisionResult(BaseModel):
     violations: list[ConstraintViolation] = Field(default_factory=list)
     evaluated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     engine_version: str = "1.0.0"
+    trace_id: str | None = None
+
+
+class ApprovalRecord(BaseModel):
+    """
+    Evidence that a human authority has reviewed and approved (or rejected)
+    a pending proposal.
+
+    An ApprovalRecord is the only legitimate way to advance a proposal from
+    REQUIRES_HUMAN_APPROVAL to APPROVED execution. Hard constraints (stale
+    state, rejected outcomes, missing assets) cannot be overridden by approval.
+    """
+
+    approval_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    proposal_id: str = Field(description="The ActionProposal this approval covers")
+    decision_id: str = Field(description="The DecisionResult that returned REQUIRES_HUMAN_APPROVAL")
+    trace_id: str | None = Field(default=None, description="Trace context for SSE linkage")
+    approved: bool = Field(description="True = approved; False = rejected")
+    approved_by: str = Field(description="Identity of the approving authority")
+    approved_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    expires_at: datetime | None = Field(default=None, description="Optional expiration; None = no expiry")
+
+    def is_expired(self) -> bool:
+        if self.expires_at is None:
+            return False
+        return datetime.now(timezone.utc) >= self.expires_at

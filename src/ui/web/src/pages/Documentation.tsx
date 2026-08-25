@@ -151,7 +151,7 @@ const Documentation: React.FC = () => {
     },
     {
       name: "NVIDIA NIMs Integration",
-      description: "Llama 3.3 Nemotron Super 49B + NV-EmbedQA-E5-v5 embeddings",
+      description: "Nemotron 3 Super 120B + llama-nemotron-embed-vl-1b-v2 embeddings",
       status: "✅ Fully Operational",
       icon: <CloudIcon />
     },
@@ -187,7 +187,7 @@ const Documentation: React.FC = () => {
     },
     {
       name: "Document Processing",
-      description: "6-stage NVIDIA NeMo pipeline with Llama Nemotron Nano VL 8B vision model",
+      description: "6-stage NVIDIA NeMo pipeline with Nemotron Nano VL vision model",
       status: "✅ Production Ready",
       icon: <ArticleIcon />
     },
@@ -453,7 +453,7 @@ const Documentation: React.FC = () => {
                 <ListItem sx={{ py: 0 }}>
                   <ListItemText 
                     primary="AI Services - NVIDIA NIMs" 
-                    secondary="LLM NIM (Llama 3.3 Nemotron Super 49B), LLM NIM (Nemotron Nano VL 8B), NV Embed (E5-V5 1024-dim), NeMo Guardrails"
+                    secondary="LLM NIM (Nemotron 3 Super 120B), VL NIM (Nemotron Nano VL), Embed NIM (llama-nemotron-embed-vl-1b-v2), NeMo Guardrails"
                   />
                 </ListItem>
                 <ListItem sx={{ py: 0 }}>
@@ -588,7 +588,7 @@ const Documentation: React.FC = () => {
                     Stage 3: Small LLM Processing ⭐
                   </Typography>
                   <Typography variant="body2" sx={{ mb: 2 }}>
-                    <strong>Model:</strong> Llama Nemotron Nano VL 8B (NVIDIA NeMo)
+                    <strong>Model:</strong> Nemotron Nano VL (runtime-configured via NEMOTRON_OMNI_API_KEY)
                   </Typography>
                   <Typography variant="body2" sx={{ mb: 2 }}>
                     <strong>Features:</strong>
@@ -632,7 +632,7 @@ const Documentation: React.FC = () => {
                     Stage 5: Large LLM Judge
                   </Typography>
                   <Typography variant="body2" sx={{ mb: 2 }}>
-                    <strong>Model:</strong> Llama 3.3 Nemotron Super 49B NIM
+                    <strong>Model:</strong> Nemotron 3 Super 120B NIM
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Comprehensive quality validation with 4 evaluation criteria: completeness, accuracy, compliance, and quality scoring.
@@ -1297,7 +1297,7 @@ const Documentation: React.FC = () => {
                 • Multi-agent orchestration with LangGraph + MCP integration<br/>
                 • <strong>5 Specialized Agents:</strong> Equipment, Operations, Safety, Forecasting, Document<br/>
                 • <strong>34+ production-ready action tools</strong> across all agents<br/>
-                • NVIDIA NIMs integration (Llama 3.3 Nemotron Super 49B + NV-EmbedQA-E5-v5 + Vision models)<br/>
+                • NVIDIA NIMs integration (Nemotron 3 Super 120B + llama-nemotron-embed-vl-1b-v2 + Vision models)<br/>
                 • <strong>Document Processing:</strong> 6-stage NVIDIA NeMo pipeline with vision models<br/>
                 • <strong>Demand Forecasting:</strong> 6 ML models with NVIDIA RAPIDS GPU acceleration<br/>
                 • <strong>NeMo Guardrails:</strong> Content safety and compliance protection<br/>

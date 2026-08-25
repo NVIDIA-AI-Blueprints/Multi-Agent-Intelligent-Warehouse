@@ -1,0 +1,175 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+name: labor_constraint_wave_risk
+display_name: "Labor Constraint + Wave Risk"
+description: >
+  Two operators are absent (on_leave).  A high-priority pick wave has seven
+  pending tasks with no assigned workers and a carrier cutoff in 45 minutes.
+  OTIF risk is high.  The operations agent must detect the constraint,
+  reallocate available workers, and reprioritize the wave.
+tags: [labor, wave, otif, risk, demo]
+rng_seed: 42
+clock_offset_seconds: 5400  # 90 min into shift
+
+initial_state:
+  inventory:
+    - sku: "SKU-1001"
+      name: "Lay's Classic Chips 1.5oz"
+      zone: "A1"
+      location_id: "A-01-01"
+      quantity_available: 2400
+      quantity_reserved: 120
+      reorder_point: 500
+
+    - sku: "SKU-1002"
+      name: "Doritos Nacho Cheese 1.75oz"
+      zone: "A1"
+      location_id: "A-01-02"
+      quantity_available: 1800
+      quantity_reserved: 200
+      reorder_point: 400
+
+    - sku: "SKU-1003"
+      name: "Cheetos Crunchy 2oz"
+      zone: "A2"
+      location_id: "A-02-01"
+      quantity_available: 950
+      quantity_reserved: 50
+      reorder_point: 300
+
+  equipment:
+    - asset_id: "AGV-01"
+      equipment_type: "agv"
+      model: "Locus Origin"
+      zone: "A1"
+      status: "available"
+      battery_pct: 91.0
+
+    - asset_id: "AGV-02"
+      equipment_type: "agv"
+      model: "Locus Origin"
+      zone: "A2"
+      status: "available"
+      battery_pct: 84.0
+
+    - asset_id: "AMR-01"
+      equipment_type: "amr"
+      model: "Boston Dynamics Spot"
+      zone: "B1"
+      status: "available"
+      battery_pct: 78.0
+
+    - asset_id: "FKL-01"
+      equipment_type: "forklift"
+      model: "Toyota 8FBE15"
+      zone: "C1"
+      status: "available"
+      battery_pct: 100.0
+
+  workers:
+    - worker_id: "w-001"
+      username: "alice"
+      full_name: "Alice Chen"
+      role: "operator"
+      status: "active"
+      zone: "A1"
+      current_task_id: "task-001"
+
+    - worker_id: "w-002"
+      username: "bob"
+      full_name: "Bob Smith"
+      role: "operator"
+      status: "on_leave"    # Absent
+      zone: "A1"
+
+    - worker_id: "w-003"
+      username: "carol"
+      full_name: "Carol Liu"
+      role: "supervisor"
+      status: "active"
+      zone: "A1"
+
+    - worker_id: "w-004"
+      username: "david"
+      full_name: "David Park"
+      role: "operator"
+      status: "on_leave"    # Absent
+      zone: "A2"
+
+    - worker_id: "w-005"
+      username: "eva"
+      full_name: "Eva Rodriguez"
+      role: "operator"
+      status: "active"
+      zone: "A2"
+      current_task_id: "task-002"
+
+    - worker_id: "w-006"
+      username: "frank"
+      full_name: "Frank Osei"
+      role: "manager"
+      status: "active"
+      zone: "C1"
+
+  tasks:
+    - task_id: "task-001"
+      task_type: "PICK"
+      zone: "A1"
+      status: "in_progress"
+      assigned_to: "w-001"
+      priority: "high"
+      deadline: "2026-08-23T09:30:00+00:00"
+
+    - task_id: "task-002"
+      task_type: "PICK"
+      zone: "A2"
+      status: "in_progress"
+      assigned_to: "w-005"
+      priority: "high"
+      deadline: "2026-08-23T09:30:00+00:00"
+
+    - task_id: "task-003"
+      task_type: "PICK"
+      zone: "A1"
+      status: "pending"         # No worker available
+      priority: "high"
+      deadline: "2026-08-23T09:30:00+00:00"
+
+    - task_id: "task-004"
+      task_type: "PICK"
+      zone: "A1"
+      status: "pending"
+      priority: "high"
+      deadline: "2026-08-23T09:30:00+00:00"
+
+    - task_id: "task-005"
+      task_type: "PACK"
+      zone: "A2"
+      status: "pending"
+      priority: "high"
+      deadline: "2026-08-23T09:30:00+00:00"
+
+    - task_id: "task-006"
+      task_type: "PACK"
+      zone: "A2"
+      status: "pending"
+      priority: "medium"
+
+    - task_id: "task-007"
+      task_type: "SHIP"
+      zone: "C1"
+      status: "pending"
+      priority: "high"
+      deadline: "2026-08-23T09:30:00+00:00"
+
+timed_events:
+  - offset_seconds: 120
+    type: worker_absence
+    payload:
+      worker_id: "w-003"
+      new_status: "on_leave"
+      reason: "unexpected_absence"
+
+recovery:
+  wave_risk_max_score: 25
+  backlog_max: 1

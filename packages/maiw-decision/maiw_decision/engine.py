@@ -144,6 +144,79 @@ class DecisionEngine:
             violations=[],
         )
 
+    def authorize_with_approval(
+        self,
+        request: DecisionRequest,
+        approval: "ApprovalRecord",
+    ) -> tuple[DecisionResult, DecisionAuditRecord]:
+        """
+        Re-evaluate a REQUIRES_HUMAN_APPROVAL proposal that now has approval evidence.
+
+        Approval grants authority for the human-approval gate only. Hard
+        constraints (REQUIRES_FRESH_STATE, REJECTED) still apply and cannot
+        be overridden by approval evidence.
+
+        Checks (in order):
+        1. ApprovalRecord binds to the correct proposal.
+        2. Approval has not expired.
+        3. Approval is not a rejection.
+        4. Hard constraints still pass (equipment freshness, asset presence).
+           READ_ONLY and state-freshness rules run as before.
+        5. If all pass: return APPROVED.
+        """
+        from .models import ApprovalRecord  # avoid circular at module level
+
+        proposal = request.proposal
+        snapshot = request.state
+        violations: list[ConstraintViolation] = []
+
+        # Check 1: binding
+        if approval.proposal_id != proposal.proposal_id:
+            violations.append(ConstraintViolation(
+                rule="approval.proposal_mismatch",
+                message=f"ApprovalRecord.proposal_id={approval.proposal_id!r} does not match proposal.proposal_id={proposal.proposal_id!r}",
+                details={"approval_proposal_id": approval.proposal_id, "proposal_id": proposal.proposal_id},
+            ))
+            return self._build(request=request, outcome=DecisionOutcome.REJECTED, violations=violations)
+
+        # Check 2: expiry
+        if approval.is_expired():
+            violations.append(ConstraintViolation(
+                rule="approval.expired",
+                message=f"ApprovalRecord expired at {approval.expires_at}",
+                details={"expires_at": str(approval.expires_at)},
+            ))
+            return self._build(request=request, outcome=DecisionOutcome.REJECTED, violations=violations)
+
+        # Check 3: rejection
+        if not approval.approved:
+            violations.append(ConstraintViolation(
+                rule="approval.rejected_by_human",
+                message=f"Proposal rejected by {approval.approved_by!r}",
+                details={"approved_by": approval.approved_by},
+            ))
+            return self._build(request=request, outcome=DecisionOutcome.REJECTED, violations=violations)
+
+        # Check 4: hard constraints still apply
+        if proposal.domain == "equipment":
+            outcome = self._check_equipment_freshness(request, violations)
+            if outcome is not None:
+                return self._build(request=request, outcome=outcome, violations=violations)
+
+            asset_id = proposal.parameters.get("asset_id")
+            if asset_id and snapshot.state.equipment is not None:
+                found = snapshot.state.equipment.find_asset(asset_id)
+                if found is None:
+                    violations.append(ConstraintViolation(
+                        rule="equipment.asset_not_found",
+                        message=f"Asset '{asset_id}' not found in state snapshot",
+                        details={"asset_id": asset_id, "snapshot_id": snapshot.snapshot_id},
+                    ))
+                    return self._build(request=request, outcome=DecisionOutcome.REJECTED, violations=violations)
+
+        # All checks passed — approval grants authority
+        return self._build(request=request, outcome=DecisionOutcome.APPROVED, violations=[])
+
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------

@@ -16,6 +16,7 @@ Public surface
 from .audit import DecisionAuditRecord
 from .engine import DecisionEngine
 from .models import (
+    ApprovalRecord,
     ConstraintViolation,
     DecisionOutcome,
     DecisionRequest,
@@ -23,6 +24,7 @@ from .models import (
 )
 
 __all__ = [
+    "ApprovalRecord",
     "ConstraintViolation",
     "DecisionAuditRecord",
     "DecisionEngine",

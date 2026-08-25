@@ -1,0 +1,84 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+name: stale_state
+display_name: "Stale State"
+description: >
+  The state provider clock is 45 minutes behind wall time.  Equipment
+  assignments exist in the world but the state snapshot lags behind.
+  The DecisionEngine should return requires_fresh_state for high-risk
+  actions until the state is refreshed.  Tests the stale-state governance path.
+tags: [stale, governance, demo]
+rng_seed: 42
+clock_offset_seconds: -2700  # 45 min stale (negative offset = old snapshot)
+
+initial_state:
+  inventory:
+    - sku: "SKU-1001"
+      name: "Lay's Classic Chips 1.5oz"
+      zone: "A1"
+      location_id: "A-01-01"
+      quantity_available: 2400
+      quantity_reserved: 120
+      reorder_point: 500
+
+  equipment:
+    - asset_id: "AGV-01"
+      equipment_type: "agv"
+      model: "Locus Origin"
+      zone: "A1"
+      status: "assigned"        # Stale — world says assigned, but actually available
+      owner_user: "w-001"
+      battery_pct: 71.0
+
+    - asset_id: "AGV-02"
+      equipment_type: "agv"
+      model: "Locus Origin"
+      zone: "A2"
+      status: "available"
+      battery_pct: 80.0
+
+    - asset_id: "FKL-01"
+      equipment_type: "forklift"
+      model: "Toyota 8FBE15"
+      zone: "C1"
+      status: "assigned"        # Stale assignment
+      owner_user: "w-003"
+      battery_pct: 100.0
+
+  workers:
+    - worker_id: "w-001"
+      username: "alice"
+      full_name: "Alice Chen"
+      role: "operator"
+      status: "active"
+      zone: "A1"
+
+    - worker_id: "w-002"
+      username: "bob"
+      full_name: "Bob Smith"
+      role: "operator"
+      status: "active"
+      zone: "A1"
+
+    - worker_id: "w-003"
+      username: "carol"
+      full_name: "Carol Liu"
+      role: "supervisor"
+      status: "active"
+      zone: "A2"
+
+  tasks:
+    - task_id: "task-001"
+      task_type: "PICK"
+      zone: "A1"
+      status: "pending"
+      priority: "high"
+
+    - task_id: "task-002"
+      task_type: "SHIP"
+      zone: "C1"
+      status: "pending"
+      priority: "high"
+      deadline: "2026-08-23T10:00:00+00:00"
+
+timed_events: []

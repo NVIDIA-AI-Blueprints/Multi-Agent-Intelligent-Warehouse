@@ -351,7 +351,7 @@ class NeMoRetrieverPreprocessor:
                         "Content-Type": "application/json",
                     },
                     json={
-                        "model": "nvidia/llama-3.3-nemotron-super-49b-v1.5",  # Fallback model for page element detection
+                        "model": "nvidia/nemotron-3-super-120b-a12b",  # Fallback model for page element detection
                         "messages": [
                             {
                                 "role": "user",

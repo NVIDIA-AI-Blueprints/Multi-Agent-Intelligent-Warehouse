@@ -170,8 +170,8 @@ Multi-Agent-Intelligent-Warehouse/
 | Web framework | `fastapi >= 0.120.0` | Uvicorn ASGI server, port 8001 |
 | Agent orchestration | `langgraph >= 1.0.5` + `langgraph-checkpoint >= 3.0.0` | StateGraph, no checkpointer (CVE-2025-8709) |
 | LLM client | Custom `httpx.AsyncClient` in `src/api/services/llm/nim_client.py` | No OpenAI SDK, no LangChain LLM wrappers |
-| LLM model | `nvidia/llama-3.3-nemotron-super-49b-v1.5` | Via NVIDIA NIM hosted at `integrate.api.nvidia.com/v1` |
-| Embedding model | `nvidia/llama-nemotron-embed-vl-1b-v2` | 2048-dim, same NIM endpoint |
+| LLM model | `nvidia/nemotron-3-super-120b-a12b` | Via NVIDIA NIM hosted at `integrate.api.nvidia.com/v1` |
+| Embedding model | `nvidia/llama-nemotron-embed-vl-1b-v2` | 2048-dim multimodal — current NVIDIA VL embedding model |
 | Guardrails | `nemoguardrails >= 0.19.0` | Pattern fallback when SDK disabled |
 | Vector DB | `pymilvus >= 2.3.0` | Collection `warehouse_docs`, IVF_FLAT index |
 | Relational DB | `asyncpg >= 0.29.0` + TimescaleDB | PostgreSQL 5435, hypertables for time-series |
@@ -270,7 +270,7 @@ Multi-Agent-Intelligent-Warehouse/
               │   ┌─────────────────────────────────────────────┐     │
               │   │  NVIDIA NIM API  integrate.api.nvidia.com   │     │
               │   │  POST /chat/completions                      │     │
-              │   │  Model: nvidia/llama-3.3-nemotron-super-49b  │     │
+              │   │  Model: nvidia/nemotron-3-super-120b-a12b    │     │
               │   │  POST /embeddings                            │     │
               │   │  Model: nvidia/llama-nemotron-embed-vl-1b    │     │
               │   └─────────────────────────────────────────────┘     │
@@ -356,7 +356,7 @@ The following traces a `POST /api/v1/chat` request end-to-end with actual file p
         src/api/services/llm/nim_client.py
       → POST https://integrate.api.nvidia.com/v1/chat/completions
         Authorization: Bearer $NVIDIA_API_KEY
-        model: nvidia/llama-3.3-nemotron-super-49b-v1.5
+        model: nvidia/nemotron-3-super-120b-a12b
         chat_template_kwargs: {enable_thinking: false}   (default)
       ← assistant message
    f. Second NIM call → natural_language string (temperature=0.4)
@@ -395,12 +395,12 @@ The following traces a `POST /api/v1/chat` request end-to-end with actual file p
 
 | Agent Class | File | LangGraph Node | Primary LLM | Tools Owned | Prompt Location |
 |---|---|---|---|---|---|
-| `MCPEquipmentAssetOperationsAgent` | `src/api/agents/inventory/mcp_equipment_agent.py` | `_mcp_equipment_agent` | `nvidia/llama-3.3-nemotron-super-49b-v1.5` | `get_equipment_status`, `assign_equipment`, `get_equipment_utilization`, `get_maintenance_schedule`; also inventory tools via `EquipmentActionTools` | `data/config/agents/equipment_agent.yaml` |
+| `MCPEquipmentAssetOperationsAgent` | `src/api/agents/inventory/mcp_equipment_agent.py` | `_mcp_equipment_agent` | `nvidia/nemotron-3-super-120b-a12b` | `get_equipment_status`, `assign_equipment`, `get_equipment_utilization`, `get_maintenance_schedule`; also inventory tools via `EquipmentActionTools` | `data/config/agents/equipment_agent.yaml` |
 | `EquipmentAssetOperationsAgent` (non-MCP) | `src/api/agents/inventory/equipment_agent.py` | Not in active graph | Same NIM model | Same equipment tools | Same YAML |
-| `MCPOperationsCoordinationAgent` | `src/api/agents/operations/mcp_operations_agent.py` | `_mcp_operations_agent` | `nvidia/llama-3.3-nemotron-super-49b-v1.5` | `create_task`, `assign_task`, `get_task_status`, `get_workforce_status`, pick wave, workload rebalance | `data/config/agents/operations_agent.yaml` |
-| `MCPSafetyComplianceAgent` | `src/api/agents/safety/mcp_safety_agent.py` | `_mcp_safety_agent` | `nvidia/llama-3.3-nemotron-super-49b-v1.5` | `log_incident`, `start_checklist`, `broadcast_alert`, `get_safety_procedures`, lockout-tagout, near-miss | `data/config/agents/safety_agent.yaml` |
-| `ForecastingAgent` | `src/api/agents/forecasting/forecasting_agent.py` | `_mcp_forecasting_agent` | `nvidia/llama-3.3-nemotron-super-49b-v1.5` | `get_forecast`, `get_batch_forecast`, `get_reorder_recommendations`, `get_model_performance`, `get_forecast_dashboard`, `get_business_intelligence` | `data/config/agents/forecasting_agent.yaml` |
-| `DocumentExtractionAgent` | `src/api/agents/document/document_extraction_agent.py` | `_mcp_document_agent` | Stage 3: Llama-Nemotron-Nano-VL-8B; Stage 5: `nvidia/llama-3.3-nemotron-super-49b-v1.5` | `upload_document`, `get_document_status`, `extract_document_data`, `validate_document_quality`, `search_documents`, `approve_document`, `reject_document` | `data/config/agents/document_agent.yaml` |
+| `MCPOperationsCoordinationAgent` | `src/api/agents/operations/mcp_operations_agent.py` | `_mcp_operations_agent` | `nvidia/nemotron-3-super-120b-a12b` | `create_task`, `assign_task`, `get_task_status`, `get_workforce_status`, pick wave, workload rebalance | `data/config/agents/operations_agent.yaml` |
+| `MCPSafetyComplianceAgent` | `src/api/agents/safety/mcp_safety_agent.py` | `_mcp_safety_agent` | `nvidia/nemotron-3-super-120b-a12b` | `log_incident`, `start_checklist`, `broadcast_alert`, `get_safety_procedures`, lockout-tagout, near-miss | `data/config/agents/safety_agent.yaml` |
+| `ForecastingAgent` | `src/api/agents/forecasting/forecasting_agent.py` | `_mcp_forecasting_agent` | `nvidia/nemotron-3-super-120b-a12b` | `get_forecast`, `get_batch_forecast`, `get_reorder_recommendations`, `get_model_performance`, `get_forecast_dashboard`, `get_business_intelligence` | `data/config/agents/forecasting_agent.yaml` |
+| `DocumentExtractionAgent` | `src/api/agents/document/document_extraction_agent.py` | `_mcp_document_agent` | Stage 3: Nemotron Nano VL (runtime-configured); Stage 5: `nvidia/nemotron-3-super-120b-a12b` | `upload_document`, `get_document_status`, `extract_document_data`, `validate_document_quality`, `search_documents`, `approve_document`, `reject_document` | `data/config/agents/document_agent.yaml` |
 | General / fallback | Inline in `_mcp_general_agent` node | `_mcp_general_agent` | Same NIM model | Any tool discovered by `ToolDiscoveryService` | No YAML; uses ToolDiscovery catalog |
 
 ---
@@ -427,7 +427,7 @@ NIMClient.generate_response()
        await self.llm_client.post(
            "/chat/completions",
            json={
-               "model": "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+               "model": "nvidia/nemotron-3-super-120b-a12b",
                "messages": [...],
                "temperature": temperature,
                "max_tokens": max_tokens,
@@ -448,14 +448,14 @@ Embedding calls:
   NIMClient.generate_embeddings(texts)
     await self.embedding_client.post(
         "/embeddings",
-        json={"model": "nvidia/llama-nemotron-embed-vl-1b-v2", "input": texts}
+        json={"model": "nvidia/llama-nemotron-embed-vl-1b-v2", "input": texts}  # multimodal embedding — current
     )
     → embeddings[0].embedding  # float[2048]
 ```
 
 **Document pipeline uses additional standalone httpx clients** (not the shared NIMClient):
-- `src/api/agents/document/processing/small_llm_processor.py` → Llama-Nemotron-Nano-VL-8B via `LLAMA_NANO_VL_API_KEY`
-- `src/api/agents/document/validation/large_llm_judge.py` → same 49B model via `NVIDIA_API_KEY`, own client per request
+- `src/api/agents/document/processing/small_llm_processor.py` → multimodal VL model via `NEMOTRON_OMNI_API_KEY` (legacy: `LLAMA_NANO_VL_API_KEY`)
+- `src/api/agents/document/validation/large_llm_judge.py` → `nvidia/nemotron-3-super-120b-a12b` via `NVIDIA_API_KEY`, own client per request
 - `src/api/agents/document/ocr/nemotron_parse.py` → NeMo Parse endpoint via `NEMO_PARSE_API_KEY`
 
 ---
@@ -690,21 +690,21 @@ Stage 2: OCR_EXTRACTION
 
 Stage 3: LLM_PROCESSING (entity extraction)
   src/api/agents/document/processing/small_llm_processor.py
-  Primary model: Llama-Nemotron-Nano-VL-8B  (LLAMA_NANO_VL_API_KEY)
+  Primary model: Nemotron VL (runtime-configured via NEMOTRON_OMNI_API_KEY)
   Vision fallback: meta/llama-3.2-11b-vision-instruct
   Text fallback: meta/llama-3.1-8b-instruct
   src/api/agents/document/processing/entity_extractor.py
 
 Stage 4: EMBEDDING
   src/api/agents/document/processing/embedding_indexing.py
-  Model: nvidia/llama-nemotron-embed-vl-1b-v2 (2048-dim)
+  Model: nvidia/llama-nemotron-embed-vl-1b-v2 (2048-dim, multimodal — current)
   Writes to: Milvus collection warehouse_docs
   Records vector_id in: Postgres document_search_metadata
 
 Stage 5: VALIDATION (LLM-as-judge)
   src/api/agents/document/validation/quality_scorer.py
   src/api/agents/document/validation/large_llm_judge.py
-  Model: nvidia/llama-3.3-nemotron-super-49b-v1.5
+  Model: nvidia/nemotron-3-super-120b-a12b
   Scores 0-5: completeness, accuracy, compliance, quality
   Writes to: Postgres quality_scores
 
@@ -865,7 +865,7 @@ All deployment is via Docker Compose. There is no Kubernetes, no Helm, no Terraf
 
 | Compose File | Purpose |
 |---|---|
-| `deploy/compose/docker-compose.dev.yaml` | **Primary dev stack**: TimescaleDB :5435, Redis :6379, Kafka :9092, etcd :2379, MinIO :9000/9001, Milvus :19530/9091, backend :8001, frontend :3001, nginx :3000, llm-nim (NIM LLaMA 3.3 Nemotron 49B :8000, 4-GPU reservation) |
+| `deploy/compose/docker-compose.dev.yaml` | **Primary dev stack**: TimescaleDB :5435, Redis :6379, Kafka :9092, etcd :2379, MinIO :9000/9001, Milvus :19530/9091, backend :8001, frontend :3001, nginx :3000, llm-nim (NIM Nemotron 3 Super 120B :8000, 4-GPU reservation) |
 | `deploy/compose/docker-compose.gpu.yaml` | GPU infrastructure overlay: Milvus v2.4.3-gpu with CUDA, Postgres/Redis/Kafka/ZooKeeper/etcd/MinIO |
 | `deploy/compose/docker-compose.monitoring.yaml` | Prometheus + Grafana + Alertmanager |
 | `deploy/compose/docker-compose.rapids.yml` | RAPIDS GPU forecasting sidecar |
@@ -933,6 +933,6 @@ Root-level `nginx.conf` is **empty** (placeholder).
 
 13. **11 unit tests excluded from CI.** Over 40% of unit test files (including the planner graph tests and MCP system tests) are `--ignore`d in `ci-cd.yml`. The CI green state does not validate the core orchestration logic.
 
-14. **`LLAMA_70B_TIMEOUT` env var is a legacy name.** `src/api/agents/document/validation/large_llm_judge.py` reads `os.getenv("LLAMA_70B_TIMEOUT", "120")` despite the model being the 49B Nemotron, not a 70B model. The env var name is misleading and may cause operator confusion.
+14. **`LLAMA_70B_TIMEOUT` env var (resolved).** Renamed to `NEMOTRON_SUPER_TIMEOUT`; `large_llm_judge.py` now reads the new name with a `DeprecationWarning` fallback to the old name for backward compatibility.
 
 15. **No streaming LLM responses.** `NIMClient.generate_response()` supports a `stream: bool = False` parameter and forwards it in the JSON payload, but no agent ever calls with `stream=True`, no SSE consumer exists, and the chat endpoint returns complete `ChatResponse` objects. The nginx `proxy_buffering off` header is in place but serves no current purpose.

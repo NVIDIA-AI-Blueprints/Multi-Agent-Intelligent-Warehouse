@@ -39,7 +39,7 @@ response = await nim_client.generate_response(messages, temperature=0.0)
 **Description:** Maximum number of tokens to generate in the response. This limits the length of the output.
 
 **Range:** `1` to model's maximum context window
-- For Llama 3.3 Nemotron Super 49B: Up to 131,072 tokens (context window)
+- For Nemotron 3 Super 120B: Up to 131,072 tokens (context window)
 - Typical values: `500-4000` for most queries, `2000-8000` for complex queries
 
 **Default:** `2000`
@@ -141,7 +141,7 @@ Add these to your `.env` file (or set as environment variables):
 
 ```bash
 # LLM Model Configuration
-LLM_MODEL=nvidia/llama-3.3-nemotron-super-49b-v1.5
+LLM_MODEL=nvidia/nemotron-3-super-120b-a12b
 
 # LLM Generation Parameters
 LLM_TEMPERATURE=0.1          # Default: 0.1 (balanced, slightly creative)
@@ -275,6 +275,6 @@ response = await nim_client.generate_response(
 ## See Also
 
 - [NVIDIA NIM Documentation](https://build.nvidia.com/)
-- [Llama 3.3 Nemotron Super 49B Model Card](https://build.nvidia.com/nvidia/llama-3_3-nemotron-super-49b-v1_5/modelcard)
+- [Nemotron 3 Super 120B Model Card](https://build.nvidia.com/nvidia/nemotron-3-super-120b-a12b/modelcard)
 - [OpenAI API Parameters Reference](https://platform.openai.com/docs/api-reference/chat/create) (similar parameter definitions)
 

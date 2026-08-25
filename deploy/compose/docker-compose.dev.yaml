@@ -158,6 +158,102 @@ services:
       - backend
     restart: unless-stopped
 
+  # ── MCP Domain Servers (stateless streamable-http, no sticky sessions) ─────────
+
+  mcp-inventory:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.mcp
+      args:
+        MCP_DOMAIN: inventory
+    container_name: wosa-mcp-inventory
+    ports:
+      - "${MAIW_MCP_INVENTORY_PORT:-8765}:8765"
+    environment:
+      - MAIW_MCP_TRANSPORT=streamable-http
+      - MAIW_MCP_INVENTORY_PORT=8765
+      - MAIW_MCP_INVENTORY_HOST=0.0.0.0
+      - DB_HOST=timescaledb
+      - DB_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    depends_on:
+      - timescaledb
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8765/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  mcp-equipment:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.mcp
+      args:
+        MCP_DOMAIN: equipment
+    container_name: wosa-mcp-equipment
+    ports:
+      - "${MAIW_MCP_EQUIPMENT_PORT:-8766}:8766"
+    environment:
+      - MAIW_MCP_TRANSPORT=streamable-http
+      - MAIW_MCP_EQUIPMENT_PORT=8766
+      - MAIW_MCP_EQUIPMENT_HOST=0.0.0.0
+      - DB_HOST=timescaledb
+      - DB_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    depends_on:
+      - timescaledb
+    restart: unless-stopped
+
+  mcp-labor:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.mcp
+      args:
+        MCP_DOMAIN: labor
+    container_name: wosa-mcp-labor
+    ports:
+      - "${MAIW_MCP_LABOR_PORT:-8767}:8767"
+    environment:
+      - MAIW_MCP_TRANSPORT=streamable-http
+      - MAIW_MCP_LABOR_PORT=8767
+      - MAIW_MCP_LABOR_HOST=0.0.0.0
+      - DB_HOST=timescaledb
+      - DB_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    depends_on:
+      - timescaledb
+    restart: unless-stopped
+
+  mcp-wave:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.mcp
+      args:
+        MCP_DOMAIN: wave
+    container_name: wosa-mcp-wave
+    ports:
+      - "${MAIW_MCP_WAVE_PORT:-8768}:8768"
+    environment:
+      - MAIW_MCP_TRANSPORT=streamable-http
+      - MAIW_MCP_WAVE_PORT=8768
+      - MAIW_MCP_WAVE_HOST=0.0.0.0
+      - DB_HOST=timescaledb
+      - DB_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    depends_on:
+      - timescaledb
+    restart: unless-stopped
+
   llm-nim:
     image: nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b:latest
     container_name: wosa-llm-nim

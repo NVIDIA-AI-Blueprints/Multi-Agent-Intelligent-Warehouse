@@ -213,11 +213,6 @@ async def get_all_equipment(
         )
 
 
-@router.get("/equipment/assignments/test")
-async def test_assignments():
-    return {"message": "Assignments endpoint is working"}
-
-
 @router.get("/equipment/assignments", response_model=List[EquipmentAssignment])
 async def get_equipment_assignments(
     asset_id: Optional[str] = None,

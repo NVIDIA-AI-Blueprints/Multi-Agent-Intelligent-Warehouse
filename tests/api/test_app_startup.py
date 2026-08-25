@@ -113,6 +113,7 @@ def test_canonical_routes_registered(test_app):
         "/api/v1/safety/policies",
         "/api/v1/mcp/status",
         "/api/v1/mcp/capabilities",
+        "/api/v1/runtime/status",
     }
     missing = expected - paths
     assert not missing, f"Missing routes: {missing}"

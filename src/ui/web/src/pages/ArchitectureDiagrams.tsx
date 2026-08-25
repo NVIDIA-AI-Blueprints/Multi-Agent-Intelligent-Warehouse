@@ -653,7 +653,7 @@ const ArchitectureDiagrams: React.FC = () => {
                     <ListItem>
                       <ListItemText 
                         primary="NVIDIA NIMs" 
-                        secondary="Llama 3.3 Nemotron Super 49B + NV-EmbedQA-E5-v5 embeddings"
+                        secondary="Nemotron 3 Super 120B + llama-nemotron-embed-vl-1b-v2 embeddings"
                       />
                     </ListItem>
                     <ListItem>

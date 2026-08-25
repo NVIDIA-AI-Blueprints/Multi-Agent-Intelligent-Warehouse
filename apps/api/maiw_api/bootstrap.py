@@ -63,6 +63,9 @@ _INVENTORY_CAPABILITIES = [
 ]
 
 
+_DEMO_MODE = os.getenv("MAIW_DEMO_MODE", "false").lower() in ("1", "true", "yes")
+
+
 @dataclass
 class MAIWRuntime:
     """
@@ -72,6 +75,9 @@ class MAIWRuntime:
     constructing their own.  All fields default to None; routers guard against
     None values and return 503 when a required component is unavailable.
     """
+
+    # Demo / simulation controller (only set when MAIW_DEMO_MODE=true)
+    demo_controller: Any = None  # maiw_api.demo.controller.DemoScenarioController
 
     # MCP layer
     mcp_registry: Any = None  # maiw_mcp.CapabilityRegistry
@@ -115,6 +121,30 @@ async def get_runtime() -> MAIWRuntime:
     logger.info("MAIW bootstrap: assembling runtime...")
     runtime = MAIWRuntime()
 
+    # ── 0. Demo mode — SimulationProviders replace DB-backed providers ─────────
+    if _DEMO_MODE:
+        try:
+            from maiw_api.demo.controller import get_demo_controller
+            from mcp_servers.inventory.server import configure_server as _cfg_inv
+            from mcp_servers.equipment.server import configure_server as _cfg_eq
+            from mcp_servers.labor.server import configure_server as _cfg_lab
+            from mcp_servers.wave.server import configure_server as _cfg_wave
+
+            ctrl = get_demo_controller()
+            _cfg_inv(ctrl.providers.inventory)
+            _cfg_eq(ctrl.providers.equipment)
+            _cfg_lab(ctrl.providers.labor)
+            _cfg_wave(ctrl.providers.wave)
+            runtime.demo_controller = ctrl
+            logger.info(
+                "MAIW bootstrap: DEMO MODE active — "
+                "SimulationProviders wired into all four MCP servers"
+            )
+        except Exception as exc:
+            logger.error(
+                "MAIW bootstrap: DEMO MODE requested but failed to wire providers — %s", exc
+            )
+
     # ── 1. CapabilityRegistry ──────────────────────────────────────────────────
     try:
         from maiw_mcp.registry.registry import CapabilityRegistry
@@ -140,6 +170,33 @@ async def get_runtime() -> MAIWRuntime:
         if wave_url:
             registry.register_domain(_WAVE_CAPABILITIES, wave_url)
             runtime.mcp_wave_available = True
+
+        # Demo mode: register MCPServer instances for in-memory transport.
+        # The MCP client's Client(server) accepts either a URL string (HTTP)
+        # or an MCPServer instance (in-memory) — no extra HTTP servers needed.
+        if _DEMO_MODE and runtime.demo_controller is not None:
+            try:
+                from mcp_servers.equipment.server import mcp_server as _eq_srv
+                from mcp_servers.inventory.server import mcp_server as _inv_srv
+                from mcp_servers.labor.server import mcp_server as _lab_srv
+                from mcp_servers.wave.server import mcp_server as _wave_srv
+
+                registry.register_domain(_EQUIPMENT_CAPABILITIES, _eq_srv)
+                registry.register_domain(_INVENTORY_CAPABILITIES, _inv_srv)
+                registry.register_domain(_LABOR_CAPABILITIES, _lab_srv)
+                registry.register_domain(_WAVE_CAPABILITIES, _wave_srv)
+
+                runtime.mcp_equipment_available = True
+                runtime.mcp_inventory_available = True
+                runtime.mcp_labor_available = True
+                runtime.mcp_wave_available = True
+
+                logger.info(
+                    "MAIW bootstrap: DEMO MODE — four MCPServer instances registered "
+                    "(in-memory transport, no HTTP servers required)"
+                )
+            except Exception as exc:
+                logger.error("MAIW bootstrap: DEMO MODE MCP registration failed — %s", exc)
 
         runtime.mcp_registry = registry
         logger.info(
@@ -181,13 +238,22 @@ async def get_runtime() -> MAIWRuntime:
     if runtime.mcp_client is not None:
         try:
             from maiw_skills.equipment.skills import EquipmentStatusSkill
+            from maiw_skills.labor.skills import LaborCapacitySkill
+            from maiw_skills.wave.skills import WaveGetSkill
             from maiw_state import WarehouseStateProvider
 
             equipment_status_skill = EquipmentStatusSkill(runtime.mcp_client)
+            labor_capacity_skill = LaborCapacitySkill(runtime.mcp_client)
+            wave_get_skill = WaveGetSkill(runtime.mcp_client)
             runtime.state_provider = WarehouseStateProvider(
                 equipment_status_skill=equipment_status_skill,
+                labor_capacity_skill=labor_capacity_skill,
+                wave_get_skill=wave_get_skill,
             )
-            logger.info("MAIW bootstrap: WarehouseStateProvider ready")
+            logger.info(
+                "MAIW bootstrap: WarehouseStateProvider ready "
+                "(equipment + labor + wave skills wired)"
+            )
         except Exception as exc:
             logger.warning(
                 "MAIW bootstrap: WarehouseStateProvider unavailable — %s", exc

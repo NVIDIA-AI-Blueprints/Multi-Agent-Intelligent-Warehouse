@@ -136,6 +136,9 @@ class MAIWMCPClient:
             Transport-level or protocol-level error.
         """
         server_url = self._registry.resolve(capability)
+        # Telemetry fields must be plain strings — MCPServer instances are not
+        # serialisable via dataclasses.asdict() (deepcopy fails on SSL objects).
+        server_label = server_url if isinstance(server_url, str) else type(server_url).__name__
         start = time.monotonic()
 
         try:
@@ -146,7 +149,7 @@ class MAIWMCPClient:
             latency_ms = (time.monotonic() - start) * 1000
             self._telemetry.record_failure(
                 capability=capability,
-                server_url=server_url,
+                server_url=server_label,
                 latency_ms=latency_ms,
                 error=exc,
                 trace_id=trace_id,
@@ -156,7 +159,7 @@ class MAIWMCPClient:
             latency_ms = (time.monotonic() - start) * 1000
             self._telemetry.record_failure(
                 capability=capability,
-                server_url=server_url,
+                server_url=server_label,
                 latency_ms=latency_ms,
                 error=exc,
                 trace_id=trace_id,
@@ -168,7 +171,7 @@ class MAIWMCPClient:
         latency_ms = (time.monotonic() - start) * 1000
         self._telemetry.record_success(
             capability=capability,
-            server_url=server_url,
+            server_url=server_label,
             latency_ms=latency_ms,
             trace_id=trace_id,
         )
@@ -202,9 +205,19 @@ class MAIWMCPClient:
         return str(result.content)
 
     def _parse_result(self, result: types.CallToolResult) -> dict[str, Any]:
-        # Prefer structuredContent if available
-        if result.structured_content is not None:
-            return result.structured_content
+        # structured_content may be an SDK auto-wrap of a string-returning tool:
+        # {"result": "<json string>"}.  In that case parse the inner value.
+        sc = result.structured_content
+        if sc is not None:
+            if isinstance(sc, dict) and list(sc.keys()) == ["result"] and isinstance(sc.get("result"), str):
+                try:
+                    parsed = json.loads(sc["result"])
+                    if isinstance(parsed, dict):
+                        return parsed
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            elif isinstance(sc, dict):
+                return sc
 
         # Fall back to parsing JSON from TextContent
         text = self._extract_text(result)

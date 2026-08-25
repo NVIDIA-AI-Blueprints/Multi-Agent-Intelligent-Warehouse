@@ -4,7 +4,7 @@
 MCP Protocol Conformance Tests — MAIW Inventory Server (MCP SDK v2).
 
 MCP protocol version: 2026-07-28
-MCP SDK version: 2.0.0
+MCP SDK version: 2.x (tested against 2.1.1+)
 
 These tests exercise the REAL MCP protocol path using the official v2 in-memory
 transport.  No network is required.  ``mcp.client.Client(server_instance)``
@@ -96,7 +96,7 @@ class TestMCPV2Protocol:
             error_message=None,
         )
         assert record.mcp_sdk_version == _MCP_SDK_VERSION
-        assert "2.0" in record.mcp_sdk_version
+        assert record.mcp_sdk_version.startswith("2."), record.mcp_sdk_version
 
     def test_telemetry_records_protocol_version(self):
         from maiw_mcp.telemetry.telemetry import CapabilityCallRecord

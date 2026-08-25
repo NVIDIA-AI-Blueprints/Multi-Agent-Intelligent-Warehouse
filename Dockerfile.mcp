@@ -1,0 +1,49 @@
+# Dockerfile.mcp — MAIW MCP domain server image
+#
+# Build args:
+#   MCP_DOMAIN   inventory | equipment | labor | wave
+#
+# Example:
+#   docker build --build-arg MCP_DOMAIN=inventory -t maiw-mcp-inventory .
+#
+# Entrypoint (override via compose environment):
+#   MAIW_MCP_TRANSPORT=streamable-http
+#   MAIW_MCP_INVENTORY_PORT=8765   (or EQUIPMENT/LABOR/WAVE variants)
+
+FROM python:3.11-slim AS base
+
+ARG MCP_DOMAIN=inventory
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+# Install shared packages first (cacheable layer)
+COPY packages/maiw-mcp ./packages/maiw-mcp
+COPY packages/maiw-models ./packages/maiw-models
+COPY packages/maiw-state ./packages/maiw-state
+RUN pip install --no-cache-dir \
+    packages/maiw-mcp \
+    packages/maiw-models \
+    packages/maiw-state
+
+# Install DB / async drivers needed by adapters
+RUN pip install --no-cache-dir asyncpg python-dotenv
+
+# Copy only the code paths the MCP servers need
+COPY src/retrieval ./src/retrieval
+COPY src/api/agents ./src/api/agents
+COPY mcp_servers/__init__.py ./mcp_servers/__init__.py
+COPY mcp_servers/${MCP_DOMAIN} ./mcp_servers/${MCP_DOMAIN}
+
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+ENV MCP_DOMAIN=${MCP_DOMAIN}
+
+# Default: streamable-http (stateless — no session affinity required)
+ENV MAIW_MCP_TRANSPORT=streamable-http
+
+RUN groupadd -r mcpuser && useradd -r -g mcpuser mcpuser
+USER mcpuser
+
+CMD python -m mcp_servers.${MCP_DOMAIN}.server

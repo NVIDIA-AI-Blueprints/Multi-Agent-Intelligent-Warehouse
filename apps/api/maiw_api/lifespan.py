@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 
 from maiw_api.bootstrap import get_runtime
@@ -29,6 +30,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Build the runtime on startup; release resources on shutdown."""
     logger.info("MAIW API: starting up...")
+    load_dotenv()
 
     runtime = await get_runtime()
     app.state.runtime = runtime
@@ -49,3 +51,8 @@ async def lifespan(app: FastAPI):
     yield
 
     logger.info("MAIW API: shutting down...")
+    if runtime is not None and runtime.mcp_client is not None:
+        try:
+            await runtime.mcp_client.aclose()
+        except Exception as exc:
+            logger.warning("MCP client close error: %s", exc)

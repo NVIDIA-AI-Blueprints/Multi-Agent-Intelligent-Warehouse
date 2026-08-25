@@ -239,7 +239,7 @@ const DocumentExtraction: React.FC = () => {
           stages: [
             { name: 'Preprocessing', completed: false, current: true, description: 'Document preprocessing with NeMo Retriever' },
             { name: 'OCR Extraction', completed: false, current: false, description: 'Intelligent OCR with NeMoRetriever-OCR-v1' },
-            { name: 'LLM Processing', completed: false, current: false, description: 'Small LLM processing with Llama Nemotron Nano VL 8B' },
+            { name: 'LLM Processing', completed: false, current: false, description: 'Small LLM processing with Nemotron Nano VL (runtime-configured)' },
             { name: 'Validation', completed: false, current: false, description: 'Large LLM judge and validator' },
             { name: 'Routing', completed: false, current: false, description: 'Intelligent routing based on quality scores' },
           ]
@@ -653,9 +653,9 @@ const DocumentExtraction: React.FC = () => {
           {[
             { name: '1. Document Preprocessing', description: 'NeMo Retriever Extraction', color: 'primary' },
             { name: '2. Intelligent OCR', description: 'NeMoRetriever-OCR-v1 + Nemotron Parse', color: 'primary' },
-            { name: '3. Small LLM Processing', description: 'Llama Nemotron Nano VL 8B', color: 'primary' },
+            { name: '3. Small LLM Processing', description: 'Nemotron Nano VL (runtime-configured)', color: 'primary' },
             { name: '4. Embedding & Indexing', description: 'llama-nemotron-embed-vl-1b-v2', color: 'primary' },
-            { name: '5. Large LLM Judge', description: 'Llama 3.3 Nemotron Super 49B', color: 'primary' },
+            { name: '5. Large LLM Judge', description: 'Nemotron 3 Super 120B', color: 'primary' },
             { name: '6. Intelligent Routing', description: 'Quality-based routing', color: 'primary' },
           ].map((stage, index) => (
             <ListItem key={index} sx={{ py: 0.5 }}>
