@@ -457,6 +457,67 @@ the `RECONCILE` category (amber) with operator-facing labels:
 ✗ Distributed reconciliation state: single-process only (same as registry)
 ```
 
+#### Request Deadline Hierarchy (Phase 10E Batch 4)
+
+Every request that enters the MAIW pipeline now carries an explicit, bounded time
+budget. Deadlines are monotonic-clock values set once at the API boundary and never
+extended — child operations can only reduce them.
+
+```
+/demo/analyze  ──── analyze_deadline  (MAIW_ANALYZE_TIMEOUT_SECONDS, default 60s)
+    │
+    ├── state_provider.get_state()          ← analyze_deadline propagated
+    │       ├── EquipmentStatusSkill MCP
+    │       ├── LaborCapacitySkill MCP
+    │       └── WaveGetSkill MCP
+    │
+    ├── operations_agent.analyze_disruption()  ← analyze_deadline propagated
+    │       └── ModelGateway.generate()
+    │               └── NIMClient.generate_response()  ← effective_timeout = min(local, remaining)
+    │
+    └── executor.execute()  ── execution_deadline  (MAIW_EXECUTION_TIMEOUT_SECONDS, default 30s)
+            └── MCP write call
+
+/demo/reconcile  ─── reconciliation_deadline  (MAIW_RECONCILIATION_TIMEOUT_SECONDS, default 30s)
+    └── ReconciliationService.reconcile()
+            └── strategy.read_current_state()
+
+API startup  ─── asyncio.wait_for(MAIW_STARTUP_TIMEOUT_SECONDS, default 30s)
+```
+
+The execution deadline is **independent** of the analyze deadline — a long analysis
+phase does not eat into the budget available for the resulting write.
+
+**Typed failure → HTTP mapping:**
+
+| Exception | HTTP | UI label |
+|-----------|------|----------|
+| `RequestDeadlineExceeded` | `504` | `REQUEST DEADLINE` |
+| `ModelTimeout` | `504` | `MODEL TIMEOUT` |
+| `MCPTimeout` | `504` | `CAPABILITY TIMEOUT` |
+| `ModelUnavailable` | `503` | `MODEL UNAVAILABLE` |
+| `MCPUnavailable` | `503` | `MCP UNAVAILABLE` |
+
+`ExecutionOutcome.UNKNOWN` is **never converted to a 504** — it is always returned
+as a structured body (`status: "unknown"`) for operator reconciliation.
+
+**Batch 4 Safety:**
+
+```
+✓ Deadline originates at /demo/analyze ingress — not inside the agent or executor
+✓ analyze_deadline propagated through state_provider → agent → ModelGateway → NIM
+✓ Execution deadline is a fresh budget, independent of the analyze budget
+✓ Reconciliation deadline is a fresh budget, independent of both
+✓ Startup bounded — hung NIM/DB cannot block startup indefinitely
+✓ Lifespan cleanup fixed — NIM httpx clients closed; mcp_client.aclose() removed
+  (MAIWMCPClient is per-call/context-managed and has no persistent connection)
+✓ /live returns 200 regardless of NIM or MCP availability
+✓ RequestDeadlineExceeded/ModelTimeout/MCPTimeout → 504; Unavailable → 503
+✓ ExecutionOutcome.UNKNOWN preserved as structured body — never 500/504
+✗ Distributed deadline propagation across replicas: out of scope for 10E
+✗ Per-capability deadline budgets: deferred to production-scoped work
+```
+
 ---
 
 ## MCP v2 Capability Plane
@@ -887,6 +948,7 @@ package-based, MCP v2 system.
 | **Reliable Execution** (Phase 10E Batch 1) | ✅ Done | `ExecutionOutcome` enum, `ExecutionRegistry` (single-process), `AmbiguousWriteError`, `execution_id` propagation, idempotent replay metadata |
 | **Approval Governance** (Phase 10E Batch 2) | ✅ Done | `ApprovalState` machine (PENDING/APPROVED/REJECTED/EXPIRED/CONSUMED), `InMemoryApprovalStore`, single-use consume, proposal/decision/warehouse binding, 300s default TTL, audit chain preserved |
 | **Reconciliation** (Phase 10E Batch 3) | ✅ Done | `ExecutionIntent` snapshot, `ReconciliationOutcome` (CONFIRMED_EXECUTED/CONFIRMED_NOT_EXECUTED/INDETERMINATE), `ReconciliationService`, `effective_status` derived property, UNKNOWN history preserved, capability-specific postcondition strategies |
+| **Request Deadlines** (Phase 10E Batch 4) | ✅ Done | `RequestDeadline` hierarchy at API boundary; analyze/execution/reconciliation/startup budgets; typed failure→HTTP map; lifespan cleanup; UNKNOWN preserved as structured outcome |
 | **Agents** (`maiw-agents`) | ✅ Done | Equipment, Operations, Safety agents in canonical packages |
 | **MCP v2 servers** | ✅ Done | Inventory, Equipment, Labor, Wave — stateless HTTP |
 | **Capability contracts** | ✅ Done | All 12 capabilities defined, contract-tested |
@@ -921,7 +983,7 @@ package-based, MCP v2 system.
 ## Contributing
 
 1. Fork the repository and create a feature branch.
-2. All changes must keep CORE CI green: Phase 9A baseline 528 passed + 214 Phase 10E reliability tests (85 Batch 1 + 63 Batch 2 + 66 Batch 3); zero new failures.
+2. All changes must keep CORE CI green: current baseline 971 passed (Phase 9A 528 + 214 Phase 10E Batches 1–3 + 18 Batch 4D + remainder of CORE suite); zero new failures.
 3. New canonical code goes in `packages/`, never in `src.*` for business logic.
 4. No `src.*` imports in any `packages/` code — enforced by the test suite.
 5. Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/).
