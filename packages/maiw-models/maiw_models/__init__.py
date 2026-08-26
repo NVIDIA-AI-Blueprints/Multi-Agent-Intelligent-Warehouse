@@ -50,11 +50,19 @@ logger = logging.getLogger(__name__)
 _gateway_instance: ModelGateway | None = None
 
 
-async def get_model_gateway() -> ModelGateway:
+async def get_model_gateway(nim_circuit=None) -> ModelGateway:
     """
     Return the process-level ModelGateway singleton.
 
     Creates it on first call using the global NIMClient.
+
+    Parameters
+    ----------
+    nim_circuit:
+        Optional CircuitBreaker for the NIM provider.  Passed through to
+        ModelGateway so that repeated NIM failures trip the circuit.
+        Only used during initial construction — subsequent calls return the
+        cached instance regardless of nim_circuit.
     """
     global _gateway_instance
     if _gateway_instance is None:
@@ -70,6 +78,7 @@ async def get_model_gateway() -> ModelGateway:
             registry=registry,
             router=router,
             telemetry=telemetry,
+            nim_circuit=nim_circuit,
         )
         logger.info(
             "ModelGateway initialised (maiw_models). Enabled models: %s",

@@ -50,6 +50,8 @@ from typing import Any
 from mcp import types
 from mcp.client import Client
 
+from maiw_mcp.circuit_breaker import CircuitOpen
+from maiw_mcp.circuit_registry import DomainCircuitRegistry
 from maiw_mcp.deadline import RequestDeadline, RequestDeadlineExceeded
 from maiw_mcp.errors import (
     BackendUnavailable,
@@ -92,9 +94,11 @@ class MAIWMCPClient:
         registry: CapabilityRegistry,
         *,
         telemetry: CapabilityTelemetry | None = None,
+        circuit_registry: DomainCircuitRegistry | None = None,
     ) -> None:
         self._registry = registry
         self._telemetry = telemetry or CapabilityTelemetry()
+        self._circuit_registry = circuit_registry
 
     async def invoke(
         self,
@@ -153,17 +157,43 @@ class MAIWMCPClient:
         else:
             effective_timeout = timeout_seconds
 
+        # Circuit breaker — extract domain from "warehouse.<domain>.<action>"
+        parts = capability.split(".")
+        domain = parts[1] if len(parts) >= 3 else "unknown"
+        breaker = self._circuit_registry.get(domain) if self._circuit_registry else None
+
         server_url = self._registry.resolve(capability)
         # Telemetry fields must be plain strings — MCPServer instances are not
         # serialisable via dataclasses.asdict() (deepcopy fails on SSL objects).
         server_label = server_url if isinstance(server_url, str) else type(server_url).__name__
         start = time.monotonic()
 
+        async def _do_call() -> dict:
+            return await self._call_tool(capability, payload, server_url, effective_timeout)
+
         try:
-            result = await self._call_tool(capability, payload, server_url, effective_timeout)
+            if breaker is not None:
+                # CircuitOpen is raised by breaker.call() when circuit is OPEN.
+                # All exceptions from _do_call() trip the circuit failure counter —
+                # including MCPTimeout and MCPUnavailable (infrastructure failures)
+                # as well as MCPToolError (server responded with error). This is an
+                # intentional tradeoff: consistent server-side errors also indicate
+                # degradation worth tracking.
+                result = await breaker.call(_do_call())
+            else:
+                result = await _do_call()
+        except CircuitOpen as exc:
+            # Translate to MCPUnavailable so callers see a uniform error type.
+            # CircuitOpen is also added to _raise_typed_http → 503 in demo.py.
+            raise MCPUnavailable(
+                f"Circuit OPEN for MCP domain {domain!r} — "
+                f"cooldown {exc.cooldown_remaining_s:.1f}s remaining"
+            ) from exc
         except RequestDeadlineExceeded:
             raise  # parent budget exhausted — not MCPTimeout
         except (CapabilityNotFound, MCPToolError, MCPContractError, BackendUnavailable):
+            raise
+        except MCPUnavailable:
             raise
         except TimeoutError as exc:
             latency_ms = (time.monotonic() - start) * 1000

@@ -43,6 +43,8 @@ from .errors import (
     BackendUnavailable,
 )
 from .deadline import RequestDeadline, RequestDeadlineExceeded
+from .circuit_breaker import CircuitBreaker, CircuitOpen, CircuitState
+from .circuit_registry import DomainCircuitRegistry
 
 __all__ = [
     "MAIWMCPError",
@@ -55,4 +57,8 @@ __all__ = [
     "BackendUnavailable",
     "RequestDeadline",
     "RequestDeadlineExceeded",
+    "CircuitBreaker",
+    "CircuitOpen",
+    "CircuitState",
+    "DomainCircuitRegistry",
 ]

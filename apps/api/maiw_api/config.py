@@ -85,6 +85,19 @@ class Settings:
     def mcp_wave_url(self) -> str | None:
         return os.getenv("MAIW_MCP_SERVER_WAVE_URL")
 
+    # ── Circuit breakers (Phase 10E Batch 5) ─────────────────────────────────
+    @property
+    def circuit_failure_threshold(self) -> int:
+        return _int("MAIW_CIRCUIT_FAILURE_THRESHOLD", 5)
+
+    @property
+    def circuit_cooldown_seconds(self) -> float:
+        return float(_int("MAIW_CIRCUIT_COOLDOWN_SECONDS", 30))
+
+    @property
+    def circuit_success_threshold(self) -> int:
+        return _int("MAIW_CIRCUIT_SUCCESS_THRESHOLD", 1)
+
     # ── Operational timeouts (Phase 10E Checkpoint D) ────────────────────────
     @property
     def analyze_timeout_seconds(self) -> float:

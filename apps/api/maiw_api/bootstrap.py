@@ -101,6 +101,10 @@ class MAIWRuntime:
     labor_executor: Any = None  # maiw_execution.LaborActionExecutor
     wave_executor: Any = None  # maiw_execution.WaveActionExecutor
 
+    # Circuit breakers (Phase 10E Batch 5)
+    circuit_registry: Any = None  # maiw_mcp.DomainCircuitRegistry (per-MCP-domain)
+    nim_circuit: Any = None  # maiw_mcp.CircuitBreaker (NIM/ModelGateway)
+
     # Execution registries — single-process idempotency + reconciliation state
     equipment_registry: Any = None  # maiw_execution.ExecutionRegistry
     labor_registry: Any = None  # maiw_execution.ExecutionRegistry
@@ -125,6 +129,35 @@ async def get_runtime() -> MAIWRuntime:
 
     logger.info("MAIW bootstrap: assembling runtime...")
     runtime = MAIWRuntime()
+
+    # ── 0a. Circuit breakers — created before all network-touching components ──
+    # Domain isolation: each MCP domain has its own independent circuit breaker.
+    # NIM has a separate circuit breaker on the ModelGateway path.
+    try:
+        from maiw_api.config import settings
+        from maiw_mcp.circuit_breaker import CircuitBreaker
+        from maiw_mcp.circuit_registry import DomainCircuitRegistry
+
+        runtime.circuit_registry = DomainCircuitRegistry.for_domains(
+            failure_threshold=settings.circuit_failure_threshold,
+            cooldown_seconds=settings.circuit_cooldown_seconds,
+            success_threshold=settings.circuit_success_threshold,
+        )
+        runtime.nim_circuit = CircuitBreaker(
+            domain="nim",
+            failure_threshold=settings.circuit_failure_threshold,
+            cooldown_seconds=settings.circuit_cooldown_seconds,
+            success_threshold=settings.circuit_success_threshold,
+        )
+        logger.info(
+            "MAIW bootstrap: circuit breakers ready "
+            "(failure_threshold=%d cooldown=%ds domains=%s nim)",
+            settings.circuit_failure_threshold,
+            settings.circuit_cooldown_seconds,
+            ", ".join(runtime.circuit_registry.all_domains()),
+        )
+    except Exception as exc:
+        logger.warning("MAIW bootstrap: circuit breakers unavailable — %s", exc)
 
     # ── 0. Demo mode — SimulationProviders replace DB-backed providers ─────────
     if _DEMO_MODE:
@@ -216,8 +249,11 @@ async def get_runtime() -> MAIWRuntime:
         try:
             from maiw_mcp.client.client import MAIWMCPClient
 
-            runtime.mcp_client = MAIWMCPClient(runtime.mcp_registry)
-            logger.info("MAIW bootstrap: MAIWMCPClient ready")
+            runtime.mcp_client = MAIWMCPClient(
+                runtime.mcp_registry,
+                circuit_registry=runtime.circuit_registry,
+            )
+            logger.info("MAIW bootstrap: MAIWMCPClient ready (circuit_registry wired)")
         except Exception as exc:
             logger.warning("MAIW bootstrap: MAIWMCPClient unavailable — %s", exc)
 
@@ -225,8 +261,8 @@ async def get_runtime() -> MAIWRuntime:
     try:
         from maiw_models import get_model_gateway
 
-        runtime.model_gateway = await get_model_gateway()
-        logger.info("MAIW bootstrap: ModelGateway ready")
+        runtime.model_gateway = await get_model_gateway(nim_circuit=runtime.nim_circuit)
+        logger.info("MAIW bootstrap: ModelGateway ready (nim_circuit wired)")
     except Exception as exc:
         logger.warning("MAIW bootstrap: ModelGateway unavailable — %s", exc)
 
