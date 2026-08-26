@@ -36,7 +36,7 @@ executed by a typed executor that enforces four guards before a write reaches MC
 | **REASON** | `ModelGateway` → Nemotron 3 | Generates a structured action proposal — no raw text, no direct tool calls |
 | **PROPOSE** | `ActionProposal` factory | Constructs a typed, immutable proposal locally; zero MCP calls at this stage |
 | **DECIDE** | `DecisionEngine` | Evaluates the proposal against deterministic constraints → `APPROVED / REJECTED / DEFERRED` |
-| **EXECUTE** | `BaseActionExecutor` | Enforces 4 guards, then calls the MCP write tool if all pass |
+| **EXECUTE** | `BaseActionExecutor` | Enforces 4 guards, assigns a stable `execution_id`, then invokes the MCP write capability; result is one of six explicit outcomes: `EXECUTED / NO_OP / DEFERRED / CONFLICT / UNKNOWN / FAILED` |
 | **MCP** | `mcp_servers.<domain>.server` | Independently deployable MCP v2 server; single entry point to backend writes |
 | **BACKEND** | PostgreSQL / TimescaleDB | Source of truth; no agent writes directly here |
 
@@ -193,7 +193,7 @@ POST /api/v1/equipment/assign
   → Agent: get_state → seal snapshot → build proposal
   → DecisionEngine: evaluate → REQUIRES_HUMAN_APPROVAL
   → Response: {executed: false, proposal_id: ..., decision_id: ...}
-  # Human posts approval → executor runs guards → MCP write → executed: true
+  # Human posts approval → executor runs guards → MCP write → outcome classified
 ```
 
 **Write (LOW risk, auto-executes):**
@@ -202,11 +202,115 @@ POST /api/v1/equipment/release
   → Agent: get_state → seal snapshot → build proposal (risk=LOW)
   → DecisionEngine: APPROVED immediately
   → EquipmentActionExecutor: 4 guards pass → MCP write
-  → Response: {executed: true, execution_id: ...}
+  → Response: {outcome: "executed", execution_id: ...}
 ```
 
 See [docs/architecture/RUNTIME_EXECUTION_FLOW.md](docs/architecture/RUNTIME_EXECUTION_FLOW.md)
 for full sequence diagrams of all implemented paths.
+
+---
+
+### Reliable Execution (Phase 10E)
+
+**MAIW separates authorization from reliable execution.** Once an action is authorized,
+`ActionExecutor` assigns a stable execution identity and applies idempotency protection
+before invoking the MCP write capability. Execution results use explicit operational
+semantics rather than reducing provider behavior to a simple success/failure boolean.
+
+**Execution lifecycle:**
+
+```
+OBSERVE
+   ↓
+REASON
+   ↓
+PROPOSE
+   ↓
+DECIDE
+   ↓
+APPROVE
+   ↓
+EXECUTE
+   │
+   ├── EXECUTED   — mutation confirmed
+   ├── NO_OP      — desired state already existed
+   ├── DEFERRED   — valid action, capacity unavailable now
+   ├── CONFLICT   — warehouse state changed; action no longer valid
+   ├── UNKNOWN    — mutation may have occurred; response was lost
+   └── FAILED     — mutation did not occur
+   ↓
+OBSERVE OUTCOME
+```
+
+**Outcome semantics:**
+
+| Outcome | Meaning |
+|---------|---------|
+| `EXECUTED` | MAIW has sufficient evidence that the intended mutation occurred |
+| `NO_OP` | Desired state already existed; no new mutation was required |
+| `DEFERRED` | Valid action, but required operational capacity or conditions are not currently available |
+| `CONFLICT` | Current warehouse state makes the approved action invalid |
+| `UNKNOWN` | Mutation may have occurred, but MAIW cannot confirm the outcome |
+| `FAILED` | MAIW has sufficient evidence that the mutation did not occur |
+
+**A particularly important case is `UNKNOWN`:** if the provider may have changed warehouse
+state but MAIW loses the acknowledgement before receiving confirmation, the system does not
+incorrectly classify the operation as `FAILED` or blindly retry it. The execution is marked
+`UNKNOWN`, automatic retry is suppressed, and reconciliation is required before another
+consequential write can safely occur.
+
+```
+ActionExecutor
+      ↓
+MCP write
+      ↓
+Provider mutation occurs
+      ↓
+Response lost (network timeout, etc.)
+      ↓
+UNKNOWN                          ← NOT FAILED
+      ↓
+Automatic retry suppressed
+      ↓
+Reconciliation required
+```
+
+Without this distinction, the unsafe path is:
+```
+mutation → timeout → FAILED → blind retry → duplicate mutation
+```
+
+**Execution identity:** MAIW distinguishes five identity concepts across the write path:
+
+| Identifier | Meaning |
+|------------|---------|
+| `trace_id` | Full request lifecycle correlation — spans the entire OBSERVE→OUTCOME cycle |
+| `proposal_id` | Identity of the proposed warehouse change |
+| `decision_id` | Identity of the authority evaluation |
+| `execution_id` | Identity of one MAIW logical execution attempt (generated before write, stable through MCP) |
+| `idempotency_key` | Identity of the intended logical mutation (caller-supplied; deduplication key) |
+| `provider_reference` | Backend-specific reference (allocation_id, transaction_id, etc.) |
+
+These identifiers are not interchangeable. `execution_id` and `idempotency_key` together
+protect against duplicate physical mutations. `trace_id` correlates the full lifecycle.
+`provider_reference` is the backend's own record of the transaction.
+
+> **Current limitation (Phase 10E Batch 1):** Idempotency protection is provided by an
+> in-memory `ExecutionRegistry` within a single process. It does not yet provide distributed
+> or multi-replica exactly-once execution guarantees. This limitation is explicit and must
+> not be treated as a production distributed guarantee.
+
+**Execution Safety — Phase 10E Batch 1:**
+
+```
+✓ Explicit six-value execution outcome (EXECUTED / NO_OP / DEFERRED / CONFLICT / UNKNOWN / FAILED)
+✓ Stable execution_id generated before write and propagated through MCP
+✓ Idempotency protection by execution_id and capability:idempotency_key
+✓ Duplicate mutation prevention (NO_OP with replayed metadata on duplicate)
+✓ Ambiguous writes represented as UNKNOWN — never misclassified as FAILED
+✓ Automatic retry suppressed after UNKNOWN
+✗ Distributed/multi-replica exactly-once: not yet implemented
+```
 
 ---
 
@@ -322,7 +426,7 @@ Multi-Agent-Intelligent-Warehouse/
 | `maiw-state` | `from maiw_state import WarehouseState` | State assembly, snapshots, freshness, provenance |
 | `maiw-skills` | `from maiw_skills.equipment import EquipmentAssignmentSkill` | Read skills, write proposal factories |
 | `maiw-decision` | `from maiw_decision import DecisionEngine` | Constraint evaluation, DecisionResult |
-| `maiw-execution` | `from maiw_execution import EquipmentActionExecutor` | 4-guard executor, error hierarchy, NoOp executor |
+| `maiw-execution` | `from maiw_execution import EquipmentActionExecutor, ExecutionOutcome` | 4-guard executor, `ExecutionOutcome` enum, `ExecutionRegistry` (single-process idempotency), `AmbiguousWriteError` |
 | `maiw-agents` | `from maiw_agents.equipment import EquipmentAssetOperationsAgent` | Agent orchestration, state assembly coordination |
 
 ---
@@ -544,6 +648,7 @@ python -m pytest tests/unit/ tests/contract/ tests/mcp/ \
 ```
 
 **Baseline (Phase 9A): 528 passed, 1 skipped, 0 failed**
+**Phase 10E Batch 1 adds 85 reliability tests in `tests/unit/reliability/`** (ambiguous write, capability semantics, execution outcome, idempotency, trace)
 
 | Test tier | Command | Requires |
 |-----------|---------|---------|
@@ -615,6 +720,10 @@ These invariants are enforced by the test suite and must not be broken:
 | No canonical package imports from `src.*` | AST scanner in `test_package_imports.py` |
 | No canonical package imports heavy infra deps | AST scanner: `asyncpg`, `pymilvus`, `redis`, `fastapi` forbidden |
 | `maiw-execution` does not import `maiw-agents` | Cycle prevention enforced in test suite |
+| `UNKNOWN` outcome is never auto-retried | `ExecutionRegistry.mark_unknown()` blocks subsequent attempts |
+| Post-mutation timeout produces `UNKNOWN`, not `FAILED` | `AmbiguousWriteError` → distinct outcome path in `BaseActionExecutor` |
+| Same idempotency key cannot produce multiple physical mutations | `ExecutionRegistry` capability:key compound dedup |
+| `execution_id` is generated before the write and propagated through MCP | `BaseActionExecutor.execute()` generates UUID pre-write; forwarded in all write-request contracts |
 
 ---
 
@@ -630,6 +739,7 @@ package-based, MCP v2 system.
 | **Skills** (`maiw-skills`) | ✅ Done | Read skills, write proposal factories, all 4 domains |
 | **DecisionEngine** (`maiw-decision`) | ✅ Done | All constraint rules, APPROVED/REJECTED/DEFERRED |
 | **Executors** (`maiw-execution`) | ✅ Done | 4-guard BaseActionExecutor, Equipment + Labor + Wave |
+| **Reliable Execution** (Phase 10E Batch 1) | ✅ Done | `ExecutionOutcome` enum, `ExecutionRegistry` (single-process), `AmbiguousWriteError`, `execution_id` propagation, idempotent replay metadata |
 | **Agents** (`maiw-agents`) | ✅ Done | Equipment, Operations, Safety agents in canonical packages |
 | **MCP v2 servers** | ✅ Done | Inventory, Equipment, Labor, Wave — stateless HTTP |
 | **Capability contracts** | ✅ Done | All 12 capabilities defined, contract-tested |
@@ -664,7 +774,7 @@ package-based, MCP v2 system.
 ## Contributing
 
 1. Fork the repository and create a feature branch.
-2. All changes must keep CORE CI green: 528 passed, 1 skipped.
+2. All changes must keep CORE CI green: Phase 9A baseline 528 passed + 85 Phase 10E reliability tests; zero new failures.
 3. New canonical code goes in `packages/`, never in `src.*` for business logic.
 4. No `src.*` imports in any `packages/` code — enforced by the test suite.
 5. Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/).
