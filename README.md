@@ -385,6 +385,78 @@ This ensures `approval_id → proposal_id → decision_id` is a consistent audit
 ✗ Durable approval storage: not yet implemented (in-memory only)
 ```
 
+#### Reconciliation (Phase 10E Batch 3)
+
+When an MCP write times out after the provider has mutated state, MAIW records
+`ExecutionOutcome.UNKNOWN` and refuses to retry. Batch 3 adds the reconciliation
+path that resolves the uncertainty by reading authoritative state through the
+same canonical MCP read skills used during normal state assembly.
+
+```
+WRITE ATTEMPT
+    ↓
+ExecutionOutcome = UNKNOWN  ← original write history, never rewritten
+    ↓
+ReconciliationService.reconcile()  ← reads through MCP read skills only
+    ↓
+CONFIRMED_EXECUTED     → "effectively_executed"   (mutation is confirmed)
+CONFIRMED_NOT_EXECUTED → "effectively_not_executed" (safe for re-evaluation)
+INDETERMINATE          → "unknown"                (manual operator review)
+```
+
+**Key design decisions:**
+
+- `ExecutionOutcome.UNKNOWN` is **never rewritten** — reconciliation is a separate
+  `ReconciliationRecord` stored alongside the original record in `ExecutionRegistry`
+- `effective_status` is a derived property, not a stored field; it is a read-only
+  interpretation of `(outcome, reconciliation.outcome)` pairs and carries no
+  authority of its own
+- `CONFIRMED_NOT_EXECUTED` does **not** trigger automatic retry — higher-level
+  re-evaluation is required; the original proposal, decision, and approval are gone
+- Reconciliation reads exclusively through canonical MCP read skills
+  (`LaborAllocationSkill`, `EquipmentStatusSkill`, `WaveGetSkill`). Provider
+  internals, simulation state, and `DemoWarehouseWorld` are never accessed
+- `ExecutionIntent` snapshot is captured **before** the write at `registry.begin()`
+  time, so reconciliation never depends on mutable post-write state
+- `ReconciliationStrategy` is a Protocol — the same `ReconciliationService` works
+  against any provider (simulation, SAP EWM, Manhattan, etc.) by swapping the
+  strategy at the demo router layer, keeping `maiw-execution` free of
+  `maiw-skills` dependency
+
+**Postcondition comparison** (capability-specific `expected_effect` in `ExecutionIntent`):
+
+| Domain | Target | Expected effect checked |
+|--------|--------|------------------------|
+| `warehouse.labor.allocate` | task_id | `status == "in_progress"` for the specific task |
+| `warehouse.equipment.assign` | asset_id | `status == "assigned"` + `owner_user == assignee` |
+| `warehouse.equipment.release` | asset_id | `status == "available"` |
+| `warehouse.equipment.schedule_maintenance` | asset_id | `status == "maintenance"` |
+| `warehouse.wave.reprioritize` | wave_id / zone | task priority matches `new_priority` in relevant zone |
+
+**Command Center UI** — reconciliation events appear in the Live Activity feed under
+the `RECONCILE` category (amber) with operator-facing labels:
+
+| SSE event message | UI label |
+|---|---|
+| `reconciliation.started` | `CHECKING AUTHORITATIVE STATE` |
+| `reconciliation.confirmed_executed` | `MUTATION CONFIRMED` |
+| `reconciliation.confirmed_not_executed` | `NO MUTATION CONFIRMED` |
+| `reconciliation.indeterminate` | `MANUAL REVIEW REQUIRED` |
+
+**Reconciliation Safety:**
+
+```
+✓ ExecutionOutcome.UNKNOWN preserved — original write history is immutable
+✓ ExecutionIntent snapshot captured before write — postcondition always verifiable
+✓ Read path: MCP read skills only — never DemoWarehouseWorld or provider internals
+✓ No automatic retry — CONFIRMED_NOT_EXECUTED is safe for higher-level re-evaluation
+✓ No new proposal/decision/approval created during reconciliation
+✓ INDETERMINATE is the safe default when read or postcondition check fails
+✓ POST /demo/reconcile endpoint wired; publishes RECONCILE SSE event
+✗ Automated reconciliation trigger: not yet implemented (operator-initiated only)
+✗ Distributed reconciliation state: single-process only (same as registry)
+```
+
 ---
 
 ## MCP v2 Capability Plane
@@ -814,6 +886,7 @@ package-based, MCP v2 system.
 | **Executors** (`maiw-execution`) | ✅ Done | 4-guard BaseActionExecutor, Equipment + Labor + Wave |
 | **Reliable Execution** (Phase 10E Batch 1) | ✅ Done | `ExecutionOutcome` enum, `ExecutionRegistry` (single-process), `AmbiguousWriteError`, `execution_id` propagation, idempotent replay metadata |
 | **Approval Governance** (Phase 10E Batch 2) | ✅ Done | `ApprovalState` machine (PENDING/APPROVED/REJECTED/EXPIRED/CONSUMED), `InMemoryApprovalStore`, single-use consume, proposal/decision/warehouse binding, 300s default TTL, audit chain preserved |
+| **Reconciliation** (Phase 10E Batch 3) | ✅ Done | `ExecutionIntent` snapshot, `ReconciliationOutcome` (CONFIRMED_EXECUTED/CONFIRMED_NOT_EXECUTED/INDETERMINATE), `ReconciliationService`, `effective_status` derived property, UNKNOWN history preserved, capability-specific postcondition strategies |
 | **Agents** (`maiw-agents`) | ✅ Done | Equipment, Operations, Safety agents in canonical packages |
 | **MCP v2 servers** | ✅ Done | Inventory, Equipment, Labor, Wave — stateless HTTP |
 | **Capability contracts** | ✅ Done | All 12 capabilities defined, contract-tested |
@@ -848,7 +921,7 @@ package-based, MCP v2 system.
 ## Contributing
 
 1. Fork the repository and create a feature branch.
-2. All changes must keep CORE CI green: Phase 9A baseline 528 passed + 148 Phase 10E reliability tests (85 Batch 1 + 63 Batch 2); zero new failures.
+2. All changes must keep CORE CI green: Phase 9A baseline 528 passed + 214 Phase 10E reliability tests (85 Batch 1 + 63 Batch 2 + 66 Batch 3); zero new failures.
 3. New canonical code goes in `packages/`, never in `src.*` for business logic.
 4. No `src.*` imports in any `packages/` code — enforced by the test suite.
 5. Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/).

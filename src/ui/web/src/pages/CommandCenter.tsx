@@ -130,7 +130,7 @@ const ACTIVITY_KEY = 'maiw_activity_feed';
 interface LogEntry {
   id: string;
   ts: string;
-  category: 'STATE' | 'AGENT' | 'MODEL' | 'SKILL' | 'PROPOSE' | 'DECIDE' | 'EXECUTE' | 'MCP' | 'API';
+  category: 'STATE' | 'AGENT' | 'MODEL' | 'SKILL' | 'PROPOSE' | 'DECIDE' | 'EXECUTE' | 'RECONCILE' | 'MCP' | 'API';
   message: string;
   detail?: string;
 }
@@ -143,8 +143,17 @@ const CAT_COLOR: Record<string, string> = {
   PROPOSE: '#D29922',
   DECIDE: '#D29922',
   EXECUTE: '#3FB950',
+  RECONCILE: '#E3B341',
   MCP: '#8B949E',
   API: '#484F58',
+};
+
+// Maps SSE reconciliation event messages to operator-facing labels.
+const RECONCILE_MSG_LABEL: Record<string, string> = {
+  'reconciliation.started':               'CHECKING AUTHORITATIVE STATE',
+  'reconciliation.confirmed_executed':    'MUTATION CONFIRMED',
+  'reconciliation.confirmed_not_executed':'NO MUTATION CONFIRMED',
+  'reconciliation.indeterminate':         'MANUAL REVIEW REQUIRED',
 };
 
 function readActivity(): LogEntry[] {
@@ -922,24 +931,27 @@ const CommandCenter: React.FC = () => {
               — session activity will appear here —
             </Typography>
           ) : (
-            activity.slice(-12).map((e) => (
-              <Box key={e.id} sx={{ display: 'flex', gap: 1.5, lineHeight: 1.8 }}>
-                <Typography component="span" sx={{ fontFamily: 'monospace', fontSize: '0.67rem', color: '#30363D', flexShrink: 0 }}>
-                  {format(new Date(e.ts), 'HH:mm:ss')}
-                </Typography>
-                <Typography component="span" sx={{ fontFamily: 'monospace', fontSize: '0.67rem', color: CAT_COLOR[e.category] ?? '#484F58', fontWeight: 700, width: 52, flexShrink: 0 }}>
-                  {e.category}
-                </Typography>
-                <Typography component="span" sx={{ fontFamily: 'monospace', fontSize: '0.67rem', color: '#8B949E', flexGrow: 1 }}>
-                  {e.message}
-                </Typography>
-                {e.detail && (
-                  <Typography component="span" sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#484F58', flexShrink: 0 }}>
-                    {e.detail}
+            activity.slice(-12).map((e) => {
+              const reconcileLabel = e.category === 'RECONCILE' ? (RECONCILE_MSG_LABEL[e.message] ?? e.message) : null;
+              return (
+                <Box key={e.id} sx={{ display: 'flex', gap: 1.5, lineHeight: 1.8 }}>
+                  <Typography component="span" sx={{ fontFamily: 'monospace', fontSize: '0.67rem', color: '#30363D', flexShrink: 0 }}>
+                    {format(new Date(e.ts), 'HH:mm:ss')}
                   </Typography>
-                )}
-              </Box>
-            ))
+                  <Typography component="span" sx={{ fontFamily: 'monospace', fontSize: '0.67rem', color: CAT_COLOR[e.category] ?? '#484F58', fontWeight: 700, width: 52, flexShrink: 0 }}>
+                    {e.category}
+                  </Typography>
+                  <Typography component="span" sx={{ fontFamily: 'monospace', fontSize: '0.67rem', color: reconcileLabel ? CAT_COLOR['RECONCILE'] : '#8B949E', flexGrow: 1, fontWeight: reconcileLabel ? 600 : 400 }}>
+                    {reconcileLabel ?? e.message}
+                  </Typography>
+                  {e.detail && (
+                    <Typography component="span" sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#484F58', flexShrink: 0 }}>
+                      {e.detail}
+                    </Typography>
+                  )}
+                </Box>
+              );
+            })
           )}
         </Box>
       </Box>
