@@ -280,20 +280,22 @@ Without this distinction, the unsafe path is:
 mutation → timeout → FAILED → blind retry → duplicate mutation
 ```
 
-**Execution identity:** MAIW distinguishes five identity concepts across the write path:
+**Execution identity:** MAIW distinguishes six identity concepts across the write path:
 
 | Identifier | Meaning |
 |------------|---------|
 | `trace_id` | Full request lifecycle correlation — spans the entire OBSERVE→OUTCOME cycle |
-| `proposal_id` | Identity of the proposed warehouse change |
+| `proposal_id` | Identity of the proposed warehouse change (stable from `evaluate()` through `authorize_with_approval()`) |
 | `decision_id` | Identity of the authority evaluation |
+| `approval_id` | Identity of the approval record — scopes exactly one human authorization event |
 | `execution_id` | Identity of one MAIW logical execution attempt (generated before write, stable through MCP) |
 | `idempotency_key` | Identity of the intended logical mutation (caller-supplied; deduplication key) |
 | `provider_reference` | Backend-specific reference (allocation_id, transaction_id, etc.) |
 
 These identifiers are not interchangeable. `execution_id` and `idempotency_key` together
 protect against duplicate physical mutations. `trace_id` correlates the full lifecycle.
-`provider_reference` is the backend's own record of the transaction.
+`provider_reference` is the backend's own record of the transaction. `approval_id` scopes
+the authority grant — it is created at queue time, consumed after execution, and is never reused.
 
 > **Current limitation (Phase 10E Batch 1):** Idempotency protection is provided by an
 > in-memory `ExecutionRegistry` within a single process. It does not yet provide distributed
@@ -310,6 +312,77 @@ protect against duplicate physical mutations. `trace_id` correlates the full lif
 ✓ Ambiguous writes represented as UNKNOWN — never misclassified as FAILED
 ✓ Automatic retry suppressed after UNKNOWN
 ✗ Distributed/multi-replica exactly-once: not yet implemented
+```
+
+#### Approval Governance (Phase 10E Batch 2)
+
+**Approval is an explicit, expirable, single-use authority grant** — not a boolean flag on a
+record. Before execution, a proposal must pass through an `ApprovalRecord` state machine that
+tracks the full authorization lifecycle and enforces its limits.
+
+**Approval lifecycle:**
+
+```
+PENDING   ← created when REQUIRES_HUMAN_APPROVAL is returned by DecisionEngine
+    │
+    ├── APPROVED  ← human confirms via POST /demo/approve
+    │       │
+    │       └── CONSUMED  ← single use exhausted after ActionExecutor completes
+    │
+    ├── REJECTED  ← human declines via POST /demo/reject  (terminal)
+    └── EXPIRED   ← TTL elapsed before decision or execution  (terminal)
+```
+
+**Binding:** Every `ApprovalRecord` is bound to a specific `proposal_id`, `decision_id`, and
+`warehouse_id`. `authorize_with_approval()` enforces all three before granting execution authority:
+
+1. `CONSUMED` check — CONSUMED approval is blocked immediately (before any binding check);
+   replay behavior is deterministic and observable
+2. `proposal_id` binding — approval must reference the exact proposal under review
+3. `decision_id` binding — approval must reference the original decision that required human review
+4. `warehouse_id` binding — approval is scoped to the warehouse it was issued for; an approval
+   issued for DC-47 cannot authorize an action at DC-99 (confused-deputy prevention)
+5. Expiry — approval authority has a finite validity window
+6. State — only `APPROVED` grants execution authority; `CONSUMED`, `REJECTED`, `PENDING`, and
+   `EXPIRED` all block execution
+
+**Note on `approval.approved`:** The `approved` computed field returns `True` only when
+`state == APPROVED`. `CONSUMED` returns `False` because the authority has already been
+exercised. This field means "currently executable authority", not "was historically approved".
+To determine whether a proposal was ever approved, inspect `state` directly.
+
+**Expiration policy:** The default approval TTL is 300 seconds. This is a configurable policy
+parameter (`InMemoryApprovalStore(default_ttl_seconds=N)`), not an architectural constant.
+Different capability classes may warrant different validity windows; the store accepts a
+per-create `ttl_seconds` override. Infinite authority (`expires_at=None`) is not permitted
+by the store.
+
+**Proposal identity preservation:** The `proposal_id` assigned during the PROPOSE phase is
+preserved unchanged through `evaluate()`, `add_pending_approval()`, and
+`authorize_with_approval()`. The approval endpoint restores the original `ActionProposal`
+from a serialized snapshot in the pending record rather than rebuilding it at approval time.
+This ensures `approval_id → proposal_id → decision_id` is a consistent audit chain.
+
+> **Current limitation (Phase 10E Batch 2):** Approval state is held in
+> `InMemoryApprovalStore` within a single process. PENDING → APPROVED → CONSUMED transitions
+> are atomic under asyncio cooperative multitasking but are **not distributed**. After a
+> process restart, all pending approvals are lost. Multi-replica approval state, durable
+> approval storage, and distributed exactly-once authority are out of scope for Phase 10E.
+
+**Authority Safety — Phase 10E Batch 2:**
+
+```
+✓ Explicit ApprovalState machine: PENDING / APPROVED / REJECTED / EXPIRED / CONSUMED
+✓ Single-use consume guarantee — second consume() returns None without raising
+✓ CONSUMED approval blocked before proposal binding check (deterministic replay detection)
+✓ proposal_id stable from evaluate() through authorize_with_approval()
+✓ warehouse_id binding prevents confused-deputy authorization reuse
+✓ decision_id binding enforced when expected_decision_id supplied
+✓ Finite approval TTL — 300s default; infinite authority not permitted by store
+✓ Expiration enforced both dynamically (is_expired()) and via explicit EXPIRED state
+✓ authority_type field: HUMAN / POLICY / SYSTEM for classification
+✗ Distributed approval state: not yet implemented (single-process only)
+✗ Durable approval storage: not yet implemented (in-memory only)
 ```
 
 ---
@@ -740,6 +813,7 @@ package-based, MCP v2 system.
 | **DecisionEngine** (`maiw-decision`) | ✅ Done | All constraint rules, APPROVED/REJECTED/DEFERRED |
 | **Executors** (`maiw-execution`) | ✅ Done | 4-guard BaseActionExecutor, Equipment + Labor + Wave |
 | **Reliable Execution** (Phase 10E Batch 1) | ✅ Done | `ExecutionOutcome` enum, `ExecutionRegistry` (single-process), `AmbiguousWriteError`, `execution_id` propagation, idempotent replay metadata |
+| **Approval Governance** (Phase 10E Batch 2) | ✅ Done | `ApprovalState` machine (PENDING/APPROVED/REJECTED/EXPIRED/CONSUMED), `InMemoryApprovalStore`, single-use consume, proposal/decision/warehouse binding, 300s default TTL, audit chain preserved |
 | **Agents** (`maiw-agents`) | ✅ Done | Equipment, Operations, Safety agents in canonical packages |
 | **MCP v2 servers** | ✅ Done | Inventory, Equipment, Labor, Wave — stateless HTTP |
 | **Capability contracts** | ✅ Done | All 12 capabilities defined, contract-tested |
@@ -774,7 +848,7 @@ package-based, MCP v2 system.
 ## Contributing
 
 1. Fork the repository and create a feature branch.
-2. All changes must keep CORE CI green: Phase 9A baseline 528 passed + 85 Phase 10E reliability tests; zero new failures.
+2. All changes must keep CORE CI green: Phase 9A baseline 528 passed + 148 Phase 10E reliability tests (85 Batch 1 + 63 Batch 2); zero new failures.
 3. New canonical code goes in `packages/`, never in `src.*` for business logic.
 4. No `src.*` imports in any `packages/` code — enforced by the test suite.
 5. Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/).
