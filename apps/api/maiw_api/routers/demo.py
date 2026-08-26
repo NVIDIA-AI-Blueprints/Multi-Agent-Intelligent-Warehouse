@@ -493,6 +493,11 @@ async def _build_and_execute_proposal(
     if result.outcome != DecisionOutcome.APPROVED:
         # Store in pending approvals if human approval is needed
         if result.outcome == DecisionOutcome.REQUIRES_HUMAN_APPROVAL:
+            _warehouse_id = (
+                ctrl.world.WAREHOUSE_ID
+                if hasattr(ctrl.world, "WAREHOUSE_ID")
+                else "DC-47"
+            )
             ctrl.add_pending_approval(
                 proposal_id=proposal.proposal_id,
                 decision_id=result.result_id,
@@ -504,6 +509,8 @@ async def _build_and_execute_proposal(
                 objective=str(rec.objective),
                 rationale=str(rec.rationale) if hasattr(rec, 'rationale') else "",
                 risk_level=proposal.risk_level.value if hasattr(proposal.risk_level, 'value') else str(proposal.risk_level),
+                warehouse_id=_warehouse_id,
+                proposal_data=proposal.model_dump(mode="json"),
             )
         return {
             "status": result.outcome.value,
@@ -709,16 +716,20 @@ class ApproveRequest(BaseModel):
 async def approve_proposal(request: ApproveRequest):
     """
     Approve a pending proposal and execute it through the canonical pipeline.
-    Creates an ApprovalRecord, re-evaluates with authorize_with_approval(),
-    then runs ActionExecutor if authorized.
+
+    Phase 10E Batch 2:
+    - Deserializes the original ActionProposal (same proposal_id, audit chain intact).
+    - Transitions the pre-created ApprovalRecord from PENDING → APPROVED via store.
+    - Consumes the approval after successful execution (APPROVED → CONSUMED).
+    - No post-construction trace injection.
     """
-    from datetime import datetime, timezone
-    from maiw_decision.models import ApprovalRecord, DecisionOutcome, DecisionRequest
+    from maiw_decision.models import DecisionOutcome, DecisionRequest
+    from maiw_decision.approval import ApprovalAlreadyDecided, ApprovalNotFound
+    from maiw_mcp.contracts.actions import ActionProposal
     from maiw_api.demo.events import ScenarioEvent
 
     ctrl = _get_controller()
 
-    # Find the pending approval
     pending = ctrl.remove_pending_approval(request.pending_id)
     if pending is None:
         raise HTTPException(status_code=404, detail=f"No pending approval for pending_id={request.pending_id}")
@@ -732,50 +743,26 @@ async def approve_proposal(request: ApproveRequest):
 
     trace_id = pending["trace_id"]
     sim_t = ctrl.world.clock.elapsed_seconds
+    approval_id = pending["approval_id"]
 
-    # Rebuild the proposal fresh from stored capability + target
-    from maiw_agents.assessment import RecommendedAction
-
-    class _RecAdapter:
-        """Minimal adapter so _build_proposal can read rec fields."""
-        def __init__(self, p: dict) -> None:
-            self.capability = p["capability"]
-            self.target = p["target"]
-            self.domain = p["domain"]
-            self.priority = p["priority"]
-            self.objective = p["objective"]
-            self.rationale = p.get("rationale", "")
-            self.subtype = None
-
-    rec_adapter = _RecAdapter(pending)
-
+    # Transition ApprovalRecord PENDING → APPROVED via store (single-use guarantee begins here)
     try:
-        proposal = await _build_proposal(rec_adapter, trace_id, runtime)
-    except ValueError as exc:
-        # CAPACITY_UNAVAILABLE or similar — execution would be a no-op.
-        # Return a clean non-error response so the caller can distinguish this
-        # from an unexpected 500.
-        reason = str(exc)
-        logger.info("approve_proposal: skipping %s — %s", pending.get("capability"), reason)
-        return {
-            "ok": False,
-            "status": "CAPACITY_UNAVAILABLE",
-            "capability": pending.get("capability"),
-            "reason": reason,
-        }
+        approval = ctrl.approval_store.approve(approval_id, approved_by=request.approved_by)
+    except ApprovalAlreadyDecided as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ApprovalNotFound:
+        raise HTTPException(status_code=404, detail=f"Approval record not found: approval_id={approval_id}")
+
+    # Restore the original ActionProposal (fixes audit chain — same proposal_id throughout)
+    proposal_data = pending.get("proposal_data")
+    if proposal_data is None:
+        raise HTTPException(status_code=500, detail="Pending record missing proposal_data (pre-Batch2 record?)")
+    try:
+        proposal = ActionProposal.model_validate(proposal_data)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to rebuild proposal: {exc}") from exc
+        raise HTTPException(status_code=500, detail=f"Failed to restore proposal: {exc}") from exc
 
-    # Create ApprovalRecord bound to newly built proposal
-    approval = ApprovalRecord(
-        proposal_id=proposal.proposal_id,
-        decision_id=pending["decision_id"],
-        trace_id=trace_id,
-        approved=True,
-        approved_by=request.approved_by,
-    )
-
-    # Fetch fresh state snapshot (must be sealed into WarehouseStateSnapshot for DecisionRequest)
+    # Fetch fresh state snapshot
     from maiw_state.requirements import StateRequirements
     from maiw_state import WarehouseStateSnapshot
     try:
@@ -788,15 +775,18 @@ async def approve_proposal(request: ApproveRequest):
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"State unavailable: {exc}") from exc
 
-    # Authorize with approval evidence
+    # Authorize with approval evidence (decision_id binding enforced)
     decision_request = DecisionRequest(
         proposal=proposal,
         state=fresh_snapshot,
         requested_by=request.approved_by,
         trace_id=trace_id,
     )
-    auth_result, _audit = runtime.decision_engine.authorize_with_approval(decision_request, approval)
-    auth_result.trace_id = trace_id
+    auth_result, _audit = runtime.decision_engine.authorize_with_approval(
+        decision_request,
+        approval,
+        expected_decision_id=pending["decision_id"],
+    )
 
     # Publish APPROVE SSE event
     await bus.publish_approve(
@@ -805,11 +795,11 @@ async def approve_proposal(request: ApproveRequest):
     )
 
     if auth_result.outcome != DecisionOutcome.APPROVED:
-        # Hard constraint blocked even after approval
         return {
             "ok": False,
             "status": auth_result.outcome.value,
             "proposal_id": proposal.proposal_id,
+            "approval_id": approval_id,
             "original_decision_id": pending["decision_id"],
             "violations": [v.model_dump() for v in auth_result.violations],
         }
@@ -817,13 +807,15 @@ async def approve_proposal(request: ApproveRequest):
     # EXECUTE via canonical executor
     executor = _get_executor(pending["domain"], runtime)
     if executor is None:
-        return {"ok": True, "status": "approved_no_executor", "proposal_id": proposal.proposal_id}
+        return {"ok": True, "status": "approved_no_executor", "proposal_id": proposal.proposal_id, "approval_id": approval_id}
 
     try:
-        exec_result = await executor.execute(proposal, auth_result)
-        exec_result.trace_id = trace_id
+        exec_result = await executor.execute(proposal, auth_result, trace_id=trace_id)
     except Exception as exc:
         return {"ok": False, "status": "execution_error", "reason": str(exc)}
+
+    # Consume the approval after execution — APPROVED → CONSUMED (single-use guarantee closes)
+    ctrl.approval_store.consume(approval_id)
 
     # Publish EXECUTE SSE
     await bus.publish(ScenarioEvent(
@@ -848,7 +840,7 @@ async def approve_proposal(request: ApproveRequest):
         "capability": pending["capability"],
         "proposal_id": proposal.proposal_id,
         "original_decision_id": pending["decision_id"],
-        "approval_id": approval.approval_id,
+        "approval_id": approval_id,
         "execution_id": exec_result.execution_id,
         "success": exec_result.success,
     }
@@ -857,10 +849,19 @@ async def approve_proposal(request: ApproveRequest):
 @router.post("/demo/reject")
 async def reject_proposal(request: ApproveRequest):
     """Reject a pending proposal."""
+    from maiw_decision.approval import ApprovalAlreadyDecided
+
     ctrl = _get_controller()
     pending = ctrl.remove_pending_approval(request.pending_id)
     if pending is None:
         raise HTTPException(status_code=404, detail=f"No pending approval for pending_id={request.pending_id}")
+
+    approval_id = pending.get("approval_id")
+    if approval_id:
+        try:
+            ctrl.approval_store.reject(approval_id, rejected_by=request.approved_by)
+        except ApprovalAlreadyDecided:
+            pass  # Already decided — rejection is still the right outcome for the queue entry
 
     await ctrl.bus.publish_reject(
         pending["capability"], pending["proposal_id"], request.approved_by,
@@ -868,7 +869,13 @@ async def reject_proposal(request: ApproveRequest):
         sim_time_seconds=ctrl.world.clock.elapsed_seconds,
     )
 
-    return {"ok": True, "status": "rejected", "pending_id": request.pending_id, "capability": pending["capability"]}
+    return {
+        "ok": True,
+        "status": "rejected",
+        "pending_id": request.pending_id,
+        "approval_id": approval_id,
+        "capability": pending["capability"],
+    }
 
 
 # ── Counterfactual artifact ───────────────────────────────────────────────────

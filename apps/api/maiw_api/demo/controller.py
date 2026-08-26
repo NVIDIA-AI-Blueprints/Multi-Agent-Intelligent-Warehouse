@@ -39,6 +39,7 @@ from maiw_api.demo.providers.inventory import SimulationInventoryProvider
 from maiw_api.demo.providers.labor import SimulationLaborProvider
 from maiw_api.demo.providers.wave import SimulationWaveProvider
 from maiw_api.demo.world import DemoWarehouseWorld
+from maiw_decision.approval import InMemoryApprovalStore
 
 logger = logging.getLogger(__name__)
 
@@ -158,12 +159,17 @@ class DemoScenarioController:
         self._last_analyze_wall_time: datetime | None = None
         self._recovery_sim_time: int | None = None
         self._pending_approvals: list[dict] = []
+        self._approval_store: InMemoryApprovalStore = InMemoryApprovalStore()
 
     # ── Properties ───────────────────────────────────────────────────────────
 
     @property
     def active(self) -> bool:
         return self._scenario is not None
+
+    @property
+    def approval_store(self) -> InMemoryApprovalStore:
+        return self._approval_store
 
     @property
     def scenario_name(self) -> str | None:
@@ -238,6 +244,7 @@ class DemoScenarioController:
         self._last_inject_wall_time = None
         self._recovery_sim_time = None
         self._pending_approvals = []
+        self._approval_store.reset()
         await self.bus.publish_scenario(
             message="scenario:reset",
             detail=self._scenario.name if self._scenario else "",
@@ -338,11 +345,20 @@ class DemoScenarioController:
         objective: str,
         rationale: str,
         risk_level: str,
+        warehouse_id: str | None = None,
+        proposal_data: dict | None = None,
     ) -> str:
         """Store a proposal pending human approval. Returns pending_id."""
+        approval_record = self._approval_store.create(
+            proposal_id=proposal_id,
+            decision_id=decision_id,
+            warehouse_id=warehouse_id,
+            trace_id=trace_id,
+        )
         pending_id = str(_uuid.uuid4())
         self._pending_approvals.append({
             "pending_id": pending_id,
+            "approval_id": approval_record.approval_id,
             "proposal_id": proposal_id,
             "decision_id": decision_id,
             "trace_id": trace_id,
@@ -353,6 +369,8 @@ class DemoScenarioController:
             "objective": objective,
             "rationale": rationale,
             "risk_level": risk_level,
+            "warehouse_id": warehouse_id,
+            "proposal_data": proposal_data,
             "queued_at": datetime.now(tz=timezone.utc).isoformat(),
         })
         return pending_id
