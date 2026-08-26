@@ -101,6 +101,11 @@ class MAIWRuntime:
     labor_executor: Any = None  # maiw_execution.LaborActionExecutor
     wave_executor: Any = None  # maiw_execution.WaveActionExecutor
 
+    # Execution registries — single-process idempotency + reconciliation state
+    equipment_registry: Any = None  # maiw_execution.ExecutionRegistry
+    labor_registry: Any = None  # maiw_execution.ExecutionRegistry
+    wave_registry: Any = None  # maiw_execution.ExecutionRegistry
+
     # Canonical agents
     equipment_agent: Any = None  # maiw_agents.equipment.EquipmentAssetOperationsAgent
     operations_agent: Any = None  # maiw_agents.operations.OperationsCoordinationAgent
@@ -267,19 +272,21 @@ async def get_runtime() -> MAIWRuntime:
                 ExecuteEquipmentMaintenanceSkill,
                 ExecuteEquipmentReleaseSkill,
             )
-            from maiw_execution import EquipmentActionExecutor
+            from maiw_execution import EquipmentActionExecutor, ExecutionRegistry
 
             assign_skill = ExecuteEquipmentAssignmentSkill(runtime.mcp_client)
             release_skill = ExecuteEquipmentReleaseSkill(runtime.mcp_client)
             maintenance_skill = ExecuteEquipmentMaintenanceSkill(runtime.mcp_client)
 
+            runtime.equipment_registry = ExecutionRegistry()
             runtime.equipment_executor = EquipmentActionExecutor(
                 assign_skill=assign_skill,
                 release_skill=release_skill,
                 maintenance_skill=maintenance_skill,
                 state_provider=runtime.state_provider,
+                registry=runtime.equipment_registry,
             )
-            logger.info("MAIW bootstrap: EquipmentActionExecutor ready")
+            logger.info("MAIW bootstrap: EquipmentActionExecutor ready (registry wired)")
         except Exception as exc:
             logger.warning(
                 "MAIW bootstrap: EquipmentActionExecutor unavailable — %s", exc
@@ -289,11 +296,15 @@ async def get_runtime() -> MAIWRuntime:
     if runtime.mcp_client is not None and runtime.mcp_labor_available:
         try:
             from maiw_skills.labor.skills import ExecuteLaborAllocationSkill
-            from maiw_execution import LaborActionExecutor
+            from maiw_execution import LaborActionExecutor, ExecutionRegistry
 
             allocate_skill = ExecuteLaborAllocationSkill(runtime.mcp_client)
-            runtime.labor_executor = LaborActionExecutor(allocate_skill=allocate_skill)
-            logger.info("MAIW bootstrap: LaborActionExecutor ready")
+            runtime.labor_registry = ExecutionRegistry()
+            runtime.labor_executor = LaborActionExecutor(
+                allocate_skill=allocate_skill,
+                registry=runtime.labor_registry,
+            )
+            logger.info("MAIW bootstrap: LaborActionExecutor ready (registry wired)")
         except Exception as exc:
             logger.warning("MAIW bootstrap: LaborActionExecutor unavailable — %s", exc)
 
@@ -301,13 +312,15 @@ async def get_runtime() -> MAIWRuntime:
     if runtime.mcp_client is not None and runtime.mcp_wave_available:
         try:
             from maiw_skills.wave.skills import ExecuteWaveReprioritizationSkill
-            from maiw_execution import WaveActionExecutor
+            from maiw_execution import WaveActionExecutor, ExecutionRegistry
 
             reprioritize_skill = ExecuteWaveReprioritizationSkill(runtime.mcp_client)
+            runtime.wave_registry = ExecutionRegistry()
             runtime.wave_executor = WaveActionExecutor(
-                reprioritize_skill=reprioritize_skill
+                reprioritize_skill=reprioritize_skill,
+                registry=runtime.wave_registry,
             )
-            logger.info("MAIW bootstrap: WaveActionExecutor ready")
+            logger.info("MAIW bootstrap: WaveActionExecutor ready (registry wired)")
         except Exception as exc:
             logger.warning("MAIW bootstrap: WaveActionExecutor unavailable — %s", exc)
 

@@ -878,6 +878,244 @@ async def reject_proposal(request: ApproveRequest):
     }
 
 
+# ── Reconciliation ────────────────────────────────────────────────────────────
+
+
+class ReconcileRequest(BaseModel):
+    execution_id: str
+    domain: str = Field(..., description="equipment | labor | wave")
+    trace_id: str | None = None
+
+
+@router.post("/demo/reconcile")
+async def reconcile_execution(request: ReconcileRequest):
+    """
+    Reconcile an UNKNOWN execution against current authoritative warehouse state.
+
+    Phase 10E Batch 3: reads authoritative state through canonical MCP read
+    skills, compares against the ExecutionIntent snapshot stored at begin() time,
+    and stores a ReconciliationRecord alongside the original UNKNOWN outcome.
+
+    Architecture invariants enforced:
+    - Reads through canonical MCP read skills only (never DemoWarehouseWorld directly)
+    - ExecutionOutcome.UNKNOWN is preserved — not overwritten
+    - No automatic retry — CONFIRMED_NOT_EXECUTED is safe for higher-level re-evaluation
+
+    Returns the reconciliation outcome and effective_status of the record.
+    """
+    from maiw_execution import ReconciliationService, ReconciliationOutcome
+    from maiw_execution.outcome import ExecutionOutcome
+    from maiw_api.demo.events import ScenarioEvent
+
+    ctrl = _get_controller()
+    try:
+        from maiw_api.bootstrap import get_runtime
+        runtime = await get_runtime()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Runtime unavailable: {exc}") from exc
+
+    # Resolve registry for the requested domain
+    registry = _get_registry(request.domain, runtime)
+    if registry is None:
+        raise HTTPException(
+            status_code=503,
+            detail=f"No ExecutionRegistry wired for domain={request.domain!r}",
+        )
+
+    rec = registry.get_by_execution_id(request.execution_id)
+    if rec is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No execution record found for execution_id={request.execution_id!r}",
+        )
+
+    if rec.outcome != ExecutionOutcome.UNKNOWN:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"execution_id={request.execution_id!r} has outcome={rec.outcome!r}; "
+                "reconciliation requires UNKNOWN outcome"
+            ),
+        )
+
+    trace_id = request.trace_id or str(uuid.uuid4())
+    strategy = _build_reconciliation_strategy(request.domain, runtime)
+    if strategy is None:
+        raise HTTPException(
+            status_code=503,
+            detail=f"No reconciliation strategy available for domain={request.domain!r}",
+        )
+
+    service = ReconciliationService()
+    reconciliation_record = await service.reconcile(rec, strategy=strategy, trace_id=trace_id)
+    registry.set_reconciliation(request.execution_id, reconciliation_record)
+
+    sim_t = ctrl.world.clock.elapsed_seconds
+    await ctrl.bus.publish(ScenarioEvent(
+        category="RECONCILE",
+        message=f"reconciliation.{reconciliation_record.outcome.value}",
+        detail=(
+            f"execution_id={request.execution_id} "
+            f"domain={request.domain} "
+            f"effective_status={rec.effective_status} "
+            f"trace_id={trace_id}"
+        ),
+        sim_time_seconds=sim_t,
+    ))
+
+    return {
+        "ok": True,
+        "execution_id": request.execution_id,
+        "domain": request.domain,
+        "reconciliation_id": reconciliation_record.reconciliation_id,
+        "reconciliation_outcome": reconciliation_record.outcome.value,
+        "effective_status": rec.effective_status,
+        "proposal_id": rec.intent.proposal_id if rec.intent else None,
+        "decision_id": rec.intent.decision_id if rec.intent else None,
+        "approval_id": rec.intent.approval_id if rec.intent else None,
+        "trace_id": trace_id,
+        "error": reconciliation_record.error,
+    }
+
+
+def _get_registry(domain: str, runtime: Any) -> Any:
+    """Return the ExecutionRegistry for a domain, or None."""
+    if domain == "equipment":
+        return runtime.equipment_registry
+    if domain == "labor":
+        return runtime.labor_registry
+    if domain == "wave":
+        return runtime.wave_registry
+    return None
+
+
+def _build_reconciliation_strategy(domain: str, runtime: Any) -> Any:
+    """
+    Build a concrete ReconciliationStrategy for the requested domain.
+
+    Strategy implementations read authoritative state through canonical MCP read
+    skills only. DemoWarehouseWorld is never accessed directly — this is enforced
+    by only injecting read skills here, not world references.
+
+    Returns None if the required skills are not wired.
+    """
+    from maiw_execution import ReconciliationOutcome
+
+    if domain == "labor" and runtime.mcp_client is not None:
+        try:
+            from maiw_skills.labor.skills import LaborAllocationSkill
+            from maiw_mcp.contracts.labor import LaborAllocationRequest
+        except ImportError:
+            return None
+
+        mcp_client = runtime.mcp_client
+
+        class LaborReconciliationStrategy:
+            async def read_current_state(self, intent):
+                skill = LaborAllocationSkill(mcp_client)
+                req = LaborAllocationRequest(
+                    warehouse_id=intent.warehouse_id or "default",
+                )
+                result = await skill.execute(req)
+                return result.model_dump()
+
+            def check_postcondition(self, intent, current_state):
+                expected_task_id = intent.expected_effect.get("task_id")
+                expected_worker_ids = intent.expected_effect.get("expected_worker_ids", [])
+                if not expected_task_id:
+                    return ReconciliationOutcome.INDETERMINATE
+                allocations = current_state.get("allocations", [])
+                for alloc in allocations:
+                    if alloc.get("task_id") == expected_task_id:
+                        if alloc.get("status") == "in_progress":
+                            return ReconciliationOutcome.CONFIRMED_EXECUTED
+                        return ReconciliationOutcome.CONFIRMED_NOT_EXECUTED
+                return ReconciliationOutcome.CONFIRMED_NOT_EXECUTED
+
+        return LaborReconciliationStrategy()
+
+    if domain == "equipment" and runtime.mcp_client is not None:
+        try:
+            from maiw_skills.equipment.skills import EquipmentStatusSkill
+            from maiw_mcp.contracts.equipment import EquipmentStatusRequest
+        except ImportError:
+            return None
+
+        mcp_client = runtime.mcp_client
+
+        class EquipmentReconciliationStrategy:
+            async def read_current_state(self, intent):
+                skill = EquipmentStatusSkill(mcp_client)
+                req = EquipmentStatusRequest(
+                    asset_id=intent.target,
+                )
+                result = await skill.execute(req)
+                return result.model_dump()
+
+            def check_postcondition(self, intent, current_state):
+                expected_status = intent.expected_effect.get("expected_status")
+                expected_assignee = intent.expected_effect.get("expected_assignee")
+                asset_id = intent.target
+                if not expected_status or not asset_id:
+                    return ReconciliationOutcome.INDETERMINATE
+                equipment = current_state.get("equipment", [])
+                for asset in equipment:
+                    if asset.get("asset_id") == asset_id:
+                        actual_status = asset.get("status")
+                        if actual_status != expected_status:
+                            return ReconciliationOutcome.CONFIRMED_NOT_EXECUTED
+                        if expected_assignee and asset.get("owner_user") != expected_assignee:
+                            return ReconciliationOutcome.CONFIRMED_NOT_EXECUTED
+                        return ReconciliationOutcome.CONFIRMED_EXECUTED
+                return ReconciliationOutcome.INDETERMINATE
+
+        return EquipmentReconciliationStrategy()
+
+    if domain == "wave" and runtime.mcp_client is not None:
+        try:
+            from maiw_skills.wave.skills import WaveGetSkill
+            from maiw_mcp.contracts.wave import WaveGetRequest
+        except ImportError:
+            return None
+
+        mcp_client = runtime.mcp_client
+
+        class WaveReconciliationStrategy:
+            async def read_current_state(self, intent):
+                skill = WaveGetSkill(mcp_client)
+                req = WaveGetRequest(
+                    warehouse_id=intent.warehouse_id or "default",
+                    wave_id=intent.expected_effect.get("wave_id"),
+                    zone=intent.expected_effect.get("zone"),
+                )
+                result = await skill.execute(req)
+                return result.model_dump()
+
+            def check_postcondition(self, intent, current_state):
+                expected_priority = intent.expected_effect.get("expected_priority")
+                zone = intent.expected_effect.get("zone")
+                if not expected_priority:
+                    return ReconciliationOutcome.INDETERMINATE
+                tasks = current_state.get("tasks", [])
+                # Filter to tasks relevant to this intent
+                relevant = [
+                    t for t in tasks
+                    if (not zone or t.get("zone") == zone)
+                    and t.get("status") not in ("completed", "failed", "cancelled")
+                ]
+                if not relevant:
+                    return ReconciliationOutcome.INDETERMINATE
+                # All relevant tasks should have been reprioritized
+                matching = [t for t in relevant if t.get("priority") == expected_priority]
+                if matching:
+                    return ReconciliationOutcome.CONFIRMED_EXECUTED
+                return ReconciliationOutcome.CONFIRMED_NOT_EXECUTED
+
+        return WaveReconciliationStrategy()
+
+    return None
+
+
 # ── Counterfactual artifact ───────────────────────────────────────────────────
 
 

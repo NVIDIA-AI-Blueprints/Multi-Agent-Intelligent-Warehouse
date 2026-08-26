@@ -60,6 +60,7 @@ from maiw_decision.models import DecisionOutcome, DecisionResult
 from maiw_mcp.contracts.actions import ActionProposal
 
 from .outcome import AmbiguousWriteError, ExecutionOutcome
+from .reconciliation import ExecutionIntent
 from .registry import ExecutionRecord, ExecutionRegistry
 
 logger = logging.getLogger(__name__)
@@ -283,6 +284,9 @@ class BaseActionExecutor:
         execution_id = str(uuid.uuid4())
         started_at = datetime.now(timezone.utc)
 
+        # Build intent snapshot before any write (immutable; used by reconciliation)
+        intent = self._build_intent(proposal, decision, trace_id=trace_id)
+
         # Idempotency check — single-process guard
         if self._registry is not None:
             existing = self._registry.begin(
@@ -290,6 +294,7 @@ class BaseActionExecutor:
                 proposal.idempotency_key,
                 proposal.action,
                 proposal.proposal_id,
+                intent=intent,
             )
             if existing is not None:
                 return self._idempotent_result(existing, proposal, decision, execution_id, trace_id)
@@ -457,6 +462,37 @@ class BaseActionExecutor:
 
     async def _check_additional_guards(self, proposal: ActionProposal) -> None:
         """Override in subclasses to add domain-specific pre-execution guards."""
+
+    def _build_intent(
+        self,
+        proposal: ActionProposal,
+        decision: DecisionResult,
+        *,
+        trace_id: str | None = None,
+    ) -> ExecutionIntent:
+        """
+        Build an immutable ExecutionIntent snapshot before the write.
+
+        Override in domain subclasses to provide precise expected_effect.
+        The base implementation captures capability/ID fields with an empty
+        expected_effect; reconciliation will return INDETERMINATE without a
+        populated expected_effect.
+
+        The returned ExecutionIntent is stored in ExecutionRecord.intent at
+        registry.begin() time. It must be captured before any write so
+        reconciliation never depends on mutable proposal/decision objects.
+        """
+        return ExecutionIntent(
+            capability=proposal.action,
+            proposal_id=proposal.proposal_id,
+            decision_id=decision.result_id,
+            warehouse_id=proposal.parameters.get("warehouse_id"),
+            target=None,
+            expected_effect={},
+            approval_id=None,
+            idempotency_key=proposal.idempotency_key,
+            trace_id=trace_id,
+        )
 
     async def _do_execute(
         self,

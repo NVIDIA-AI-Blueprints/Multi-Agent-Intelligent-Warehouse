@@ -4,6 +4,7 @@
 ExecutionRegistry — single-process in-memory idempotency store.
 
 Phase 10E Batch 1 — Idempotency Contract
+Phase 10E Batch 3 — Reconciliation support (intent snapshot, ReconciliationRecord)
 
 SINGLE-PROCESS SAFETY
 ---------------------
@@ -29,6 +30,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from .outcome import ExecutionOutcome
+from .reconciliation import ExecutionIntent, ReconciliationRecord, ReconciliationOutcome
 
 if TYPE_CHECKING:
     pass
@@ -48,6 +50,33 @@ class ExecutionRecord:
     outcome: ExecutionOutcome | None = None   # None = in-progress
     completed_at: datetime | None = None
     result: Any = None                        # ActionExecutionResult once complete
+    intent: ExecutionIntent | None = None     # Immutable snapshot captured at begin() time
+    reconciliation: ReconciliationRecord | None = None  # Set by set_reconciliation()
+
+    @property
+    def effective_status(self) -> str:
+        """
+        Derived operational view of this execution record.
+
+        Returns
+        -------
+        "in_progress"           — outcome is None (write not yet complete)
+        "effectively_executed"  — UNKNOWN + reconciliation CONFIRMED_EXECUTED
+        "effectively_not_executed" — UNKNOWN + reconciliation CONFIRMED_NOT_EXECUTED
+        "unknown"               — UNKNOWN + no reconciliation or INDETERMINATE
+        "{outcome.value}"       — any other completed outcome
+        """
+        if self.outcome is None:
+            return "in_progress"
+        if self.outcome == ExecutionOutcome.UNKNOWN:
+            if self.reconciliation is None:
+                return "unknown"
+            if self.reconciliation.outcome == ReconciliationOutcome.CONFIRMED_EXECUTED:
+                return "effectively_executed"
+            if self.reconciliation.outcome == ReconciliationOutcome.CONFIRMED_NOT_EXECUTED:
+                return "effectively_not_executed"
+            return "unknown"  # INDETERMINATE
+        return self.outcome.value
 
 
 class ExecutionRegistry:
@@ -79,9 +108,17 @@ class ExecutionRegistry:
         idempotency_key: str | None,
         capability: str,
         proposal_id: str,
+        intent: ExecutionIntent | None = None,
     ) -> ExecutionRecord | None:
         """
         Register the start of a new execution attempt.
+
+        Parameters
+        ----------
+        intent : ExecutionIntent | None
+            Compact immutable snapshot of write intent. Stored in the
+            ExecutionRecord so reconciliation has everything it needs without
+            a reference back to the original ActionProposal.
 
         Returns
         -------
@@ -124,6 +161,7 @@ class ExecutionRegistry:
             capability=capability,
             proposal_id=proposal_id,
             started_at=datetime.now(timezone.utc),
+            intent=intent,
         )
         self._by_execution_id[execution_id] = record
         if idempotency_key is not None:
@@ -166,6 +204,37 @@ class ExecutionRegistry:
             "ExecutionRegistry: execution_id=%s marked UNKNOWN — "
             "reconciliation required before re-execution",
             execution_id,
+        )
+
+    def set_reconciliation(
+        self, execution_id: str, record: ReconciliationRecord
+    ) -> None:
+        """
+        Attach a ReconciliationRecord to an UNKNOWN execution.
+
+        The original ExecutionOutcome.UNKNOWN is NOT rewritten — this is by
+        design. Use ExecutionRecord.effective_status for the derived
+        operational view after reconciliation.
+        """
+        existing = self._by_execution_id.get(execution_id)
+        if existing is None:
+            logger.warning(
+                "ExecutionRegistry.set_reconciliation: unknown execution_id=%s",
+                execution_id,
+            )
+            return
+        if existing.outcome != ExecutionOutcome.UNKNOWN:
+            logger.warning(
+                "ExecutionRegistry.set_reconciliation: execution_id=%s outcome is %s, "
+                "not UNKNOWN — reconciliation record stored but outcome is unchanged",
+                execution_id,
+                existing.outcome,
+            )
+        existing.reconciliation = record
+        logger.info(
+            "ExecutionRegistry: reconciliation stored execution_id=%s outcome=%s",
+            execution_id,
+            record.outcome.value,
         )
 
     def get_by_execution_id(self, execution_id: str) -> ExecutionRecord | None:

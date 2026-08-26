@@ -12,6 +12,7 @@ from maiw_mcp.contracts.actions import ActionProposal
 
 from .base import BaseActionExecutor
 from .outcome import ExecutionOutcome
+from .reconciliation import ExecutionIntent
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,31 @@ class WaveActionExecutor(BaseActionExecutor):
     ) -> None:
         super().__init__(max_decision_age_seconds=max_decision_age_seconds, **kwargs)
         self._reprioritize_skill = reprioritize_skill
+
+    def _build_intent(
+        self,
+        proposal: ActionProposal,
+        decision: DecisionResult,
+        *,
+        trace_id: str | None = None,
+    ) -> ExecutionIntent:
+        params = proposal.parameters
+        wave_id = params.get("wave_id")
+        zone = params.get("zone")
+        return ExecutionIntent(
+            capability=proposal.action,
+            proposal_id=proposal.proposal_id,
+            decision_id=decision.result_id,
+            warehouse_id=params.get("warehouse_id"),
+            target=wave_id or zone,
+            expected_effect={
+                "wave_id": wave_id,
+                "zone": zone,
+                "expected_priority": params.get("new_priority"),
+            },
+            idempotency_key=proposal.idempotency_key,
+            trace_id=trace_id,
+        )
 
     async def _do_execute(
         self,

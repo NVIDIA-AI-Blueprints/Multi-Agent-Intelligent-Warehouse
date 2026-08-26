@@ -12,6 +12,7 @@ from maiw_mcp.contracts.actions import ActionProposal
 
 from .base import ActionConflict, ActionUnsupported, BaseActionExecutor
 from .outcome import ExecutionOutcome
+from .reconciliation import ExecutionIntent
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,43 @@ class EquipmentActionExecutor(BaseActionExecutor):
         self._release_skill = release_skill
         self._maintenance_skill = maintenance_skill
         self._state_provider = state_provider
+
+    def _build_intent(
+        self,
+        proposal: ActionProposal,
+        decision: DecisionResult,
+        *,
+        trace_id: str | None = None,
+    ) -> ExecutionIntent:
+        params = proposal.parameters
+        asset_id = params.get("asset_id")
+        action = proposal.action
+        if action == "warehouse.equipment.assign":
+            expected_effect = {
+                "asset_id": asset_id,
+                "expected_status": "assigned",
+                "expected_assignee": params.get("assignee"),
+            }
+        elif action == "warehouse.equipment.release":
+            expected_effect = {
+                "asset_id": asset_id,
+                "expected_status": "available",
+            }
+        else:  # schedule_maintenance
+            expected_effect = {
+                "asset_id": asset_id,
+                "expected_status": "maintenance",
+            }
+        return ExecutionIntent(
+            capability=action,
+            proposal_id=proposal.proposal_id,
+            decision_id=decision.result_id,
+            warehouse_id=params.get("warehouse_id"),
+            target=asset_id,
+            expected_effect=expected_effect,
+            idempotency_key=proposal.idempotency_key,
+            trace_id=trace_id,
+        )
 
     async def _check_additional_guards(self, proposal: ActionProposal) -> None:
         if not self._state_provider:

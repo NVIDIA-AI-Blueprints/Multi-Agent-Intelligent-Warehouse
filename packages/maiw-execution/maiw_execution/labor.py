@@ -12,6 +12,7 @@ from maiw_mcp.contracts.actions import ActionProposal
 
 from .base import BaseActionExecutor
 from .outcome import ExecutionOutcome
+from .reconciliation import ExecutionIntent
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,29 @@ class LaborActionExecutor(BaseActionExecutor):
     ) -> None:
         super().__init__(max_decision_age_seconds=max_decision_age_seconds, **kwargs)
         self._allocate_skill = allocate_skill
+
+    def _build_intent(
+        self,
+        proposal: ActionProposal,
+        decision: DecisionResult,
+        *,
+        trace_id: str | None = None,
+    ) -> ExecutionIntent:
+        params = proposal.parameters
+        return ExecutionIntent(
+            capability=proposal.action,
+            proposal_id=proposal.proposal_id,
+            decision_id=decision.result_id,
+            warehouse_id=params.get("warehouse_id"),
+            target=params.get("task_id"),
+            expected_effect={
+                "task_id": params.get("task_id"),
+                "expected_worker_ids": params.get("worker_ids", []),
+                "expected_task_status": "in_progress",
+            },
+            idempotency_key=proposal.idempotency_key,
+            trace_id=trace_id,
+        )
 
     async def _do_execute(
         self,
