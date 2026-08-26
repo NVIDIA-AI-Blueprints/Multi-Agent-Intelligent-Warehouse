@@ -44,6 +44,11 @@ EventCategory = Literal[
     "RECOVERY",       # Recovery conditions met after disruption
     "APPROVE",        # Human approved a pending proposal
     "REJECT",         # Human rejected a pending proposal
+    "RECONCILE",      # UNKNOWN execution reconciled against authoritative state
+    # Operational failure labels (Phase 10E Checkpoint D)
+    "MODEL TIMEOUT",       # NIM did not respond in time
+    "REQUEST DEADLINE",    # Analyze/execution/reconciliation deadline exhausted
+    "CAPABILITY TIMEOUT",  # MCP capability did not respond in time
 ]
 
 

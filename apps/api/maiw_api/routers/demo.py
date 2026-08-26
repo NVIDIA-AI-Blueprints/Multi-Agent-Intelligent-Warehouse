@@ -31,6 +31,8 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from maiw_api.config import settings
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["demo"])
@@ -183,6 +185,71 @@ async def demo_status():
     return ctrl.status()
 
 
+# ── Typed failure → HTTP mapping ─────────────────────────────────────────────
+
+
+def _raise_typed_http(exc: BaseException, context: str) -> None:
+    """
+    Map typed runtime failures to the correct HTTP status code.
+
+    RequestDeadlineExceeded → 504 (deadline exhausted at ingress)
+    ModelTimeout            → 504 (NIM did not respond in time)
+    MCPTimeout              → 504 (MCP server did not respond in time)
+    ModelUnavailable        → 503 (no enabled model can serve the request)
+    MCPUnavailable          → 503 (transport-level MCP failure)
+
+    ExecutionOutcome.UNKNOWN is NOT raised as an exception — callers preserve it
+    as a structured operational outcome in the response body (never 500/504).
+    """
+    from maiw_mcp.deadline import RequestDeadlineExceeded  # noqa: PLC0415
+    from maiw_mcp.errors import MCPTimeout, MCPUnavailable  # noqa: PLC0415
+    from maiw_models.errors import ModelTimeout, ModelUnavailable  # noqa: PLC0415
+
+    if isinstance(exc, RequestDeadlineExceeded):
+        raise HTTPException(
+            status_code=504,
+            detail={
+                "error": "REQUEST DEADLINE",
+                "message": f"{context}: request deadline exceeded",
+                "expired_by_ms": exc.expired_by_ms,
+            },
+        ) from exc
+    if isinstance(exc, ModelTimeout):
+        raise HTTPException(
+            status_code=504,
+            detail={
+                "error": "MODEL TIMEOUT",
+                "message": f"{context}: NIM model did not respond in time",
+                "model_id": exc.model_id,
+            },
+        ) from exc
+    if isinstance(exc, MCPTimeout):
+        raise HTTPException(
+            status_code=504,
+            detail={
+                "error": "CAPABILITY TIMEOUT",
+                "message": f"{context}: MCP capability did not respond in time",
+            },
+        ) from exc
+    if isinstance(exc, ModelUnavailable):
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "MODEL UNAVAILABLE",
+                "message": f"{context}: no enabled model can serve the request",
+                "model_id": exc.model_id,
+            },
+        ) from exc
+    if isinstance(exc, MCPUnavailable):
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "MCP UNAVAILABLE",
+                "message": f"{context}: MCP transport failure",
+            },
+        ) from exc
+
+
 # ── MAIW Analysis ─────────────────────────────────────────────────────────────
 
 
@@ -198,16 +265,25 @@ async def analyze_disruption():
     3. For each RecommendedAction (ordered, sequential):
        a. Build ActionProposal via canonical proposal skill.
        b. Evaluate with DecisionEngine.
-       c. If APPROVED, execute via domain ActionExecutor.
+       c. If APPROVED, execute via domain ActionExecutor (fresh execution deadline).
     4. Refresh state post-execution.
     5. Return full lifecycle record + assessment.
 
     SSE lifecycle events are published at each phase:
         OBSERVE → REASON → SKILL / PROPOSE → DECIDE → EXECUTE → OBSERVE_OUTCOME
+
+    Typed failure mapping (Phase 10E Checkpoint D):
+        RequestDeadlineExceeded → 504
+        ModelTimeout            → 504
+        MCPTimeout              → 504
+        ModelUnavailable        → 503
+        MCPUnavailable          → 503
+        ExecutionOutcome.UNKNOWN → preserved as structured body (never 500/504)
     """
     import time as _time
     from datetime import datetime, timezone
     from maiw_api.demo.kpi import DemoKPIEngine
+    from maiw_mcp.deadline import RequestDeadline
 
     analyze_wall_start = _time.perf_counter()
     pre_kpis_dict: dict = {}
@@ -230,6 +306,9 @@ async def analyze_disruption():
         raise HTTPException(status_code=503, detail="DecisionEngine not initialized")
     if not ctrl.active:
         raise HTTPException(status_code=409, detail="No active scenario — start a scenario first")
+
+    # Originate the analyze deadline at request ingress (after pre-flight checks).
+    analyze_deadline = RequestDeadline.from_timeout(settings.analyze_timeout_seconds)
 
     # Capture pre-analysis KPIs
     pre_kpi = DemoKPIEngine(ctrl.world, ctrl._last_analyze_wall_time).compute()
@@ -258,10 +337,12 @@ async def analyze_disruption():
             warehouse_id,
             requirements,
             trace_id=trace_id,
+            deadline=analyze_deadline,
         )
         snapshot = WarehouseStateSnapshot.seal(state)
     except Exception as exc:
         await bus.publish_observe("State assembly failed", str(exc), trace_id=trace_id)
+        _raise_typed_http(exc, "state assembly")
         raise HTTPException(status_code=500, detail=f"State assembly failed: {exc}") from exc
 
     lifecycle.append({
@@ -290,8 +371,10 @@ async def analyze_disruption():
             snapshot=snapshot,
             scenario_context=scenario_context,
             trace_id=trace_id,
+            deadline=analyze_deadline,
         )
     except Exception as exc:
+        _raise_typed_http(exc, "agent analysis")
         raise HTTPException(status_code=500, detail=f"Agent analysis failed: {exc}") from exc
 
     lifecycle.append({
@@ -342,6 +425,7 @@ async def analyze_disruption():
             lifecycle=lifecycle,
             index=i,
             ctrl=ctrl,
+            execution_timeout_seconds=settings.execution_timeout_seconds,
         )
         proposal_results.append(proposal_result)
 
@@ -440,6 +524,7 @@ async def _build_and_execute_proposal(
     lifecycle: list,
     index: int,
     ctrl: Any,
+    execution_timeout_seconds: float = 30.0,
 ) -> dict[str, Any]:
     """Translate one RecommendedAction into a proposal + decision + optional execution."""
     from maiw_decision.models import DecisionOutcome, DecisionRequest
@@ -537,25 +622,39 @@ async def _build_and_execute_proposal(
             "decision_id": result.result_id,
         }
 
+    # Fresh execution deadline — independent budget from the analyze deadline.
+    from maiw_mcp.deadline import RequestDeadline as _RequestDeadline  # noqa: PLC0415
+    exec_deadline = _RequestDeadline.from_timeout(execution_timeout_seconds)
+
     try:
-        exec_result = await executor.execute(proposal, result)
+        exec_result = await executor.execute(proposal, result, deadline=exec_deadline)
         exec_result.trace_id = trace_id
+
+        # Preserve ExecutionOutcome.UNKNOWN as a structured operational outcome —
+        # never convert it to a generic 500/504.  The caller can reconcile it.
+        from maiw_execution.outcome import ExecutionOutcome as _EO  # noqa: PLC0415
+        outcome_label = (
+            exec_result.outcome.value
+            if hasattr(exec_result, "outcome") and exec_result.outcome is not None
+            else ("executed" if exec_result.success else "failed")
+        )
         lifecycle.append({
             "phase": "EXECUTE",
             "index": index,
-            "status": "executed",
+            "status": outcome_label,
             "action": exec_result.action,
             "execution_id": exec_result.execution_id,
             "success": exec_result.success,
             "trace_id": trace_id,
         })
         return {
-            "status": "executed",
+            "status": outcome_label,
             "capability": rec.capability,
             "proposal_id": proposal.proposal_id,
             "decision_id": result.result_id,
             "execution_id": exec_result.execution_id,
             "success": exec_result.success,
+            "outcome": outcome_label,
         }
     except Exception as exc:
         lifecycle.append({
@@ -946,8 +1045,17 @@ async def reconcile_execution(request: ReconcileRequest):
             detail=f"No reconciliation strategy available for domain={request.domain!r}",
         )
 
+    from maiw_mcp.deadline import RequestDeadline as _RD  # noqa: PLC0415
+    reconcile_deadline = _RD.from_timeout(settings.reconciliation_timeout_seconds)
+
     service = ReconciliationService()
-    reconciliation_record = await service.reconcile(rec, strategy=strategy, trace_id=trace_id)
+    try:
+        reconciliation_record = await service.reconcile(
+            rec, strategy=strategy, trace_id=trace_id, deadline=reconcile_deadline
+        )
+    except Exception as exc:
+        _raise_typed_http(exc, "reconciliation")
+        raise HTTPException(status_code=500, detail=f"Reconciliation failed: {exc}") from exc
     registry.set_reconciliation(request.execution_id, reconciliation_record)
 
     sim_t = ctrl.world.clock.elapsed_seconds

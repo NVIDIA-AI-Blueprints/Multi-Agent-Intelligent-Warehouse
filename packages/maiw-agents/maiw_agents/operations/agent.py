@@ -959,6 +959,7 @@ class OperationsCoordinationAgent:
         snapshot: Any,
         scenario_context: str = "",
         trace_id: str,
+        deadline: Any = None,
     ) -> Any:
         """
         Observe warehouse state and produce an OperationalAssessment.
@@ -1067,6 +1068,7 @@ class OperationsCoordinationAgent:
             reasoning=ReasoningLevel.HIGH,
             risk_level=RiskLevel.HIGH,
             trace_id=trace_id,
+            deadline=deadline,
         ))
 
         # Parse structured response — expect JSON

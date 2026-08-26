@@ -184,6 +184,7 @@ class ReconciliationService:
         *,
         strategy: ReconciliationStrategy,
         trace_id: str | None = None,
+        deadline: Any = None,  # RequestDeadline | None — checked before state read
     ) -> ReconciliationRecord:
         """
         Reconcile an UNKNOWN execution against authoritative state.
@@ -238,6 +239,12 @@ class ReconciliationService:
                 trace_id=trace_id,
                 error="ExecutionRecord has no intent snapshot; reconciliation cannot proceed",
             )
+
+        # Deadline guard — reject before any MCP read call
+        if deadline is not None and deadline.expired:
+            from maiw_mcp.deadline import RequestDeadlineExceeded  # noqa: PLC0415
+            over_ms = (deadline._clock() - deadline.deadline_at) * 1000.0  # type: ignore[operator]
+            raise RequestDeadlineExceeded(expired_by_ms=over_ms)
 
         # Read authoritative state through canonical read path
         try:

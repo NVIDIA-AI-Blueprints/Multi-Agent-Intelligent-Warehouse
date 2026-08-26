@@ -85,6 +85,23 @@ class Settings:
     def mcp_wave_url(self) -> str | None:
         return os.getenv("MAIW_MCP_SERVER_WAVE_URL")
 
+    # ── Operational timeouts (Phase 10E Checkpoint D) ────────────────────────
+    @property
+    def analyze_timeout_seconds(self) -> float:
+        return float(_int("MAIW_ANALYZE_TIMEOUT_SECONDS", 60))
+
+    @property
+    def execution_timeout_seconds(self) -> float:
+        return float(_int("MAIW_EXECUTION_TIMEOUT_SECONDS", 30))
+
+    @property
+    def reconciliation_timeout_seconds(self) -> float:
+        return float(_int("MAIW_RECONCILIATION_TIMEOUT_SECONDS", 30))
+
+    @property
+    def startup_timeout_seconds(self) -> float:
+        return float(_int("MAIW_STARTUP_TIMEOUT_SECONDS", 30))
+
     # ── Rate limiting ─────────────────────────────────────────────────────────
     @property
     def rate_limit_requests(self) -> int:
