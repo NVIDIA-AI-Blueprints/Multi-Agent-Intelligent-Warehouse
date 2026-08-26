@@ -58,6 +58,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from maiw_decision.models import DecisionOutcome, DecisionResult
 from maiw_mcp.contracts.actions import ActionProposal
+from maiw_mcp.deadline import RequestDeadline, RequestDeadlineExceeded
 
 from .outcome import AmbiguousWriteError, ExecutionOutcome
 from .reconciliation import ExecutionIntent
@@ -154,6 +155,7 @@ class ActionExecutor(Protocol):
         decision: DecisionResult,
         *,
         trace_id: str | None = None,
+        deadline: RequestDeadline | None = None,
     ) -> ActionExecutionResult: ...
 
 
@@ -172,7 +174,12 @@ class NoOpActionExecutor:
         decision: DecisionResult,
         *,
         trace_id: str | None = None,
+        deadline: RequestDeadline | None = None,
     ) -> ActionExecutionResult:
+        if deadline is not None and deadline.expired:
+            raise RequestDeadlineExceeded(
+                expired_by_ms=(deadline._clock() - deadline.deadline_at) * 1000.0  # type: ignore[operator]
+            )
         if decision.outcome != DecisionOutcome.APPROVED:
             raise ActionNotApproved(
                 f"NoOpActionExecutor: non-APPROVED outcome {decision.outcome.value!r}"
@@ -236,6 +243,7 @@ class BaseActionExecutor:
         decision: DecisionResult,
         *,
         trace_id: str | None = None,
+        deadline: RequestDeadline | None = None,
     ) -> ActionExecutionResult:
         """
         Execute an approved action proposal through all guards.
@@ -246,6 +254,7 @@ class BaseActionExecutor:
         Guard violations (pre-execution authorization failures) still raise.
         Backend/provider failures return result with outcome=FAILED.
         Ambiguous writes (post-mutation response lost) return outcome=UNKNOWN.
+        Deadline expired before write → raises RequestDeadlineExceeded (no mutation).
         """
         # Guard 1: APPROVED gate
         if decision.outcome != DecisionOutcome.APPROVED:
@@ -279,6 +288,12 @@ class BaseActionExecutor:
 
         # Guard 5: Domain-specific additional guards (state-drift, etc.)
         await self._check_additional_guards(proposal)
+
+        # Guard 6: Deadline — must check immediately before write; no mutation on expiry
+        if deadline is not None and deadline.expired:
+            raise RequestDeadlineExceeded(
+                expired_by_ms=(deadline._clock() - deadline.deadline_at) * 1000.0  # type: ignore[operator]
+            )
 
         # Generate execution_id before the write — stable for the full lifecycle
         execution_id = str(uuid.uuid4())

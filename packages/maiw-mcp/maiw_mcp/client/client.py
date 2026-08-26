@@ -50,6 +50,7 @@ from typing import Any
 from mcp import types
 from mcp.client import Client
 
+from maiw_mcp.deadline import RequestDeadline, RequestDeadlineExceeded
 from maiw_mcp.errors import (
     BackendUnavailable,
     CapabilityNotFound,
@@ -102,6 +103,7 @@ class MAIWMCPClient:
         *,
         trace_id: str | None = None,
         timeout_seconds: float = 30.0,
+        deadline: RequestDeadline | None = None,
     ) -> dict[str, Any]:
         """
         Invoke a warehouse capability via the MCP 2026-07-28 protocol.
@@ -115,7 +117,14 @@ class MAIWMCPClient:
         trace_id:
             Correlation ID propagated from ModelGateway / agent span.
         timeout_seconds:
-            Client-side read timeout per round trip.
+            Client-side read timeout per round trip.  When a *deadline* is
+            supplied this becomes the upper bound for the local operation;
+            the effective timeout is ``min(timeout_seconds, remaining_budget)``.
+        deadline:
+            Parent request deadline.  When supplied and already expired,
+            raises ``RequestDeadlineExceeded`` before any network call.
+            When the remaining budget is smaller than ``timeout_seconds``,
+            the tighter value is used.
 
         Returns
         -------
@@ -124,10 +133,13 @@ class MAIWMCPClient:
 
         Raises
         ------
+        RequestDeadlineExceeded
+            Parent request deadline was already exhausted before the call.
         CapabilityNotFound
             No server registered for this capability.
         MCPTimeout
-            Server did not respond within ``timeout_seconds``.
+            Server did not respond within the effective timeout (parent budget
+            still existed at call time; the child operation simply ran long).
         MCPToolError
             Server returned ``is_error=True`` in the tool result.
         MCPContractError
@@ -135,6 +147,12 @@ class MAIWMCPClient:
         MCPUnavailable
             Transport-level or protocol-level error.
         """
+        # Deadline guard — reject before any network call
+        if deadline is not None:
+            effective_timeout = deadline.effective_timeout(timeout_seconds)
+        else:
+            effective_timeout = timeout_seconds
+
         server_url = self._registry.resolve(capability)
         # Telemetry fields must be plain strings — MCPServer instances are not
         # serialisable via dataclasses.asdict() (deepcopy fails on SSL objects).
@@ -142,7 +160,9 @@ class MAIWMCPClient:
         start = time.monotonic()
 
         try:
-            result = await self._call_tool(capability, payload, server_url, timeout_seconds)
+            result = await self._call_tool(capability, payload, server_url, effective_timeout)
+        except RequestDeadlineExceeded:
+            raise  # parent budget exhausted — not MCPTimeout
         except (CapabilityNotFound, MCPToolError, MCPContractError, BackendUnavailable):
             raise
         except TimeoutError as exc:
@@ -154,7 +174,9 @@ class MAIWMCPClient:
                 error=exc,
                 trace_id=trace_id,
             )
-            raise MCPTimeout(f"Timeout after {timeout_seconds}s calling {capability!r}") from exc
+            raise MCPTimeout(
+                f"Timeout after {effective_timeout:.1f}s calling {capability!r}"
+            ) from exc
         except Exception as exc:
             latency_ms = (time.monotonic() - start) * 1000
             self._telemetry.record_failure(

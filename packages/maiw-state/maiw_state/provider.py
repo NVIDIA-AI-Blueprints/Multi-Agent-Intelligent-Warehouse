@@ -31,9 +31,12 @@ Usage
 
 from __future__ import annotations
 
+import asyncio
 import time
 from datetime import datetime, timezone
 from typing import Any, Protocol, runtime_checkable
+
+from maiw_mcp.deadline import RequestDeadline, RequestDeadlineExceeded
 
 from .errors import StateAssemblyError
 from .freshness import StateFreshness
@@ -85,6 +88,7 @@ class StateProvider(Protocol):
         requirements: StateRequirements,
         *,
         trace_id: str | None = None,
+        deadline: RequestDeadline | None = None,
     ) -> WarehouseState: ...
 
 
@@ -132,12 +136,18 @@ class WarehouseStateProvider:
         requirements: StateRequirements,
         *,
         trace_id: str | None = None,
+        deadline: RequestDeadline | None = None,
     ) -> WarehouseState:
         """
         Assemble WarehouseState for *warehouse_id* per *requirements*.
 
+        The same *deadline* object is passed to all domain reads — they share
+        the parent budget rather than each getting a fresh timeout.
+
         Raises
         ------
+        RequestDeadlineExceeded
+            Parent deadline expired before or during state assembly.
         StateAssemblyError
             When a required skill is not configured or a capability call fails.
         """
@@ -150,25 +160,25 @@ class WarehouseStateProvider:
 
         if requirements.inventory:
             inventory_state, prov = await self._assemble_inventory(
-                warehouse_id, requirements, trace_id=trace_id
+                warehouse_id, requirements, trace_id=trace_id, deadline=deadline
             )
             provenance.append(prov)
 
         if requirements.equipment:
             equipment_state, prov = await self._assemble_equipment(
-                warehouse_id, requirements, trace_id=trace_id
+                warehouse_id, requirements, trace_id=trace_id, deadline=deadline
             )
             provenance.append(prov)
 
         if requirements.labor:
             labor_state, prov = await self._assemble_labor(
-                warehouse_id, requirements, trace_id=trace_id
+                warehouse_id, requirements, trace_id=trace_id, deadline=deadline
             )
             provenance.append(prov)
 
         if requirements.waves:
             wave_state, prov = await self._assemble_waves(
-                warehouse_id, requirements, trace_id=trace_id
+                warehouse_id, requirements, trace_id=trace_id, deadline=deadline
             )
             provenance.append(prov)
 
@@ -192,6 +202,7 @@ class WarehouseStateProvider:
         requirements: StateRequirements,
         *,
         trace_id: str | None,
+        deadline: RequestDeadline | None = None,
     ) -> tuple[EquipmentState, StateProvenance]:
         if self._equipment_skill is None:
             raise StateAssemblyError(
@@ -199,9 +210,9 @@ class WarehouseStateProvider:
                 "EquipmentStatusSkill not configured — pass equipment_status_skill to WarehouseStateProvider",
             )
 
-        # Build the request using duck-typed fields; avoids importing the
-        # concrete EquipmentStatusRequest (which lives in maiw-mcp → OK to
-        # import here, but we want to keep this layer thin).
+        if deadline is not None and deadline.expired:
+            raise RequestDeadlineExceeded(expired_by_ms=(deadline._clock() - deadline.deadline_at) * 1000.0)  # type: ignore[operator]
+
         from maiw_mcp.contracts.equipment import EquipmentStatusRequest  # noqa: PLC0415
 
         req = EquipmentStatusRequest(
@@ -213,7 +224,17 @@ class WarehouseStateProvider:
 
         t0 = time.monotonic()
         try:
-            result = await self._equipment_skill.execute(req, trace_id=trace_id)
+            coro = self._equipment_skill.execute(req, trace_id=trace_id)
+            if deadline is not None:
+                remaining = deadline.remaining_seconds
+                try:
+                    result = await asyncio.wait_for(coro, timeout=remaining)
+                except asyncio.TimeoutError:
+                    raise RequestDeadlineExceeded(expired_by_ms=0.0)
+            else:
+                result = await coro
+        except RequestDeadlineExceeded:
+            raise
         except Exception as exc:
             raise StateAssemblyError("equipment", str(exc), cause=exc) from exc
         latency_ms = (time.monotonic() - t0) * 1000
@@ -238,6 +259,7 @@ class WarehouseStateProvider:
         requirements: StateRequirements,
         *,
         trace_id: str | None,
+        deadline: RequestDeadline | None = None,
     ) -> tuple[InventoryState, StateProvenance]:
         if self._inventory_skill is None:
             raise StateAssemblyError(
@@ -245,7 +267,9 @@ class WarehouseStateProvider:
                 "InventorySkill not configured — pass inventory_skill to WarehouseStateProvider",
             )
 
-        # Import the concrete request type; maiw-mcp is a declared dependency
+        if deadline is not None and deadline.expired:
+            raise RequestDeadlineExceeded(expired_by_ms=(deadline._clock() - deadline.deadline_at) * 1000.0)  # type: ignore[operator]
+
         from maiw_mcp.contracts.inventory import InventoryLookupRequest  # noqa: PLC0415
 
         req = InventoryLookupRequest(
@@ -255,7 +279,17 @@ class WarehouseStateProvider:
 
         t0 = time.monotonic()
         try:
-            result = await self._inventory_skill.execute(req, trace_id=trace_id)
+            coro = self._inventory_skill.execute(req, trace_id=trace_id)
+            if deadline is not None:
+                remaining = deadline.remaining_seconds
+                try:
+                    result = await asyncio.wait_for(coro, timeout=remaining)
+                except asyncio.TimeoutError:
+                    raise RequestDeadlineExceeded(expired_by_ms=0.0)
+            else:
+                result = await coro
+        except RequestDeadlineExceeded:
+            raise
         except Exception as exc:
             raise StateAssemblyError("inventory", str(exc), cause=exc) from exc
         latency_ms = (time.monotonic() - t0) * 1000
@@ -280,12 +314,16 @@ class WarehouseStateProvider:
         requirements: StateRequirements,
         *,
         trace_id: str | None,
+        deadline: RequestDeadline | None = None,
     ) -> tuple[LaborState, StateProvenance]:
         if self._labor_skill is None:
             raise StateAssemblyError(
                 "labor",
                 "LaborCapacitySkill not configured — pass labor_capacity_skill to WarehouseStateProvider",
             )
+
+        if deadline is not None and deadline.expired:
+            raise RequestDeadlineExceeded(expired_by_ms=(deadline._clock() - deadline.deadline_at) * 1000.0)  # type: ignore[operator]
 
         from maiw_mcp.contracts.labor import LaborCapacityRequest  # noqa: PLC0415
 
@@ -298,7 +336,17 @@ class WarehouseStateProvider:
 
         t0 = time.monotonic()
         try:
-            result = await self._labor_skill.execute(req, trace_id=trace_id)
+            coro = self._labor_skill.execute(req, trace_id=trace_id)
+            if deadline is not None:
+                remaining = deadline.remaining_seconds
+                try:
+                    result = await asyncio.wait_for(coro, timeout=remaining)
+                except asyncio.TimeoutError:
+                    raise RequestDeadlineExceeded(expired_by_ms=0.0)
+            else:
+                result = await coro
+        except RequestDeadlineExceeded:
+            raise
         except Exception as exc:
             raise StateAssemblyError("labor", str(exc), cause=exc) from exc
         latency_ms = (time.monotonic() - t0) * 1000
@@ -323,12 +371,16 @@ class WarehouseStateProvider:
         requirements: StateRequirements,
         *,
         trace_id: str | None,
+        deadline: RequestDeadline | None = None,
     ) -> tuple[WaveState, StateProvenance]:
         if self._wave_skill is None:
             raise StateAssemblyError(
                 "waves",
                 "WaveGetSkill not configured — pass wave_get_skill to WarehouseStateProvider",
             )
+
+        if deadline is not None and deadline.expired:
+            raise RequestDeadlineExceeded(expired_by_ms=(deadline._clock() - deadline.deadline_at) * 1000.0)  # type: ignore[operator]
 
         from maiw_mcp.contracts.wave import WaveGetRequest  # noqa: PLC0415
 
@@ -341,7 +393,17 @@ class WarehouseStateProvider:
 
         t0 = time.monotonic()
         try:
-            result = await self._wave_skill.execute(req, trace_id=trace_id)
+            coro = self._wave_skill.execute(req, trace_id=trace_id)
+            if deadline is not None:
+                remaining = deadline.remaining_seconds
+                try:
+                    result = await asyncio.wait_for(coro, timeout=remaining)
+                except asyncio.TimeoutError:
+                    raise RequestDeadlineExceeded(expired_by_ms=0.0)
+            else:
+                result = await coro
+        except RequestDeadlineExceeded:
+            raise
         except Exception as exc:
             raise StateAssemblyError("waves", str(exc), cause=exc) from exc
         latency_ms = (time.monotonic() - t0) * 1000

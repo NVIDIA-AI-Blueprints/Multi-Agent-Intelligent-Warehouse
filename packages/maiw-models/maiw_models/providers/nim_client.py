@@ -25,12 +25,17 @@ import json
 import asyncio
 import hashlib
 import math
-from typing import Dict, List, Optional, Any, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Any, Union
 from dataclasses import dataclass, asdict
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 import os
 from dotenv import load_dotenv
+
+if TYPE_CHECKING:
+    from maiw_mcp.deadline import RequestDeadline
+
+from maiw_mcp.deadline import RequestDeadlineExceeded
 
 load_dotenv()
 
@@ -359,6 +364,7 @@ class NIMClient:
         reasoning_budget: Optional[int] = None,
         enable_thinking: Optional[bool] = None,
         model_override: Optional[str] = None,
+        deadline: Optional["RequestDeadline"] = None,
     ) -> LLMResponse:
         """
         Generate response using NVIDIA NIM LLM with retry logic.
@@ -435,9 +441,24 @@ class NIMClient:
         last_exception = None
 
         for attempt in range(max_retries):
+            # ── Deadline budget check before this attempt ──────────────────────
+            attempt_timeout: Optional[float] = None
+            if deadline is not None:
+                try:
+                    attempt_timeout = deadline.effective_timeout(self.config.timeout)
+                except RequestDeadlineExceeded:
+                    logger.warning(
+                        "retry_suppressed_deadline: deadline expired before "
+                        "LLM attempt %d/%d", attempt + 1, max_retries,
+                    )
+                    raise
+
             try:
                 logger.info(f"LLM generation attempt {attempt + 1}/{max_retries}")
-                response = await self.llm_client.post("/chat/completions", json=payload)
+                post_kwargs: Dict[str, Any] = {"json": payload}
+                if attempt_timeout is not None:
+                    post_kwargs["timeout"] = attempt_timeout
+                response = await self.llm_client.post("/chat/completions", **post_kwargs)
                 response.raise_for_status()
 
                 data = response.json()
@@ -468,8 +489,16 @@ class NIMClient:
                     f"Temperature: {temperature}"
                 )
                 if attempt < max_retries - 1:
-                    # Wait before retry (exponential backoff)
                     wait_time = 2**attempt
+                    if deadline is not None:
+                        remaining = deadline.remaining_seconds
+                        if remaining <= wait_time:
+                            logger.warning(
+                                "retry_suppressed_deadline: %.3fs remaining < %ss "
+                                "backoff after timeout on attempt %d",
+                                remaining, wait_time, attempt + 1,
+                            )
+                            raise
                     logger.info(f"Retrying in {wait_time} seconds...")
                     await asyncio.sleep(wait_time)
                 else:
@@ -509,6 +538,17 @@ class NIMClient:
                     # Rate limit - retry with backoff
                     if attempt < max_retries - 1:
                         wait_time = 2**attempt
+                        if deadline is not None:
+                            remaining = deadline.remaining_seconds
+                            if remaining <= wait_time:
+                                logger.warning(
+                                    "retry_suppressed_deadline: %.3fs remaining < %ss "
+                                    "backoff after 429 on attempt %d",
+                                    remaining, wait_time, attempt + 1,
+                                )
+                                raise ConnectionError(
+                                    "LLM service is currently rate-limited. Please try again in a moment."
+                                ) from e
                         logger.info(f"Rate limited. Retrying in {wait_time} seconds...")
                         await asyncio.sleep(wait_time)
                     else:
@@ -526,6 +566,17 @@ class NIMClient:
                     # Server errors (5xx) - retry
                     if attempt < max_retries - 1:
                         wait_time = 2**attempt
+                        if deadline is not None:
+                            remaining = deadline.remaining_seconds
+                            if remaining <= wait_time:
+                                logger.warning(
+                                    "retry_suppressed_deadline: %.3fs remaining < %ss "
+                                    "backoff after HTTP %d on attempt %d",
+                                    remaining, wait_time, status_code, attempt + 1,
+                                )
+                                raise ConnectionError(
+                                    "LLM service is temporarily unavailable. Please try again later."
+                                ) from e
                         logger.info(f"Server error ({status_code}). Retrying in {wait_time} seconds...")
                         await asyncio.sleep(wait_time)
                     else:
@@ -537,8 +588,18 @@ class NIMClient:
                 last_exception = e
                 logger.warning(f"LLM generation attempt {attempt + 1} failed: Request error - {e}")
                 if attempt < max_retries - 1:
-                    # Wait before retry (exponential backoff)
                     wait_time = 2**attempt
+                    if deadline is not None:
+                        remaining = deadline.remaining_seconds
+                        if remaining <= wait_time:
+                            logger.warning(
+                                "retry_suppressed_deadline: %.3fs remaining < %ss "
+                                "backoff after request error on attempt %d",
+                                remaining, wait_time, attempt + 1,
+                            )
+                            raise ConnectionError(
+                                "Unable to connect to LLM service. Please check your network connection and service configuration."
+                            ) from e
                     logger.info(f"Retrying in {wait_time} seconds...")
                     await asyncio.sleep(wait_time)
                 else:
@@ -548,12 +609,24 @@ class NIMClient:
                     raise ConnectionError(
                         "Unable to connect to LLM service. Please check your network connection and service configuration."
                     ) from e
+            except RequestDeadlineExceeded:
+                raise  # must not be swallowed by the generic handler
             except Exception as e:
                 last_exception = e
                 logger.warning(f"LLM generation attempt {attempt + 1} failed: {e}")
                 if attempt < max_retries - 1:
-                    # Wait before retry (exponential backoff)
                     wait_time = 2**attempt
+                    if deadline is not None:
+                        remaining = deadline.remaining_seconds
+                        if remaining <= wait_time:
+                            logger.warning(
+                                "retry_suppressed_deadline: %.3fs remaining < %ss "
+                                "backoff after error on attempt %d",
+                                remaining, wait_time, attempt + 1,
+                            )
+                            raise ConnectionError(
+                                "LLM service error occurred. Please try again or contact support if the issue persists."
+                            ) from e
                     logger.info(f"Retrying in {wait_time} seconds...")
                     await asyncio.sleep(wait_time)
                 else:

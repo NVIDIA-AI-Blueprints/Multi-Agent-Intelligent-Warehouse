@@ -26,7 +26,9 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+from maiw_mcp.deadline import RequestDeadline  # noqa: F401 — needed for Pydantic resolution
 
 
 # ── Enumerations ──────────────────────────────────────────────────────────────
@@ -145,6 +147,8 @@ class ModelRequest(BaseModel):
     The gateway owns routing.
     """
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     task: str
     messages: list[dict[str, Any]]
     reasoning: ReasoningLevel = ReasoningLevel.MEDIUM
@@ -162,6 +166,9 @@ class ModelRequest(BaseModel):
     # in telemetry instead of generating its own, enabling end-to-end tracing
     # across State → Agent → Model → Proposal → Decision → Execution.
     trace_id: str | None = None
+    # Parent request deadline — bounds the entire model path including retries.
+    # None preserves legacy behaviour (NIMClient config.timeout applies per attempt).
+    deadline: RequestDeadline | None = Field(default=None, exclude=True)
 
 
 # ── Route Decision (embedded in response for observability) ───────────────────

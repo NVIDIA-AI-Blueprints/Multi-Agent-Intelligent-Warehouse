@@ -35,6 +35,8 @@ import logging
 import time
 from typing import Optional
 
+from maiw_mcp.deadline import RequestDeadlineExceeded
+
 from .errors import ModelGatewayError, ModelUnavailable
 from .models import ModelRequest, ModelResponse, ModelRouteDecision
 from .providers.nim import NIMProvider
@@ -78,6 +80,12 @@ class ModelGateway:
         start = time.monotonic()
 
         try:
+            # 0. Deadline guard — reject before any provider call (0 provider calls)
+            if request.deadline is not None and request.deadline.expired:
+                dl = request.deadline
+                expired_by_ms = (dl._clock() - dl.deadline_at) * 1000.0  # type: ignore[operator]
+                raise RequestDeadlineExceeded(expired_by_ms=expired_by_ms)
+
             # 1. Route
             decision = self._router.route(request)
 

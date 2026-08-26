@@ -42,6 +42,7 @@ from .errors import (
     CapabilityPermissionDenied,
     BackendUnavailable,
 )
+from .deadline import RequestDeadline, RequestDeadlineExceeded
 
 __all__ = [
     "MAIWMCPError",
@@ -52,4 +53,6 @@ __all__ = [
     "CapabilityNotFound",
     "CapabilityPermissionDenied",
     "BackendUnavailable",
+    "RequestDeadline",
+    "RequestDeadlineExceeded",
 ]
