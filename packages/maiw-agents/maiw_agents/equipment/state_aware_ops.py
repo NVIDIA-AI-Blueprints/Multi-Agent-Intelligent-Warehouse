@@ -340,16 +340,16 @@ async def _execute_action(
     Captures all errors and maps them to status="error".
     """
     try:
-        exec_result = await action_executor.execute(proposal, decision)
+        exec_result = await action_executor.execute(proposal, decision, trace_id=trace_id)
         return {
-            "status": "executed",
+            "status": exec_result.outcome.value,
             "action": proposal.action,
             "proposal_id": proposal.proposal_id,
             "decision_id": decision.result_id,
             "execution_id": exec_result.execution_id,
             "success": exec_result.success,
             "reason": "approved and executed",
-            "executed": True,
+            "executed": exec_result.executed,
             "snapshot_id": snapshot_id,
             "trace_id": trace_id,
             "violations": [],

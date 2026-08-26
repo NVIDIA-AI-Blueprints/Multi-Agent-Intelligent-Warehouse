@@ -139,6 +139,7 @@ class LaborAllocateRequest(BaseModel):
     notes: str | None = None
     proposal_id: str = Field(..., description="Bound ActionProposal.proposal_id")
     decision_id: str = Field(..., description="Bound DecisionResult.result_id")
+    execution_id: str | None = Field(default=None, description="MAIW execution identity, propagated from BaseActionExecutor")
 
 
 class LaborAllocateResult(BaseModel):
@@ -150,6 +151,8 @@ class LaborAllocateResult(BaseModel):
     worker_ids: list[str]
     proposal_id: str
     decision_id: str
+    execution_id: str | None = None
+    outcome: str = "executed"
     source: str = "mock"
     message: str = ""
 

@@ -11,6 +11,7 @@ from maiw_decision.models import DecisionResult
 from maiw_mcp.contracts.actions import ActionProposal
 
 from .base import ActionConflict, ActionUnsupported, BaseActionExecutor
+from .outcome import ExecutionOutcome
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,8 @@ class EquipmentActionExecutor(BaseActionExecutor):
         warehouse.equipment.assign               → assign_skill
         warehouse.equipment.release              → release_skill
         warehouse.equipment.schedule_maintenance → maintenance_skill
+
+    Outcome mapping: reads the ``outcome`` field on the provider result.
     """
 
     _ALLOWED_ACTIONS: frozenset[str] = frozenset({
@@ -43,8 +46,9 @@ class EquipmentActionExecutor(BaseActionExecutor):
         maintenance_skill: Optional[Any] = None,
         state_provider: Optional[Any] = None,
         max_decision_age_seconds: int = 300,
+        **kwargs: Any,
     ) -> None:
-        super().__init__(max_decision_age_seconds=max_decision_age_seconds)
+        super().__init__(max_decision_age_seconds=max_decision_age_seconds, **kwargs)
         self._assign_skill = assign_skill
         self._release_skill = release_skill
         self._maintenance_skill = maintenance_skill
@@ -80,18 +84,22 @@ class EquipmentActionExecutor(BaseActionExecutor):
         self,
         proposal: ActionProposal,
         decision: DecisionResult,
-    ) -> tuple[dict[str, Any], str | None]:
+        execution_id: str,
+    ) -> tuple[dict[str, Any], str | None, ExecutionOutcome]:
         if proposal.action == "warehouse.equipment.assign":
-            resp = await self._do_assign(proposal, decision)
+            resp = await self._do_assign(proposal, decision, execution_id)
         elif proposal.action == "warehouse.equipment.release":
-            resp = await self._do_release(proposal, decision)
+            resp = await self._do_release(proposal, decision, execution_id)
         else:
-            resp = await self._do_maintenance(proposal, decision)
+            resp = await self._do_maintenance(proposal, decision, execution_id)
+
+        outcome_str = resp.get("outcome", "")
+        outcome = _map_outcome(outcome_str, bool(resp.get("success", True)))
         provider_ref = str(resp.get("assignment_id") or resp.get("maintenance_id") or "") or None
-        return resp, provider_ref
+        return resp, provider_ref, outcome
 
     async def _do_assign(
-        self, proposal: ActionProposal, decision: DecisionResult
+        self, proposal: ActionProposal, decision: DecisionResult, execution_id: str
     ) -> dict[str, Any]:
         if self._assign_skill is None:
             raise ActionUnsupported("No assign_skill configured on EquipmentActionExecutor")
@@ -106,12 +114,13 @@ class EquipmentActionExecutor(BaseActionExecutor):
             notes=proposal.parameters.get("notes"),
             proposal_id=proposal.proposal_id,
             decision_id=decision.result_id,
+            execution_id=execution_id,
         )
         result = await self._assign_skill.execute(req)
         return result.model_dump()
 
     async def _do_release(
-        self, proposal: ActionProposal, decision: DecisionResult
+        self, proposal: ActionProposal, decision: DecisionResult, execution_id: str
     ) -> dict[str, Any]:
         if self._release_skill is None:
             raise ActionUnsupported("No release_skill configured on EquipmentActionExecutor")
@@ -123,12 +132,13 @@ class EquipmentActionExecutor(BaseActionExecutor):
             notes=proposal.parameters.get("notes"),
             proposal_id=proposal.proposal_id,
             decision_id=decision.result_id,
+            execution_id=execution_id,
         )
         result = await self._release_skill.execute(req)
         return result.model_dump()
 
     async def _do_maintenance(
-        self, proposal: ActionProposal, decision: DecisionResult
+        self, proposal: ActionProposal, decision: DecisionResult, execution_id: str
     ) -> dict[str, Any]:
         if self._maintenance_skill is None:
             raise ActionUnsupported("No maintenance_skill configured on EquipmentActionExecutor")
@@ -144,6 +154,21 @@ class EquipmentActionExecutor(BaseActionExecutor):
             priority=proposal.parameters.get("priority", "medium"),
             proposal_id=proposal.proposal_id,
             decision_id=decision.result_id,
+            execution_id=execution_id,
         )
         result = await self._maintenance_skill.execute(req)
         return result.model_dump()
+
+
+def _map_outcome(outcome_str: str, success: bool) -> ExecutionOutcome:
+    _MAP = {
+        "executed": ExecutionOutcome.EXECUTED,
+        "no_op": ExecutionOutcome.NO_OP,
+        "deferred": ExecutionOutcome.DEFERRED,
+        "conflict": ExecutionOutcome.CONFLICT,
+        "failed": ExecutionOutcome.FAILED,
+        "unknown": ExecutionOutcome.UNKNOWN,
+    }
+    if outcome_str in _MAP:
+        return _MAP[outcome_str]
+    return ExecutionOutcome.EXECUTED if success else ExecutionOutcome.FAILED

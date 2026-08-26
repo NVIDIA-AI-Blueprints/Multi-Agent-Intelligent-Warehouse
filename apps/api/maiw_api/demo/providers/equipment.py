@@ -3,9 +3,23 @@
 """
 SimulationEquipmentProvider — implements EquipmentProvider against DemoWarehouseWorld.
 
-All five methods (2 reads + 3 writes) are backed by the shared world.
-Write methods (assign, release, schedule_maintenance) mutate world state and
-publish a ScenarioEvent so the activity feed updates in real time.
+Phase 10E Batch 1: canonical outcome semantics, execution_id propagation,
+mutation counter for reliability testing, and fault injection support.
+
+Write outcome semantics
+-----------------------
+assign:
+    NO_OP    — asset already assigned to the same assignee + task
+    CONFLICT — asset assigned to a different task (cannot silently overwrite)
+    EXECUTED — mutation committed
+
+release:
+    NO_OP    — asset already available
+    EXECUTED — mutation committed
+
+schedule_maintenance:
+    NO_OP    — asset already in maintenance
+    EXECUTED — mutation committed
 """
 
 from __future__ import annotations
@@ -37,7 +51,6 @@ if TYPE_CHECKING:
 
 
 def _asset_to_info(asset: "DemoWarehouseWorld") -> EquipmentAssetInfo:  # type: ignore[name-defined]
-    """Translate a world EquipmentAsset into the contract EquipmentAssetInfo."""
     from maiw_api.demo.world import EquipmentAsset
     a: EquipmentAsset = asset  # type: ignore[assignment]
     return EquipmentAssetInfo(
@@ -58,34 +71,18 @@ def _asset_to_info(asset: "DemoWarehouseWorld") -> EquipmentAssetInfo:  # type: 
 
 
 def _synthetic_telemetry(asset_id: str, hours_back: int) -> list[TelemetryPoint]:
-    """Generate plausible telemetry points for a simulation asset."""
     import random
     rng = random.Random(hash(asset_id) & 0xFFFFFFFF)
     now = datetime.now(tz=timezone.utc)
     points: list[TelemetryPoint] = []
     for h in range(min(hours_back, 24), 0, -1):
         ts = now - timedelta(hours=h)
-        points.append(TelemetryPoint(
-            timestamp=ts,
-            metric="battery_pct",
-            value=round(rng.uniform(20.0, 100.0), 1),
-            unit="%",
-            quality_score=0.98,
-        ))
-        points.append(TelemetryPoint(
-            timestamp=ts,
-            metric="speed_mps",
-            value=round(rng.uniform(0.0, 1.5), 2),
-            unit="m/s",
-            quality_score=0.97,
-        ))
-        points.append(TelemetryPoint(
-            timestamp=ts,
-            metric="load_kg",
-            value=round(rng.uniform(0.0, 500.0), 1),
-            unit="kg",
-            quality_score=0.95,
-        ))
+        points.append(TelemetryPoint(timestamp=ts, metric="battery_pct",
+            value=round(rng.uniform(20.0, 100.0), 1), unit="%", quality_score=0.98))
+        points.append(TelemetryPoint(timestamp=ts, metric="speed_mps",
+            value=round(rng.uniform(0.0, 1.5), 2), unit="m/s", quality_score=0.97))
+        points.append(TelemetryPoint(timestamp=ts, metric="load_kg",
+            value=round(rng.uniform(0.0, 500.0), 1), unit="kg", quality_score=0.95))
     return points
 
 
@@ -96,6 +93,11 @@ class SimulationEquipmentProvider:
         self._world = world
         self._bus = bus
         self._assignment_counter = 1000
+        # Reliability testing instrumentation (not production business fields)
+        self._mutation_count: int = 0
+        self._post_mutation_fault: Exception | None = None
+
+    # ── Read methods ────────────────────────────────────────────────────────────
 
     async def get_equipment_status(
         self, request: EquipmentStatusRequest
@@ -118,10 +120,8 @@ class SimulationEquipmentProvider:
                 summary[a.equipment_type].get(a.status, 0) + 1
             )
         return EquipmentStatusResult(
-            equipment=infos,
-            summary=summary,
-            total_count=len(infos),
-            source=self._world.SOURCE,
+            equipment=infos, summary=summary,
+            total_count=len(infos), source=self._world.SOURCE,
         )
 
     async def get_equipment_telemetry(
@@ -137,13 +137,12 @@ class SimulationEquipmentProvider:
         metrics: dict[str, str] = {p.metric: p.unit for p in points}
         available = [AvailableMetric(metric=m, unit=u) for m, u in metrics.items()]
         return EquipmentTelemetryResult(
-            asset_id=request.asset_id,
-            telemetry_data=points,
-            available_metrics=available,
-            hours_back=request.hours_back,
-            data_points=len(points),
-            source=self._world.SOURCE,
+            asset_id=request.asset_id, telemetry_data=points,
+            available_metrics=available, hours_back=request.hours_back,
+            data_points=len(points), source=self._world.SOURCE,
         )
+
+    # ── Write methods ───────────────────────────────────────────────────────────
 
     async def execute_equipment_assignment(
         self, request: EquipmentExecuteAssignRequest
@@ -153,7 +152,38 @@ class SimulationEquipmentProvider:
             raise BackendUnavailable(
                 f"Asset '{request.asset_id}' not found in simulation world"
             )
-        # Mutate world state
+
+        current_task = asset.metadata.get("current_task_id")
+
+        # NO_OP: exact desired state already exists
+        if (asset.status == "assigned"
+                and asset.owner_user == request.assignee
+                and current_task == request.task_id):
+            return EquipmentExecuteAssignResult(
+                assignment_id=None,
+                success=True,
+                proposal_id=request.proposal_id,
+                decision_id=request.decision_id,
+                execution_id=request.execution_id,
+                outcome="no_op",
+                source=self._world.SOURCE,
+                message=f"[SIM] NO_OP: {request.asset_id} already assigned to {request.assignee}/{request.task_id}",
+            )
+
+        # CONFLICT: asset is assigned to a DIFFERENT task
+        if asset.status == "assigned" and current_task and current_task != request.task_id:
+            return EquipmentExecuteAssignResult(
+                assignment_id=None,
+                success=False,
+                proposal_id=request.proposal_id,
+                decision_id=request.decision_id,
+                execution_id=request.execution_id,
+                outcome="conflict",
+                source=self._world.SOURCE,
+                message=f"[SIM] CONFLICT: {request.asset_id} already assigned to task {current_task}; requested {request.task_id}",
+            )
+
+        # ── MUTATION ────────────────────────────────────────────────────────────
         asset.status = "assigned"
         asset.owner_user = request.assignee
         if request.task_id:
@@ -161,6 +191,7 @@ class SimulationEquipmentProvider:
 
         self._assignment_counter += 1
         assignment_id = self._assignment_counter
+        self._mutation_count += 1
 
         import asyncio
         asyncio.create_task(self._bus.publish_equipment_write(
@@ -169,11 +200,19 @@ class SimulationEquipmentProvider:
             detail=f"→ {request.assignee}",
         ))
 
+        # Fault injection: raise AFTER mutation to simulate ambiguous write
+        if self._post_mutation_fault is not None:
+            fault = self._post_mutation_fault
+            self._post_mutation_fault = None
+            raise fault
+
         return EquipmentExecuteAssignResult(
             assignment_id=assignment_id,
             success=True,
             proposal_id=request.proposal_id,
             decision_id=request.decision_id,
+            execution_id=request.execution_id,
+            outcome="executed",
             source=self._world.SOURCE,
             message=f"[SIM] Assigned {request.asset_id} to {request.assignee}",
         )
@@ -186,10 +225,25 @@ class SimulationEquipmentProvider:
             raise BackendUnavailable(
                 f"Asset '{request.asset_id}' not found in simulation world"
             )
+
+        # NO_OP: already available
+        if asset.status == "available" and asset.owner_user is None:
+            return EquipmentExecuteReleaseResult(
+                success=True,
+                proposal_id=request.proposal_id,
+                decision_id=request.decision_id,
+                execution_id=request.execution_id,
+                outcome="no_op",
+                source=self._world.SOURCE,
+                message=f"[SIM] NO_OP: {request.asset_id} already available",
+            )
+
+        # ── MUTATION ────────────────────────────────────────────────────────────
         prev_owner = asset.owner_user
         asset.status = "available"
         asset.owner_user = None
         asset.metadata.pop("current_task_id", None)
+        self._mutation_count += 1
 
         import asyncio
         asyncio.create_task(self._bus.publish_equipment_write(
@@ -198,10 +252,17 @@ class SimulationEquipmentProvider:
             detail=f"released by {request.released_by} (was: {prev_owner})",
         ))
 
+        if self._post_mutation_fault is not None:
+            fault = self._post_mutation_fault
+            self._post_mutation_fault = None
+            raise fault
+
         return EquipmentExecuteReleaseResult(
             success=True,
             proposal_id=request.proposal_id,
             decision_id=request.decision_id,
+            execution_id=request.execution_id,
+            outcome="executed",
             source=self._world.SOURCE,
             message=f"[SIM] Released {request.asset_id}",
         )
@@ -214,11 +275,27 @@ class SimulationEquipmentProvider:
             raise BackendUnavailable(
                 f"Asset '{request.asset_id}' not found in simulation world"
             )
+
+        # NO_OP: already in maintenance
+        if asset.status == "maintenance":
+            return EquipmentExecuteMaintenanceResult(
+                maintenance_id=None,
+                success=True,
+                proposal_id=request.proposal_id,
+                decision_id=request.decision_id,
+                execution_id=request.execution_id,
+                outcome="no_op",
+                source=self._world.SOURCE,
+                message=f"[SIM] NO_OP: {request.asset_id} already in maintenance",
+            )
+
+        # ── MUTATION ────────────────────────────────────────────────────────────
         asset.status = "maintenance"
         try:
             asset.next_pm_due = datetime.fromisoformat(request.scheduled_for)
         except ValueError:
             pass
+        self._mutation_count += 1
 
         import asyncio
         asyncio.create_task(self._bus.publish_equipment_write(
@@ -227,11 +304,18 @@ class SimulationEquipmentProvider:
             detail=f"{request.maintenance_type} scheduled by {request.scheduled_by}",
         ))
 
+        if self._post_mutation_fault is not None:
+            fault = self._post_mutation_fault
+            self._post_mutation_fault = None
+            raise fault
+
         return EquipmentExecuteMaintenanceResult(
             maintenance_id=int(uuid.uuid4().int % 100000),
             success=True,
             proposal_id=request.proposal_id,
             decision_id=request.decision_id,
+            execution_id=request.execution_id,
+            outcome="executed",
             source=self._world.SOURCE,
             message=f"[SIM] Scheduled {request.maintenance_type} for {request.asset_id}",
         )

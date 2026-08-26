@@ -11,6 +11,7 @@ from maiw_decision.models import DecisionResult
 from maiw_mcp.contracts.actions import ActionProposal
 
 from .base import BaseActionExecutor
+from .outcome import ExecutionOutcome
 
 logger = logging.getLogger(__name__)
 
@@ -32,15 +33,17 @@ class WaveActionExecutor(BaseActionExecutor):
         *,
         reprioritize_skill: Any,
         max_decision_age_seconds: int = 300,
+        **kwargs: Any,
     ) -> None:
-        super().__init__(max_decision_age_seconds=max_decision_age_seconds)
+        super().__init__(max_decision_age_seconds=max_decision_age_seconds, **kwargs)
         self._reprioritize_skill = reprioritize_skill
 
     async def _do_execute(
         self,
         proposal: ActionProposal,
         decision: DecisionResult,
-    ) -> tuple[dict[str, Any], str | None]:
+        execution_id: str,
+    ) -> tuple[dict[str, Any], str | None, ExecutionOutcome]:
         from maiw_mcp.contracts.wave import WaveReprioritizeRequest
 
         params = proposal.parameters
@@ -52,6 +55,21 @@ class WaveActionExecutor(BaseActionExecutor):
             reason=proposal.reason,
             proposal_id=proposal.proposal_id,
             decision_id=decision.result_id,
+            execution_id=execution_id,
         )
         result = await self._reprioritize_skill.execute(req)
-        return result.model_dump(), None
+        resp = result.model_dump()
+
+        outcome_str = resp.get("outcome", "")
+        if outcome_str == "no_op":
+            outcome = ExecutionOutcome.NO_OP
+        elif outcome_str == "failed":
+            outcome = ExecutionOutcome.FAILED
+        elif outcome_str == "conflict":
+            outcome = ExecutionOutcome.CONFLICT
+        elif outcome_str == "deferred":
+            outcome = ExecutionOutcome.DEFERRED
+        else:
+            outcome = ExecutionOutcome.EXECUTED if result.success else ExecutionOutcome.FAILED
+
+        return resp, None, outcome

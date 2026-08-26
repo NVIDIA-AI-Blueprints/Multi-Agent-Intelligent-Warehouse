@@ -91,10 +91,9 @@ async def propose_labor_allocation(
 
     if result.outcome == DecisionOutcome.APPROVED and action_executor is not None:
         try:
-            exec_result = await action_executor.execute(proposal, result)
-            exec_result.trace_id = trace_id
+            exec_result = await action_executor.execute(proposal, result, trace_id=trace_id)
             return {
-                "status": "approved",
+                "status": exec_result.outcome.value if exec_result.outcome.value != "executed" else "approved",
                 "action": "warehouse.labor.allocate",
                 "proposal_id": proposal.proposal_id,
                 "decision_id": result.result_id,
@@ -175,10 +174,9 @@ async def propose_wave_reprioritization(
 
     if result.outcome == DecisionOutcome.APPROVED and action_executor is not None:
         try:
-            exec_result = await action_executor.execute(proposal, result)
-            exec_result.trace_id = trace_id
+            exec_result = await action_executor.execute(proposal, result, trace_id=trace_id)
             return {
-                "status": "approved",
+                "status": exec_result.outcome.value if exec_result.outcome.value != "executed" else "approved",
                 "action": "warehouse.wave.reprioritize",
                 "proposal_id": proposal.proposal_id,
                 "decision_id": result.result_id,

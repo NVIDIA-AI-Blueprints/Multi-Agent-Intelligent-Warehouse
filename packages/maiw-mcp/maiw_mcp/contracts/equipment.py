@@ -116,6 +116,7 @@ class EquipmentExecuteAssignRequest(BaseModel):
     notes: str | None = Field(default=None)
     proposal_id: str = Field(..., description="Bound proposal identifier for audit")
     decision_id: str = Field(..., description="Bound decision identifier for audit")
+    execution_id: str | None = Field(default=None, description="MAIW execution identity, propagated from BaseActionExecutor")
 
 
 class EquipmentExecuteReleaseRequest(BaseModel):
@@ -126,6 +127,7 @@ class EquipmentExecuteReleaseRequest(BaseModel):
     notes: str | None = Field(default=None)
     proposal_id: str = Field(...)
     decision_id: str = Field(...)
+    execution_id: str | None = Field(default=None, description="MAIW execution identity")
 
 
 class EquipmentExecuteMaintenanceRequest(BaseModel):
@@ -140,6 +142,7 @@ class EquipmentExecuteMaintenanceRequest(BaseModel):
     priority: str = Field(default="medium")
     proposal_id: str = Field(...)
     decision_id: str = Field(...)
+    execution_id: str | None = Field(default=None, description="MAIW execution identity")
 
 
 # ── Result fragments ───────────────────────────────────────────────────────────
@@ -230,6 +233,8 @@ class EquipmentExecuteAssignResult(BaseModel):
     success: bool
     proposal_id: str
     decision_id: str
+    execution_id: str | None = None
+    outcome: str = "executed"
     source: str
     message: str | None = None
 
@@ -240,6 +245,8 @@ class EquipmentExecuteReleaseResult(BaseModel):
     success: bool
     proposal_id: str
     decision_id: str
+    execution_id: str | None = None
+    outcome: str = "executed"
     source: str
     message: str | None = None
 
@@ -251,6 +258,8 @@ class EquipmentExecuteMaintenanceResult(BaseModel):
     success: bool
     proposal_id: str
     decision_id: str
+    execution_id: str | None = None
+    outcome: str = "executed"
     source: str
     message: str | None = None
 

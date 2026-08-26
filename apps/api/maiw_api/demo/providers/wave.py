@@ -3,8 +3,15 @@
 """
 SimulationWaveProvider — implements WaveProvider against DemoWarehouseWorld.
 
-Wave state is modelled as TaskState records with PICK/PACK/SHIP/RECEIVE types.
-Write: execute_wave_reprioritize mutates priority on matching tasks in the world.
+Phase 10E Batch 1: canonical outcome semantics, execution_id propagation,
+mutation counter, and fault injection support.
+
+Write outcome semantics
+-----------------------
+reprioritize:
+    FAILED   — no tasks found for the requested zone/wave (raises BackendUnavailable)
+    NO_OP    — all matching tasks already have the requested priority
+    EXECUTED — mutation committed (at least one task priority changed)
 """
 
 from __future__ import annotations
@@ -21,6 +28,7 @@ from maiw_mcp.contracts.wave import (
     WaveRiskResult,
     WaveTaskInfo,
 )
+from maiw_mcp.errors import BackendUnavailable
 
 if TYPE_CHECKING:
     from maiw_api.demo.events import ScenarioEventBus
@@ -35,6 +43,9 @@ class SimulationWaveProvider:
     def __init__(self, world: "DemoWarehouseWorld", bus: "ScenarioEventBus") -> None:
         self._world = world
         self._bus = bus
+        # Reliability testing instrumentation
+        self._mutation_count: int = 0
+        self._post_mutation_fault: Exception | None = None
 
     def _wave_tasks(
         self,
@@ -43,17 +54,13 @@ class SimulationWaveProvider:
         task_type: str | None = None,
     ) -> list:
         tasks = self._world.tasks_list(
-            zone=zone,
-            status_filter=status_filter,
-            task_type=task_type,
+            zone=zone, status_filter=status_filter, task_type=task_type,
         )
-        # Filter to wave-relevant task types
         return [t for t in tasks if t.task_type in _WAVE_TYPES]
 
     async def get_wave(self, request: WaveGetRequest) -> WaveGetResult:
         tasks = self._wave_tasks(
-            zone=request.zone,
-            status_filter=request.status_filter,
+            zone=request.zone, status_filter=request.status_filter,
             task_type=request.task_type,
         )
         zones_active = list({t.zone for t in tasks if t.zone})
@@ -63,21 +70,14 @@ class SimulationWaveProvider:
         return WaveGetResult(
             tasks=[
                 WaveTaskInfo(
-                    task_id=t.task_id,
-                    task_type=t.task_type,
-                    zone=t.zone,
-                    status=t.status,
-                    assigned_to=t.assigned_to,
-                    priority=t.priority,
-                    deadline=t.deadline,
+                    task_id=t.task_id, task_type=t.task_type, zone=t.zone,
+                    status=t.status, assigned_to=t.assigned_to,
+                    priority=t.priority, deadline=t.deadline,
                 )
                 for t in tasks
             ],
-            total_tasks=len(tasks),
-            zones_active=zones_active,
-            summary=summary,
-            wave_id=request.wave_id,
-            source=self._world.SOURCE,
+            total_tasks=len(tasks), zones_active=zones_active,
+            summary=summary, wave_id=request.wave_id, source=self._world.SOURCE,
         )
 
     async def get_wave_risk(self, request: WaveRiskRequest) -> WaveRiskResult:
@@ -95,14 +95,12 @@ class SimulationWaveProvider:
             ))
         if has_deadline:
             risk_factors.append(WaveRiskFactor(
-                factor="deadline_approaching",
-                severity="high",
+                factor="deadline_approaching", severity="high",
                 detail=f"Task(s) have carrier cutoff deadline within {request.cutoff_minutes}min",
             ))
         if overdue:
             risk_factors.append(WaveRiskFactor(
-                factor="high_priority_unassigned",
-                severity="critical",
+                factor="high_priority_unassigned", severity="critical",
                 detail=f"{len(overdue)} high/critical priority task(s) unassigned",
             ))
 
@@ -125,37 +123,69 @@ class SimulationWaveProvider:
                 "additional worker(s) to reduce OTIF risk."
             )
         return WaveRiskResult(
-            otif_at_risk=otif_at_risk,
-            risk_level=risk_level,
-            at_risk_task_count=len(at_risk),
-            total_task_count=len(tasks),
-            risk_factors=risk_factors,
-            recommendation=recommendation,
-            wave_id=request.wave_id,
-            source=self._world.SOURCE,
+            otif_at_risk=otif_at_risk, risk_level=risk_level,
+            at_risk_task_count=len(at_risk), total_task_count=len(tasks),
+            risk_factors=risk_factors, recommendation=recommendation,
+            wave_id=request.wave_id, source=self._world.SOURCE,
         )
 
     async def execute_wave_reprioritize(
         self, request: WaveReprioritizeRequest
     ) -> WaveReprioritizeResult:
         tasks = self._wave_tasks(zone=request.zone)
+
+        # FAILED: no tasks to reprioritize
+        if not tasks:
+            raise BackendUnavailable(
+                f"No wave tasks found for zone={request.zone!r} wave_id={request.wave_id!r}"
+            )
+
+        # NO_OP: all tasks already have the requested priority
+        already_correct = [t for t in tasks if t.priority == request.new_priority]
+        if len(already_correct) == len(tasks):
+            return WaveReprioritizeResult(
+                success=True,
+                tasks_updated=0,
+                wave_id=request.wave_id,
+                new_priority=request.new_priority,
+                proposal_id=request.proposal_id,
+                decision_id=request.decision_id,
+                execution_id=request.execution_id,
+                outcome="no_op",
+                source=self._world.SOURCE,
+                message=f"[SIM] NO_OP: all {len(tasks)} task(s) already at priority '{request.new_priority}'",
+            )
+
+        # ── MUTATION ────────────────────────────────────────────────────────────
+        changed = 0
         for t in tasks:
-            t.priority = request.new_priority
+            if t.priority != request.new_priority:
+                t.priority = request.new_priority
+                changed += 1
+        self._mutation_count += 1
 
         import asyncio
         asyncio.create_task(self._bus.publish_wave_write(
             zone=request.zone,
             new_priority=request.new_priority,
-            tasks_updated=len(tasks),
+            tasks_updated=changed,
         ))
+
+        # Fault injection: raise AFTER mutation to simulate ambiguous write
+        if self._post_mutation_fault is not None:
+            fault = self._post_mutation_fault
+            self._post_mutation_fault = None
+            raise fault
 
         return WaveReprioritizeResult(
             success=True,
-            tasks_updated=len(tasks),
+            tasks_updated=changed,
             wave_id=request.wave_id,
             new_priority=request.new_priority,
             proposal_id=request.proposal_id,
             decision_id=request.decision_id,
+            execution_id=request.execution_id,
+            outcome="executed",
             source=self._world.SOURCE,
-            message=f"[SIM] Reprioritized {len(tasks)} task(s) to '{request.new_priority}'",
+            message=f"[SIM] Reprioritized {changed} task(s) to '{request.new_priority}'",
         )
