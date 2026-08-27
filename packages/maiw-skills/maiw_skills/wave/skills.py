@@ -183,7 +183,9 @@ async def get_propose_wave_reprioritization_skill() -> ProposeWaveReprioritizati
     global _propose_wave_reprioritization_skill
     if _propose_wave_reprioritization_skill is None:
         _propose_wave_reprioritization_skill = ProposeWaveReprioritizationSkill()
-        logger.info("ProposeWaveReprioritizationSkill initialised (local proposal builder, no MCP)")
+        logger.info(
+            "ProposeWaveReprioritizationSkill initialised (local proposal builder, no MCP)"
+        )
     return _propose_wave_reprioritization_skill
 
 

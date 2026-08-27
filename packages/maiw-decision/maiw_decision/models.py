@@ -32,7 +32,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from maiw_mcp.contracts.actions import ActionProposal
 from maiw_state.warehouse import WarehouseStateSnapshot
@@ -120,6 +120,30 @@ class DecisionResult(BaseModel):
     trace_id: str | None = None
 
 
+class ApprovalState(str, Enum):
+    """
+    Explicit state machine for approval lifecycle.
+
+    PENDING  — queued, awaiting human decision
+    APPROVED — human confirmed; authority granted for one execution
+    REJECTED — human declined; no execution allowed
+    EXPIRED  — TTL elapsed before decision or execution
+    CONSUMED — authority was exercised; single-use guarantee enforced
+    """
+
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    EXPIRED = "expired"
+    CONSUMED = "consumed"
+
+
+class AuthorityType(str, Enum):
+    HUMAN = "human"
+    POLICY = "policy"
+    SYSTEM = "system"
+
+
 class ApprovalRecord(BaseModel):
     """
     Evidence that a human authority has reviewed and approved (or rejected)
@@ -128,18 +152,48 @@ class ApprovalRecord(BaseModel):
     An ApprovalRecord is the only legitimate way to advance a proposal from
     REQUIRES_HUMAN_APPROVAL to APPROVED execution. Hard constraints (stale
     state, rejected outcomes, missing assets) cannot be overridden by approval.
+
+    Phase 10E Batch 2: explicit state machine, warehouse_id binding,
+    authority_type classification, single-use guarantee via CONSUMED state.
+
+    SINGLE-PROCESS SAFETY: InMemoryApprovalStore mutates state in place.
+    Multi-replica approval state is out of scope for Phase 10E.
     """
+
+    model_config = ConfigDict(frozen=False)
 
     approval_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     proposal_id: str = Field(description="The ActionProposal this approval covers")
-    decision_id: str = Field(description="The DecisionResult that returned REQUIRES_HUMAN_APPROVAL")
-    trace_id: str | None = Field(default=None, description="Trace context for SSE linkage")
-    approved: bool = Field(description="True = approved; False = rejected")
-    approved_by: str = Field(description="Identity of the approving authority")
-    approved_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    expires_at: datetime | None = Field(default=None, description="Optional expiration; None = no expiry")
+    decision_id: str = Field(
+        description="The DecisionResult that returned REQUIRES_HUMAN_APPROVAL"
+    )
+    warehouse_id: str | None = Field(
+        default=None, description="Warehouse scope; None = unbound"
+    )
+    trace_id: str | None = Field(
+        default=None, description="Trace context for SSE linkage"
+    )
+    authority_type: AuthorityType = Field(default=AuthorityType.HUMAN)
+    state: ApprovalState = Field(default=ApprovalState.PENDING)
+    approved_by: str | None = Field(
+        default=None, description="Identity set by approve() or reject()"
+    )
+    approved_at: datetime | None = Field(
+        default=None, description="Set when state transitions from PENDING"
+    )
+    expires_at: datetime | None = Field(
+        default=None, description="None = no expiry; store sets default"
+    )
+
+    @computed_field
+    @property
+    def approved(self) -> bool:
+        """Backward-compat: True only when state is APPROVED (not CONSUMED)."""
+        return self.state == ApprovalState.APPROVED
 
     def is_expired(self) -> bool:
+        if self.state == ApprovalState.EXPIRED:
+            return True
         if self.expires_at is None:
             return False
         return datetime.now(timezone.utc) >= self.expires_at

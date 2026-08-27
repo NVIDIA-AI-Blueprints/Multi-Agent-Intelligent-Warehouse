@@ -108,7 +108,9 @@ class OperationsCoordinationAgent:
 
     async def initialize(self) -> None:
         """No-op: all dependencies are injected at construction time."""
-        logger.info("OperationsCoordinationAgent.initialize() called — all deps pre-injected.")
+        logger.info(
+            "OperationsCoordinationAgent.initialize() called — all deps pre-injected."
+        )
 
     async def process_query(
         self,
@@ -175,7 +177,9 @@ class OperationsCoordinationAgent:
                 "observed_at": result.observed_at.isoformat(),
             }
         except Exception as exc:
-            logger.warning("OperationsAgent: inventory skill call failed for SKU=%s: %s", sku, exc)
+            logger.warning(
+                "OperationsAgent: inventory skill call failed for SKU=%s: %s", sku, exc
+            )
             return None
 
     async def _get_equipment_status(
@@ -216,7 +220,9 @@ class OperationsCoordinationAgent:
                 "total_count": result.total_count,
             }
         except Exception as exc:
-            logger.warning("OperationsAgent: equipment status skill call failed: %s", exc)
+            logger.warning(
+                "OperationsAgent: equipment status skill call failed: %s", exc
+            )
             return None
 
     async def _get_equipment_telemetry(
@@ -253,12 +259,15 @@ class OperationsCoordinationAgent:
                     for p in result.telemetry_data
                 ],
                 "available_metrics": [
-                    {"metric": m.metric, "unit": m.unit} for m in result.available_metrics
+                    {"metric": m.metric, "unit": m.unit}
+                    for m in result.available_metrics
                 ],
             }
         except Exception as exc:
             logger.warning(
-                "OperationsAgent: equipment telemetry skill call failed for %s: %s", asset_id, exc
+                "OperationsAgent: equipment telemetry skill call failed for %s: %s",
+                asset_id,
+                exc,
             )
             return None
 
@@ -266,7 +275,9 @@ class OperationsCoordinationAgent:
         self, query: str, session_id: str, context: Optional[Dict[str, Any]]
     ) -> OperationsQuery:
         try:
-            conversation_history = self.conversation_context.get(session_id, {}).get("history", [])
+            conversation_history = self.conversation_context.get(session_id, {}).get(
+                "history", []
+            )
             context_str = self._build_context_string(conversation_history, context)
 
             safe_query = sanitize_prompt_input(query)
@@ -274,7 +285,9 @@ class OperationsCoordinationAgent:
 
             understanding_prompt_template = self.config.persona.understanding_prompt
             system_prompt = self.config.persona.system_prompt
-            prompt = understanding_prompt_template.format(query=safe_query, context=safe_context)
+            prompt = understanding_prompt_template.format(
+                query=safe_query, context=safe_context
+            )
 
             messages = [
                 {"role": "system", "content": system_prompt},
@@ -283,13 +296,15 @@ class OperationsCoordinationAgent:
 
             from maiw_models import ModelRequest, ReasoningLevel, RiskLevel
 
-            gw_resp = await self.model_gateway.generate(ModelRequest(
-                task="warehouse.operations.understand_query",
-                messages=messages,
-                reasoning=ReasoningLevel.LOW,
-                risk_level=RiskLevel.LOW,
-                temperature=0.1,
-            ))
+            gw_resp = await self.model_gateway.generate(
+                ModelRequest(
+                    task="warehouse.operations.understand_query",
+                    messages=messages,
+                    reasoning=ReasoningLevel.LOW,
+                    risk_level=RiskLevel.LOW,
+                    temperature=0.1,
+                )
+            )
             response_content = gw_resp.content
 
             try:
@@ -310,27 +325,72 @@ class OperationsCoordinationAgent:
     def _fallback_intent_detection(self, query: str) -> OperationsQuery:
         query_lower = query.lower()
 
-        if any(word in query_lower for word in ["shift", "workforce", "employee", "staff", "team", "worker", "workers", "active workers", "how many"]):
+        if any(
+            word in query_lower
+            for word in [
+                "shift",
+                "workforce",
+                "employee",
+                "staff",
+                "team",
+                "worker",
+                "workers",
+                "active workers",
+                "how many",
+            ]
+        ):
             intent = "workforce"
-        elif any(word in query_lower for word in ["assign", "task assignment", "assign task"]):
+        elif any(
+            word in query_lower for word in ["assign", "task assignment", "assign task"]
+        ):
             intent = "task_assignment"
         elif any(word in query_lower for word in ["rebalance", "workload", "balance"]):
             intent = "workload_rebalance"
-        elif any(word in query_lower for word in ["wave", "pick wave", "generate wave"]):
+        elif any(
+            word in query_lower for word in ["wave", "pick wave", "generate wave"]
+        ):
             intent = "pick_wave"
-        elif any(word in query_lower for word in ["optimize", "path", "route", "efficiency"]):
+        elif any(
+            word in query_lower for word in ["optimize", "path", "route", "efficiency"]
+        ):
             intent = "optimize_paths"
-        elif any(word in query_lower for word in ["shift management", "manage shift", "schedule shift"]):
+        elif any(
+            word in query_lower
+            for word in ["shift management", "manage shift", "schedule shift"]
+        ):
             intent = "shift_management"
         elif any(word in query_lower for word in ["dock", "appointment", "scheduling"]):
             intent = "dock_scheduling"
-        elif any(word in query_lower for word in ["dispatch", "equipment dispatch", "send equipment"]):
+        elif any(
+            word in query_lower
+            for word in ["dispatch", "equipment dispatch", "send equipment"]
+        ):
             intent = "equipment_dispatch"
-        elif any(word in query_lower for word in ["publish", "kpi", "metrics", "dashboard"]):
+        elif any(
+            word in query_lower for word in ["publish", "kpi", "metrics", "dashboard"]
+        ):
             intent = "publish_kpis"
-        elif any(word in query_lower for word in ["task", "tasks", "work", "job", "pick", "pack", "latest", "pending", "in progress", "assignment", "assignments"]):
+        elif any(
+            word in query_lower
+            for word in [
+                "task",
+                "tasks",
+                "work",
+                "job",
+                "pick",
+                "pack",
+                "latest",
+                "pending",
+                "in progress",
+                "assignment",
+                "assignments",
+            ]
+        ):
             intent = "task_management"
-        elif any(word in query_lower for word in ["equipment", "forklift", "conveyor", "machine"]):
+        elif any(
+            word in query_lower
+            for word in ["equipment", "forklift", "conveyor", "machine"]
+        ):
             intent = "equipment"
         elif any(word in query_lower for word in ["performance", "productivity"]):
             intent = "kpi"
@@ -341,7 +401,9 @@ class OperationsCoordinationAgent:
 
         return OperationsQuery(intent=intent, entities={}, context={}, user_query=query)
 
-    async def _retrieve_operations_data(self, operations_query: OperationsQuery) -> Dict[str, Any]:
+    async def _retrieve_operations_data(
+        self, operations_query: OperationsQuery
+    ) -> Dict[str, Any]:
         try:
             data: Dict[str, Any] = {}
 
@@ -350,13 +412,19 @@ class OperationsCoordinationAgent:
                 data["task_summary"] = task_summary
 
             if operations_query.intent == "task_management" and self.task_queries:
-                pending_tasks = await self.task_queries.get_tasks_by_status("pending", limit=20)
-                in_progress_tasks = await self.task_queries.get_tasks_by_status("in_progress", limit=20)
+                pending_tasks = await self.task_queries.get_tasks_by_status(
+                    "pending", limit=20
+                )
+                in_progress_tasks = await self.task_queries.get_tasks_by_status(
+                    "in_progress", limit=20
+                )
                 data["pending_tasks"] = [asdict(task) for task in pending_tasks]
                 data["in_progress_tasks"] = [asdict(task) for task in in_progress_tasks]
 
             if operations_query.intent == "equipment" and self.telemetry_queries:
-                equipment_health = await self.telemetry_queries.get_equipment_health_status()
+                equipment_health = (
+                    await self.telemetry_queries.get_equipment_health_status()
+                )
                 data["equipment_health"] = equipment_health
 
             if operations_query.intent == "workforce":
@@ -411,23 +479,27 @@ class OperationsCoordinationAgent:
                         constraints=constraints,
                         assignees=assignees,
                     )
-                    actions_taken.append({
-                        "action": "assign_tasks",
-                        "task_type": task_type,
-                        "quantity": quantity,
-                        "result": asdict(assignment),
-                        "timestamp": datetime.now().isoformat(),
-                    })
+                    actions_taken.append(
+                        {
+                            "action": "assign_tasks",
+                            "task_type": task_type,
+                            "quantity": quantity,
+                            "result": asdict(assignment),
+                            "timestamp": datetime.now().isoformat(),
+                        }
+                    )
 
             elif operations_query.intent == "workload_rebalance":
                 rebalance = await self.action_tools.rebalance_workload(
                     sla_rules=operations_query.entities.get("sla_rules")
                 )
-                actions_taken.append({
-                    "action": "rebalance_workload",
-                    "result": asdict(rebalance),
-                    "timestamp": datetime.now().isoformat(),
-                })
+                actions_taken.append(
+                    {
+                        "action": "rebalance_workload",
+                        "result": asdict(rebalance),
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
 
             elif operations_query.intent == "pick_wave":
                 if not order_ids:
@@ -435,36 +507,49 @@ class OperationsCoordinationAgent:
                     if order_matches:
                         order_ids = order_matches
                     else:
-                        line_count_match = re.search(r"(\d{1,5})-line order", operations_query.user_query)
-                        zone_match = re.search(r"Zone ([A-Z])", operations_query.user_query)
+                        line_count_match = re.search(
+                            r"(\d{1,5})-line order", operations_query.user_query
+                        )
+                        zone_match = re.search(
+                            r"Zone ([A-Z])", operations_query.user_query
+                        )
                         if line_count_match and zone_match:
                             order_id = f"ORD_{datetime.now().strftime('%Y%m%d%H%M%S')}"
                             order_ids = [order_id]
                         else:
-                            order_ids = [f"ORD_{datetime.now().strftime('%Y%m%d%H%M%S')}"]
+                            order_ids = [
+                                f"ORD_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                            ]
 
                 if order_ids:
                     pick_wave = await self.action_tools.generate_pick_wave(
                         order_ids=order_ids, wave_strategy=wave_strategy
                     )
-                    actions_taken.append({
-                        "action": "generate_pick_wave",
-                        "order_ids": order_ids,
-                        "result": asdict(pick_wave),
-                        "timestamp": datetime.now().isoformat(),
-                    })
+                    actions_taken.append(
+                        {
+                            "action": "generate_pick_wave",
+                            "order_ids": order_ids,
+                            "result": asdict(pick_wave),
+                            "timestamp": datetime.now().isoformat(),
+                        }
+                    )
 
-            elif operations_query.intent == "optimize_paths" and operations_query.entities.get("picker_id"):
+            elif (
+                operations_query.intent == "optimize_paths"
+                and operations_query.entities.get("picker_id")
+            ):
                 optimization = await self.action_tools.optimize_pick_paths(
                     picker_id=operations_query.entities.get("picker_id"),
                     wave_id=operations_query.entities.get("wave_id"),
                 )
-                actions_taken.append({
-                    "action": "optimize_pick_paths",
-                    "picker_id": operations_query.entities.get("picker_id"),
-                    "result": asdict(optimization),
-                    "timestamp": datetime.now().isoformat(),
-                })
+                actions_taken.append(
+                    {
+                        "action": "optimize_pick_paths",
+                        "picker_id": operations_query.entities.get("picker_id"),
+                        "result": asdict(optimization),
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
 
             elif operations_query.intent == "shift_management" and shift_id and action:
                 shift_schedule = await self.action_tools.manage_shift_schedule(
@@ -473,24 +558,31 @@ class OperationsCoordinationAgent:
                     workers=workers,
                     swaps=operations_query.entities.get("swaps"),
                 )
-                actions_taken.append({
-                    "action": "manage_shift_schedule",
-                    "shift_id": shift_id,
-                    "result": asdict(shift_schedule),
-                    "timestamp": datetime.now().isoformat(),
-                })
+                actions_taken.append(
+                    {
+                        "action": "manage_shift_schedule",
+                        "shift_id": shift_id,
+                        "result": asdict(shift_schedule),
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
 
-            elif operations_query.intent == "dock_scheduling" and operations_query.entities.get("appointments"):
+            elif (
+                operations_query.intent == "dock_scheduling"
+                and operations_query.entities.get("appointments")
+            ):
                 appointments = await self.action_tools.dock_scheduling(
                     appointments=operations_query.entities.get("appointments", []),
                     capacity=operations_query.entities.get("capacity", {}),
                 )
-                actions_taken.append({
-                    "action": "dock_scheduling",
-                    "appointments_count": len(appointments),
-                    "result": [asdict(apt) for apt in appointments],
-                    "timestamp": datetime.now().isoformat(),
-                })
+                actions_taken.append(
+                    {
+                        "action": "dock_scheduling",
+                        "appointments_count": len(appointments),
+                        "result": [asdict(apt) for apt in appointments],
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
 
             elif operations_query.intent == "equipment_dispatch" and equipment_id:
                 if not task_id:
@@ -500,29 +592,39 @@ class OperationsCoordinationAgent:
                     task_id=task_id,
                     operator=operations_query.entities.get("operator"),
                 )
-                actions_taken.append({
-                    "action": "dispatch_equipment",
-                    "equipment_id": equipment_id,
-                    "task_id": task_id,
-                    "result": asdict(dispatch),
-                    "timestamp": datetime.now().isoformat(),
-                })
+                actions_taken.append(
+                    {
+                        "action": "dispatch_equipment",
+                        "equipment_id": equipment_id,
+                        "task_id": task_id,
+                        "result": asdict(dispatch),
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
 
             elif operations_query.intent == "publish_kpis":
                 kpi_result = await self.action_tools.publish_kpis(
                     metrics=operations_query.entities.get("metrics")
                 )
-                actions_taken.append({
-                    "action": "publish_kpis",
-                    "result": kpi_result,
-                    "timestamp": datetime.now().isoformat(),
-                })
+                actions_taken.append(
+                    {
+                        "action": "publish_kpis",
+                        "result": kpi_result,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
 
             return actions_taken
 
         except Exception as e:
             logger.error("Action tools execution failed: %s", e)
-            return [{"action": "error", "error": str(e), "timestamp": datetime.now().isoformat()}]
+            return [
+                {
+                    "action": "error",
+                    "error": str(e),
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ]
 
     def _simulate_workforce_data(self) -> Dict[str, Any]:
         return {
@@ -533,7 +635,11 @@ class OperationsCoordinationAgent:
                     "employees": [
                         {"name": "John Smith", "role": "Picker", "status": "active"},
                         {"name": "Sarah Johnson", "role": "Packer", "status": "active"},
-                        {"name": "Mike Wilson", "role": "Forklift Operator", "status": "active"},
+                        {
+                            "name": "Mike Wilson",
+                            "role": "Forklift Operator",
+                            "status": "active",
+                        },
                     ],
                     "total_count": 3,
                     "active_tasks": 8,
@@ -566,7 +672,9 @@ class OperationsCoordinationAgent:
     ) -> OperationsResponse:
         try:
             context_str = self._build_retrieved_context(retrieved_data)
-            conversation_history = self.conversation_context.get(session_id, {}).get("history", [])
+            conversation_history = self.conversation_context.get(session_id, {}).get(
+                "history", []
+            )
 
             actions_str = ""
             if actions_taken:
@@ -596,7 +704,9 @@ class OperationsCoordinationAgent:
                 entities=safe_entities,
                 retrieved_data=context_str,
                 actions_taken=actions_str,
-                conversation_history=conversation_history[-3:] if conversation_history else "None",
+                conversation_history=(
+                    conversation_history[-3:] if conversation_history else "None"
+                ),
                 dispatch_instructions=dispatch_instructions,
             )
 
@@ -607,16 +717,22 @@ class OperationsCoordinationAgent:
 
             from maiw_models import ModelRequest, ReasoningLevel, RiskLevel
 
-            _is_high_risk = operations_query.intent in {"pick_wave", "workload_rebalance", "shift_management"}
+            _is_high_risk = operations_query.intent in {
+                "pick_wave",
+                "workload_rebalance",
+                "shift_management",
+            }
             _risk = RiskLevel.HIGH if _is_high_risk else RiskLevel.LOW
 
-            gw_resp = await self.model_gateway.generate(ModelRequest(
-                task="warehouse.operations.generate_response",
-                messages=messages,
-                reasoning=ReasoningLevel.MEDIUM,
-                risk_level=_risk,
-                temperature=0.2,
-            ))
+            gw_resp = await self.model_gateway.generate(
+                ModelRequest(
+                    task="warehouse.operations.generate_response",
+                    messages=messages,
+                    reasoning=ReasoningLevel.MEDIUM,
+                    risk_level=_risk,
+                    temperature=0.2,
+                )
+            )
             response_content = gw_resp.content
 
             try:
@@ -624,17 +740,23 @@ class OperationsCoordinationAgent:
                 return OperationsResponse(
                     response_type=parsed_response.get("response_type", "general"),
                     data=parsed_response.get("data", {}),
-                    natural_language=parsed_response.get("natural_language", "I processed your operations query."),
+                    natural_language=parsed_response.get(
+                        "natural_language", "I processed your operations query."
+                    ),
                     recommendations=parsed_response.get("recommendations", []),
                     confidence=parsed_response.get("confidence", 0.8),
                     actions_taken=actions_taken or [],
                 )
             except json.JSONDecodeError:
-                return self._generate_fallback_response(operations_query, retrieved_data, actions_taken)
+                return self._generate_fallback_response(
+                    operations_query, retrieved_data, actions_taken
+                )
 
         except Exception as e:
             logger.error("Response generation failed: %s", e)
-            return self._generate_fallback_response(operations_query, retrieved_data, actions_taken)
+            return self._generate_fallback_response(
+                operations_query, retrieved_data, actions_taken
+            )
 
     def _generate_fallback_response(
         self,
@@ -654,7 +776,9 @@ class OperationsCoordinationAgent:
                 for shift_name, shift_data in shifts.items():
                     shift_count = shift_data.get("total_count", 0)
                     total_workers += shift_count
-                    shift_details.append(f"{shift_name.title()} shift: {shift_count} workers")
+                    shift_details.append(
+                        f"{shift_name.title()} shift: {shift_count} workers"
+                    )
                 natural_language = (
                     f"Currently, we have **{total_workers} active workers** across all shifts:\n\n"
                     + "\n".join(shift_details)
@@ -675,7 +799,9 @@ class OperationsCoordinationAgent:
                 response_data = {
                     "total_active_workers": total_workers,
                     "shifts": shifts,
-                    "productivity_metrics": workforce_info.get("productivity_metrics", {}),
+                    "productivity_metrics": workforce_info.get(
+                        "productivity_metrics", {}
+                    ),
                 }
 
             elif intent == "task_management":
@@ -704,21 +830,41 @@ class OperationsCoordinationAgent:
                     for i, task in enumerate(pending_tasks[:5], 1):
                         task_id = task.get("id", "N/A")
                         task_kind = task.get("kind", "Unknown")
-                        priority = task.get("payload", {}).get("priority", "medium") if isinstance(task.get("payload"), dict) else "medium"
-                        zone = task.get("payload", {}).get("zone", "N/A") if isinstance(task.get("payload"), dict) else "N/A"
+                        priority = (
+                            task.get("payload", {}).get("priority", "medium")
+                            if isinstance(task.get("payload"), dict)
+                            else "medium"
+                        )
+                        zone = (
+                            task.get("payload", {}).get("zone", "N/A")
+                            if isinstance(task.get("payload"), dict)
+                            else "N/A"
+                        )
                         natural_language += f"{i}. {task_kind.title()} (ID: {task_id}, Priority: {priority}, Zone: {zone})\n"
                     if len(pending_tasks) > 5:
-                        natural_language += f"... and {len(pending_tasks) - 5} more pending tasks\n"
+                        natural_language += (
+                            f"... and {len(pending_tasks) - 5} more pending tasks\n"
+                        )
                     natural_language += "\n"
 
                 if in_progress_tasks:
-                    natural_language += f"**In Progress Tasks ({len(in_progress_tasks)}):**\n"
+                    natural_language += (
+                        f"**In Progress Tasks ({len(in_progress_tasks)}):**\n"
+                    )
                     for i, task in enumerate(in_progress_tasks[:5], 1):
                         task_id = task.get("id", "N/A")
                         task_kind = task.get("kind", "Unknown")
                         assignee = task.get("assignee", "Unassigned")
-                        priority = task.get("payload", {}).get("priority", "medium") if isinstance(task.get("payload"), dict) else "medium"
-                        zone = task.get("payload", {}).get("zone", "N/A") if isinstance(task.get("payload"), dict) else "N/A"
+                        priority = (
+                            task.get("payload", {}).get("priority", "medium")
+                            if isinstance(task.get("payload"), dict)
+                            else "medium"
+                        )
+                        zone = (
+                            task.get("payload", {}).get("zone", "N/A")
+                            if isinstance(task.get("payload"), dict)
+                            else "N/A"
+                        )
                         natural_language += f"{i}. {task_kind.title()} (ID: {task_id}, Assigned to: {assignee}, Priority: {priority}, Zone: {zone})\n"
                     if len(in_progress_tasks) > 5:
                         natural_language += f"... and {len(in_progress_tasks) - 5} more in-progress tasks\n"
@@ -751,7 +897,9 @@ class OperationsCoordinationAgent:
                     total_lines = pick_wave_data.get("total_lines", 0)
                     zones = pick_wave_data.get("zones", [])
                     assigned_pickers = pick_wave_data.get("assigned_pickers", [])
-                    estimated_duration = pick_wave_data.get("estimated_duration", "Unknown")
+                    estimated_duration = pick_wave_data.get(
+                        "estimated_duration", "Unknown"
+                    )
                     natural_language += (
                         f"**Wave Details:**\n"
                         f"- Wave ID: {wave_id}\n"
@@ -761,7 +909,9 @@ class OperationsCoordinationAgent:
                         f"- Assigned Pickers: {len(assigned_pickers)} pickers\n"
                         f"- Estimated Duration: {estimated_duration}\n"
                     )
-                    natural_language += f"\n**Status:** {pick_wave_data.get('status', 'Generated')}\n"
+                    natural_language += (
+                        f"\n**Status:** {pick_wave_data.get('status', 'Generated')}\n"
+                    )
                     recommendations = [
                         "Monitor pick wave progress",
                         "Ensure all pickers have necessary equipment",
@@ -804,10 +954,14 @@ class OperationsCoordinationAgent:
                         ]
                     elif status == "error":
                         natural_language = f"The system encountered an error dispatching forklift {equipment_id} to {location}."
-                        recommendations = [f"Verify equipment {equipment_id} is available"]
+                        recommendations = [
+                            f"Verify equipment {equipment_id} is available"
+                        ]
                     else:
                         natural_language = f"Forklift {equipment_id} dispatch to {location} is being processed (status: {status})."
-                        recommendations = [f"Monitor dispatch status for {equipment_id}"]
+                        recommendations = [
+                            f"Monitor dispatch status for {equipment_id}"
+                        ]
                     response_data = {
                         "equipment_id": equipment_id,
                         "task_id": task_id,
@@ -816,21 +970,36 @@ class OperationsCoordinationAgent:
                         "operator": operator,
                     }
                 else:
-                    natural_language = "Equipment dispatch request received. Processing..."
+                    natural_language = (
+                        "Equipment dispatch request received. Processing..."
+                    )
                     recommendations = ["Monitor dispatch progress"]
                     response_data = {"status": "processing"}
 
             elif intent == "equipment":
-                natural_language = "Here's the current equipment status and health information."
-                recommendations = ["Schedule preventive maintenance", "Monitor equipment performance"]
+                natural_language = (
+                    "Here's the current equipment status and health information."
+                )
+                recommendations = [
+                    "Schedule preventive maintenance",
+                    "Monitor equipment performance",
+                ]
                 response_data = data
             elif intent == "kpi":
-                natural_language = "Here are the current operational KPIs and performance metrics."
-                recommendations = ["Focus on accuracy improvements", "Optimize workflow efficiency"]
+                natural_language = (
+                    "Here are the current operational KPIs and performance metrics."
+                )
+                recommendations = [
+                    "Focus on accuracy improvements",
+                    "Optimize workflow efficiency",
+                ]
                 response_data = data
             else:
                 natural_language = "I processed your operations query and retrieved relevant information."
-                recommendations = ["Review operational procedures", "Monitor performance metrics"]
+                recommendations = [
+                    "Review operational procedures",
+                    "Monitor performance metrics",
+                ]
                 response_data = data
 
             return OperationsResponse(
@@ -853,7 +1022,11 @@ class OperationsCoordinationAgent:
                 actions_taken=actions_taken or [],
             )
 
-    def _build_context_string(self, conversation_history: List[Dict[str, Any]], context: Optional[Dict[str, Any]]) -> str:
+    def _build_context_string(
+        self,
+        conversation_history: List[Dict[str, Any]],
+        context: Optional[Dict[str, Any]],
+    ) -> str:
         if not conversation_history and not context:
             return "No previous context"
         context_parts = []
@@ -886,7 +1059,11 @@ class OperationsCoordinationAgent:
                     ctx = f"Pending Tasks ({len(pending)}):\n"
                     for i, task in enumerate(pending[:3], 1):
                         task_id = task.get("id", "N/A")
-                        priority = task.get("payload", {}).get("priority", "medium") if isinstance(task.get("payload"), dict) else "medium"
+                        priority = (
+                            task.get("payload", {}).get("priority", "medium")
+                            if isinstance(task.get("payload"), dict)
+                            else "medium"
+                        )
                         ctx += f"{i}. {task.get('kind', 'Unknown').title()} (ID: {task_id}, Priority: {priority})\n"
                     if len(pending) > 3:
                         ctx += f"... and {len(pending) - 3} more\n"
@@ -914,40 +1091,63 @@ class OperationsCoordinationAgent:
                 context_parts.append(ctx)
 
             if "equipment_health" in retrieved_data:
-                context_parts.append(f"Equipment Health: {retrieved_data['equipment_health']}")
+                context_parts.append(
+                    f"Equipment Health: {retrieved_data['equipment_health']}"
+                )
 
-            return "\n".join(context_parts) if context_parts else "No relevant data found"
+            return (
+                "\n".join(context_parts) if context_parts else "No relevant data found"
+            )
 
         except Exception as e:
             logger.error("Context building failed: %s", e)
             return "Error building context"
 
-    def _update_context(self, session_id: str, operations_query: OperationsQuery, response: OperationsResponse) -> None:
+    def _update_context(
+        self,
+        session_id: str,
+        operations_query: OperationsQuery,
+        response: OperationsResponse,
+    ) -> None:
         try:
             if session_id not in self.conversation_context:
-                self.conversation_context[session_id] = {"history": [], "current_focus": None, "last_entities": {}}
+                self.conversation_context[session_id] = {
+                    "history": [],
+                    "current_focus": None,
+                    "last_entities": {},
+                }
 
-            self.conversation_context[session_id]["history"].append({
-                "query": operations_query.user_query,
-                "intent": operations_query.intent,
-                "response_type": response.response_type,
-                "timestamp": datetime.now().isoformat(),
-            })
+            self.conversation_context[session_id]["history"].append(
+                {
+                    "query": operations_query.user_query,
+                    "intent": operations_query.intent,
+                    "response_type": response.response_type,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
 
             if operations_query.intent != "general":
-                self.conversation_context[session_id]["current_focus"] = operations_query.intent
+                self.conversation_context[session_id][
+                    "current_focus"
+                ] = operations_query.intent
 
             if operations_query.entities:
-                self.conversation_context[session_id]["last_entities"] = operations_query.entities
+                self.conversation_context[session_id][
+                    "last_entities"
+                ] = operations_query.entities
 
             if len(self.conversation_context[session_id]["history"]) > 10:
-                self.conversation_context[session_id]["history"] = self.conversation_context[session_id]["history"][-10:]
+                self.conversation_context[session_id]["history"] = (
+                    self.conversation_context[session_id]["history"][-10:]
+                )
 
         except Exception as e:
             logger.error("Context update failed: %s", e)
 
     async def get_conversation_context(self, session_id: str) -> Dict[str, Any]:
-        return self.conversation_context.get(session_id, {"history": [], "current_focus": None, "last_entities": {}})
+        return self.conversation_context.get(
+            session_id, {"history": [], "current_focus": None, "last_entities": {}}
+        )
 
     async def clear_conversation_context(self, session_id: str) -> None:
         if session_id in self.conversation_context:
@@ -959,6 +1159,7 @@ class OperationsCoordinationAgent:
         snapshot: Any,
         scenario_context: str = "",
         trace_id: str,
+        deadline: Any = None,
     ) -> Any:
         """
         Observe warehouse state and produce an OperationalAssessment.
@@ -991,14 +1192,20 @@ class OperationsCoordinationAgent:
 
         if state.equipment is not None:
             eq = state.equipment
-            facts.append(f"Equipment: {eq.total_count} total, {eq.available_count} available")
+            facts.append(
+                f"Equipment: {eq.total_count} total, {eq.available_count} available"
+            )
             offline = [a for a in eq.assets if a.status == "offline"]
             maintenance = [a for a in eq.assets if a.status == "maintenance"]
             if offline:
-                facts.append(f"OFFLINE assets: {', '.join(a.asset_id for a in offline)}")
+                facts.append(
+                    f"OFFLINE assets: {', '.join(a.asset_id for a in offline)}"
+                )
                 domains_affected.append("equipment")
             if maintenance:
-                facts.append(f"MAINTENANCE assets: {', '.join(a.asset_id for a in maintenance)}")
+                facts.append(
+                    f"MAINTENANCE assets: {', '.join(a.asset_id for a in maintenance)}"
+                )
                 if "equipment" not in domains_affected:
                     domains_affected.append("equipment")
 
@@ -1021,7 +1228,9 @@ class OperationsCoordinationAgent:
                 domains_affected.append("wave")
             # Explicitly surface unassigned pending tasks so the model knows
             # labor.allocate (not wave.reprioritize) is the correct remedy.
-            unassigned = [t for t in wv.tasks if t.status == "pending" and t.assigned_to is None]
+            unassigned = [
+                t for t in wv.tasks if t.status == "pending" and t.assigned_to is None
+            ]
             if unassigned:
                 available_workers = state.labor.available_workers if state.labor else 0
                 facts.append(
@@ -1041,7 +1250,9 @@ class OperationsCoordinationAgent:
         )
 
         if self.model_gateway is None:
-            logger.warning("analyze_disruption: ModelGateway not available; returning stub assessment")
+            logger.warning(
+                "analyze_disruption: ModelGateway not available; returning stub assessment"
+            )
             return OperationalAssessment(
                 trace_id=trace_id,
                 snapshot_id=snapshot_id,
@@ -1058,26 +1269,33 @@ class OperationsCoordinationAgent:
                 latency_ms=0.0,
             )
 
-        response = await self.model_gateway.generate(ModelRequest(
-            task="warehouse.operations.analyze_disruption",
-            messages=[
-                {"role": "system", "content": system_msg},
-                {"role": "user", "content": user_msg},
-            ],
-            reasoning=ReasoningLevel.HIGH,
-            risk_level=RiskLevel.HIGH,
-            trace_id=trace_id,
-        ))
+        response = await self.model_gateway.generate(
+            ModelRequest(
+                task="warehouse.operations.analyze_disruption",
+                messages=[
+                    {"role": "system", "content": system_msg},
+                    {"role": "user", "content": user_msg},
+                ],
+                reasoning=ReasoningLevel.HIGH,
+                risk_level=RiskLevel.HIGH,
+                trace_id=trace_id,
+                deadline=deadline,
+            )
+        )
 
         # Parse structured response — expect JSON
         import json as _json
+
         parsed: dict = {}
         try:
             parsed = _json.loads(response.content)
         except Exception:
             # Attempt to extract JSON block if wrapped in markdown
             import re as _re
-            m = _re.search(r"```(?:json)?\s*(\{.*?\})\s*```", response.content, _re.DOTALL)
+
+            m = _re.search(
+                r"```(?:json)?\s*(\{.*?\})\s*```", response.content, _re.DOTALL
+            )
             if m:
                 try:
                     parsed = _json.loads(m.group(1))
@@ -1093,7 +1311,11 @@ class OperationsCoordinationAgent:
             try:
                 recommendations.append(RecommendedAction(**r))
             except Exception as exc:
-                logger.warning("analyze_disruption: skipping malformed recommendation %s: %s", r, exc)
+                logger.warning(
+                    "analyze_disruption: skipping malformed recommendation %s: %s",
+                    r,
+                    exc,
+                )
 
         rd = response.route_decision
         return OperationalAssessment(

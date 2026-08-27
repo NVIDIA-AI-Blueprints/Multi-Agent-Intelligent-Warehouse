@@ -35,6 +35,9 @@ import logging
 import time
 from typing import Optional
 
+from maiw_mcp.circuit_breaker import CircuitBreaker, CircuitOpen
+from maiw_mcp.deadline import RequestDeadlineExceeded
+
 from .errors import ModelGatewayError, ModelUnavailable
 from .models import ModelRequest, ModelResponse, ModelRouteDecision
 from .providers.nim import NIMProvider
@@ -59,11 +62,13 @@ class ModelGateway:
         registry: ModelRegistry,
         router: ModelRouter,
         telemetry: Optional[GatewayTelemetry] = None,
+        nim_circuit: Optional[CircuitBreaker] = None,
     ) -> None:
         self._provider = provider
         self._registry = registry
         self._router = router
         self._telemetry = telemetry or GatewayTelemetry()
+        self._nim_circuit = nim_circuit
 
     async def generate(self, request: ModelRequest) -> ModelResponse:
         """
@@ -78,6 +83,12 @@ class ModelGateway:
         start = time.monotonic()
 
         try:
+            # 0. Deadline guard — reject before any provider call (0 provider calls)
+            if request.deadline is not None and request.deadline.expired:
+                dl = request.deadline
+                expired_by_ms = (dl._clock() - dl.deadline_at) * 1000.0  # type: ignore[operator]
+                raise RequestDeadlineExceeded(expired_by_ms=expired_by_ms)
+
             # 1. Route
             decision = self._router.route(request)
 
@@ -89,12 +100,24 @@ class ModelGateway:
                     model_id=decision.selected_model_id,
                 )
 
-            # 3. Call provider
-            llm_response = await self._provider.call(
-                model_id=decision.selected_model_id,
-                request=request,
-                capability=capability,
-            )
+            # 3. Call provider (wrapped in NIM circuit breaker if configured)
+            async def _provider_call():
+                return await self._provider.call(
+                    model_id=decision.selected_model_id,
+                    request=request,
+                    capability=capability,
+                )
+
+            if self._nim_circuit is not None:
+                try:
+                    llm_response = await self._nim_circuit.call(_provider_call())
+                except CircuitOpen as exc:
+                    raise ModelUnavailable(
+                        f"NIM circuit OPEN — cooldown {exc.cooldown_remaining_s:.1f}s remaining",
+                        model_id=decision.selected_model_id,
+                    ) from exc
+            else:
+                llm_response = await _provider_call()
 
             latency_ms = (time.monotonic() - start) * 1000
 

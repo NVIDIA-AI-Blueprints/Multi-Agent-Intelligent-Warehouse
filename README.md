@@ -36,7 +36,7 @@ executed by a typed executor that enforces four guards before a write reaches MC
 | **REASON** | `ModelGateway` → Nemotron 3 | Generates a structured action proposal — no raw text, no direct tool calls |
 | **PROPOSE** | `ActionProposal` factory | Constructs a typed, immutable proposal locally; zero MCP calls at this stage |
 | **DECIDE** | `DecisionEngine` | Evaluates the proposal against deterministic constraints → `APPROVED / REJECTED / DEFERRED` |
-| **EXECUTE** | `BaseActionExecutor` | Enforces 4 guards, then calls the MCP write tool if all pass |
+| **EXECUTE** | `BaseActionExecutor` | Enforces 4 guards, assigns a stable `execution_id`, then invokes the MCP write capability; result is one of six explicit outcomes: `EXECUTED / NO_OP / DEFERRED / CONFLICT / UNKNOWN / FAILED` |
 | **MCP** | `mcp_servers.<domain>.server` | Independently deployable MCP v2 server; single entry point to backend writes |
 | **BACKEND** | PostgreSQL / TimescaleDB | Source of truth; no agent writes directly here |
 
@@ -193,7 +193,7 @@ POST /api/v1/equipment/assign
   → Agent: get_state → seal snapshot → build proposal
   → DecisionEngine: evaluate → REQUIRES_HUMAN_APPROVAL
   → Response: {executed: false, proposal_id: ..., decision_id: ...}
-  # Human posts approval → executor runs guards → MCP write → executed: true
+  # Human posts approval → executor runs guards → MCP write → outcome classified
 ```
 
 **Write (LOW risk, auto-executes):**
@@ -202,11 +202,496 @@ POST /api/v1/equipment/release
   → Agent: get_state → seal snapshot → build proposal (risk=LOW)
   → DecisionEngine: APPROVED immediately
   → EquipmentActionExecutor: 4 guards pass → MCP write
-  → Response: {executed: true, execution_id: ...}
+  → Response: {outcome: "executed", execution_id: ...}
 ```
 
 See [docs/architecture/RUNTIME_EXECUTION_FLOW.md](docs/architecture/RUNTIME_EXECUTION_FLOW.md)
 for full sequence diagrams of all implemented paths.
+
+---
+
+### Reliable Execution (Phase 10E)
+
+**MAIW separates authorization from reliable execution.** Once an action is authorized,
+`ActionExecutor` assigns a stable execution identity and applies idempotency protection
+before invoking the MCP write capability. Execution results use explicit operational
+semantics rather than reducing provider behavior to a simple success/failure boolean.
+
+**Execution lifecycle:**
+
+```
+OBSERVE
+   ↓
+REASON
+   ↓
+PROPOSE
+   ↓
+DECIDE
+   ↓
+APPROVE
+   ↓
+EXECUTE
+   │
+   ├── EXECUTED   — mutation confirmed
+   ├── NO_OP      — desired state already existed
+   ├── DEFERRED   — valid action, capacity unavailable now
+   ├── CONFLICT   — warehouse state changed; action no longer valid
+   ├── UNKNOWN    — mutation may have occurred; response was lost
+   └── FAILED     — mutation did not occur
+   ↓
+OBSERVE OUTCOME
+```
+
+**Outcome semantics:**
+
+| Outcome | Meaning |
+|---------|---------|
+| `EXECUTED` | MAIW has sufficient evidence that the intended mutation occurred |
+| `NO_OP` | Desired state already existed; no new mutation was required |
+| `DEFERRED` | Valid action, but required operational capacity or conditions are not currently available |
+| `CONFLICT` | Current warehouse state makes the approved action invalid |
+| `UNKNOWN` | Mutation may have occurred, but MAIW cannot confirm the outcome |
+| `FAILED` | MAIW has sufficient evidence that the mutation did not occur |
+
+**A particularly important case is `UNKNOWN`:** if the provider may have changed warehouse
+state but MAIW loses the acknowledgement before receiving confirmation, the system does not
+incorrectly classify the operation as `FAILED` or blindly retry it. The execution is marked
+`UNKNOWN`, automatic retry is suppressed, and reconciliation is required before another
+consequential write can safely occur.
+
+```
+ActionExecutor
+      ↓
+MCP write
+      ↓
+Provider mutation occurs
+      ↓
+Response lost (network timeout, etc.)
+      ↓
+UNKNOWN                          ← NOT FAILED
+      ↓
+Automatic retry suppressed
+      ↓
+Reconciliation required
+```
+
+Without this distinction, the unsafe path is:
+```
+mutation → timeout → FAILED → blind retry → duplicate mutation
+```
+
+**Execution identity:** MAIW distinguishes six identity concepts across the write path:
+
+| Identifier | Meaning |
+|------------|---------|
+| `trace_id` | Full request lifecycle correlation — spans the entire OBSERVE→OUTCOME cycle |
+| `proposal_id` | Identity of the proposed warehouse change (stable from `evaluate()` through `authorize_with_approval()`) |
+| `decision_id` | Identity of the authority evaluation |
+| `approval_id` | Identity of the approval record — scopes exactly one human authorization event |
+| `execution_id` | Identity of one MAIW logical execution attempt (generated before write, stable through MCP) |
+| `idempotency_key` | Identity of the intended logical mutation (caller-supplied; deduplication key) |
+| `provider_reference` | Backend-specific reference (allocation_id, transaction_id, etc.) |
+
+These identifiers are not interchangeable. `execution_id` and `idempotency_key` together
+protect against duplicate physical mutations. `trace_id` correlates the full lifecycle.
+`provider_reference` is the backend's own record of the transaction. `approval_id` scopes
+the authority grant — it is created at queue time, consumed after execution, and is never reused.
+
+> **Current limitation (Phase 10E Batch 1):** Idempotency protection is provided by an
+> in-memory `ExecutionRegistry` within a single process. It does not yet provide distributed
+> or multi-replica exactly-once execution guarantees. This limitation is explicit and must
+> not be treated as a production distributed guarantee.
+
+**Execution Safety — Phase 10E Batch 1:**
+
+```
+✓ Explicit six-value execution outcome (EXECUTED / NO_OP / DEFERRED / CONFLICT / UNKNOWN / FAILED)
+✓ Stable execution_id generated before write and propagated through MCP
+✓ Idempotency protection by execution_id and capability:idempotency_key
+✓ Duplicate mutation prevention (NO_OP with replayed metadata on duplicate)
+✓ Ambiguous writes represented as UNKNOWN — never misclassified as FAILED
+✓ Automatic retry suppressed after UNKNOWN
+✗ Distributed/multi-replica exactly-once: not yet implemented
+```
+
+#### Approval Governance (Phase 10E Batch 2)
+
+**Approval is an explicit, expirable, single-use authority grant** — not a boolean flag on a
+record. Before execution, a proposal must pass through an `ApprovalRecord` state machine that
+tracks the full authorization lifecycle and enforces its limits.
+
+**Approval lifecycle:**
+
+```
+PENDING   ← created when REQUIRES_HUMAN_APPROVAL is returned by DecisionEngine
+    │
+    ├── APPROVED  ← human confirms via POST /demo/approve
+    │       │
+    │       └── CONSUMED  ← single use exhausted after ActionExecutor completes
+    │
+    ├── REJECTED  ← human declines via POST /demo/reject  (terminal)
+    └── EXPIRED   ← TTL elapsed before decision or execution  (terminal)
+```
+
+**Binding:** Every `ApprovalRecord` is bound to a specific `proposal_id`, `decision_id`, and
+`warehouse_id`. `authorize_with_approval()` enforces all three before granting execution authority:
+
+1. `CONSUMED` check — CONSUMED approval is blocked immediately (before any binding check);
+   replay behavior is deterministic and observable
+2. `proposal_id` binding — approval must reference the exact proposal under review
+3. `decision_id` binding — approval must reference the original decision that required human review
+4. `warehouse_id` binding — approval is scoped to the warehouse it was issued for; an approval
+   issued for DC-47 cannot authorize an action at DC-99 (confused-deputy prevention)
+5. Expiry — approval authority has a finite validity window
+6. State — only `APPROVED` grants execution authority; `CONSUMED`, `REJECTED`, `PENDING`, and
+   `EXPIRED` all block execution
+
+**Note on `approval.approved`:** The `approved` computed field returns `True` only when
+`state == APPROVED`. `CONSUMED` returns `False` because the authority has already been
+exercised. This field means "currently executable authority", not "was historically approved".
+To determine whether a proposal was ever approved, inspect `state` directly.
+
+**Expiration policy:** The default approval TTL is 300 seconds. This is a configurable policy
+parameter (`InMemoryApprovalStore(default_ttl_seconds=N)`), not an architectural constant.
+Different capability classes may warrant different validity windows; the store accepts a
+per-create `ttl_seconds` override. Infinite authority (`expires_at=None`) is not permitted
+by the store.
+
+**Proposal identity preservation:** The `proposal_id` assigned during the PROPOSE phase is
+preserved unchanged through `evaluate()`, `add_pending_approval()`, and
+`authorize_with_approval()`. The approval endpoint restores the original `ActionProposal`
+from a serialized snapshot in the pending record rather than rebuilding it at approval time.
+This ensures `approval_id → proposal_id → decision_id` is a consistent audit chain.
+
+> **Current limitation (Phase 10E Batch 2):** Approval state is held in
+> `InMemoryApprovalStore` within a single process. PENDING → APPROVED → CONSUMED transitions
+> are atomic under asyncio cooperative multitasking but are **not distributed**. After a
+> process restart, all pending approvals are lost. Multi-replica approval state, durable
+> approval storage, and distributed exactly-once authority are out of scope for Phase 10E.
+
+**Authority Safety — Phase 10E Batch 2:**
+
+```
+✓ Explicit ApprovalState machine: PENDING / APPROVED / REJECTED / EXPIRED / CONSUMED
+✓ Single-use consume guarantee — second consume() returns None without raising
+✓ CONSUMED approval blocked before proposal binding check (deterministic replay detection)
+✓ proposal_id stable from evaluate() through authorize_with_approval()
+✓ warehouse_id binding prevents confused-deputy authorization reuse
+✓ decision_id binding enforced when expected_decision_id supplied
+✓ Finite approval TTL — 300s default; infinite authority not permitted by store
+✓ Expiration enforced both dynamically (is_expired()) and via explicit EXPIRED state
+✓ authority_type field: HUMAN / POLICY / SYSTEM for classification
+✗ Distributed approval state: not yet implemented (single-process only)
+✗ Durable approval storage: not yet implemented (in-memory only)
+```
+
+#### Reconciliation (Phase 10E Batch 3)
+
+When an MCP write times out after the provider has mutated state, MAIW records
+`ExecutionOutcome.UNKNOWN` and refuses to retry. Batch 3 adds the reconciliation
+path that resolves the uncertainty by reading authoritative state through the
+same canonical MCP read skills used during normal state assembly.
+
+```
+WRITE ATTEMPT
+    ↓
+ExecutionOutcome = UNKNOWN  ← original write history, never rewritten
+    ↓
+ReconciliationService.reconcile()  ← reads through MCP read skills only
+    ↓
+CONFIRMED_EXECUTED     → "effectively_executed"   (mutation is confirmed)
+CONFIRMED_NOT_EXECUTED → "effectively_not_executed" (safe for re-evaluation)
+INDETERMINATE          → "unknown"                (manual operator review)
+```
+
+**Key design decisions:**
+
+- `ExecutionOutcome.UNKNOWN` is **never rewritten** — reconciliation is a separate
+  `ReconciliationRecord` stored alongside the original record in `ExecutionRegistry`
+- `effective_status` is a derived property, not a stored field; it is a read-only
+  interpretation of `(outcome, reconciliation.outcome)` pairs and carries no
+  authority of its own
+- `CONFIRMED_NOT_EXECUTED` does **not** trigger automatic retry — higher-level
+  re-evaluation is required; the original proposal, decision, and approval are gone
+- Reconciliation reads exclusively through canonical MCP read skills
+  (`LaborAllocationSkill`, `EquipmentStatusSkill`, `WaveGetSkill`). Provider
+  internals, simulation state, and `DemoWarehouseWorld` are never accessed
+- `ExecutionIntent` snapshot is captured **before** the write at `registry.begin()`
+  time, so reconciliation never depends on mutable post-write state
+- `ReconciliationStrategy` is a Protocol — the same `ReconciliationService` works
+  against any provider (simulation, SAP EWM, Manhattan, etc.) by swapping the
+  strategy at the demo router layer, keeping `maiw-execution` free of
+  `maiw-skills` dependency
+
+**Postcondition comparison** (capability-specific `expected_effect` in `ExecutionIntent`):
+
+| Domain | Target | Expected effect checked |
+|--------|--------|------------------------|
+| `warehouse.labor.allocate` | task_id | `status == "in_progress"` for the specific task |
+| `warehouse.equipment.assign` | asset_id | `status == "assigned"` + `owner_user == assignee` |
+| `warehouse.equipment.release` | asset_id | `status == "available"` |
+| `warehouse.equipment.schedule_maintenance` | asset_id | `status == "maintenance"` |
+| `warehouse.wave.reprioritize` | wave_id / zone | task priority matches `new_priority` in relevant zone |
+
+**Command Center UI** — reconciliation events appear in the Live Activity feed under
+the `RECONCILE` category (amber) with operator-facing labels:
+
+| SSE event message | UI label |
+|---|---|
+| `reconciliation.started` | `CHECKING AUTHORITATIVE STATE` |
+| `reconciliation.confirmed_executed` | `MUTATION CONFIRMED` |
+| `reconciliation.confirmed_not_executed` | `NO MUTATION CONFIRMED` |
+| `reconciliation.indeterminate` | `MANUAL REVIEW REQUIRED` |
+
+**Reconciliation Safety:**
+
+```
+✓ ExecutionOutcome.UNKNOWN preserved — original write history is immutable
+✓ ExecutionIntent snapshot captured before write — postcondition always verifiable
+✓ Read path: MCP read skills only — never DemoWarehouseWorld or provider internals
+✓ No automatic retry — CONFIRMED_NOT_EXECUTED is safe for higher-level re-evaluation
+✓ No new proposal/decision/approval created during reconciliation
+✓ INDETERMINATE is the safe default when read or postcondition check fails
+✓ POST /demo/reconcile endpoint wired; publishes RECONCILE SSE event
+✗ Automated reconciliation trigger: not yet implemented (operator-initiated only)
+✗ Distributed reconciliation state: single-process only (same as registry)
+```
+
+#### Request Deadline Hierarchy (Phase 10E Batch 4)
+
+Every request that enters the MAIW pipeline now carries an explicit, bounded time
+budget. Deadlines are monotonic-clock values set once at the API boundary and never
+extended — child operations can only reduce them.
+
+```
+/demo/analyze  ──── analyze_deadline  (MAIW_ANALYZE_TIMEOUT_SECONDS, default 60s)
+    │
+    ├── state_provider.get_state()          ← analyze_deadline propagated
+    │       ├── EquipmentStatusSkill MCP
+    │       ├── LaborCapacitySkill MCP
+    │       └── WaveGetSkill MCP
+    │
+    ├── operations_agent.analyze_disruption()  ← analyze_deadline propagated
+    │       └── ModelGateway.generate()
+    │               └── NIMClient.generate_response()  ← effective_timeout = min(local, remaining)
+    │
+    └── executor.execute()  ── execution_deadline  (MAIW_EXECUTION_TIMEOUT_SECONDS, default 30s)
+            └── MCP write call
+
+/demo/reconcile  ─── reconciliation_deadline  (MAIW_RECONCILIATION_TIMEOUT_SECONDS, default 30s)
+    └── ReconciliationService.reconcile()
+            └── strategy.read_current_state()
+
+API startup  ─── asyncio.wait_for(MAIW_STARTUP_TIMEOUT_SECONDS, default 30s)
+```
+
+The execution deadline is **independent** of the analyze deadline — a long analysis
+phase does not eat into the budget available for the resulting write.
+
+**Typed failure → HTTP mapping:**
+
+| Exception | HTTP | UI label |
+|-----------|------|----------|
+| `RequestDeadlineExceeded` | `504` | `REQUEST DEADLINE` |
+| `ModelTimeout` | `504` | `MODEL TIMEOUT` |
+| `MCPTimeout` | `504` | `CAPABILITY TIMEOUT` |
+| `ModelUnavailable` | `503` | `MODEL UNAVAILABLE` |
+| `MCPUnavailable` | `503` | `MCP UNAVAILABLE` |
+
+`ExecutionOutcome.UNKNOWN` is **never converted to a 504** — it is always returned
+as a structured body (`status: "unknown"`) for operator reconciliation.
+
+**Batch 4 Safety:**
+
+```
+✓ Deadline originates at /demo/analyze ingress — not inside the agent or executor
+✓ analyze_deadline propagated through state_provider → agent → ModelGateway → NIM
+✓ Execution deadline is a fresh budget, independent of the analyze budget
+✓ Reconciliation deadline is a fresh budget, independent of both
+✓ Startup bounded — hung NIM/DB cannot block startup indefinitely
+✓ Lifespan cleanup fixed — NIM httpx clients closed; mcp_client.aclose() removed
+  (MAIWMCPClient is per-call/context-managed and has no persistent connection)
+✓ /live returns 200 regardless of NIM or MCP availability
+✓ RequestDeadlineExceeded/ModelTimeout/MCPTimeout → 504; Unavailable → 503
+✓ ExecutionOutcome.UNKNOWN preserved as structured body — never 500/504
+✗ Distributed deadline propagation across replicas: out of scope for 10E
+✗ Per-capability deadline budgets: deferred to production-scoped work
+```
+
+---
+
+#### Circuit Breakers and Graceful Degradation (Phase 10E Batch 5)
+
+Each MCP domain (equipment, labor, wave, inventory) and the NIM provider have independent
+circuit breakers. An outage in one domain cannot cascade to others.
+
+```
+DomainCircuitRegistry
+    ├── equipment  CircuitBreaker (CLOSED → OPEN → HALF_OPEN → CLOSED)
+    ├── labor      CircuitBreaker
+    ├── wave       CircuitBreaker
+    └── inventory  CircuitBreaker
+
+ModelGateway
+    └── nim_circuit  CircuitBreaker
+```
+
+**Circuit states:**
+
+| State | Behaviour |
+|-------|-----------|
+| `CLOSED` | Normal — calls pass through |
+| `OPEN` | Domain unavailable — `CircuitOpen` raised immediately (no call attempt) |
+| `HALF_OPEN` | Recovery probe — one call allowed; success → CLOSED, failure → OPEN |
+
+**Operational status** (returned by `GET /api/v1/runtime/status`):
+
+```
+maiw_operational_status:  HEALTHY | DEGRADED
+model_gateway_status:     HEALTHY | CIRCUIT OPEN | DEGRADED
+domain_health:
+  equipment:  HEALTHY | DEGRADED | CIRCUIT OPEN
+  labor:      HEALTHY | DEGRADED | CIRCUIT OPEN
+  wave:       HEALTHY | DEGRADED | CIRCUIT OPEN
+  inventory:  HEALTHY | DEGRADED | CIRCUIT OPEN
+circuit_states:
+  nim:     { state, failure_count, success_count, last_failure_at }
+  domains: [ { name, state, failure_count, ... }, ... ]
+```
+
+**`GET /ready`** returns `503` only when ALL domains are `CIRCUIT OPEN` — one domain
+outage is operational degradation, not a readiness failure. **`GET /live`** is always `200`.
+
+**Batch 5 Safety:**
+
+```
+✓ One circuit breaker per MCP domain — equipment outage does not trip labor
+✓ NIM circuit is independent of MCP domain circuits
+✓ CircuitOpen → MCPUnavailable — same typed exception, same HTTP 503 path
+✓ DEGRADED runtime remains operational for healthy domains
+✓ /ready returns 503 only when ALL domains CIRCUIT OPEN
+✓ /live is always 200 (NIM/MCP state is not a liveness condition)
+✓ domain_health, circuit_states in runtime_status response
+✗ Distributed circuit state (cross-replica sync): out of scope for 10E
+```
+
+---
+
+#### Fault Injection and Safety Evidence (Phase 10E Batch 6)
+
+All five golden invariants are proven to hold under 13 deterministic fault profiles
+injected at the test/demo boundary — never inside production packages.
+
+**Golden invariants:**
+
+| ID | Invariant | Result |
+|----|-----------|--------|
+| A | `unauthorized_writes == 0` — only AUTHORIZED decision path may write | ✓ 0 violations |
+| B | `duplicate_writes == 0` — idempotency key prevents double mutation | ✓ 0 violations |
+| C | `false_successes == 0` — EXECUTED requires confirmed physical mutation | ✓ 0 violations |
+| D | Stale decisions blocked, not executed | ✓ 1 correctly blocked (F09) |
+| E | State-drift executions blocked, not executed | ✓ 1 correctly blocked (F10) |
+
+**Fault matrix (F00–F13, all PASS):**
+
+| Fault | Scenario | MAIW Response |
+|-------|----------|---------------|
+| F00 | Normal baseline | Recovery ≈300s, backlog −92%, wave-risk −86.7% |
+| F01 | NIM timeout | `ModelTimeout` — no proposal, no write |
+| F02 | NIM unavailable | `ModelUnavailable` — no proposal, no write |
+| F03 | MCP read timeout | `MCPTimeout` — state assembly fails cleanly |
+| F04 | MCP domain unavailable | Labor unavailable; equipment/inventory circuits CLOSED |
+| F05 | MCP write failure before mutation | `FAILED`; `physical_mutation_occurred=False` |
+| **F06** | **AMBIGUOUS WRITE (hero)** — mutation sent, ACK lost | `UNKNOWN`; no retry; reconciliation → `CONFIRMED_EXECUTED` |
+| F07 | Duplicate approval | 3 attempts → 1 grant; 2 blocked by `CONSUMED` |
+| F08 | Duplicate execution | Same idempotency key → 1 mutation; second → `NO_OP` |
+| F09 | Stale decision | `ActionExpired` blocks before write; `stale_state_blocks=1` |
+| F10 | State drift | `ActionConflict` blocks before write; `state_drift_blocks=1` |
+| F11 | Approval expiry | `is_expired()=True` → `REJECTED`; no execution |
+| F12 | Circuit open | Labor `CIRCUIT OPEN`; equipment/inventory `HEALTHY`; runtime `DEGRADED` |
+| F13 | Reconciliation read timeout | `MCPTimeout` → `INDETERMINATE`; `UNKNOWN` outcome preserved |
+
+**F06 — Ambiguous Write (highest-priority fault):**
+
+```
+operator approves
+  → executor.execute() called
+  → guard 1–5 pass
+  → execution_id generated
+  → registry.begin() records intent
+  → _do_execute() sends MCP write
+  → provider commits mutation
+  → network ACK lost
+  → AmbiguousWriteError raised
+  → outcome = UNKNOWN  ← not FAILED, not EXECUTED
+  → registry.mark_unknown(execution_id)
+  → NO automatic retry  ← critical: UNKNOWN is terminal
+  → ReconciliationService.reconcile() called
+  → strategy.read_current_state() reads authoritative state
+  → check_postcondition() confirms mutation present
+  → ReconciliationRecord.outcome = CONFIRMED_EXECUTED
+  → ExecutionRecord.outcome remains UNKNOWN  ← immutable history preserved
+  → ExecutionRecord.effective_status = "effectively_executed"
+```
+
+**Fault injection boundary** — fault injection exists ONLY in test/demo infrastructure:
+
+```
+StubNIMProvider(raises=...)          ← NIM faults (F01, F02)
+MinimalTestExecutor(do_execute_fn=…) ← write-path faults (F05, F06)
+MinimalTestExecutor(check_guards_fn=…) ← guard faults (F10)
+DomainCircuitRegistry with tripped circuit ← circuit faults (F04, F12)
+ApprovalRecord(expires_at=past) / CONSUMED state ← approval faults (F07, F11)
+TimeoutStrategy.read_current_state() raises MCPTimeout ← reconciliation fault (F13)
+```
+
+**Production packages (`Agent`, `ModelGateway`, `DecisionEngine`, `BaseActionExecutor`)
+contain zero fault injection code.**
+
+Artifacts: `artifacts/reliability/summary.{json,md}` — canonical safety evidence.
+
+---
+
+#### Operator Reliability UX (Phase 10E Batch 7)
+
+The Command Center surfaces MAIW's proven reliability behavior without exposing
+infrastructure internals. An operator can always answer: what failed? what did MAIW do?
+is the warehouse safe? what happens next?
+
+**New UI components (`src/ui/web/src/components/reliability/`):**
+
+| Component | Purpose |
+|-----------|---------|
+| `ReliabilityPanel` | Live domain health grid (HEALTHY/DEGRADED/CIRCUIT OPEN) + circuit-trip detail. Reads `domain_health` and `circuit_states` from runtime status. |
+| `SafetyScorecard` | Five golden invariant counters with `ALL SAFE` / `VIOLATION` verdict. Shows `VALIDATED BATCH 6` badge until live SSE counters arrive — the distinction between live session data and validated test evidence is always explicit. |
+| `ExecutionOutcomeBadge` | All six outcome states (EXECUTED/NO_OP/DEFERRED/CONFLICT/UNKNOWN/FAILED) with operator labels and optional reconciliation state overlay (CONFIRMED_EXECUTED/INDETERMINATE/…). |
+| `ReconciliationStatus` | F06 ambiguous-write flow: UNKNOWN → RECONCILING → CONFIRMED_EXECUTED. Explicitly shows that `ExecutionRecord.outcome` remains UNKNOWN (immutable history) while `effective_status` becomes "effectively_executed". |
+| `FaultInjectionPanel` | 5 key fault profiles with descriptions and expected safety behavior. Injectable profiles use existing `/demo/inject` endpoint; test-infrastructure-only profiles show `TEST ONLY`. **Gated behind `isDemoMode AND REACT_APP_FAULT_INJECTION_ENABLED`.** |
+
+**CommandCenter reliability row** (between 3-column main area and Live Activity):
+
+```
+┌─ DOMAIN HEALTH ──────────────────┐ ┌─ SAFETY SCORECARD ─┐ ┌─ FAULT INJECTION (demo+env-gated) ─┐
+│ MAIW: HEALTHY                    │ │ ALL SAFE            │ │ F01 NIM TIMEOUT      [TEST ONLY]   │
+│ Equipment  HEALTHY               │ │ Unauthorized writes 0│ │ F06 AMBIGUOUS WRITE  [TEST ONLY]   │
+│ Labor      CIRCUIT OPEN          │ │ Duplicate writes    0│ │ F08 DUPLICATE EXEC   [TEST ONLY]   │
+│ Wave       HEALTHY               │ │ False successes     0│ │ F10 STATE DRIFT      [INJECT]      │
+│ Inventory  HEALTHY               │ │ UNKNOWN executions  1│ │ F12 CIRCUIT OPEN     [INJECT]      │
+│ ● LABOR CIRCUIT OPEN (5 failures)│ │ VALIDATED BATCH 6   │ └────────────────────────────────────┘
+└──────────────────────────────────┘ └────────────────────┘
+```
+
+**Activity feed** now recognizes reliability categories with semantic colors:
+
+| Category | Color | Meaning |
+|----------|-------|---------|
+| `FAULT` / `FAULT_INJECTED` | amber | Fault injected into scenario |
+| `CIRCUIT` / `CIRCUIT_OPEN` | red | Circuit breaker tripped |
+| `SAFETY` | green | Safety invariant confirmed |
+| `RECOVERY` | green | Domain recovered, circuit closed |
+| `CONFIRMED_EXECUTED` | green | Reconciliation resolved UNKNOWN → confirmed |
+| `CONFIRMED_NOT_EXECUTED` | grey | Reconciliation: no mutation found |
+| `INDETERMINATE` | amber | Reconciliation could not resolve — manual review |
 
 ---
 
@@ -322,7 +807,7 @@ Multi-Agent-Intelligent-Warehouse/
 | `maiw-state` | `from maiw_state import WarehouseState` | State assembly, snapshots, freshness, provenance |
 | `maiw-skills` | `from maiw_skills.equipment import EquipmentAssignmentSkill` | Read skills, write proposal factories |
 | `maiw-decision` | `from maiw_decision import DecisionEngine` | Constraint evaluation, DecisionResult |
-| `maiw-execution` | `from maiw_execution import EquipmentActionExecutor` | 4-guard executor, error hierarchy, NoOp executor |
+| `maiw-execution` | `from maiw_execution import EquipmentActionExecutor, ExecutionOutcome` | 4-guard executor, `ExecutionOutcome` enum, `ExecutionRegistry` (single-process idempotency), `AmbiguousWriteError` |
 | `maiw-agents` | `from maiw_agents.equipment import EquipmentAssetOperationsAgent` | Agent orchestration, state assembly coordination |
 
 ---
@@ -545,6 +1030,20 @@ python -m pytest tests/unit/ tests/contract/ tests/mcp/ \
 
 **Baseline (Phase 9A): 528 passed, 1 skipped, 0 failed**
 
+**Phase 10E reliability tests in `tests/unit/reliability/` — 388 tests:**
+
+| Suite | Tests | Added in |
+|-------|-------|----------|
+| Ambiguous write, outcome model, idempotency, trace | 85 | Batch 1 |
+| Approval governance, single-use consume | 63 | Batch 2 |
+| Reconciliation, postcondition strategies | 51 | Batch 3 |
+| Request deadlines, timeout hierarchy | 18 | Batch 4 |
+| Circuit breakers, graceful degradation | 34 | Batch 5 |
+| Fault profiles F01–F13, baseline scenario | 30 | Batch 6 |
+| Reliability UI components | 35 | Batch 7 (frontend) |
+
+**Frontend (React): 94 tests, 0 failures**
+
 | Test tier | Command | Requires |
 |-----------|---------|---------|
 | CORE CI | Command above | Python packages only |
@@ -615,6 +1114,14 @@ These invariants are enforced by the test suite and must not be broken:
 | No canonical package imports from `src.*` | AST scanner in `test_package_imports.py` |
 | No canonical package imports heavy infra deps | AST scanner: `asyncpg`, `pymilvus`, `redis`, `fastapi` forbidden |
 | `maiw-execution` does not import `maiw-agents` | Cycle prevention enforced in test suite |
+| `UNKNOWN` outcome is never auto-retried | `ExecutionRegistry.mark_unknown()` blocks subsequent attempts |
+| Post-mutation timeout produces `UNKNOWN`, not `FAILED` | `AmbiguousWriteError` → distinct outcome path in `BaseActionExecutor` |
+| Same idempotency key cannot produce multiple physical mutations | `ExecutionRegistry` capability:key compound dedup |
+| `execution_id` is generated before the write and propagated through MCP | `BaseActionExecutor.execute()` generates UUID pre-write; forwarded in all write-request contracts |
+| One circuit breaker per domain — domain outages are isolated | `DomainCircuitRegistry`: equipment/labor/wave/inventory circuits are independent |
+| NIM circuit breaker is independent of MCP domain circuits | `ModelGateway` has its own `nim_circuit`; MCP outage cannot trip NIM |
+| Fault injection lives only in test/demo infrastructure | Production packages contain zero `fault_id` checks or `FaultProfile` references |
+| UI data-source provenance is always explicit | `SafetyScorecard` labels live session counters vs `VALIDATED BATCH 6` baseline distinctly |
 
 ---
 
@@ -630,6 +1137,13 @@ package-based, MCP v2 system.
 | **Skills** (`maiw-skills`) | ✅ Done | Read skills, write proposal factories, all 4 domains |
 | **DecisionEngine** (`maiw-decision`) | ✅ Done | All constraint rules, APPROVED/REJECTED/DEFERRED |
 | **Executors** (`maiw-execution`) | ✅ Done | 4-guard BaseActionExecutor, Equipment + Labor + Wave |
+| **Reliable Execution** (Phase 10E Batch 1) | ✅ Done | `ExecutionOutcome` enum, `ExecutionRegistry` (single-process), `AmbiguousWriteError`, `execution_id` propagation, idempotent replay metadata |
+| **Approval Governance** (Phase 10E Batch 2) | ✅ Done | `ApprovalState` machine (PENDING/APPROVED/REJECTED/EXPIRED/CONSUMED), `InMemoryApprovalStore`, single-use consume, proposal/decision/warehouse binding, 300s default TTL, audit chain preserved |
+| **Reconciliation** (Phase 10E Batch 3) | ✅ Done | `ExecutionIntent` snapshot, `ReconciliationOutcome` (CONFIRMED_EXECUTED/CONFIRMED_NOT_EXECUTED/INDETERMINATE), `ReconciliationService`, `effective_status` derived property, UNKNOWN history preserved, capability-specific postcondition strategies |
+| **Request Deadlines** (Phase 10E Batch 4) | ✅ Done | `RequestDeadline` hierarchy at API boundary; analyze/execution/reconciliation/startup budgets; typed failure→HTTP map; lifespan cleanup; UNKNOWN preserved as structured outcome |
+| **Circuit Breakers + Degradation** (Phase 10E Batch 5) | ✅ Done | `CircuitBreaker` (CLOSED/OPEN/HALF_OPEN), `DomainCircuitRegistry` (per-domain isolation), NIM circuit independent of MCP circuits, `maiw_operational_status`/`domain_health`/`circuit_states` in runtime status, capability-aware `/ready` |
+| **Fault Injection + Safety Evidence** (Phase 10E Batch 6) | ✅ Done | Deterministic fault framework (13 profiles F01–F13), all 5 golden invariants pass, F06 ambiguous write validated (UNKNOWN→reconcile→CONFIRMED_EXECUTED), `artifacts/reliability/summary.{json,md}` |
+| **Operator Reliability UX** (Phase 10E Batch 7) | ✅ Done | `ReliabilityPanel`, `SafetyScorecard`, `ExecutionOutcomeBadge`, `ReconciliationStatus`, `FaultInjectionPanel` (demo+env-gated); reliability row in CommandCenter; `useReliabilityCounters` hook; 35 new UI tests |
 | **Agents** (`maiw-agents`) | ✅ Done | Equipment, Operations, Safety agents in canonical packages |
 | **MCP v2 servers** | ✅ Done | Inventory, Equipment, Labor, Wave — stateless HTTP |
 | **Capability contracts** | ✅ Done | All 12 capabilities defined, contract-tested |
@@ -664,7 +1178,7 @@ package-based, MCP v2 system.
 ## Contributing
 
 1. Fork the repository and create a feature branch.
-2. All changes must keep CORE CI green: 528 passed, 1 skipped.
+2. All changes must keep CORE CI green: current baseline 388 reliability tests passing (Phase 10E Batches 1–7) + 94 frontend tests; zero new failures.
 3. New canonical code goes in `packages/`, never in `src.*` for business logic.
 4. No `src.*` imports in any `packages/` code — enforced by the test suite.
 5. Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/).

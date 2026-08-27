@@ -69,7 +69,9 @@ class ConformanceReport:
         lines = [f"Conformance: {self.passed_count}/{len(self.results)} passed"]
         for r in self.results:
             status = "✓" if r.passed else "✗"
-            lines.append(f"  {status} {r.name}" + (f" — {r.detail}" if r.detail else ""))
+            lines.append(
+                f"  {status} {r.name}" + (f" — {r.detail}" if r.detail else "")
+            )
         return "\n".join(lines)
 
 
@@ -123,9 +125,8 @@ async def run_inventory_conformance(
         get_tool = next(
             (t for t in tools_result.tools if t.name == "warehouse.inventory.get"), None
         )
-        schema_ok = (
-            get_tool is not None
-            and "sku" in get_tool.input_schema.get("properties", {})
+        schema_ok = get_tool is not None and "sku" in get_tool.input_schema.get(
+            "properties", {}
         )
         report.add(
             "input_schema_has_sku",
@@ -170,7 +171,9 @@ async def run_inventory_conformance(
             )
         else:
             report.add("result_is_json_object", False, "skipped — previous call failed")
-            report.add("result_has_required_fields", False, "skipped — previous call failed")
+            report.add(
+                "result_has_required_fields", False, "skipped — previous call failed"
+            )
 
         # 8. Empty SKU is rejected or handled gracefully (not a crash)
         try:

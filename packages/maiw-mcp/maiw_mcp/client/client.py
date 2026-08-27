@@ -50,6 +50,9 @@ from typing import Any
 from mcp import types
 from mcp.client import Client
 
+from maiw_mcp.circuit_breaker import CircuitOpen
+from maiw_mcp.circuit_registry import DomainCircuitRegistry
+from maiw_mcp.deadline import RequestDeadline, RequestDeadlineExceeded
 from maiw_mcp.errors import (
     BackendUnavailable,
     CapabilityNotFound,
@@ -91,9 +94,11 @@ class MAIWMCPClient:
         registry: CapabilityRegistry,
         *,
         telemetry: CapabilityTelemetry | None = None,
+        circuit_registry: DomainCircuitRegistry | None = None,
     ) -> None:
         self._registry = registry
         self._telemetry = telemetry or CapabilityTelemetry()
+        self._circuit_registry = circuit_registry
 
     async def invoke(
         self,
@@ -102,6 +107,7 @@ class MAIWMCPClient:
         *,
         trace_id: str | None = None,
         timeout_seconds: float = 30.0,
+        deadline: RequestDeadline | None = None,
     ) -> dict[str, Any]:
         """
         Invoke a warehouse capability via the MCP 2026-07-28 protocol.
@@ -115,7 +121,14 @@ class MAIWMCPClient:
         trace_id:
             Correlation ID propagated from ModelGateway / agent span.
         timeout_seconds:
-            Client-side read timeout per round trip.
+            Client-side read timeout per round trip.  When a *deadline* is
+            supplied this becomes the upper bound for the local operation;
+            the effective timeout is ``min(timeout_seconds, remaining_budget)``.
+        deadline:
+            Parent request deadline.  When supplied and already expired,
+            raises ``RequestDeadlineExceeded`` before any network call.
+            When the remaining budget is smaller than ``timeout_seconds``,
+            the tighter value is used.
 
         Returns
         -------
@@ -124,10 +137,13 @@ class MAIWMCPClient:
 
         Raises
         ------
+        RequestDeadlineExceeded
+            Parent request deadline was already exhausted before the call.
         CapabilityNotFound
             No server registered for this capability.
         MCPTimeout
-            Server did not respond within ``timeout_seconds``.
+            Server did not respond within the effective timeout (parent budget
+            still existed at call time; the child operation simply ran long).
         MCPToolError
             Server returned ``is_error=True`` in the tool result.
         MCPContractError
@@ -135,15 +151,53 @@ class MAIWMCPClient:
         MCPUnavailable
             Transport-level or protocol-level error.
         """
+        # Deadline guard — reject before any network call
+        if deadline is not None:
+            effective_timeout = deadline.effective_timeout(timeout_seconds)
+        else:
+            effective_timeout = timeout_seconds
+
+        # Circuit breaker — extract domain from "warehouse.<domain>.<action>"
+        parts = capability.split(".")
+        domain = parts[1] if len(parts) >= 3 else "unknown"
+        breaker = self._circuit_registry.get(domain) if self._circuit_registry else None
+
         server_url = self._registry.resolve(capability)
         # Telemetry fields must be plain strings — MCPServer instances are not
         # serialisable via dataclasses.asdict() (deepcopy fails on SSL objects).
-        server_label = server_url if isinstance(server_url, str) else type(server_url).__name__
+        server_label = (
+            server_url if isinstance(server_url, str) else type(server_url).__name__
+        )
         start = time.monotonic()
 
+        async def _do_call() -> dict:
+            return await self._call_tool(
+                capability, payload, server_url, effective_timeout
+            )
+
         try:
-            result = await self._call_tool(capability, payload, server_url, timeout_seconds)
+            if breaker is not None:
+                # CircuitOpen is raised by breaker.call() when circuit is OPEN.
+                # All exceptions from _do_call() trip the circuit failure counter —
+                # including MCPTimeout and MCPUnavailable (infrastructure failures)
+                # as well as MCPToolError (server responded with error). This is an
+                # intentional tradeoff: consistent server-side errors also indicate
+                # degradation worth tracking.
+                result = await breaker.call(_do_call())
+            else:
+                result = await _do_call()
+        except CircuitOpen as exc:
+            # Translate to MCPUnavailable so callers see a uniform error type.
+            # CircuitOpen is also added to _raise_typed_http → 503 in demo.py.
+            raise MCPUnavailable(
+                f"Circuit OPEN for MCP domain {domain!r} — "
+                f"cooldown {exc.cooldown_remaining_s:.1f}s remaining"
+            ) from exc
+        except RequestDeadlineExceeded:
+            raise  # parent budget exhausted — not MCPTimeout
         except (CapabilityNotFound, MCPToolError, MCPContractError, BackendUnavailable):
+            raise
+        except MCPUnavailable:
             raise
         except TimeoutError as exc:
             latency_ms = (time.monotonic() - start) * 1000
@@ -154,7 +208,9 @@ class MAIWMCPClient:
                 error=exc,
                 trace_id=trace_id,
             )
-            raise MCPTimeout(f"Timeout after {timeout_seconds}s calling {capability!r}") from exc
+            raise MCPTimeout(
+                f"Timeout after {effective_timeout:.1f}s calling {capability!r}"
+            ) from exc
         except Exception as exc:
             latency_ms = (time.monotonic() - start) * 1000
             self._telemetry.record_failure(
@@ -190,7 +246,9 @@ class MAIWMCPClient:
         # - tools/call request
         # - session teardown
         async with Client(server_url, read_timeout_seconds=timeout_seconds) as client:
-            call_result: types.CallToolResult = await client.call_tool(capability, payload)
+            call_result: types.CallToolResult = await client.call_tool(
+                capability, payload
+            )
 
         if call_result.is_error:
             error_text = self._extract_text(call_result)
@@ -209,7 +267,11 @@ class MAIWMCPClient:
         # {"result": "<json string>"}.  In that case parse the inner value.
         sc = result.structured_content
         if sc is not None:
-            if isinstance(sc, dict) and list(sc.keys()) == ["result"] and isinstance(sc.get("result"), str):
+            if (
+                isinstance(sc, dict)
+                and list(sc.keys()) == ["result"]
+                and isinstance(sc.get("result"), str)
+            ):
                 try:
                     parsed = json.loads(sc["result"])
                     if isinstance(parsed, dict):

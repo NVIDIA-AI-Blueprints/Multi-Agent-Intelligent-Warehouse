@@ -25,6 +25,7 @@ from maiw_state.errors import StateFreshnessError
 
 from .audit import DecisionAuditRecord
 from .models import (
+    ApprovalState,
     ConstraintViolation,
     DecisionOutcome,
     DecisionRequest,
@@ -76,11 +77,11 @@ class DecisionEngine:
 
         # Rule 2: Equipment domain — check state freshness when asset_id given
         if proposal.domain == "equipment":
-            outcome = self._check_equipment_freshness(
-                request, violations
-            )
+            outcome = self._check_equipment_freshness(request, violations)
             if outcome is not None:
-                return self._build(request=request, outcome=outcome, violations=violations)
+                return self._build(
+                    request=request, outcome=outcome, violations=violations
+                )
 
             # Rule 3: asset_id given but not found in snapshot
             asset_id = proposal.parameters.get("asset_id")
@@ -91,7 +92,10 @@ class DecisionEngine:
                         ConstraintViolation(
                             rule="equipment.asset_not_found",
                             message=f"Asset '{asset_id}' not found in state snapshot",
-                            details={"asset_id": asset_id, "snapshot_id": snapshot.snapshot_id},
+                            details={
+                                "asset_id": asset_id,
+                                "snapshot_id": snapshot.snapshot_id,
+                            },
                         )
                     )
                     return self._build(
@@ -101,10 +105,7 @@ class DecisionEngine:
                     )
 
         # Rule 4: LOW risk + no approval required → APPROVED
-        if (
-            proposal.risk_level == RiskLevel.LOW
-            and not proposal.requires_approval
-        ):
+        if proposal.risk_level == RiskLevel.LOW and not proposal.requires_approval:
             return self._build(
                 request=request,
                 outcome=DecisionOutcome.APPROVED,
@@ -148,6 +149,8 @@ class DecisionEngine:
         self,
         request: DecisionRequest,
         approval: "ApprovalRecord",
+        *,
+        expected_decision_id: str | None = None,
     ) -> tuple[DecisionResult, DecisionAuditRecord]:
         """
         Re-evaluate a REQUIRES_HUMAN_APPROVAL proposal that now has approval evidence.
@@ -157,65 +160,163 @@ class DecisionEngine:
         be overridden by approval evidence.
 
         Checks (in order):
-        1. ApprovalRecord binds to the correct proposal.
+        0. Approval has not been consumed (CONSUMED → already used).
+        1. ApprovalRecord binds to the correct proposal_id.
+        1b. If expected_decision_id provided: decision_id binding check.
+        1c. If both warehouse_ids set: warehouse binding check.
         2. Approval has not expired.
-        3. Approval is not a rejection.
+        3. Approval is not a rejection (state == APPROVED).
         4. Hard constraints still pass (equipment freshness, asset presence).
-           READ_ONLY and state-freshness rules run as before.
         5. If all pass: return APPROVED.
         """
-        from .models import ApprovalRecord  # avoid circular at module level
-
         proposal = request.proposal
         snapshot = request.state
         violations: list[ConstraintViolation] = []
 
-        # Check 1: binding
+        # Check 0: single-use — CONSUMED approval must never re-authorize
+        if approval.state == ApprovalState.CONSUMED:
+            violations.append(
+                ConstraintViolation(
+                    rule="approval.already_consumed",
+                    message=f"ApprovalRecord approval_id={approval.approval_id!r} has already been consumed",
+                    details={
+                        "approval_id": approval.approval_id,
+                        "state": approval.state.value,
+                    },
+                )
+            )
+            return self._build(
+                request=request, outcome=DecisionOutcome.REJECTED, violations=violations
+            )
+
+        # Check 1: proposal_id binding
         if approval.proposal_id != proposal.proposal_id:
-            violations.append(ConstraintViolation(
-                rule="approval.proposal_mismatch",
-                message=f"ApprovalRecord.proposal_id={approval.proposal_id!r} does not match proposal.proposal_id={proposal.proposal_id!r}",
-                details={"approval_proposal_id": approval.proposal_id, "proposal_id": proposal.proposal_id},
-            ))
-            return self._build(request=request, outcome=DecisionOutcome.REJECTED, violations=violations)
+            violations.append(
+                ConstraintViolation(
+                    rule="approval.proposal_mismatch",
+                    message=(
+                        f"ApprovalRecord.proposal_id={approval.proposal_id!r} "
+                        f"does not match proposal.proposal_id={proposal.proposal_id!r}"
+                    ),
+                    details={
+                        "approval_proposal_id": approval.proposal_id,
+                        "proposal_id": proposal.proposal_id,
+                    },
+                )
+            )
+            return self._build(
+                request=request, outcome=DecisionOutcome.REJECTED, violations=violations
+            )
+
+        # Check 1b: decision_id binding (when caller supplies expected value)
+        if (
+            expected_decision_id is not None
+            and approval.decision_id != expected_decision_id
+        ):
+            violations.append(
+                ConstraintViolation(
+                    rule="approval.decision_mismatch",
+                    message=(
+                        f"ApprovalRecord.decision_id={approval.decision_id!r} "
+                        f"does not match expected_decision_id={expected_decision_id!r}"
+                    ),
+                    details={
+                        "approval_decision_id": approval.decision_id,
+                        "expected_decision_id": expected_decision_id,
+                    },
+                )
+            )
+            return self._build(
+                request=request, outcome=DecisionOutcome.REJECTED, violations=violations
+            )
+
+        # Check 1c: warehouse_id binding (confused deputy prevention)
+        if approval.warehouse_id is not None:
+            proposal_wh = proposal.parameters.get("warehouse_id")
+            if proposal_wh is not None and approval.warehouse_id != proposal_wh:
+                violations.append(
+                    ConstraintViolation(
+                        rule="approval.warehouse_mismatch",
+                        message=(
+                            f"ApprovalRecord.warehouse_id={approval.warehouse_id!r} "
+                            f"does not match proposal warehouse_id={proposal_wh!r}"
+                        ),
+                        details={
+                            "approval_warehouse_id": approval.warehouse_id,
+                            "proposal_warehouse_id": proposal_wh,
+                        },
+                    )
+                )
+                return self._build(
+                    request=request,
+                    outcome=DecisionOutcome.REJECTED,
+                    violations=violations,
+                )
 
         # Check 2: expiry
         if approval.is_expired():
-            violations.append(ConstraintViolation(
-                rule="approval.expired",
-                message=f"ApprovalRecord expired at {approval.expires_at}",
-                details={"expires_at": str(approval.expires_at)},
-            ))
-            return self._build(request=request, outcome=DecisionOutcome.REJECTED, violations=violations)
+            violations.append(
+                ConstraintViolation(
+                    rule="approval.expired",
+                    message=f"ApprovalRecord expired at {approval.expires_at}",
+                    details={"expires_at": str(approval.expires_at)},
+                )
+            )
+            return self._build(
+                request=request, outcome=DecisionOutcome.REJECTED, violations=violations
+            )
 
-        # Check 3: rejection
+        # Check 3: rejection or non-APPROVED state
         if not approval.approved:
-            violations.append(ConstraintViolation(
-                rule="approval.rejected_by_human",
-                message=f"Proposal rejected by {approval.approved_by!r}",
-                details={"approved_by": approval.approved_by},
-            ))
-            return self._build(request=request, outcome=DecisionOutcome.REJECTED, violations=violations)
+            violations.append(
+                ConstraintViolation(
+                    rule="approval.not_approved",
+                    message=(
+                        f"ApprovalRecord is not in APPROVED state "
+                        f"(state={approval.state.value!r}, approved_by={approval.approved_by!r})"
+                    ),
+                    details={
+                        "state": approval.state.value,
+                        "approved_by": approval.approved_by,
+                    },
+                )
+            )
+            return self._build(
+                request=request, outcome=DecisionOutcome.REJECTED, violations=violations
+            )
 
         # Check 4: hard constraints still apply
         if proposal.domain == "equipment":
             outcome = self._check_equipment_freshness(request, violations)
             if outcome is not None:
-                return self._build(request=request, outcome=outcome, violations=violations)
+                return self._build(
+                    request=request, outcome=outcome, violations=violations
+                )
 
             asset_id = proposal.parameters.get("asset_id")
             if asset_id and snapshot.state.equipment is not None:
                 found = snapshot.state.equipment.find_asset(asset_id)
                 if found is None:
-                    violations.append(ConstraintViolation(
-                        rule="equipment.asset_not_found",
-                        message=f"Asset '{asset_id}' not found in state snapshot",
-                        details={"asset_id": asset_id, "snapshot_id": snapshot.snapshot_id},
-                    ))
-                    return self._build(request=request, outcome=DecisionOutcome.REJECTED, violations=violations)
+                    violations.append(
+                        ConstraintViolation(
+                            rule="equipment.asset_not_found",
+                            message=f"Asset '{asset_id}' not found in state snapshot",
+                            details={
+                                "asset_id": asset_id,
+                                "snapshot_id": snapshot.snapshot_id,
+                            },
+                        )
+                    )
+                    return self._build(
+                        request=request,
+                        outcome=DecisionOutcome.REJECTED,
+                        violations=violations,
+                    )
 
         # All checks passed — approval grants authority
-        return self._build(request=request, outcome=DecisionOutcome.APPROVED, violations=[])
+        return self._build(
+            request=request, outcome=DecisionOutcome.APPROVED, violations=[]
+        )
 
     # ------------------------------------------------------------------
     # Helpers

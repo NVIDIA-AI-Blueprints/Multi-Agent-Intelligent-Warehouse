@@ -193,7 +193,9 @@ async def get_propose_labor_allocation_skill() -> ProposeLaborAllocationSkill:
     global _propose_labor_allocation_skill
     if _propose_labor_allocation_skill is None:
         _propose_labor_allocation_skill = ProposeLaborAllocationSkill()
-        logger.info("ProposeLaborAllocationSkill initialised (local proposal builder, no MCP)")
+        logger.info(
+            "ProposeLaborAllocationSkill initialised (local proposal builder, no MCP)"
+        )
     return _propose_labor_allocation_skill
 
 

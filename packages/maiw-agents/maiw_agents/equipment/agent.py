@@ -104,7 +104,9 @@ class EquipmentAssetOperationsAgent:
         No-op: all dependencies are injected at construction time.
         Kept for backward-compatibility with callers that call initialize() on startup.
         """
-        logger.info("EquipmentAssetOperationsAgent.initialize() called — all deps pre-injected.")
+        logger.info(
+            "EquipmentAssetOperationsAgent.initialize() called — all deps pre-injected."
+        )
 
     # ------------------------------------------------------------------
     # State-aware public API
@@ -132,7 +134,9 @@ class EquipmentAssetOperationsAgent:
         Falls back to the legacy direct-write path if the state-aware path is
         not configured (state_provider not injected).
         """
-        if not (self._state_provider and self._decision_engine and self._assignment_skill):
+        if not (
+            self._state_provider and self._decision_engine and self._assignment_skill
+        ):
             logger.warning(
                 "State-aware path not available for assignment of %s; using legacy path",
                 asset_id,
@@ -179,7 +183,8 @@ class EquipmentAssetOperationsAgent:
         """
         if not (self._state_provider and self._decision_engine):
             logger.warning(
-                "State-aware path not available for release of %s; using legacy path", asset_id
+                "State-aware path not available for release of %s; using legacy path",
+                asset_id,
             )
             if self.asset_tools:
                 result = await self.asset_tools.release_equipment(
@@ -231,7 +236,8 @@ class EquipmentAssetOperationsAgent:
         """
         if not (self._state_provider and self._decision_engine):
             logger.warning(
-                "State-aware path not available for maintenance of %s; using legacy path", asset_id
+                "State-aware path not available for maintenance of %s; using legacy path",
+                asset_id,
             )
             if self.asset_tools:
                 try:
@@ -381,21 +387,27 @@ class EquipmentAssetOperationsAgent:
         self, query: str, session_id: str, context: Optional[Dict[str, Any]]
     ) -> EquipmentQuery:
         try:
-            conversation_history = self.conversation_context.get(session_id, {}).get("history", [])
+            conversation_history = self.conversation_context.get(session_id, {}).get(
+                "history", []
+            )
             context_str = self._build_context_string(conversation_history, context)
 
             understanding_prompt_template = self.config.persona.understanding_prompt
-            prompt = understanding_prompt_template.format(query=query, context=context_str)
+            prompt = understanding_prompt_template.format(
+                query=query, context=context_str
+            )
 
             from maiw_models import ModelRequest, ReasoningLevel, RiskLevel
 
-            gw_resp = await self.model_gateway.generate(ModelRequest(
-                task="warehouse.equipment.understand_query",
-                messages=[{"role": "user", "content": prompt}],
-                reasoning=ReasoningLevel.LOW,
-                risk_level=RiskLevel.LOW,
-                temperature=0.1,
-            ))
+            gw_resp = await self.model_gateway.generate(
+                ModelRequest(
+                    task="warehouse.equipment.understand_query",
+                    messages=[{"role": "user", "content": prompt}],
+                    reasoning=ReasoningLevel.LOW,
+                    risk_level=RiskLevel.LOW,
+                    temperature=0.1,
+                )
+            )
             response_content = gw_resp.content
 
             try:
@@ -408,13 +420,19 @@ class EquipmentAssetOperationsAgent:
                 )
             except json.JSONDecodeError:
                 logger.warning("Failed to parse LLM response as JSON, using fallback")
-                return EquipmentQuery(intent="equipment_lookup", entities={}, context={}, user_query=query)
+                return EquipmentQuery(
+                    intent="equipment_lookup", entities={}, context={}, user_query=query
+                )
 
         except Exception as e:
             logger.error("Error understanding query: %s", e)
-            return EquipmentQuery(intent="equipment_lookup", entities={}, context={}, user_query=query)
+            return EquipmentQuery(
+                intent="equipment_lookup", entities={}, context={}, user_query=query
+            )
 
-    async def _retrieve_equipment_data(self, equipment_query: EquipmentQuery) -> Dict[str, Any]:
+    async def _retrieve_equipment_data(
+        self, equipment_query: EquipmentQuery
+    ) -> Dict[str, Any]:
         try:
             search_context = SearchContext(
                 query=equipment_query.user_query,
@@ -450,7 +468,9 @@ class EquipmentAssetOperationsAgent:
             assignee = equipment_query.entities.get("assignee")
 
             if not asset_id and equipment_query.user_query:
-                asset_match = re.search(r"[A-Z]{2,3}-\d+", equipment_query.user_query.upper())
+                asset_match = re.search(
+                    r"[A-Z]{2,3}-\d+", equipment_query.user_query.upper()
+                )
                 if asset_match:
                     asset_id = asset_match.group()
                     logger.info("Extracted asset_id from query: %s", asset_id)
@@ -462,28 +482,34 @@ class EquipmentAssetOperationsAgent:
                     zone=zone,
                     status=equipment_query.entities.get("status"),
                 )
-                actions_taken.append({
-                    "action": "get_equipment_status",
-                    "asset_id": asset_id,
-                    "result": equipment_status,
-                    "timestamp": datetime.now().isoformat(),
-                })
+                actions_taken.append(
+                    {
+                        "action": "get_equipment_status",
+                        "asset_id": asset_id,
+                        "result": equipment_status,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
 
             elif equipment_query.intent == "assignment" and asset_id and assignee:
                 decision_response = await self.propose_equipment_assignment(
                     asset_id=asset_id,
                     assignee=assignee,
-                    assignment_type=equipment_query.entities.get("assignment_type", "task"),
+                    assignment_type=equipment_query.entities.get(
+                        "assignment_type", "task"
+                    ),
                     task_id=equipment_query.entities.get("task_id"),
                     duration_hours=equipment_query.entities.get("duration_hours"),
                     notes=equipment_query.entities.get("notes"),
                 )
-                actions_taken.append({
-                    "action": "propose_equipment_assignment",
-                    "asset_id": asset_id,
-                    "result": decision_response,
-                    "timestamp": datetime.now().isoformat(),
-                })
+                actions_taken.append(
+                    {
+                        "action": "propose_equipment_assignment",
+                        "asset_id": asset_id,
+                        "result": decision_response,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
 
             elif equipment_query.intent == "utilization" and asset_id:
                 telemetry_data = await self.asset_tools.get_equipment_telemetry(
@@ -491,29 +517,41 @@ class EquipmentAssetOperationsAgent:
                     metric=equipment_query.entities.get("metric"),
                     hours_back=equipment_query.entities.get("hours_back", 24),
                 )
-                actions_taken.append({
-                    "action": "get_equipment_telemetry",
-                    "asset_id": asset_id,
-                    "result": telemetry_data,
-                    "timestamp": datetime.now().isoformat(),
-                })
+                actions_taken.append(
+                    {
+                        "action": "get_equipment_telemetry",
+                        "asset_id": asset_id,
+                        "result": telemetry_data,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
 
             elif equipment_query.intent == "maintenance" and asset_id:
                 maintenance_result = await self.asset_tools.schedule_maintenance(
                     asset_id=asset_id,
-                    maintenance_type=equipment_query.entities.get("maintenance_type", "preventive"),
-                    description=equipment_query.entities.get("description", "Scheduled maintenance"),
+                    maintenance_type=equipment_query.entities.get(
+                        "maintenance_type", "preventive"
+                    ),
+                    description=equipment_query.entities.get(
+                        "description", "Scheduled maintenance"
+                    ),
                     scheduled_by=equipment_query.entities.get("scheduled_by", "system"),
-                    scheduled_for=equipment_query.entities.get("scheduled_for", datetime.now()),
-                    estimated_duration_minutes=equipment_query.entities.get("duration_minutes", 60),
+                    scheduled_for=equipment_query.entities.get(
+                        "scheduled_for", datetime.now()
+                    ),
+                    estimated_duration_minutes=equipment_query.entities.get(
+                        "duration_minutes", 60
+                    ),
                     priority=equipment_query.entities.get("priority", "medium"),
                 )
-                actions_taken.append({
-                    "action": "schedule_maintenance",
-                    "asset_id": asset_id,
-                    "result": maintenance_result,
-                    "timestamp": datetime.now().isoformat(),
-                })
+                actions_taken.append(
+                    {
+                        "action": "schedule_maintenance",
+                        "asset_id": asset_id,
+                        "result": maintenance_result,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
 
             elif equipment_query.intent == "release" and asset_id:
                 release_result = await self.asset_tools.release_equipment(
@@ -521,12 +559,14 @@ class EquipmentAssetOperationsAgent:
                     released_by=equipment_query.entities.get("released_by", "system"),
                     notes=equipment_query.entities.get("notes"),
                 )
-                actions_taken.append({
-                    "action": "release_equipment",
-                    "asset_id": asset_id,
-                    "result": release_result,
-                    "timestamp": datetime.now().isoformat(),
-                })
+                actions_taken.append(
+                    {
+                        "action": "release_equipment",
+                        "asset_id": asset_id,
+                        "result": release_result,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
 
             elif equipment_query.intent == "telemetry" and asset_id:
                 telemetry_data = await self.asset_tools.get_equipment_telemetry(
@@ -534,20 +574,24 @@ class EquipmentAssetOperationsAgent:
                     metric=equipment_query.entities.get("metric"),
                     hours_back=equipment_query.entities.get("hours_back", 24),
                 )
-                actions_taken.append({
-                    "action": "get_equipment_telemetry",
-                    "asset_id": asset_id,
-                    "result": telemetry_data,
-                    "timestamp": datetime.now().isoformat(),
-                })
+                actions_taken.append(
+                    {
+                        "action": "get_equipment_telemetry",
+                        "asset_id": asset_id,
+                        "result": telemetry_data,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
 
         except Exception as e:
             logger.error("Error executing action tools: %s", e)
-            actions_taken.append({
-                "action": "error",
-                "result": {"error": str(e)},
-                "timestamp": datetime.now().isoformat(),
-            })
+            actions_taken.append(
+                {
+                    "action": "error",
+                    "result": {"error": str(e)},
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
 
         return actions_taken
 
@@ -582,13 +626,15 @@ class EquipmentAssetOperationsAgent:
                 else RiskLevel.LOW
             )
 
-            gw_resp = await self.model_gateway.generate(ModelRequest(
-                task=f"warehouse.equipment.{equipment_query.intent}",
-                messages=[{"role": "user", "content": prompt}],
-                reasoning=_reasoning,
-                risk_level=_risk,
-                temperature=0.3,
-            ))
+            gw_resp = await self.model_gateway.generate(
+                ModelRequest(
+                    task=f"warehouse.equipment.{equipment_query.intent}",
+                    messages=[{"role": "user", "content": prompt}],
+                    reasoning=_reasoning,
+                    risk_level=_risk,
+                    temperature=0.3,
+                )
+            )
             _response_text = gw_resp.content
 
             response_type_map = {
@@ -600,7 +646,9 @@ class EquipmentAssetOperationsAgent:
                 "release": "release_status",
                 "telemetry": "telemetry_data",
             }
-            response_type = response_type_map.get(equipment_query.intent, "equipment_info")
+            response_type = response_type_map.get(
+                equipment_query.intent, "equipment_info"
+            )
             recommendations = self._extract_recommendations(_response_text)
 
             return EquipmentResponse(
@@ -619,7 +667,9 @@ class EquipmentAssetOperationsAgent:
             )
 
     def _build_context_string(
-        self, conversation_history: List[Dict[str, Any]], context: Optional[Dict[str, Any]]
+        self,
+        conversation_history: List[Dict[str, Any]],
+        context: Optional[Dict[str, Any]],
     ) -> str:
         context_parts = []
         if conversation_history:
@@ -655,7 +705,10 @@ class EquipmentAssetOperationsAgent:
         recommendations = []
         for line in response_text.split("\n"):
             line = line.strip()
-            if line.startswith(("•", "-", "*", "1.", "2.", "3.")) or "recommend" in line.lower():
+            if (
+                line.startswith(("•", "-", "*", "1.", "2.", "3."))
+                or "recommend" in line.lower()
+            ):
                 clean_line = line.lstrip("•-*123456789. ").strip()
                 if clean_line and len(clean_line) > 10:
                     recommendations.append(clean_line)

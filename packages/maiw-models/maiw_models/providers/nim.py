@@ -28,6 +28,8 @@ import logging
 
 import httpx
 
+from maiw_mcp.deadline import RequestDeadlineExceeded
+
 from maiw_models.providers.nim_client import LLMResponse, NIMClient
 
 from ..errors import ModelResponseError, ModelTimeout, ModelUnavailable
@@ -74,7 +76,10 @@ class NIMProvider:
                 stream=request.stream,
                 enable_thinking=enable_thinking,
                 model_override=model_id,
+                deadline=request.deadline,
             )
+        except RequestDeadlineExceeded:
+            raise  # parent deadline exhaustion — not a ModelTimeout
         except (httpx.TimeoutException, asyncio.TimeoutError) as exc:
             raise ModelTimeout(
                 f"NIM model {model_id} timed out: {exc}",

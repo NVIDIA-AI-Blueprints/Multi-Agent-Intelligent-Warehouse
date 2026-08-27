@@ -68,7 +68,13 @@ from __future__ import annotations
 import logging
 import os
 
-from .models import CostClass, DeploymentStatus, LatencyClass, ModelCapability, ReasoningLevel
+from .models import (
+    CostClass,
+    DeploymentStatus,
+    LatencyClass,
+    ModelCapability,
+    ReasoningLevel,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -91,10 +97,10 @@ _NANO_OMNI_ENABLED_ENV = "NEMOTRON_NANO_OMNI_ENABLED"
 # Override via env vars for self-hosted or alternate deployments.
 
 _DEFAULTS: dict[str, str] = {
-    _LIGHTNING_MODEL_ENV: "nvidia/nemotron-3.5-lightning-30b-a3b",   # Nemotron 3.5
-    _NANO_MODEL_ENV:      "nvidia/nemotron-3-nano-30b-a3b",          # Nemotron 3
-    _SUPER_MODEL_ENV:     "nvidia/nemotron-3-super-120b-a12b",       # Nemotron 3
-    _ULTRA_MODEL_ENV:     "nvidia/nemotron-3-ultra-550b-a55b",       # Nemotron 3
+    _LIGHTNING_MODEL_ENV: "nvidia/nemotron-3.5-lightning-30b-a3b",  # Nemotron 3.5
+    _NANO_MODEL_ENV: "nvidia/nemotron-3-nano-30b-a3b",  # Nemotron 3
+    _SUPER_MODEL_ENV: "nvidia/nemotron-3-super-120b-a12b",  # Nemotron 3
+    _ULTRA_MODEL_ENV: "nvidia/nemotron-3-ultra-550b-a55b",  # Nemotron 3
     # Nano Omni: no verified model available.
     # Operator MUST set NEMOTRON_NANO_OMNI_MODEL to a confirmed VL model ID.
     _NANO_OMNI_MODEL_ENV: "OPERATOR_MUST_CONFIGURE_NEMOTRON_NANO_OMNI_MODEL",
@@ -113,11 +119,11 @@ LEGACY_NANO_VL = "nvidia/llama-nemotron-nano-vl-8b-v1"
 # ── Enabled defaults ───────────────────────────────────────────────────────────
 
 _ENABLED_DEFAULTS: dict[str, bool] = {
-    _LIGHTNING_ENABLED_ENV: True,    # validated DEPLOYED; fast path now available
-    _NANO_ENABLED_ENV:      True,    # validated DEPLOYED
-    _SUPER_ENABLED_ENV:     True,    # validated DEPLOYED; primary deployment
-    _ULTRA_ENABLED_ENV:     False,   # validated DEPLOYED but ~31s latency; operator opt-in
-    _NANO_OMNI_ENABLED_ENV: False,   # NOT_CURRENTLY_DEPLOYED; requires operator model config
+    _LIGHTNING_ENABLED_ENV: True,  # validated DEPLOYED; fast path now available
+    _NANO_ENABLED_ENV: True,  # validated DEPLOYED
+    _SUPER_ENABLED_ENV: True,  # validated DEPLOYED; primary deployment
+    _ULTRA_ENABLED_ENV: False,  # validated DEPLOYED but ~31s latency; operator opt-in
+    _NANO_OMNI_ENABLED_ENV: False,  # NOT_CURRENTLY_DEPLOYED; requires operator model config
 }
 
 _NANO_OMNI_SENTINEL = "OPERATOR_MUST_CONFIGURE_NEMOTRON_NANO_OMNI_MODEL"
@@ -147,8 +153,12 @@ class ModelRegistry:
         self._build()
 
     def _build(self) -> None:
-        nano_omni_model = os.getenv(_NANO_OMNI_MODEL_ENV, _DEFAULTS[_NANO_OMNI_MODEL_ENV])
-        nano_omni_enabled = _getenv_bool(_NANO_OMNI_ENABLED_ENV, _ENABLED_DEFAULTS[_NANO_OMNI_ENABLED_ENV])
+        nano_omni_model = os.getenv(
+            _NANO_OMNI_MODEL_ENV, _DEFAULTS[_NANO_OMNI_MODEL_ENV]
+        )
+        nano_omni_enabled = _getenv_bool(
+            _NANO_OMNI_ENABLED_ENV, _ENABLED_DEFAULTS[_NANO_OMNI_ENABLED_ENV]
+        )
 
         if nano_omni_enabled and nano_omni_model == _NANO_OMNI_SENTINEL:
             logger.error(
@@ -161,7 +171,9 @@ class ModelRegistry:
 
         entries = [
             ModelCapability(
-                model_id=os.getenv(_LIGHTNING_MODEL_ENV, _DEFAULTS[_LIGHTNING_MODEL_ENV]),
+                model_id=os.getenv(
+                    _LIGHTNING_MODEL_ENV, _DEFAULTS[_LIGHTNING_MODEL_ENV]
+                ),
                 role="lightning",
                 family="nemotron",
                 generation="nemotron-3.5",
@@ -176,8 +188,10 @@ class ModelRegistry:
                 latency_class=LatencyClass.LOW,
                 cost_class=CostClass.LOW,
                 teacher_judge=False,
-                context_window=None,   # not confirmed from documentation
-                enabled=_getenv_bool(_LIGHTNING_ENABLED_ENV, _ENABLED_DEFAULTS[_LIGHTNING_ENABLED_ENV]),
+                context_window=None,  # not confirmed from documentation
+                enabled=_getenv_bool(
+                    _LIGHTNING_ENABLED_ENV, _ENABLED_DEFAULTS[_LIGHTNING_ENABLED_ENV]
+                ),
             ),
             ModelCapability(
                 model_id=os.getenv(_NANO_MODEL_ENV, _DEFAULTS[_NANO_MODEL_ENV]),
@@ -195,7 +209,9 @@ class ModelRegistry:
                 cost_class=CostClass.LOW,
                 teacher_judge=False,
                 context_window=None,
-                enabled=_getenv_bool(_NANO_ENABLED_ENV, _ENABLED_DEFAULTS[_NANO_ENABLED_ENV]),
+                enabled=_getenv_bool(
+                    _NANO_ENABLED_ENV, _ENABLED_DEFAULTS[_NANO_ENABLED_ENV]
+                ),
             ),
             ModelCapability(
                 model_id=os.getenv(_SUPER_MODEL_ENV, _DEFAULTS[_SUPER_MODEL_ENV]),
@@ -213,7 +229,9 @@ class ModelRegistry:
                 cost_class=CostClass.MEDIUM,
                 teacher_judge=False,
                 context_window=None,
-                enabled=_getenv_bool(_SUPER_ENABLED_ENV, _ENABLED_DEFAULTS[_SUPER_ENABLED_ENV]),
+                enabled=_getenv_bool(
+                    _SUPER_ENABLED_ENV, _ENABLED_DEFAULTS[_SUPER_ENABLED_ENV]
+                ),
             ),
             ModelCapability(
                 model_id=os.getenv(_ULTRA_MODEL_ENV, _DEFAULTS[_ULTRA_MODEL_ENV]),
@@ -231,7 +249,9 @@ class ModelRegistry:
                 cost_class=CostClass.HIGH,
                 teacher_judge=True,
                 context_window=None,
-                enabled=_getenv_bool(_ULTRA_ENABLED_ENV, _ENABLED_DEFAULTS[_ULTRA_ENABLED_ENV]),
+                enabled=_getenv_bool(
+                    _ULTRA_ENABLED_ENV, _ENABLED_DEFAULTS[_ULTRA_ENABLED_ENV]
+                ),
             ),
             ModelCapability(
                 model_id=nano_omni_model,
@@ -261,7 +281,11 @@ class ModelRegistry:
             status = "enabled" if cap.enabled else "disabled"
             logger.info(
                 "ModelRegistry: role=%s model=%s generation=%s deployment=%s status=%s",
-                cap.role, cap.model_id, cap.generation, cap.deployment_status.value, status,
+                cap.role,
+                cap.model_id,
+                cap.generation,
+                cap.deployment_status.value,
+                status,
             )
 
     def reload(self) -> None:

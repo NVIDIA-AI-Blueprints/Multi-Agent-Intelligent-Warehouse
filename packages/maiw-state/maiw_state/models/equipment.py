@@ -28,7 +28,9 @@ class EquipmentAssetSummary(BaseModel):
     equipment_type: str
     model: str
     zone: str
-    status: str = Field(description="available | assigned | charging | maintenance | offline")
+    status: str = Field(
+        description="available | assigned | charging | maintenance | offline"
+    )
     owner_user: str | None = None
 
 

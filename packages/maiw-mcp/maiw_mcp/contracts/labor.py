@@ -19,7 +19,6 @@ from pydantic import BaseModel, Field
 
 from .common import CapabilityMetadata
 
-
 # ── Shared types ───────────────────────────────────────────────────────────────
 
 
@@ -40,7 +39,9 @@ class LaborTaskInfo(BaseModel):
     task_id: str
     task_type: str
     zone: str | None = None
-    status: str = Field(description="pending | in_progress | completed | failed | cancelled")
+    status: str = Field(
+        description="pending | in_progress | completed | failed | cancelled"
+    )
     assigned_to: str | None = None
     priority: str = "medium"
 
@@ -139,6 +140,10 @@ class LaborAllocateRequest(BaseModel):
     notes: str | None = None
     proposal_id: str = Field(..., description="Bound ActionProposal.proposal_id")
     decision_id: str = Field(..., description="Bound DecisionResult.result_id")
+    execution_id: str | None = Field(
+        default=None,
+        description="MAIW execution identity, propagated from BaseActionExecutor",
+    )
 
 
 class LaborAllocateResult(BaseModel):
@@ -150,6 +155,8 @@ class LaborAllocateResult(BaseModel):
     worker_ids: list[str]
     proposal_id: str
     decision_id: str
+    execution_id: str | None = None
+    outcome: str = "executed"
     source: str = "mock"
     message: str = ""
 

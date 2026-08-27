@@ -4,14 +4,21 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRuntimeStatus } from '../hooks/useRuntimeStatus';
 import { useDemoStatus } from '../hooks/useDemoStatus';
+import { useDemoSSE } from '../hooks/useDemoSSE';
+import { useReliabilityCounters } from '../hooks/useReliabilityCounters';
 import { equipmentAPI, operationsAPI, safetyAPI, mcpAPI } from '../services/api';
 import DemoControlBar from '../components/demo/DemoControlBar';
 import DecisionLifecycle from '../components/demo/DecisionLifecycle';
 import MAIWPipeline from '../components/demo/MAIWPipeline';
 import KPITrendChart from '../components/demo/KPITrendChart';
 import CounterfactualPanel from '../components/demo/CounterfactualPanel';
+import ReliabilityPanel from '../components/reliability/ReliabilityPanel';
+import SafetyScorecard from '../components/reliability/SafetyScorecard';
+import FaultInjectionPanel from '../components/reliability/FaultInjectionPanel';
 import { AnalysisResult, demoAPI } from '../services/demoAPI';
 import { format } from 'date-fns';
+
+const FAULT_INJECTION_ENABLED = process.env.REACT_APP_FAULT_INJECTION_ENABLED === 'true';
 
 // ── shared primitives ──────────────────────────────────────────────────────
 
@@ -130,7 +137,12 @@ const ACTIVITY_KEY = 'maiw_activity_feed';
 interface LogEntry {
   id: string;
   ts: string;
-  category: 'STATE' | 'AGENT' | 'MODEL' | 'SKILL' | 'PROPOSE' | 'DECIDE' | 'EXECUTE' | 'MCP' | 'API';
+  category:
+    | 'STATE' | 'AGENT' | 'MODEL' | 'SKILL' | 'PROPOSE' | 'DECIDE'
+    | 'EXECUTE' | 'RECONCILE' | 'MCP' | 'API'
+    | 'FAULT' | 'SAFETY' | 'CIRCUIT' | 'RECOVERY'
+    | 'FAULT_INJECTED' | 'CIRCUIT_OPEN'
+    | 'CONFIRMED_EXECUTED' | 'CONFIRMED_NOT_EXECUTED' | 'INDETERMINATE';
   message: string;
   detail?: string;
 }
@@ -143,8 +155,27 @@ const CAT_COLOR: Record<string, string> = {
   PROPOSE: '#D29922',
   DECIDE: '#D29922',
   EXECUTE: '#3FB950',
+  RECONCILE: '#E3B341',
   MCP: '#8B949E',
   API: '#484F58',
+  // Batch 7: reliability & safety categories
+  FAULT:                  '#F0883E',
+  FAULT_INJECTED:         '#F0883E',
+  SAFETY:                 '#3FB950',
+  CIRCUIT:                '#F85149',
+  CIRCUIT_OPEN:           '#F85149',
+  RECOVERY:               '#76B900',
+  CONFIRMED_EXECUTED:     '#3FB950',
+  CONFIRMED_NOT_EXECUTED: '#8B949E',
+  INDETERMINATE:          '#D29922',
+};
+
+// Maps SSE reconciliation event messages to operator-facing labels.
+const RECONCILE_MSG_LABEL: Record<string, string> = {
+  'reconciliation.started':               'CHECKING AUTHORITATIVE STATE',
+  'reconciliation.confirmed_executed':    'MUTATION CONFIRMED',
+  'reconciliation.confirmed_not_executed':'NO MUTATION CONFIRMED',
+  'reconciliation.indeterminate':         'MANUAL REVIEW REQUIRED',
 };
 
 function readActivity(): LogEntry[] {
@@ -161,6 +192,8 @@ const CommandCenter: React.FC = () => {
   const qc = useQueryClient();
   const { data: runtime } = useRuntimeStatus();
   const { isDemoMode, status: demoStatus } = useDemoStatus();
+  const { events: sseEvents } = useDemoSSE(isDemoMode);
+  const reliabilityCounters = useReliabilityCounters(sseEvents);
   const [decisions, setDecisions] = useState<DecisionRecord[]>([]);
   const [activity, setActivity] = useState<LogEntry[]>([]);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
@@ -887,6 +920,64 @@ const CommandCenter: React.FC = () => {
         </Box>
       </Box>
 
+      {/* ── RELIABILITY & SAFETY ROW ── */}
+      <Box sx={{ display: 'flex', gap: 1.5, flexShrink: 0 }}>
+
+        {/* Domain Health / Circuit State */}
+        <Box sx={{ ...panelSx, flex: 1, minWidth: 0 }}>
+          <Box sx={panelHeaderSx}>
+            <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.6rem', color: '#8B949E', letterSpacing: '0.1em' }}>
+              DOMAIN HEALTH
+            </Typography>
+            {runtime?.maiw_operational_status && (
+              <Typography sx={{
+                fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
+                color: runtime.maiw_operational_status === 'HEALTHY' ? '#3FB950' : '#D29922',
+                letterSpacing: '0.06em',
+              }}>
+                {runtime.maiw_operational_status}
+              </Typography>
+            )}
+          </Box>
+          <Box sx={{ p: 1.25 }}>
+            <ReliabilityPanel runtime={runtime} />
+          </Box>
+        </Box>
+
+        {/* Safety Scorecard */}
+        <Box sx={{ ...panelSx, flex: '0 0 200px' }}>
+          <Box sx={panelHeaderSx}>
+            <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.6rem', color: '#8B949E', letterSpacing: '0.1em' }}>
+              SAFETY SCORECARD
+            </Typography>
+          </Box>
+          <Box sx={{ p: 1.25 }}>
+            <SafetyScorecard
+              counters={sseEvents.length > 0 ? reliabilityCounters : undefined}
+              showValidatedBadge={isDemoMode}
+            />
+          </Box>
+        </Box>
+
+        {/* Fault Injection (demo + env-gated) */}
+        {isDemoMode && FAULT_INJECTION_ENABLED && (
+          <Box sx={{ ...panelSx, flex: '0 0 320px' }}>
+            <Box sx={panelHeaderSx}>
+              <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.6rem', color: '#F85149', letterSpacing: '0.1em' }}>
+                FAULT INJECTION
+              </Typography>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#484F58' }}>
+                DEMO ONLY
+              </Typography>
+            </Box>
+            <Box sx={{ p: 1.25, overflow: 'auto', maxHeight: 220 }}>
+              <FaultInjectionPanel scenarioActive={!!demoStatus?.scenario?.name} />
+            </Box>
+          </Box>
+        )}
+
+      </Box>
+
       {/* ── LIVE ACTIVITY ── */}
       <Box sx={{ ...panelSx, flexShrink: 0, height: 148 }}>
         <Box sx={{ ...panelHeaderSx }}>
@@ -922,24 +1013,27 @@ const CommandCenter: React.FC = () => {
               — session activity will appear here —
             </Typography>
           ) : (
-            activity.slice(-12).map((e) => (
-              <Box key={e.id} sx={{ display: 'flex', gap: 1.5, lineHeight: 1.8 }}>
-                <Typography component="span" sx={{ fontFamily: 'monospace', fontSize: '0.67rem', color: '#30363D', flexShrink: 0 }}>
-                  {format(new Date(e.ts), 'HH:mm:ss')}
-                </Typography>
-                <Typography component="span" sx={{ fontFamily: 'monospace', fontSize: '0.67rem', color: CAT_COLOR[e.category] ?? '#484F58', fontWeight: 700, width: 52, flexShrink: 0 }}>
-                  {e.category}
-                </Typography>
-                <Typography component="span" sx={{ fontFamily: 'monospace', fontSize: '0.67rem', color: '#8B949E', flexGrow: 1 }}>
-                  {e.message}
-                </Typography>
-                {e.detail && (
-                  <Typography component="span" sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#484F58', flexShrink: 0 }}>
-                    {e.detail}
+            activity.slice(-12).map((e) => {
+              const reconcileLabel = e.category === 'RECONCILE' ? (RECONCILE_MSG_LABEL[e.message] ?? e.message) : null;
+              return (
+                <Box key={e.id} sx={{ display: 'flex', gap: 1.5, lineHeight: 1.8 }}>
+                  <Typography component="span" sx={{ fontFamily: 'monospace', fontSize: '0.67rem', color: '#30363D', flexShrink: 0 }}>
+                    {format(new Date(e.ts), 'HH:mm:ss')}
                   </Typography>
-                )}
-              </Box>
-            ))
+                  <Typography component="span" sx={{ fontFamily: 'monospace', fontSize: '0.67rem', color: CAT_COLOR[e.category] ?? '#484F58', fontWeight: 700, width: 52, flexShrink: 0 }}>
+                    {e.category}
+                  </Typography>
+                  <Typography component="span" sx={{ fontFamily: 'monospace', fontSize: '0.67rem', color: reconcileLabel ? CAT_COLOR['RECONCILE'] : '#8B949E', flexGrow: 1, fontWeight: reconcileLabel ? 600 : 400 }}>
+                    {reconcileLabel ?? e.message}
+                  </Typography>
+                  {e.detail && (
+                    <Typography component="span" sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#484F58', flexShrink: 0 }}>
+                      {e.detail}
+                    </Typography>
+                  )}
+                </Box>
+              );
+            })
           )}
         </Box>
       </Box>

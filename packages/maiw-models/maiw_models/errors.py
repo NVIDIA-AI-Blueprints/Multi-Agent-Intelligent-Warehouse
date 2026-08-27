@@ -33,7 +33,9 @@ class ModelUnavailable(ModelGatewayError):
 class ModelTimeout(ModelGatewayError):
     """Raised when the model provider did not respond within the deadline."""
 
-    def __init__(self, message: str, model_id: str | None = None, timeout_s: float | None = None) -> None:
+    def __init__(
+        self, message: str, model_id: str | None = None, timeout_s: float | None = None
+    ) -> None:
         super().__init__(message, model_id)
         self.timeout_s = timeout_s
 

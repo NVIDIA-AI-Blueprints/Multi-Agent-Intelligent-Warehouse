@@ -14,7 +14,9 @@ class StateAssemblyError(RuntimeError):
     partial state.
     """
 
-    def __init__(self, domain: str, message: str, cause: Exception | None = None) -> None:
+    def __init__(
+        self, domain: str, message: str, cause: Exception | None = None
+    ) -> None:
         self.domain = domain
         self.cause = cause
         super().__init__(f"[{domain}] {message}")

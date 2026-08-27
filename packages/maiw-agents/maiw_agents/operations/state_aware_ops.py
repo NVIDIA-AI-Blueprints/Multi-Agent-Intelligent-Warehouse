@@ -91,10 +91,15 @@ async def propose_labor_allocation(
 
     if result.outcome == DecisionOutcome.APPROVED and action_executor is not None:
         try:
-            exec_result = await action_executor.execute(proposal, result)
-            exec_result.trace_id = trace_id
+            exec_result = await action_executor.execute(
+                proposal, result, trace_id=trace_id
+            )
             return {
-                "status": "approved",
+                "status": (
+                    exec_result.outcome.value
+                    if exec_result.outcome.value != "executed"
+                    else "approved"
+                ),
                 "action": "warehouse.labor.allocate",
                 "proposal_id": proposal.proposal_id,
                 "decision_id": result.result_id,
@@ -102,7 +107,9 @@ async def propose_labor_allocation(
                 "trace_id": trace_id,
             }
         except Exception as exc:
-            logger.error("Labor execution failed for proposal %s: %s", proposal.proposal_id, exc)
+            logger.error(
+                "Labor execution failed for proposal %s: %s", proposal.proposal_id, exc
+            )
             return {
                 "status": "execution_error",
                 "action": "warehouse.labor.allocate",
@@ -157,7 +164,9 @@ async def propose_wave_reprioritization(
             trace_id=trace_id,
         )
     except Exception as exc:
-        logger.error("Wave reprioritization proposal build failed zone=%s: %s", zone, exc)
+        logger.error(
+            "Wave reprioritization proposal build failed zone=%s: %s", zone, exc
+        )
         return {
             "status": "error",
             "action": "warehouse.wave.reprioritize",
@@ -175,10 +184,15 @@ async def propose_wave_reprioritization(
 
     if result.outcome == DecisionOutcome.APPROVED and action_executor is not None:
         try:
-            exec_result = await action_executor.execute(proposal, result)
-            exec_result.trace_id = trace_id
+            exec_result = await action_executor.execute(
+                proposal, result, trace_id=trace_id
+            )
             return {
-                "status": "approved",
+                "status": (
+                    exec_result.outcome.value
+                    if exec_result.outcome.value != "executed"
+                    else "approved"
+                ),
                 "action": "warehouse.wave.reprioritize",
                 "proposal_id": proposal.proposal_id,
                 "decision_id": result.result_id,
@@ -186,7 +200,9 @@ async def propose_wave_reprioritization(
                 "trace_id": trace_id,
             }
         except Exception as exc:
-            logger.error("Wave execution failed for proposal %s: %s", proposal.proposal_id, exc)
+            logger.error(
+                "Wave execution failed for proposal %s: %s", proposal.proposal_id, exc
+            )
             return {
                 "status": "execution_error",
                 "action": "warehouse.wave.reprioritize",

@@ -123,16 +123,51 @@ async def liveness_check():
 
 
 @router.get("/ready")
-async def readiness_check():
-    db = await _check_database()
-    if db["status"] != "healthy":
+async def readiness_check(request: Request):
+    """
+    Capability-aware readiness probe.
+
+    Returns 200 if at least one MAIW operational path is available.
+    A single domain being CIRCUIT OPEN does NOT fail readiness — only that
+    domain's workflows are affected; others remain available.
+
+    Returns 503 only when:
+        - MAIW runtime is not initialized, OR
+        - ALL MCP domains are CIRCUIT OPEN (total loss of MCP capability)
+    """
+    rt = getattr(request.app.state, "runtime", None)
+
+    if rt is None:
+        raise HTTPException(status_code=503, detail="MAIW runtime not initialized")
+
+    # Check per-domain circuit states
+    domain_status: dict = {}
+    if rt.circuit_registry is not None:
+        domain_status = rt.circuit_registry.operational_status()
+
+    open_domains = [d for d, s in domain_status.items() if s == "CIRCUIT OPEN"]
+    all_open = len(open_domains) > 0 and len(open_domains) == len(domain_status)
+
+    if all_open:
         raise HTTPException(
-            status_code=503, detail="Service not ready: Database unavailable"
+            status_code=503,
+            detail={
+                "error": "All MCP domains CIRCUIT OPEN",
+                "open_domains": open_domains,
+            },
         )
+
+    healthy_domains = [d for d, s in domain_status.items() if s == "HEALTHY"]
+    degraded_domains = [d for d, s in domain_status.items() if s == "DEGRADED"]
+
     return {
         "status": "ready",
         "timestamp": datetime.utcnow().isoformat(),
         "version": _version_display(),
+        "domain_health": domain_status,
+        "healthy_domains": healthy_domains,
+        "degraded_domains": degraded_domains,
+        "circuit_open_domains": open_domains,
     }
 
 

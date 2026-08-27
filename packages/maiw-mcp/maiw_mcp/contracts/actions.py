@@ -88,11 +88,15 @@ class ActionProposal(BaseModel):
     """
 
     proposal_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    action: str = Field(..., description="Capability name, e.g. 'warehouse.equipment.assign'")
+    action: str = Field(
+        ..., description="Capability name, e.g. 'warehouse.equipment.assign'"
+    )
     parameters: dict[str, Any] = Field(default_factory=dict)
     domain: str = Field(..., description="Warehouse domain, e.g. 'equipment'")
     risk_level: RiskLevel = Field(RiskLevel.MEDIUM)
-    reason: str = Field(default="", description="Why the agent is requesting this action")
+    reason: str = Field(
+        default="", description="Why the agent is requesting this action"
+    )
     requested_by: str = Field(default="unknown", description="Agent or system name")
     idempotency_key: str | None = Field(default=None)
     requires_approval: bool = Field(
@@ -100,9 +104,7 @@ class ActionProposal(BaseModel):
         description="True when risk_level >= MEDIUM — human or DecisionEngine must approve",
     )
     trace_id: str | None = Field(default=None)
-    proposed_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    proposed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     @classmethod
     def for_equipment_assign(

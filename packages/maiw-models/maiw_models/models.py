@@ -26,8 +26,11 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
+from maiw_mcp.deadline import (
+    RequestDeadline,
+)  # noqa: F401 — needed for Pydantic resolution
 
 # ── Enumerations ──────────────────────────────────────────────────────────────
 
@@ -77,6 +80,7 @@ class DeploymentStatus(str, Enum):
     LEGACY               — model is available but pre-dates the Nemotron 3
                            generation; retained for compatibility only.
     """
+
     DEPLOYED = "deployed"
     SUPPORTED_BY_ARCH = "supported_by_architecture"
     NOT_CURRENTLY_DEPLOYED = "not_currently_deployed"
@@ -99,11 +103,11 @@ class ModelCapability(BaseModel):
     """
 
     model_id: str
-    role: str           # lightning | nano | super | ultra | nano-omni
+    role: str  # lightning | nano | super | ultra | nano-omni
 
     # Provenance — generation label follows the official NVIDIA Nemotron naming.
     family: str = "nemotron"
-    generation: str = "unknown"   # e.g. "nemotron-3", "nemotron-3.5", "legacy"
+    generation: str = "unknown"  # e.g. "nemotron-3", "nemotron-3.5", "legacy"
     provider: str = "nvidia-nim"
 
     # Deployment availability — verified by endpoint probe where possible.
@@ -111,7 +115,7 @@ class ModelCapability(BaseModel):
 
     # Capability flags — only mark True when confirmed by endpoint test or docs.
     modalities: set[str] = Field(default_factory=lambda: {"text"})
-    tool_use: bool = False          # conservative default; override when confirmed
+    tool_use: bool = False  # conservative default; override when confirmed
     structured_output: bool = False  # conservative default; override when confirmed
     reasoning_level: ReasoningLevel = ReasoningLevel.MEDIUM
 
@@ -145,6 +149,8 @@ class ModelRequest(BaseModel):
     The gateway owns routing.
     """
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     task: str
     messages: list[dict[str, Any]]
     reasoning: ReasoningLevel = ReasoningLevel.MEDIUM
@@ -162,6 +168,9 @@ class ModelRequest(BaseModel):
     # in telemetry instead of generating its own, enabling end-to-end tracing
     # across State → Agent → Model → Proposal → Decision → Execution.
     trace_id: str | None = None
+    # Parent request deadline — bounds the entire model path including retries.
+    # None preserves legacy behaviour (NIMClient config.timeout applies per attempt).
+    deadline: RequestDeadline | None = Field(default=None, exclude=True)
 
 
 # ── Route Decision (embedded in response for observability) ───────────────────
@@ -184,9 +193,9 @@ class ModelRouteDecision(BaseModel):
 
     selected_model_id: str
     selected_role: str
-    requested_role: str               # ideal role before fallback
-    routing_rule: str                 # machine-readable: e.g. "medium_reasoning"
-    routing_reason: str               # human-readable description of the routing rule
+    requested_role: str  # ideal role before fallback
+    routing_rule: str  # machine-readable: e.g. "medium_reasoning"
+    routing_reason: str  # human-readable description of the routing rule
     fallback_from: str | None = None
     fallback_reason: str | None = None
     task: str

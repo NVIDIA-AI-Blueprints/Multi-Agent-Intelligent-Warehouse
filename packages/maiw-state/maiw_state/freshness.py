@@ -30,7 +30,9 @@ _DEFAULT_STALE_MS = 30_000  # 30 seconds
 class StateFreshness(BaseModel):
     """Temporal quality annotation for a single state component."""
 
-    observed_at: datetime = Field(description="When this data was read from the source (UTC)")
+    observed_at: datetime = Field(
+        description="When this data was read from the source (UTC)"
+    )
     age_ms: int | None = Field(
         default=None,
         description="Milliseconds between observed_at and snapshot creation; None if unknown",

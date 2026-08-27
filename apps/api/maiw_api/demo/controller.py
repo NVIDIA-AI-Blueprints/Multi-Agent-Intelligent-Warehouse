@@ -39,16 +39,20 @@ from maiw_api.demo.providers.inventory import SimulationInventoryProvider
 from maiw_api.demo.providers.labor import SimulationLaborProvider
 from maiw_api.demo.providers.wave import SimulationWaveProvider
 from maiw_api.demo.world import DemoWarehouseWorld
+from maiw_decision.approval import InMemoryApprovalStore
 
 logger = logging.getLogger(__name__)
 
 _SCENARIOS_DIR = Path(__file__).parent / "scenarios"
 
 # Event types that count as disruptions for recovery tracking
-_DISRUPTION_EVENT_TYPES = frozenset({"equipment_fault", "worker_absence", "low_stock", "wave_delay"})
+_DISRUPTION_EVENT_TYPES = frozenset(
+    {"equipment_fault", "worker_absence", "low_stock", "wave_delay"}
+)
 
 
 # ── Scenario definition ───────────────────────────────────────────────────────
+
 
 @dataclass
 class TimedEvent:
@@ -107,13 +111,11 @@ def _load_scenario_file(path: Path) -> ScenarioDefinition:
 
 def list_scenario_files() -> dict[str, Path]:
     """Return {name: path} for all YAML files in the scenarios directory."""
-    return {
-        p.stem: p
-        for p in sorted(_SCENARIOS_DIR.glob("*.yaml"))
-    }
+    return {p.stem: p for p in sorted(_SCENARIOS_DIR.glob("*.yaml"))}
 
 
 # ── Providers container ───────────────────────────────────────────────────────
+
 
 @dataclass
 class SimulationProviders:
@@ -124,6 +126,7 @@ class SimulationProviders:
 
 
 # ── Controller ────────────────────────────────────────────────────────────────
+
 
 class DemoScenarioController:
     """
@@ -152,18 +155,23 @@ class DemoScenarioController:
         self._snapshot: dict[str, Any] | None = None
         self._paused: bool = False
         self._tick_task: asyncio.Task | None = None
-        self._next_event_idx: int = 0   # Index into scenario.timed_events
+        self._next_event_idx: int = 0  # Index into scenario.timed_events
         self._kpi_history: list[dict] = []
         self._last_inject_wall_time: datetime | None = None
         self._last_analyze_wall_time: datetime | None = None
         self._recovery_sim_time: int | None = None
         self._pending_approvals: list[dict] = []
+        self._approval_store: InMemoryApprovalStore = InMemoryApprovalStore()
 
     # ── Properties ───────────────────────────────────────────────────────────
 
     @property
     def active(self) -> bool:
         return self._scenario is not None
+
+    @property
+    def approval_store(self) -> InMemoryApprovalStore:
+        return self._approval_store
 
     @property
     def scenario_name(self) -> str | None:
@@ -189,8 +197,7 @@ class DemoScenarioController:
         files = list_scenario_files()
         if scenario_name not in files:
             raise ValueError(
-                f"Scenario '{scenario_name}' not found. "
-                f"Available: {sorted(files)}"
+                f"Scenario '{scenario_name}' not found. " f"Available: {sorted(files)}"
             )
         defn = _load_scenario_file(files[scenario_name])
         self._cancel_tick_task()
@@ -238,6 +245,7 @@ class DemoScenarioController:
         self._last_inject_wall_time = None
         self._recovery_sim_time = None
         self._pending_approvals = []
+        self._approval_store.reset()
         await self.bus.publish_scenario(
             message="scenario:reset",
             detail=self._scenario.name if self._scenario else "",
@@ -269,24 +277,29 @@ class DemoScenarioController:
 
         # 4. Compute KPI snapshot and publish
         from maiw_api.demo.kpi import DemoKPIEngine
+
         kpi = DemoKPIEngine(self.world, self._last_analyze_wall_time).compute()
         kpi_dict = kpi.to_dict()
         self._kpi_history.append(kpi_dict)
         if len(self._kpi_history) > self._MAX_KPI_HISTORY:
-            self._kpi_history = self._kpi_history[-self._MAX_KPI_HISTORY:]
+            self._kpi_history = self._kpi_history[-self._MAX_KPI_HISTORY :]
 
         # 5. Publish events
-        await self.bus.publish_tick(elapsed_seconds=seconds, clock_iso=clock_iso, sim_time_seconds=elapsed)
+        await self.bus.publish_tick(
+            elapsed_seconds=seconds, clock_iso=clock_iso, sim_time_seconds=elapsed
+        )
         await self.bus.publish_kpi(kpi_dict, elapsed)
 
         if newly_recovered:
             ttr = elapsed - (self.world._disruption_sim_time or elapsed)
-            await self.bus.publish(ScenarioEvent(
-                category="RECOVERY",
-                message="scenario:recovery:detected",
-                detail=f"TTR={ttr}s wave_risk={kpi.wave_risk_level} backlog={kpi.pending_backlog}",
-                sim_time_seconds=elapsed,
-            ))
+            await self.bus.publish(
+                ScenarioEvent(
+                    category="RECOVERY",
+                    message="scenario:recovery:detected",
+                    detail=f"TTR={ttr}s wave_risk={kpi.wave_risk_level} backlog={kpi.pending_backlog}",
+                    sim_time_seconds=elapsed,
+                )
+            )
 
     # ── inject ────────────────────────────────────────────────────────────────
 
@@ -338,23 +351,36 @@ class DemoScenarioController:
         objective: str,
         rationale: str,
         risk_level: str,
+        warehouse_id: str | None = None,
+        proposal_data: dict | None = None,
     ) -> str:
         """Store a proposal pending human approval. Returns pending_id."""
+        approval_record = self._approval_store.create(
+            proposal_id=proposal_id,
+            decision_id=decision_id,
+            warehouse_id=warehouse_id,
+            trace_id=trace_id,
+        )
         pending_id = str(_uuid.uuid4())
-        self._pending_approvals.append({
-            "pending_id": pending_id,
-            "proposal_id": proposal_id,
-            "decision_id": decision_id,
-            "trace_id": trace_id,
-            "capability": capability,
-            "target": target,
-            "domain": domain,
-            "priority": priority,
-            "objective": objective,
-            "rationale": rationale,
-            "risk_level": risk_level,
-            "queued_at": datetime.now(tz=timezone.utc).isoformat(),
-        })
+        self._pending_approvals.append(
+            {
+                "pending_id": pending_id,
+                "approval_id": approval_record.approval_id,
+                "proposal_id": proposal_id,
+                "decision_id": decision_id,
+                "trace_id": trace_id,
+                "capability": capability,
+                "target": target,
+                "domain": domain,
+                "priority": priority,
+                "objective": objective,
+                "rationale": rationale,
+                "risk_level": risk_level,
+                "warehouse_id": warehouse_id,
+                "proposal_data": proposal_data,
+                "queued_at": datetime.now(tz=timezone.utc).isoformat(),
+            }
+        )
         return pending_id
 
     def remove_pending_approval(self, pending_id: str) -> dict | None:
@@ -370,9 +396,11 @@ class DemoScenarioController:
         """Return current controller + world status for GET /demo/status."""
         world_summary = self.world.status_summary() if self.active else {}
         from maiw_api.demo.kpi import DemoKPIEngine
+
         current_kpis = (
             DemoKPIEngine(self.world, self._last_analyze_wall_time).compute().to_dict()
-            if self.active else None
+            if self.active
+            else None
         )
         return {
             "active": self.active,
@@ -423,13 +451,20 @@ class DemoScenarioController:
 
         r = self._scenario.recovery
         from maiw_api.demo.kpi import DemoKPIEngine
+
         kpi = DemoKPIEngine(self.world, self._last_analyze_wall_time).compute()
 
-        if "wave_risk_max_score" in r and kpi.wave_risk_score > r["wave_risk_max_score"]:
+        if (
+            "wave_risk_max_score" in r
+            and kpi.wave_risk_score > r["wave_risk_max_score"]
+        ):
             return False
         if "backlog_max" in r and kpi.pending_backlog > r["backlog_max"]:
             return False
-        if "labor_availability_min_pct" in r and kpi.labor_availability_pct < r["labor_availability_min_pct"] * 100:
+        if (
+            "labor_availability_min_pct" in r
+            and kpi.labor_availability_pct < r["labor_availability_min_pct"] * 100
+        ):
             return False
 
         self.world._recovery_sim_time = elapsed
@@ -494,7 +529,11 @@ class DemoScenarioController:
             if item is None:
                 raise ValueError(f"SKU '{sku}' not found")
             item.quantity_available = int(payload.get("quantity_available", 0))
-            return {"sku": sku, "quantity_available": item.quantity_available, "is_low_stock": item.is_low_stock}
+            return {
+                "sku": sku,
+                "quantity_available": item.quantity_available,
+                "is_low_stock": item.is_low_stock,
+            }
 
         if event_type == "worker_absence":
             worker_id = payload["worker_id"]
