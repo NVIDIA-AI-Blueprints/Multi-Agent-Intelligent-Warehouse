@@ -3,26 +3,28 @@ import { Box, Typography } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDemoStatus } from '../hooks/useDemoStatus';
 import { useRuntimeStatus } from '../hooks/useRuntimeStatus';
+import { useDemoSSE } from '../hooks/useDemoSSE';
+import { useDemoLifecycle } from '../hooks/useDemoLifecycle';
 import { demoAPI } from '../services/demoAPI';
 import ScenarioSelector from '../components/demo/ScenarioSelector';
-
-// ── Phase 12A: Shell + Scenario Selection ─────────────────────────────────────
-// 12B will replace <ActiveDemoPlaceholder> with the full lifecycle layout.
+import LifecycleRail from '../components/demo/LifecycleRail';
+import OperationalContextStrip from '../components/demo/OperationalContextStrip';
 
 const WAREHOUSE_ID = process.env.REACT_APP_WAREHOUSE_ID || 'DC-47';
 
 type DemoMode = 'operations' | 'reliability';
 
-// ── Sub-components ─────────────────────────────────────────────────────────────
+// ── Chrome sub-components ──────────────────────────────────────────────────────
 
 function ModeSwitcher({ mode, onChange }: { mode: DemoMode; onChange: (m: DemoMode) => void }) {
   return (
-    <Box sx={{ display: 'flex', gap: 0 }}>
+    <Box sx={{ display: 'flex', gap: 0 }} role="group" aria-label="Demo mode">
       {(['operations', 'reliability'] as DemoMode[]).map((m, i) => (
         <Box
           key={m}
           component="button"
           onClick={() => onChange(m)}
+          aria-pressed={mode === m}
           sx={{
             background: mode === m ? '#1C2128' : 'transparent',
             border: '1px solid #21262D',
@@ -51,6 +53,8 @@ function ExpertToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
     <Box
       component="button"
       onClick={onToggle}
+      aria-pressed={on}
+      aria-label={on ? 'Expert view on' : 'Expert view off'}
       sx={{
         display: 'flex', alignItems: 'center', gap: 0.75,
         background: on ? '#0d2146' : 'transparent',
@@ -80,14 +84,18 @@ function StateDot({ color, glow }: { color: string; glow?: boolean }) {
   return (
     <Box sx={{
       width: 6, height: 6, borderRadius: '50%',
-      background: color,
-      flexShrink: 0,
+      background: color, flexShrink: 0,
       boxShadow: glow ? `0 0 5px ${color}` : 'none',
     }} />
   );
 }
 
-function StateStrip({ wareId, stateLabel, systemLabel, systemColor }: {
+function StateStrip({
+  wareId,
+  stateLabel,
+  systemLabel,
+  systemColor,
+}: {
   wareId: string;
   stateLabel: string;
   systemLabel: string;
@@ -127,55 +135,220 @@ function StateStrip({ wareId, stateLabel, systemLabel, systemColor }: {
   );
 }
 
-// ── Active demo placeholder (replaced in 12B) ──────────────────────────────────
+// ── Scenario header ────────────────────────────────────────────────────────────
 
-function ActiveDemoPlaceholder({ scenarioName }: { scenarioName: string }) {
+function ScenarioHeader({
+  displayName,
+  elapsedSeconds,
+  onReset,
+  onPause,
+  isPaused,
+}: {
+  displayName: string;
+  elapsedSeconds: number;
+  onReset: () => void;
+  onPause: () => void;
+  isPaused: boolean;
+}) {
   return (
     <Box sx={{
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      height: 260, gap: 1,
+      display: 'flex', alignItems: 'center', gap: 1.5,
+      px: 2, py: '6px',
+      borderBottom: '1px solid #21262D',
+      background: '#0D1117',
     }}>
-      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.72rem', color: '#3FB950' }}>
-        ● {scenarioName.replace(/_/g, ' ').toUpperCase()} — RUNNING
+      <Typography sx={{
+        fontFamily: 'monospace', fontSize: '0.72rem', fontWeight: 700,
+        color: '#C9D1D9', textTransform: 'uppercase', letterSpacing: '0.04em',
+      }}>
+        {displayName}
       </Typography>
-      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#484F58' }}>
-        Lifecycle rail, stage content pane, and operational context strip coming in Phase 12B.
+      <Typography sx={{
+        fontFamily: 'monospace', fontSize: '0.65rem',
+        color: '#484F58',
+        background: '#161B22',
+        border: '1px solid #21262D',
+        borderRadius: '4px',
+        px: '6px', py: '1px',
+      }}>
+        t={elapsedSeconds}s
+      </Typography>
+      <Box sx={{ flexGrow: 1 }} />
+      <Box
+        component="button"
+        onClick={onPause}
+        sx={{
+          background: 'transparent', border: '1px solid #21262D', borderRadius: '4px',
+          px: '8px', py: '3px', fontFamily: 'monospace', fontSize: '0.62rem',
+          color: '#6E7681', cursor: 'pointer',
+          '&:hover': { color: '#C9D1D9', borderColor: '#30363D' },
+        }}
+      >
+        {isPaused ? 'Resume' : 'Pause'}
+      </Box>
+      <Box
+        component="button"
+        onClick={onReset}
+        data-testid="reset-button"
+        sx={{
+          background: 'transparent', border: '1px solid #21262D', borderRadius: '4px',
+          px: '8px', py: '3px', fontFamily: 'monospace', fontSize: '0.62rem',
+          color: '#6E7681', cursor: 'pointer',
+          '&:hover': { color: '#F85149', borderColor: '#6e1111' },
+        }}
+      >
+        Reset
+      </Box>
+    </Box>
+  );
+}
+
+// ── Stage workspace placeholder (replaced per-stage in 12C) ───────────────────
+
+function StageWorkspace({ currentStage }: { currentStage: string }) {
+  return (
+    <Box
+      data-testid="stage-workspace"
+      sx={{
+        flexGrow: 1, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', gap: 1,
+        py: 4,
+      }}
+    >
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.72rem', color: '#484F58' }}>
+        Current stage:{' '}
+        <Box component="span" sx={{ color: '#C9D1D9', fontWeight: 700 }}>
+          {currentStage}
+        </Box>
+      </Typography>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#30363D' }}>
+        Stage details arrive in Phase 12C.
       </Typography>
     </Box>
   );
 }
 
-// ── Shell ──────────────────────────────────────────────────────────────────────
+// ── Expert panel (12G will expand this) ───────────────────────────────────────
+
+function ExpertPanel({ runtime, demoStatus }: { runtime: any; demoStatus: any }) {
+  return (
+    <Box sx={{
+      mx: 2, mb: 2,
+      background: '#161B22',
+      border: '1px solid #1F6FEB33',
+      borderRadius: '6px',
+      p: 2,
+    }}>
+      <Typography sx={{
+        fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
+        color: '#58A6FF', letterSpacing: '0.1em', textTransform: 'uppercase', mb: 1,
+      }}>
+        Expert view — system details (Phase 12G: full layout)
+      </Typography>
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2 }}>
+        <Box>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: '#484F58', mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Runtime</Typography>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: '#8B949E' }}>
+            maiw_operational_status: {runtime?.maiw_operational_status ?? '—'}<br />
+            model_gateway_status: {runtime?.model_gateway_status ?? '—'}
+          </Typography>
+        </Box>
+        <Box>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: '#484F58', mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Domain health</Typography>
+          {runtime?.domain_health ? (
+            Object.entries(runtime.domain_health).map(([k, v]: [string, any]) => (
+              <Typography key={k} sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: '#8B949E' }}>
+                {k}: {v}
+              </Typography>
+            ))
+          ) : (
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: '#484F58' }}>—</Typography>
+          )}
+        </Box>
+        <Box>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: '#484F58', mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Scenario</Typography>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: '#8B949E' }}>
+            active: {String(demoStatus?.active ?? false)}<br />
+            name: {demoStatus?.scenario?.name ?? '—'}<br />
+            elapsed: {demoStatus?.world?.elapsed_seconds ?? 0}s
+          </Typography>
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
+// ── DemoShell ──────────────────────────────────────────────────────────────────
 
 export default function DemoShell() {
   const [mode, setMode] = useState<DemoMode>('operations');
   const [expertMode, setExpertMode] = useState(false);
+  // showSelector overrides demoStatus.active — set true on reset so ScenarioSelector
+  // appears immediately without waiting for the status poll to confirm active:false.
+  const [showSelector, setShowSelector] = useState(false);
   const queryClient = useQueryClient();
 
   const { status: demoStatus, isLoading: demoLoading } = useDemoStatus();
   const { data: runtime } = useRuntimeStatus();
 
-  const scenarioActive = demoStatus?.active === true;
-  const scenarioName = demoStatus?.scenario?.display_name ?? demoStatus?.scenario?.name ?? '';
+  const scenarioActive = demoStatus?.active === true && !showSelector;
 
-  // State freshness: use state_freshness_seconds from current_kpis
-  const freshnessSecs = demoStatus?.current_kpis?.state_freshness_seconds;
-  const stateLabel = freshnessSecs != null && freshnessSecs < 120 ? 'FRESH' : 'STALE';
+  // SSE enabled only while a scenario is running — clear() on reset wipes stale events.
+  const sseState = useDemoSSE(scenarioActive);
 
-  // System health from runtime status
+  // Derive rail state from SSE events + pending approvals (pure, no side-effects).
+  const pendingApprovals = demoStatus?.pending_approvals ?? [];
+  const { currentStage, completedStages, waitingForApproval } = useDemoLifecycle(
+    sseState.events,
+    pendingApprovals,
+  );
+
+  // System health indicators
   const sysStatus = runtime?.maiw_operational_status ?? 'UNKNOWN';
   const systemColor =
     sysStatus === 'HEALTHY' ? '#3FB950' :
     sysStatus === 'DEGRADED' ? '#D29922' : '#484F58';
 
+  const freshnessSecs = demoStatus?.current_kpis?.state_freshness_seconds;
+  const stateLabel = freshnessSecs != null && freshnessSecs < 120 ? 'FRESH' : 'STALE';
+
+  // ── Handlers ────────────────────────────────────────────────────────────────
+
   const handleStart = useCallback(async (name: string) => {
     await demoAPI.startScenario(name);
+    setShowSelector(false);
+    sseState.clear();
     await queryClient.invalidateQueries({ queryKey: ['demo-status'] });
-  }, [queryClient]);
+  }, [queryClient, sseState]);
+
+  const handleReset = useCallback(async () => {
+    setShowSelector(true);       // show selector immediately
+    sseState.clear();            // wipe SSE buffer so no stale events leak
+    await demoAPI.resetScenario();
+    await queryClient.invalidateQueries({ queryKey: ['demo-status'] });
+  }, [queryClient, sseState]);
+
+  const handlePause = useCallback(async () => {
+    if (demoStatus?.paused) {
+      await demoAPI.resumeScenario();
+    } else {
+      await demoAPI.pauseScenario();
+    }
+    await queryClient.invalidateQueries({ queryKey: ['demo-status'] });
+  }, [demoStatus, queryClient]);
+
+  // ── Render ───────────────────────────────────────────────────────────────────
+
+  const displayName = demoStatus?.scenario?.display_name ?? demoStatus?.scenario?.name ?? '';
+  const elapsedSeconds = demoStatus?.world?.elapsed_seconds ?? 0;
+  const isPaused = demoStatus?.paused ?? false;
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100%', background: '#0D1117' }}>
-      {/* Top nav */}
+    <Box
+      data-testid="demo-shell"
+      sx={{ display: 'flex', flexDirection: 'column', minHeight: '100%', background: '#0D1117' }}
+    >
+      {/* Top navigation */}
       <Box sx={{
         display: 'flex', alignItems: 'center', gap: 2,
         px: 2, py: '7px',
@@ -189,32 +362,18 @@ export default function DemoShell() {
         }}>
           MAIW Command Center
         </Typography>
-
+        <Box sx={{ width: '1px', height: 14, background: '#21262D', flexShrink: 0 }} />
         <Box sx={{
-          width: '1px', height: 14, background: '#21262D', flexShrink: 0,
-        }} />
-
-        <Box sx={{
-          background: '#0d2146',
-          border: '1px solid #21262D',
-          borderRadius: '4px',
+          background: '#0d2146', border: '1px solid #21262D', borderRadius: '4px',
           px: '6px', py: '1px',
-          fontFamily: 'monospace',
-          fontSize: '0.6rem',
-          color: '#58A6FF',
-          letterSpacing: '0.06em',
-          textTransform: 'uppercase',
-          flexShrink: 0,
+          fontFamily: 'monospace', fontSize: '0.6rem', color: '#58A6FF',
+          letterSpacing: '0.06em', textTransform: 'uppercase', flexShrink: 0,
         }}>
           Synthetic demo
         </Box>
-
         <Box sx={{ flexGrow: 1 }} />
-
         <ModeSwitcher mode={mode} onChange={setMode} />
-
         <Box sx={{ width: '1px', height: 14, background: '#21262D', flexShrink: 0 }} />
-
         <ExpertToggle on={expertMode} onToggle={() => setExpertMode(e => !e)} />
       </Box>
 
@@ -226,8 +385,8 @@ export default function DemoShell() {
         systemColor={systemColor}
       />
 
-      {/* Content area */}
-      <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+      {/* Content */}
+      <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
         {demoLoading && !demoStatus && (
           <Box sx={{ p: 3 }}>
             <Typography sx={{ fontFamily: 'monospace', fontSize: '0.72rem', color: '#484F58' }}>
@@ -236,67 +395,49 @@ export default function DemoShell() {
           </Box>
         )}
 
-        {!demoLoading && !scenarioActive && (
+        {/* ── First-run: scenario selection ── */}
+        {(!scenarioActive) && !demoLoading && (
           <ScenarioSelector onStart={handleStart} />
         )}
 
+        {/* ── Active scenario: lifecycle layout ── */}
         {scenarioActive && mode === 'operations' && (
-          <ActiveDemoPlaceholder scenarioName={scenarioName} />
+          <>
+            {/* Scenario header with controls */}
+            <ScenarioHeader
+              displayName={displayName}
+              elapsedSeconds={elapsedSeconds}
+              onReset={handleReset}
+              onPause={handlePause}
+              isPaused={isPaused}
+            />
+
+            {/* Lifecycle rail — driven by SSE events */}
+            <LifecycleRail
+              currentStage={currentStage}
+              completedStages={completedStages}
+              waitingForApproval={waitingForApproval}
+            />
+
+            {/* Persistent operational context — driven by current_kpis */}
+            <OperationalContextStrip kpis={demoStatus?.current_kpis ?? null} />
+
+            {/* Stage workspace — Phase 12C will populate */}
+            <StageWorkspace currentStage={currentStage} />
+          </>
         )}
 
         {scenarioActive && mode === 'reliability' && (
           <Box sx={{ p: 3 }}>
             <Typography sx={{ fontFamily: 'monospace', fontSize: '0.72rem', color: '#484F58' }}>
-              Reliability demo mode — coming in Phase 12F.
+              Reliability demo mode — Phase 12F.
             </Typography>
           </Box>
         )}
 
-        {/* Expert overlay: shown as bottom panel for now; 12G will style it properly */}
+        {/* Expert overlay */}
         {expertMode && (
-          <Box sx={{
-            mx: 3, mb: 2,
-            background: '#161B22',
-            border: '1px solid #1F6FEB33',
-            borderRadius: '6px',
-            p: 2,
-          }}>
-            <Typography sx={{
-              fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
-              color: '#58A6FF', letterSpacing: '0.1em', textTransform: 'uppercase', mb: 1,
-            }}>
-              Expert view — system details (12G: full layout)
-            </Typography>
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2 }}>
-              <Box>
-                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: '#484F58', mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Runtime</Typography>
-                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: '#8B949E' }}>
-                  maiw_operational_status: {runtime?.maiw_operational_status ?? '—'}<br />
-                  model_gateway_status: {runtime?.model_gateway_status ?? '—'}
-                </Typography>
-              </Box>
-              <Box>
-                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: '#484F58', mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Domain health</Typography>
-                {runtime?.domain_health ? (
-                  Object.entries(runtime.domain_health).map(([k, v]) => (
-                    <Typography key={k} sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: '#8B949E' }}>
-                      {k}: {v}
-                    </Typography>
-                  ))
-                ) : (
-                  <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: '#484F58' }}>—</Typography>
-                )}
-              </Box>
-              <Box>
-                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: '#484F58', mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Scenario</Typography>
-                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: '#8B949E' }}>
-                  active: {String(demoStatus?.active ?? false)}<br />
-                  name: {demoStatus?.scenario?.name ?? '—'}<br />
-                  elapsed: {demoStatus?.world?.elapsed_seconds ?? 0}s
-                </Typography>
-              </Box>
-            </Box>
-          </Box>
+          <ExpertPanel runtime={runtime} demoStatus={demoStatus} />
         )}
       </Box>
 
@@ -326,8 +467,7 @@ export default function DemoShell() {
         <Box sx={{ flexGrow: 1 }} />
         <Typography sx={{
           fontFamily: 'monospace', fontSize: '0.62rem', color: '#484F58',
-          cursor: 'pointer',
-          '&:hover': { color: '#8B949E' },
+          cursor: 'pointer', '&:hover': { color: '#8B949E' },
         }}>
           Details ›
         </Typography>
