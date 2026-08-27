@@ -21,6 +21,8 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { ThemeProvider } from '@mui/material/styles';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 import { nvidiaTheme } from '../../theme/nvidiaTheme';
 
 import StageContentPane, { parseDetail, runWindowEvents } from '../../components/demo/StageContentPane';
@@ -154,8 +156,18 @@ const basePendingApproval: PendingApproval = {
 
 // ── Render helpers ─────────────────────────────────────────────────────────────
 
+function makeQC() {
+  return new QueryClient({ defaultOptions: { queries: { retry: false } } });
+}
+
 function wrap(el: React.ReactElement) {
-  return render(<ThemeProvider theme={nvidiaTheme}>{el}</ThemeProvider>);
+  return render(
+    <MemoryRouter>
+      <QueryClientProvider client={makeQC()}>
+        <ThemeProvider theme={nvidiaTheme}>{el}</ThemeProvider>
+      </QueryClientProvider>
+    </MemoryRouter>
+  );
 }
 
 const noop = async () => {};
@@ -270,9 +282,11 @@ describe('StageContentPane — stage routing', () => {
     expect(screen.getByTestId('decide-stage')).toBeInTheDocument();
   });
 
-  it('renders coming-soon placeholder for APPROVE (Phase 12D)', () => {
+  it('renders approve-stage for APPROVE (Phase 12D implemented)', () => {
     wrap(<StageContentPane {...makeProps({ currentStage: 'APPROVE' })} />);
-    expect(screen.getByText(/Phase 12D/i)).toBeInTheDocument();
+    // APPROVE now has a real implementation — no placeholder
+    expect(screen.getByTestId('approve-stage')).toBeInTheDocument();
+    expect(screen.queryByText(/Phase 12D/i)).not.toBeInTheDocument();
     expect(screen.queryByTestId('observe-stage')).not.toBeInTheDocument();
   });
 

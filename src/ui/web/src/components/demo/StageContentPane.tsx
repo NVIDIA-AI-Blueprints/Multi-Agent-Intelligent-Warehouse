@@ -11,10 +11,11 @@ import { RailStage } from '../../hooks/useDemoLifecycle';
 import { SSEEvent } from '../../hooks/useDemoSSE';
 import { DemoStatus, AnalysisResult, PendingApproval } from '../../services/demoAPI';
 
-import ObserveStage from './stages/ObserveStage';
-import ReasonStage  from './stages/ReasonStage';
-import ProposeStage from './stages/ProposeStage';
-import DecideStage  from './stages/DecideStage';
+import ObserveStage  from './stages/ObserveStage';
+import ReasonStage   from './stages/ReasonStage';
+import ProposeStage  from './stages/ProposeStage';
+import DecideStage   from './stages/DecideStage';
+import ApproveStage  from './stages/ApproveStage';
 
 // ── Shared utilities exported for stage components ─────────────────────────────
 
@@ -203,7 +204,7 @@ export default function StageContentPane(props: StageContentPaneProps) {
         {currentStage === 'REASON'   && <ReasonStage   {...props} />}
         {currentStage === 'PROPOSE'  && <ProposeStage  {...props} />}
         {currentStage === 'DECIDE'   && <DecideStage   {...props} />}
-        {currentStage === 'APPROVE'  && <ComingSoonPane stage="APPROVE" phase="Phase 12D" />}
+        {currentStage === 'APPROVE'  && <ApproveStage   {...props} />}
         {currentStage === 'EXECUTE'  && <ComingSoonPane stage="EXECUTE" phase="Phase 12E" />}
         {currentStage === 'OUTCOME'  && <ComingSoonPane stage="OUTCOME" phase="Phase 12E" />}
       </Box>
