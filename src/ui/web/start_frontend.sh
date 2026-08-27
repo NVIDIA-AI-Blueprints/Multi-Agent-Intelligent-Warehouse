@@ -4,7 +4,7 @@
 
 echo "🚀 Starting Multi-Agent-Intelligent-Warehouse Frontend..."
 echo "📡 Frontend will be available at: http://localhost:3001"
-echo "🔗 Backend API should be running at: http://localhost:8002"
+echo "🔗 Backend API should be running at: http://localhost:8001"
 echo ""
 
 # Check if Node.js is installed
@@ -37,7 +37,7 @@ fi
 
 # Check if backend is running
 echo "🔍 Checking backend API status..."
-if curl -s http://localhost:8002/api/v1/health > /dev/null; then
+if curl -s http://localhost:8001/api/v1/health > /dev/null; then
     echo "✅ Backend API is running"
 else
     echo "⚠️  Backend API is not running. Please start the backend first:"
