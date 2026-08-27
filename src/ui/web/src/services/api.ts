@@ -562,6 +562,25 @@ export const healthAPI = {
   },
 };
 
+export interface CircuitStats {
+  state: 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+  failure_count: number;
+  success_count: number;
+  last_failure_at: string | null;
+}
+
+export interface DomainHealth {
+  equipment: 'HEALTHY' | 'DEGRADED' | 'CIRCUIT OPEN';
+  labor: 'HEALTHY' | 'DEGRADED' | 'CIRCUIT OPEN';
+  wave: 'HEALTHY' | 'DEGRADED' | 'CIRCUIT OPEN';
+  inventory: 'HEALTHY' | 'DEGRADED' | 'CIRCUIT OPEN';
+}
+
+export interface CircuitStates {
+  nim: CircuitStats;
+  domains: Array<{ name: string } & CircuitStats>;
+}
+
 export interface RuntimeStatus {
   runtime_initialized: boolean;
   uptime_seconds?: number;
@@ -578,6 +597,11 @@ export interface RuntimeStatus {
   equipment_executor_available: boolean;
   labor_executor_available: boolean;
   wave_executor_available: boolean;
+  // Batch 5 fields: operational health and circuit state
+  maiw_operational_status?: 'HEALTHY' | 'DEGRADED';
+  model_gateway_status?: 'HEALTHY' | 'CIRCUIT OPEN' | 'DEGRADED';
+  domain_health?: DomainHealth;
+  circuit_states?: CircuitStates;
 }
 
 export const runtimeAPI = {
