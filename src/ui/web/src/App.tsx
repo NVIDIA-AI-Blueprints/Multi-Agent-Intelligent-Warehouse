@@ -18,6 +18,7 @@ import ArchitectureDiagrams from './pages/ArchitectureDiagrams';
 import MCPTest from './pages/MCPTest';
 import VersionFooter from './components/VersionFooter';
 import CommandCenter from './pages/CommandCenter';
+import DemoShell from './pages/DemoShell';
 import WarehouseStatePage from './pages/WarehouseStatePage';
 import DecisionCenter from './pages/DecisionCenter';
 import ModelGateway from './pages/ModelGateway';
@@ -36,6 +37,7 @@ function App() {
               <Layout>
                 <Routes>
                   <Route path="/command" element={<CommandCenter />} />
+                  <Route path="/demo" element={<DemoShell />} />
                   <Route path="/state" element={<WarehouseStatePage />} />
                   <Route path="/decisions" element={<DecisionCenter />} />
                   <Route path="/models" element={<ModelGateway />} />
