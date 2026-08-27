@@ -49,6 +49,13 @@ EventCategory = Literal[
     "MODEL TIMEOUT",       # NIM did not respond in time
     "REQUEST DEADLINE",    # Analyze/execution/reconciliation deadline exhausted
     "CAPABILITY TIMEOUT",  # MCP capability did not respond in time
+    # Fault injection / reliability labels (Phase 10E Batch 6)
+    "FAULT_INJECTED",          # Deterministic fault was triggered (test/demo boundary only)
+    "CIRCUIT_OPEN",            # Domain circuit breaker tripped; calls rejected
+    "RECONCILIATION_REQUIRED", # UNKNOWN execution requires operator reconciliation
+    "CONFIRMED_EXECUTED",      # Reconciliation confirmed: mutation occurred
+    "CONFIRMED_NOT_EXECUTED",  # Reconciliation confirmed: mutation did not occur
+    "INDETERMINATE",           # Reconciliation cannot resolve; manual intervention needed
 ]
 
 
