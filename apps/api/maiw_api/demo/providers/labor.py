@@ -62,35 +62,50 @@ class SimulationLaborProvider:
         return LaborCapacityResult(
             workers=[
                 LaborWorkerInfo(
-                    worker_id=w.worker_id, username=w.username, full_name=w.full_name,
-                    role=w.role, status=w.status, zone=w.zone,
+                    worker_id=w.worker_id,
+                    username=w.username,
+                    full_name=w.full_name,
+                    role=w.role,
+                    status=w.status,
+                    zone=w.zone,
                 )
                 for w in workers
             ],
-            total_workers=total, available_workers=available,
-            utilization_pct=util, zone=request.zone,
-            shift=request.shift, source=self._world.SOURCE,
+            total_workers=total,
+            available_workers=available,
+            utilization_pct=util,
+            zone=request.zone,
+            shift=request.shift,
+            source=self._world.SOURCE,
         )
 
     async def get_labor_allocation(
         self, request: LaborAllocationRequest
     ) -> LaborAllocationResult:
         tasks = self._world.tasks_list(
-            zone=request.zone, status_filter=request.status_filter,
-            task_type=request.task_type, worker_id=request.worker_id,
+            zone=request.zone,
+            status_filter=request.status_filter,
+            task_type=request.task_type,
+            worker_id=request.worker_id,
         )
         in_progress = sum(1 for t in tasks if t.status == "in_progress")
         pending = sum(1 for t in tasks if t.status == "pending")
         return LaborAllocationResult(
             allocations=[
                 LaborTaskInfo(
-                    task_id=t.task_id, task_type=t.task_type, zone=t.zone,
-                    status=t.status, assigned_to=t.assigned_to, priority=t.priority,
+                    task_id=t.task_id,
+                    task_type=t.task_type,
+                    zone=t.zone,
+                    status=t.status,
+                    assigned_to=t.assigned_to,
+                    priority=t.priority,
                 )
                 for t in tasks
             ],
-            total_tasks=len(tasks), in_progress_count=in_progress,
-            pending_count=pending, source=self._world.SOURCE,
+            total_tasks=len(tasks),
+            in_progress_count=in_progress,
+            pending_count=pending,
+            source=self._world.SOURCE,
         )
 
     async def execute_labor_allocation(
@@ -107,7 +122,8 @@ class SimulationLaborProvider:
         # DEFERRED: no workers provided and none available
         if not request.worker_ids:
             available_workers = [
-                w for w in self._world.workers.values()
+                w
+                for w in self._world.workers.values()
                 if w.status == "active" and w.current_task_id is None
             ]
             if not available_workers:
@@ -125,10 +141,12 @@ class SimulationLaborProvider:
                 )
 
         # NO_OP: task already assigned to exactly the same worker
-        if (task.status == "in_progress"
-                and task.assigned_to
-                and request.worker_ids
-                and task.assigned_to == request.worker_ids[0]):
+        if (
+            task.status == "in_progress"
+            and task.assigned_to
+            and request.worker_ids
+            and task.assigned_to == request.worker_ids[0]
+        ):
             return LaborAllocateResult(
                 success=True,
                 allocation_id=None,
@@ -157,10 +175,13 @@ class SimulationLaborProvider:
         self._mutation_count += 1
 
         import asyncio
-        asyncio.create_task(self._bus.publish_labor_write(
-            task_id=request.task_id,
-            worker_ids=request.worker_ids,
-        ))
+
+        asyncio.create_task(
+            self._bus.publish_labor_write(
+                task_id=request.task_id,
+                worker_ids=request.worker_ids,
+            )
+        )
 
         # Fault injection: raise AFTER mutation to simulate ambiguous write
         if self._post_mutation_fault is not None:

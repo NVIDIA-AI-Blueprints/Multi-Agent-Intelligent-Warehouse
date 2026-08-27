@@ -26,7 +26,6 @@ from __future__ import annotations
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -68,7 +67,9 @@ def _make_mock_runtime(*, labor_open: bool = False, all_open: bool = False):
         cooldown_seconds=30.0,
         clock=clock,
     )
-    nim = CircuitBreaker(domain="nim", failure_threshold=1, cooldown_seconds=30.0, clock=clock)
+    nim = CircuitBreaker(
+        domain="nim", failure_threshold=1, cooldown_seconds=30.0, clock=clock
+    )
 
     runtime = MagicMock()
     runtime.nim_circuit = nim
@@ -93,6 +94,7 @@ def _make_mock_runtime(*, labor_open: bool = False, all_open: bool = False):
 @pytest.mark.asyncio
 async def test_runtime_status_has_operational_status():
     from maiw_api.routers.runtime_status import runtime_status
+
     runtime, clock, reg, nim = _make_mock_runtime()
 
     request = MagicMock()
@@ -105,6 +107,7 @@ async def test_runtime_status_has_operational_status():
 @pytest.mark.asyncio
 async def test_runtime_status_has_domain_health():
     from maiw_api.routers.runtime_status import runtime_status
+
     runtime, clock, reg, nim = _make_mock_runtime()
 
     request = MagicMock()
@@ -120,6 +123,7 @@ async def test_runtime_status_has_domain_health():
 @pytest.mark.asyncio
 async def test_runtime_status_has_circuit_states():
     from maiw_api.routers.runtime_status import runtime_status
+
     runtime, clock, reg, nim = _make_mock_runtime()
 
     request = MagicMock()
@@ -134,6 +138,7 @@ async def test_runtime_status_has_circuit_states():
 @pytest.mark.asyncio
 async def test_runtime_status_healthy_when_all_healthy():
     from maiw_api.routers.runtime_status import runtime_status
+
     runtime, clock, reg, nim = _make_mock_runtime()
 
     request = MagicMock()
@@ -146,6 +151,7 @@ async def test_runtime_status_healthy_when_all_healthy():
 @pytest.mark.asyncio
 async def test_runtime_status_degraded_when_domain_circuit_open():
     from maiw_api.routers.runtime_status import runtime_status
+
     runtime, clock, reg, nim = _make_mock_runtime()
 
     # Trip labor circuit
@@ -313,6 +319,7 @@ async def test_ready_response_includes_domain_health():
 
 def test_maiw_runtime_has_circuit_fields():
     from maiw_api.bootstrap import MAIWRuntime
+
     rt = MAIWRuntime()
     assert hasattr(rt, "circuit_registry")
     assert hasattr(rt, "nim_circuit")
@@ -336,7 +343,9 @@ def test_domain_extraction_from_capability():
     for capability, expected_domain in cases:
         parts = capability.split(".")
         domain = parts[1] if len(parts) >= 3 else "unknown"
-        assert domain == expected_domain, f"Expected {expected_domain!r} for {capability!r}"
+        assert (
+            domain == expected_domain
+        ), f"Expected {expected_domain!r} for {capability!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -440,10 +449,14 @@ async def test_get_model_gateway_forwards_nim_circuit():
     nim_circuit = CircuitBreaker(domain="nim")
 
     with (
-        patch("maiw_models.providers.nim_client.get_nim_client", new=AsyncMock(return_value=MagicMock())),
+        patch(
+            "maiw_models.providers.nim_client.get_nim_client",
+            new=AsyncMock(return_value=MagicMock()),
+        ),
         patch("maiw_models._gateway_instance", None),
     ):
         import maiw_models
+
         maiw_models._gateway_instance = None  # ensure fresh construction
 
         with patch("maiw_models.ModelGateway.__init__", return_value=None) as mock_init:
@@ -455,6 +468,7 @@ async def test_get_model_gateway_forwards_nim_circuit():
     # The definitive contract: ModelGateway.__init__ accepts nim_circuit
     import inspect
     from maiw_models.gateway import ModelGateway
+
     sig = inspect.signature(ModelGateway.__init__)
     assert "nim_circuit" in sig.parameters
     param = sig.parameters["nim_circuit"]

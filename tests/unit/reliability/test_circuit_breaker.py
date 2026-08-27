@@ -30,7 +30,6 @@ import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -62,6 +61,7 @@ async def _fail():
 
 def test_starts_closed():
     from maiw_mcp.circuit_breaker import CircuitBreaker, CircuitState
+
     b = CircuitBreaker(domain="test")
     assert b.state == CircuitState.CLOSED
 
@@ -74,8 +74,11 @@ def test_starts_closed():
 @pytest.mark.asyncio
 async def test_trips_to_open_at_threshold():
     from maiw_mcp.circuit_breaker import CircuitBreaker, CircuitState
+
     clock = FakeClock()
-    b = CircuitBreaker(domain="test", failure_threshold=3, cooldown_seconds=30.0, clock=clock)
+    b = CircuitBreaker(
+        domain="test", failure_threshold=3, cooldown_seconds=30.0, clock=clock
+    )
 
     for _ in range(3):
         with pytest.raises(RuntimeError):
@@ -92,8 +95,11 @@ async def test_trips_to_open_at_threshold():
 @pytest.mark.asyncio
 async def test_rejects_when_open():
     from maiw_mcp.circuit_breaker import CircuitBreaker, CircuitOpen, CircuitState
+
     clock = FakeClock()
-    b = CircuitBreaker(domain="test", failure_threshold=1, cooldown_seconds=30.0, clock=clock)
+    b = CircuitBreaker(
+        domain="test", failure_threshold=1, cooldown_seconds=30.0, clock=clock
+    )
 
     with pytest.raises(RuntimeError):
         await b.call(_fail())
@@ -115,8 +121,11 @@ async def test_rejects_when_open():
 @pytest.mark.asyncio
 async def test_transitions_to_half_open_after_cooldown():
     from maiw_mcp.circuit_breaker import CircuitBreaker, CircuitState
+
     clock = FakeClock()
-    b = CircuitBreaker(domain="test", failure_threshold=1, cooldown_seconds=30.0, clock=clock)
+    b = CircuitBreaker(
+        domain="test", failure_threshold=1, cooldown_seconds=30.0, clock=clock
+    )
 
     with pytest.raises(RuntimeError):
         await b.call(_fail())
@@ -136,10 +145,14 @@ async def test_transitions_to_half_open_after_cooldown():
 @pytest.mark.asyncio
 async def test_closes_on_successful_probe():
     from maiw_mcp.circuit_breaker import CircuitBreaker, CircuitState
+
     clock = FakeClock()
     b = CircuitBreaker(
-        domain="test", failure_threshold=1, cooldown_seconds=30.0,
-        success_threshold=1, clock=clock
+        domain="test",
+        failure_threshold=1,
+        cooldown_seconds=30.0,
+        success_threshold=1,
+        clock=clock,
     )
 
     with pytest.raises(RuntimeError):
@@ -161,8 +174,11 @@ async def test_closes_on_successful_probe():
 @pytest.mark.asyncio
 async def test_re_trips_on_failed_probe():
     from maiw_mcp.circuit_breaker import CircuitBreaker, CircuitState
+
     clock = FakeClock()
-    b = CircuitBreaker(domain="test", failure_threshold=1, cooldown_seconds=30.0, clock=clock)
+    b = CircuitBreaker(
+        domain="test", failure_threshold=1, cooldown_seconds=30.0, clock=clock
+    )
 
     with pytest.raises(RuntimeError):
         await b.call(_fail())
@@ -186,8 +202,11 @@ async def test_re_trips_on_failed_probe():
 @pytest.mark.asyncio
 async def test_success_resets_failure_counter_in_closed():
     from maiw_mcp.circuit_breaker import CircuitBreaker, CircuitState
+
     clock = FakeClock()
-    b = CircuitBreaker(domain="test", failure_threshold=3, cooldown_seconds=30.0, clock=clock)
+    b = CircuitBreaker(
+        domain="test", failure_threshold=3, cooldown_seconds=30.0, clock=clock
+    )
 
     # Two failures
     for _ in range(2):
@@ -211,6 +230,7 @@ async def test_success_resets_failure_counter_in_closed():
 @pytest.mark.asyncio
 async def test_partial_failures_dont_trip():
     from maiw_mcp.circuit_breaker import CircuitBreaker, CircuitState
+
     b = CircuitBreaker(domain="test", failure_threshold=5)
     for _ in range(4):
         with pytest.raises(RuntimeError):
@@ -227,6 +247,7 @@ async def test_partial_failures_dont_trip():
 @pytest.mark.asyncio
 async def test_get_stats_fields():
     from maiw_mcp.circuit_breaker import CircuitBreaker
+
     b = CircuitBreaker(domain="equipment", failure_threshold=5)
     await b.call(_ok())
     stats = b.get_stats()
@@ -246,8 +267,11 @@ async def test_get_stats_fields():
 @pytest.mark.asyncio
 async def test_reset_forces_closed():
     from maiw_mcp.circuit_breaker import CircuitBreaker, CircuitState
+
     clock = FakeClock()
-    b = CircuitBreaker(domain="test", failure_threshold=1, cooldown_seconds=30.0, clock=clock)
+    b = CircuitBreaker(
+        domain="test", failure_threshold=1, cooldown_seconds=30.0, clock=clock
+    )
     with pytest.raises(RuntimeError):
         await b.call(_fail())
     assert b.state == CircuitState.OPEN
@@ -264,8 +288,11 @@ async def test_reset_forces_closed():
 @pytest.mark.asyncio
 async def test_circuit_open_has_domain_and_cooldown():
     from maiw_mcp.circuit_breaker import CircuitBreaker, CircuitOpen
+
     clock = FakeClock()
-    b = CircuitBreaker(domain="labor", failure_threshold=1, cooldown_seconds=30.0, clock=clock)
+    b = CircuitBreaker(
+        domain="labor", failure_threshold=1, cooldown_seconds=30.0, clock=clock
+    )
     with pytest.raises(RuntimeError):
         await b.call(_fail())
 
@@ -287,10 +314,14 @@ async def test_circuit_open_has_domain_and_cooldown():
 @pytest.mark.asyncio
 async def test_success_threshold_in_half_open():
     from maiw_mcp.circuit_breaker import CircuitBreaker, CircuitState
+
     clock = FakeClock()
     b = CircuitBreaker(
-        domain="test", failure_threshold=1, cooldown_seconds=10.0,
-        success_threshold=2, clock=clock
+        domain="test",
+        failure_threshold=1,
+        cooldown_seconds=10.0,
+        success_threshold=2,
+        clock=clock,
     )
     with pytest.raises(RuntimeError):
         await b.call(_fail())
@@ -319,6 +350,7 @@ async def test_success_threshold_in_half_open():
 
 def test_domain_registry_creates_per_domain_breakers():
     from maiw_mcp.circuit_registry import DomainCircuitRegistry
+
     reg = DomainCircuitRegistry.for_domains(
         domains=["equipment", "labor", "wave", "inventory"],
         failure_threshold=3,
@@ -412,6 +444,7 @@ async def test_operational_status_labels():
 
 def test_config_circuit_breaker_defaults():
     from maiw_api.config import Settings
+
     s = Settings()
     assert s.circuit_failure_threshold == 5
     assert s.circuit_cooldown_seconds == 30.0
@@ -423,6 +456,7 @@ def test_config_circuit_breaker_env_override(monkeypatch):
     monkeypatch.setenv("MAIW_CIRCUIT_COOLDOWN_SECONDS", "60")
     monkeypatch.setenv("MAIW_CIRCUIT_SUCCESS_THRESHOLD", "2")
     from maiw_api.config import Settings
+
     s = Settings()
     assert s.circuit_failure_threshold == 3
     assert s.circuit_cooldown_seconds == 60.0
@@ -437,6 +471,7 @@ def test_config_circuit_breaker_env_override(monkeypatch):
 def test_mcp_client_accepts_circuit_registry():
     import inspect
     from maiw_mcp.client.client import MAIWMCPClient
+
     sig = inspect.signature(MAIWMCPClient.__init__)
     assert "circuit_registry" in sig.parameters
 
@@ -449,5 +484,6 @@ def test_mcp_client_accepts_circuit_registry():
 def test_model_gateway_accepts_nim_circuit():
     import inspect
     from maiw_models.gateway import ModelGateway
+
     sig = inspect.signature(ModelGateway.__init__)
     assert "nim_circuit" in sig.parameters

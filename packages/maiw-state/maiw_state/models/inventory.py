@@ -28,7 +28,9 @@ class InventoryItemSummary(BaseModel):
     name: str
     total_available: int = Field(ge=0)
     is_low_stock: bool
-    location_count: int = Field(ge=0, description="Number of locations holding this SKU")
+    location_count: int = Field(
+        ge=0, description="Number of locations holding this SKU"
+    )
 
 
 class InventoryState(BaseModel):

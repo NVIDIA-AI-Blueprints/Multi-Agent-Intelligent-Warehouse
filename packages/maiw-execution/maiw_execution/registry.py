@@ -47,10 +47,10 @@ class ExecutionRecord:
     capability: str
     proposal_id: str
     started_at: datetime
-    outcome: ExecutionOutcome | None = None   # None = in-progress
+    outcome: ExecutionOutcome | None = None  # None = in-progress
     completed_at: datetime | None = None
-    result: Any = None                        # ActionExecutionResult once complete
-    intent: ExecutionIntent | None = None     # Immutable snapshot captured at begin() time
+    result: Any = None  # ActionExecutionResult once complete
+    intent: ExecutionIntent | None = None  # Immutable snapshot captured at begin() time
     reconciliation: ReconciliationRecord | None = None  # Set by set_reconciliation()
 
     @property
@@ -73,7 +73,10 @@ class ExecutionRecord:
                 return "unknown"
             if self.reconciliation.outcome == ReconciliationOutcome.CONFIRMED_EXECUTED:
                 return "effectively_executed"
-            if self.reconciliation.outcome == ReconciliationOutcome.CONFIRMED_NOT_EXECUTED:
+            if (
+                self.reconciliation.outcome
+                == ReconciliationOutcome.CONFIRMED_NOT_EXECUTED
+            ):
                 return "effectively_not_executed"
             return "unknown"  # INDETERMINATE
         return self.outcome.value

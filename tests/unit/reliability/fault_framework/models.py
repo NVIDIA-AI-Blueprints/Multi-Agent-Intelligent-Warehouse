@@ -28,7 +28,7 @@ class FaultType(str, Enum):
 
     # MCP write faults
     MCP_WRITE_BEFORE_MUTATION = "mcp_write_before_mutation"
-    MCP_WRITE_AFTER_MUTATION = "mcp_write_after_mutation"   # AMBIGUOUS WRITE
+    MCP_WRITE_AFTER_MUTATION = "mcp_write_after_mutation"  # AMBIGUOUS WRITE
 
     # Approval / approval-reuse faults
     DUPLICATE_APPROVAL = "duplicate_approval"
@@ -51,9 +51,9 @@ class FaultType(str, Enum):
 class FaultTrigger(str, Enum):
     """When the fault should fire."""
 
-    IMMEDIATE = "immediate"        # first call matching target
-    CALL_NUMBER = "call_number"    # Nth call matching target
-    SIM_TIME = "sim_time"          # at simulated clock time T
+    IMMEDIATE = "immediate"  # first call matching target
+    CALL_NUMBER = "call_number"  # Nth call matching target
+    SIM_TIME = "sim_time"  # at simulated clock time T
 
 
 @dataclass
@@ -70,14 +70,14 @@ class FaultProfile:
     must NOT contain any fault_id checks.
     """
 
-    fault_id: str                                   # "F01", "F02", …
-    target: str                                     # "nim", "mcp.labor", "executor", …
+    fault_id: str  # "F01", "F02", …
+    target: str  # "nim", "mcp.labor", "executor", …
     fault_type: FaultType
     trigger: FaultTrigger = FaultTrigger.IMMEDIATE
-    call_number: int | None = None                 # for CALL_NUMBER trigger
-    sim_time: float | None = None                  # for SIM_TIME trigger
-    duration_calls: int | None = None              # how many calls to fault (None = all)
-    expected_safety_behavior: str = ""             # human-readable contract
+    call_number: int | None = None  # for CALL_NUMBER trigger
+    sim_time: float | None = None  # for SIM_TIME trigger
+    duration_calls: int | None = None  # how many calls to fault (None = all)
+    expected_safety_behavior: str = ""  # human-readable contract
 
     def matches(self, target: str, call_n: int) -> bool:
         """Return True if this fault should fire for the given target and call number."""
@@ -98,6 +98,7 @@ class FaultProfile:
 @dataclass
 class ReconciliationEntry:
     """Result of a single reconciliation attempt."""
+
     execution_id: str
     outcome: str  # ReconciliationOutcome.value
     trace_id: str | None = None
@@ -125,7 +126,7 @@ class ReliabilityResult:
     # Safety metrics (PRIMARY)
     unauthorized_writes: int = 0
     duplicate_writes: int = 0
-    false_successes: int = 0           # outcome==EXECUTED but no mutation
+    false_successes: int = 0  # outcome==EXECUTED but no mutation
     unknown_executions: int = 0
     conflicts: int = 0
     stale_state_blocks: int = 0

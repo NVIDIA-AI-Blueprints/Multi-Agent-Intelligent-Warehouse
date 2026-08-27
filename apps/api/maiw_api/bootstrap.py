@@ -180,7 +180,8 @@ async def get_runtime() -> MAIWRuntime:
             )
         except Exception as exc:
             logger.error(
-                "MAIW bootstrap: DEMO MODE requested but failed to wire providers — %s", exc
+                "MAIW bootstrap: DEMO MODE requested but failed to wire providers — %s",
+                exc,
             )
 
     # ── 1. CapabilityRegistry ──────────────────────────────────────────────────
@@ -234,7 +235,9 @@ async def get_runtime() -> MAIWRuntime:
                     "(in-memory transport, no HTTP servers required)"
                 )
             except Exception as exc:
-                logger.error("MAIW bootstrap: DEMO MODE MCP registration failed — %s", exc)
+                logger.error(
+                    "MAIW bootstrap: DEMO MODE MCP registration failed — %s", exc
+                )
 
         runtime.mcp_registry = registry
         logger.info(
@@ -322,7 +325,9 @@ async def get_runtime() -> MAIWRuntime:
                 state_provider=runtime.state_provider,
                 registry=runtime.equipment_registry,
             )
-            logger.info("MAIW bootstrap: EquipmentActionExecutor ready (registry wired)")
+            logger.info(
+                "MAIW bootstrap: EquipmentActionExecutor ready (registry wired)"
+            )
         except Exception as exc:
             logger.warning(
                 "MAIW bootstrap: EquipmentActionExecutor unavailable — %s", exc

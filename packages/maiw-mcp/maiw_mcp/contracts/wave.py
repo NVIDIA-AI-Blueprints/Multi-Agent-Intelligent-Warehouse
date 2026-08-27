@@ -18,7 +18,6 @@ from pydantic import BaseModel, Field
 
 from .common import CapabilityMetadata
 
-
 # ── Shared types ───────────────────────────────────────────────────────────────
 
 
@@ -26,9 +25,13 @@ class WaveTaskInfo(BaseModel):
     """Operational summary for one wave task."""
 
     task_id: str
-    task_type: str = Field(description="PICK | PACK | SHIP | RECEIVE | PUTAWAY | CYCLE_COUNT | TRANSFER")
+    task_type: str = Field(
+        description="PICK | PACK | SHIP | RECEIVE | PUTAWAY | CYCLE_COUNT | TRANSFER"
+    )
     zone: str | None = None
-    status: str = Field(description="pending | in_progress | completed | failed | cancelled")
+    status: str = Field(
+        description="pending | in_progress | completed | failed | cancelled"
+    )
     assigned_to: str | None = None
     priority: str = "medium"
     deadline: str | None = None
@@ -144,7 +147,10 @@ class WaveReprioritizeRequest(BaseModel):
     reason: str = ""
     proposal_id: str = Field(..., description="Bound ActionProposal.proposal_id")
     decision_id: str = Field(..., description="Bound DecisionResult.result_id")
-    execution_id: str | None = Field(default=None, description="MAIW execution identity, propagated from BaseActionExecutor")
+    execution_id: str | None = Field(
+        default=None,
+        description="MAIW execution identity, propagated from BaseActionExecutor",
+    )
 
 
 class WaveReprioritizeResult(BaseModel):

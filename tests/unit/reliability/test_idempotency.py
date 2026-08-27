@@ -80,14 +80,18 @@ class TestExecutionRegistry:
     def test_begin_same_execution_id_returns_existing(self):
         registry = ExecutionRegistry()
         registry.begin("EXEC-1", "IDEMP-A", "warehouse.labor.allocate", "P-1")
-        existing = registry.begin("EXEC-1", "IDEMP-A", "warehouse.labor.allocate", "P-1")
+        existing = registry.begin(
+            "EXEC-1", "IDEMP-A", "warehouse.labor.allocate", "P-1"
+        )
         assert existing is not None
         assert existing.execution_id == "EXEC-1"
 
     def test_begin_same_idempotency_key_different_execution_id(self):
         registry = ExecutionRegistry()
         registry.begin("EXEC-1", "IDEMP-A", "warehouse.labor.allocate", "P-1")
-        existing = registry.begin("EXEC-2", "IDEMP-A", "warehouse.labor.allocate", "P-1")
+        existing = registry.begin(
+            "EXEC-2", "IDEMP-A", "warehouse.labor.allocate", "P-1"
+        )
         assert existing is not None
         assert existing.execution_id == "EXEC-1"  # points to first
 
@@ -95,7 +99,9 @@ class TestExecutionRegistry:
         """Different capability = different logical operation."""
         registry = ExecutionRegistry()
         registry.begin("EXEC-1", "IDEMP-A", "warehouse.labor.allocate", "P-1")
-        existing = registry.begin("EXEC-2", "IDEMP-A", "warehouse.wave.reprioritize", "P-2")
+        existing = registry.begin(
+            "EXEC-2", "IDEMP-A", "warehouse.wave.reprioritize", "P-2"
+        )
         assert existing is None  # different capability → fresh
 
     def test_complete_marks_record(self):
@@ -223,8 +229,12 @@ class TestDuplicateIdempotencyKeyDifferentExecutionId:
         # Two different proposals without idempotency_key
         p1 = _labor_proposal(idempotency_key=None)
         p2 = ActionProposal.for_labor_allocate(
-            task_id="T-001", task_type="PICK", worker_ids=["W-001"],
-            zone="ZONE-A", reason="second", requested_by="test-agent",
+            task_id="T-001",
+            task_type="PICK",
+            worker_ids=["W-001"],
+            zone="ZONE-A",
+            reason="second",
+            requested_by="test-agent",
         )
         d1 = _approved_decision(p1.proposal_id)
         d2 = _approved_decision(p2.proposal_id)

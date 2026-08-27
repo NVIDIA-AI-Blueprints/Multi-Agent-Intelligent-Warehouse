@@ -53,8 +53,8 @@ from maiw_execution import (
 )
 from maiw_execution.outcome import ExecutionOutcome
 
-
 # ── Helpers ────────────────────────────────────────────────────────────────────
+
 
 def _make_intent(**kwargs) -> ExecutionIntent:
     defaults = dict(
@@ -63,7 +63,11 @@ def _make_intent(**kwargs) -> ExecutionIntent:
         decision_id="dec-001",
         warehouse_id="DC-TEST",
         target="task-123",
-        expected_effect={"task_id": "task-123", "expected_worker_ids": ["w1"], "expected_task_status": "in_progress"},
+        expected_effect={
+            "task_id": "task-123",
+            "expected_worker_ids": ["w1"],
+            "expected_task_status": "in_progress",
+        },
         approval_id="appr-001",
         idempotency_key="idem-001",
         trace_id="trace-001",
@@ -92,7 +96,9 @@ class _ConfirmedExecutedStrategy:
     async def read_current_state(self, intent: ExecutionIntent) -> dict:
         return {"allocations": [{"task_id": "task-123", "status": "in_progress"}]}
 
-    def check_postcondition(self, intent: ExecutionIntent, state: dict) -> ReconciliationOutcome:
+    def check_postcondition(
+        self, intent: ExecutionIntent, state: dict
+    ) -> ReconciliationOutcome:
         return ReconciliationOutcome.CONFIRMED_EXECUTED
 
 
@@ -100,7 +106,9 @@ class _ConfirmedNotExecutedStrategy:
     async def read_current_state(self, intent: ExecutionIntent) -> dict:
         return {"allocations": []}
 
-    def check_postcondition(self, intent: ExecutionIntent, state: dict) -> ReconciliationOutcome:
+    def check_postcondition(
+        self, intent: ExecutionIntent, state: dict
+    ) -> ReconciliationOutcome:
         return ReconciliationOutcome.CONFIRMED_NOT_EXECUTED
 
 
@@ -108,7 +116,9 @@ class _IndeterminateStrategy:
     async def read_current_state(self, intent: ExecutionIntent) -> dict:
         return {}
 
-    def check_postcondition(self, intent: ExecutionIntent, state: dict) -> ReconciliationOutcome:
+    def check_postcondition(
+        self, intent: ExecutionIntent, state: dict
+    ) -> ReconciliationOutcome:
         return ReconciliationOutcome.INDETERMINATE
 
 
@@ -116,7 +126,9 @@ class _ReadFailStrategy:
     async def read_current_state(self, intent: ExecutionIntent) -> dict:
         raise RuntimeError("MCP timeout")
 
-    def check_postcondition(self, intent: ExecutionIntent, state: dict) -> ReconciliationOutcome:
+    def check_postcondition(
+        self, intent: ExecutionIntent, state: dict
+    ) -> ReconciliationOutcome:
         return ReconciliationOutcome.CONFIRMED_EXECUTED
 
 
@@ -124,7 +136,9 @@ class _CheckFailStrategy:
     async def read_current_state(self, intent: ExecutionIntent) -> dict:
         return {"data": "ok"}
 
-    def check_postcondition(self, intent: ExecutionIntent, state: dict) -> ReconciliationOutcome:
+    def check_postcondition(
+        self, intent: ExecutionIntent, state: dict
+    ) -> ReconciliationOutcome:
         raise ValueError("postcondition logic error")
 
 
@@ -212,7 +226,10 @@ class TestReconciliationRecordDefaults:
 class TestReconciliationOutcomeEnum:
     def test_values(self):
         assert ReconciliationOutcome.CONFIRMED_EXECUTED.value == "confirmed_executed"
-        assert ReconciliationOutcome.CONFIRMED_NOT_EXECUTED.value == "confirmed_not_executed"
+        assert (
+            ReconciliationOutcome.CONFIRMED_NOT_EXECUTED.value
+            == "confirmed_not_executed"
+        )
         assert ReconciliationOutcome.INDETERMINATE.value == "indeterminate"
 
     def test_is_str_enum(self):
@@ -241,7 +258,9 @@ class TestExecutionRecordBatch3Fields:
 
     def test_reconciliation_stored(self):
         rec = _make_record()
-        recon_rec = ReconciliationRecord(outcome=ReconciliationOutcome.CONFIRMED_EXECUTED)
+        recon_rec = ReconciliationRecord(
+            outcome=ReconciliationOutcome.CONFIRMED_EXECUTED
+        )
         rec.reconciliation = recon_rec
         assert rec.reconciliation.outcome == ReconciliationOutcome.CONFIRMED_EXECUTED
 
@@ -280,7 +299,9 @@ class TestReconciliationServiceNoIntent:
     async def test_no_intent_returns_indeterminate(self):
         rec = _make_record(intent=None)
         service = ReconciliationService()
-        result = await service.reconcile(rec, strategy=_ConfirmedExecutedStrategy(), trace_id="t1")
+        result = await service.reconcile(
+            rec, strategy=_ConfirmedExecutedStrategy(), trace_id="t1"
+        )
         assert result.outcome == ReconciliationOutcome.INDETERMINATE
         assert result.error is not None
         assert "no intent" in result.error.lower() or "intent" in result.error.lower()
@@ -302,7 +323,9 @@ class TestReconciliationServiceReadFailure:
         intent = _make_intent()
         rec = _make_record(intent=intent)
         service = ReconciliationService()
-        result = await service.reconcile(rec, strategy=_ReadFailStrategy(), trace_id="t2")
+        result = await service.reconcile(
+            rec, strategy=_ReadFailStrategy(), trace_id="t2"
+        )
         assert result.outcome == ReconciliationOutcome.INDETERMINATE
         assert result.error == "MCP timeout"
         assert result.evidence.get("reason") == "read_failed"
@@ -312,7 +335,9 @@ class TestReconciliationServiceReadFailure:
         intent = _make_intent()
         rec = _make_record(intent=intent)
         service = ReconciliationService()
-        result = await service.reconcile(rec, strategy=_ReadFailStrategy(), trace_id="trace-xyz")
+        result = await service.reconcile(
+            rec, strategy=_ReadFailStrategy(), trace_id="trace-xyz"
+        )
         assert result.trace_id == "trace-xyz"
 
 
@@ -340,7 +365,9 @@ class TestReconciliationServiceConfirmedExecuted:
         intent = _make_intent()
         rec = _make_record(intent=intent)
         service = ReconciliationService()
-        result = await service.reconcile(rec, strategy=_ConfirmedExecutedStrategy(), trace_id="t3")
+        result = await service.reconcile(
+            rec, strategy=_ConfirmedExecutedStrategy(), trace_id="t3"
+        )
         assert result.outcome == ReconciliationOutcome.CONFIRMED_EXECUTED
 
     @pytest.mark.asyncio
@@ -441,7 +468,9 @@ class TestExecutionRegistryBeginWithIntent:
     def test_begin_stores_intent(self):
         registry = ExecutionRegistry()
         intent = _make_intent()
-        result = registry.begin("exec-A", "idem-A", "warehouse.labor.allocate", "prop-A", intent=intent)
+        result = registry.begin(
+            "exec-A", "idem-A", "warehouse.labor.allocate", "prop-A", intent=intent
+        )
         assert result is None
         stored = registry.get_by_execution_id("exec-A")
         assert stored is not None
@@ -456,8 +485,12 @@ class TestExecutionRegistryBeginWithIntent:
     def test_duplicate_returns_existing_with_original_intent(self):
         registry = ExecutionRegistry()
         intent = _make_intent()
-        registry.begin("exec-C", "idem-C", "warehouse.labor.allocate", "prop-C", intent=intent)
-        existing = registry.begin("exec-C", "idem-C", "warehouse.labor.allocate", "prop-C")
+        registry.begin(
+            "exec-C", "idem-C", "warehouse.labor.allocate", "prop-C", intent=intent
+        )
+        existing = registry.begin(
+            "exec-C", "idem-C", "warehouse.labor.allocate", "prop-C"
+        )
         assert existing is not None
         assert existing.intent is intent
 
@@ -482,7 +515,9 @@ class TestExecutionRegistrySetReconciliation:
         registry._by_execution_id[rec.execution_id] = rec
         registry.mark_unknown(rec.execution_id)
 
-        recon = ReconciliationRecord(outcome=ReconciliationOutcome.CONFIRMED_NOT_EXECUTED)
+        recon = ReconciliationRecord(
+            outcome=ReconciliationOutcome.CONFIRMED_NOT_EXECUTED
+        )
         registry.set_reconciliation(rec.execution_id, recon)
         assert rec.effective_status == "effectively_not_executed"
 
@@ -528,17 +563,23 @@ class TestEffectiveStatusProperty:
 
     def test_unknown_confirmed_executed(self):
         rec = _make_record(outcome=ExecutionOutcome.UNKNOWN)
-        rec.reconciliation = ReconciliationRecord(outcome=ReconciliationOutcome.CONFIRMED_EXECUTED)
+        rec.reconciliation = ReconciliationRecord(
+            outcome=ReconciliationOutcome.CONFIRMED_EXECUTED
+        )
         assert rec.effective_status == "effectively_executed"
 
     def test_unknown_confirmed_not_executed(self):
         rec = _make_record(outcome=ExecutionOutcome.UNKNOWN)
-        rec.reconciliation = ReconciliationRecord(outcome=ReconciliationOutcome.CONFIRMED_NOT_EXECUTED)
+        rec.reconciliation = ReconciliationRecord(
+            outcome=ReconciliationOutcome.CONFIRMED_NOT_EXECUTED
+        )
         assert rec.effective_status == "effectively_not_executed"
 
     def test_unknown_indeterminate_stays_unknown(self):
         rec = _make_record(outcome=ExecutionOutcome.UNKNOWN)
-        rec.reconciliation = ReconciliationRecord(outcome=ReconciliationOutcome.INDETERMINATE)
+        rec.reconciliation = ReconciliationRecord(
+            outcome=ReconciliationOutcome.INDETERMINATE
+        )
         assert rec.effective_status == "unknown"
 
     def test_executed(self):
@@ -560,6 +601,7 @@ class TestEffectiveStatusProperty:
 class TestBaseActionExecutorBuildIntent:
     def _make_proposal_and_decision(self, capability: str = "warehouse.labor.allocate"):
         from unittest.mock import MagicMock
+
         proposal = MagicMock()
         proposal.action = capability
         proposal.proposal_id = "prop-base"
@@ -571,6 +613,7 @@ class TestBaseActionExecutorBuildIntent:
 
     def test_base_build_intent_capability(self):
         from maiw_execution.base import BaseActionExecutor
+
         executor = BaseActionExecutor.__new__(BaseActionExecutor)
         proposal, decision = self._make_proposal_and_decision()
         intent = executor._build_intent(proposal, decision, trace_id="t1")
@@ -583,6 +626,7 @@ class TestBaseActionExecutorBuildIntent:
 
     def test_base_build_intent_empty_expected_effect(self):
         from maiw_execution.base import BaseActionExecutor
+
         executor = BaseActionExecutor.__new__(BaseActionExecutor)
         proposal, decision = self._make_proposal_and_decision()
         intent = executor._build_intent(proposal, decision)
@@ -609,6 +653,7 @@ class TestLaborBuildIntent:
 
     def test_labor_intent_target_is_task_id(self):
         from maiw_execution.labor import LaborActionExecutor
+
         executor = LaborActionExecutor.__new__(LaborActionExecutor)
         proposal, decision = self._make_labor_proposal()
         intent = executor._build_intent(proposal, decision, trace_id="tl")
@@ -616,6 +661,7 @@ class TestLaborBuildIntent:
 
     def test_labor_intent_expected_effect(self):
         from maiw_execution.labor import LaborActionExecutor
+
         executor = LaborActionExecutor.__new__(LaborActionExecutor)
         proposal, decision = self._make_labor_proposal()
         intent = executor._build_intent(proposal, decision)
@@ -640,6 +686,7 @@ class TestEquipmentBuildIntent:
 
     def test_assign_intent_expected_status(self):
         from maiw_execution.equipment import EquipmentActionExecutor
+
         executor = EquipmentActionExecutor.__new__(EquipmentActionExecutor)
         proposal, decision = self._make_eq_proposal(
             "warehouse.equipment.assign",
@@ -652,6 +699,7 @@ class TestEquipmentBuildIntent:
 
     def test_release_intent_expected_status(self):
         from maiw_execution.equipment import EquipmentActionExecutor
+
         executor = EquipmentActionExecutor.__new__(EquipmentActionExecutor)
         proposal, decision = self._make_eq_proposal(
             "warehouse.equipment.release",
@@ -662,6 +710,7 @@ class TestEquipmentBuildIntent:
 
     def test_maintenance_intent_expected_status(self):
         from maiw_execution.equipment import EquipmentActionExecutor
+
         executor = EquipmentActionExecutor.__new__(EquipmentActionExecutor)
         proposal, decision = self._make_eq_proposal(
             "warehouse.equipment.schedule_maintenance",
@@ -692,6 +741,7 @@ class TestWaveBuildIntent:
 
     def test_wave_intent_wave_id_target(self):
         from maiw_execution.wave import WaveActionExecutor
+
         executor = WaveActionExecutor.__new__(WaveActionExecutor)
         proposal, decision = self._make_wave_proposal(wave_id="wave-7")
         intent = executor._build_intent(proposal, decision)
@@ -701,6 +751,7 @@ class TestWaveBuildIntent:
 
     def test_wave_intent_zone_target(self):
         from maiw_execution.wave import WaveActionExecutor
+
         executor = WaveActionExecutor.__new__(WaveActionExecutor)
         proposal, decision = self._make_wave_proposal(zone="zone_A")
         intent = executor._build_intent(proposal, decision)
@@ -724,6 +775,7 @@ class TestReconciliationStrategyProtocol:
     def test_class_without_methods_does_not_satisfy(self):
         class NotAStrategy:
             pass
+
         assert not isinstance(NotAStrategy(), ReconciliationStrategy)
 
 
@@ -735,7 +787,9 @@ class TestAuditTrail:
     async def test_reconciliation_id_is_unique(self):
         intent = _make_intent()
         rec1 = _make_record("exec-R1", intent=intent)
-        rec2 = _make_record("exec-R2", intent=_make_intent(proposal_id="prop-R2", decision_id="dec-R2"))
+        rec2 = _make_record(
+            "exec-R2", intent=_make_intent(proposal_id="prop-R2", decision_id="dec-R2")
+        )
         service = ReconciliationService()
         r1 = await service.reconcile(rec1, strategy=_ConfirmedExecutedStrategy())
         r2 = await service.reconcile(rec2, strategy=_ConfirmedExecutedStrategy())
@@ -754,7 +808,9 @@ class TestAuditTrail:
         intent = _make_intent()
         rec = _make_record(intent=intent)
         service = ReconciliationService()
-        result = await service.reconcile(rec, strategy=_ConfirmedExecutedStrategy(), trace_id="audit-trace-001")
+        result = await service.reconcile(
+            rec, strategy=_ConfirmedExecutedStrategy(), trace_id="audit-trace-001"
+        )
         assert result.trace_id == "audit-trace-001"
 
 
@@ -768,7 +824,9 @@ class TestStructuredLogEvents:
         rec = _make_record(intent=intent)
         service = ReconciliationService()
         with caplog.at_level(logging.INFO, logger="maiw_execution.reconciliation"):
-            await service.reconcile(rec, strategy=_ConfirmedExecutedStrategy(), trace_id="log-t1")
+            await service.reconcile(
+                rec, strategy=_ConfirmedExecutedStrategy(), trace_id="log-t1"
+            )
         assert "reconciliation.started" in caplog.text
 
     @pytest.mark.asyncio
@@ -777,7 +835,9 @@ class TestStructuredLogEvents:
         rec = _make_record(intent=intent)
         service = ReconciliationService()
         with caplog.at_level(logging.INFO, logger="maiw_execution.reconciliation"):
-            await service.reconcile(rec, strategy=_ConfirmedExecutedStrategy(), trace_id="log-t2")
+            await service.reconcile(
+                rec, strategy=_ConfirmedExecutedStrategy(), trace_id="log-t2"
+            )
         assert "reconciliation.confirmed_executed" in caplog.text
 
     @pytest.mark.asyncio
@@ -785,5 +845,7 @@ class TestStructuredLogEvents:
         rec = _make_record(intent=None)
         service = ReconciliationService()
         with caplog.at_level(logging.WARNING, logger="maiw_execution.reconciliation"):
-            await service.reconcile(rec, strategy=_ConfirmedExecutedStrategy(), trace_id="log-t3")
+            await service.reconcile(
+                rec, strategy=_ConfirmedExecutedStrategy(), trace_id="log-t3"
+            )
         assert "reconciliation.indeterminate" in caplog.text

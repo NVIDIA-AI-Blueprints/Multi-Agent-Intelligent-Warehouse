@@ -195,9 +195,7 @@ class CircuitBreaker:
     def get_stats(self) -> dict:
         state = self._resolve_state()
         cooldown_remaining = (
-            self._cooldown_remaining()
-            if state == CircuitState.OPEN
-            else 0.0
+            self._cooldown_remaining() if state == CircuitState.OPEN else 0.0
         )
         return {
             "domain": self.domain,

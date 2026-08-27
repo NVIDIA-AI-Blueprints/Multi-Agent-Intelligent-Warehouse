@@ -106,9 +106,7 @@ class WarehouseStateSnapshot(BaseModel):
 
     snapshot_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     warehouse_id: str
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     state: WarehouseState
 
     @classmethod

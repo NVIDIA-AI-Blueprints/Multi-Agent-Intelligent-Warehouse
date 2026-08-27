@@ -101,7 +101,10 @@ class TestMAIWMCPClientDeadline:
         async def run():
             with patch.object(client, "_call_tool", side_effect=fake_call_tool):
                 return await client.invoke(
-                    "warehouse.inventory.get", {}, timeout_seconds=30.0, deadline=deadline
+                    "warehouse.inventory.get",
+                    {},
+                    timeout_seconds=30.0,
+                    deadline=deadline,
                 )
 
         _run(run())
@@ -125,7 +128,10 @@ class TestMAIWMCPClientDeadline:
         async def run():
             with patch.object(client, "_call_tool", side_effect=fake_call_tool):
                 return await client.invoke(
-                    "warehouse.inventory.get", {}, timeout_seconds=15.0, deadline=deadline
+                    "warehouse.inventory.get",
+                    {},
+                    timeout_seconds=15.0,
+                    deadline=deadline,
                 )
 
         _run(run())
@@ -176,6 +182,7 @@ class TestMAIWMCPClientDeadline:
 
 class _MockResult:
     """Minimal duck-type mock for skill result objects."""
+
     total_count = 0
     summary = {}
     equipment = []
@@ -230,9 +237,15 @@ def _make_wave_skill(result=None, side_effect=None):
 
 class TestWarehouseStateProviderDeadline:
 
-    def _make_provider(self, equipment_skill=None, inventory_skill=None,
-                       labor_skill=None, wave_skill=None):
+    def _make_provider(
+        self,
+        equipment_skill=None,
+        inventory_skill=None,
+        labor_skill=None,
+        wave_skill=None,
+    ):
         from maiw_state import WarehouseStateProvider
+
         return WarehouseStateProvider(
             equipment_status_skill=equipment_skill,
             inventory_skill=inventory_skill,
@@ -242,6 +255,7 @@ class TestWarehouseStateProviderDeadline:
 
     def _make_reqs(self, *, inventory=False, equipment=False, labor=False, waves=False):
         from maiw_state import StateRequirements
+
         return StateRequirements(
             inventory=inventory,
             inventory_sku="SKU-001" if inventory else None,
@@ -291,6 +305,7 @@ class TestWarehouseStateProviderDeadline:
         clock.advance(10.0)  # expired
 
         from maiw_mcp.contracts.equipment import EquipmentStatusResult
+
         mock_result = MagicMock(spec=EquipmentStatusResult)
         mock_result.total_count = 0
         mock_result.summary = {}
@@ -332,7 +347,9 @@ class TestWarehouseStateProviderDeadline:
         inv_skill.execute = AsyncMock(side_effect=slow_inventory)
         eq_skill = _make_equipment_skill(result=eq_result)
 
-        provider = self._make_provider(inventory_skill=inv_skill, equipment_skill=eq_skill)
+        provider = self._make_provider(
+            inventory_skill=inv_skill, equipment_skill=eq_skill
+        )
         reqs = self._make_reqs(inventory=True, equipment=True)
 
         with pytest.raises(RequestDeadlineExceeded):
@@ -378,7 +395,9 @@ class TestWarehouseStateProviderDeadline:
         eq_skill = MagicMock()
         eq_skill.execute = AsyncMock(side_effect=record_eq)
 
-        provider = self._make_provider(inventory_skill=inv_skill, equipment_skill=eq_skill)
+        provider = self._make_provider(
+            inventory_skill=inv_skill, equipment_skill=eq_skill
+        )
         reqs = self._make_reqs(inventory=True, equipment=True)
 
         _run(provider.get_state("wh-1", reqs, deadline=deadline))
@@ -475,6 +494,7 @@ class TestWarehouseStateProviderDeadline:
 
 def _make_proposal(action: str = "test.action") -> "ActionProposal":
     from maiw_mcp.contracts.actions import ActionProposal, RiskLevel
+
     return ActionProposal(
         action=action,
         domain="test",
@@ -486,6 +506,7 @@ def _make_proposal(action: str = "test.action") -> "ActionProposal":
 
 def _approved_decision(proposal_id: str, age_seconds: float = 0.0) -> "DecisionResult":
     from maiw_decision.models import DecisionOutcome, DecisionResult
+
     evaluated_at = datetime.now(timezone.utc) - timedelta(seconds=age_seconds)
     return DecisionResult(
         request_id="req-1",
@@ -502,6 +523,7 @@ class _StubExecutor:
 
     def __init__(self, *, max_decision_age_seconds: int = 300, registry=None) -> None:
         from maiw_execution.base import BaseActionExecutor
+
         # Build via BaseActionExecutor
         self._base = _BaseExecutorSubclass(
             max_decision_age_seconds=max_decision_age_seconds,

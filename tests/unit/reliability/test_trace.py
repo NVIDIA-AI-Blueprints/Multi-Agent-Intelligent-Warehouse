@@ -47,7 +47,6 @@ from maiw_mcp.errors import BackendUnavailable
 
 import uuid
 
-
 TRACE_ID = "trace-10e-0001"
 
 
@@ -115,7 +114,9 @@ class TestTraceIdInResult:
     def test_trace_id_in_model_dump(self):
         result = ActionExecutionResult(
             outcome=ExecutionOutcome.EXECUTED,
-            action="test", proposal_id="p1", decision_id="d1",
+            action="test",
+            proposal_id="p1",
+            decision_id="d1",
             trace_id=TRACE_ID,
         )
         d = result.model_dump()
@@ -125,7 +126,9 @@ class TestTraceIdInResult:
     def test_trace_id_none_serializes_as_none(self):
         result = ActionExecutionResult(
             outcome=ExecutionOutcome.EXECUTED,
-            action="test", proposal_id="p1", decision_id="d1",
+            action="test",
+            proposal_id="p1",
+            decision_id="d1",
         )
         d = result.model_dump()
         assert "trace_id" in d
@@ -224,6 +227,7 @@ class TestTraceIdOnAllPaths:
     def test_trace_id_on_no_op_path(self):
         """Provider returns no_op outcome; trace_id still present."""
         from maiw_mcp.contracts.labor import LaborAllocateResult
+
         skill = MagicMock()
         skill.execute = AsyncMock(
             return_value=LaborAllocateResult(
@@ -291,12 +295,8 @@ class TestExecutionIdStability:
         p1 = _labor_proposal()
         p2 = _labor_proposal()
 
-        r1 = asyncio.run(
-            executor1.execute(p1, _approved_decision(p1.proposal_id))
-        )
-        r2 = asyncio.run(
-            executor2.execute(p2, _approved_decision(p2.proposal_id))
-        )
+        r1 = asyncio.run(executor1.execute(p1, _approved_decision(p1.proposal_id)))
+        r2 = asyncio.run(executor2.execute(p2, _approved_decision(p2.proposal_id)))
 
         assert r1.execution_id != r2.execution_id
 
@@ -332,32 +332,38 @@ class TestMCPTraceBoundary:
     def test_execution_id_present_in_labor_write_request_contract(self):
         """execution_id field exists on the write-request contract → crosses MCP."""
         from maiw_mcp.contracts.labor import LaborAllocateRequest
+
         fields = LaborAllocateRequest.model_fields
         assert "execution_id" in fields
 
     def test_trace_id_absent_from_labor_write_request_contract(self):
         """trace_id field is NOT on the write-request contract → stops at executor."""
         from maiw_mcp.contracts.labor import LaborAllocateRequest
+
         fields = LaborAllocateRequest.model_fields
         assert "trace_id" not in fields
 
     def test_execution_id_present_in_wave_write_request_contract(self):
         from maiw_mcp.contracts.wave import WaveReprioritizeRequest
+
         fields = WaveReprioritizeRequest.model_fields
         assert "execution_id" in fields
 
     def test_trace_id_absent_from_wave_write_request_contract(self):
         from maiw_mcp.contracts.wave import WaveReprioritizeRequest
+
         fields = WaveReprioritizeRequest.model_fields
         assert "trace_id" not in fields
 
     def test_execution_id_present_in_equipment_assign_request_contract(self):
         from maiw_mcp.contracts.equipment import EquipmentExecuteAssignRequest
+
         fields = EquipmentExecuteAssignRequest.model_fields
         assert "execution_id" in fields
 
     def test_trace_id_absent_from_equipment_assign_request_contract(self):
         from maiw_mcp.contracts.equipment import EquipmentExecuteAssignRequest
+
         fields = EquipmentExecuteAssignRequest.model_fields
         assert "trace_id" not in fields
 
@@ -371,9 +377,14 @@ class TestMCPTraceBoundary:
         async def capturing_skill(req):
             captured_requests.append(req)
             from maiw_mcp.contracts.labor import LaborAllocateResult
+
             return LaborAllocateResult(
-                success=True, allocation_id="alloc-1", task_id="T-TRACE",
-                worker_ids=["W-001"], proposal_id="p-1", decision_id="d-1",
+                success=True,
+                allocation_id="alloc-1",
+                task_id="T-TRACE",
+                worker_ids=["W-001"],
+                proposal_id="p-1",
+                decision_id="d-1",
                 outcome="executed",
             )
 

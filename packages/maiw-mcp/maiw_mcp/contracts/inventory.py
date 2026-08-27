@@ -21,7 +21,6 @@ from pydantic import BaseModel, Field
 
 from .common import CapabilityMetadata
 
-
 # ── Requests ──────────────────────────────────────────────────────────────────
 
 
@@ -79,9 +78,15 @@ class InventoryLookupResult(BaseModel):
     sku: str
     name: str = Field(description="Human-readable item name")
     locations: list[InventoryLocation]
-    total_available: int = Field(ge=0, description="Sum of available quantity across all locations")
-    is_low_stock: bool = Field(description="True when any location is at or below reorder_point")
-    observed_at: datetime = Field(description="When this data was last updated in the source system")
+    total_available: int = Field(
+        ge=0, description="Sum of available quantity across all locations"
+    )
+    is_low_stock: bool = Field(
+        description="True when any location is at or below reorder_point"
+    )
+    observed_at: datetime = Field(
+        description="When this data was last updated in the source system"
+    )
     source: str = Field(
         description="Backend identifier: 'maiw-backend', 'sap-ewm', 'manhattan', 'mock', …"
     )

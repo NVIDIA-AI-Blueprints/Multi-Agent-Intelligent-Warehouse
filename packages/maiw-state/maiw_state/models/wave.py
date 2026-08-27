@@ -26,7 +26,9 @@ class WaveTaskSummary(BaseModel):
     task_id: str
     task_type: str
     zone: str | None = None
-    status: str = Field(description="pending | in_progress | completed | failed | cancelled")
+    status: str = Field(
+        description="pending | in_progress | completed | failed | cancelled"
+    )
     priority: str = "medium"
     assigned_to: str | None = None
 
@@ -111,7 +113,9 @@ class WaveState(BaseModel):
                 zone=zone,
                 total_tasks=len(zone_tasks),
                 pending_tasks=sum(1 for t in zone_tasks if t.status == "pending"),
-                in_progress_tasks=sum(1 for t in zone_tasks if t.status == "in_progress"),
+                in_progress_tasks=sum(
+                    1 for t in zone_tasks if t.status == "in_progress"
+                ),
                 completed_tasks=sum(1 for t in zone_tasks if t.status == "completed"),
             )
             for zone, zone_tasks in zone_map.items()

@@ -138,7 +138,10 @@ class ActionExecutionResult(BaseModel):
     def _derive_compat_from_outcome(self) -> "ActionExecutionResult":
         """outcome is authoritative — derive executed and success from it."""
         self.executed = self.outcome == ExecutionOutcome.EXECUTED
-        self.success = self.outcome in (ExecutionOutcome.EXECUTED, ExecutionOutcome.NO_OP)
+        self.success = self.outcome in (
+            ExecutionOutcome.EXECUTED,
+            ExecutionOutcome.NO_OP,
+        )
         return self
 
 
@@ -312,7 +315,9 @@ class BaseActionExecutor:
                 intent=intent,
             )
             if existing is not None:
-                return self._idempotent_result(existing, proposal, decision, execution_id, trace_id)
+                return self._idempotent_result(
+                    existing, proposal, decision, execution_id, trace_id
+                )
 
         # ── Write path ─────────────────────────────────────────────────────────
         try:
@@ -350,7 +355,10 @@ class BaseActionExecutor:
             logger.error(
                 "%s: UNKNOWN execution action=%s proposal_id=%s execution_id=%s — "
                 "mutation may have occurred; reconciliation required",
-                type(self).__name__, proposal.action, proposal.proposal_id, execution_id,
+                type(self).__name__,
+                proposal.action,
+                proposal.proposal_id,
+                execution_id,
             )
             return result
         except Exception as exc:
@@ -372,7 +380,11 @@ class BaseActionExecutor:
                 self._registry.complete(execution_id, ExecutionOutcome.FAILED, result)
             logger.error(
                 "%s: FAILED execution action=%s proposal_id=%s execution_id=%s: %s",
-                type(self).__name__, proposal.action, proposal.proposal_id, execution_id, exc,
+                type(self).__name__,
+                proposal.action,
+                proposal.proposal_id,
+                execution_id,
+                exc,
             )
             return result
 
@@ -420,7 +432,9 @@ class BaseActionExecutor:
             logger.warning(
                 "%s: duplicate detected for in-flight execution_id=%s or "
                 "idempotency_key=%r; returning UNKNOWN",
-                type(self).__name__, existing.execution_id, existing.idempotency_key,
+                type(self).__name__,
+                existing.execution_id,
+                existing.idempotency_key,
             )
             return ActionExecutionResult(
                 execution_id=existing.execution_id,
@@ -437,7 +451,8 @@ class BaseActionExecutor:
             logger.warning(
                 "%s: prior execution execution_id=%s is UNKNOWN; "
                 "returning UNKNOWN — reconciliation required before retry",
-                type(self).__name__, existing.execution_id,
+                type(self).__name__,
+                existing.execution_id,
             )
             return ActionExecutionResult(
                 execution_id=existing.execution_id,
@@ -456,7 +471,9 @@ class BaseActionExecutor:
         logger.info(
             "%s: idempotent replay — prior execution_id=%s completed with outcome=%s; "
             "suppressing duplicate physical mutation",
-            type(self).__name__, existing.execution_id, existing.outcome.value,
+            type(self).__name__,
+            existing.execution_id,
+            existing.outcome.value,
         )
         prior_resp = existing.result.backend_response if existing.result else {}
         return ActionExecutionResult(
@@ -465,7 +482,9 @@ class BaseActionExecutor:
             action=proposal.action,
             proposal_id=proposal.proposal_id,
             decision_id=decision.result_id,
-            provider_reference=existing.result.provider_reference if existing.result else None,
+            provider_reference=(
+                existing.result.provider_reference if existing.result else None
+            ),
             backend_response={
                 **prior_resp,
                 "replayed": True,
@@ -532,6 +551,4 @@ class BaseActionExecutor:
             provider_reference: backend-generated transaction ID (allocation_id, etc.)
             outcome           : canonical ExecutionOutcome for this write
         """
-        raise NotImplementedError(
-            f"{type(self).__name__} must implement _do_execute()"
-        )
+        raise NotImplementedError(f"{type(self).__name__} must implement _do_execute()")

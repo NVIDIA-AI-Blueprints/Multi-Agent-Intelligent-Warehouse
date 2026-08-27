@@ -69,6 +69,7 @@ def _minimal_world_with_task(
 
 # ── Test 1: Task completes after processing_duration_seconds ──────────────────
 
+
 def test_task_progression_completes_after_duration():
     duration = _DEFAULT_PROCESSING_SECONDS["PICK"]  # 300
     w = _minimal_world_with_task(task_type="PICK", started_at=0)
@@ -79,6 +80,7 @@ def test_task_progression_completes_after_duration():
 
     # Manually advance via controller logic equivalent
     from maiw_api.demo.controller import DemoScenarioController
+
     ctrl = DemoScenarioController()
     ctrl.world = w
     ctrl._scenario = object()  # non-None sentinel
@@ -98,12 +100,14 @@ def test_task_progression_completes_after_duration():
 
 # ── Test 2: Task NOT completed before duration ────────────────────────────────
 
+
 def test_task_not_completed_before_duration():
     duration = _DEFAULT_PROCESSING_SECONDS["PICK"]  # 300
     w = _minimal_world_with_task(task_type="PICK", started_at=0)
     task = w.tasks["task-001"]
 
     from maiw_api.demo.controller import DemoScenarioController
+
     ctrl = DemoScenarioController()
     ctrl.world = w
     ctrl._scenario = object()
@@ -119,6 +123,7 @@ def test_task_not_completed_before_duration():
 
 # ── Test 3: wave_completion_pct updates after task completes ──────────────────
 
+
 def test_wave_completion_pct_updates():
     duration = _DEFAULT_PROCESSING_SECONDS["PICK"]
     w = _minimal_world_with_task(task_type="PICK", started_at=0)
@@ -127,6 +132,7 @@ def test_wave_completion_pct_updates():
     assert kpi_before.wave_completion_pct == 0.0
 
     from maiw_api.demo.controller import DemoScenarioController
+
     ctrl = DemoScenarioController()
     ctrl.world = w
     ctrl._scenario = object()
@@ -140,6 +146,7 @@ def test_wave_completion_pct_updates():
 
 # ── Test 4: simulated_throughput counts work units ────────────────────────────
 
+
 def test_simulated_throughput():
     w = DemoWarehouseWorld()
     # Inject 3 completed tasks directly into completion log
@@ -151,6 +158,7 @@ def test_simulated_throughput():
 
 
 # ── Test 5: Recovery detection ────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_recovery_detection():
@@ -182,6 +190,7 @@ async def test_recovery_detection():
 
 # ── Test 6: Reset clears completion log ──────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_scenario_reset_clears_completion_log():
     from maiw_api.demo.controller import DemoScenarioController
@@ -204,24 +213,28 @@ async def test_scenario_reset_clears_completion_log():
 
 # ── Test 7: stale_state has no CRITICAL wave risk ─────────────────────────────
 
+
 def test_stale_state_no_wave_critical():
     import yaml
+
     data = yaml.safe_load((_SCENARIOS_DIR / "stale_state.yaml").read_text())
     initial = dict(data.get("initial_state", {}))
     initial["clock_offset_seconds"] = data.get("clock_offset_seconds", 0)
     w = DemoWarehouseWorld()
     w.seed(initial, rng_seed=42)
     snap = DemoKPIEngine(w).compute()
-    assert snap.wave_risk_level != "critical", (
-        f"stale_state should not be CRITICAL, got {snap.wave_risk_level}"
-    )
+    assert (
+        snap.wave_risk_level != "critical"
+    ), f"stale_state should not be CRITICAL, got {snap.wave_risk_level}"
     assert snap.sim_time_seconds >= 0
 
 
 # ── Test 8: No execution → no recovery in stale_state ────────────────────────
 
+
 def test_no_execution_no_recovery():
     import yaml
+
     data = yaml.safe_load((_SCENARIOS_DIR / "stale_state.yaml").read_text())
     initial = dict(data.get("initial_state", {}))
     initial["clock_offset_seconds"] = data.get("clock_offset_seconds", 0)
@@ -237,6 +250,7 @@ def test_no_execution_no_recovery():
 
 # ── Test 9: labor_allocate sets started_at_sim_seconds ───────────────────────
 
+
 @pytest.mark.asyncio
 async def test_labor_allocate_sets_started_at_sim_seconds():
     from maiw_api.demo.controller import DemoScenarioController
@@ -249,7 +263,8 @@ async def test_labor_allocate_sets_started_at_sim_seconds():
     # Find a pending task and a free active worker
     pending = [t for t in ctrl.world.tasks.values() if t.status == "pending"]
     free_workers = [
-        wk for wk in ctrl.world.workers.values()
+        wk
+        for wk in ctrl.world.workers.values()
         if wk.status == "active" and wk.current_task_id is None
     ]
     assert pending, "Expected at least one pending task"
@@ -276,6 +291,7 @@ async def test_labor_allocate_sets_started_at_sim_seconds():
 
 # ── Test 10: Deterministic same seed → same completion count ──────────────────
 
+
 @pytest.mark.asyncio
 async def test_deterministic_same_seed_same_result():
     from maiw_api.demo.controller import DemoScenarioController
@@ -286,7 +302,8 @@ async def test_deterministic_same_seed_same_result():
         # Manually start one task so progression can happen
         pending = [t for t in ctrl.world.tasks.values() if t.status == "pending"]
         free = [
-            wk for wk in ctrl.world.workers.values()
+            wk
+            for wk in ctrl.world.workers.values()
             if wk.status == "active" and wk.current_task_id is None
         ]
         if pending and free:

@@ -129,9 +129,7 @@ async def propose_equipment_assignment(
         snapshot.snapshot_id,
     )
 
-    reason = (
-        result.violations[0].message if result.violations else "all checks passed"
-    )
+    reason = result.violations[0].message if result.violations else "all checks passed"
 
     # Step 4: Execute if APPROVED and executor provided
     if result.outcome == DecisionOutcome.APPROVED and action_executor is not None:
@@ -216,7 +214,9 @@ async def propose_equipment_release(
 
     logger.info(
         "DecisionEngine: %s proposal_id=%s action=release asset_id=%s",
-        result.outcome.value, proposal.proposal_id, asset_id,
+        result.outcome.value,
+        proposal.proposal_id,
+        asset_id,
     )
 
     if result.outcome == DecisionOutcome.APPROVED and action_executor is not None:
@@ -308,7 +308,9 @@ async def propose_schedule_maintenance(
 
     logger.info(
         "DecisionEngine: %s proposal_id=%s action=schedule_maintenance asset_id=%s",
-        result.outcome.value, proposal.proposal_id, asset_id,
+        result.outcome.value,
+        proposal.proposal_id,
+        asset_id,
     )
 
     # MEDIUM risk: never auto-executes regardless of executor
@@ -340,7 +342,9 @@ async def _execute_action(
     Captures all errors and maps them to status="error".
     """
     try:
-        exec_result = await action_executor.execute(proposal, decision, trace_id=trace_id)
+        exec_result = await action_executor.execute(
+            proposal, decision, trace_id=trace_id
+        )
         return {
             "status": exec_result.outcome.value,
             "action": proposal.action,
@@ -411,23 +415,27 @@ async def get_equipment_state_snapshot(
         "snapshot_id": snapshot.snapshot_id,
         "warehouse_id": snapshot.warehouse_id,
         "observed_at": state.observed_at.isoformat(),
-        "equipment": {
-            "total_count": eq.total_count if eq else 0,
-            "available_count": eq.available_count if eq else 0,
-            "assets": [
-                {
-                    "asset_id": a.asset_id,
-                    "type": a.equipment_type,
-                    "zone": a.zone,
-                    "status": a.status,
-                }
-                for a in (eq.assets if eq else [])
-            ],
-            "freshness": {
-                "age_ms": eq.freshness.age_ms if eq else None,
-                "stale": eq.freshness.stale if eq else None,
-            },
-        } if eq else None,
+        "equipment": (
+            {
+                "total_count": eq.total_count if eq else 0,
+                "available_count": eq.available_count if eq else 0,
+                "assets": [
+                    {
+                        "asset_id": a.asset_id,
+                        "type": a.equipment_type,
+                        "zone": a.zone,
+                        "status": a.status,
+                    }
+                    for a in (eq.assets if eq else [])
+                ],
+                "freshness": {
+                    "age_ms": eq.freshness.age_ms if eq else None,
+                    "stale": eq.freshness.stale if eq else None,
+                },
+            }
+            if eq
+            else None
+        ),
         "provenance": [
             {
                 "domain": p.domain,

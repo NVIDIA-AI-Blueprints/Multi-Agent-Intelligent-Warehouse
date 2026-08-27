@@ -59,7 +59,6 @@ from fault_framework.fakes import (
     make_test_snapshot,
 )
 
-
 # ===========================================================================
 # F01 — NIM timeout
 # ===========================================================================
@@ -87,13 +86,18 @@ async def test_f01_nim_timeout_no_proposal_no_execution():
     )
 
     # Wire a stub NIM provider that raises ModelTimeout
-    nim_provider = StubNIMProvider(raises=ModelTimeout("NIM timed out", model_id="nim-nano", timeout_s=30.0))
+    nim_provider = StubNIMProvider(
+        raises=ModelTimeout("NIM timed out", model_id="nim-nano", timeout_s=30.0)
+    )
     registry = ModelRegistry()
     router = ModelRouter(registry)
     telemetry = MagicMock()
-    gateway = ModelGateway(provider=nim_provider, registry=registry, router=router, telemetry=telemetry)
+    gateway = ModelGateway(
+        provider=nim_provider, registry=registry, router=router, telemetry=telemetry
+    )
 
     from maiw_models.models import ModelRequest, ReasoningLevel, RiskLevel as ModelRisk
+
     request = ModelRequest(
         task="analyze warehouse disruption",
         messages=[{"role": "user", "content": "analyze"}],
@@ -144,9 +148,12 @@ async def test_f02_nim_unavailable_no_proposal_no_execution():
     registry = ModelRegistry()
     router = ModelRouter(registry)
     telemetry = MagicMock()
-    gateway = ModelGateway(provider=nim_provider, registry=registry, router=router, telemetry=telemetry)
+    gateway = ModelGateway(
+        provider=nim_provider, registry=registry, router=router, telemetry=telemetry
+    )
 
     from maiw_models.models import ModelRequest, ReasoningLevel, RiskLevel as ModelRisk
+
     request = ModelRequest(
         task="assess disruption",
         messages=[{"role": "user", "content": "assess"}],
@@ -253,13 +260,16 @@ async def test_f04_mcp_domain_unavailable_no_execution():
     )
     # Manually trip labor circuit
     labor = reg.get("labor")
+
     async def _fail():
         raise RuntimeError("fail")
+
     with pytest.raises(RuntimeError):
         await labor.call(_fail())
 
     # Equipment still CLOSED and available
     from maiw_mcp.circuit_breaker import CircuitState
+
     equipment = reg.get("equipment")
     assert equipment.state == CircuitState.CLOSED
 
@@ -298,7 +308,9 @@ async def test_f05_mcp_write_before_mutation_outcome_failed():
     proposal = make_test_proposal()
     decision = make_approved_decision(proposal.proposal_id)
     registry = ExecutionRegistry()
-    executor = MinimalTestExecutor(do_execute_fn=fail_before_mutation, registry=registry)
+    executor = MinimalTestExecutor(
+        do_execute_fn=fail_before_mutation, registry=registry
+    )
 
     result_obj = await executor.execute(proposal, decision, trace_id="trace-f05")
 
@@ -307,6 +319,7 @@ async def test_f05_mcp_write_before_mutation_outcome_failed():
     result.recovery_reached = False
 
     from maiw_execution.outcome import ExecutionOutcome
+
     assert result_obj.outcome == ExecutionOutcome.FAILED
     assert result_obj.physical_mutation_occurred is False
 
@@ -359,14 +372,16 @@ async def test_f06_ambiguous_write_outcome_unknown_no_retry():
     proposal = make_test_proposal()
     decision = make_approved_decision(proposal.proposal_id)
     registry = ExecutionRegistry()
-    executor = MinimalTestExecutor(do_execute_fn=ambiguous_do_execute, registry=registry)
+    executor = MinimalTestExecutor(
+        do_execute_fn=ambiguous_do_execute, registry=registry
+    )
 
     exec_result = await executor.execute(proposal, decision, trace_id="trace-f06")
 
     # Core assertions — UNKNOWN, not FAILED
-    assert exec_result.outcome == ExecutionOutcome.UNKNOWN, (
-        f"Expected UNKNOWN, got {exec_result.outcome.value}"
-    )
+    assert (
+        exec_result.outcome == ExecutionOutcome.UNKNOWN
+    ), f"Expected UNKNOWN, got {exec_result.outcome.value}"
     assert exec_result.physical_mutation_occurred is True
     assert exec_result.execution_id is not None
 
@@ -388,7 +403,9 @@ async def test_f06_ambiguous_write_outcome_unknown_no_retry():
         async def read_current_state(self, intent: ExecutionIntent) -> dict:
             return {"status": "assigned", "asset_id": "AGV-001"}  # mutation confirmed
 
-        def check_postcondition(self, intent: ExecutionIntent, state: dict) -> ReconciliationOutcome:
+        def check_postcondition(
+            self, intent: ExecutionIntent, state: dict
+        ) -> ReconciliationOutcome:
             return ReconciliationOutcome.CONFIRMED_EXECUTED
 
     # Reconciliation works on the ExecutionRecord, not the ActionExecutionResult
@@ -635,7 +652,10 @@ async def test_f10_state_drift_blocks_execution():
     with pytest.raises(ActionConflict) as exc_info:
         await executor.execute(proposal, decision)
 
-    assert "drift" in str(exc_info.value).lower() or "reassigned" in str(exc_info.value).lower()
+    assert (
+        "drift" in str(exc_info.value).lower()
+        or "reassigned" in str(exc_info.value).lower()
+    )
 
     result = ReliabilityResult(fault_id="F10")
     result.fault_triggered = True
@@ -748,8 +768,10 @@ async def test_f12_circuit_open_isolates_domain():
 
     # Trip labor circuit
     labor = reg.get("labor")
+
     async def _fail():
         raise RuntimeError("Labor MCP server unreachable")
+
     for _ in range(2):
         with pytest.raises(RuntimeError):
             await labor.call(_fail())
@@ -864,10 +886,18 @@ async def test_f13_reconciliation_read_timeout_propagates():
 def test_all_fault_profiles_defined():
     """Verify the full fault matrix is covered — F01 through F13."""
     expected = {f"F{i:02d}" for i in range(1, 14)}
-    expected.add("F01"); expected.add("F02"); expected.add("F03")
-    expected.add("F04"); expected.add("F05"); expected.add("F06")
-    expected.add("F07"); expected.add("F08"); expected.add("F09")
-    expected.add("F10"); expected.add("F11"); expected.add("F12")
+    expected.add("F01")
+    expected.add("F02")
+    expected.add("F03")
+    expected.add("F04")
+    expected.add("F05")
+    expected.add("F06")
+    expected.add("F07")
+    expected.add("F08")
+    expected.add("F09")
+    expected.add("F10")
+    expected.add("F11")
+    expected.add("F12")
     expected.add("F13")
     # All 13 faults are defined — this test is a documentation check
     assert len(expected) == 13
@@ -909,9 +939,16 @@ def test_reliability_result_to_dict():
     r = ReliabilityResult(fault_id="F01", fault_triggered=True)
     d = r.to_dict()
     required_keys = {
-        "scenario_id", "seed", "fault_id", "fault_triggered",
-        "unauthorized_writes", "duplicate_writes", "false_successes",
-        "unknown_executions", "safety_pass", "trace_complete",
+        "scenario_id",
+        "seed",
+        "fault_id",
+        "fault_triggered",
+        "unauthorized_writes",
+        "duplicate_writes",
+        "false_successes",
+        "unknown_executions",
+        "safety_pass",
+        "trace_complete",
     }
     assert required_keys.issubset(d.keys())
 
@@ -920,6 +957,7 @@ def test_event_category_has_fault_labels():
     """EventCategory Literal must include all 6 new Batch 6 labels."""
     import typing
     from maiw_api.demo.events import EventCategory
+
     args = typing.get_args(EventCategory)
     required = {
         "FAULT_INJECTED",

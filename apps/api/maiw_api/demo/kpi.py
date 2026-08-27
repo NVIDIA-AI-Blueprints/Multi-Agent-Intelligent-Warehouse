@@ -17,7 +17,11 @@ PICKS_PER_ACTIVE_WORKER_PER_HOUR = 12
 _WAVE_TASK_TYPES = frozenset({"PICK", "PACK", "SHIP", "RECEIVE", "PUTAWAY", "TRANSFER"})
 
 _WAVE_RISK_SCORE: dict[str, float] = {
-    "none": 0.0, "low": 20.0, "medium": 50.0, "high": 75.0, "critical": 95.0,
+    "none": 0.0,
+    "low": 20.0,
+    "medium": 50.0,
+    "high": 75.0,
+    "critical": 95.0,
 }
 
 
@@ -29,22 +33,26 @@ class KPISnapshot:
     equipment_total: int
     equipment_operational_pct: float  # (available+assigned+charging)/total*100
     labor_total: int
-    labor_availability_pct: float    # active/total*100
-    labor_utilization_pct: float     # workers_with_task/active*100
+    labor_availability_pct: float  # active/total*100
+    labor_utilization_pct: float  # workers_with_task/active*100
     pending_backlog: int
-    wave_risk_score: float           # 0-100 numeric
-    wave_risk_level: str             # none/low/medium/high/critical
+    wave_risk_score: float  # 0-100 numeric
+    wave_risk_level: str  # none/low/medium/high/critical
     low_stock_count: int
     state_freshness_seconds: float | None  # None if never analyzed
     # SIMULATION-DERIVED PROXY metrics
-    service_risk_index: float        # PROXY — fraction of critical deadline tasks
-    capacity_throughput_proxy: float # PROXY — active_with_task * 12
+    service_risk_index: float  # PROXY — fraction of critical deadline tasks
+    capacity_throughput_proxy: float  # PROXY — active_with_task * 12
     # New EXACT within simulation metrics
-    wave_completion_pct: float       # completed wave tasks / total wave tasks * 100
-    simulated_throughput: float      # work units completed in last 3600 sim-seconds
+    wave_completion_pct: float  # completed wave tasks / total wave tasks * 100
+    simulated_throughput: float  # work units completed in last 3600 sim-seconds
     # New SIMULATION-DERIVED metrics
-    projected_service_level: float   # fraction of deadline tasks projected to complete on time
-    time_to_recovery_seconds: float | None  # sim seconds from disruption to recovery; None if not yet recovered
+    projected_service_level: (
+        float  # fraction of deadline tasks projected to complete on time
+    )
+    time_to_recovery_seconds: (
+        float | None
+    )  # sim seconds from disruption to recovery; None if not yet recovered
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -79,17 +87,33 @@ class KPISnapshot:
     def delta_to(self, other: "KPISnapshot") -> dict[str, float | int]:
         """Return delta: other - self. Negative pending_backlog/wave_risk = improvement."""
         return {
-            "equipment_operational_pct": round(other.equipment_operational_pct - self.equipment_operational_pct, 1),
-            "labor_availability_pct": round(other.labor_availability_pct - self.labor_availability_pct, 1),
-            "labor_utilization_pct": round(other.labor_utilization_pct - self.labor_utilization_pct, 1),
+            "equipment_operational_pct": round(
+                other.equipment_operational_pct - self.equipment_operational_pct, 1
+            ),
+            "labor_availability_pct": round(
+                other.labor_availability_pct - self.labor_availability_pct, 1
+            ),
+            "labor_utilization_pct": round(
+                other.labor_utilization_pct - self.labor_utilization_pct, 1
+            ),
             "pending_backlog": other.pending_backlog - self.pending_backlog,
             "wave_risk_score": round(other.wave_risk_score - self.wave_risk_score, 1),
             "low_stock_count": other.low_stock_count - self.low_stock_count,
-            "service_risk_index": round(other.service_risk_index - self.service_risk_index, 1),
-            "capacity_throughput_proxy": round(other.capacity_throughput_proxy - self.capacity_throughput_proxy, 1),
-            "wave_completion_pct": round(other.wave_completion_pct - self.wave_completion_pct, 1),
-            "simulated_throughput": round(other.simulated_throughput - self.simulated_throughput, 1),
-            "projected_service_level": round(other.projected_service_level - self.projected_service_level, 1),
+            "service_risk_index": round(
+                other.service_risk_index - self.service_risk_index, 1
+            ),
+            "capacity_throughput_proxy": round(
+                other.capacity_throughput_proxy - self.capacity_throughput_proxy, 1
+            ),
+            "wave_completion_pct": round(
+                other.wave_completion_pct - self.wave_completion_pct, 1
+            ),
+            "simulated_throughput": round(
+                other.simulated_throughput - self.simulated_throughput, 1
+            ),
+            "projected_service_level": round(
+                other.projected_service_level - self.projected_service_level, 1
+            ),
         }
 
 
@@ -111,7 +135,9 @@ class DemoKPIEngine:
         # Equipment
         eq_list = list(world.equipment.values())
         eq_total = len(eq_list)
-        eq_operational = sum(1 for a in eq_list if a.status in ("available", "assigned", "charging"))
+        eq_operational = sum(
+            1 for a in eq_list if a.status in ("available", "assigned", "charging")
+        )
         eq_pct = round(eq_operational / max(eq_total, 1) * 100, 1)
 
         # Labor
@@ -128,8 +154,12 @@ class DemoKPIEngine:
         pending_backlog = sum(1 for t in world.tasks.values() if t.status == "pending")
 
         # Wave risk (inline — avoids async call to WaveProvider)
-        wave_tasks = [t for t in world.tasks.values() if t.task_type in _WAVE_TASK_TYPES]
-        at_risk = [t for t in wave_tasks if t.status == "pending" and t.assigned_to is None]
+        wave_tasks = [
+            t for t in world.tasks.values() if t.task_type in _WAVE_TASK_TYPES
+        ]
+        at_risk = [
+            t for t in wave_tasks if t.status == "pending" and t.assigned_to is None
+        ]
         has_deadline = any(t.deadline is not None for t in at_risk)
         has_high_priority = any(t.priority in ("high", "critical") for t in at_risk)
 
@@ -153,21 +183,30 @@ class DemoKPIEngine:
         freshness: float | None = None
         if self._last_analyze_wall_time is not None:
             freshness = round(
-                (datetime.now(tz=timezone.utc) - self._last_analyze_wall_time).total_seconds(), 1
+                (
+                    datetime.now(tz=timezone.utc) - self._last_analyze_wall_time
+                ).total_seconds(),
+                1,
             )
 
         # PROXY: Service Risk Index
         critical_deadline = [
-            t for t in wave_tasks
-            if t.status == "pending" and t.deadline is not None
+            t
+            for t in wave_tasks
+            if t.status == "pending"
+            and t.deadline is not None
             and t.priority in ("high", "critical")
         ]
-        service_risk_index = round(
-            min(100.0, len(critical_deadline) / max(len(wave_tasks), 1) * 100), 1
-        ) if wave_tasks else 0.0
+        service_risk_index = (
+            round(min(100.0, len(critical_deadline) / max(len(wave_tasks), 1) * 100), 1)
+            if wave_tasks
+            else 0.0
+        )
 
         # PROXY: Capacity Throughput Proxy
-        capacity_throughput_proxy = round(wk_with_task * PICKS_PER_ACTIVE_WORKER_PER_HOUR, 1)
+        capacity_throughput_proxy = round(
+            wk_with_task * PICKS_PER_ACTIVE_WORKER_PER_HOUR, 1
+        )
 
         # NEW: Wave completion %
         wave_counts = world.wave_task_counts()
@@ -178,14 +217,16 @@ class DemoKPIEngine:
         # NEW: Simulated throughput — work units completed in the last 3600 sim-seconds
         window_start = elapsed - 3600
         throughput_units = sum(
-            units for t, units in world._completion_log
-            if t >= window_start
+            units for t, units in world._completion_log if t >= window_start
         )
-        simulated_throughput = round(throughput_units / 1.0, 1)  # units per 60 min window
+        simulated_throughput = round(
+            throughput_units / 1.0, 1
+        )  # units per 60 min window
 
         # NEW: Projected service level (SIMULATION-DERIVED — not OTIF)
         deadline_tasks = [
-            t for t in world.tasks.values()
+            t
+            for t in world.tasks.values()
             if t.deadline is not None and t.status in ("pending", "in_progress")
         ]
         if not deadline_tasks:
@@ -198,8 +239,13 @@ class DemoKPIEngine:
                     world_now = world.clock.now()
                     time_to_deadline = (dl - world_now).total_seconds()
                     # Estimate remaining work
-                    if t.status == "in_progress" and t.started_at_sim_seconds is not None:
-                        remaining = t.processing_duration_seconds - (elapsed - t.started_at_sim_seconds)
+                    if (
+                        t.status == "in_progress"
+                        and t.started_at_sim_seconds is not None
+                    ):
+                        remaining = t.processing_duration_seconds - (
+                            elapsed - t.started_at_sim_seconds
+                        )
                         remaining = max(0, remaining)
                     else:
                         remaining = t.processing_duration_seconds
@@ -207,11 +253,18 @@ class DemoKPIEngine:
                         on_track += 1
                 except (ValueError, TypeError):
                     pass  # Unparseable deadline — skip
-            projected_service_level = round(on_track / max(len(deadline_tasks), 1) * 100, 1)
+            projected_service_level = round(
+                on_track / max(len(deadline_tasks), 1) * 100, 1
+            )
 
         # NEW: Time to recovery
-        if world._recovery_sim_time is not None and world._disruption_sim_time is not None:
-            time_to_recovery_seconds = float(world._recovery_sim_time - world._disruption_sim_time)
+        if (
+            world._recovery_sim_time is not None
+            and world._disruption_sim_time is not None
+        ):
+            time_to_recovery_seconds = float(
+                world._recovery_sim_time - world._disruption_sim_time
+            )
         else:
             time_to_recovery_seconds = None
 

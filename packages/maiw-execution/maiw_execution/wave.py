@@ -25,9 +25,11 @@ class WaveActionExecutor(BaseActionExecutor):
         warehouse.wave.reprioritize → reprioritize_skill
     """
 
-    _ALLOWED_ACTIONS: frozenset[str] = frozenset({
-        "warehouse.wave.reprioritize",
-    })
+    _ALLOWED_ACTIONS: frozenset[str] = frozenset(
+        {
+            "warehouse.wave.reprioritize",
+        }
+    )
 
     def __init__(
         self,
@@ -96,6 +98,8 @@ class WaveActionExecutor(BaseActionExecutor):
         elif outcome_str == "deferred":
             outcome = ExecutionOutcome.DEFERRED
         else:
-            outcome = ExecutionOutcome.EXECUTED if result.success else ExecutionOutcome.FAILED
+            outcome = (
+                ExecutionOutcome.EXECUTED if result.success else ExecutionOutcome.FAILED
+            )
 
         return resp, None, outcome

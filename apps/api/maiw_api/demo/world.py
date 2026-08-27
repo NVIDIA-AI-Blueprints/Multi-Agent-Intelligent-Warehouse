@@ -26,7 +26,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-
 # ── Default processing durations per task type ────────────────────────────────
 
 _DEFAULT_PROCESSING_SECONDS: dict[str, int] = {
@@ -41,6 +40,7 @@ _DEFAULT_PROCESSING_SECONDS: dict[str, int] = {
 
 
 # ── Simulation clock ──────────────────────────────────────────────────────────
+
 
 class SimulationClock:
     """
@@ -66,6 +66,7 @@ class SimulationClock:
     def now(self) -> datetime:
         """Return current simulated UTC time."""
         from datetime import timedelta
+
         return self._EPOCH + timedelta(seconds=self._elapsed_seconds)
 
     @property
@@ -80,6 +81,7 @@ class SimulationClock:
 
 
 # ── World entity types ────────────────────────────────────────────────────────
+
 
 @dataclass
 class InventoryItem:
@@ -99,10 +101,10 @@ class InventoryItem:
 @dataclass
 class EquipmentAsset:
     asset_id: str
-    equipment_type: str          # forklift | amr | agv | scanner | charger
+    equipment_type: str  # forklift | amr | agv | scanner | charger
     model: str
     zone: str
-    status: str                  # available | assigned | charging | maintenance | offline
+    status: str  # available | assigned | charging | maintenance | offline
     owner_user: str | None = None
     next_pm_due: datetime | None = None
     last_maintenance: datetime | None = None
@@ -116,8 +118,8 @@ class WorkerState:
     worker_id: str
     username: str
     full_name: str
-    role: str                    # operator | supervisor | manager
-    status: str                  # active | inactive | on_leave
+    role: str  # operator | supervisor | manager
+    status: str  # active | inactive | on_leave
     zone: str | None = None
     current_task_id: str | None = None
 
@@ -125,9 +127,9 @@ class WorkerState:
 @dataclass
 class TaskState:
     task_id: str
-    task_type: str               # PICK | PACK | SHIP | RECEIVE | PUTAWAY | CYCLE_COUNT
+    task_type: str  # PICK | PACK | SHIP | RECEIVE | PUTAWAY | CYCLE_COUNT
     zone: str | None
-    status: str                  # pending | in_progress | completed | failed | cancelled
+    status: str  # pending | in_progress | completed | failed | cancelled
     assigned_to: str | None = None
     priority: str = "medium"
     deadline: str | None = None  # ISO-8601 string
@@ -138,6 +140,7 @@ class TaskState:
 
 
 # ── DemoWarehouseWorld ────────────────────────────────────────────────────────
+
 
 class DemoWarehouseWorld:
     """
@@ -164,15 +167,21 @@ class DemoWarehouseWorld:
 
     def __init__(self) -> None:
         self.clock = SimulationClock()
-        self.inventory: dict[str, InventoryItem] = {}      # sku → item
-        self.equipment: dict[str, EquipmentAsset] = {}     # asset_id → asset
-        self.workers: dict[str, WorkerState] = {}          # worker_id → worker
-        self.tasks: dict[str, TaskState] = {}              # task_id → task
+        self.inventory: dict[str, InventoryItem] = {}  # sku → item
+        self.equipment: dict[str, EquipmentAsset] = {}  # asset_id → asset
+        self.workers: dict[str, WorkerState] = {}  # worker_id → worker
+        self.tasks: dict[str, TaskState] = {}  # task_id → task
         self._rng = random.Random(42)
         # Simulation progression tracking
-        self._completion_log: list[tuple[int, int]] = []   # (sim_time_seconds, work_units)
-        self._disruption_sim_time: int | None = None       # first INJECT event sim clock time
-        self._recovery_sim_time: int | None = None         # first recovery-threshold-met sim clock time
+        self._completion_log: list[tuple[int, int]] = (
+            []
+        )  # (sim_time_seconds, work_units)
+        self._disruption_sim_time: int | None = (
+            None  # first INJECT event sim clock time
+        )
+        self._recovery_sim_time: int | None = (
+            None  # first recovery-threshold-met sim clock time
+        )
 
     # ── seeding ──────────────────────────────────────────────────────────────
 
@@ -207,10 +216,13 @@ class DemoWarehouseWorld:
             task_def = dict(task_def)
             # Strip sim-only fields that may appear from snapshot round-trips
             # but are not in YAML seeds — they have defaults on dataclass
-            t = TaskState(**{
-                k: v for k, v in task_def.items()
-                if k in TaskState.__dataclass_fields__
-            })
+            t = TaskState(
+                **{
+                    k: v
+                    for k, v in task_def.items()
+                    if k in TaskState.__dataclass_fields__
+                }
+            )
             self.tasks[t.task_id] = t
 
         # Set processing_duration_seconds from scenario data or defaults
@@ -258,8 +270,15 @@ class DemoWarehouseWorld:
 
     def wave_task_counts(self) -> dict[str, int]:
         """Count wave tasks by status for KPIEngine."""
-        _WAVE_TYPES = frozenset({"PICK", "PACK", "SHIP", "RECEIVE", "PUTAWAY", "TRANSFER"})
-        counts: dict[str, int] = {"pending": 0, "in_progress": 0, "completed": 0, "failed": 0}
+        _WAVE_TYPES = frozenset(
+            {"PICK", "PACK", "SHIP", "RECEIVE", "PUTAWAY", "TRANSFER"}
+        )
+        counts: dict[str, int] = {
+            "pending": 0,
+            "in_progress": 0,
+            "completed": 0,
+            "failed": 0,
+        }
         for t in self.tasks.values():
             if t.task_type in _WAVE_TYPES and t.status in counts:
                 counts[t.status] += 1

@@ -28,10 +28,10 @@ from pydantic import BaseModel, Field
 class StateSource(str, Enum):
     """Where the state component data originated."""
 
-    MCP = "mcp"           # via official MCP v2 capability
+    MCP = "mcp"  # via official MCP v2 capability
     DIRECT_DB = "direct_db"  # future: direct SQL (fallback path)
-    CACHE = "cache"        # future: in-memory/Redis cache
-    MOCK = "mock"          # test/development mock
+    CACHE = "cache"  # future: in-memory/Redis cache
+    MOCK = "mock"  # test/development mock
 
 
 class StateProvenance(BaseModel):
@@ -49,9 +49,7 @@ class StateProvenance(BaseModel):
     capability: str = Field(
         description="MCP capability name, e.g. 'warehouse.equipment.get_status'"
     )
-    server: str = Field(
-        description="MCP server name, e.g. 'MAIW Equipment Server'"
-    )
+    server: str = Field(description="MCP server name, e.g. 'MAIW Equipment Server'")
     provider: str = Field(
         description="Backend adapter identifier, e.g. 'maiw-backend', 'mock'"
     )

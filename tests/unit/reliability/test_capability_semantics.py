@@ -45,22 +45,29 @@ import pytest
 
 from maiw_mcp.errors import BackendUnavailable
 
-
 # ── World factory helpers ─────────────────────────────────────────────────────
 
 
 def _make_labor_world(*, with_task: bool = True, with_worker: bool = True):
     from maiw_api.demo.world import DemoWarehouseWorld, TaskState, WorkerState
+
     world = DemoWarehouseWorld()
     if with_task:
         world.tasks["T-CAP"] = TaskState(
-            task_id="T-CAP", task_type="PICK", zone="ZONE-A",
-            status="pending", priority="medium",
+            task_id="T-CAP",
+            task_type="PICK",
+            zone="ZONE-A",
+            status="pending",
+            priority="medium",
         )
     if with_worker:
         world.workers["W-001"] = WorkerState(
-            worker_id="W-001", username="worker1", full_name="Worker One",
-            role="operator", status="active", zone="ZONE-A",
+            worker_id="W-001",
+            username="worker1",
+            full_name="Worker One",
+            role="operator",
+            status="active",
+            zone="ZONE-A",
         )
     bus = MagicMock()
     bus.publish_labor_write = AsyncMock()
@@ -69,26 +76,38 @@ def _make_labor_world(*, with_task: bool = True, with_worker: bool = True):
 
 def _make_wave_world(*, num_tasks: int = 2, priority: str = "medium"):
     from maiw_api.demo.world import DemoWarehouseWorld, TaskState
+
     world = DemoWarehouseWorld()
     for i in range(num_tasks):
         world.tasks[f"T-W{i}"] = TaskState(
-            task_id=f"T-W{i}", task_type="PICK", zone="ZONE-A",
-            status="pending", priority=priority,
+            task_id=f"T-W{i}",
+            task_type="PICK",
+            zone="ZONE-A",
+            status="pending",
+            priority=priority,
         )
     bus = MagicMock()
     bus.publish_wave_write = AsyncMock()
     return world, bus
 
 
-def _make_equip_world(*, status: str = "available", owner_user=None, current_task_id=None):
+def _make_equip_world(
+    *, status: str = "available", owner_user=None, current_task_id=None
+):
     from maiw_api.demo.world import DemoWarehouseWorld, EquipmentAsset
+
     world = DemoWarehouseWorld()
     metadata = {}
     if current_task_id:
         metadata["current_task_id"] = current_task_id
     world.equipment["FA-001"] = EquipmentAsset(
-        asset_id="FA-001", equipment_type="forklift", model="XR500",
-        zone="ZONE-A", status=status, owner_user=owner_user, metadata=metadata,
+        asset_id="FA-001",
+        equipment_type="forklift",
+        model="XR500",
+        zone="ZONE-A",
+        status=status,
+        owner_user=owner_user,
+        metadata=metadata,
     )
     bus = MagicMock()
     bus.publish_equipment_write = AsyncMock()
@@ -97,9 +116,14 @@ def _make_equip_world(*, status: str = "available", owner_user=None, current_tas
 
 def _labor_req(**kwargs):
     from maiw_mcp.contracts.labor import LaborAllocateRequest
+
     defaults = dict(
-        warehouse_id="default", task_id="T-CAP", task_type="PICK",
-        worker_ids=["W-001"], proposal_id="p-cap", decision_id="d-cap",
+        warehouse_id="default",
+        task_id="T-CAP",
+        task_type="PICK",
+        worker_ids=["W-001"],
+        proposal_id="p-cap",
+        decision_id="d-cap",
         execution_id="exec-cap",
     )
     return LaborAllocateRequest(**{**defaults, **kwargs})
@@ -107,18 +131,28 @@ def _labor_req(**kwargs):
 
 def _wave_req(**kwargs):
     from maiw_mcp.contracts.wave import WaveReprioritizeRequest
+
     defaults = dict(
-        warehouse_id="default", zone="ZONE-A", new_priority="high",
-        proposal_id="p-cap", decision_id="d-cap", execution_id="exec-cap",
+        warehouse_id="default",
+        zone="ZONE-A",
+        new_priority="high",
+        proposal_id="p-cap",
+        decision_id="d-cap",
+        execution_id="exec-cap",
     )
     return WaveReprioritizeRequest(**{**defaults, **kwargs})
 
 
 def _assign_req(**kwargs):
     from maiw_mcp.contracts.equipment import EquipmentExecuteAssignRequest
+
     defaults = dict(
-        warehouse_id="default", asset_id="FA-001", assignee="W-001",
-        task_id="T-001", proposal_id="p-cap", decision_id="d-cap",
+        warehouse_id="default",
+        asset_id="FA-001",
+        assignee="W-001",
+        task_id="T-001",
+        proposal_id="p-cap",
+        decision_id="d-cap",
         execution_id="exec-cap",
     )
     return EquipmentExecuteAssignRequest(**{**defaults, **kwargs})
@@ -126,19 +160,30 @@ def _assign_req(**kwargs):
 
 def _release_req(**kwargs):
     from maiw_mcp.contracts.equipment import EquipmentExecuteReleaseRequest
+
     defaults = dict(
-        warehouse_id="default", asset_id="FA-001", released_by="W-001",
-        proposal_id="p-cap", decision_id="d-cap", execution_id="exec-cap",
+        warehouse_id="default",
+        asset_id="FA-001",
+        released_by="W-001",
+        proposal_id="p-cap",
+        decision_id="d-cap",
+        execution_id="exec-cap",
     )
     return EquipmentExecuteReleaseRequest(**{**defaults, **kwargs})
 
 
 def _maint_req(**kwargs):
     from maiw_mcp.contracts.equipment import EquipmentExecuteMaintenanceRequest
+
     defaults = dict(
-        asset_id="FA-001", maintenance_type="PM", description="Scheduled PM",
-        scheduled_for="2026-09-01T08:00:00", scheduled_by="ops-manager",
-        proposal_id="p-cap", decision_id="d-cap", execution_id="exec-cap",
+        asset_id="FA-001",
+        maintenance_type="PM",
+        description="Scheduled PM",
+        scheduled_for="2026-09-01T08:00:00",
+        scheduled_by="ops-manager",
+        proposal_id="p-cap",
+        decision_id="d-cap",
+        execution_id="exec-cap",
     )
     return EquipmentExecuteMaintenanceRequest(**{**defaults, **kwargs})
 
@@ -153,6 +198,7 @@ class TestLaborAllocateSemantics:
         """FAILED: task_id not in world → BackendUnavailable raised."""
         world, bus = _make_labor_world(with_task=False)
         from maiw_api.demo.providers.labor import SimulationLaborProvider
+
         provider = SimulationLaborProvider(world=world, bus=bus)
 
         with pytest.raises(BackendUnavailable):
@@ -164,6 +210,7 @@ class TestLaborAllocateSemantics:
         """DEFERRED: worker_ids=[] and no idle workers in world."""
         world, bus = _make_labor_world(with_worker=False)
         from maiw_api.demo.providers.labor import SimulationLaborProvider
+
         provider = SimulationLaborProvider(world=world, bus=bus)
 
         result = asyncio.run(
@@ -180,6 +227,7 @@ class TestLaborAllocateSemantics:
         world.tasks["T-CAP"].status = "in_progress"
         world.tasks["T-CAP"].assigned_to = "W-001"
         from maiw_api.demo.providers.labor import SimulationLaborProvider
+
         provider = SimulationLaborProvider(world=world, bus=bus)
 
         result = asyncio.run(provider.execute_labor_allocation(_labor_req()))
@@ -192,6 +240,7 @@ class TestLaborAllocateSemantics:
         """EXECUTED: valid task + worker → mutation committed."""
         world, bus = _make_labor_world()
         from maiw_api.demo.providers.labor import SimulationLaborProvider
+
         provider = SimulationLaborProvider(world=world, bus=bus)
 
         result = asyncio.run(provider.execute_labor_allocation(_labor_req()))
@@ -213,6 +262,7 @@ class TestWaveReprioritizeSemantics:
         """FAILED: zone has no tasks → BackendUnavailable raised."""
         world, bus = _make_wave_world(num_tasks=0)
         from maiw_api.demo.providers.wave import SimulationWaveProvider
+
         provider = SimulationWaveProvider(world=world, bus=bus)
 
         with pytest.raises(BackendUnavailable):
@@ -224,6 +274,7 @@ class TestWaveReprioritizeSemantics:
         """NO_OP: all tasks already have new_priority."""
         world, bus = _make_wave_world(num_tasks=2, priority="high")
         from maiw_api.demo.providers.wave import SimulationWaveProvider
+
         provider = SimulationWaveProvider(world=world, bus=bus)
 
         result = asyncio.run(
@@ -238,6 +289,7 @@ class TestWaveReprioritizeSemantics:
         """EXECUTED: at least one task priority changed."""
         world, bus = _make_wave_world(num_tasks=3, priority="medium")
         from maiw_api.demo.providers.wave import SimulationWaveProvider
+
         provider = SimulationWaveProvider(world=world, bus=bus)
 
         result = asyncio.run(
@@ -260,6 +312,7 @@ class TestEquipmentAssignSemantics:
         world, bus = _make_equip_world()
         world.equipment.clear()
         from maiw_api.demo.providers.equipment import SimulationEquipmentProvider
+
         provider = SimulationEquipmentProvider(world=world, bus=bus)
 
         with pytest.raises(BackendUnavailable):
@@ -273,6 +326,7 @@ class TestEquipmentAssignSemantics:
             status="assigned", owner_user="W-001", current_task_id="T-001"
         )
         from maiw_api.demo.providers.equipment import SimulationEquipmentProvider
+
         provider = SimulationEquipmentProvider(world=world, bus=bus)
 
         result = asyncio.run(
@@ -291,12 +345,11 @@ class TestEquipmentAssignSemantics:
             status="assigned", owner_user="W-999", current_task_id="T-OTHER"
         )
         from maiw_api.demo.providers.equipment import SimulationEquipmentProvider
+
         provider = SimulationEquipmentProvider(world=world, bus=bus)
 
         result = asyncio.run(
-            provider.execute_equipment_assignment(
-                _assign_req(task_id="T-001")
-            )
+            provider.execute_equipment_assignment(_assign_req(task_id="T-001"))
         )
 
         assert result.outcome == "conflict"
@@ -308,6 +361,7 @@ class TestEquipmentAssignSemantics:
         """EXECUTED: asset available → assign mutation committed."""
         world, bus = _make_equip_world(status="available")
         from maiw_api.demo.providers.equipment import SimulationEquipmentProvider
+
         provider = SimulationEquipmentProvider(world=world, bus=bus)
 
         result = asyncio.run(
@@ -330,6 +384,7 @@ class TestEquipmentReleaseSemantics:
         world, bus = _make_equip_world()
         world.equipment.clear()
         from maiw_api.demo.providers.equipment import SimulationEquipmentProvider
+
         provider = SimulationEquipmentProvider(world=world, bus=bus)
 
         with pytest.raises(BackendUnavailable):
@@ -341,6 +396,7 @@ class TestEquipmentReleaseSemantics:
         """NO_OP: asset already available with no owner."""
         world, bus = _make_equip_world(status="available", owner_user=None)
         from maiw_api.demo.providers.equipment import SimulationEquipmentProvider
+
         provider = SimulationEquipmentProvider(world=world, bus=bus)
 
         result = asyncio.run(provider.execute_equipment_release(_release_req()))
@@ -353,6 +409,7 @@ class TestEquipmentReleaseSemantics:
         """EXECUTED: assigned asset released → mutation committed."""
         world, bus = _make_equip_world(status="assigned", owner_user="W-001")
         from maiw_api.demo.providers.equipment import SimulationEquipmentProvider
+
         provider = SimulationEquipmentProvider(world=world, bus=bus)
 
         result = asyncio.run(provider.execute_equipment_release(_release_req()))
@@ -371,6 +428,7 @@ class TestEquipmentMaintenanceSemantics:
         world, bus = _make_equip_world()
         world.equipment.clear()
         from maiw_api.demo.providers.equipment import SimulationEquipmentProvider
+
         provider = SimulationEquipmentProvider(world=world, bus=bus)
 
         with pytest.raises(BackendUnavailable):
@@ -382,6 +440,7 @@ class TestEquipmentMaintenanceSemantics:
         """NO_OP: asset already in maintenance state."""
         world, bus = _make_equip_world(status="maintenance")
         from maiw_api.demo.providers.equipment import SimulationEquipmentProvider
+
         provider = SimulationEquipmentProvider(world=world, bus=bus)
 
         result = asyncio.run(provider.execute_schedule_maintenance(_maint_req()))
@@ -394,6 +453,7 @@ class TestEquipmentMaintenanceSemantics:
         """EXECUTED: available asset scheduled for maintenance."""
         world, bus = _make_equip_world(status="available")
         from maiw_api.demo.providers.equipment import SimulationEquipmentProvider
+
         provider = SimulationEquipmentProvider(world=world, bus=bus)
 
         result = asyncio.run(provider.execute_schedule_maintenance(_maint_req()))
@@ -407,6 +467,7 @@ class TestEquipmentMaintenanceSemantics:
         """EXECUTED: currently assigned asset can be scheduled for maintenance."""
         world, bus = _make_equip_world(status="assigned", owner_user="W-001")
         from maiw_api.demo.providers.equipment import SimulationEquipmentProvider
+
         provider = SimulationEquipmentProvider(world=world, bus=bus)
 
         result = asyncio.run(provider.execute_schedule_maintenance(_maint_req()))

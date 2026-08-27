@@ -164,14 +164,26 @@ class ApprovalRecord(BaseModel):
 
     approval_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     proposal_id: str = Field(description="The ActionProposal this approval covers")
-    decision_id: str = Field(description="The DecisionResult that returned REQUIRES_HUMAN_APPROVAL")
-    warehouse_id: str | None = Field(default=None, description="Warehouse scope; None = unbound")
-    trace_id: str | None = Field(default=None, description="Trace context for SSE linkage")
+    decision_id: str = Field(
+        description="The DecisionResult that returned REQUIRES_HUMAN_APPROVAL"
+    )
+    warehouse_id: str | None = Field(
+        default=None, description="Warehouse scope; None = unbound"
+    )
+    trace_id: str | None = Field(
+        default=None, description="Trace context for SSE linkage"
+    )
     authority_type: AuthorityType = Field(default=AuthorityType.HUMAN)
     state: ApprovalState = Field(default=ApprovalState.PENDING)
-    approved_by: str | None = Field(default=None, description="Identity set by approve() or reject()")
-    approved_at: datetime | None = Field(default=None, description="Set when state transitions from PENDING")
-    expires_at: datetime | None = Field(default=None, description="None = no expiry; store sets default")
+    approved_by: str | None = Field(
+        default=None, description="Identity set by approve() or reject()"
+    )
+    approved_at: datetime | None = Field(
+        default=None, description="Set when state transitions from PENDING"
+    )
+    expires_at: datetime | None = Field(
+        default=None, description="None = no expiry; store sets default"
+    )
 
     @computed_field
     @property

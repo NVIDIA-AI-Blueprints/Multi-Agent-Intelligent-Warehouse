@@ -44,6 +44,7 @@ def _get_controller():
     """Retrieve the demo controller; 503 if demo mode is not active."""
     try:
         from maiw_api.demo.controller import get_demo_controller
+
         return get_demo_controller()
     except Exception as exc:
         raise HTTPException(
@@ -294,18 +295,27 @@ async def analyze_disruption():
 
     try:
         from maiw_api.bootstrap import get_runtime
+
         runtime = await get_runtime()
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Runtime unavailable: {exc}") from exc
+        raise HTTPException(
+            status_code=503, detail=f"Runtime unavailable: {exc}"
+        ) from exc
 
     if runtime.state_provider is None:
-        raise HTTPException(status_code=503, detail="WarehouseStateProvider not initialized")
+        raise HTTPException(
+            status_code=503, detail="WarehouseStateProvider not initialized"
+        )
     if runtime.operations_agent is None:
-        raise HTTPException(status_code=503, detail="OperationsCoordinationAgent not initialized")
+        raise HTTPException(
+            status_code=503, detail="OperationsCoordinationAgent not initialized"
+        )
     if runtime.decision_engine is None:
         raise HTTPException(status_code=503, detail="DecisionEngine not initialized")
     if not ctrl.active:
-        raise HTTPException(status_code=409, detail="No active scenario — start a scenario first")
+        raise HTTPException(
+            status_code=409, detail="No active scenario — start a scenario first"
+        )
 
     # Originate the analyze deadline at request ingress (after pre-flight checks).
     analyze_deadline = RequestDeadline.from_timeout(settings.analyze_timeout_seconds)
@@ -317,7 +327,9 @@ async def analyze_disruption():
     ctrl._last_analyze_wall_time = datetime.now(tz=timezone.utc)
 
     trace_id = str(uuid.uuid4())
-    scenario_context = f"{ctrl.scenario_name} scenario active" if ctrl.scenario_name else ""
+    scenario_context = (
+        f"{ctrl.scenario_name} scenario active" if ctrl.scenario_name else ""
+    )
     lifecycle: list[dict[str, Any]] = []
 
     # ── OBSERVE: assemble 4-domain state ──────────────────────────────────────
@@ -327,10 +339,13 @@ async def analyze_disruption():
         trace_id=trace_id,
         sim_time_seconds=ctrl.world.clock.elapsed_seconds,
     )
-    lifecycle.append({"phase": "OBSERVE", "message": "State assembly started", "trace_id": trace_id})
+    lifecycle.append(
+        {"phase": "OBSERVE", "message": "State assembly started", "trace_id": trace_id}
+    )
 
     try:
         from maiw_state import StateRequirements, WarehouseStateSnapshot
+
         requirements = StateRequirements(equipment=True, labor=True, waves=True)
         warehouse_id = ctrl.world.WAREHOUSE_ID if ctrl.world else "default"
         state = await runtime.state_provider.get_state(
@@ -343,17 +358,21 @@ async def analyze_disruption():
     except Exception as exc:
         await bus.publish_observe("State assembly failed", str(exc), trace_id=trace_id)
         _raise_typed_http(exc, "state assembly")
-        raise HTTPException(status_code=500, detail=f"State assembly failed: {exc}") from exc
+        raise HTTPException(
+            status_code=500, detail=f"State assembly failed: {exc}"
+        ) from exc
 
-    lifecycle.append({
-        "phase": "OBSERVE",
-        "snapshot_id": snapshot.snapshot_id,
-        "warehouse_id": snapshot.warehouse_id,
-        "equipment_total": state.equipment.total_count if state.equipment else 0,
-        "labor_total": state.labor.total_workers if state.labor else 0,
-        "wave_tasks": state.waves.total_tasks if state.waves else 0,
-        "trace_id": trace_id,
-    })
+    lifecycle.append(
+        {
+            "phase": "OBSERVE",
+            "snapshot_id": snapshot.snapshot_id,
+            "warehouse_id": snapshot.warehouse_id,
+            "equipment_total": state.equipment.total_count if state.equipment else 0,
+            "labor_total": state.labor.total_workers if state.labor else 0,
+            "wave_tasks": state.waves.total_tasks if state.waves else 0,
+            "trace_id": trace_id,
+        }
+    )
     await bus.publish_observe(
         f"Snapshot sealed — {state.equipment.total_count if state.equipment else 0} assets, "
         f"{state.labor.total_workers if state.labor else 0} workers",
@@ -363,8 +382,20 @@ async def analyze_disruption():
     )
 
     # ── REASON: agent analyzes snapshot ──────────────────────────────────────
-    await bus.publish_reason("pending", "routing", "Invoking OperationsCoordinationAgent.analyze_disruption()", trace_id=trace_id, sim_time_seconds=ctrl.world.clock.elapsed_seconds)
-    lifecycle.append({"phase": "REASON", "message": "ModelGateway call started", "trace_id": trace_id})
+    await bus.publish_reason(
+        "pending",
+        "routing",
+        "Invoking OperationsCoordinationAgent.analyze_disruption()",
+        trace_id=trace_id,
+        sim_time_seconds=ctrl.world.clock.elapsed_seconds,
+    )
+    lifecycle.append(
+        {
+            "phase": "REASON",
+            "message": "ModelGateway call started",
+            "trace_id": trace_id,
+        }
+    )
 
     try:
         assessment = await runtime.operations_agent.analyze_disruption(
@@ -375,19 +406,23 @@ async def analyze_disruption():
         )
     except Exception as exc:
         _raise_typed_http(exc, "agent analysis")
-        raise HTTPException(status_code=500, detail=f"Agent analysis failed: {exc}") from exc
+        raise HTTPException(
+            status_code=500, detail=f"Agent analysis failed: {exc}"
+        ) from exc
 
-    lifecycle.append({
-        "phase": "REASON",
-        "summary": assessment.summary,
-        "severity": assessment.severity,
-        "model_id": assessment.model_id,
-        "routing_rule": assessment.routing_rule,
-        "routing_reason": assessment.routing_reason,
-        "latency_ms": assessment.latency_ms,
-        "recommendations_count": len(assessment.recommendations),
-        "trace_id": trace_id,
-    })
+    lifecycle.append(
+        {
+            "phase": "REASON",
+            "summary": assessment.summary,
+            "severity": assessment.severity,
+            "model_id": assessment.model_id,
+            "routing_rule": assessment.routing_rule,
+            "routing_reason": assessment.routing_reason,
+            "latency_ms": assessment.latency_ms,
+            "recommendations_count": len(assessment.recommendations),
+            "trace_id": trace_id,
+        }
+    )
     await bus.publish_reason(
         assessment.model_id,
         assessment.routing_rule,
@@ -404,16 +439,18 @@ async def analyze_disruption():
 
         # SKILL event
         await bus.publish_skill(rec.capability, rec.target, trace_id=trace_id)
-        lifecycle.append({
-            "phase": "SKILL",
-            "index": i,
-            "capability": rec.capability,
-            "target": rec.target,
-            "domain": rec.domain,
-            "priority": rec.priority,
-            "objective": rec.objective,
-            "trace_id": trace_id,
-        })
+        lifecycle.append(
+            {
+                "phase": "SKILL",
+                "index": i,
+                "capability": rec.capability,
+                "target": rec.target,
+                "domain": rec.domain,
+                "priority": rec.priority,
+                "objective": rec.objective,
+                "trace_id": trace_id,
+            }
+        )
 
         # Build proposal via canonical proposal skill
         proposal_result = await _build_and_execute_proposal(
@@ -431,7 +468,9 @@ async def analyze_disruption():
 
         # Stop if we hit an error that should abort further processing
         if proposal_result.get("status") == "error":
-            logger.warning("analyze_disruption: aborting at rec[%d] due to build error", i)
+            logger.warning(
+                "analyze_disruption: aborting at rec[%d] due to build error", i
+            )
             break
 
     # Track time to decision (after DECIDE phase completes, before EXECUTE)
@@ -456,8 +495,14 @@ async def analyze_disruption():
     except Exception as exc:
         outcome_summary = f"State refresh failed: {exc}"
 
-    lifecycle.append({"phase": "OBSERVE_OUTCOME", "summary": outcome_summary, "trace_id": trace_id})
-    await bus.publish_observe_outcome(outcome_summary, trace_id=trace_id, sim_time_seconds=ctrl.world.clock.elapsed_seconds)
+    lifecycle.append(
+        {"phase": "OBSERVE_OUTCOME", "summary": outcome_summary, "trace_id": trace_id}
+    )
+    await bus.publish_observe_outcome(
+        outcome_summary,
+        trace_id=trace_id,
+        sim_time_seconds=ctrl.world.clock.elapsed_seconds,
+    )
 
     execute_wall_elapsed = _time.perf_counter() - analyze_wall_start
 
@@ -468,7 +513,7 @@ async def analyze_disruption():
     # Append to KPI history
     ctrl._kpi_history.append(post_kpis_dict)
     if len(ctrl._kpi_history) > ctrl._MAX_KPI_HISTORY:
-        ctrl._kpi_history = ctrl._kpi_history[-ctrl._MAX_KPI_HISTORY:]
+        ctrl._kpi_history = ctrl._kpi_history[-ctrl._MAX_KPI_HISTORY :]
 
     # Publish KPI SSE event
     await ctrl.bus.publish_kpi(post_kpis_dict, ctrl.world.clock.elapsed_seconds)
@@ -533,26 +578,34 @@ async def _build_and_execute_proposal(
     try:
         proposal = await _build_proposal(rec, trace_id, runtime)
     except Exception as exc:
-        lifecycle.append({
-            "phase": "PROPOSE",
-            "index": index,
-            "status": "error",
-            "capability": rec.capability,
-            "reason": str(exc),
-            "trace_id": trace_id,
-        })
+        lifecycle.append(
+            {
+                "phase": "PROPOSE",
+                "index": index,
+                "status": "error",
+                "capability": rec.capability,
+                "reason": str(exc),
+                "trace_id": trace_id,
+            }
+        )
         return {"status": "error", "capability": rec.capability, "reason": str(exc)}
 
     # PROPOSE event
     await bus.publish_propose(proposal.action, proposal.proposal_id, trace_id=trace_id)
-    lifecycle.append({
-        "phase": "PROPOSE",
-        "index": index,
-        "action": proposal.action,
-        "proposal_id": proposal.proposal_id,
-        "risk_level": proposal.risk_level.value if hasattr(proposal.risk_level, 'value') else str(proposal.risk_level),
-        "trace_id": trace_id,
-    })
+    lifecycle.append(
+        {
+            "phase": "PROPOSE",
+            "index": index,
+            "action": proposal.action,
+            "proposal_id": proposal.proposal_id,
+            "risk_level": (
+                proposal.risk_level.value
+                if hasattr(proposal.risk_level, "value")
+                else str(proposal.risk_level)
+            ),
+            "trace_id": trace_id,
+        }
+    )
 
     # DECIDE
     decision_request = DecisionRequest(
@@ -564,16 +617,20 @@ async def _build_and_execute_proposal(
     result, _audit = runtime.decision_engine.evaluate(decision_request)
     result.trace_id = trace_id
 
-    await bus.publish_decide(result.outcome.value, proposal.proposal_id, result.result_id, trace_id=trace_id)
-    lifecycle.append({
-        "phase": "DECIDE",
-        "index": index,
-        "outcome": result.outcome.value,
-        "proposal_id": proposal.proposal_id,
-        "decision_id": result.result_id,
-        "violations": [v.model_dump() for v in result.violations],
-        "trace_id": trace_id,
-    })
+    await bus.publish_decide(
+        result.outcome.value, proposal.proposal_id, result.result_id, trace_id=trace_id
+    )
+    lifecycle.append(
+        {
+            "phase": "DECIDE",
+            "index": index,
+            "outcome": result.outcome.value,
+            "proposal_id": proposal.proposal_id,
+            "decision_id": result.result_id,
+            "violations": [v.model_dump() for v in result.violations],
+            "trace_id": trace_id,
+        }
+    )
 
     if result.outcome != DecisionOutcome.APPROVED:
         # Store in pending approvals if human approval is needed
@@ -592,8 +649,12 @@ async def _build_and_execute_proposal(
                 domain=str(rec.domain),
                 priority=str(rec.priority),
                 objective=str(rec.objective),
-                rationale=str(rec.rationale) if hasattr(rec, 'rationale') else "",
-                risk_level=proposal.risk_level.value if hasattr(proposal.risk_level, 'value') else str(proposal.risk_level),
+                rationale=str(rec.rationale) if hasattr(rec, "rationale") else "",
+                risk_level=(
+                    proposal.risk_level.value
+                    if hasattr(proposal.risk_level, "value")
+                    else str(proposal.risk_level)
+                ),
                 warehouse_id=_warehouse_id,
                 proposal_data=proposal.model_dump(mode="json"),
             )
@@ -608,13 +669,15 @@ async def _build_and_execute_proposal(
     # EXECUTE
     executor = _get_executor(rec.domain, runtime)
     if executor is None:
-        lifecycle.append({
-            "phase": "EXECUTE",
-            "index": index,
-            "status": "no_executor",
-            "capability": rec.capability,
-            "trace_id": trace_id,
-        })
+        lifecycle.append(
+            {
+                "phase": "EXECUTE",
+                "index": index,
+                "status": "no_executor",
+                "capability": rec.capability,
+                "trace_id": trace_id,
+            }
+        )
         return {
             "status": "approved_no_executor",
             "capability": rec.capability,
@@ -624,6 +687,7 @@ async def _build_and_execute_proposal(
 
     # Fresh execution deadline — independent budget from the analyze deadline.
     from maiw_mcp.deadline import RequestDeadline as _RequestDeadline  # noqa: PLC0415
+
     exec_deadline = _RequestDeadline.from_timeout(execution_timeout_seconds)
 
     try:
@@ -633,20 +697,23 @@ async def _build_and_execute_proposal(
         # Preserve ExecutionOutcome.UNKNOWN as a structured operational outcome —
         # never convert it to a generic 500/504.  The caller can reconcile it.
         from maiw_execution.outcome import ExecutionOutcome as _EO  # noqa: PLC0415
+
         outcome_label = (
             exec_result.outcome.value
             if hasattr(exec_result, "outcome") and exec_result.outcome is not None
             else ("executed" if exec_result.success else "failed")
         )
-        lifecycle.append({
-            "phase": "EXECUTE",
-            "index": index,
-            "status": outcome_label,
-            "action": exec_result.action,
-            "execution_id": exec_result.execution_id,
-            "success": exec_result.success,
-            "trace_id": trace_id,
-        })
+        lifecycle.append(
+            {
+                "phase": "EXECUTE",
+                "index": index,
+                "status": outcome_label,
+                "action": exec_result.action,
+                "execution_id": exec_result.execution_id,
+                "success": exec_result.success,
+                "trace_id": trace_id,
+            }
+        )
         return {
             "status": outcome_label,
             "capability": rec.capability,
@@ -657,14 +724,16 @@ async def _build_and_execute_proposal(
             "outcome": outcome_label,
         }
     except Exception as exc:
-        lifecycle.append({
-            "phase": "EXECUTE",
-            "index": index,
-            "status": "execution_error",
-            "capability": rec.capability,
-            "reason": str(exc),
-            "trace_id": trace_id,
-        })
+        lifecycle.append(
+            {
+                "phase": "EXECUTE",
+                "index": index,
+                "status": "execution_error",
+                "capability": rec.capability,
+                "reason": str(exc),
+                "trace_id": trace_id,
+            }
+        )
         return {
             "status": "execution_error",
             "capability": rec.capability,
@@ -691,21 +760,32 @@ def _resolve_labor_allocation_target(rec: Any) -> tuple[str, list[str]]:
     that would execute as a no-op and return success=True with no warehouse mutation.
     """
     from maiw_api.demo.controller import get_demo_controller as _get_ctrl
+
     ctrl = _get_ctrl()
     world = ctrl.world
 
     pending = sorted(
-        [t for t in world.tasks.values()
-         if t.status == "pending" and t.task_type in _WAVE_TASK_TYPES],
-        key=lambda t: (0 if t.priority == "high" else 1 if t.priority == "medium" else 2,
-                       t.deadline or "9999", t.task_id),
+        [
+            t
+            for t in world.tasks.values()
+            if t.status == "pending" and t.task_type in _WAVE_TASK_TYPES
+        ],
+        key=lambda t: (
+            0 if t.priority == "high" else 1 if t.priority == "medium" else 2,
+            t.deadline or "9999",
+            t.task_id,
+        ),
     )
     available = [
-        w for w in world.workers.values()
+        w
+        for w in world.workers.values()
         if w.status == "active" and w.current_task_id is None
     ]
-    logger.debug("_resolve_labor_allocation_target: pending=%d available=%d",
-                 len(pending), len(available))
+    logger.debug(
+        "_resolve_labor_allocation_target: pending=%d available=%d",
+        len(pending),
+        len(available),
+    )
 
     if not pending:
         raise ValueError("CAPACITY_UNAVAILABLE: no pending wave tasks to allocate")
@@ -726,7 +806,11 @@ async def _build_proposal(rec: Any, trace_id: str, runtime: Any) -> Any:
     cap = rec.capability
 
     if cap == "warehouse.equipment.assign":
-        from maiw_skills.equipment.skills import EquipmentAssignmentSkill, EquipmentAssignmentRequest
+        from maiw_skills.equipment.skills import (
+            EquipmentAssignmentSkill,
+            EquipmentAssignmentRequest,
+        )
+
         skill = EquipmentAssignmentSkill()
         req = EquipmentAssignmentRequest(
             asset_id=rec.target,
@@ -739,6 +823,7 @@ async def _build_proposal(rec: Any, trace_id: str, runtime: Any) -> Any:
 
     if cap == "warehouse.equipment.release":
         from maiw_mcp.contracts.actions import ActionProposal
+
         return ActionProposal.for_equipment_release(
             asset_id=rec.target,
             released_by="operations-agent",
@@ -749,6 +834,7 @@ async def _build_proposal(rec: Any, trace_id: str, runtime: Any) -> Any:
 
     if cap == "warehouse.equipment.schedule_maintenance":
         from maiw_mcp.contracts.actions import ActionProposal
+
         return ActionProposal.for_schedule_maintenance(
             asset_id=rec.target,
             maintenance_type=rec.subtype or "unscheduled",
@@ -762,6 +848,7 @@ async def _build_proposal(rec: Any, trace_id: str, runtime: Any) -> Any:
 
     if cap == "warehouse.labor.allocate":
         from maiw_skills.labor.skills import ProposeLaborAllocationSkill
+
         # Resolve semantic targets (e.g. "wave_pending_tasks", "zone_A") to real IDs.
         # The agent recommends at the semantic level; the demo router grounds it in
         # the current world state. Production would receive grounded IDs from a planner.
@@ -779,10 +866,19 @@ async def _build_proposal(rec: Any, trace_id: str, runtime: Any) -> Any:
 
     if cap == "warehouse.wave.reprioritize":
         from maiw_skills.wave.skills import ProposeWaveReprioritizationSkill
+
         skill = ProposeWaveReprioritizationSkill()
         return await skill.execute(
-            zone=rec.target if rec.target.startswith("zone") or len(rec.target) <= 3 else None,
-            wave_id=rec.target if not (rec.target.startswith("zone") or len(rec.target) <= 3) else None,
+            zone=(
+                rec.target
+                if rec.target.startswith("zone") or len(rec.target) <= 3
+                else None
+            ),
+            wave_id=(
+                rec.target
+                if not (rec.target.startswith("zone") or len(rec.target) <= 3)
+                else None
+            ),
             new_priority=rec.priority,
             reason=rec.rationale,
             requested_by="operations-agent",
@@ -831,14 +927,20 @@ async def approve_proposal(request: ApproveRequest):
 
     pending = ctrl.remove_pending_approval(request.pending_id)
     if pending is None:
-        raise HTTPException(status_code=404, detail=f"No pending approval for pending_id={request.pending_id}")
+        raise HTTPException(
+            status_code=404,
+            detail=f"No pending approval for pending_id={request.pending_id}",
+        )
 
     bus = ctrl.bus
     try:
         from maiw_api.bootstrap import get_runtime
+
         runtime = await get_runtime()
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Runtime unavailable: {exc}") from exc
+        raise HTTPException(
+            status_code=503, detail=f"Runtime unavailable: {exc}"
+        ) from exc
 
     trace_id = pending["trace_id"]
     sim_t = ctrl.world.clock.elapsed_seconds
@@ -846,24 +948,35 @@ async def approve_proposal(request: ApproveRequest):
 
     # Transition ApprovalRecord PENDING → APPROVED via store (single-use guarantee begins here)
     try:
-        approval = ctrl.approval_store.approve(approval_id, approved_by=request.approved_by)
+        approval = ctrl.approval_store.approve(
+            approval_id, approved_by=request.approved_by
+        )
     except ApprovalAlreadyDecided as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ApprovalNotFound:
-        raise HTTPException(status_code=404, detail=f"Approval record not found: approval_id={approval_id}")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Approval record not found: approval_id={approval_id}",
+        )
 
     # Restore the original ActionProposal (fixes audit chain — same proposal_id throughout)
     proposal_data = pending.get("proposal_data")
     if proposal_data is None:
-        raise HTTPException(status_code=500, detail="Pending record missing proposal_data (pre-Batch2 record?)")
+        raise HTTPException(
+            status_code=500,
+            detail="Pending record missing proposal_data (pre-Batch2 record?)",
+        )
     try:
         proposal = ActionProposal.model_validate(proposal_data)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to restore proposal: {exc}") from exc
+        raise HTTPException(
+            status_code=500, detail=f"Failed to restore proposal: {exc}"
+        ) from exc
 
     # Fetch fresh state snapshot
     from maiw_state.requirements import StateRequirements
     from maiw_state import WarehouseStateSnapshot
+
     try:
         fresh_state = await runtime.state_provider.get_state(
             ctrl.world.WAREHOUSE_ID if hasattr(ctrl.world, "WAREHOUSE_ID") else "DC-47",
@@ -872,7 +985,9 @@ async def approve_proposal(request: ApproveRequest):
         )
         fresh_snapshot = WarehouseStateSnapshot.seal(fresh_state)
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"State unavailable: {exc}") from exc
+        raise HTTPException(
+            status_code=503, detail=f"State unavailable: {exc}"
+        ) from exc
 
     # Authorize with approval evidence (decision_id binding enforced)
     decision_request = DecisionRequest(
@@ -889,8 +1004,11 @@ async def approve_proposal(request: ApproveRequest):
 
     # Publish APPROVE SSE event
     await bus.publish_approve(
-        pending["capability"], proposal.proposal_id, request.approved_by,
-        trace_id=trace_id, sim_time_seconds=sim_t,
+        pending["capability"],
+        proposal.proposal_id,
+        request.approved_by,
+        trace_id=trace_id,
+        sim_time_seconds=sim_t,
     )
 
     if auth_result.outcome != DecisionOutcome.APPROVED:
@@ -906,7 +1024,12 @@ async def approve_proposal(request: ApproveRequest):
     # EXECUTE via canonical executor
     executor = _get_executor(pending["domain"], runtime)
     if executor is None:
-        return {"ok": True, "status": "approved_no_executor", "proposal_id": proposal.proposal_id, "approval_id": approval_id}
+        return {
+            "ok": True,
+            "status": "approved_no_executor",
+            "proposal_id": proposal.proposal_id,
+            "approval_id": approval_id,
+        }
 
     try:
         exec_result = await executor.execute(proposal, auth_result, trace_id=trace_id)
@@ -917,20 +1040,23 @@ async def approve_proposal(request: ApproveRequest):
     ctrl.approval_store.consume(approval_id)
 
     # Publish EXECUTE SSE
-    await bus.publish(ScenarioEvent(
-        category="EXECUTE",
-        message=f"execute:{pending['capability']}",
-        detail=f"success={exec_result.success} exec_id={exec_result.execution_id}",
-        sim_time_seconds=sim_t,
-    ))
+    await bus.publish(
+        ScenarioEvent(
+            category="EXECUTE",
+            message=f"execute:{pending['capability']}",
+            detail=f"success={exec_result.success} exec_id={exec_result.execution_id}",
+            sim_time_seconds=sim_t,
+        )
+    )
 
     # Compute and publish fresh KPI
     from maiw_api.demo.kpi import DemoKPIEngine
+
     kpi = DemoKPIEngine(ctrl.world, ctrl._last_analyze_wall_time).compute()
     kpi_dict = kpi.to_dict()
     ctrl._kpi_history.append(kpi_dict)
     if len(ctrl._kpi_history) > ctrl._MAX_KPI_HISTORY:
-        ctrl._kpi_history = ctrl._kpi_history[-ctrl._MAX_KPI_HISTORY:]
+        ctrl._kpi_history = ctrl._kpi_history[-ctrl._MAX_KPI_HISTORY :]
     await bus.publish_kpi(kpi_dict, sim_t)
 
     return {
@@ -953,7 +1079,10 @@ async def reject_proposal(request: ApproveRequest):
     ctrl = _get_controller()
     pending = ctrl.remove_pending_approval(request.pending_id)
     if pending is None:
-        raise HTTPException(status_code=404, detail=f"No pending approval for pending_id={request.pending_id}")
+        raise HTTPException(
+            status_code=404,
+            detail=f"No pending approval for pending_id={request.pending_id}",
+        )
 
     approval_id = pending.get("approval_id")
     if approval_id:
@@ -963,7 +1092,9 @@ async def reject_proposal(request: ApproveRequest):
             pass  # Already decided — rejection is still the right outcome for the queue entry
 
     await ctrl.bus.publish_reject(
-        pending["capability"], pending["proposal_id"], request.approved_by,
+        pending["capability"],
+        pending["proposal_id"],
+        request.approved_by,
         trace_id=pending["trace_id"],
         sim_time_seconds=ctrl.world.clock.elapsed_seconds,
     )
@@ -1009,9 +1140,12 @@ async def reconcile_execution(request: ReconcileRequest):
     ctrl = _get_controller()
     try:
         from maiw_api.bootstrap import get_runtime
+
         runtime = await get_runtime()
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Runtime unavailable: {exc}") from exc
+        raise HTTPException(
+            status_code=503, detail=f"Runtime unavailable: {exc}"
+        ) from exc
 
     # Resolve registry for the requested domain
     registry = _get_registry(request.domain, runtime)
@@ -1046,6 +1180,7 @@ async def reconcile_execution(request: ReconcileRequest):
         )
 
     from maiw_mcp.deadline import RequestDeadline as _RD  # noqa: PLC0415
+
     reconcile_deadline = _RD.from_timeout(settings.reconciliation_timeout_seconds)
 
     service = ReconciliationService()
@@ -1055,21 +1190,25 @@ async def reconcile_execution(request: ReconcileRequest):
         )
     except Exception as exc:
         _raise_typed_http(exc, "reconciliation")
-        raise HTTPException(status_code=500, detail=f"Reconciliation failed: {exc}") from exc
+        raise HTTPException(
+            status_code=500, detail=f"Reconciliation failed: {exc}"
+        ) from exc
     registry.set_reconciliation(request.execution_id, reconciliation_record)
 
     sim_t = ctrl.world.clock.elapsed_seconds
-    await ctrl.bus.publish(ScenarioEvent(
-        category="RECONCILE",
-        message=f"reconciliation.{reconciliation_record.outcome.value}",
-        detail=(
-            f"execution_id={request.execution_id} "
-            f"domain={request.domain} "
-            f"effective_status={rec.effective_status} "
-            f"trace_id={trace_id}"
-        ),
-        sim_time_seconds=sim_t,
-    ))
+    await ctrl.bus.publish(
+        ScenarioEvent(
+            category="RECONCILE",
+            message=f"reconciliation.{reconciliation_record.outcome.value}",
+            detail=(
+                f"execution_id={request.execution_id} "
+                f"domain={request.domain} "
+                f"effective_status={rec.effective_status} "
+                f"trace_id={trace_id}"
+            ),
+            sim_time_seconds=sim_t,
+        )
+    )
 
     return {
         "ok": True,
@@ -1129,7 +1268,9 @@ def _build_reconciliation_strategy(domain: str, runtime: Any) -> Any:
 
             def check_postcondition(self, intent, current_state):
                 expected_task_id = intent.expected_effect.get("task_id")
-                expected_worker_ids = intent.expected_effect.get("expected_worker_ids", [])
+                expected_worker_ids = intent.expected_effect.get(
+                    "expected_worker_ids", []
+                )
                 if not expected_task_id:
                     return ReconciliationOutcome.INDETERMINATE
                 allocations = current_state.get("allocations", [])
@@ -1172,7 +1313,10 @@ def _build_reconciliation_strategy(domain: str, runtime: Any) -> Any:
                         actual_status = asset.get("status")
                         if actual_status != expected_status:
                             return ReconciliationOutcome.CONFIRMED_NOT_EXECUTED
-                        if expected_assignee and asset.get("owner_user") != expected_assignee:
+                        if (
+                            expected_assignee
+                            and asset.get("owner_user") != expected_assignee
+                        ):
                             return ReconciliationOutcome.CONFIRMED_NOT_EXECUTED
                         return ReconciliationOutcome.CONFIRMED_EXECUTED
                 return ReconciliationOutcome.INDETERMINATE
@@ -1207,14 +1351,17 @@ def _build_reconciliation_strategy(domain: str, runtime: Any) -> Any:
                 tasks = current_state.get("tasks", [])
                 # Filter to tasks relevant to this intent
                 relevant = [
-                    t for t in tasks
+                    t
+                    for t in tasks
                     if (not zone or t.get("zone") == zone)
                     and t.get("status") not in ("completed", "failed", "cancelled")
                 ]
                 if not relevant:
                     return ReconciliationOutcome.INDETERMINATE
                 # All relevant tasks should have been reprioritized
-                matching = [t for t in relevant if t.get("priority") == expected_priority]
+                matching = [
+                    t for t in relevant if t.get("priority") == expected_priority
+                ]
                 if matching:
                     return ReconciliationOutcome.CONFIRMED_EXECUTED
                 return ReconciliationOutcome.CONFIRMED_NOT_EXECUTED
@@ -1236,7 +1383,9 @@ async def counterfactual_result():
 
     artifact = (
         _Path(__file__).parent.parent.parent.parent.parent
-        / "artifacts" / "demo" / "labor_wave_control_vs_maiw.json"
+        / "artifacts"
+        / "demo"
+        / "labor_wave_control_vs_maiw.json"
     )
     if not artifact.exists():
         raise HTTPException(

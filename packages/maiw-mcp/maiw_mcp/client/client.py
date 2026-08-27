@@ -165,11 +165,15 @@ class MAIWMCPClient:
         server_url = self._registry.resolve(capability)
         # Telemetry fields must be plain strings — MCPServer instances are not
         # serialisable via dataclasses.asdict() (deepcopy fails on SSL objects).
-        server_label = server_url if isinstance(server_url, str) else type(server_url).__name__
+        server_label = (
+            server_url if isinstance(server_url, str) else type(server_url).__name__
+        )
         start = time.monotonic()
 
         async def _do_call() -> dict:
-            return await self._call_tool(capability, payload, server_url, effective_timeout)
+            return await self._call_tool(
+                capability, payload, server_url, effective_timeout
+            )
 
         try:
             if breaker is not None:
@@ -242,7 +246,9 @@ class MAIWMCPClient:
         # - tools/call request
         # - session teardown
         async with Client(server_url, read_timeout_seconds=timeout_seconds) as client:
-            call_result: types.CallToolResult = await client.call_tool(capability, payload)
+            call_result: types.CallToolResult = await client.call_tool(
+                capability, payload
+            )
 
         if call_result.is_error:
             error_text = self._extract_text(call_result)
@@ -261,7 +267,11 @@ class MAIWMCPClient:
         # {"result": "<json string>"}.  In that case parse the inner value.
         sc = result.structured_content
         if sc is not None:
-            if isinstance(sc, dict) and list(sc.keys()) == ["result"] and isinstance(sc.get("result"), str):
+            if (
+                isinstance(sc, dict)
+                and list(sc.keys()) == ["result"]
+                and isinstance(sc.get("result"), str)
+            ):
                 try:
                     parsed = json.loads(sc["result"])
                     if isinstance(parsed, dict):

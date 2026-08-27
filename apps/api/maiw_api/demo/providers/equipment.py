@@ -52,6 +52,7 @@ if TYPE_CHECKING:
 
 def _asset_to_info(asset: "DemoWarehouseWorld") -> EquipmentAssetInfo:  # type: ignore[name-defined]
     from maiw_api.demo.world import EquipmentAsset
+
     a: EquipmentAsset = asset  # type: ignore[assignment]
     return EquipmentAssetInfo(
         asset_id=a.asset_id,
@@ -72,17 +73,39 @@ def _asset_to_info(asset: "DemoWarehouseWorld") -> EquipmentAssetInfo:  # type: 
 
 def _synthetic_telemetry(asset_id: str, hours_back: int) -> list[TelemetryPoint]:
     import random
+
     rng = random.Random(hash(asset_id) & 0xFFFFFFFF)
     now = datetime.now(tz=timezone.utc)
     points: list[TelemetryPoint] = []
     for h in range(min(hours_back, 24), 0, -1):
         ts = now - timedelta(hours=h)
-        points.append(TelemetryPoint(timestamp=ts, metric="battery_pct",
-            value=round(rng.uniform(20.0, 100.0), 1), unit="%", quality_score=0.98))
-        points.append(TelemetryPoint(timestamp=ts, metric="speed_mps",
-            value=round(rng.uniform(0.0, 1.5), 2), unit="m/s", quality_score=0.97))
-        points.append(TelemetryPoint(timestamp=ts, metric="load_kg",
-            value=round(rng.uniform(0.0, 500.0), 1), unit="kg", quality_score=0.95))
+        points.append(
+            TelemetryPoint(
+                timestamp=ts,
+                metric="battery_pct",
+                value=round(rng.uniform(20.0, 100.0), 1),
+                unit="%",
+                quality_score=0.98,
+            )
+        )
+        points.append(
+            TelemetryPoint(
+                timestamp=ts,
+                metric="speed_mps",
+                value=round(rng.uniform(0.0, 1.5), 2),
+                unit="m/s",
+                quality_score=0.97,
+            )
+        )
+        points.append(
+            TelemetryPoint(
+                timestamp=ts,
+                metric="load_kg",
+                value=round(rng.uniform(0.0, 500.0), 1),
+                unit="kg",
+                quality_score=0.95,
+            )
+        )
     return points
 
 
@@ -120,8 +143,10 @@ class SimulationEquipmentProvider:
                 summary[a.equipment_type].get(a.status, 0) + 1
             )
         return EquipmentStatusResult(
-            equipment=infos, summary=summary,
-            total_count=len(infos), source=self._world.SOURCE,
+            equipment=infos,
+            summary=summary,
+            total_count=len(infos),
+            source=self._world.SOURCE,
         )
 
     async def get_equipment_telemetry(
@@ -137,9 +162,12 @@ class SimulationEquipmentProvider:
         metrics: dict[str, str] = {p.metric: p.unit for p in points}
         available = [AvailableMetric(metric=m, unit=u) for m, u in metrics.items()]
         return EquipmentTelemetryResult(
-            asset_id=request.asset_id, telemetry_data=points,
-            available_metrics=available, hours_back=request.hours_back,
-            data_points=len(points), source=self._world.SOURCE,
+            asset_id=request.asset_id,
+            telemetry_data=points,
+            available_metrics=available,
+            hours_back=request.hours_back,
+            data_points=len(points),
+            source=self._world.SOURCE,
         )
 
     # ── Write methods ───────────────────────────────────────────────────────────
@@ -156,9 +184,11 @@ class SimulationEquipmentProvider:
         current_task = asset.metadata.get("current_task_id")
 
         # NO_OP: exact desired state already exists
-        if (asset.status == "assigned"
-                and asset.owner_user == request.assignee
-                and current_task == request.task_id):
+        if (
+            asset.status == "assigned"
+            and asset.owner_user == request.assignee
+            and current_task == request.task_id
+        ):
             return EquipmentExecuteAssignResult(
                 assignment_id=None,
                 success=True,
@@ -171,7 +201,11 @@ class SimulationEquipmentProvider:
             )
 
         # CONFLICT: asset is assigned to a DIFFERENT task
-        if asset.status == "assigned" and current_task and current_task != request.task_id:
+        if (
+            asset.status == "assigned"
+            and current_task
+            and current_task != request.task_id
+        ):
             return EquipmentExecuteAssignResult(
                 assignment_id=None,
                 success=False,
@@ -194,11 +228,14 @@ class SimulationEquipmentProvider:
         self._mutation_count += 1
 
         import asyncio
-        asyncio.create_task(self._bus.publish_equipment_write(
-            action="assign",
-            asset_id=request.asset_id,
-            detail=f"→ {request.assignee}",
-        ))
+
+        asyncio.create_task(
+            self._bus.publish_equipment_write(
+                action="assign",
+                asset_id=request.asset_id,
+                detail=f"→ {request.assignee}",
+            )
+        )
 
         # Fault injection: raise AFTER mutation to simulate ambiguous write
         if self._post_mutation_fault is not None:
@@ -246,11 +283,14 @@ class SimulationEquipmentProvider:
         self._mutation_count += 1
 
         import asyncio
-        asyncio.create_task(self._bus.publish_equipment_write(
-            action="release",
-            asset_id=request.asset_id,
-            detail=f"released by {request.released_by} (was: {prev_owner})",
-        ))
+
+        asyncio.create_task(
+            self._bus.publish_equipment_write(
+                action="release",
+                asset_id=request.asset_id,
+                detail=f"released by {request.released_by} (was: {prev_owner})",
+            )
+        )
 
         if self._post_mutation_fault is not None:
             fault = self._post_mutation_fault
@@ -298,11 +338,14 @@ class SimulationEquipmentProvider:
         self._mutation_count += 1
 
         import asyncio
-        asyncio.create_task(self._bus.publish_equipment_write(
-            action="maintenance",
-            asset_id=request.asset_id,
-            detail=f"{request.maintenance_type} scheduled by {request.scheduled_by}",
-        ))
+
+        asyncio.create_task(
+            self._bus.publish_equipment_write(
+                action="maintenance",
+                asset_id=request.asset_id,
+                detail=f"{request.maintenance_type} scheduled by {request.scheduled_by}",
+            )
+        )
 
         if self._post_mutation_fault is not None:
             fault = self._post_mutation_fault

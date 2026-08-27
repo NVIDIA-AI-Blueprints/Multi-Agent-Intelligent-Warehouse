@@ -48,7 +48,6 @@ from maiw_decision.engine import DecisionEngine
 from maiw_mcp.contracts.actions import ActionProposal
 from maiw_state.warehouse import WarehouseStateSnapshot
 
-
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 
@@ -65,7 +64,10 @@ def _labor_proposal() -> ActionProposal:
 
 def _fresh_snapshot() -> WarehouseStateSnapshot:
     from maiw_state import WarehouseState
-    state = WarehouseState(warehouse_id="DC-TEST", observed_at=datetime.now(timezone.utc))
+
+    state = WarehouseState(
+        warehouse_id="DC-TEST", observed_at=datetime.now(timezone.utc)
+    )
     return WarehouseStateSnapshot.seal(state)
 
 
@@ -115,7 +117,9 @@ class TestApprovalStateCreation:
 
     def test_create_warehouse_id_stored(self):
         store = _store()
-        record = store.create(proposal_id="P-1", decision_id="D-1", warehouse_id="DC-47")
+        record = store.create(
+            proposal_id="P-1", decision_id="D-1", warehouse_id="DC-47"
+        )
         assert record.warehouse_id == "DC-47"
 
     def test_create_authority_type_default_human(self):
@@ -674,19 +678,27 @@ class TestApprovalRecordModel:
         assert record.state == ApprovalState.PENDING
 
     def test_approved_computed_field_pending(self):
-        record = ApprovalRecord(proposal_id="P-1", decision_id="D-1", state=ApprovalState.PENDING)
+        record = ApprovalRecord(
+            proposal_id="P-1", decision_id="D-1", state=ApprovalState.PENDING
+        )
         assert record.approved is False
 
     def test_approved_computed_field_approved(self):
-        record = ApprovalRecord(proposal_id="P-1", decision_id="D-1", state=ApprovalState.APPROVED)
+        record = ApprovalRecord(
+            proposal_id="P-1", decision_id="D-1", state=ApprovalState.APPROVED
+        )
         assert record.approved is True
 
     def test_approved_computed_field_consumed(self):
-        record = ApprovalRecord(proposal_id="P-1", decision_id="D-1", state=ApprovalState.CONSUMED)
+        record = ApprovalRecord(
+            proposal_id="P-1", decision_id="D-1", state=ApprovalState.CONSUMED
+        )
         assert record.approved is False
 
     def test_approved_computed_field_rejected(self):
-        record = ApprovalRecord(proposal_id="P-1", decision_id="D-1", state=ApprovalState.REJECTED)
+        record = ApprovalRecord(
+            proposal_id="P-1", decision_id="D-1", state=ApprovalState.REJECTED
+        )
         assert record.approved is False
 
     def test_model_dump_includes_state(self):
@@ -696,7 +708,9 @@ class TestApprovalRecordModel:
         assert d["state"] == ApprovalState.PENDING
 
     def test_model_dump_includes_approved_computed_field(self):
-        record = ApprovalRecord(proposal_id="P-1", decision_id="D-1", state=ApprovalState.APPROVED)
+        record = ApprovalRecord(
+            proposal_id="P-1", decision_id="D-1", state=ApprovalState.APPROVED
+        )
         d = record.model_dump()
         assert "approved" in d
         assert d["approved"] is True

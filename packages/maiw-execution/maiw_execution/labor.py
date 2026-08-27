@@ -33,9 +33,11 @@ class LaborActionExecutor(BaseActionExecutor):
         (default)   → EXECUTED
     """
 
-    _ALLOWED_ACTIONS: frozenset[str] = frozenset({
-        "warehouse.labor.allocate",
-    })
+    _ALLOWED_ACTIONS: frozenset[str] = frozenset(
+        {
+            "warehouse.labor.allocate",
+        }
+    )
 
     def __init__(
         self,

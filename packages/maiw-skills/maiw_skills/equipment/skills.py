@@ -320,7 +320,9 @@ async def get_equipment_assignment_skill() -> EquipmentAssignmentSkill:
     global _equipment_assignment_skill
     if _equipment_assignment_skill is None:
         _equipment_assignment_skill = EquipmentAssignmentSkill()
-        logger.info("EquipmentAssignmentSkill initialised (local proposal builder, no MCP).")
+        logger.info(
+            "EquipmentAssignmentSkill initialised (local proposal builder, no MCP)."
+        )
     return _equipment_assignment_skill
 
 

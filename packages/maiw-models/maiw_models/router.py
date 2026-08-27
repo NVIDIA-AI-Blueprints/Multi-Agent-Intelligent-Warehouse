@@ -64,7 +64,9 @@ from .registry import ModelRegistry
 logger = logging.getLogger(__name__)
 
 # Tasks whose names signal judge / teacher / offline-eval workloads
-_JUDGE_TASK_KEYWORDS = frozenset({"judge", "teacher", "eval", "offline", "score", "grade"})
+_JUDGE_TASK_KEYWORDS = frozenset(
+    {"judge", "teacher", "eval", "offline", "score", "grade"}
+)
 
 # Fallback chain: role → ordered list of roles to try if preferred is unavailable
 _FALLBACK_CHAIN: dict[str, list[str]] = {
@@ -90,8 +92,8 @@ class ModelRouter:
     def route(self, request: ModelRequest) -> ModelRouteDecision:
         """Select a model and record the full routing decision."""
         preferred_role, routing_rule, routing_reason = self._select_role(request)
-        capability, final_role, fallback_from, fallback_reason = self._resolve_with_fallback(
-            preferred_role
+        capability, final_role, fallback_from, fallback_reason = (
+            self._resolve_with_fallback(preferred_role)
         )
 
         decision = ModelRouteDecision(

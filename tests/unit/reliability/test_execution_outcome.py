@@ -20,7 +20,14 @@ from maiw_execution import ActionExecutionResult, ExecutionOutcome
 class TestExecutionOutcomeEnum:
     def test_all_six_values_exist(self):
         values = {o.value for o in ExecutionOutcome}
-        assert values == {"executed", "no_op", "deferred", "conflict", "unknown", "failed"}
+        assert values == {
+            "executed",
+            "no_op",
+            "deferred",
+            "conflict",
+            "unknown",
+            "failed",
+        }
 
     def test_values_are_strings(self):
         for o in ExecutionOutcome:
@@ -74,8 +81,10 @@ class TestCompatibilityFields:
         r = ActionExecutionResult(
             outcome=ExecutionOutcome.FAILED,
             executed=True,  # will be overridden
-            success=True,   # will be overridden
-            action="test", proposal_id="p1", decision_id="d1",
+            success=True,  # will be overridden
+            action="test",
+            proposal_id="p1",
+            decision_id="d1",
         )
         assert r.executed is False
         assert r.success is False
@@ -111,15 +120,19 @@ class TestResultConstruction:
     def test_trace_id_propagated(self):
         r = ActionExecutionResult(
             outcome=ExecutionOutcome.EXECUTED,
-            action="test", proposal_id="p1", decision_id="d1",
+            action="test",
+            proposal_id="p1",
+            decision_id="d1",
             trace_id="trace-abc",
         )
         assert r.trace_id == "trace-abc"
 
     def test_model_dump_includes_outcome_field(self):
         r = ActionExecutionResult(
-            outcome=ExecutionOutcome.EXECUTED, action="test",
-            proposal_id="p1", decision_id="d1",
+            outcome=ExecutionOutcome.EXECUTED,
+            action="test",
+            proposal_id="p1",
+            decision_id="d1",
         )
         d = r.model_dump()
         assert "outcome" in d
@@ -129,8 +142,10 @@ class TestResultConstruction:
 
     def test_physical_mutation_occurred_field(self):
         r = ActionExecutionResult(
-            outcome=ExecutionOutcome.UNKNOWN, action="test",
-            proposal_id="p1", decision_id="d1",
+            outcome=ExecutionOutcome.UNKNOWN,
+            action="test",
+            proposal_id="p1",
+            decision_id="d1",
             physical_mutation_occurred=True,
         )
         assert r.physical_mutation_occurred is True

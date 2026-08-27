@@ -51,6 +51,7 @@ def test_config_defaults():
         os.environ.pop(key, None)
 
     from maiw_api.config import Settings
+
     s = Settings()
     assert s.analyze_timeout_seconds == 60.0
     assert s.execution_timeout_seconds == 30.0
@@ -66,6 +67,7 @@ def test_config_env_override(monkeypatch):
     monkeypatch.setenv("MAIW_STARTUP_TIMEOUT_SECONDS", "10")
 
     from maiw_api.config import Settings
+
     s = Settings()
     assert s.analyze_timeout_seconds == 120.0
     assert s.execution_timeout_seconds == 45.0
@@ -81,6 +83,7 @@ def test_config_env_override(monkeypatch):
 def test_mcp_client_has_no_aclose():
     """MAIWMCPClient is per-call/context-managed and must not expose aclose()."""
     from maiw_mcp.client.client import MAIWMCPClient
+
     assert not hasattr(MAIWMCPClient, "aclose"), (
         "MAIWMCPClient must not have aclose() — it is per-call/context-managed. "
         "The lifespan was fixed to close NIM clients instead."
@@ -111,6 +114,7 @@ async def test_analyze_deadline_propagated_to_state_provider():
     # Import the helper function directly to test deadline threading
     # We test the function logic rather than the FastAPI endpoint
     from maiw_mcp.deadline import RequestDeadline
+
     deadline = RequestDeadline.from_timeout(60.0)
 
     class FakeSnapshotClass:
@@ -122,7 +126,10 @@ async def test_analyze_deadline_propagated_to_state_provider():
     provider = SpyStateProvider()
     with pytest.raises(RuntimeError, match="spy_stopped"):
         from maiw_state import StateRequirements
-        await provider.get_state("wh", StateRequirements(), trace_id="t", deadline=deadline)
+
+        await provider.get_state(
+            "wh", StateRequirements(), trace_id="t", deadline=deadline
+        )
 
     assert captured["deadline"] is deadline
 
@@ -140,10 +147,12 @@ async def test_analyze_disruption_accepts_deadline():
             raise RuntimeError("spy_stopped")
 
     from maiw_agents.operations import OperationsCoordinationAgent
+
     agent = OperationsCoordinationAgent(model_gateway=SpyGateway())
 
     # Build a minimal stub snapshot
     from unittest.mock import MagicMock
+
     snapshot = MagicMock()
     snapshot.warehouse_id = "wh-test"
     snapshot.snapshot_id = "snap-001"
@@ -174,6 +183,7 @@ def test_build_and_execute_proposal_signature_accepts_execution_timeout():
     """_build_and_execute_proposal accepts execution_timeout_seconds kwarg."""
     import inspect
     from maiw_api.routers.demo import _build_and_execute_proposal
+
     sig = inspect.signature(_build_and_execute_proposal)
     assert "execution_timeout_seconds" in sig.parameters
 
@@ -187,6 +197,7 @@ def test_reconciliation_service_accepts_deadline():
     """ReconciliationService.reconcile() has a deadline kwarg."""
     import inspect
     from maiw_execution.reconciliation import ReconciliationService
+
     sig = inspect.signature(ReconciliationService.reconcile)
     assert "deadline" in sig.parameters
 
@@ -195,13 +206,17 @@ def test_reconciliation_service_accepts_deadline():
 async def test_reconciliation_service_raises_when_deadline_expired():
     """ReconciliationService.reconcile() raises RequestDeadlineExceeded when deadline expired."""
     from maiw_mcp.deadline import RequestDeadline, RequestDeadlineExceeded
-    from maiw_execution.reconciliation import ReconciliationService, ReconciliationStrategy
+    from maiw_execution.reconciliation import (
+        ReconciliationService,
+        ReconciliationStrategy,
+    )
     from maiw_execution.outcome import ExecutionOutcome
 
     # Build an already-expired deadline (use a fake clock already past deadline)
     class FakeClock:
         def __init__(self):
             self.t = 0.0
+
         def __call__(self):
             return self.t
 
@@ -212,6 +227,7 @@ async def test_reconciliation_service_raises_when_deadline_expired():
 
     # Build a stub ExecutionRecord with UNKNOWN outcome
     from unittest.mock import MagicMock
+
     record = MagicMock()
     record.execution_id = "exec-001"
     record.outcome = ExecutionOutcome.UNKNOWN
@@ -223,9 +239,14 @@ async def test_reconciliation_service_raises_when_deadline_expired():
 
     class NeverCalledStrategy:
         async def read_current_state(self, intent):
-            raise AssertionError("read_current_state must not be called when deadline expired")
+            raise AssertionError(
+                "read_current_state must not be called when deadline expired"
+            )
+
         def check_postcondition(self, intent, state):
-            raise AssertionError("check_postcondition must not be called when deadline expired")
+            raise AssertionError(
+                "check_postcondition must not be called when deadline expired"
+            )
 
     service = ReconciliationService()
     with pytest.raises(RequestDeadlineExceeded):
@@ -246,6 +267,7 @@ def _make_http_exc(exc: Exception) -> Exception:
     """Call _raise_typed_http and capture the HTTPException it raises."""
     from maiw_api.routers.demo import _raise_typed_http
     from fastapi import HTTPException
+
     try:
         _raise_typed_http(exc, "test context")
     except HTTPException as http_exc:
@@ -256,6 +278,7 @@ def _make_http_exc(exc: Exception) -> Exception:
 def test_raise_typed_http_deadline_exceeded_is_504():
     from maiw_mcp.deadline import RequestDeadlineExceeded
     from fastapi import HTTPException
+
     exc = RequestDeadlineExceeded(expired_by_ms=123.0)
     http_exc = _make_http_exc(exc)
     assert isinstance(http_exc, HTTPException)
@@ -266,6 +289,7 @@ def test_raise_typed_http_deadline_exceeded_is_504():
 def test_raise_typed_http_model_timeout_is_504():
     from maiw_models.errors import ModelTimeout
     from fastapi import HTTPException
+
     exc = ModelTimeout("nim timed out", model_id="nim-nano", timeout_s=30.0)
     http_exc = _make_http_exc(exc)
     assert isinstance(http_exc, HTTPException)
@@ -276,6 +300,7 @@ def test_raise_typed_http_model_timeout_is_504():
 def test_raise_typed_http_mcp_timeout_is_504():
     from maiw_mcp.errors import MCPTimeout
     from fastapi import HTTPException
+
     exc = MCPTimeout("mcp timed out")
     http_exc = _make_http_exc(exc)
     assert isinstance(http_exc, HTTPException)
@@ -286,6 +311,7 @@ def test_raise_typed_http_mcp_timeout_is_504():
 def test_raise_typed_http_model_unavailable_is_503():
     from maiw_models.errors import ModelUnavailable
     from fastapi import HTTPException
+
     exc = ModelUnavailable("no models", model_id="nim-super")
     http_exc = _make_http_exc(exc)
     assert isinstance(http_exc, HTTPException)
@@ -296,6 +322,7 @@ def test_raise_typed_http_model_unavailable_is_503():
 def test_raise_typed_http_mcp_unavailable_is_503():
     from maiw_mcp.errors import MCPUnavailable
     from fastapi import HTTPException
+
     exc = MCPUnavailable("transport down")
     http_exc = _make_http_exc(exc)
     assert isinstance(http_exc, HTTPException)
@@ -306,6 +333,7 @@ def test_raise_typed_http_mcp_unavailable_is_503():
 def test_raise_typed_http_unknown_exc_does_not_raise():
     """_raise_typed_http is a no-op for unrecognised exceptions (caller handles them)."""
     from maiw_api.routers.demo import _raise_typed_http
+
     result = _raise_typed_http(ValueError("random"), "ctx")
     assert result is None
 
@@ -351,7 +379,9 @@ async def test_unknown_outcome_preserved_in_proposal_result():
 
     runtime = MagicMock()
     runtime.decision_engine = MagicMock()
-    runtime.decision_engine.evaluate = MagicMock(return_value=(decision_result, MagicMock()))
+    runtime.decision_engine.evaluate = MagicMock(
+        return_value=(decision_result, MagicMock())
+    )
 
     bus = MagicMock()
     bus.publish_skill = AsyncMock()
@@ -363,9 +393,12 @@ async def test_unknown_outcome_preserved_in_proposal_result():
     with (
         patch.object(demo_mod, "_build_proposal", AsyncMock(return_value=proposal)),
         patch.object(demo_mod, "_get_executor", return_value=executor),
-        patch("maiw_decision.models.DecisionRequest", MagicMock(return_value=MagicMock())),
+        patch(
+            "maiw_decision.models.DecisionRequest", MagicMock(return_value=MagicMock())
+        ),
     ):
         from maiw_api.routers.demo import _build_and_execute_proposal
+
         proposal_result = await _build_and_execute_proposal(
             rec=rec,
             snapshot=MagicMock(),
@@ -392,6 +425,7 @@ async def test_unknown_outcome_preserved_in_proposal_result():
 async def test_live_handler_does_not_touch_nim_or_mcp():
     """/live handler must not import or call NIM/MCP — tested by calling it directly."""
     from maiw_api.routers.health import liveness_check
+
     result = await liveness_check()
     assert result["status"] == "alive"
     # Must not have nim_ or mcp_ keys
@@ -409,6 +443,7 @@ def test_reconcile_deadline_kwarg_is_keyword_only():
     """deadline must be a keyword-only parameter in ReconciliationService.reconcile."""
     import inspect
     from maiw_execution.reconciliation import ReconciliationService
+
     sig = inspect.signature(ReconciliationService.reconcile)
     param = sig.parameters.get("deadline")
     assert param is not None
@@ -422,6 +457,7 @@ def test_reconcile_deadline_kwarg_is_keyword_only():
 
 def test_settings_has_all_four_timeout_properties():
     from maiw_api.config import Settings
+
     s = Settings()
     for prop in (
         "analyze_timeout_seconds",

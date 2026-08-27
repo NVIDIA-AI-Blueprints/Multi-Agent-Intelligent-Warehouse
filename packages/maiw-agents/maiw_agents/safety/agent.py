@@ -106,7 +106,9 @@ class SafetyComplianceAgent:
 
     async def initialize(self) -> None:
         """No-op: all dependencies are injected at construction time."""
-        logger.info("SafetyComplianceAgent.initialize() called — all deps pre-injected.")
+        logger.info(
+            "SafetyComplianceAgent.initialize() called — all deps pre-injected."
+        )
 
     async def process_query(
         self,
@@ -125,19 +127,33 @@ class SafetyComplianceAgent:
                 }
 
             reasoning_chain = None
-            if enable_reasoning and self.reasoning_engine and self._is_complex_query(query):
+            if (
+                enable_reasoning
+                and self.reasoning_engine
+                and self._is_complex_query(query)
+            ):
                 try:
                     if reasoning_types is None:
-                        reasoning_types = self._determine_reasoning_types(query, context)
-                    reasoning_chain = await self.reasoning_engine.process_with_reasoning(
-                        query=query,
-                        context=context or {},
-                        reasoning_types=reasoning_types,
-                        session_id=session_id,
+                        reasoning_types = self._determine_reasoning_types(
+                            query, context
+                        )
+                    reasoning_chain = (
+                        await self.reasoning_engine.process_with_reasoning(
+                            query=query,
+                            context=context or {},
+                            reasoning_types=reasoning_types,
+                            session_id=session_id,
+                        )
                     )
-                    logger.info("Advanced reasoning completed: %d steps", len(reasoning_chain.steps))
+                    logger.info(
+                        "Advanced reasoning completed: %d steps",
+                        len(reasoning_chain.steps),
+                    )
                 except Exception as e:
-                    logger.warning("Advanced reasoning failed, continuing with standard processing: %s", e)
+                    logger.warning(
+                        "Advanced reasoning failed, continuing with standard processing: %s",
+                        e,
+                    )
             else:
                 logger.info("Skipping advanced reasoning for simple query")
 
@@ -167,12 +183,16 @@ class SafetyComplianceAgent:
         self, query: str, session_id: str, context: Optional[Dict[str, Any]]
     ) -> SafetyQuery:
         try:
-            conversation_history = self.conversation_context.get(session_id, {}).get("history", [])
+            conversation_history = self.conversation_context.get(session_id, {}).get(
+                "history", []
+            )
             context_str = self._build_context_string(conversation_history, context)
 
             understanding_prompt_template = self.config.persona.understanding_prompt
             system_prompt = self.config.persona.system_prompt
-            prompt = understanding_prompt_template.format(query=query, context=context_str)
+            prompt = understanding_prompt_template.format(
+                query=query, context=context_str
+            )
 
             messages = [
                 {"role": "system", "content": system_prompt},
@@ -181,13 +201,15 @@ class SafetyComplianceAgent:
 
             from maiw_models import ModelRequest, ReasoningLevel, RiskLevel
 
-            gw_resp = await self.model_gateway.generate(ModelRequest(
-                task="warehouse.safety.understand_query",
-                messages=messages,
-                reasoning=ReasoningLevel.LOW,
-                risk_level=RiskLevel.LOW,
-                temperature=0.1,
-            ))
+            gw_resp = await self.model_gateway.generate(
+                ModelRequest(
+                    task="warehouse.safety.understand_query",
+                    messages=messages,
+                    reasoning=ReasoningLevel.LOW,
+                    risk_level=RiskLevel.LOW,
+                    temperature=0.1,
+                )
+            )
             _response_content = gw_resp.content
 
             try:
@@ -208,25 +230,52 @@ class SafetyComplianceAgent:
     def _fallback_intent_detection(self, query: str) -> SafetyQuery:
         query_lower = query.lower()
 
-        if any(word in query_lower for word in ["incident", "accident", "injury", "hazard", "report"]):
+        if any(
+            word in query_lower
+            for word in ["incident", "accident", "injury", "hazard", "report"]
+        ):
             intent = "incident_report"
-        elif any(word in query_lower for word in ["checklist", "start checklist", "safety checklist"]):
+        elif any(
+            word in query_lower
+            for word in ["checklist", "start checklist", "safety checklist"]
+        ):
             intent = "start_checklist"
-        elif any(word in query_lower for word in ["alert", "broadcast", "emergency", "urgent"]):
+        elif any(
+            word in query_lower
+            for word in ["alert", "broadcast", "emergency", "urgent"]
+        ):
             intent = "broadcast_alert"
-        elif any(word in query_lower for word in ["lockout", "tagout", "loto", "lock out"]):
+        elif any(
+            word in query_lower for word in ["lockout", "tagout", "loto", "lock out"]
+        ):
             intent = "lockout_tagout"
-        elif any(word in query_lower for word in ["corrective action", "corrective", "action plan"]):
+        elif any(
+            word in query_lower
+            for word in ["corrective action", "corrective", "action plan"]
+        ):
             intent = "corrective_action"
-        elif any(word in query_lower for word in ["sds", "safety data sheet", "chemical", "hazardous"]):
+        elif any(
+            word in query_lower
+            for word in ["sds", "safety data sheet", "chemical", "hazardous"]
+        ):
             intent = "retrieve_sds"
-        elif any(word in query_lower for word in ["near miss", "near-miss", "close call"]):
+        elif any(
+            word in query_lower for word in ["near miss", "near-miss", "close call"]
+        ):
             intent = "near_miss"
-        elif any(word in query_lower for word in ["policy", "procedure", "guideline", "rule"]):
+        elif any(
+            word in query_lower for word in ["policy", "procedure", "guideline", "rule"]
+        ):
             intent = "policy_lookup"
-        elif any(word in query_lower for word in ["compliance", "audit", "check", "inspection"]):
+        elif any(
+            word in query_lower
+            for word in ["compliance", "audit", "check", "inspection"]
+        ):
             intent = "compliance_check"
-        elif any(word in query_lower for word in ["training", "certification", "safety course"]):
+        elif any(
+            word in query_lower
+            for word in ["training", "certification", "safety course"]
+        ):
             intent = "training"
         else:
             intent = "general"
@@ -301,7 +350,11 @@ class SafetyComplianceAgent:
                         safety_query.user_query,
                         re.IGNORECASE,
                     )
-                    description = desc_match.group(1).strip() if desc_match else safety_query.user_query
+                    description = (
+                        desc_match.group(1).strip()
+                        if desc_match
+                        else safety_query.user_query
+                    )
 
                 if not location:
                     location_match = re.search(
@@ -309,14 +362,24 @@ class SafetyComplianceAgent:
                         safety_query.user_query,
                         re.IGNORECASE,
                     )
-                    location = location_match.group(1).strip() if location_match else "unknown"
+                    location = (
+                        location_match.group(1).strip() if location_match else "unknown"
+                    )
 
                 if not severity:
-                    if any(w in safety_query.user_query.lower() for w in ["high", "critical", "severe"]):
+                    if any(
+                        w in safety_query.user_query.lower()
+                        for w in ["high", "critical", "severe"]
+                    ):
                         severity = "high"
-                    elif any(w in safety_query.user_query.lower() for w in ["medium", "moderate"]):
+                    elif any(
+                        w in safety_query.user_query.lower()
+                        for w in ["medium", "moderate"]
+                    ):
                         severity = "medium"
-                    elif any(w in safety_query.user_query.lower() for w in ["low", "minor"]):
+                    elif any(
+                        w in safety_query.user_query.lower() for w in ["low", "minor"]
+                    ):
                         severity = "low"
                     else:
                         severity = "medium"
@@ -329,13 +392,15 @@ class SafetyComplianceAgent:
                         reporter=reporter,
                         attachments=attachments,
                     )
-                    actions_taken.append({
-                        "action": "log_incident",
-                        "severity": severity,
-                        "description": description,
-                        "result": asdict(incident),
-                        "timestamp": datetime.now().isoformat(),
-                    })
+                    actions_taken.append(
+                        {
+                            "action": "log_incident",
+                            "severity": severity,
+                            "description": description,
+                            "result": asdict(incident),
+                            "timestamp": datetime.now().isoformat(),
+                        }
+                    )
 
             elif safety_query.intent == "start_checklist":
                 if not checklist_type:
@@ -354,19 +419,23 @@ class SafetyComplianceAgent:
                         safety_query.user_query,
                         re.IGNORECASE,
                     )
-                    assignee = assignee_match.group(1).strip() if assignee_match else "system"
+                    assignee = (
+                        assignee_match.group(1).strip() if assignee_match else "system"
+                    )
 
                 if checklist_type and assignee:
                     checklist = await self.action_tools.start_checklist(
                         checklist_type=checklist_type, assignee=assignee, due_in=due_in
                     )
-                    actions_taken.append({
-                        "action": "start_checklist",
-                        "checklist_type": checklist_type,
-                        "assignee": assignee,
-                        "result": asdict(checklist),
-                        "timestamp": datetime.now().isoformat(),
-                    })
+                    actions_taken.append(
+                        {
+                            "action": "start_checklist",
+                            "checklist_type": checklist_type,
+                            "assignee": assignee,
+                            "result": asdict(checklist),
+                            "timestamp": datetime.now().isoformat(),
+                        }
+                    )
 
             elif safety_query.intent == "broadcast_alert":
                 if not message:
@@ -375,7 +444,11 @@ class SafetyComplianceAgent:
                         safety_query.user_query,
                         re.IGNORECASE,
                     )
-                    message = alert_match.group(1).strip() if alert_match else safety_query.user_query
+                    message = (
+                        alert_match.group(1).strip()
+                        if alert_match
+                        else safety_query.user_query
+                    )
 
                 if not zone:
                     zone_match = re.search(
@@ -386,62 +459,84 @@ class SafetyComplianceAgent:
                     zone = zone_match.group(1).strip() if zone_match else "all"
 
                 if message:
-                    alert = await self.action_tools.broadcast_alert(message=message, zone=zone, channels=channels)
-                    actions_taken.append({
-                        "action": "broadcast_alert",
-                        "message": message,
-                        "zone": zone,
-                        "result": asdict(alert),
-                        "timestamp": datetime.now().isoformat(),
-                    })
+                    alert = await self.action_tools.broadcast_alert(
+                        message=message, zone=zone, channels=channels
+                    )
+                    actions_taken.append(
+                        {
+                            "action": "broadcast_alert",
+                            "message": message,
+                            "zone": zone,
+                            "result": asdict(alert),
+                            "timestamp": datetime.now().isoformat(),
+                        }
+                    )
 
             elif safety_query.intent == "lockout_tagout" and asset_id and reason:
                 loto_request = await self.action_tools.lockout_tagout_request(
                     asset_id=asset_id, reason=reason, requester=requester
                 )
-                actions_taken.append({
-                    "action": "lockout_tagout_request",
-                    "asset_id": asset_id,
-                    "reason": reason,
-                    "result": asdict(loto_request),
-                    "timestamp": datetime.now().isoformat(),
-                })
+                actions_taken.append(
+                    {
+                        "action": "lockout_tagout_request",
+                        "asset_id": asset_id,
+                        "reason": reason,
+                        "result": asdict(loto_request),
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
 
-            elif safety_query.intent == "corrective_action" and incident_id and action_owner and due_date:
+            elif (
+                safety_query.intent == "corrective_action"
+                and incident_id
+                and action_owner
+                and due_date
+            ):
                 corrective_action = await self.action_tools.create_corrective_action(
                     incident_id=incident_id,
                     action_owner=action_owner,
                     description=description,
                     due_date=due_date,
                 )
-                actions_taken.append({
-                    "action": "create_corrective_action",
-                    "incident_id": incident_id,
-                    "action_owner": action_owner,
-                    "result": asdict(corrective_action),
-                    "timestamp": datetime.now().isoformat(),
-                })
+                actions_taken.append(
+                    {
+                        "action": "create_corrective_action",
+                        "incident_id": incident_id,
+                        "action_owner": action_owner,
+                        "result": asdict(corrective_action),
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
 
             elif safety_query.intent == "retrieve_sds" and chemical_name:
-                sds = await self.action_tools.retrieve_sds(chemical_name=chemical_name, assignee=assignee)
-                actions_taken.append({
-                    "action": "retrieve_sds",
-                    "chemical_name": chemical_name,
-                    "result": asdict(sds),
-                    "timestamp": datetime.now().isoformat(),
-                })
+                sds = await self.action_tools.retrieve_sds(
+                    chemical_name=chemical_name, assignee=assignee
+                )
+                actions_taken.append(
+                    {
+                        "action": "retrieve_sds",
+                        "chemical_name": chemical_name,
+                        "result": asdict(sds),
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
 
             elif safety_query.intent == "near_miss" and description:
                 near_miss = await self.action_tools.near_miss_capture(
-                    description=description, zone=zone, reporter=reporter, severity=severity
+                    description=description,
+                    zone=zone,
+                    reporter=reporter,
+                    severity=severity,
                 )
-                actions_taken.append({
-                    "action": "near_miss_capture",
-                    "description": description,
-                    "zone": zone,
-                    "result": asdict(near_miss),
-                    "timestamp": datetime.now().isoformat(),
-                })
+                actions_taken.append(
+                    {
+                        "action": "near_miss_capture",
+                        "description": description,
+                        "zone": zone,
+                        "result": asdict(near_miss),
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
 
             elif (
                 safety_query.intent in ["policy_lookup", "general"]
@@ -452,19 +547,27 @@ class SafetyComplianceAgent:
                 procedures = await self.action_tools.get_safety_procedures(
                     procedure_type=procedure_type, category=category
                 )
-                actions_taken.append({
-                    "action": "get_safety_procedures",
-                    "procedure_type": procedure_type,
-                    "category": category,
-                    "result": procedures,
-                    "timestamp": datetime.now().isoformat(),
-                })
+                actions_taken.append(
+                    {
+                        "action": "get_safety_procedures",
+                        "procedure_type": procedure_type,
+                        "category": category,
+                        "result": procedures,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
 
             return actions_taken
 
         except Exception as e:
             logger.error("Action tools execution failed: %s", e)
-            return [{"action": "error", "error": str(e), "timestamp": datetime.now().isoformat()}]
+            return [
+                {
+                    "action": "error",
+                    "error": str(e),
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ]
 
     async def _get_safety_incidents(self) -> List[Dict[str, Any]]:
         try:
@@ -519,9 +622,24 @@ class SafetyComplianceAgent:
             "overall_status": "Compliant",
             "compliance_score": 95.5,
             "areas": [
-                {"area": "Safety Equipment", "status": "Compliant", "score": 98.0, "last_audit": "2024-01-20"},
-                {"area": "Training Records", "status": "Compliant", "score": 92.0, "last_audit": "2024-01-18"},
-                {"area": "Incident Reporting", "status": "Minor Issues", "score": 88.0, "last_audit": "2024-01-15"},
+                {
+                    "area": "Safety Equipment",
+                    "status": "Compliant",
+                    "score": 98.0,
+                    "last_audit": "2024-01-20",
+                },
+                {
+                    "area": "Training Records",
+                    "status": "Compliant",
+                    "score": 92.0,
+                    "last_audit": "2024-01-18",
+                },
+                {
+                    "area": "Incident Reporting",
+                    "status": "Minor Issues",
+                    "score": 88.0,
+                    "last_audit": "2024-01-15",
+                },
             ],
             "next_audit": "2024-02-15",
         }
@@ -533,33 +651,66 @@ class SafetyComplianceAgent:
                     "name": "John Smith",
                     "role": "Picker",
                     "certifications": [
-                        {"name": "Forklift Safety", "expires": "2024-06-15", "status": "Valid"},
-                        {"name": "PPE Training", "expires": "2024-08-20", "status": "Valid"},
+                        {
+                            "name": "Forklift Safety",
+                            "expires": "2024-06-15",
+                            "status": "Valid",
+                        },
+                        {
+                            "name": "PPE Training",
+                            "expires": "2024-08-20",
+                            "status": "Valid",
+                        },
                     ],
                 },
                 {
                     "name": "Sarah Johnson",
                     "role": "Packer",
                     "certifications": [
-                        {"name": "Safety Awareness", "expires": "2024-05-10", "status": "Valid"},
-                        {"name": "Emergency Response", "expires": "2024-07-25", "status": "Valid"},
+                        {
+                            "name": "Safety Awareness",
+                            "expires": "2024-05-10",
+                            "status": "Valid",
+                        },
+                        {
+                            "name": "Emergency Response",
+                            "expires": "2024-07-25",
+                            "status": "Valid",
+                        },
                     ],
                 },
             ],
             "upcoming_expirations": [
-                {"employee": "Mike Wilson", "certification": "Forklift Safety", "expires": "2024-02-28"},
-                {"employee": "Lisa Brown", "certification": "PPE Training", "expires": "2024-03-05"},
+                {
+                    "employee": "Mike Wilson",
+                    "certification": "Forklift Safety",
+                    "expires": "2024-02-28",
+                },
+                {
+                    "employee": "Lisa Brown",
+                    "certification": "PPE Training",
+                    "expires": "2024-03-05",
+                },
             ],
         }
 
     async def _get_safety_procedures(self) -> Dict[str, Any]:
         try:
             if not self.action_tools:
-                return {"procedures": [], "total_count": 0, "last_updated": datetime.now().isoformat()}
+                return {
+                    "procedures": [],
+                    "total_count": 0,
+                    "last_updated": datetime.now().isoformat(),
+                }
             return await self.action_tools.get_safety_procedures()
         except Exception as e:
             logger.error("Failed to get safety procedures: %s", e)
-            return {"procedures": [], "total_count": 0, "error": str(e), "last_updated": datetime.now().isoformat()}
+            return {
+                "procedures": [],
+                "total_count": 0,
+                "error": str(e),
+                "last_updated": datetime.now().isoformat(),
+            }
 
     async def _generate_safety_response(
         self,
@@ -571,7 +722,9 @@ class SafetyComplianceAgent:
     ) -> SafetyResponse:
         try:
             context_str = self._build_retrieved_context(retrieved_data)
-            conversation_history = self.conversation_context.get(session_id, {}).get("history", [])
+            conversation_history = self.conversation_context.get(session_id, {}).get(
+                "history", []
+            )
 
             actions_str = ""
             if actions_taken:
@@ -581,7 +734,9 @@ class SafetyComplianceAgent:
             if reasoning_chain:
                 reasoning_steps_text = []
                 for step in reasoning_chain.steps:
-                    reasoning_steps_text.append(f"Step {step.step_id}: {step.description}\n{step.reasoning}")
+                    reasoning_steps_text.append(
+                        f"Step {step.step_id}: {step.description}\n{step.reasoning}"
+                    )
                 reasoning_str = (
                     f"\nAdvanced Reasoning Analysis:\n{chr(10).join(reasoning_steps_text)}"
                     f"\n\nFinal Conclusion: {reasoning_chain.final_conclusion}"
@@ -601,7 +756,9 @@ class SafetyComplianceAgent:
                 retrieved_data=context_str,
                 actions_taken=actions_str,
                 reasoning_analysis=reasoning_str,
-                conversation_history=conversation_history[-3:] if conversation_history else "None",
+                conversation_history=(
+                    conversation_history[-3:] if conversation_history else "None"
+                ),
             )
 
             messages = [
@@ -611,23 +768,39 @@ class SafetyComplianceAgent:
 
             from maiw_models import ModelRequest, ReasoningLevel, RiskLevel
 
-            _high_risk_intents = {"incident_report", "broadcast_alert", "lockout_tagout", "corrective_action", "near_miss"}
+            _high_risk_intents = {
+                "incident_report",
+                "broadcast_alert",
+                "lockout_tagout",
+                "corrective_action",
+                "near_miss",
+            }
             _critical_intents = {"broadcast_alert", "lockout_tagout"}
             _intent = safety_query.intent
             _gw_risk = (
-                RiskLevel.CRITICAL if _intent in _critical_intents
-                else RiskLevel.HIGH if _intent in _high_risk_intents
-                else RiskLevel.MEDIUM
+                RiskLevel.CRITICAL
+                if _intent in _critical_intents
+                else (
+                    RiskLevel.HIGH
+                    if _intent in _high_risk_intents
+                    else RiskLevel.MEDIUM
+                )
             )
-            _gw_reasoning = ReasoningLevel.HIGH if _intent in _high_risk_intents else ReasoningLevel.MEDIUM
+            _gw_reasoning = (
+                ReasoningLevel.HIGH
+                if _intent in _high_risk_intents
+                else ReasoningLevel.MEDIUM
+            )
 
-            gw_resp = await self.model_gateway.generate(ModelRequest(
-                task=f"warehouse.safety.{_intent}",
-                messages=messages,
-                reasoning=_gw_reasoning,
-                risk_level=_gw_risk,
-                temperature=0.2,
-            ))
+            gw_resp = await self.model_gateway.generate(
+                ModelRequest(
+                    task=f"warehouse.safety.{_intent}",
+                    messages=messages,
+                    reasoning=_gw_reasoning,
+                    risk_level=_gw_risk,
+                    temperature=0.2,
+                )
+            )
             _gen_response_content = gw_resp.content
 
             try:
@@ -636,7 +809,9 @@ class SafetyComplianceAgent:
                 return SafetyResponse(
                     response_type=parsed_response.get("response_type", "general"),
                     data=parsed_response.get("data", {}),
-                    natural_language=parsed_response.get("natural_language", "I processed your safety query."),
+                    natural_language=parsed_response.get(
+                        "natural_language", "I processed your safety query."
+                    ),
                     recommendations=parsed_response.get("recommendations", []),
                     confidence=parsed_response.get("confidence", 0.8),
                     actions_taken=actions_taken or [],
@@ -644,13 +819,19 @@ class SafetyComplianceAgent:
                     reasoning_steps=reasoning_steps,
                 )
             except json.JSONDecodeError:
-                return self._generate_fallback_response(safety_query, retrieved_data, actions_taken, reasoning_chain)
+                return self._generate_fallback_response(
+                    safety_query, retrieved_data, actions_taken, reasoning_chain
+                )
 
         except Exception as e:
             logger.error("Response generation failed: %s", e)
-            return self._generate_fallback_response(safety_query, retrieved_data, actions_taken)
+            return self._generate_fallback_response(
+                safety_query, retrieved_data, actions_taken
+            )
 
-    def _extract_reasoning_steps(self, reasoning_chain: Optional[Any]) -> Optional[List[Dict[str, Any]]]:
+    def _extract_reasoning_steps(
+        self, reasoning_chain: Optional[Any]
+    ) -> Optional[List[Dict[str, Any]]]:
         if not reasoning_chain:
             return None
         try:
@@ -685,11 +866,21 @@ class SafetyComplianceAgent:
                     query_lower = safety_query.user_query.lower()
                     filtered = incidents
                     if "critical" in query_lower:
-                        filtered = [i for i in incidents if i.get("severity") == "critical"]
+                        filtered = [
+                            i for i in incidents if i.get("severity") == "critical"
+                        ]
                     elif "high" in query_lower:
-                        filtered = [i for i in incidents if i.get("severity") in ["high", "critical"]]
+                        filtered = [
+                            i
+                            for i in incidents
+                            if i.get("severity") in ["high", "critical"]
+                        ]
                     elif "medium" in query_lower:
-                        filtered = [i for i in incidents if i.get("severity") in ["medium", "high", "critical"]]
+                        filtered = [
+                            i
+                            for i in incidents
+                            if i.get("severity") in ["medium", "high", "critical"]
+                        ]
                     elif "low" in query_lower:
                         filtered = [i for i in incidents if i.get("severity") == "low"]
 
@@ -697,7 +888,9 @@ class SafetyComplianceAgent:
                         summary = f"Found {len(filtered)} safety incidents:\n"
                         for incident in filtered[:5]:
                             summary += f"• {incident.get('description', 'No description')} (Severity: {incident.get('severity', 'Unknown')}, Reported by: {incident.get('reported_by', 'Unknown')}, Date: {incident.get('occurred_at', 'Unknown')})\n"
-                        natural_language = f"Here's the safety incident information:\n\n{summary}"
+                        natural_language = (
+                            f"Here's the safety incident information:\n\n{summary}"
+                        )
                     else:
                         natural_language = f"No incidents found matching your criteria. Total incidents in system: {len(incidents)}"
                 else:
@@ -712,7 +905,9 @@ class SafetyComplianceAgent:
                 procedures = data.get("procedures", {})
                 if procedures and procedures.get("procedures"):
                     procedure_list = procedures["procedures"]
-                    natural_language = "Here are the comprehensive safety procedures and policies:\n\n"
+                    natural_language = (
+                        "Here are the comprehensive safety procedures and policies:\n\n"
+                    )
                     for i, proc in enumerate(procedure_list[:5], 1):
                         natural_language += (
                             f"{i}. **{proc.get('name', 'Unknown Procedure')}**\n"
@@ -729,25 +924,46 @@ class SafetyComplianceAgent:
                     if len(procedure_list) > 5:
                         natural_language += f"... and {len(procedure_list) - 5} more procedures available.\n"
                 else:
-                    natural_language = "Here are the relevant safety policies and procedures."
-                recommendations = ["Review policy updates", "Ensure team compliance", "Follow all safety procedures"]
+                    natural_language = (
+                        "Here are the relevant safety policies and procedures."
+                    )
+                recommendations = [
+                    "Review policy updates",
+                    "Ensure team compliance",
+                    "Follow all safety procedures",
+                ]
 
             elif intent == "compliance_check":
-                natural_language = "Here's the current compliance status and audit information."
+                natural_language = (
+                    "Here's the current compliance status and audit information."
+                )
                 recommendations = ["Address compliance gaps", "Schedule regular audits"]
 
             elif intent == "training":
-                natural_language = "Here are the training records and certification status."
-                recommendations = ["Schedule upcoming training", "Track certification expirations"]
+                natural_language = (
+                    "Here are the training records and certification status."
+                )
+                recommendations = [
+                    "Schedule upcoming training",
+                    "Track certification expirations",
+                ]
 
             else:
                 incidents = data.get("incidents", [])
                 query_lower = safety_query.user_query.lower()
-                if incidents and ("issue" in query_lower or "problem" in query_lower or "today" in query_lower):
+                if incidents and (
+                    "issue" in query_lower
+                    or "problem" in query_lower
+                    or "today" in query_lower
+                ):
                     natural_language = f"Here are the main safety issues based on recent incidents:\n\nFound {len(incidents)} recent safety incidents:\n"
                     for incident in incidents[:5]:
                         natural_language += f"• {incident.get('description', 'No description')} (Severity: {incident.get('severity', 'Unknown')}, Reported by: {incident.get('reported_by', 'Unknown')}, Date: {incident.get('occurred_at', 'Unknown')})\n"
-                    recommendations = ["Address high-priority incidents immediately", "Review incident patterns", "Implement preventive measures"]
+                    recommendations = [
+                        "Address high-priority incidents immediately",
+                        "Review incident patterns",
+                        "Implement preventive measures",
+                    ]
                 else:
                     procedures = data.get("procedures", {})
                     if procedures and procedures.get("procedures"):
@@ -764,7 +980,11 @@ class SafetyComplianceAgent:
                             natural_language += f"... and {len(procedure_list) - 5} more procedures available.\n"
                     else:
                         natural_language = "I processed your safety query and retrieved relevant information."
-                    recommendations = ["Review policy updates", "Ensure team compliance", "Follow all safety procedures"]
+                    recommendations = [
+                        "Review policy updates",
+                        "Ensure team compliance",
+                        "Follow all safety procedures",
+                    ]
 
             return SafetyResponse(
                 response_type="fallback",
@@ -788,7 +1008,11 @@ class SafetyComplianceAgent:
                 actions_taken=actions_taken or [],
             )
 
-    def _build_context_string(self, conversation_history: List[Dict[str, Any]], context: Optional[Dict[str, Any]]) -> str:
+    def _build_context_string(
+        self,
+        conversation_history: List[Dict[str, Any]],
+        context: Optional[Dict[str, Any]],
+    ) -> str:
         if not conversation_history and not context:
             return "No previous context"
         context_parts = []
@@ -813,50 +1037,78 @@ class SafetyComplianceAgent:
                 else:
                     context_parts.append("Recent Incidents: No incidents found")
             if "policies" in retrieved_data:
-                context_parts.append(f"Safety Policies: {retrieved_data['policies'].get('total_count', 0)} policies available")
+                context_parts.append(
+                    f"Safety Policies: {retrieved_data['policies'].get('total_count', 0)} policies available"
+                )
             if "compliance" in retrieved_data:
-                context_parts.append(f"Compliance Status: {retrieved_data['compliance'].get('overall_status', 'Unknown')}")
+                context_parts.append(
+                    f"Compliance Status: {retrieved_data['compliance'].get('overall_status', 'Unknown')}"
+                )
             if "training" in retrieved_data:
-                context_parts.append(f"Training Records: {len(retrieved_data['training'].get('employees', []))} employees tracked")
+                context_parts.append(
+                    f"Training Records: {len(retrieved_data['training'].get('employees', []))} employees tracked"
+                )
             if "procedures" in retrieved_data:
                 procedures = retrieved_data["procedures"]
                 if procedures and procedures.get("procedures"):
                     procedure_list = procedures["procedures"]
-                    context_parts.append(f"Safety Procedures: {len(procedure_list)} procedures available")
-                    context_parts.append(f"Categories: {', '.join(procedures.get('categories', []))}")
+                    context_parts.append(
+                        f"Safety Procedures: {len(procedure_list)} procedures available"
+                    )
+                    context_parts.append(
+                        f"Categories: {', '.join(procedures.get('categories', []))}"
+                    )
                 else:
                     context_parts.append("Safety Procedures: No procedures found")
-            return "\n".join(context_parts) if context_parts else "No relevant data found"
+            return (
+                "\n".join(context_parts) if context_parts else "No relevant data found"
+            )
         except Exception as e:
             logger.error("Context building failed: %s", e)
             return "Error building context"
 
-    def _update_context(self, session_id: str, safety_query: SafetyQuery, response: SafetyResponse) -> None:
+    def _update_context(
+        self, session_id: str, safety_query: SafetyQuery, response: SafetyResponse
+    ) -> None:
         try:
             if session_id not in self.conversation_context:
-                self.conversation_context[session_id] = {"history": [], "current_focus": None, "last_entities": {}}
+                self.conversation_context[session_id] = {
+                    "history": [],
+                    "current_focus": None,
+                    "last_entities": {},
+                }
 
-            self.conversation_context[session_id]["history"].append({
-                "query": safety_query.user_query,
-                "intent": safety_query.intent,
-                "response_type": response.response_type,
-                "timestamp": datetime.now().isoformat(),
-            })
+            self.conversation_context[session_id]["history"].append(
+                {
+                    "query": safety_query.user_query,
+                    "intent": safety_query.intent,
+                    "response_type": response.response_type,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
 
             if safety_query.intent != "general":
-                self.conversation_context[session_id]["current_focus"] = safety_query.intent
+                self.conversation_context[session_id][
+                    "current_focus"
+                ] = safety_query.intent
 
             if safety_query.entities:
-                self.conversation_context[session_id]["last_entities"] = safety_query.entities
+                self.conversation_context[session_id][
+                    "last_entities"
+                ] = safety_query.entities
 
             if len(self.conversation_context[session_id]["history"]) > 10:
-                self.conversation_context[session_id]["history"] = self.conversation_context[session_id]["history"][-10:]
+                self.conversation_context[session_id]["history"] = (
+                    self.conversation_context[session_id]["history"][-10:]
+                )
 
         except Exception as e:
             logger.error("Context update failed: %s", e)
 
     async def get_conversation_context(self, session_id: str) -> Dict[str, Any]:
-        return self.conversation_context.get(session_id, {"history": [], "current_focus": None, "last_entities": {}})
+        return self.conversation_context.get(
+            session_id, {"history": [], "current_focus": None, "last_entities": {}}
+        )
 
     async def clear_conversation_context(self, session_id: str) -> None:
         if session_id in self.conversation_context:
@@ -865,20 +1117,55 @@ class SafetyComplianceAgent:
     def _is_complex_query(self, query: str) -> bool:
         query_lower = query.lower()
         simple_patterns = [
-            "what are the safety procedures", "show me safety procedures", "list safety procedures",
-            "safety procedures", "what is the safety procedure", "safety procedure",
-            "ppe requirements", "what is ppe", "lockout tagout procedure", "emergency evacuation procedure",
+            "what are the safety procedures",
+            "show me safety procedures",
+            "list safety procedures",
+            "safety procedures",
+            "what is the safety procedure",
+            "safety procedure",
+            "ppe requirements",
+            "what is ppe",
+            "lockout tagout procedure",
+            "emergency evacuation procedure",
         ]
         for pattern in simple_patterns:
             if pattern in query_lower:
                 return False
         complex_keywords = [
-            "analyze", "compare", "relationship", "connection", "across", "multiple",
-            "what if", "scenario", "alternative", "option", "if", "when", "suppose",
-            "why", "cause", "effect", "because", "result", "consequence", "due to",
-            "leads to", "pattern", "trend", "learn", "insight", "recommendation",
-            "optimize", "improve", "how does", "explain", "understand", "investigate",
-            "determine", "evaluate",
+            "analyze",
+            "compare",
+            "relationship",
+            "connection",
+            "across",
+            "multiple",
+            "what if",
+            "scenario",
+            "alternative",
+            "option",
+            "if",
+            "when",
+            "suppose",
+            "why",
+            "cause",
+            "effect",
+            "because",
+            "result",
+            "consequence",
+            "due to",
+            "leads to",
+            "pattern",
+            "trend",
+            "learn",
+            "insight",
+            "recommendation",
+            "optimize",
+            "improve",
+            "how does",
+            "explain",
+            "understand",
+            "investigate",
+            "determine",
+            "evaluate",
         ]
         return any(keyword in query_lower for keyword in complex_keywords)
 
@@ -888,15 +1175,62 @@ class SafetyComplianceAgent:
         reasoning_types = [ReasoningType.CHAIN_OF_THOUGHT]
         query_lower = query.lower()
 
-        if any(k in query_lower for k in ["analyze", "compare", "relationship", "connection", "across", "multiple"]):
+        if any(
+            k in query_lower
+            for k in [
+                "analyze",
+                "compare",
+                "relationship",
+                "connection",
+                "across",
+                "multiple",
+            ]
+        ):
             reasoning_types.append(ReasoningType.MULTI_HOP)
-        if any(k in query_lower for k in ["what if", "scenario", "alternative", "option", "if", "when", "suppose"]):
+        if any(
+            k in query_lower
+            for k in [
+                "what if",
+                "scenario",
+                "alternative",
+                "option",
+                "if",
+                "when",
+                "suppose",
+            ]
+        ):
             reasoning_types.append(ReasoningType.SCENARIO_ANALYSIS)
-        if any(k in query_lower for k in ["why", "cause", "effect", "because", "result", "consequence", "due to", "leads to"]):
+        if any(
+            k in query_lower
+            for k in [
+                "why",
+                "cause",
+                "effect",
+                "because",
+                "result",
+                "consequence",
+                "due to",
+                "leads to",
+            ]
+        ):
             reasoning_types.append(ReasoningType.CAUSAL)
-        if any(k in query_lower for k in ["pattern", "trend", "learn", "insight", "recommendation", "optimize", "improve"]):
+        if any(
+            k in query_lower
+            for k in [
+                "pattern",
+                "trend",
+                "learn",
+                "insight",
+                "recommendation",
+                "optimize",
+                "improve",
+            ]
+        ):
             reasoning_types.append(ReasoningType.PATTERN_RECOGNITION)
-        if any(k in query_lower for k in ["safety", "incident", "hazard", "risk", "compliance"]):
+        if any(
+            k in query_lower
+            for k in ["safety", "incident", "hazard", "risk", "compliance"]
+        ):
             if ReasoningType.CAUSAL not in reasoning_types:
                 reasoning_types.append(ReasoningType.CAUSAL)
 

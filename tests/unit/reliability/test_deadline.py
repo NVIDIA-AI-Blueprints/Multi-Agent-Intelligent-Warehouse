@@ -10,7 +10,6 @@ import pytest
 
 from maiw_mcp.deadline import RequestDeadline, RequestDeadlineExceeded
 
-
 # ---------------------------------------------------------------------------
 # FakeClock helper
 # ---------------------------------------------------------------------------

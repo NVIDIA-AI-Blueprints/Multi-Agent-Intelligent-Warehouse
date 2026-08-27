@@ -33,11 +33,13 @@ class EquipmentActionExecutor(BaseActionExecutor):
     Outcome mapping: reads the ``outcome`` field on the provider result.
     """
 
-    _ALLOWED_ACTIONS: frozenset[str] = frozenset({
-        "warehouse.equipment.assign",
-        "warehouse.equipment.release",
-        "warehouse.equipment.schedule_maintenance",
-    })
+    _ALLOWED_ACTIONS: frozenset[str] = frozenset(
+        {
+            "warehouse.equipment.assign",
+            "warehouse.equipment.release",
+            "warehouse.equipment.schedule_maintenance",
+        }
+    )
 
     def __init__(
         self,
@@ -133,14 +135,18 @@ class EquipmentActionExecutor(BaseActionExecutor):
 
         outcome_str = resp.get("outcome", "")
         outcome = _map_outcome(outcome_str, bool(resp.get("success", True)))
-        provider_ref = str(resp.get("assignment_id") or resp.get("maintenance_id") or "") or None
+        provider_ref = (
+            str(resp.get("assignment_id") or resp.get("maintenance_id") or "") or None
+        )
         return resp, provider_ref, outcome
 
     async def _do_assign(
         self, proposal: ActionProposal, decision: DecisionResult, execution_id: str
     ) -> dict[str, Any]:
         if self._assign_skill is None:
-            raise ActionUnsupported("No assign_skill configured on EquipmentActionExecutor")
+            raise ActionUnsupported(
+                "No assign_skill configured on EquipmentActionExecutor"
+            )
         from maiw_mcp.contracts.equipment import EquipmentExecuteAssignRequest
 
         req = EquipmentExecuteAssignRequest(
@@ -161,7 +167,9 @@ class EquipmentActionExecutor(BaseActionExecutor):
         self, proposal: ActionProposal, decision: DecisionResult, execution_id: str
     ) -> dict[str, Any]:
         if self._release_skill is None:
-            raise ActionUnsupported("No release_skill configured on EquipmentActionExecutor")
+            raise ActionUnsupported(
+                "No release_skill configured on EquipmentActionExecutor"
+            )
         from maiw_mcp.contracts.equipment import EquipmentExecuteReleaseRequest
 
         req = EquipmentExecuteReleaseRequest(
@@ -179,7 +187,9 @@ class EquipmentActionExecutor(BaseActionExecutor):
         self, proposal: ActionProposal, decision: DecisionResult, execution_id: str
     ) -> dict[str, Any]:
         if self._maintenance_skill is None:
-            raise ActionUnsupported("No maintenance_skill configured on EquipmentActionExecutor")
+            raise ActionUnsupported(
+                "No maintenance_skill configured on EquipmentActionExecutor"
+            )
         from maiw_mcp.contracts.equipment import EquipmentExecuteMaintenanceRequest
 
         req = EquipmentExecuteMaintenanceRequest(
@@ -188,7 +198,9 @@ class EquipmentActionExecutor(BaseActionExecutor):
             description=proposal.parameters.get("description", ""),
             scheduled_by=proposal.parameters.get("scheduled_by", "unknown"),
             scheduled_for=proposal.parameters.get("scheduled_for", ""),
-            estimated_duration_minutes=proposal.parameters.get("estimated_duration_minutes", 60),
+            estimated_duration_minutes=proposal.parameters.get(
+                "estimated_duration_minutes", 60
+            ),
             priority=proposal.parameters.get("priority", "medium"),
             proposal_id=proposal.proposal_id,
             decision_id=decision.result_id,

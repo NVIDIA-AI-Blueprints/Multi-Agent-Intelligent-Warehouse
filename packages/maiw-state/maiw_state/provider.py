@@ -48,7 +48,6 @@ from .provenance import StateProvenance, StateSource
 from .requirements import StateRequirements
 from .warehouse import WarehouseState
 
-
 # ---------------------------------------------------------------------------
 # Skill protocols — structural typing; no import of concrete skill classes
 # ---------------------------------------------------------------------------
@@ -240,7 +239,9 @@ class WarehouseStateProvider:
         latency_ms = (time.monotonic() - t0) * 1000
 
         freshness = StateFreshness.now(stale_after_ms=requirements.max_age_ms)
-        state = EquipmentState.from_status_result(warehouse_id, result, freshness=freshness)
+        state = EquipmentState.from_status_result(
+            warehouse_id, result, freshness=freshness
+        )
 
         prov = StateProvenance(
             domain="equipment",
@@ -295,7 +296,9 @@ class WarehouseStateProvider:
         latency_ms = (time.monotonic() - t0) * 1000
 
         freshness = StateFreshness.now(stale_after_ms=requirements.max_age_ms)
-        state = InventoryState.from_lookup_result(warehouse_id, result, freshness=freshness)
+        state = InventoryState.from_lookup_result(
+            warehouse_id, result, freshness=freshness
+        )
 
         prov = StateProvenance(
             domain="inventory",
@@ -352,7 +355,9 @@ class WarehouseStateProvider:
         latency_ms = (time.monotonic() - t0) * 1000
 
         freshness = StateFreshness.now(stale_after_ms=requirements.max_age_ms)
-        state = LaborState.from_capacity_result(warehouse_id, result, freshness=freshness)
+        state = LaborState.from_capacity_result(
+            warehouse_id, result, freshness=freshness
+        )
 
         prov = StateProvenance(
             domain="labor",

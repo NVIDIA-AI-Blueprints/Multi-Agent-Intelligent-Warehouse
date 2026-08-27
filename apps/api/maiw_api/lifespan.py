@@ -48,6 +48,7 @@ async def lifespan(app: FastAPI):
         )
         # get_runtime() caches its singleton; retrieve whatever was assembled.
         from maiw_api.bootstrap import _runtime as _partial  # noqa: PLC0415
+
         runtime = _partial  # may be None if assembly failed entirely
 
     app.state.runtime = runtime
@@ -72,6 +73,7 @@ async def lifespan(app: FastAPI):
     # connection and no aclose() method.  Close the NIM httpx clients instead.
     try:
         from maiw_models.providers.nim_client import close_nim_client  # noqa: PLC0415
+
         await close_nim_client()
     except Exception as exc:
         logger.warning("NIM client close error: %s", exc)

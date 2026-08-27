@@ -22,7 +22,6 @@ from maiw_models.errors import ModelTimeout, ModelUnavailable, ModelResponseErro
 from maiw_models.models import ModelRequest, ReasoningLevel, RiskLevel
 from maiw_models.providers.nim_client import NIMClient, NIMConfig, LLMResponse
 
-
 # ---------------------------------------------------------------------------
 # Helpers / fixtures
 # ---------------------------------------------------------------------------
@@ -65,12 +64,14 @@ def _ok_post_mock(content: str = "ok") -> AsyncMock:
 
 def _http_status_post_mock(status_code: int) -> AsyncMock:
     """Returns a mock that raises HTTPStatusError with the given status."""
+
     def _raise(*args, **kwargs):
         resp = MagicMock()
         resp.status_code = status_code
         raise httpx.HTTPStatusError(
             f"HTTP {status_code}", request=MagicMock(), response=resp
         )
+
     return AsyncMock(side_effect=_raise)
 
 
@@ -246,12 +247,15 @@ class TestNIMClientTimeoutPropagation:
             resp.raise_for_status = MagicMock()
             resp.json.return_value = {
                 "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}],
-                "usage": {}, "model": "test/model",
+                "usage": {},
+                "model": "test/model",
             }
             return resp
 
         client.llm_client.post = fake_post
-        result = _run(client.generate_response(messages=[{"role": "user", "content": "hi"}]))
+        result = _run(
+            client.generate_response(messages=[{"role": "user", "content": "hi"}])
+        )
         assert result.content == "ok"
         # No deadline → no per-request timeout kwarg (uses client-level default)
         assert captured_timeout[0] == "DEFAULT"
@@ -268,14 +272,17 @@ class TestNIMClientTimeoutPropagation:
             resp.raise_for_status = MagicMock()
             resp.json.return_value = {
                 "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}],
-                "usage": {}, "model": "test/model",
+                "usage": {},
+                "model": "test/model",
             }
             return resp
 
         client.llm_client.post = fake_post
-        _run(client.generate_response(
-            messages=[{"role": "user", "content": "hi"}], deadline=dl
-        ))
+        _run(
+            client.generate_response(
+                messages=[{"role": "user", "content": "hi"}], deadline=dl
+            )
+        )
         # config.timeout=30, remaining=3600 → effective = min(30, 3600) = 30
         assert captured_timeout[0] == pytest.approx(30.0)
 
@@ -292,14 +299,17 @@ class TestNIMClientTimeoutPropagation:
             resp.raise_for_status = MagicMock()
             resp.json.return_value = {
                 "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}],
-                "usage": {}, "model": "test/model",
+                "usage": {},
+                "model": "test/model",
             }
             return resp
 
         client.llm_client.post = fake_post
-        _run(client.generate_response(
-            messages=[{"role": "user", "content": "hi"}], deadline=dl
-        ))
+        _run(
+            client.generate_response(
+                messages=[{"role": "user", "content": "hi"}], deadline=dl
+            )
+        )
         # config.timeout=30, remaining≈2s → effective = min(30, 2) = 2
         assert captured_timeout[0] == pytest.approx(2.0, abs=0.1)
 
@@ -312,9 +322,11 @@ class TestNIMClientTimeoutPropagation:
         client.llm_client.post = AsyncMock()  # should never be called
 
         with pytest.raises(RequestDeadlineExceeded):
-            _run(client.generate_response(
-                messages=[{"role": "user", "content": "hi"}], deadline=dl
-            ))
+            _run(
+                client.generate_response(
+                    messages=[{"role": "user", "content": "hi"}], deadline=dl
+                )
+            )
 
         client.llm_client.post.assert_not_called()
 
@@ -343,7 +355,8 @@ class TestNIMClientRetryWithDeadline:
         resp.raise_for_status = MagicMock()
         resp.json.return_value = {
             "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}],
-            "usage": {}, "model": "test/model",
+            "usage": {},
+            "model": "test/model",
         }
         return resp
 
@@ -364,9 +377,11 @@ class TestNIMClientRetryWithDeadline:
         client = self._client_with_response_sequence(responses, timeout=30)
 
         with patch("asyncio.sleep", new_callable=AsyncMock):
-            result = _run(client.generate_response(
-                messages=[{"role": "user", "content": "hi"}], deadline=dl
-            ))
+            result = _run(
+                client.generate_response(
+                    messages=[{"role": "user", "content": "hi"}], deadline=dl
+                )
+            )
         assert result.content == "ok"
 
     def test_429_retry_succeeds_within_budget(self):
@@ -376,9 +391,11 @@ class TestNIMClientRetryWithDeadline:
         client = self._client_with_response_sequence(responses)
 
         with patch("asyncio.sleep", new_callable=AsyncMock):
-            result = _run(client.generate_response(
-                messages=[{"role": "user", "content": "hi"}], deadline=dl
-            ))
+            result = _run(
+                client.generate_response(
+                    messages=[{"role": "user", "content": "hi"}], deadline=dl
+                )
+            )
         assert result.content == "ok"
 
     def test_500_retry_succeeds_within_budget(self):
@@ -388,9 +405,11 @@ class TestNIMClientRetryWithDeadline:
         client = self._client_with_response_sequence(responses)
 
         with patch("asyncio.sleep", new_callable=AsyncMock):
-            result = _run(client.generate_response(
-                messages=[{"role": "user", "content": "hi"}], deadline=dl
-            ))
+            result = _run(
+                client.generate_response(
+                    messages=[{"role": "user", "content": "hi"}], deadline=dl
+                )
+            )
         assert result.content == "ok"
 
     # ── No-retry on 4xx ───────────────────────────────────────────────────
@@ -410,9 +429,11 @@ class TestNIMClientRetryWithDeadline:
         client.llm_client.post = counting_post
 
         with pytest.raises(ConnectionError):
-            _run(client.generate_response(
-                messages=[{"role": "user", "content": "hi"}], deadline=dl
-            ))
+            _run(
+                client.generate_response(
+                    messages=[{"role": "user", "content": "hi"}], deadline=dl
+                )
+            )
         # 400 = no retry → exactly 1 call
         assert call_count[0] == 1
 
@@ -424,9 +445,11 @@ class TestNIMClientRetryWithDeadline:
 
         with pytest.raises(ConnectionError):
             with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
-                _run(client.generate_response(
-                    messages=[{"role": "user", "content": "hi"}], deadline=dl
-                ))
+                _run(
+                    client.generate_response(
+                        messages=[{"role": "user", "content": "hi"}], deadline=dl
+                    )
+                )
         mock_sleep.assert_not_called()
 
     # ── Deadline suppresses retry ─────────────────────────────────────────
@@ -440,9 +463,11 @@ class TestNIMClientRetryWithDeadline:
         client.llm_client.post = AsyncMock()
 
         with pytest.raises(RequestDeadlineExceeded):
-            _run(client.generate_response(
-                messages=[{"role": "user", "content": "hi"}], deadline=dl
-            ))
+            _run(
+                client.generate_response(
+                    messages=[{"role": "user", "content": "hi"}], deadline=dl
+                )
+            )
         client.llm_client.post.assert_not_called()
 
     def test_deadline_exhausted_after_first_timeout_suppresses_retry(self):
@@ -465,9 +490,11 @@ class TestNIMClientRetryWithDeadline:
 
         # remaining (0.4s) < backoff (1s) → retry suppressed
         with pytest.raises(httpx.TimeoutException):
-            _run(client.generate_response(
-                messages=[{"role": "user", "content": "hi"}], deadline=dl
-            ))
+            _run(
+                client.generate_response(
+                    messages=[{"role": "user", "content": "hi"}], deadline=dl
+                )
+            )
         assert call_count[0] == 1
 
     def test_deadline_insufficient_for_backoff_suppresses_retry(self):
@@ -489,9 +516,11 @@ class TestNIMClientRetryWithDeadline:
 
         # 0.5s remaining < 1s backoff → no second attempt
         with pytest.raises(httpx.TimeoutException):
-            _run(client.generate_response(
-                messages=[{"role": "user", "content": "hi"}], deadline=dl
-            ))
+            _run(
+                client.generate_response(
+                    messages=[{"role": "user", "content": "hi"}], deadline=dl
+                )
+            )
         assert call_count[0] == 1
 
     def test_deadline_expired_before_second_attempt(self):
@@ -514,7 +543,10 @@ class TestNIMClientRetryWithDeadline:
             clock.advance(seconds + 20.0)  # drain clock far past deadline
 
         async def run():
-            with patch("maiw_models.providers.nim_client.asyncio.sleep", side_effect=draining_sleep):
+            with patch(
+                "maiw_models.providers.nim_client.asyncio.sleep",
+                side_effect=draining_sleep,
+            ):
                 return await client.generate_response(
                     messages=[{"role": "user", "content": "hi"}], deadline=dl
                 )
@@ -531,10 +563,12 @@ class TestNIMClientRetryWithDeadline:
         client = self._client_with_response_sequence(responses)
 
         with patch("asyncio.sleep", new_callable=AsyncMock):
-            result = _run(client.generate_response(
-                messages=[{"role": "user", "content": "hi"}],
-                # no deadline
-            ))
+            result = _run(
+                client.generate_response(
+                    messages=[{"role": "user", "content": "hi"}],
+                    # no deadline
+                )
+            )
         assert result.content == "ok"
 
 
@@ -562,9 +596,11 @@ class TestNIMProviderDeadlinePropagation:
         clock = FakeClock(start=0.0)
         dl = RequestDeadline.from_timeout(30.0, clock=clock)
 
-        mock_client.generate_response = AsyncMock(return_value=LLMResponse(
-            content="ok", usage={}, model="test/model", finish_reason="stop"
-        ))
+        mock_client.generate_response = AsyncMock(
+            return_value=LLMResponse(
+                content="ok", usage={}, model="test/model", finish_reason="stop"
+            )
+        )
 
         req = ModelRequest(task="t", messages=[], deadline=dl)
         _run(provider.call(model_id="test/model", request=req, capability=capability))
@@ -575,9 +611,11 @@ class TestNIMProviderDeadlinePropagation:
     def test_none_deadline_passed_to_nim_client(self):
         provider, mock_client, capability = self._make_provider()
 
-        mock_client.generate_response = AsyncMock(return_value=LLMResponse(
-            content="ok", usage={}, model="test/model", finish_reason="stop"
-        ))
+        mock_client.generate_response = AsyncMock(
+            return_value=LLMResponse(
+                content="ok", usage={}, model="test/model", finish_reason="stop"
+            )
+        )
 
         req = ModelRequest(task="t", messages=[])
         _run(provider.call(model_id="test/model", request=req, capability=capability))
@@ -594,7 +632,9 @@ class TestNIMProviderDeadlinePropagation:
 
         req = ModelRequest(task="t", messages=[])
         with pytest.raises(RequestDeadlineExceeded):
-            _run(provider.call(model_id="test/model", request=req, capability=capability))
+            _run(
+                provider.call(model_id="test/model", request=req, capability=capability)
+            )
 
     def test_timeout_still_becomes_model_timeout(self):
         provider, mock_client, capability = self._make_provider()
@@ -605,7 +645,9 @@ class TestNIMProviderDeadlinePropagation:
 
         req = ModelRequest(task="t", messages=[])
         with pytest.raises(ModelTimeout):
-            _run(provider.call(model_id="test/model", request=req, capability=capability))
+            _run(
+                provider.call(model_id="test/model", request=req, capability=capability)
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -636,10 +678,12 @@ class TestWorstCaseBound:
         with patch("asyncio.sleep", new_callable=AsyncMock):
             # Will eventually exhaust budget
             try:
-                _run(client.generate_response(
-                    messages=[{"role": "user", "content": "hi"}],
-                    deadline=dl,
-                ))
+                _run(
+                    client.generate_response(
+                        messages=[{"role": "user", "content": "hi"}],
+                        deadline=dl,
+                    )
+                )
             except (RequestDeadlineExceeded, httpx.TimeoutException, ConnectionError):
                 pass
 
@@ -661,13 +705,16 @@ class TestWorstCaseBound:
             resp.raise_for_status = MagicMock()
             resp.json.return_value = {
                 "choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}],
-                "usage": {}, "model": "test/model",
+                "usage": {},
+                "model": "test/model",
             }
             return resp
 
         client.llm_client.post = fake_post
-        _run(client.generate_response(
-            messages=[{"role": "user", "content": "hi"}], deadline=dl
-        ))
+        _run(
+            client.generate_response(
+                messages=[{"role": "user", "content": "hi"}], deadline=dl
+            )
+        )
         assert captured_timeout[0] == pytest.approx(5.0, abs=0.1)
         assert captured_timeout[0] < 10.0  # definitely not 240

@@ -40,7 +40,6 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable
 
-
 # ---------------------------------------------------------------------------
 # Exception
 # ---------------------------------------------------------------------------
@@ -51,9 +50,7 @@ class RequestDeadlineExceeded(Exception):
 
     def __init__(self, expired_by_ms: float) -> None:
         self.expired_by_ms = expired_by_ms
-        super().__init__(
-            f"Request deadline exceeded by {expired_by_ms:.1f} ms"
-        )
+        super().__init__(f"Request deadline exceeded by {expired_by_ms:.1f} ms")
 
 
 # ---------------------------------------------------------------------------
@@ -101,9 +98,7 @@ class RequestDeadline:
         Raises ``ValueError`` for non-positive *seconds*.
         """
         if seconds <= 0:
-            raise ValueError(
-                f"timeout must be positive, got {seconds!r}"
-            )
+            raise ValueError(f"timeout must be positive, got {seconds!r}")
         now = clock()
         return cls(started_at=now, deadline_at=now + seconds, _clock=clock)
 

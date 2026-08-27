@@ -54,13 +54,16 @@ class SimulationWaveProvider:
         task_type: str | None = None,
     ) -> list:
         tasks = self._world.tasks_list(
-            zone=zone, status_filter=status_filter, task_type=task_type,
+            zone=zone,
+            status_filter=status_filter,
+            task_type=task_type,
         )
         return [t for t in tasks if t.task_type in _WAVE_TYPES]
 
     async def get_wave(self, request: WaveGetRequest) -> WaveGetResult:
         tasks = self._wave_tasks(
-            zone=request.zone, status_filter=request.status_filter,
+            zone=request.zone,
+            status_filter=request.status_filter,
             task_type=request.task_type,
         )
         zones_active = list({t.zone for t in tasks if t.zone})
@@ -70,14 +73,21 @@ class SimulationWaveProvider:
         return WaveGetResult(
             tasks=[
                 WaveTaskInfo(
-                    task_id=t.task_id, task_type=t.task_type, zone=t.zone,
-                    status=t.status, assigned_to=t.assigned_to,
-                    priority=t.priority, deadline=t.deadline,
+                    task_id=t.task_id,
+                    task_type=t.task_type,
+                    zone=t.zone,
+                    status=t.status,
+                    assigned_to=t.assigned_to,
+                    priority=t.priority,
+                    deadline=t.deadline,
                 )
                 for t in tasks
             ],
-            total_tasks=len(tasks), zones_active=zones_active,
-            summary=summary, wave_id=request.wave_id, source=self._world.SOURCE,
+            total_tasks=len(tasks),
+            zones_active=zones_active,
+            summary=summary,
+            wave_id=request.wave_id,
+            source=self._world.SOURCE,
         )
 
     async def get_wave_risk(self, request: WaveRiskRequest) -> WaveRiskResult:
@@ -88,21 +98,29 @@ class SimulationWaveProvider:
 
         risk_factors: list[WaveRiskFactor] = []
         if at_risk:
-            risk_factors.append(WaveRiskFactor(
-                factor="unassigned_pending_tasks",
-                severity="high" if len(at_risk) > 2 else "medium",
-                detail=f"{len(at_risk)} pending task(s) have no assigned worker",
-            ))
+            risk_factors.append(
+                WaveRiskFactor(
+                    factor="unassigned_pending_tasks",
+                    severity="high" if len(at_risk) > 2 else "medium",
+                    detail=f"{len(at_risk)} pending task(s) have no assigned worker",
+                )
+            )
         if has_deadline:
-            risk_factors.append(WaveRiskFactor(
-                factor="deadline_approaching", severity="high",
-                detail=f"Task(s) have carrier cutoff deadline within {request.cutoff_minutes}min",
-            ))
+            risk_factors.append(
+                WaveRiskFactor(
+                    factor="deadline_approaching",
+                    severity="high",
+                    detail=f"Task(s) have carrier cutoff deadline within {request.cutoff_minutes}min",
+                )
+            )
         if overdue:
-            risk_factors.append(WaveRiskFactor(
-                factor="high_priority_unassigned", severity="critical",
-                detail=f"{len(overdue)} high/critical priority task(s) unassigned",
-            ))
+            risk_factors.append(
+                WaveRiskFactor(
+                    factor="high_priority_unassigned",
+                    severity="critical",
+                    detail=f"{len(overdue)} high/critical priority task(s) unassigned",
+                )
+            )
 
         otif_at_risk = len(at_risk) > 0
         if not otif_at_risk:
@@ -123,10 +141,14 @@ class SimulationWaveProvider:
                 "additional worker(s) to reduce OTIF risk."
             )
         return WaveRiskResult(
-            otif_at_risk=otif_at_risk, risk_level=risk_level,
-            at_risk_task_count=len(at_risk), total_task_count=len(tasks),
-            risk_factors=risk_factors, recommendation=recommendation,
-            wave_id=request.wave_id, source=self._world.SOURCE,
+            otif_at_risk=otif_at_risk,
+            risk_level=risk_level,
+            at_risk_task_count=len(at_risk),
+            total_task_count=len(tasks),
+            risk_factors=risk_factors,
+            recommendation=recommendation,
+            wave_id=request.wave_id,
+            source=self._world.SOURCE,
         )
 
     async def execute_wave_reprioritize(
@@ -165,11 +187,14 @@ class SimulationWaveProvider:
         self._mutation_count += 1
 
         import asyncio
-        asyncio.create_task(self._bus.publish_wave_write(
-            zone=request.zone,
-            new_priority=request.new_priority,
-            tasks_updated=changed,
-        ))
+
+        asyncio.create_task(
+            self._bus.publish_wave_write(
+                zone=request.zone,
+                new_priority=request.new_priority,
+                tasks_updated=changed,
+            )
+        )
 
         # Fault injection: raise AFTER mutation to simulate ambiguous write
         if self._post_mutation_fault is not None:

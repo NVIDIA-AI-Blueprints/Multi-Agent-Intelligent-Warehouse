@@ -32,7 +32,6 @@ from pydantic import BaseModel, Field
 from .actions import ActionProposal
 from .common import CapabilityMetadata
 
-
 # ── Read requests ─────────────────────────────────────────────────────────────
 
 
@@ -50,9 +49,7 @@ class EquipmentStatusRequest(BaseModel):
         default=None,
         description="Filter by equipment type: forklift, amr, agv, scanner, …",
     )
-    zone: str | None = Field(
-        default=None, description="Filter by warehouse zone"
-    )
+    zone: str | None = Field(default=None, description="Filter by warehouse zone")
     status_filter: str | None = Field(
         default=None,
         description="Filter by status: available, assigned, charging, maintenance, …",
@@ -116,7 +113,10 @@ class EquipmentExecuteAssignRequest(BaseModel):
     notes: str | None = Field(default=None)
     proposal_id: str = Field(..., description="Bound proposal identifier for audit")
     decision_id: str = Field(..., description="Bound decision identifier for audit")
-    execution_id: str | None = Field(default=None, description="MAIW execution identity, propagated from BaseActionExecutor")
+    execution_id: str | None = Field(
+        default=None,
+        description="MAIW execution identity, propagated from BaseActionExecutor",
+    )
 
 
 class EquipmentExecuteReleaseRequest(BaseModel):
@@ -127,7 +127,9 @@ class EquipmentExecuteReleaseRequest(BaseModel):
     notes: str | None = Field(default=None)
     proposal_id: str = Field(...)
     decision_id: str = Field(...)
-    execution_id: str | None = Field(default=None, description="MAIW execution identity")
+    execution_id: str | None = Field(
+        default=None, description="MAIW execution identity"
+    )
 
 
 class EquipmentExecuteMaintenanceRequest(BaseModel):
@@ -142,7 +144,9 @@ class EquipmentExecuteMaintenanceRequest(BaseModel):
     priority: str = Field(default="medium")
     proposal_id: str = Field(...)
     decision_id: str = Field(...)
-    execution_id: str | None = Field(default=None, description="MAIW execution identity")
+    execution_id: str | None = Field(
+        default=None, description="MAIW execution identity"
+    )
 
 
 # ── Result fragments ───────────────────────────────────────────────────────────
@@ -152,10 +156,14 @@ class EquipmentAssetInfo(BaseModel):
     """Status snapshot of a single equipment asset."""
 
     asset_id: str
-    equipment_type: str = Field(description="Asset type: forklift, amr, agv, scanner, …")
+    equipment_type: str = Field(
+        description="Asset type: forklift, amr, agv, scanner, …"
+    )
     model: str
     zone: str
-    status: str = Field(description="available | assigned | charging | maintenance | offline")
+    status: str = Field(
+        description="available | assigned | charging | maintenance | offline"
+    )
     owner_user: str | None = Field(default=None, description="Currently assigned user")
     next_pm_due: datetime | None = Field(
         default=None, description="Next scheduled preventive maintenance"
@@ -198,9 +206,7 @@ class EquipmentStatusResult(BaseModel):
         description="summary[equipment_type][status] = count",
     )
     total_count: int = Field(ge=0)
-    source: str = Field(
-        description="Backend identifier: 'maiw-backend', 'mock', …"
-    )
+    source: str = Field(description="Backend identifier: 'maiw-backend', 'mock', …")
 
 
 class EquipmentTelemetryResult(BaseModel):

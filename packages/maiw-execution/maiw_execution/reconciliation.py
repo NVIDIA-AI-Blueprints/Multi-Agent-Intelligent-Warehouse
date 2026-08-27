@@ -111,9 +111,7 @@ class ReconciliationRecord:
 
     reconciliation_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     outcome: ReconciliationOutcome = ReconciliationOutcome.INDETERMINATE
-    reconciled_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    reconciled_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     evidence: dict = field(default_factory=dict)
     trace_id: str | None = None
     error: str | None = None
@@ -243,6 +241,7 @@ class ReconciliationService:
         # Deadline guard — reject before any MCP read call
         if deadline is not None and deadline.expired:
             from maiw_mcp.deadline import RequestDeadlineExceeded  # noqa: PLC0415
+
             over_ms = (deadline._clock() - deadline.deadline_at) * 1000.0  # type: ignore[operator]
             raise RequestDeadlineExceeded(expired_by_ms=over_ms)
 
@@ -277,7 +276,11 @@ class ReconciliationService:
             )
             return ReconciliationRecord(
                 outcome=ReconciliationOutcome.INDETERMINATE,
-                evidence={"reason": "check_failed", "partial_state": current_state, "error": str(exc)},
+                evidence={
+                    "reason": "check_failed",
+                    "partial_state": current_state,
+                    "error": str(exc),
+                },
                 trace_id=trace_id,
                 error=str(exc),
             )

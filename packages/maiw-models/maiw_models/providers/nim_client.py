@@ -46,11 +46,13 @@ def _getenv_int(key: str, default: int) -> int:
     """Safely get integer from environment variable, stripping comments."""
     value = os.getenv(key, str(default))
     # Strip comments (everything after #) and whitespace
-    value = value.split('#')[0].strip()
+    value = value.split("#")[0].strip()
     try:
         return int(value)
     except ValueError:
-        logger.warning(f"Invalid integer value for {key}: '{value}', using default {default}")
+        logger.warning(
+            f"Invalid integer value for {key}: '{value}', using default {default}"
+        )
         return default
 
 
@@ -58,11 +60,13 @@ def _getenv_float(key: str, default: float) -> float:
     """Safely get float from environment variable, stripping comments."""
     value = os.getenv(key, str(default))
     # Strip comments (everything after #) and whitespace
-    value = value.split('#')[0].strip()
+    value = value.split("#")[0].strip()
     try:
         return float(value)
     except ValueError:
-        logger.warning(f"Invalid float value for {key}: '{value}', using default {default}")
+        logger.warning(
+            f"Invalid float value for {key}: '{value}', using default {default}"
+        )
         return default
 
 
@@ -76,7 +80,9 @@ def _getenv_bool(key: str, default: bool) -> bool:
         return True
     if value in {"0", "false", "no", "off"}:
         return False
-    logger.warning(f"Invalid boolean value for {key}: '{value}', using default {default}")
+    logger.warning(
+        f"Invalid boolean value for {key}: '{value}', using default {default}"
+    )
     return default
 
 
@@ -88,7 +94,10 @@ def _ensure_no_think_system_prompt(
     for message in updated_messages:
         if message.get("role") == "system":
             content = message.get("content") or ""
-            if "/no_think" not in content and "detailed thinking off" not in content.lower():
+            if (
+                "/no_think" not in content
+                and "detailed thinking off" not in content.lower()
+            ):
                 message["content"] = f"/no_think\n{content}".strip()
             break
     else:
@@ -102,13 +111,19 @@ class NIMConfig:
 
     llm_api_key: str = os.getenv("NVIDIA_API_KEY", "")
     llm_base_url: str = os.getenv("LLM_NIM_URL", "https://integrate.api.nvidia.com/v1")
-    embedding_api_key: str = os.getenv("EMBEDDING_API_KEY") or os.getenv("NVIDIA_API_KEY", "")
+    embedding_api_key: str = os.getenv("EMBEDDING_API_KEY") or os.getenv(
+        "NVIDIA_API_KEY", ""
+    )
     embedding_base_url: str = os.getenv(
         "EMBEDDING_NIM_URL", "https://integrate.api.nvidia.com/v1"
     )
     llm_model: str = os.getenv("LLM_MODEL", "nvidia/nemotron-3-super-120b-a12b")
-    embedding_model: str = os.getenv("EMBEDDING_MODEL", "nvidia/llama-nemotron-embed-vl-1b-v2")
-    timeout: int = _getenv_int("LLM_CLIENT_TIMEOUT", 240)  # 240s code default (doubled) to prevent premature timeouts
+    embedding_model: str = os.getenv(
+        "EMBEDDING_MODEL", "nvidia/llama-nemotron-embed-vl-1b-v2"
+    )
+    timeout: int = _getenv_int(
+        "LLM_CLIENT_TIMEOUT", 240
+    )  # 240s code default (doubled) to prevent premature timeouts
     # LLM generation parameters (configurable via environment variables)
     default_temperature: float = _getenv_float("LLM_TEMPERATURE", 0.1)
     default_max_tokens: int = _getenv_int("LLM_MAX_TOKENS", 2000)
@@ -119,7 +134,9 @@ class NIMConfig:
     default_enable_thinking: bool = _getenv_bool("LLM_ENABLE_THINKING", False)
 
 
-def _extract_message_content(message: Dict[str, Any], allow_reasoning_fallback: bool = False) -> str:
+def _extract_message_content(
+    message: Dict[str, Any], allow_reasoning_fallback: bool = False
+) -> str:
     """Extract assistant text from NIM chat completion message payloads."""
     content = message.get("content")
     if content:
@@ -162,17 +179,22 @@ class NIMClient:
     warehouse operational intelligence.
     """
 
-    def __init__(self, config: Optional[NIMConfig] = None, enable_cache: bool = True, cache_ttl: int = 300):
+    def __init__(
+        self,
+        config: Optional[NIMConfig] = None,
+        enable_cache: bool = True,
+        cache_ttl: int = 300,
+    ):
         self.config = config or NIMConfig()
         self.enable_cache = enable_cache
         self.cache_ttl = cache_ttl  # Default 5 minutes
         self._response_cache: Dict[str, Dict[str, Any]] = {}
         self._cache_lock = asyncio.Lock()
         self._cache_stats = {"hits": 0, "misses": 0}
-        
+
         # Validate configuration
         self._validate_config()
-        
+
         self.llm_client = httpx.AsyncClient(
             base_url=self.config.llm_base_url,
             timeout=self.config.timeout,
@@ -189,7 +211,7 @@ class NIMClient:
                 "Content-Type": "application/json",
             },
         )
-    
+
     def _validate_config(self) -> None:
         """Validate NIM configuration and log warnings for common issues."""
         # Check for common misconfigurations
@@ -197,7 +219,7 @@ class NIMClient:
             logger.warning(
                 "NVIDIA_API_KEY is not set or is empty. LLM requests will fail with authentication errors."
             )
-        
+
         # Validate URL format using urlparse to avoid SonarQube warnings
         parsed_url = urlparse(self.config.llm_base_url)
         if parsed_url.scheme not in ("http", "https"):
@@ -205,7 +227,7 @@ class NIMClient:
                 f"Invalid LLM_NIM_URL format: {self.config.llm_base_url}\n"
                 f"   URL must use http:// or https:// scheme"
             )
-        
+
         # Security: HTTP protocol is only acceptable for localhost/development environments
         # For production deployments, HTTPS must be used to encrypt API communications
         # This check is acceptable for:
@@ -213,16 +235,16 @@ class NIMClient:
         # - Internal network services in trusted environments
         # Production external services must use HTTPS
         if parsed_url.scheme == "http" and not (
-            "localhost" in parsed_url.netloc or 
-            "127.0.0.1" in parsed_url.netloc or
-            "0.0.0.0" in parsed_url.netloc
+            "localhost" in parsed_url.netloc
+            or "127.0.0.1" in parsed_url.netloc
+            or "0.0.0.0" in parsed_url.netloc
         ):
             logger.warning(
                 f"⚠️  SECURITY WARNING: LLM_NIM_URL uses HTTP protocol (insecure). "
                 f"Use HTTPS for production deployments to encrypt API communications. "
                 f"HTTP is only acceptable for localhost/development environments."
             )
-        
+
         # Log configuration (without exposing API key)
         # Default: https://integrate.api.nvidia.com/v1 (NVIDIA public cloud)
         logger.info(
@@ -235,18 +257,26 @@ class NIMClient:
     def _normalize_content_for_cache(self, content: str) -> str:
         """Normalize content to improve cache hit rates by removing variable data."""
         import re
+
         # Remove timestamps (various formats)
-        content = re.sub(r'\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2}[.\d]*Z?', '', content)
+        content = re.sub(
+            r"\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2}[.\d]*Z?", "", content
+        )
         # Remove task IDs and similar patterns (e.g., TASK_PICK_20251207_121327)
-        content = re.sub(r'TASK_[A-Z_]+_\d{8}_\d{6}', 'TASK_ID', content)
+        content = re.sub(r"TASK_[A-Z_]+_\d{8}_\d{6}", "TASK_ID", content)
         # Remove UUIDs
-        content = re.sub(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', 'UUID', content, flags=re.IGNORECASE)
+        content = re.sub(
+            r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+            "UUID",
+            content,
+            flags=re.IGNORECASE,
+        )
         # Remove specific dates in various formats
-        content = re.sub(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', 'DATE', content)
+        content = re.sub(r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b", "DATE", content)
         # Normalize whitespace
-        content = ' '.join(content.split())
+        content = " ".join(content.split())
         return content.strip()
-    
+
     def _generate_cache_key(
         self,
         messages: List[Dict[str, str]],
@@ -265,78 +295,85 @@ class NIMClient:
             content = msg.get("content", "").strip()
             # Normalize content to remove variable data (timestamps, IDs, etc.)
             normalized_content = self._normalize_content_for_cache(content)
-            
-            normalized_messages.append({
-                "role": msg.get("role", "user"),
-                "content": normalized_content
-            })
-        
+
+            normalized_messages.append(
+                {"role": msg.get("role", "user"), "content": normalized_content}
+            )
+
         # Create cache key from normalized parameters
         # Only include parameters that affect the response
         cache_data = {
             "messages": normalized_messages,
-            "temperature": round(temperature, 2),  # Round to avoid float precision issues
+            "temperature": round(
+                temperature, 2
+            ),  # Round to avoid float precision issues
             "max_tokens": max_tokens,
             "top_p": round(top_p, 2),
             "frequency_penalty": round(frequency_penalty, 2),
             "presence_penalty": round(presence_penalty, 2),
             "model": self.config.llm_model,
         }
-        
+
         cache_string = json.dumps(cache_data, sort_keys=True)
         cache_key = hashlib.sha256(cache_string.encode()).hexdigest()
         return cache_key
-    
+
     async def _get_cached_response(self, cache_key: str) -> Optional[LLMResponse]:
         """Get cached response if available and not expired."""
         if not self.enable_cache:
             return None
-        
+
         async with self._cache_lock:
             if cache_key not in self._response_cache:
                 return None
-            
+
             cached_item = self._response_cache[cache_key]
             expires_at = cached_item.get("expires_at")
-            
+
             # Check if expired
             if expires_at and datetime.now(timezone.utc) > expires_at:
                 del self._response_cache[cache_key]
                 logger.debug(f"Cache entry expired for key: {cache_key[:16]}...")
                 return None
-            
+
             self._cache_stats["hits"] += 1
             logger.info(f"✅ Cache hit for LLM request (key: {cache_key[:16]}...)")
             return cached_item.get("response")
-    
+
     async def _cache_response(self, cache_key: str, response: LLMResponse) -> None:
         """Cache LLM response."""
         if not self.enable_cache:
             return
-        
+
         async with self._cache_lock:
             now = datetime.now(timezone.utc)
             expires_at = now + timedelta(seconds=self.cache_ttl)
-            
+
             self._response_cache[cache_key] = {
                 "response": response,
                 "expires_at": expires_at,
                 "cached_at": now,
             }
-            
-            logger.debug(f"Cached LLM response (key: {cache_key[:16]}..., TTL: {self.cache_ttl}s)")
-    
+
+            logger.debug(
+                f"Cached LLM response (key: {cache_key[:16]}..., TTL: {self.cache_ttl}s)"
+            )
+
     async def clear_cache(self) -> None:
         """Clear all cached responses."""
         async with self._cache_lock:
             self._response_cache.clear()
             logger.info("LLM response cache cleared")
-    
+
     def get_cache_stats(self) -> Dict[str, Any]:
         """Get cache statistics."""
         total_requests = self._cache_stats["hits"] + self._cache_stats["misses"]
-        hit_rate = (self._cache_stats["hits"] / total_requests * 100) if total_requests > 0 else 0
-        
+        hit_rate = (
+            (self._cache_stats["hits"] / total_requests * 100)
+            if total_requests > 0
+            else 0
+        )
+
         return {
             "hits": self._cache_stats["hits"],
             "misses": self._cache_stats["misses"],
@@ -345,7 +382,7 @@ class NIMClient:
             "cached_entries": len(self._response_cache),
             "cache_enabled": self.enable_cache,
         }
-    
+
     async def close(self):
         """Close HTTP clients."""
         await self.llm_client.aclose()
@@ -383,23 +420,40 @@ class NIMClient:
             LLMResponse with generated content
         """
         # Use config defaults if parameters are not provided
-        temperature = temperature if temperature is not None else self.config.default_temperature
-        max_tokens = max_tokens if max_tokens is not None else self.config.default_max_tokens
+        temperature = (
+            temperature if temperature is not None else self.config.default_temperature
+        )
+        max_tokens = (
+            max_tokens if max_tokens is not None else self.config.default_max_tokens
+        )
         top_p = top_p if top_p is not None else self.config.default_top_p
-        frequency_penalty = frequency_penalty if frequency_penalty is not None else self.config.default_frequency_penalty
-        presence_penalty = presence_penalty if presence_penalty is not None else self.config.default_presence_penalty
-        
+        frequency_penalty = (
+            frequency_penalty
+            if frequency_penalty is not None
+            else self.config.default_frequency_penalty
+        )
+        presence_penalty = (
+            presence_penalty
+            if presence_penalty is not None
+            else self.config.default_presence_penalty
+        )
+
         # Check cache first (skip for streaming)
         if not stream and self.enable_cache:
             cache_key = self._generate_cache_key(
-                messages, temperature, max_tokens, top_p, frequency_penalty, presence_penalty
+                messages,
+                temperature,
+                max_tokens,
+                top_p,
+                frequency_penalty,
+                presence_penalty,
             )
             cached_response = await self._get_cached_response(cache_key)
             if cached_response:
                 return cached_response
             else:
                 self._cache_stats["misses"] += 1
-        
+
         resolved_enable_thinking = (
             self.config.default_enable_thinking
             if enable_thinking is None
@@ -417,7 +471,7 @@ class NIMClient:
             "max_tokens": max_tokens,
             "stream": stream,
         }
-        
+
         # Add optional parameters if they differ from defaults
         # Use math.isclose() for floating point comparisons to avoid precision issues
         if not math.isclose(top_p, 1.0, rel_tol=1e-09, abs_tol=1e-09):
@@ -449,7 +503,9 @@ class NIMClient:
                 except RequestDeadlineExceeded:
                     logger.warning(
                         "retry_suppressed_deadline: deadline expired before "
-                        "LLM attempt %d/%d", attempt + 1, max_retries,
+                        "LLM attempt %d/%d",
+                        attempt + 1,
+                        max_retries,
                     )
                     raise
 
@@ -458,7 +514,9 @@ class NIMClient:
                 post_kwargs: Dict[str, Any] = {"json": payload}
                 if attempt_timeout is not None:
                     post_kwargs["timeout"] = attempt_timeout
-                response = await self.llm_client.post("/chat/completions", **post_kwargs)
+                response = await self.llm_client.post(
+                    "/chat/completions", **post_kwargs
+                )
                 response.raise_for_status()
 
                 data = response.json()
@@ -470,14 +528,19 @@ class NIMClient:
                     model=data.get("model", self.config.llm_model),
                     finish_reason=data["choices"][0].get("finish_reason", "stop"),
                 )
-                
+
                 # Cache the response (skip for streaming)
                 if not stream and self.enable_cache:
                     cache_key = self._generate_cache_key(
-                        messages, temperature, max_tokens, top_p, frequency_penalty, presence_penalty
+                        messages,
+                        temperature,
+                        max_tokens,
+                        top_p,
+                        frequency_penalty,
+                        presence_penalty,
                     )
                     await self._cache_response(cache_key, llm_response)
-                
+
                 return llm_response
 
             except (httpx.TimeoutException, asyncio.TimeoutError) as e:
@@ -496,7 +559,9 @@ class NIMClient:
                             logger.warning(
                                 "retry_suppressed_deadline: %.3fs remaining < %ss "
                                 "backoff after timeout on attempt %d",
-                                remaining, wait_time, attempt + 1,
+                                remaining,
+                                wait_time,
+                                attempt + 1,
                             )
                             raise
                     logger.info(f"Retrying in {wait_time} seconds...")
@@ -510,12 +575,12 @@ class NIMClient:
                 last_exception = e
                 status_code = e.response.status_code
                 error_detail = str(e)
-                
+
                 # Log detailed error information
                 logger.warning(
                     f"LLM generation attempt {attempt + 1} failed: HTTP {status_code} - {error_detail}"
                 )
-                
+
                 # Don't retry on client errors (4xx) except 429 (rate limit)
                 if status_code == 404:
                     logger.error(
@@ -544,7 +609,9 @@ class NIMClient:
                                 logger.warning(
                                     "retry_suppressed_deadline: %.3fs remaining < %ss "
                                     "backoff after 429 on attempt %d",
-                                    remaining, wait_time, attempt + 1,
+                                    remaining,
+                                    wait_time,
+                                    attempt + 1,
                                 )
                                 raise ConnectionError(
                                     "LLM service is currently rate-limited. Please try again in a moment."
@@ -552,7 +619,9 @@ class NIMClient:
                         logger.info(f"Rate limited. Retrying in {wait_time} seconds...")
                         await asyncio.sleep(wait_time)
                     else:
-                        logger.error(f"LLM generation failed after {max_retries} attempts due to rate limiting")
+                        logger.error(
+                            f"LLM generation failed after {max_retries} attempts due to rate limiting"
+                        )
                         raise ConnectionError(
                             "LLM service is currently rate-limited. Please try again in a moment."
                         ) from e
@@ -572,21 +641,30 @@ class NIMClient:
                                 logger.warning(
                                     "retry_suppressed_deadline: %.3fs remaining < %ss "
                                     "backoff after HTTP %d on attempt %d",
-                                    remaining, wait_time, status_code, attempt + 1,
+                                    remaining,
+                                    wait_time,
+                                    status_code,
+                                    attempt + 1,
                                 )
                                 raise ConnectionError(
                                     "LLM service is temporarily unavailable. Please try again later."
                                 ) from e
-                        logger.info(f"Server error ({status_code}). Retrying in {wait_time} seconds...")
+                        logger.info(
+                            f"Server error ({status_code}). Retrying in {wait_time} seconds..."
+                        )
                         await asyncio.sleep(wait_time)
                     else:
-                        logger.error(f"LLM generation failed after {max_retries} attempts: {error_detail}")
+                        logger.error(
+                            f"LLM generation failed after {max_retries} attempts: {error_detail}"
+                        )
                         raise ConnectionError(
                             "LLM service is temporarily unavailable. Please try again later."
                         ) from e
             except httpx.RequestError as e:
                 last_exception = e
-                logger.warning(f"LLM generation attempt {attempt + 1} failed: Request error - {e}")
+                logger.warning(
+                    f"LLM generation attempt {attempt + 1} failed: Request error - {e}"
+                )
                 if attempt < max_retries - 1:
                     wait_time = 2**attempt
                     if deadline is not None:
@@ -595,7 +673,9 @@ class NIMClient:
                             logger.warning(
                                 "retry_suppressed_deadline: %.3fs remaining < %ss "
                                 "backoff after request error on attempt %d",
-                                remaining, wait_time, attempt + 1,
+                                remaining,
+                                wait_time,
+                                attempt + 1,
                             )
                             raise ConnectionError(
                                 "Unable to connect to LLM service. Please check your network connection and service configuration."
@@ -622,7 +702,9 @@ class NIMClient:
                             logger.warning(
                                 "retry_suppressed_deadline: %.3fs remaining < %ss "
                                 "backoff after error on attempt %d",
-                                remaining, wait_time, attempt + 1,
+                                remaining,
+                                wait_time,
+                                attempt + 1,
                             )
                             raise ConnectionError(
                                 "LLM service error occurred. Please try again or contact support if the issue persists."
@@ -721,8 +803,12 @@ async def get_nim_client(enable_cache: bool = True, cache_ttl: int = 300) -> NIM
         # Enable caching by default for better performance
         cache_enabled = os.getenv("LLM_CACHE_ENABLED", "true").lower() == "true"
         cache_ttl_seconds = _getenv_int("LLM_CACHE_TTL_SECONDS", cache_ttl)
-        _nim_client = NIMClient(enable_cache=cache_enabled and enable_cache, cache_ttl=cache_ttl_seconds)
-        logger.info(f"NIM Client initialized with caching: {cache_enabled and enable_cache} (TTL: {cache_ttl_seconds}s)")
+        _nim_client = NIMClient(
+            enable_cache=cache_enabled and enable_cache, cache_ttl=cache_ttl_seconds
+        )
+        logger.info(
+            f"NIM Client initialized with caching: {cache_enabled and enable_cache} (TTL: {cache_ttl_seconds}s)"
+        )
     return _nim_client
 
 
