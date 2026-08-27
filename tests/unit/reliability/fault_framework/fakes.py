@@ -18,7 +18,7 @@ from maiw_execution.base import (
     BaseActionExecutor,
     ActionExecutionResult,
 )
-from maiw_execution.outcome import AmbiguousWriteError, ExecutionOutcome
+from maiw_execution.outcome import ExecutionOutcome
 from maiw_execution.registry import ExecutionRegistry
 
 # ---------------------------------------------------------------------------
