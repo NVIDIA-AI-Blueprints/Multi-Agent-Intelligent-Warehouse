@@ -10,6 +10,7 @@ import ScenarioSelector from '../components/demo/ScenarioSelector';
 import LifecycleRail from '../components/demo/LifecycleRail';
 import OperationalContextStrip from '../components/demo/OperationalContextStrip';
 import StageContentPane from '../components/demo/StageContentPane';
+import ReliabilityPanel from '../components/demo/reliability/ReliabilityPanel';
 
 const WAREHOUSE_ID = process.env.REACT_APP_WAREHOUSE_ID || 'DC-47';
 
@@ -429,11 +430,16 @@ export default function DemoShell() {
         )}
 
         {scenarioActive && mode === 'reliability' && (
-          <Box sx={{ p: 3 }}>
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.72rem', color: '#484F58' }}>
-              Reliability demo mode — Phase 12F.
-            </Typography>
-          </Box>
+          <>
+            <ScenarioHeader
+              displayName={displayName}
+              elapsedSeconds={elapsedSeconds}
+              onReset={handleReset}
+              onPause={handlePause}
+              isPaused={isPaused}
+            />
+            <ReliabilityPanel sseEvents={sseState.events} runtime={runtime} />
+          </>
         )}
 
         {/* Expert overlay */}

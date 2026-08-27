@@ -212,6 +212,17 @@ async function rejectPending(pending_id: string, approved_by: string = 'operator
   return r.data;
 }
 
+// ── Reconciliation ────────────────────────────────────────────────────────────
+
+async function reconcile(
+  execution_id: string,
+  domain: string,
+  trace_id?: string,
+): Promise<any> {
+  const r = await http.post('/demo/reconcile', { execution_id, domain, trace_id });
+  return r.data;
+}
+
 // ── Counterfactual ────────────────────────────────────────────────────────────
 
 export interface CounterfactualKPI {
@@ -309,5 +320,6 @@ export const demoAPI = {
   analyze,
   approvePending,
   rejectPending,
+  reconcile,
   getCounterfactualResult,
 };
