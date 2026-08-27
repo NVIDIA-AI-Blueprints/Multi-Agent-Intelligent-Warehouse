@@ -5,10 +5,11 @@ import { useDemoStatus } from '../hooks/useDemoStatus';
 import { useRuntimeStatus } from '../hooks/useRuntimeStatus';
 import { useDemoSSE } from '../hooks/useDemoSSE';
 import { useDemoLifecycle } from '../hooks/useDemoLifecycle';
-import { demoAPI } from '../services/demoAPI';
+import { demoAPI, AnalysisResult } from '../services/demoAPI';
 import ScenarioSelector from '../components/demo/ScenarioSelector';
 import LifecycleRail from '../components/demo/LifecycleRail';
 import OperationalContextStrip from '../components/demo/OperationalContextStrip';
+import StageContentPane from '../components/demo/StageContentPane';
 
 const WAREHOUSE_ID = process.env.REACT_APP_WAREHOUSE_ID || 'DC-47';
 
@@ -203,31 +204,6 @@ function ScenarioHeader({
   );
 }
 
-// ── Stage workspace placeholder (replaced per-stage in 12C) ───────────────────
-
-function StageWorkspace({ currentStage }: { currentStage: string }) {
-  return (
-    <Box
-      data-testid="stage-workspace"
-      sx={{
-        flexGrow: 1, display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center', gap: 1,
-        py: 4,
-      }}
-    >
-      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.72rem', color: '#484F58' }}>
-        Current stage:{' '}
-        <Box component="span" sx={{ color: '#C9D1D9', fontWeight: 700 }}>
-          {currentStage}
-        </Box>
-      </Typography>
-      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#30363D' }}>
-        Stage details arrive in Phase 12C.
-      </Typography>
-    </Box>
-  );
-}
-
 // ── Expert panel (12G will expand this) ───────────────────────────────────────
 
 function ExpertPanel({ runtime, demoStatus }: { runtime: any; demoStatus: any }) {
@@ -286,6 +262,8 @@ export default function DemoShell() {
   // showSelector overrides demoStatus.active — set true on reset so ScenarioSelector
   // appears immediately without waiting for the status poll to confirm active:false.
   const [showSelector, setShowSelector] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
   const queryClient = useQueryClient();
 
   const { status: demoStatus, isLoading: demoLoading } = useDemoStatus();
@@ -324,9 +302,23 @@ export default function DemoShell() {
   const handleReset = useCallback(async () => {
     setShowSelector(true);       // show selector immediately
     sseState.clear();            // wipe SSE buffer so no stale events leak
+    setAnalysisResult(null);     // clear pipeline result from previous run
+    setAnalyzing(false);
     await demoAPI.resetScenario();
     await queryClient.invalidateQueries({ queryKey: ['demo-status'] });
   }, [queryClient, sseState]);
+
+  const handleAnalyze = useCallback(async () => {
+    if (analyzing) return;
+    setAnalyzing(true);
+    try {
+      const result = await demoAPI.analyze();
+      setAnalysisResult(result);
+      await queryClient.invalidateQueries({ queryKey: ['demo-status'] });
+    } finally {
+      setAnalyzing(false);
+    }
+  }, [analyzing, queryClient]);
 
   const handlePause = useCallback(async () => {
     if (demoStatus?.paused) {
@@ -422,8 +414,16 @@ export default function DemoShell() {
             {/* Persistent operational context — driven by current_kpis */}
             <OperationalContextStrip kpis={demoStatus?.current_kpis ?? null} />
 
-            {/* Stage workspace — Phase 12C will populate */}
-            <StageWorkspace currentStage={currentStage} />
+            {/* Stage content — SSE-driven per-stage narrative */}
+            <StageContentPane
+              currentStage={currentStage}
+              sseEvents={sseState.events}
+              demoStatus={demoStatus}
+              analysisResult={analysisResult}
+              pendingApprovals={pendingApprovals}
+              analyzing={analyzing}
+              onAnalyze={handleAnalyze}
+            />
           </>
         )}
 

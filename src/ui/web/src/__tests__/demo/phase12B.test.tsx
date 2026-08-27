@@ -415,7 +415,7 @@ describe('DemoShell — scenario routing', () => {
     expect(screen.getByTestId('kpi-wave-risk')).toHaveTextContent('CRITICAL');
   });
 
-  it('shows stage workspace placeholder when scenario is active', () => {
+  it('shows stage content pane when scenario is active', () => {
     renderShell({
       active: true,
       paused: false,
@@ -425,7 +425,9 @@ describe('DemoShell — scenario routing', () => {
       kpi_history: [],
       pending_approvals: [],
     });
-    expect(screen.getByTestId('stage-workspace')).toBeInTheDocument();
+    // Phase 12C: StageWorkspace replaced by StageContentPane
+    expect(screen.getByTestId('stage-content-pane')).toBeInTheDocument();
+    expect(screen.queryByTestId('stage-workspace')).not.toBeInTheDocument();
   });
 
   it('reset returns to ScenarioSelector and clears lifecycle state', async () => {
