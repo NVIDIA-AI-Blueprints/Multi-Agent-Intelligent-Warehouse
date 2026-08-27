@@ -854,25 +854,60 @@ MAIW_MCP_TRANSPORT=streamable-http MAIW_MCP_WAVE_PORT=8768 \
 ### Prerequisites
 
 - Python 3.11+
-- PostgreSQL 14+ (or Docker)
+- Node.js 18.17+ (20.x LTS recommended)
 - NVIDIA API key — get one at [build.nvidia.com](https://build.nvidia.com/)
-- [uv](https://docs.astral.sh/uv/) (recommended) or pip
+- PostgreSQL 14+ only required for full-stack mode (not needed for demo mode)
 
-### Install
+### Demo mode (no database required)
+
+Demo mode uses synthetic simulation providers. No PostgreSQL, Redis, Kafka, or
+MCP servers are needed. **This is the recommended starting point.**
 
 ```bash
 git clone https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse.git
 cd Multi-Agent-Intelligent-Warehouse
 
-# Install all workspace packages in editable mode
+# 1. Set up Python environment and install all workspace packages
+python3 -m venv env && source env/bin/activate
+./scripts/install_packages.sh
+
+# 2. Configure (set NVIDIA_API_KEY at minimum)
+cp .env.example .env
+# Edit .env → set NVIDIA_API_KEY=nvapi-...
+
+# 3. Verify the environment is ready
+./scripts/check_demo_environment.sh
+
+# 4. Start the API in demo mode (terminal 1)
+./scripts/start_demo_mode.sh
+
+# 5. Install and start the frontend (terminal 2)
+cd src/ui/web
+cp .env.example .env
+npm install && npm start
+```
+
+Open http://localhost:3001, navigate to the **COMMAND** tab, select
+**Labor Constraint + Wave Risk** (recommended first scenario), and click **START**.
+
+See [docs/demo/DEMO_RUNBOOK.md](docs/demo/DEMO_RUNBOOK.md) for the full walkthrough.
+
+### Install all workspace packages (pip)
+
+```bash
+# One-liner — installs requirements.txt then all 8 editable packages:
+./scripts/install_packages.sh
+
+# Or manually:
 pip install -r requirements.txt
-pip install -e packages/maiw-models
-pip install -e packages/maiw-mcp
-pip install -e packages/maiw-state
-pip install -e packages/maiw-skills
-pip install -e packages/maiw-decision
-pip install -e packages/maiw-execution
-pip install -e packages/maiw-agents
+pip install -e packages/maiw-models \
+            -e packages/maiw-mcp \
+            -e packages/maiw-state \
+            -e packages/maiw-skills \
+            -e packages/maiw-decision \
+            -e packages/maiw-execution \
+            -e packages/maiw-agents \
+            -e apps/api
 ```
 
 Or with uv (workspace-aware):
