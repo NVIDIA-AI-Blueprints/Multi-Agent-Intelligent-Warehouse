@@ -423,6 +423,7 @@ export default function DemoShell() {
               pendingApprovals={pendingApprovals}
               analyzing={analyzing}
               onAnalyze={handleAnalyze}
+              onReset={handleReset}
             />
           </>
         )}

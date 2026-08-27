@@ -1,8 +1,8 @@
 /**
  * StageContentPane — routes to the active stage's detail component.
  *
- * OBSERVE / REASON / PROPOSE / DECIDE have full implementations (Phase 12C).
- * APPROVE / EXECUTE / OUTCOME are placeholders until 12D / 12E.
+ * OBSERVE / REASON / PROPOSE / DECIDE / APPROVE — complete (Phases 12C–12D).
+ * EXECUTE / OUTCOME — complete (Phase 12E).
  */
 
 import React from 'react';
@@ -16,6 +16,8 @@ import ReasonStage   from './stages/ReasonStage';
 import ProposeStage  from './stages/ProposeStage';
 import DecideStage   from './stages/DecideStage';
 import ApproveStage  from './stages/ApproveStage';
+import ExecuteStage  from './stages/ExecuteStage';
+import OutcomeStage  from './stages/OutcomeStage';
 
 // ── Shared utilities exported for stage components ─────────────────────────────
 
@@ -181,6 +183,7 @@ export interface StageContentPaneProps {
   pendingApprovals: PendingApproval[];
   analyzing: boolean;
   onAnalyze: () => Promise<void>;
+  onReset?: () => void;
 }
 
 // ── Router ─────────────────────────────────────────────────────────────────────
@@ -204,9 +207,9 @@ export default function StageContentPane(props: StageContentPaneProps) {
         {currentStage === 'REASON'   && <ReasonStage   {...props} />}
         {currentStage === 'PROPOSE'  && <ProposeStage  {...props} />}
         {currentStage === 'DECIDE'   && <DecideStage   {...props} />}
-        {currentStage === 'APPROVE'  && <ApproveStage   {...props} />}
-        {currentStage === 'EXECUTE'  && <ComingSoonPane stage="EXECUTE" phase="Phase 12E" />}
-        {currentStage === 'OUTCOME'  && <ComingSoonPane stage="OUTCOME" phase="Phase 12E" />}
+        {currentStage === 'APPROVE'  && <ApproveStage  {...props} />}
+        {currentStage === 'EXECUTE'  && <ExecuteStage  {...props} />}
+        {currentStage === 'OUTCOME'  && <OutcomeStage  {...props} />}
       </Box>
     </Box>
   );

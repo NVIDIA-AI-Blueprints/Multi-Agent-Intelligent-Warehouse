@@ -290,9 +290,9 @@ describe('StageContentPane — stage routing', () => {
     expect(screen.queryByTestId('observe-stage')).not.toBeInTheDocument();
   });
 
-  it('renders coming-soon placeholder for OUTCOME (Phase 12E)', () => {
+  it('renders outcome-stage for OUTCOME (Phase 12E complete)', () => {
     wrap(<StageContentPane {...makeProps({ currentStage: 'OUTCOME' })} />);
-    expect(screen.getByText(/Phase 12E/i)).toBeInTheDocument();
+    expect(screen.getByTestId('outcome-stage')).toBeInTheDocument();
   });
 
   it('renders stage-content-pane testid on root', () => {
