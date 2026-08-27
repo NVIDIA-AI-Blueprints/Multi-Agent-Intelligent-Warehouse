@@ -99,7 +99,7 @@ class RequestDeadline:
         """
         if seconds <= 0:
             raise ValueError(f"timeout must be positive, got {seconds!r}")
-        now = clock()
+        now = clock()  # skipcq: PYL-E1102
         return cls(started_at=now, deadline_at=now + seconds, _clock=clock)
 
     @classmethod
@@ -109,7 +109,7 @@ class RequestDeadline:
         clock: Callable[[], float] = time.monotonic,
     ) -> "RequestDeadline":
         """Create a deadline with no expiry (useful for tests and CLI paths)."""
-        return cls(started_at=clock(), deadline_at=None, _clock=clock)
+        return cls(started_at=clock(), deadline_at=None, _clock=clock)  # skipcq: PYL-E1102
 
     # ------------------------------------------------------------------
     # Derived properties — all computed against live clock
