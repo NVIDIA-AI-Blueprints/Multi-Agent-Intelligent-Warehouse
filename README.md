@@ -520,6 +520,181 @@ as a structured body (`status: "unknown"`) for operator reconciliation.
 
 ---
 
+#### Circuit Breakers and Graceful Degradation (Phase 10E Batch 5)
+
+Each MCP domain (equipment, labor, wave, inventory) and the NIM provider have independent
+circuit breakers. An outage in one domain cannot cascade to others.
+
+```
+DomainCircuitRegistry
+    ├── equipment  CircuitBreaker (CLOSED → OPEN → HALF_OPEN → CLOSED)
+    ├── labor      CircuitBreaker
+    ├── wave       CircuitBreaker
+    └── inventory  CircuitBreaker
+
+ModelGateway
+    └── nim_circuit  CircuitBreaker
+```
+
+**Circuit states:**
+
+| State | Behaviour |
+|-------|-----------|
+| `CLOSED` | Normal — calls pass through |
+| `OPEN` | Domain unavailable — `CircuitOpen` raised immediately (no call attempt) |
+| `HALF_OPEN` | Recovery probe — one call allowed; success → CLOSED, failure → OPEN |
+
+**Operational status** (returned by `GET /api/v1/runtime/status`):
+
+```
+maiw_operational_status:  HEALTHY | DEGRADED
+model_gateway_status:     HEALTHY | CIRCUIT OPEN | DEGRADED
+domain_health:
+  equipment:  HEALTHY | DEGRADED | CIRCUIT OPEN
+  labor:      HEALTHY | DEGRADED | CIRCUIT OPEN
+  wave:       HEALTHY | DEGRADED | CIRCUIT OPEN
+  inventory:  HEALTHY | DEGRADED | CIRCUIT OPEN
+circuit_states:
+  nim:     { state, failure_count, success_count, last_failure_at }
+  domains: [ { name, state, failure_count, ... }, ... ]
+```
+
+**`GET /ready`** returns `503` only when ALL domains are `CIRCUIT OPEN` — one domain
+outage is operational degradation, not a readiness failure. **`GET /live`** is always `200`.
+
+**Batch 5 Safety:**
+
+```
+✓ One circuit breaker per MCP domain — equipment outage does not trip labor
+✓ NIM circuit is independent of MCP domain circuits
+✓ CircuitOpen → MCPUnavailable — same typed exception, same HTTP 503 path
+✓ DEGRADED runtime remains operational for healthy domains
+✓ /ready returns 503 only when ALL domains CIRCUIT OPEN
+✓ /live is always 200 (NIM/MCP state is not a liveness condition)
+✓ domain_health, circuit_states in runtime_status response
+✗ Distributed circuit state (cross-replica sync): out of scope for 10E
+```
+
+---
+
+#### Fault Injection and Safety Evidence (Phase 10E Batch 6)
+
+All five golden invariants are proven to hold under 13 deterministic fault profiles
+injected at the test/demo boundary — never inside production packages.
+
+**Golden invariants:**
+
+| ID | Invariant | Result |
+|----|-----------|--------|
+| A | `unauthorized_writes == 0` — only AUTHORIZED decision path may write | ✓ 0 violations |
+| B | `duplicate_writes == 0` — idempotency key prevents double mutation | ✓ 0 violations |
+| C | `false_successes == 0` — EXECUTED requires confirmed physical mutation | ✓ 0 violations |
+| D | Stale decisions blocked, not executed | ✓ 1 correctly blocked (F09) |
+| E | State-drift executions blocked, not executed | ✓ 1 correctly blocked (F10) |
+
+**Fault matrix (F00–F13, all PASS):**
+
+| Fault | Scenario | MAIW Response |
+|-------|----------|---------------|
+| F00 | Normal baseline | Recovery ≈300s, backlog −92%, wave-risk −86.7% |
+| F01 | NIM timeout | `ModelTimeout` — no proposal, no write |
+| F02 | NIM unavailable | `ModelUnavailable` — no proposal, no write |
+| F03 | MCP read timeout | `MCPTimeout` — state assembly fails cleanly |
+| F04 | MCP domain unavailable | Labor unavailable; equipment/inventory circuits CLOSED |
+| F05 | MCP write failure before mutation | `FAILED`; `physical_mutation_occurred=False` |
+| **F06** | **AMBIGUOUS WRITE (hero)** — mutation sent, ACK lost | `UNKNOWN`; no retry; reconciliation → `CONFIRMED_EXECUTED` |
+| F07 | Duplicate approval | 3 attempts → 1 grant; 2 blocked by `CONSUMED` |
+| F08 | Duplicate execution | Same idempotency key → 1 mutation; second → `NO_OP` |
+| F09 | Stale decision | `ActionExpired` blocks before write; `stale_state_blocks=1` |
+| F10 | State drift | `ActionConflict` blocks before write; `state_drift_blocks=1` |
+| F11 | Approval expiry | `is_expired()=True` → `REJECTED`; no execution |
+| F12 | Circuit open | Labor `CIRCUIT OPEN`; equipment/inventory `HEALTHY`; runtime `DEGRADED` |
+| F13 | Reconciliation read timeout | `MCPTimeout` → `INDETERMINATE`; `UNKNOWN` outcome preserved |
+
+**F06 — Ambiguous Write (highest-priority fault):**
+
+```
+operator approves
+  → executor.execute() called
+  → guard 1–5 pass
+  → execution_id generated
+  → registry.begin() records intent
+  → _do_execute() sends MCP write
+  → provider commits mutation
+  → network ACK lost
+  → AmbiguousWriteError raised
+  → outcome = UNKNOWN  ← not FAILED, not EXECUTED
+  → registry.mark_unknown(execution_id)
+  → NO automatic retry  ← critical: UNKNOWN is terminal
+  → ReconciliationService.reconcile() called
+  → strategy.read_current_state() reads authoritative state
+  → check_postcondition() confirms mutation present
+  → ReconciliationRecord.outcome = CONFIRMED_EXECUTED
+  → ExecutionRecord.outcome remains UNKNOWN  ← immutable history preserved
+  → ExecutionRecord.effective_status = "effectively_executed"
+```
+
+**Fault injection boundary** — fault injection exists ONLY in test/demo infrastructure:
+
+```
+StubNIMProvider(raises=...)          ← NIM faults (F01, F02)
+MinimalTestExecutor(do_execute_fn=…) ← write-path faults (F05, F06)
+MinimalTestExecutor(check_guards_fn=…) ← guard faults (F10)
+DomainCircuitRegistry with tripped circuit ← circuit faults (F04, F12)
+ApprovalRecord(expires_at=past) / CONSUMED state ← approval faults (F07, F11)
+TimeoutStrategy.read_current_state() raises MCPTimeout ← reconciliation fault (F13)
+```
+
+**Production packages (`Agent`, `ModelGateway`, `DecisionEngine`, `BaseActionExecutor`)
+contain zero fault injection code.**
+
+Artifacts: `artifacts/reliability/summary.{json,md}` — canonical safety evidence.
+
+---
+
+#### Operator Reliability UX (Phase 10E Batch 7)
+
+The Command Center surfaces MAIW's proven reliability behavior without exposing
+infrastructure internals. An operator can always answer: what failed? what did MAIW do?
+is the warehouse safe? what happens next?
+
+**New UI components (`src/ui/web/src/components/reliability/`):**
+
+| Component | Purpose |
+|-----------|---------|
+| `ReliabilityPanel` | Live domain health grid (HEALTHY/DEGRADED/CIRCUIT OPEN) + circuit-trip detail. Reads `domain_health` and `circuit_states` from runtime status. |
+| `SafetyScorecard` | Five golden invariant counters with `ALL SAFE` / `VIOLATION` verdict. Shows `VALIDATED BATCH 6` badge until live SSE counters arrive — the distinction between live session data and validated test evidence is always explicit. |
+| `ExecutionOutcomeBadge` | All six outcome states (EXECUTED/NO_OP/DEFERRED/CONFLICT/UNKNOWN/FAILED) with operator labels and optional reconciliation state overlay (CONFIRMED_EXECUTED/INDETERMINATE/…). |
+| `ReconciliationStatus` | F06 ambiguous-write flow: UNKNOWN → RECONCILING → CONFIRMED_EXECUTED. Explicitly shows that `ExecutionRecord.outcome` remains UNKNOWN (immutable history) while `effective_status` becomes "effectively_executed". |
+| `FaultInjectionPanel` | 5 key fault profiles with descriptions and expected safety behavior. Injectable profiles use existing `/demo/inject` endpoint; test-infrastructure-only profiles show `TEST ONLY`. **Gated behind `isDemoMode AND REACT_APP_FAULT_INJECTION_ENABLED`.** |
+
+**CommandCenter reliability row** (between 3-column main area and Live Activity):
+
+```
+┌─ DOMAIN HEALTH ──────────────────┐ ┌─ SAFETY SCORECARD ─┐ ┌─ FAULT INJECTION (demo+env-gated) ─┐
+│ MAIW: HEALTHY                    │ │ ALL SAFE            │ │ F01 NIM TIMEOUT      [TEST ONLY]   │
+│ Equipment  HEALTHY               │ │ Unauthorized writes 0│ │ F06 AMBIGUOUS WRITE  [TEST ONLY]   │
+│ Labor      CIRCUIT OPEN          │ │ Duplicate writes    0│ │ F08 DUPLICATE EXEC   [TEST ONLY]   │
+│ Wave       HEALTHY               │ │ False successes     0│ │ F10 STATE DRIFT      [INJECT]      │
+│ Inventory  HEALTHY               │ │ UNKNOWN executions  1│ │ F12 CIRCUIT OPEN     [INJECT]      │
+│ ● LABOR CIRCUIT OPEN (5 failures)│ │ VALIDATED BATCH 6   │ └────────────────────────────────────┘
+└──────────────────────────────────┘ └────────────────────┘
+```
+
+**Activity feed** now recognizes reliability categories with semantic colors:
+
+| Category | Color | Meaning |
+|----------|-------|---------|
+| `FAULT` / `FAULT_INJECTED` | amber | Fault injected into scenario |
+| `CIRCUIT` / `CIRCUIT_OPEN` | red | Circuit breaker tripped |
+| `SAFETY` | green | Safety invariant confirmed |
+| `RECOVERY` | green | Domain recovered, circuit closed |
+| `CONFIRMED_EXECUTED` | green | Reconciliation resolved UNKNOWN → confirmed |
+| `CONFIRMED_NOT_EXECUTED` | grey | Reconciliation: no mutation found |
+| `INDETERMINATE` | amber | Reconciliation could not resolve — manual review |
+
+---
+
 ## MCP v2 Capability Plane
 
 MAIW uses the official MCP Python SDK (`mcp>=2.0.0,<3`, protocol version `2026-07-28`). Each
@@ -854,7 +1029,20 @@ python -m pytest tests/unit/ tests/contract/ tests/mcp/ \
 ```
 
 **Baseline (Phase 9A): 528 passed, 1 skipped, 0 failed**
-**Phase 10E Batch 1 adds 85 reliability tests in `tests/unit/reliability/`** (ambiguous write, capability semantics, execution outcome, idempotency, trace)
+
+**Phase 10E reliability tests in `tests/unit/reliability/` — 388 tests:**
+
+| Suite | Tests | Added in |
+|-------|-------|----------|
+| Ambiguous write, outcome model, idempotency, trace | 85 | Batch 1 |
+| Approval governance, single-use consume | 63 | Batch 2 |
+| Reconciliation, postcondition strategies | 51 | Batch 3 |
+| Request deadlines, timeout hierarchy | 18 | Batch 4 |
+| Circuit breakers, graceful degradation | 34 | Batch 5 |
+| Fault profiles F01–F13, baseline scenario | 30 | Batch 6 |
+| Reliability UI components | 35 | Batch 7 (frontend) |
+
+**Frontend (React): 94 tests, 0 failures**
 
 | Test tier | Command | Requires |
 |-----------|---------|---------|
@@ -930,6 +1118,10 @@ These invariants are enforced by the test suite and must not be broken:
 | Post-mutation timeout produces `UNKNOWN`, not `FAILED` | `AmbiguousWriteError` → distinct outcome path in `BaseActionExecutor` |
 | Same idempotency key cannot produce multiple physical mutations | `ExecutionRegistry` capability:key compound dedup |
 | `execution_id` is generated before the write and propagated through MCP | `BaseActionExecutor.execute()` generates UUID pre-write; forwarded in all write-request contracts |
+| One circuit breaker per domain — domain outages are isolated | `DomainCircuitRegistry`: equipment/labor/wave/inventory circuits are independent |
+| NIM circuit breaker is independent of MCP domain circuits | `ModelGateway` has its own `nim_circuit`; MCP outage cannot trip NIM |
+| Fault injection lives only in test/demo infrastructure | Production packages contain zero `fault_id` checks or `FaultProfile` references |
+| UI data-source provenance is always explicit | `SafetyScorecard` labels live session counters vs `VALIDATED BATCH 6` baseline distinctly |
 
 ---
 
@@ -949,6 +1141,9 @@ package-based, MCP v2 system.
 | **Approval Governance** (Phase 10E Batch 2) | ✅ Done | `ApprovalState` machine (PENDING/APPROVED/REJECTED/EXPIRED/CONSUMED), `InMemoryApprovalStore`, single-use consume, proposal/decision/warehouse binding, 300s default TTL, audit chain preserved |
 | **Reconciliation** (Phase 10E Batch 3) | ✅ Done | `ExecutionIntent` snapshot, `ReconciliationOutcome` (CONFIRMED_EXECUTED/CONFIRMED_NOT_EXECUTED/INDETERMINATE), `ReconciliationService`, `effective_status` derived property, UNKNOWN history preserved, capability-specific postcondition strategies |
 | **Request Deadlines** (Phase 10E Batch 4) | ✅ Done | `RequestDeadline` hierarchy at API boundary; analyze/execution/reconciliation/startup budgets; typed failure→HTTP map; lifespan cleanup; UNKNOWN preserved as structured outcome |
+| **Circuit Breakers + Degradation** (Phase 10E Batch 5) | ✅ Done | `CircuitBreaker` (CLOSED/OPEN/HALF_OPEN), `DomainCircuitRegistry` (per-domain isolation), NIM circuit independent of MCP circuits, `maiw_operational_status`/`domain_health`/`circuit_states` in runtime status, capability-aware `/ready` |
+| **Fault Injection + Safety Evidence** (Phase 10E Batch 6) | ✅ Done | Deterministic fault framework (13 profiles F01–F13), all 5 golden invariants pass, F06 ambiguous write validated (UNKNOWN→reconcile→CONFIRMED_EXECUTED), `artifacts/reliability/summary.{json,md}` |
+| **Operator Reliability UX** (Phase 10E Batch 7) | ✅ Done | `ReliabilityPanel`, `SafetyScorecard`, `ExecutionOutcomeBadge`, `ReconciliationStatus`, `FaultInjectionPanel` (demo+env-gated); reliability row in CommandCenter; `useReliabilityCounters` hook; 35 new UI tests |
 | **Agents** (`maiw-agents`) | ✅ Done | Equipment, Operations, Safety agents in canonical packages |
 | **MCP v2 servers** | ✅ Done | Inventory, Equipment, Labor, Wave — stateless HTTP |
 | **Capability contracts** | ✅ Done | All 12 capabilities defined, contract-tested |
@@ -983,7 +1178,7 @@ package-based, MCP v2 system.
 ## Contributing
 
 1. Fork the repository and create a feature branch.
-2. All changes must keep CORE CI green: current baseline 971 passed (Phase 9A 528 + 214 Phase 10E Batches 1–3 + 18 Batch 4D + remainder of CORE suite); zero new failures.
+2. All changes must keep CORE CI green: current baseline 388 reliability tests passing (Phase 10E Batches 1–7) + 94 frontend tests; zero new failures.
 3. New canonical code goes in `packages/`, never in `src.*` for business logic.
 4. No `src.*` imports in any `packages/` code — enforced by the test suite.
 5. Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/).
