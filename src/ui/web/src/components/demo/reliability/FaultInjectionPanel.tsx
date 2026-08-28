@@ -128,7 +128,7 @@ export default function FaultInjectionPanel({ scenarioId, sseEvents }: Props) {
       {
         label: 'INJECT FAULT',
         description: 'Trigger equipment fault → drives ambiguous write path',
-        action: () => demoAPI.inject('equipment_fault', { target: 'EQ-001', simulate_ambiguous_write: true }),
+        action: () => demoAPI.inject('equipment_fault', { asset_id: 'AGV-01', simulate_ambiguous_write: true }),
         color: '#D29922',
         testId: 'inject-fault-F06',
       },
@@ -155,8 +155,8 @@ export default function FaultInjectionPanel({ scenarioId, sseEvents }: Props) {
         label: 'INJECT STATE DRIFT',
         description: 'Inject equipment fault then restore → state changes during proposal window',
         action: async () => {
-          await demoAPI.inject('equipment_fault', { target: 'EQ-001' });
-          await demoAPI.inject('equipment_restore', { target: 'EQ-001' });
+          await demoAPI.inject('equipment_fault', { asset_id: 'AGV-01' });
+          await demoAPI.inject('equipment_restore', { asset_id: 'AGV-01' });
         },
         color: '#D29922',
         testId: 'inject-fault-F10',
@@ -166,7 +166,7 @@ export default function FaultInjectionPanel({ scenarioId, sseEvents }: Props) {
       {
         label: 'INJECT WORKER ABSENCE',
         description: 'Simulate labor domain stress → worker_absence burst',
-        action: () => demoAPI.inject('worker_absence', { target: 'WORKER-001' }),
+        action: () => demoAPI.inject('worker_absence', { worker_id: 'w-003' }),
         color: '#D29922',
         testId: 'inject-fault-F12',
       },
@@ -175,7 +175,7 @@ export default function FaultInjectionPanel({ scenarioId, sseEvents }: Props) {
       {
         label: 'INJECT TASK DEADLINE',
         description: 'Force urgent task — NIM timeout path triggered at capacity',
-        action: () => demoAPI.inject('task_deadline', { target: 'TASK-001' }),
+        action: () => demoAPI.inject('task_deadline', { task_id: 'task-001', deadline: '2026-08-23T10:00:00Z' }),
         color: '#D29922',
         testId: 'inject-fault-F01',
       },
