@@ -187,28 +187,12 @@ const CounterfactualPanel: React.FC = () => {
     staleTime: 300_000,
   });
 
-  if (isLoading) {
-    return (
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, p: 2 }}>
-        <CircularProgress size={14} sx={{ color: '#3FB950' }} />
-        <Mono color="#6E7681">Loading evaluation data…</Mono>
-      </Box>
-    );
-  }
-
-  if (error || !data) {
-    return (
-      <Alert severity="info" sx={{ background: '#0D1117', border: '1px solid #21262D', color: '#8B949E', fontFamily: 'monospace', fontSize: '0.72rem' }}>
-        No evaluation data. Run: <code style={{ color: '#76B900' }}>python scripts/counterfactual_eval.py</code>
-      </Alert>
-    );
-  }
-
-  const { control, maiw, comparison: cmp } = data;
-
   // at_horizon values in the pre-generated artifact may be null even though the
   // trajectory has the correct data. Fall back to the closest trajectory entry.
+  // Must be called unconditionally (before any early returns) to satisfy Rules of Hooks.
   const enrichedHorizons = useMemo(() => {
+    if (!data) return {};
+    const { control, maiw, comparison: cmp } = data;
     const t0 = control.t0_kpis.sim_time_seconds ?? 0;
     function closestKpi(
       traj: CounterfactualRun['trajectory'],
@@ -240,7 +224,26 @@ const CounterfactualPanel: React.FC = () => {
       }
     }
     return result;
-  }, [control, maiw, cmp]);
+  }, [data]);
+
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, p: 2 }}>
+        <CircularProgress size={14} sx={{ color: '#3FB950' }} />
+        <Mono color="#6E7681">Loading evaluation data…</Mono>
+      </Box>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <Alert severity="info" sx={{ background: '#0D1117', border: '1px solid #21262D', color: '#8B949E', fontFamily: 'monospace', fontSize: '0.72rem' }}>
+        No evaluation data. Run: <code style={{ color: '#76B900' }}>python scripts/counterfactual_eval.py</code>
+      </Alert>
+    );
+  }
+
+  const { control, maiw, comparison: cmp } = data;
 
   function fmtTTR(secs: number | null, never: boolean): string {
     if (never || secs === null) return `>${Math.round((data?.horizon_seconds ?? 1800) / 60)}m`;
