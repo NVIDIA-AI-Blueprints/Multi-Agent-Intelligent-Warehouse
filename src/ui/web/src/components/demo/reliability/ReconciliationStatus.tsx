@@ -13,7 +13,7 @@
 
 import React from 'react';
 import { Box, Typography } from '@mui/material';
-import { SSEEvent } from '../../../hooks/useDemoSSE';
+import { SSEEvent, parseEventDetail } from '../../../hooks/useDemoSSE';
 
 interface Props {
   sseEvents: SSEEvent[];
@@ -36,8 +36,10 @@ function deriveState(events: SSEEvent[]): ReconcileState {
   const hasReconcile = events.find(e => e.category === 'RECONCILE');
   const hasRequired = events.find(e => e.category === 'RECONCILIATION_REQUIRED');
 
-  const pickExecId = (ev: SSEEvent | undefined): string =>
-    ev?.detail?.execution_id ?? ev?.execution_id ?? '—';
+  const pickExecId = (ev: SSEEvent | undefined): string => {
+    const d = ev ? parseEventDetail(ev) : null;
+    return d?.execution_id ?? ev?.execution_id ?? '—';
+  };
 
   if (hasConfirmedExec) {
     return { phase: 'confirmed_executed', executionId: pickExecId(hasConfirmedExec) };
@@ -53,7 +55,8 @@ function deriveState(events: SSEEvent[]): ReconcileState {
   }
   if (hasRequired) {
     const id = pickExecId(hasRequired);
-    const domain = hasRequired?.detail?.domain ?? hasRequired?.domain ?? 'equipment';
+    const det = parseEventDetail(hasRequired);
+    const domain = det?.domain ?? hasRequired?.domain ?? 'equipment';
     return { phase: 'required', executionId: id, domain };
   }
   return { phase: 'idle' };

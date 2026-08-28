@@ -420,9 +420,19 @@ export default function DemoShell() {
         <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           Safety
         </Typography>
-        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: '#3FB950' }}>
-          ✓ All invariants hold
-        </Typography>
+        {(() => {
+          const unresolvedUnknown = sseState.events.some(e => e.category === 'RECONCILIATION_REQUIRED') &&
+            !sseState.events.some(e => e.category === 'CONFIRMED_EXECUTED' || e.category === 'CONFIRMED_NOT_EXECUTED' || e.category === 'INDETERMINATE');
+          return unresolvedUnknown ? (
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: '#D29922' }}>
+              ! Review required
+            </Typography>
+          ) : (
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: '#3FB950' }}>
+              ✓ All invariants hold
+            </Typography>
+          );
+        })()}
         <Box sx={{ flexGrow: 1 }} />
         <Typography sx={{
           fontFamily: 'monospace', fontSize: '0.62rem', color: '#484F58',

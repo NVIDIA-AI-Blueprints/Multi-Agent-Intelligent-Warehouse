@@ -10,6 +10,23 @@ export interface SSEEvent {
   task_id: string | null;
   worker_id: string | null;
   sim_time_seconds?: number;
+  /** Present on reliability/reconciliation events */
+  execution_id?: string;
+  domain?: string;
+}
+
+/** Safely parse detail as JSON object; returns null if not an object.
+ *  Handles both string (prod) and object (test mocks passed via `as any`). */
+export function parseEventDetail(ev: SSEEvent): Record<string, any> | null {
+  if (!ev.detail) return null;
+  // In tests, detail may be passed as an object directly (via `as any`)
+  if (typeof ev.detail !== 'string') return ev.detail as unknown as Record<string, any>;
+  try {
+    const parsed = JSON.parse(ev.detail);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
 }
 
 export interface DemoSSEState {

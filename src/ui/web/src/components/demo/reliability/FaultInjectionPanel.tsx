@@ -15,7 +15,7 @@
 import React, { useState } from 'react';
 import { Box, Typography, CircularProgress } from '@mui/material';
 import { demoAPI } from '../../../services/demoAPI';
-import { SSEEvent } from '../../../hooks/useDemoSSE';
+import { SSEEvent, parseEventDetail } from '../../../hooks/useDemoSSE';
 
 interface Props {
   scenarioId: string | null;
@@ -91,8 +91,9 @@ export default function FaultInjectionPanel({ scenarioId, sseEvents }: Props) {
 
   // Find an UNKNOWN execution pending reconciliation from SSE
   const unknownEvent = sseEvents.find(e => e.category === 'RECONCILIATION_REQUIRED');
-  const executionId = unknownEvent?.detail?.execution_id ?? unknownEvent?.execution_id ?? null;
-  const domain = unknownEvent?.detail?.domain ?? unknownEvent?.domain ?? 'equipment';
+  const unknownDetail = unknownEvent ? parseEventDetail(unknownEvent) : null;
+  const executionId = unknownDetail?.execution_id ?? unknownEvent?.execution_id ?? null;
+  const domain = unknownDetail?.domain ?? unknownEvent?.domain ?? 'equipment';
 
   const handleInject = async (fn: () => Promise<any>, label: string) => {
     if (injectLoading) return;

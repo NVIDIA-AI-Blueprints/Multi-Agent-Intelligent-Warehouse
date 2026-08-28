@@ -578,6 +578,10 @@ export interface RuntimeStatus {
   equipment_executor_available: boolean;
   labor_executor_available: boolean;
   wave_executor_available: boolean;
+  /** Extended fields returned by the backend but not in the v1 spec */
+  maiw_operational_status?: string;
+  model_gateway_status?: string;
+  domain_health?: Record<string, string>;
 }
 
 export const runtimeAPI = {
