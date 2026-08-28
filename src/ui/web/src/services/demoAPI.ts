@@ -196,7 +196,7 @@ async function getStatus(): Promise<DemoStatus> {
 // ── MAIW Analysis ─────────────────────────────────────────────────────────────
 
 async function analyze(): Promise<AnalysisResult> {
-  const r = await http.post('/demo/analyze');
+  const r = await http.post('/demo/analyze', undefined, { timeout: 120_000 });
   return r.data as AnalysisResult;
 }
 

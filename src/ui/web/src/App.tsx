@@ -57,9 +57,9 @@ function App() {
                   <Route path="/documentation/deployment" element={<DeploymentGuide />} />
                   <Route path="/documentation/architecture" element={<ArchitectureDiagrams />} />
                   <Route path="/mcp-test" element={<MCPTest />} />
-                  <Route path="/" element={<Navigate to="/command" replace />} />
-                  <Route path="/login" element={<Navigate to="/command" replace />} />
-                  <Route path="*" element={<Navigate to="/command" replace />} />
+                  <Route path="/" element={<Navigate to="/demo" replace />} />
+                  <Route path="/login" element={<Navigate to="/demo" replace />} />
+                  <Route path="*" element={<Navigate to="/demo" replace />} />
                 </Routes>
               </Layout>
             }
