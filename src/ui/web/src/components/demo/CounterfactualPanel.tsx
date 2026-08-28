@@ -206,6 +206,42 @@ const CounterfactualPanel: React.FC = () => {
 
   const { control, maiw, comparison: cmp } = data;
 
+  // at_horizon values in the pre-generated artifact may be null even though the
+  // trajectory has the correct data. Fall back to the closest trajectory entry.
+  const enrichedHorizons = useMemo(() => {
+    const t0 = control.t0_kpis.sim_time_seconds ?? 0;
+    function closestKpi(
+      traj: CounterfactualRun['trajectory'],
+      targetElapsed: number,
+    ): Record<string, number | null> | null {
+      let best: Record<string, number | null> | null = null;
+      let bestDiff = Infinity;
+      for (const e of traj) {
+        const d = Math.abs(e.elapsed_seconds - targetElapsed);
+        if (d < bestDiff) { bestDiff = d; best = e.kpis as any; }
+      }
+      return best;
+    }
+    const HORIZON_KEYS = ['300s', '600s', '900s', '1200s', '1800s'] as const;
+    const METRICS = ['wave_risk_score', 'pending_backlog', 'wave_completion_pct',
+                     'simulated_throughput', 'projected_service_level'];
+    const result: Record<string, Record<string, { control: number | null; maiw: number | null }>> = {};
+    for (const hKey of HORIZON_KEYS) {
+      const offsetSec = parseInt(hKey);
+      const raw = (cmp.at_horizon as any)[hKey] ?? {};
+      const ctrlFallback = closestKpi(control.trajectory, t0 + offsetSec);
+      const maiwFallback = closestKpi(maiw.trajectory, t0 + offsetSec);
+      result[hKey] = {};
+      for (const m of METRICS) {
+        result[hKey][m] = {
+          control: raw[m]?.control ?? ctrlFallback?.[m] ?? null,
+          maiw:    raw[m]?.maiw    ?? maiwFallback?.[m]  ?? null,
+        };
+      }
+    }
+    return result;
+  }, [control, maiw, cmp]);
+
   function fmtTTR(secs: number | null, never: boolean): string {
     if (never || secs === null) return `>${Math.round((data?.horizon_seconds ?? 1800) / 60)}m`;
     const m = Math.round(secs / 60);
@@ -292,7 +328,7 @@ const CounterfactualPanel: React.FC = () => {
           <Mono color="#3FB950" size="0.62rem">MAIW</Mono>
         </Box>
         {['300s', '600s', '900s'].map(hKey => {
-          const h = cmp.at_horizon[hKey];
+          const h = enrichedHorizons[hKey];
           if (!h) return null;
           return (
             <Box key={hKey} sx={{ mb: 0.75, pb: 0.75, borderBottom: '1px solid #0D1117' }}>
