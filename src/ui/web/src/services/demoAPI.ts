@@ -196,7 +196,7 @@ async function getStatus(): Promise<DemoStatus> {
 // ── MAIW Analysis ─────────────────────────────────────────────────────────────
 
 async function analyze(): Promise<AnalysisResult> {
-  const r = await http.post('/demo/analyze');
+  const r = await http.post('/demo/analyze', undefined, { timeout: 120_000 });
   return r.data as AnalysisResult;
 }
 
@@ -228,7 +228,7 @@ export interface ReconcileResult {
   error: string | null;
 }
 
-async function reconcileExecution(
+async function reconcile(
   execution_id: string,
   domain: string,
   trace_id?: string,
@@ -334,6 +334,6 @@ export const demoAPI = {
   analyze,
   approvePending,
   rejectPending,
-  reconcileExecution,
+  reconcile,
   getCounterfactualResult,
 };
