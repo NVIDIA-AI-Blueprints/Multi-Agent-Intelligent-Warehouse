@@ -11,6 +11,7 @@ import LifecycleRail from '../components/demo/LifecycleRail';
 import OperationalContextStrip from '../components/demo/OperationalContextStrip';
 import StageContentPane from '../components/demo/StageContentPane';
 import ReliabilityPanel from '../components/demo/reliability/ReliabilityPanel';
+import ExpertOverlay from '../components/demo/ExpertOverlay';
 
 const WAREHOUSE_ID = process.env.REACT_APP_WAREHOUSE_ID || 'DC-47';
 
@@ -205,55 +206,6 @@ function ScenarioHeader({
   );
 }
 
-// ── Expert panel (12G will expand this) ───────────────────────────────────────
-
-function ExpertPanel({ runtime, demoStatus }: { runtime: any; demoStatus: any }) {
-  return (
-    <Box sx={{
-      mx: 2, mb: 2,
-      background: '#161B22',
-      border: '1px solid #1F6FEB33',
-      borderRadius: '6px',
-      p: 2,
-    }}>
-      <Typography sx={{
-        fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
-        color: '#58A6FF', letterSpacing: '0.1em', textTransform: 'uppercase', mb: 1,
-      }}>
-        Expert view — system details (Phase 12G: full layout)
-      </Typography>
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2 }}>
-        <Box>
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: '#484F58', mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Runtime</Typography>
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: '#8B949E' }}>
-            maiw_operational_status: {runtime?.maiw_operational_status ?? '—'}<br />
-            model_gateway_status: {runtime?.model_gateway_status ?? '—'}
-          </Typography>
-        </Box>
-        <Box>
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: '#484F58', mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Domain health</Typography>
-          {runtime?.domain_health ? (
-            Object.entries(runtime.domain_health).map(([k, v]: [string, any]) => (
-              <Typography key={k} sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: '#8B949E' }}>
-                {k}: {v}
-              </Typography>
-            ))
-          ) : (
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: '#484F58' }}>—</Typography>
-          )}
-        </Box>
-        <Box>
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: '#484F58', mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Scenario</Typography>
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: '#8B949E' }}>
-            active: {String(demoStatus?.active ?? false)}<br />
-            name: {demoStatus?.scenario?.name ?? '—'}<br />
-            elapsed: {demoStatus?.world?.elapsed_seconds ?? 0}s
-          </Typography>
-        </Box>
-      </Box>
-    </Box>
-  );
-}
 
 // ── DemoShell ──────────────────────────────────────────────────────────────────
 
@@ -444,7 +396,7 @@ export default function DemoShell() {
 
         {/* Expert overlay */}
         {expertMode && (
-          <ExpertPanel runtime={runtime} demoStatus={demoStatus} />
+          <ExpertOverlay runtime={runtime} demoStatus={demoStatus} sseEvents={sseState.events} />
         )}
       </Box>
 
