@@ -49,7 +49,7 @@ export default function ReliabilityPanel({ runtime }: Props) {
   const domainHealth = runtime?.domain_health;
   const circuitStates = runtime?.circuit_states;
 
-  const nimState = circuitStates?.nim?.state;
+  const nimState = circuitStates?.nim?.state?.toUpperCase();
 
   const opColor = opStatus === 'HEALTHY' ? '#3FB950' : opStatus === 'DEGRADED' ? '#D29922' : '#484F58';
 
@@ -98,21 +98,24 @@ export default function ReliabilityPanel({ runtime }: Props) {
       )}
 
       {/* Circuit state summary if any domain is not healthy */}
-      {circuitStates?.domains && circuitStates.domains.some(d => d.state !== 'CLOSED') && (
+      {circuitStates?.domains && circuitStates.domains.some(d => d.state.toUpperCase() !== 'CLOSED') && (
         <Box sx={{ mt: 0.75, pt: 0.5, borderTop: '1px solid #1C2128' }}>
           {circuitStates.domains
-            .filter(d => d.state !== 'CLOSED')
-            .map(d => (
-              <Box key={d.name} sx={{ display: 'flex', gap: 0.75, alignItems: 'center', py: 0.2 }}>
-                <Box sx={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: '#F85149', flexShrink: 0 }} />
-                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: '#F85149' }}>
-                  {d.name.toUpperCase()} CIRCUIT {d.state}
-                </Typography>
-                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58' }}>
-                  ({d.failure_count} failures)
-                </Typography>
-              </Box>
-            ))}
+            .filter(d => d.state.toUpperCase() !== 'CLOSED')
+            .map(d => {
+              const domainKey = (d as any).domain ?? (d as any).name ?? 'unknown';
+              return (
+                <Box key={domainKey} sx={{ display: 'flex', gap: 0.75, alignItems: 'center', py: 0.2 }}>
+                  <Box sx={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: '#F85149', flexShrink: 0 }} />
+                  <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: '#F85149' }}>
+                    {domainKey.toUpperCase()} CIRCUIT {d.state.toUpperCase()}
+                  </Typography>
+                  <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58' }}>
+                    ({d.failure_count} failures)
+                  </Typography>
+                </Box>
+              );
+            })}
         </Box>
       )}
     </Box>

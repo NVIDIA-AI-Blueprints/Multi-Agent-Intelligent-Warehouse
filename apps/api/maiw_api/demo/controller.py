@@ -162,6 +162,10 @@ class DemoScenarioController:
         self._recovery_sim_time: int | None = None
         self._pending_approvals: list[dict] = []
         self._approval_store: InMemoryApprovalStore = InMemoryApprovalStore()
+        # Monotonically-incrementing run identity, reset on start() and reset().
+        # Used as a dedup boundary so approvals from a previous run are never
+        # confused with those from the current one.
+        self._scenario_run_id: str = str(_uuid.uuid4())
 
     # ── Properties ───────────────────────────────────────────────────────────
 
@@ -208,6 +212,8 @@ class DemoScenarioController:
         self._paused = False
         self._next_event_idx = 0
         self._recovery_sim_time = None
+        self._pending_approvals = []
+        self._scenario_run_id = str(_uuid.uuid4())
 
         logger.info("Demo: started scenario '%s'", scenario_name)
         await self.bus.publish_scenario(
@@ -246,6 +252,7 @@ class DemoScenarioController:
         self._recovery_sim_time = None
         self._pending_approvals = []
         self._approval_store.reset()
+        self._scenario_run_id = str(_uuid.uuid4())
         await self.bus.publish_scenario(
             message="scenario:reset",
             detail=self._scenario.name if self._scenario else "",
@@ -354,7 +361,23 @@ class DemoScenarioController:
         warehouse_id: str | None = None,
         proposal_data: dict | None = None,
     ) -> str:
-        """Store a proposal pending human approval. Returns pending_id."""
+        """Store a proposal pending human approval. Returns pending_id.
+
+        Dedup: if a pending approval with the same logical identity
+        (scenario_run_id + capability + target + domain) already exists for
+        this run, returns its existing pending_id without creating a duplicate.
+        This prevents retry storms from the frontend creating multiple
+        approval cards for the same logical proposal.
+        """
+        dedup_key = f"{self._scenario_run_id}|{capability}|{target}|{domain}"
+        for pa in self._pending_approvals:
+            if pa.get("_dedup_key") == dedup_key:
+                logger.debug(
+                    "Dedup: returning existing pending_id=%s for key=%s",
+                    pa["pending_id"], dedup_key,
+                )
+                return pa["pending_id"]
+
         approval_record = self._approval_store.create(
             proposal_id=proposal_id,
             decision_id=decision_id,
@@ -362,25 +385,24 @@ class DemoScenarioController:
             trace_id=trace_id,
         )
         pending_id = str(_uuid.uuid4())
-        self._pending_approvals.append(
-            {
-                "pending_id": pending_id,
-                "approval_id": approval_record.approval_id,
-                "proposal_id": proposal_id,
-                "decision_id": decision_id,
-                "trace_id": trace_id,
-                "capability": capability,
-                "target": target,
-                "domain": domain,
-                "priority": priority,
-                "objective": objective,
-                "rationale": rationale,
-                "risk_level": risk_level,
-                "warehouse_id": warehouse_id,
-                "proposal_data": proposal_data,
-                "queued_at": datetime.now(tz=timezone.utc).isoformat(),
-            }
-        )
+        self._pending_approvals.append({
+            "pending_id": pending_id,
+            "approval_id": approval_record.approval_id,
+            "proposal_id": proposal_id,
+            "decision_id": decision_id,
+            "trace_id": trace_id,
+            "capability": capability,
+            "target": target,
+            "domain": domain,
+            "priority": priority,
+            "objective": objective,
+            "rationale": rationale,
+            "risk_level": risk_level,
+            "warehouse_id": warehouse_id,
+            "proposal_data": proposal_data,
+            "queued_at": datetime.now(tz=timezone.utc).isoformat(),
+            "_dedup_key": dedup_key,
+        })
         return pending_id
 
     def remove_pending_approval(self, pending_id: str) -> dict | None:
@@ -409,7 +431,10 @@ class DemoScenarioController:
             "world": world_summary,
             "current_kpis": current_kpis,
             "kpi_history": list(self._kpi_history),
-            "pending_approvals": list(self._pending_approvals),
+            "pending_approvals": [
+                {k: v for k, v in pa.items() if k != "_dedup_key"}
+                for pa in self._pending_approvals
+            ],
         }
 
     # ── internal helpers ──────────────────────────────────────────────────────

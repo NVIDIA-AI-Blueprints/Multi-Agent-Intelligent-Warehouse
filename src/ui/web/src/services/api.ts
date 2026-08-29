@@ -563,10 +563,16 @@ export const healthAPI = {
 };
 
 export interface CircuitStats {
-  state: 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+  state: 'closed' | 'open' | 'half_open' | 'CLOSED' | 'OPEN' | 'HALF_OPEN';
   failure_count: number;
-  success_count: number;
-  last_failure_at: string | null;
+  success_count?: number;
+  last_failure_at?: string | null;
+  failure_threshold?: number;
+  total_calls?: number;
+  total_failures?: number;
+  total_successes?: number;
+  trip_count?: number;
+  cooldown_remaining_s?: number;
 }
 
 export interface DomainHealth {
@@ -578,7 +584,7 @@ export interface DomainHealth {
 
 export interface CircuitStates {
   nim: CircuitStats;
-  domains: Array<{ name: string } & CircuitStats>;
+  domains: Array<{ domain?: string; name?: string } & CircuitStats>;
 }
 
 export interface RuntimeStatus {
