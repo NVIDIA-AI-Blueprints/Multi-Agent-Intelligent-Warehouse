@@ -30,7 +30,7 @@ import {
 
 // ── Delta display helpers ─────────────────────────────────────────────────────
 
-function deltaColor(delta: number | undefined, positiveIsBetter: boolean): string {
+function deltaColor(delta: number | undefined | null, positiveIsBetter: boolean): string {
   if (delta === undefined || delta === null) return '#484F58';
   if (delta === 0) return '#6E7681';
   const good = positiveIsBetter ? delta > 0 : delta < 0;
@@ -55,9 +55,9 @@ function fmtDelta(v: number | undefined | null, suffix = '', positiveIsBetter = 
 
 interface KPIRow {
   label: string;
-  pre: number | undefined;
-  post: number | undefined;
-  delta: number | undefined;
+  pre: number | undefined | null;
+  post: number | undefined | null;
+  delta: number | undefined | null;
   suffix: string;
   positiveIsBetter: boolean;
 }
