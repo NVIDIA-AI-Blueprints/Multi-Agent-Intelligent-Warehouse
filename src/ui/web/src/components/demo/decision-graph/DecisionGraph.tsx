@@ -16,6 +16,9 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
 import { Box, Typography } from '@mui/material';
+import { DecisionGraph as DecisionGraphData, DecisionGraphNode, DecisionGraphEdge } from './graphTypes';
+import DecisionGraphNodeCard from './DecisionGraphNode';
+import DecisionGraphDetails from './DecisionGraphDetails';
 
 // ── Zoom constants ────────────────────────────────────────────────────────────
 
@@ -23,10 +26,6 @@ const ZOOM_MIN  = 0.4;
 const ZOOM_MAX  = 1.5;
 const ZOOM_STEP = 0.15;
 const ZOOM_DEFAULT = 0.85;
-
-import { DecisionGraph as DecisionGraphData, DecisionGraphNode, DecisionGraphEdge } from './graphTypes';
-import DecisionGraphNodeCard from './DecisionGraphNode';
-import DecisionGraphDetails from './DecisionGraphDetails';
 
 // ── Layout constants ──────────────────────────────────────────────────────────
 
