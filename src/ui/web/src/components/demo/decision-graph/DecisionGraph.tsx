@@ -17,6 +17,13 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { Box, Typography } from '@mui/material';
 
+// ── Zoom constants ────────────────────────────────────────────────────────────
+
+const ZOOM_MIN  = 0.4;
+const ZOOM_MAX  = 1.5;
+const ZOOM_STEP = 0.15;
+const ZOOM_DEFAULT = 0.85;
+
 import { DecisionGraph as DecisionGraphData, DecisionGraphNode, DecisionGraphEdge } from './graphTypes';
 import DecisionGraphNodeCard from './DecisionGraphNode';
 import DecisionGraphDetails from './DecisionGraphDetails';
@@ -104,6 +111,11 @@ interface DecisionGraphProps {
 
 export default function DecisionGraph({ graph }: DecisionGraphProps) {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(ZOOM_DEFAULT);
+
+  const zoomIn  = useCallback(() => setZoom(z => Math.min(ZOOM_MAX, +(z + ZOOM_STEP).toFixed(2))), []);
+  const zoomOut = useCallback(() => setZoom(z => Math.max(ZOOM_MIN, +(z - ZOOM_STEP).toFixed(2))), []);
+  const zoomReset = useCallback(() => setZoom(ZOOM_DEFAULT), []);
 
   const handleNodeClick = useCallback((nodeId: string) => {
     setSelectedNodeId(prev => prev === nodeId ? null : nodeId);
@@ -155,6 +167,98 @@ export default function DecisionGraph({ graph }: DecisionGraphProps) {
           minWidth: 0,
         }}
       >
+        {/* Zoom controls */}
+        <Box sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 0.5,
+          mb: 1.5,
+          userSelect: 'none',
+        }}>
+          {/* Zoom out */}
+          <Box
+            component="button"
+            onClick={zoomOut}
+            disabled={zoom <= ZOOM_MIN}
+            title="Zoom out"
+            sx={{
+              background: 'transparent',
+              border: '1px solid #30363D',
+              borderRadius: '4px',
+              color: zoom <= ZOOM_MIN ? '#30363D' : '#8B949E',
+              cursor: zoom <= ZOOM_MIN ? 'default' : 'pointer',
+              fontFamily: 'monospace',
+              fontSize: '1rem',
+              lineHeight: 1,
+              px: '8px',
+              py: '3px',
+              '&:hover:not(:disabled)': { borderColor: '#58A6FF', color: '#58A6FF' },
+            }}
+          >
+            −
+          </Box>
+
+          {/* Zoom level — click to reset */}
+          <Box
+            component="button"
+            onClick={zoomReset}
+            title="Reset zoom"
+            sx={{
+              background: 'transparent',
+              border: '1px solid #21262D',
+              borderRadius: '4px',
+              color: '#484F58',
+              cursor: 'pointer',
+              fontFamily: 'monospace',
+              fontSize: '0.6rem',
+              px: '8px',
+              py: '3px',
+              minWidth: 44,
+              letterSpacing: '0.04em',
+              '&:hover': { borderColor: '#30363D', color: '#8B949E' },
+            }}
+          >
+            {Math.round(zoom * 100)}%
+          </Box>
+
+          {/* Zoom in */}
+          <Box
+            component="button"
+            onClick={zoomIn}
+            disabled={zoom >= ZOOM_MAX}
+            title="Zoom in"
+            sx={{
+              background: 'transparent',
+              border: '1px solid #30363D',
+              borderRadius: '4px',
+              color: zoom >= ZOOM_MAX ? '#30363D' : '#8B949E',
+              cursor: zoom >= ZOOM_MAX ? 'default' : 'pointer',
+              fontFamily: 'monospace',
+              fontSize: '1rem',
+              lineHeight: 1,
+              px: '8px',
+              py: '3px',
+              '&:hover:not(:disabled)': { borderColor: '#58A6FF', color: '#58A6FF' },
+            }}
+          >
+            +
+          </Box>
+        </Box>
+
+        {/* Scaled canvas wrapper — transform-origin top-left keeps scroll predictable */}
+        <Box sx={{
+          overflow: 'auto',
+          // Reserve exact scaled height so the outer scroll container knows the content size
+          height: Math.round(canvasHeight * zoom) + 8,
+        }}>
+          <Box
+            sx={{
+              transformOrigin: 'top left',
+              transform: `scale(${zoom})`,
+              // Don't let the scaled element push siblings
+              display: 'inline-block',
+            }}
+          >
         <Box
           sx={{
             position: 'relative',
@@ -249,6 +353,8 @@ export default function DecisionGraph({ graph }: DecisionGraphProps) {
               />
             </Box>
           ))}
+        </Box>
+          </Box>
         </Box>
       </Box>
 
