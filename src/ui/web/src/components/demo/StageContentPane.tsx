@@ -3,13 +3,16 @@
  *
  * OBSERVE / REASON / PROPOSE / DECIDE / APPROVE — complete (Phases 12C–12D).
  * EXECUTE / OUTCOME — complete (Phase 12E).
+ * Phase 13C: STORY | DECISION GRAPH toggle for REASON through OUTCOME stages.
  */
 
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Typography } from '@mui/material';
 import { RailStage } from '../../hooks/useDemoLifecycle';
 import { SSEEvent } from '../../hooks/useDemoSSE';
 import { DemoStatus, AnalysisResult, PendingApproval } from '../../services/demoAPI';
+import DecisionGraph from './decision-graph/DecisionGraph';
+import { buildDecisionGraph } from './decision-graph/buildDecisionGraph';
 
 import ObserveStage  from './stages/ObserveStage';
 import ReasonStage   from './stages/ReasonStage';
@@ -186,10 +189,73 @@ export interface StageContentPaneProps {
   onReset?: () => void;
 }
 
+// ── Stages that support STORY/GRAPH toggle ────────────────────────────────────
+
+const GRAPH_ENABLED_STAGES = new Set<RailStage>([
+  'REASON', 'PROPOSE', 'DECIDE', 'APPROVE', 'EXECUTE', 'OUTCOME',
+]);
+
+// ── View-mode toggle ──────────────────────────────────────────────────────────
+
+function ViewModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: 'story' | 'graph';
+  onChange: (m: 'story' | 'graph') => void;
+}) {
+  return (
+    <Box sx={{ display: 'flex', gap: '2px', background: '#161B22', borderRadius: '5px', p: '3px', border: '1px solid #21262D' }}>
+      {(['story', 'graph'] as const).map(m => (
+        <Box
+          key={m}
+          component="button"
+          data-testid={`view-mode-${m}`}
+          onClick={() => onChange(m)}
+          sx={{
+            fontFamily: 'monospace',
+            fontSize: '0.58rem',
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.1em',
+            px: '10px',
+            py: '4px',
+            borderRadius: '3px',
+            border: 'none',
+            cursor: 'pointer',
+            background: mode === m ? '#21262D' : 'transparent',
+            color: mode === m ? '#C9D1D9' : '#484F58',
+            transition: 'background 0.1s ease, color 0.1s ease',
+          }}
+        >
+          {m === 'story' ? 'Story' : 'Decision Graph'}
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
 // ── Router ─────────────────────────────────────────────────────────────────────
 
 export default function StageContentPane(props: StageContentPaneProps) {
-  const { currentStage } = props;
+  const { currentStage, demoStatus, analysisResult, pendingApprovals } = props;
+
+  // Reset to story mode whenever stage changes
+  const [viewMode, setViewMode] = useState<'story' | 'graph'>('story');
+  useEffect(() => { setViewMode('story'); }, [currentStage]);
+
+  const showToggle = GRAPH_ENABLED_STAGES.has(currentStage);
+
+  // Build graph lazily — only when graph mode is requested or about to be shown
+  const graph = useMemo(() => {
+    if (!showToggle) return null;
+    return buildDecisionGraph({
+      currentStage,
+      demoStatus: demoStatus ?? null,
+      analysisResult,
+      pendingApprovals,
+    });
+  }, [currentStage, demoStatus, analysisResult, pendingApprovals, showToggle]);
 
   return (
     <Box
@@ -202,15 +268,39 @@ export default function StageContentPane(props: StageContentPaneProps) {
         background: '#0D1117',
       }}
     >
-      <Box sx={{ maxWidth: 880, width: '100%', mx: 'auto', px: 3, py: 2.5 }}>
-        {currentStage === 'OBSERVE'  && <ObserveStage  {...props} />}
-        {currentStage === 'REASON'   && <ReasonStage   {...props} />}
-        {currentStage === 'PROPOSE'  && <ProposeStage  {...props} />}
-        {currentStage === 'DECIDE'   && <DecideStage   {...props} />}
-        {currentStage === 'APPROVE'  && <ApproveStage  {...props} />}
-        {currentStage === 'EXECUTE'  && <ExecuteStage  {...props} />}
-        {currentStage === 'OUTCOME'  && <OutcomeStage  {...props} />}
-      </Box>
+      {/* Toggle bar — shown for REASON through OUTCOME */}
+      {showToggle && (
+        <Box sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          px: 3,
+          pt: 2,
+          pb: 0,
+          maxWidth: viewMode === 'graph' ? 'none' : 880,
+          width: '100%',
+          mx: 'auto',
+        }}>
+          <ViewModeToggle mode={viewMode} onChange={setViewMode} />
+        </Box>
+      )}
+
+      {/* Content area */}
+      {viewMode === 'graph' && showToggle && graph ? (
+        <Box sx={{ px: 3, py: 2, overflow: 'auto' }}>
+          <DecisionGraph graph={graph} />
+        </Box>
+      ) : (
+        <Box sx={{ maxWidth: 880, width: '100%', mx: 'auto', px: 3, py: 2.5 }}>
+          {currentStage === 'OBSERVE'  && <ObserveStage  {...props} />}
+          {currentStage === 'REASON'   && <ReasonStage   {...props} />}
+          {currentStage === 'PROPOSE'  && <ProposeStage  {...props} />}
+          {currentStage === 'DECIDE'   && <DecideStage   {...props} />}
+          {currentStage === 'APPROVE'  && <ApproveStage  {...props} />}
+          {currentStage === 'EXECUTE'  && <ExecuteStage  {...props} />}
+          {currentStage === 'OUTCOME'  && <OutcomeStage  {...props} />}
+        </Box>
+      )}
     </Box>
   );
 }

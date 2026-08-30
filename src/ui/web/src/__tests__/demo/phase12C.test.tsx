@@ -369,8 +369,9 @@ describe('ObserveStage', () => {
 
 describe('ReasonStage', () => {
   it('shows model ID from analysisResult', () => {
+    // AgenticReasoningCanvas renders model_id once in the canvas header
     wrap(<ReasonStage {...makeProps({ currentStage: 'REASON', analysisResult: baseAnalysis })} />);
-    expect(screen.getByText('nvidia/llama-3.1-nemotron-70b-instruct')).toBeInTheDocument();
+    expect(screen.getAllByText('nvidia/llama-3.1-nemotron-70b-instruct').length).toBeGreaterThan(0);
   });
 
   it('shows routing rule from analysisResult', () => {
@@ -385,47 +386,41 @@ describe('ReasonStage', () => {
 
   it('shows assessment summary', () => {
     wrap(<ReasonStage {...makeProps({ currentStage: 'REASON', analysisResult: baseAnalysis })} />);
-    expect(screen.getByText(/3 workers on unplanned absence/)).toBeInTheDocument();
+    // Match the full summary string to distinguish from the shorter facts_observed entry
+    expect(screen.getByText(/3 workers on unplanned absence causing/)).toBeInTheDocument();
   });
 
   it('shows latency', () => {
+    // Canvas renders latency in the header; getAllByText handles multiple occurrences
     wrap(<ReasonStage {...makeProps({ currentStage: 'REASON', analysisResult: baseAnalysis })} />);
-    expect(screen.getByText('1240ms')).toBeInTheDocument();
+    expect(screen.getAllByText('1240ms').length).toBeGreaterThan(0);
   });
 
   it('shows SKILL chips from lifecycle records', () => {
+    // Canvas renders capability in both Pillar 3 (skills) and Pillar 4 (recommendations)
     wrap(<ReasonStage {...makeProps({ currentStage: 'REASON', analysisResult: baseAnalysis })} />);
-    expect(screen.getByText('reassign_labor_from_equipment')).toBeInTheDocument();
-    expect(screen.getByText('AGV-03')).toBeInTheDocument();
+    expect(screen.getAllByText('reassign_labor_from_equipment').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('AGV-03').length).toBeGreaterThan(0);
   });
 
-  it('falls back to SSE SKILL events when no lifecycle records', () => {
-    const events = makeEvents(
-      ['OBSERVE', 'start'],
-      ['REASON', 'Summary text', 'model=test-model rule=labor'],
-      ['SKILL', 'some_capability', 'target=WORKER-01'],
-    );
-    // analysisResult has no lifecycle SKILL records (empty lifecycle)
+  it('shows no-skills placeholder when no lifecycle SKILL records', () => {
+    // AgenticReasoningCanvas does not fall back to SSE for skills — it uses analysisResult.lifecycle
     const analysisNoSkill: AnalysisResult = {
       ...baseAnalysis,
       lifecycle: [
         { phase: 'REASON', summary: 'Summary text', severity: 'high', model_id: 'test-model', routing_rule: 'labor', routing_reason: '', latency_ms: 500, recommendations_count: 1, trace_id: 'trace-001' },
       ],
     };
-    wrap(<ReasonStage {...makeProps({ currentStage: 'REASON', sseEvents: events, analysisResult: analysisNoSkill })} />);
-    expect(screen.getByText('some_capability')).toBeInTheDocument();
-    expect(screen.getByText('WORKER-01')).toBeInTheDocument();
+    wrap(<ReasonStage {...makeProps({ currentStage: 'REASON', analysisResult: analysisNoSkill })} />);
+    expect(screen.getByText('No skills activated.')).toBeInTheDocument();
   });
 
-  it('shows model from SSE detail when no analysisResult', () => {
-    const events = makeEvents(
-      ['OBSERVE', 'start'],
-      ['REASON', 'Assessment via SSE', 'model=sse-model rule=sse-rule'],
-    );
-    wrap(<ReasonStage {...makeProps({ currentStage: 'REASON', sseEvents: events, analysisResult: null })} />);
-    expect(screen.getByText('sse-model')).toBeInTheDocument();
-    expect(screen.getByText('sse-rule')).toBeInTheDocument();
-    expect(screen.getByText('Assessment via SSE')).toBeInTheDocument();
+  it('shows awaiting state when no analysisResult', () => {
+    // Canvas shows structured awaiting placeholders when no analysis has run yet
+    wrap(<ReasonStage {...makeProps({ currentStage: 'REASON', analysisResult: null })} />);
+    expect(screen.getByTestId('agentic-reasoning-canvas')).toBeInTheDocument();
+    expect(screen.getByText('Awaiting analysis...')).toBeInTheDocument();
+    expect(screen.getByText('Awaiting model response...')).toBeInTheDocument();
   });
 
   it('does not expose chain-of-thought — no raw LLM output label', () => {
