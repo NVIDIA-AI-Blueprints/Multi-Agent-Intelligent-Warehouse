@@ -165,7 +165,7 @@ function DecisionCard({ index, outcome, proposalId, decisionId, violations, requ
 
 // ── DecideStage ───────────────────────────────────────────────────────────────
 
-export default function DecideStage({ sseEvents, analysisResult, pendingApprovals }: StageContentPaneProps) {
+export default function DecideStage({ sseEvents, analysisResult, pendingApprovals, onOpenExplanation }: StageContentPaneProps) {
   const decideEvents = runWindowEvents(sseEvents, ['DECIDE']);
   const decideRecords = analysisResult?.lifecycle?.filter(r => r.phase === 'DECIDE') ?? [];
 
@@ -233,6 +233,34 @@ export default function DecideStage({ sseEvents, analysisResult, pendingApproval
             Waiting for DecisionEngine evaluation...
           </MonoText>
         </StageSection>
+      )}
+
+      {/* Explain CTA */}
+      {onOpenExplanation && cards.length > 0 && (
+        <Box sx={{ mb: 1.5 }}>
+          <Box
+            component="button"
+            onClick={() => onOpenExplanation({ kind: 'stage', stage: 'DECIDE' })}
+            data-testid="explain-decide-button"
+            sx={{
+              background: 'transparent',
+              border: '1px solid #30363D',
+              borderRadius: '4px',
+              color: '#58A6FF',
+              cursor: 'pointer',
+              fontFamily: 'monospace',
+              fontSize: '0.65rem',
+              fontWeight: 600,
+              letterSpacing: '0.04em',
+              px: '12px',
+              py: '6px',
+              transition: 'all 0.12s ease',
+              '&:hover': { borderColor: '#58A6FF', background: '#0d2146' },
+            }}
+          >
+            WHY THIS DECISION? →
+          </Box>
+        </Box>
       )}
 
       {/* Approval queue summary when multiple pending */}

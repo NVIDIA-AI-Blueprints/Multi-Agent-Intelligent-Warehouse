@@ -21,6 +21,8 @@ import DecisionGraphNodeCard from './DecisionGraphNode';
 import DecisionGraphDetails from './DecisionGraphDetails';
 import StoryDecisionGraph from './StoryDecisionGraph';
 import { getSemanticZoomLevel } from './semanticZoom';
+import { ExplanationFocus } from '../decision-explanation/explanationTypes';
+import { AnalysisResult, PendingApproval, DemoStatus } from '../../../services/demoAPI';
 
 // ── Zoom constants ────────────────────────────────────────────────────────────
 
@@ -107,11 +109,15 @@ function execBoundaryX(canvasHeight: number): { x: number; h: number } {
 
 interface DecisionGraphProps {
   graph: DecisionGraphData;
+  analysisResult?: AnalysisResult | null;
+  pendingApprovals?: PendingApproval[];
+  demoStatus?: DemoStatus | null;
+  onOpenExplanation?: (focus: ExplanationFocus) => void;
 }
 
 type GraphMode = 'story' | 'trace';
 
-export default function DecisionGraph({ graph }: DecisionGraphProps) {
+export default function DecisionGraph({ graph, onOpenExplanation }: DecisionGraphProps) {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(ZOOM_DEFAULT);
   const [graphMode, setGraphMode] = useState<GraphMode>('story');
@@ -124,8 +130,12 @@ export default function DecisionGraph({ graph }: DecisionGraphProps) {
   const fitStory = useCallback(() => { setZoom(ZOOM_DEFAULT); setGraphMode('story'); }, []);
 
   const handleNodeClick = useCallback((nodeId: string) => {
-    setSelectedNodeId(prev => prev === nodeId ? null : nodeId);
-  }, []);
+    if (onOpenExplanation) {
+      onOpenExplanation({ kind: 'node', nodeId });
+    } else {
+      setSelectedNodeId(prev => prev === nodeId ? null : nodeId);
+    }
+  }, [onOpenExplanation]);
 
   const selectedNode = useMemo(
     () => graph.nodes.find(n => n.id === selectedNodeId) ?? null,
@@ -456,8 +466,8 @@ export default function DecisionGraph({ graph }: DecisionGraphProps) {
 
       </Box>
 
-      {/* Detail panel */}
-      {selectedNode && (
+      {/* Detail panel — shown only in standalone mode (when onOpenExplanation not provided) */}
+      {selectedNode && !onOpenExplanation && (
         <DecisionGraphDetails
           selectedNode={selectedNode}
           artifact={artifact}
