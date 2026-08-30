@@ -24,9 +24,16 @@
  * Render tests (3 tests) for DecisionGraph component — see bottom of file.
  */
 
+import React from 'react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import '@testing-library/jest-dom';
+import { ThemeProvider } from '@mui/material/styles';
+
 import { buildDecisionGraph, BuildDecisionGraphParams } from '../../components/demo/decision-graph/buildDecisionGraph';
 import { NodeSource, DecisionGraphNode } from '../../components/demo/decision-graph/graphTypes';
 import { DemoStatus, AnalysisResult, PendingApproval, KPISnapshot } from '../../services/demoAPI';
+import { nvidiaTheme } from '../../theme/nvidiaTheme';
+import DecisionGraph from '../../components/demo/decision-graph/DecisionGraph';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -634,15 +641,6 @@ describe('buildDecisionGraph — evidence from current_kpis', () => {
 });
 
 // ── Rendering tests ───────────────────────────────────────────────────────────
-// Import React + testing utilities only for these tests to keep pure-fn tests
-// free of React dependency.
-
-import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import '@testing-library/jest-dom';
-import { ThemeProvider } from '@mui/material/styles';
-import { nvidiaTheme } from '../../theme/nvidiaTheme';
-import DecisionGraph from '../../components/demo/decision-graph/DecisionGraph';
 
 function wrapGraph(el: React.ReactElement) {
   return render(<ThemeProvider theme={nvidiaTheme}>{el}</ThemeProvider>);
