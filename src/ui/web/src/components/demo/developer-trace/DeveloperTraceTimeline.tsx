@@ -11,10 +11,11 @@
  *   — these three are never conflated
  */
 
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Box, Typography } from '@mui/material';
 import { DeveloperTraceEvent, TraceEventCategory } from './developerTraceTypes';
 import { ExplanationFocus } from '../decision-explanation/explanationTypes';
+import { TraceReplayState, getPrimaryText } from './useTraceReplay';
 
 // ── Category badge colors ──────────────────────────────────────────────────────
 
@@ -45,6 +46,8 @@ const CATEGORY_COLORS: Record<TraceEventCategory, string> = {
 interface DeveloperTraceTimelineProps {
   events: DeveloperTraceEvent[];
   onOpenExplanation?: (focus: ExplanationFocus) => void;
+  // NEW: if provided, controls what's visible (replay animation)
+  replayState?: TraceReplayState;
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
@@ -282,8 +285,82 @@ function TraceEventRow({
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export default function DeveloperTraceTimeline({ events, onOpenExplanation }: DeveloperTraceTimelineProps) {
-  if (events.length === 0) {
+// ── In-progress row (typewriter cursor) ───────────────────────────────────────
+
+function InProgressRow({
+  event,
+  charCount,
+}: {
+  event: DeveloperTraceEvent;
+  charCount: number;
+}) {
+  const primaryText = getPrimaryText(event);
+  const visibleText = primaryText.slice(0, charCount);
+  const color = CATEGORY_COLORS[event.category] ?? '#484F58';
+
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 0.75,
+        py: '4px',
+        px: '4px',
+      }}
+    >
+      {/* Prompt indicator */}
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#484F58', flexShrink: 0 }}>
+        {'>'}
+      </Typography>
+      {/* Category badge */}
+      <Box
+        component="span"
+        sx={{
+          fontFamily: 'monospace',
+          fontSize: '0.55rem',
+          fontWeight: 700,
+          color,
+          border: `1px solid ${color}44`,
+          borderRadius: '3px',
+          px: '4px',
+          py: '1px',
+          textTransform: 'uppercase',
+          letterSpacing: '0.08em',
+          flexShrink: 0,
+        }}
+      >
+        {event.category.replace(/_/g, ' ')}
+      </Box>
+      {/* Partially-typed text + cursor */}
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#8B949E' }}>
+        {visibleText}
+        <Box
+          component="span"
+          sx={{ color: '#484F58', fontSize: '0.7rem' }}
+        >
+          █
+        </Box>
+      </Typography>
+    </Box>
+  );
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
+
+export default function DeveloperTraceTimeline({ events, onOpenExplanation, replayState }: DeveloperTraceTimelineProps) {
+  const inProgressRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-scroll when activeEventIndex changes
+  useEffect(() => {
+    if (replayState && replayState.activeEventIndex >= 0 && inProgressRef.current) {
+      inProgressRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [replayState?.activeEventIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Determine which events to render
+  const displayEvents = replayState ? replayState.visibleEvents : events;
+
+  if (displayEvents.length === 0 && (!replayState || replayState.activeEventIndex < 0)) {
     return (
       <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: '#30363D' }}>
         No lifecycle events recorded yet.
@@ -291,9 +368,15 @@ export default function DeveloperTraceTimeline({ events, onOpenExplanation }: De
     );
   }
 
+  // Active in-progress event
+  const activeEvent =
+    replayState && replayState.activeEventIndex >= 0
+      ? events[replayState.activeEventIndex]
+      : null;
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-      {events.map((ev) => {
+      {displayEvents.map((ev) => {
         if (ev.isGap) {
           return <GapEvent key={ev.id} event={ev} />;
         }
@@ -308,6 +391,14 @@ export default function DeveloperTraceTimeline({ events, onOpenExplanation }: De
           />
         );
       })}
+      {activeEvent && (
+        <Box ref={inProgressRef}>
+          <InProgressRow
+            event={activeEvent}
+            charCount={replayState!.activeCharCount}
+          />
+        </Box>
+      )}
     </Box>
   );
 }

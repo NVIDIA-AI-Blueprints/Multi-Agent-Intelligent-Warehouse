@@ -6,13 +6,14 @@
  * When trace exists: shows header + TIMELINE + ARTIFACT LINEAGE + TRACE PERFORMANCE.
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Box, Typography } from '@mui/material';
 import { DeveloperTrace, DeveloperTraceStatus } from './developerTraceTypes';
 import { ExplanationFocus } from '../decision-explanation/explanationTypes';
 import DeveloperTraceTimeline from './DeveloperTraceTimeline';
 import DeveloperTraceArtifacts from './DeveloperTraceArtifacts';
 import DeveloperTracePerformance from './DeveloperTracePerformance';
+import { useTraceReplay } from './useTraceReplay';
 
 // ── Props ──────────────────────────────────────────────────────────────────────
 
@@ -84,6 +85,86 @@ function SectionHeader({ label }: { label: string }) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
+// ── Replay controls ────────────────────────────────────────────────────────────
+
+function ReplayControls({
+  mode,
+  onSkip,
+  onReplay,
+}: {
+  mode: 'REPLAYING' | 'LIVE' | 'COMPLETE';
+  onSkip: () => void;
+  onReplay: () => void;
+}) {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      {mode === 'REPLAYING' ? (
+        <>
+          <Typography sx={{
+            fontFamily: 'monospace',
+            fontSize: '0.62rem',
+            color: '#D29922',
+            letterSpacing: '0.08em',
+          }}>
+            REPLAYING TRACE
+          </Typography>
+          <Box
+            component="button"
+            onClick={onSkip}
+            sx={{
+              fontFamily: 'monospace',
+              fontSize: '0.62rem',
+              color: '#484F58',
+              background: 'transparent',
+              border: '1px solid #30363D',
+              borderRadius: '3px',
+              px: '6px',
+              py: '1px',
+              cursor: 'pointer',
+              letterSpacing: '0.04em',
+              '&:hover': { borderColor: '#484F58', color: '#8B949E' },
+            }}
+          >
+            SKIP
+          </Box>
+        </>
+      ) : (
+        <>
+          <Typography sx={{
+            fontFamily: 'monospace',
+            fontSize: '0.62rem',
+            color: '#3FB950',
+            letterSpacing: '0.08em',
+          }}>
+            ● LIVE
+          </Typography>
+          <Box
+            component="button"
+            onClick={onReplay}
+            sx={{
+              fontFamily: 'monospace',
+              fontSize: '0.62rem',
+              color: '#484F58',
+              background: 'transparent',
+              border: '1px solid #30363D',
+              borderRadius: '3px',
+              px: '6px',
+              py: '1px',
+              cursor: 'pointer',
+              letterSpacing: '0.04em',
+              '&:hover': { borderColor: '#484F58', color: '#8B949E' },
+            }}
+          >
+            REPLAY
+          </Box>
+        </>
+      )}
+    </Box>
+  );
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
+
 export default function DeveloperTraceView({ trace, onOpenExplanation }: DeveloperTraceViewProps) {
   if (!trace) {
     return (
@@ -119,9 +200,28 @@ export default function DeveloperTraceView({ trace, onOpenExplanation }: Develop
     );
   }
 
+  const prefersReducedMotion = useMemo(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      // jsdom / SSR: skip animation, show all events immediately
+      return true;
+    }
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }, []);
+
+  const replayState = useTraceReplay(trace.events, {
+    charIntervalMs: 12,
+    eventDelayMs: 100,
+    reducedMotion: prefersReducedMotion,
+  });
+
   const shortTraceId = trace.traceId
     ? `${trace.traceId.slice(0, 8)}…`
     : null;
+
+  const showPreamble =
+    replayState.mode === 'REPLAYING' &&
+    replayState.visibleEvents.length === 0 &&
+    replayState.activeEventIndex === 0;
 
   return (
     <Box data-testid="dev-trace-view" sx={{ display: 'flex', flexDirection: 'column' }}>
@@ -151,6 +251,13 @@ export default function DeveloperTraceView({ trace, onOpenExplanation }: Develop
               {shortTraceId}
             </Typography>
           )}
+          <Box sx={{ ml: 'auto' }}>
+            <ReplayControls
+              mode={replayState.mode}
+              onSkip={replayState.skipReplay}
+              onReplay={replayState.startReplay}
+            />
+          </Box>
         </Box>
 
         {trace.scenarioName && (
@@ -171,9 +278,24 @@ export default function DeveloperTraceView({ trace, onOpenExplanation }: Develop
 
       {/* Timeline */}
       <SectionHeader label="Timeline" />
+
+      {/* Opening animation preamble */}
+      {showPreamble && (
+        <Typography sx={{
+          fontFamily: 'monospace',
+          fontSize: '0.65rem',
+          color: '#484F58',
+          fontStyle: 'italic',
+          mb: '4px',
+        }}>
+          TRACE INITIALIZING...
+        </Typography>
+      )}
+
       <DeveloperTraceTimeline
         events={trace.events}
         onOpenExplanation={onOpenExplanation}
+        replayState={replayState}
       />
 
       <SectionDivider />
