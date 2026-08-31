@@ -1,17 +1,24 @@
 /**
- * ExpertOverlay — Phase 12G expert panel for the demo shell.
+ * ExpertOverlay — Phase 13E refactor: 3-tab panel.
  *
- * Four sections rendered in a 2×2 grid:
- *   1. Runtime health     — maiw_operational_status, model_gateway, decision_engine, state_provider, uptime
- *   2. MCP domains        — inventory/equipment/labor/wave configured + domain health
- *   3. Agent / executor   — operations/equipment/safety agents + 3 executors
- *   4. SSE stream         — last 30 events from live buffer, newest first
+ * Tabs:
+ *   TRACE   — DeveloperTraceView (Phase 13E)
+ *   RUNTIME — Runtime health, MCP Domains, Agents & Executors
+ *   RAW EVENTS — SSE stream
+ *
+ * defaultTab prop allows external code (e.g. "VIEW FULL TRACE →" button) to
+ * force the TRACE tab open.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Typography } from '@mui/material';
 import { RuntimeStatus } from '../../services/api';
 import { SSEEvent } from '../../hooks/useDemoSSE';
+import { AnalysisResult, PendingApproval, DemoStatus } from '../../services/demoAPI';
+import { DecisionGraph } from './decision-graph/graphTypes';
+import { ExplanationFocus } from './decision-explanation/explanationTypes';
+import { buildDeveloperTrace } from './developer-trace/buildDeveloperTrace';
+import DeveloperTraceView from './developer-trace/DeveloperTraceView';
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
@@ -61,7 +68,7 @@ function RuntimeSection({ runtime }: { runtime: any }) {
     : '—';
 
   return (
-    <Box data-testid="expert-runtime">
+    <Box data-testid="expert-runtime" sx={{ mb: 2 }}>
       <SectionHeader label="Runtime" />
       <StatusRow
         label="maiw_operational_status"
@@ -99,7 +106,7 @@ const MCP_DOMAINS = ['inventory', 'equipment', 'labor', 'wave'] as const;
 
 function McpSection({ runtime }: { runtime: any }) {
   return (
-    <Box data-testid="expert-mcp">
+    <Box data-testid="expert-mcp" sx={{ mb: 2 }}>
       <SectionHeader label="MCP Domains" />
       {MCP_DOMAINS.map(d => {
         const configured: boolean | undefined = runtime?.[`${d}_mcp_configured`];
@@ -153,7 +160,7 @@ const EXECUTORS = [
 
 function AgentSection({ runtime }: { runtime: any }) {
   return (
-    <Box data-testid="expert-agents">
+    <Box data-testid="expert-agents" sx={{ mb: 2 }}>
       <SectionHeader label="Agents &amp; Executors" />
       {[...AGENTS, ...EXECUTORS].map(({ key, label }) => {
         const available: boolean | undefined = runtime?.[key];
@@ -253,15 +260,84 @@ function SseSection({ events }: { events: SSEEvent[] }) {
   );
 }
 
+// ── Tab pill ───────────────────────────────────────────────────────────────────
+
+type ExpertTab = 'trace' | 'runtime' | 'raw';
+
+function TabPill({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Box
+      component="button"
+      onClick={onClick}
+      sx={{
+        fontFamily: 'monospace',
+        fontSize: '0.58rem',
+        fontWeight: 700,
+        textTransform: 'uppercase',
+        letterSpacing: '0.1em',
+        px: '10px',
+        py: '4px',
+        borderRadius: '3px',
+        border: 'none',
+        cursor: 'pointer',
+        background: active ? '#21262D' : 'transparent',
+        color: active ? '#C9D1D9' : '#484F58',
+        transition: 'background 0.1s ease, color 0.1s ease',
+        '&:hover': { color: active ? '#C9D1D9' : '#8B949E' },
+      }}
+    >
+      {label}
+    </Box>
+  );
+}
+
 // ── ExpertOverlay ─────────────────────────────────────────────────────────────
 
 interface Props {
   runtime: RuntimeStatus | undefined | null;
-  demoStatus: any;
+  demoStatus: DemoStatus | null | undefined;
   sseEvents: SSEEvent[];
+  // Phase 13E additions
+  defaultTab?: ExpertTab;
+  analysisResult?: AnalysisResult | null;
+  pendingApprovals?: PendingApproval[];
+  graph?: DecisionGraph | null;
+  onOpenExplanation?: (focus: ExplanationFocus) => void;
 }
 
-export default function ExpertOverlay({ runtime, demoStatus, sseEvents }: Props) {
+export default function ExpertOverlay({
+  runtime,
+  demoStatus,
+  sseEvents,
+  defaultTab,
+  analysisResult,
+  pendingApprovals,
+  graph,
+  onOpenExplanation,
+}: Props) {
+  const [activeTab, setActiveTab] = useState<ExpertTab>(defaultTab ?? 'trace');
+
+  // Reset to defaultTab when it changes externally (for VIEW FULL TRACE click)
+  useEffect(() => {
+    if (defaultTab) setActiveTab(defaultTab);
+  }, [defaultTab]);
+
+  const trace = useMemo(() => buildDeveloperTrace({
+    analysisResult: analysisResult ?? null,
+    pendingApprovals: pendingApprovals ?? [],
+    demoStatus: demoStatus ?? null,
+    sseEvents,
+    graph: graph ?? null,
+  }), [analysisResult, pendingApprovals, demoStatus, sseEvents, graph]);
+
   return (
     <Box
       data-testid="expert-overlay"
@@ -283,6 +359,7 @@ export default function ExpertOverlay({ runtime, demoStatus, sseEvents }: Props)
         <Typography sx={{
           fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
           color: '#58A6FF', letterSpacing: '0.1em', textTransform: 'uppercase',
+          flexShrink: 0,
         }}>
           Expert view
         </Typography>
@@ -290,26 +367,35 @@ export default function ExpertOverlay({ runtime, demoStatus, sseEvents }: Props)
         <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D' }}>
           {demoStatus?.scenario?.name ?? 'no scenario'} · {demoStatus?.world?.elapsed_seconds ?? 0}s elapsed
         </Typography>
+        <Box sx={{ flexGrow: 1 }} />
+        {/* Tab pills */}
+        <Box sx={{ display: 'flex', gap: '2px', background: '#161B22', borderRadius: '5px', p: '3px', border: '1px solid #21262D' }}>
+          <TabPill label="Trace" active={activeTab === 'trace'} onClick={() => setActiveTab('trace')} />
+          <TabPill label="Runtime" active={activeTab === 'runtime'} onClick={() => setActiveTab('runtime')} />
+          <TabPill label="Raw Events" active={activeTab === 'raw'} onClick={() => setActiveTab('raw')} />
+        </Box>
       </Box>
 
-      {/* Grid */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 2fr', gap: 0 }}>
-        {[
-          { id: 'runtime', content: <RuntimeSection runtime={runtime} /> },
-          { id: 'mcp',     content: <McpSection runtime={runtime} /> },
-          { id: 'agents',  content: <AgentSection runtime={runtime} /> },
-          { id: 'sse',     content: <SseSection events={sseEvents} /> },
-        ].map(({ id, content }, i) => (
-          <Box
-            key={id}
-            sx={{
-              p: 1.5,
-              borderRight: i < 3 ? '1px solid #1F6FEB1A' : 'none',
-            }}
-          >
-            {content}
+      {/* Tab content */}
+      <Box sx={{ p: 2, overflow: 'auto', maxHeight: 480 }}>
+        {activeTab === 'trace' && (
+          <DeveloperTraceView
+            trace={trace}
+            onOpenExplanation={onOpenExplanation}
+          />
+        )}
+
+        {activeTab === 'runtime' && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            <RuntimeSection runtime={runtime} />
+            <McpSection runtime={runtime} />
+            <AgentSection runtime={runtime} />
           </Box>
-        ))}
+        )}
+
+        {activeTab === 'raw' && (
+          <SseSection events={sseEvents} />
+        )}
       </Box>
     </Box>
   );

@@ -191,6 +191,8 @@ export interface StageContentPaneProps {
   onReset?: () => void;
   /** Injected by StageContentPane — stage components may call this to open the explanation drawer. */
   onOpenExplanation?: (focus: ExplanationFocus) => void;
+  /** Open the Expert Overlay pinned to the TRACE tab. */
+  onViewFullTrace?: () => void;
 }
 
 // ── Stages that support STORY/GRAPH toggle ────────────────────────────────────
@@ -242,7 +244,7 @@ function ViewModeToggle({
 // ── Router ─────────────────────────────────────────────────────────────────────
 
 export default function StageContentPane(props: StageContentPaneProps) {
-  const { currentStage, demoStatus, analysisResult, pendingApprovals } = props;
+  const { currentStage, demoStatus, analysisResult, pendingApprovals, onViewFullTrace } = props;
 
   // Reset to story mode whenever stage changes
   const [viewMode, setViewMode] = useState<'story' | 'graph'>('story');
@@ -272,8 +274,8 @@ export default function StageContentPane(props: StageContentPaneProps) {
     });
   }, [currentStage, demoStatus, analysisResult, pendingApprovals, showToggle]);
 
-  // Props enriched with explanation callback
-  const stageProps = { ...props, onOpenExplanation: handleOpenExplanation };
+  // Props enriched with explanation callback + trace callback
+  const stageProps = { ...props, onOpenExplanation: handleOpenExplanation, onViewFullTrace };
 
   return (
     <Box
@@ -336,6 +338,7 @@ export default function StageContentPane(props: StageContentPaneProps) {
             pendingApprovals={pendingApprovals}
             demoStatus={demoStatus}
             onClose={handleCloseExplanation}
+            onViewFullTrace={onViewFullTrace}
           />
         )}
       </Box>

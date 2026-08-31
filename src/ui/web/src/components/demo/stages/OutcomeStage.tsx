@@ -123,7 +123,7 @@ function kpiRows(pre: KPISnapshot | undefined, post: KPISnapshot | undefined, de
 
 // ── OutcomeStage ──────────────────────────────────────────────────────────────
 
-export default function OutcomeStage({ analysisResult, demoStatus, onReset, onOpenExplanation }: StageContentPaneProps) {
+export default function OutcomeStage({ analysisResult, demoStatus, onReset, onOpenExplanation, onViewFullTrace }: StageContentPaneProps) {
   const [showCounterfactual, setShowCounterfactual] = useState(false);
 
   const pre = analysisResult?.pre_kpis;
@@ -213,8 +213,32 @@ export default function OutcomeStage({ analysisResult, demoStatus, onReset, onOp
             ))}
           </Box>
           {traceId && (
-            <Box sx={{ mt: 0.75 }}>
+            <Box sx={{ mt: 0.75, display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
               <IdText label="trace" value={traceId} />
+              {onViewFullTrace && (
+                <Box
+                  component="button"
+                  onClick={onViewFullTrace}
+                  data-testid="outcome-view-full-trace-button"
+                  sx={{
+                    background: 'transparent',
+                    border: '1px solid #30363D',
+                    borderRadius: '4px',
+                    color: '#58A6FF',
+                    cursor: 'pointer',
+                    fontFamily: 'monospace',
+                    fontSize: '0.62rem',
+                    fontWeight: 600,
+                    letterSpacing: '0.04em',
+                    px: '8px',
+                    py: '3px',
+                    transition: 'all 0.12s ease',
+                    '&:hover': { borderColor: '#58A6FF', background: '#0d2146' },
+                  }}
+                >
+                  VIEW FULL TRACE →
+                </Box>
+              )}
             </Box>
           )}
         </StageSection>

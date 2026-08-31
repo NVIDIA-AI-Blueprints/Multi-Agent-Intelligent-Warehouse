@@ -41,6 +41,8 @@ interface DecisionExplanationDrawerProps {
   pendingApprovals: PendingApproval[];
   demoStatus: DemoStatus | null;
   onClose: () => void;
+  /** Open the Expert Overlay pinned to the TRACE tab. */
+  onViewFullTrace?: () => void;
 }
 
 // ── Approval state badge ───────────────────────────────────────────────────────
@@ -497,6 +499,7 @@ export default function DecisionExplanationDrawer({
   pendingApprovals,
   demoStatus,
   onClose,
+  onViewFullTrace,
 }: DecisionExplanationDrawerProps) {
   // Local proposal index for multi-proposal stage focus
   const [proposalIndex, setProposalIndex] = useState(
@@ -683,6 +686,31 @@ export default function DecisionExplanationDrawer({
           Source:
         </Typography>
         {explanation && <SourceBadge source={explanation.source} />}
+        <Box sx={{ flexGrow: 1 }} />
+        {onViewFullTrace && (
+          <Box
+            component="button"
+            onClick={onViewFullTrace}
+            data-testid="view-full-trace-button"
+            sx={{
+              background: 'transparent',
+              border: '1px solid #30363D',
+              borderRadius: '4px',
+              color: '#58A6FF',
+              cursor: 'pointer',
+              fontFamily: 'monospace',
+              fontSize: '0.58rem',
+              fontWeight: 600,
+              letterSpacing: '0.04em',
+              px: '8px',
+              py: '3px',
+              transition: 'all 0.12s ease',
+              '&:hover': { borderColor: '#58A6FF', background: '#0d2146' },
+            }}
+          >
+            VIEW FULL TRACE →
+          </Box>
+        )}
       </Box>
     </Box>
   );

@@ -212,6 +212,7 @@ function ScenarioHeader({
 export default function DemoShell() {
   const [mode, setMode] = useState<DemoMode>('operations');
   const [expertMode, setExpertMode] = useState(false);
+  const [expertDefaultTab, setExpertDefaultTab] = useState<'trace' | 'runtime' | 'raw'>('trace');
   // showSelector overrides demoStatus.active — set true on reset so ScenarioSelector
   // appears immediately without waiting for the status poll to confirm active:false.
   const [showSelector, setShowSelector] = useState(false);
@@ -281,6 +282,11 @@ export default function DemoShell() {
     }
     await queryClient.invalidateQueries({ queryKey: ['demo-status'] });
   }, [demoStatus, queryClient]);
+
+  const handleViewFullTrace = useCallback(() => {
+    setExpertDefaultTab('trace');
+    setExpertMode(true);
+  }, []);
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -377,6 +383,7 @@ export default function DemoShell() {
               analyzing={analyzing}
               onAnalyze={handleAnalyze}
               onReset={handleReset}
+              onViewFullTrace={handleViewFullTrace}
             />
           </>
         )}
@@ -396,7 +403,14 @@ export default function DemoShell() {
 
         {/* Expert overlay */}
         {expertMode && (
-          <ExpertOverlay runtime={runtime} demoStatus={demoStatus} sseEvents={sseState.events} />
+          <ExpertOverlay
+            runtime={runtime}
+            demoStatus={demoStatus}
+            sseEvents={sseState.events}
+            defaultTab={expertDefaultTab}
+            analysisResult={analysisResult}
+            pendingApprovals={pendingApprovals}
+          />
         )}
       </Box>
 
