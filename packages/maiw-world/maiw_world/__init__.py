@@ -73,6 +73,18 @@ from .scenario import (
     labor_constraint_scenario,
     equipment_failure_scenario,
 )
+from .projections import (
+    InventoryItemProjection,
+    InventoryProjection,
+    WorkerProjection,
+    LaborProjection,
+    EquipmentItemProjection,
+    EquipmentProjection,
+    TaskProjection,
+    WaveItemProjection,
+    WaveProjection,
+    WarehouseProjectionBuilder,
+)
 
 __all__ = [
     # config
@@ -128,4 +140,15 @@ __all__ = [
     "ScenarioWorld",
     "labor_constraint_scenario",
     "equipment_failure_scenario",
+    # projections (Phase 14E)
+    "InventoryItemProjection",
+    "InventoryProjection",
+    "WorkerProjection",
+    "LaborProjection",
+    "EquipmentItemProjection",
+    "EquipmentProjection",
+    "TaskProjection",
+    "WaveItemProjection",
+    "WaveProjection",
+    "WarehouseProjectionBuilder",
 ]

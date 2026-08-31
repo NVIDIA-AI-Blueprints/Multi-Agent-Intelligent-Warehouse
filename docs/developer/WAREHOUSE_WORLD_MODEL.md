@@ -173,6 +173,76 @@ WarehouseWorldConfig.large()      # seed=99, 100k SKUs, 150w/shift, 30 AGVs, 40 
 
 ## Known Gaps for Phase 14B+
 
+---
+
+## Projection Architecture (Phase 14E)
+
+```
+CanonicalWarehouseGraph  (Operational Graph — immutable DataPack)
+        ↓
+ScenarioWorld  (base_graph + ScenarioOverlay disruption events)
+        ↓
+WarehouseProjectionBuilder  (at sim_time_offset)
+        ├── inventory()    → InventoryProjection
+        ├── labor()        → LaborProjection
+        ├── equipment()    → EquipmentProjection
+        └── waves()        → WaveProjection
+        ↓
+DemoWarehouseWorld  (mutable runtime state — agents act on this)
+        ↓
+Simulation Providers  (existing, unchanged)
+        ↓
+WarehouseState  (agent-facing contract, unchanged)
+        ↓
+Agents  (unaware of maiw-world)
+```
+
+**Three layers — kept explicit and separate:**
+
+| Layer | Class | Mutable? | Purpose |
+|---|---|---|---|
+| DataPack | `WarehouseDataPack` (files on disk) | No | Reproducible warehouse definition |
+| ScenarioWorld | `ScenarioWorld` | No | Baseline graph + overlay disruptions |
+| Runtime | `DemoWarehouseWorld` | Yes | Live state after MAIW actions |
+
+**DataPack checksum** must remain unchanged throughout a demo run. All mutations happen in `DemoWarehouseWorld` only.
+
+**Projection builder** (`WarehouseProjectionBuilder`) is the ONLY place that translates graph → domain model. Providers consume projections, not raw graph entities.
+
+**Agents never know `maiw-world` exists.** The `WarehouseState` contract is unchanged.
+
+### Loading a Scenario (Phase 14E path)
+
+```python
+# world_loader.py entry point
+from maiw_api.demo.world_loader import build_scenario_world
+from maiw_api.demo.world import DemoWarehouseWorld
+
+sw = build_scenario_world("labor_constraint_wave_risk")
+world = DemoWarehouseWorld(scenario_world=sw)
+# Providers wired to world as before — no changes needed
+```
+
+### Scenario Migration Status
+
+| Scenario name | Status | Path |
+|---|---|---|
+| `labor_constraint_wave_risk` | DataPack-native | `labor_constraint_scenario()` overlay |
+| `equipment_failure` | DataPack-native | `equipment_failure_scenario()` overlay |
+| `healthy_baseline` | DataPack-native | No-disruption overlay |
+| `stale_state` | Compat adapter → healthy_baseline | Maps to no-disruption overlay |
+| `state_drift` | Compat adapter → healthy_baseline | Maps to no-disruption overlay |
+
+### DataPack Location
+
+The canonical DC-47 DataPack is stored at `data/worlds/dc47-demo-v1/` (17MB, committed to the repo).
+
+Override with `MAIW_WORLD_DATAPACK_DIR` env var. Set `MAIW_WORLD_AUTO_GENERATE=true` for CI/local dev (generates on demand; never use in production).
+
+---
+
+## Known Gaps
+
 1. **No world generator** — `WarehouseWorldConfig` is a spec; Phase 14B will add a `WorldBuilder` that produces a populated `CanonicalWarehouseGraph` from config + seed.
 2. **No serialization to/from JSON** — edges and entities serialize individually (Pydantic `.model_dump()`), but there's no graph-level snapshot/restore yet.
 3. **No removal** — the graph is add-only in Phase 14A. Edge expiry is expressed temporally; explicit removal is not supported.

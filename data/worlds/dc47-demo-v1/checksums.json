@@ -1,0 +1,9 @@
+{
+  "files": {
+    "graph/edges.jsonl": "be63bf53b5e2b3a922dc66a7e50458cf49d4af24e5648dbc25344d34ffdb6bea",
+    "graph/entities.jsonl": "17fda5c5e2807344842ee85a01b711671326bed5b351fcc9eb77ed3bbd7eefe7",
+    "graph/events.jsonl": "043c58a1a392553d477abcd2bd6925971d40a6654fe1507d1d83df9be5c6cf21",
+    "manifest.json": "6117707c471cf37daa86a2fda532a466929269754ce22e43dd39735e31edd7e4"
+  },
+  "semantic_checksum": "b895d3c8cd56397d4938b52a519c682eae1365147cae506a6016750ee258ed1a"
+}
