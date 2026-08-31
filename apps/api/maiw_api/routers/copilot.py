@@ -97,5 +97,6 @@ async def copilot_turn(body: CopilotTurnRequest, request: Request):
         degradation_reason=result.degradation_reason,
         answerability=result.answerability,
         missing_context=result.missing_context,
+        timing=result.timing,
         related_artifacts={},
     )
