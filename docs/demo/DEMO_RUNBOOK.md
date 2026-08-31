@@ -176,7 +176,7 @@ To run the demo again from a clean state:
 
 1. Click **STOP** in the Demo Control Bar
 2. Click **RESET** (if available) or simply click **START** on the same scenario
-3. The simulation world re-initializes from the YAML `initial_state`
+3. The simulation world re-initializes by reconstructing `DemoWarehouseWorld` from the immutable `WarehouseDataPack` + `ScenarioOverlay` sources — not from a YAML `initial_state` block or snapshot
 
 ---
 

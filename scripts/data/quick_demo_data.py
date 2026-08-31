@@ -17,6 +17,11 @@
 """
 Quick Demo Data Generator
 
+LEGACY — Demo Mode data generation
+As of Phase 14E, MAIW Demo Mode uses WarehouseDataPack from packages/maiw-world/
+instead of direct PostgreSQL seeding.
+This script is retained for reference but is NOT part of the v2 demo setup path.
+
 Generates a smaller set of realistic demo data for quick testing and demos.
 This is faster than the full synthetic data generator and perfect for demos.
 

@@ -17,6 +17,11 @@
 """
 Generate sample equipment telemetry data for testing.
 
+LEGACY — Demo Mode data generation
+As of Phase 14E, MAIW Demo Mode uses WarehouseDataPack from packages/maiw-world/
+instead of direct PostgreSQL seeding.
+This script is retained for reference but is NOT part of the v2 demo setup path.
+
 Security Note: This script uses Python's random module (PRNG) for generating
 synthetic test data (sensor readings, telemetry values). This is appropriate
 for data generation purposes. For security-sensitive operations (tokens, keys,
