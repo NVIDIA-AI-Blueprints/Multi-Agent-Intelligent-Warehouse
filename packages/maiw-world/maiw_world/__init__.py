@@ -64,6 +64,15 @@ from .validation import (
     validate_config,
     validate_graph,
 )
+from .scenario import (
+    OverlayEvent,
+    OverlayEventKind,
+    ScenarioOverlay,
+    ScenarioOverlayBuilder,
+    ScenarioWorld,
+    labor_constraint_scenario,
+    equipment_failure_scenario,
+)
 
 __all__ = [
     # config
@@ -111,4 +120,12 @@ __all__ = [
     "ValidationReport",
     "validate_graph",
     "validate_config",
+    # scenario overlay (Phase 14D)
+    "OverlayEventKind",
+    "OverlayEvent",
+    "ScenarioOverlay",
+    "ScenarioOverlayBuilder",
+    "ScenarioWorld",
+    "labor_constraint_scenario",
+    "equipment_failure_scenario",
 ]
