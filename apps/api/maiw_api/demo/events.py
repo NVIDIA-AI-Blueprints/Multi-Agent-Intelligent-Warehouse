@@ -56,6 +56,11 @@ EventCategory = Literal[
     "CONFIRMED_EXECUTED",  # Reconciliation confirmed: mutation occurred
     "CONFIRMED_NOT_EXECUTED",  # Reconciliation confirmed: mutation did not occur
     "INDETERMINATE",  # Reconciliation cannot resolve; manual intervention needed
+    # Copilot conversational turn events (Phase 15)
+    "COPILOT_TURN_STARTED",     # Operator message received; turn processing begins
+    "COPILOT_INTENT_RESOLVED",  # ASK / ANALYZE / ACT intent determined
+    "COPILOT_CONTEXT_RESOLVED", # WarehouseState + graph neighborhood assembled
+    "COPILOT_TURN_COMPLETE",    # Copilot response ready
 ]
 
 

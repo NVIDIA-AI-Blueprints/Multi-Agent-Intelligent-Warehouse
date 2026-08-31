@@ -1160,6 +1160,8 @@ class OperationsCoordinationAgent:
         scenario_context: str = "",
         trace_id: str,
         deadline: Any = None,
+        reasoning_level: Any = None,
+        risk_level: Any = None,
     ) -> Any:
         """
         Observe warehouse state and produce an OperationalAssessment.
@@ -1269,6 +1271,9 @@ class OperationsCoordinationAgent:
                 latency_ms=0.0,
             )
 
+        _reasoning = reasoning_level if reasoning_level is not None else ReasoningLevel.HIGH
+        _risk = risk_level if risk_level is not None else RiskLevel.HIGH
+
         response = await self.model_gateway.generate(
             ModelRequest(
                 task="warehouse.operations.analyze_disruption",
@@ -1276,8 +1281,8 @@ class OperationsCoordinationAgent:
                     {"role": "system", "content": system_msg},
                     {"role": "user", "content": user_msg},
                 ],
-                reasoning=ReasoningLevel.HIGH,
-                risk_level=RiskLevel.HIGH,
+                reasoning=_reasoning,
+                risk_level=_risk,
                 trace_id=trace_id,
                 deadline=deadline,
             )
