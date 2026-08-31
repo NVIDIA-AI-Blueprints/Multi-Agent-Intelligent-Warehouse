@@ -116,18 +116,90 @@ class CopilotService:
         await self._publish("COPILOT_INTENT_RESOLVED", "intent=ASK", trace_id=trace_id)
 
         # ── Assemble WarehouseState ───────────────────────────────────────────
+        _t_state = time.monotonic()
         state, state_degraded, state_degradation_reason = await self._get_state(
             warehouse_id=warehouse_id,
             scenario_name=scenario_name,
             trace_id=trace_id,
         )
+        _state_ms = (time.monotonic() - _t_state) * 1000
 
-        # ── Resolve Operational Graph neighborhood ────────────────────────────
+        # ── Early answerability check — skip graph lookup if state is missing ─
+        missing = _missing_context(state, scenario_name)
+
+        if state is None or missing:
+            # Build a null neighborhood — no graph lookup needed
+            from maiw_api.copilot.models import ContextNeighborhood as _CN
+            neighborhood = _CN(
+                focus_entity_id=None,
+                focus_entity_label=None,
+                entity_ids=[],
+                relationship_summary={},
+                max_depth=2,
+                graph_available=False,
+            )
+            degradation = _build_degradation(state_degradation_reason, missing, neighborhood)
+            if state is None:
+                answer = (
+                    f"I cannot determine the answer because warehouse state is unavailable"
+                    f" for scenario '{scenario_name or warehouse_id}'. "
+                    + (state_degradation_reason or "")
+                ).strip()
+                routing_reason = "State unavailable — skipped"
+            else:
+                domain_str = ", ".join(missing)
+                answer = (
+                    f"I cannot determine the answer because the following context is unavailable: "
+                    f"{domain_str}. This usually means the scenario has not been started or "
+                    f"the requested data has not been loaded into the runtime."
+                )
+                routing_reason = "Answerability gate — empty state refused"
+            result = CopilotAskResult(
+                answer=answer,
+                evidence=[],
+                neighborhood=neighborhood,
+                agent="OperationsCoordinationAgent",
+                skills_used=[],
+                skills_available=[],
+                model_id="none",
+                reasoning_level="MEDIUM",
+                routing_rule="none",
+                routing_reason=routing_reason,
+                trace_id=trace_id,
+                snapshot_id="none",
+                warehouse_id=warehouse_id,
+                latency_ms=(time.monotonic() - _t0) * 1000,
+                degraded=True,
+                degradation_reason=degradation,
+                answerability="insufficient_evidence",
+                missing_context=missing,
+                timing={
+                    "state_assembly_ms": round(_state_ms, 1),
+                    "graph_lookup_ms": 0.0,
+                    "model_inference_ms": 0.0,
+                    "total_ms": round((time.monotonic() - _t0) * 1000, 1),
+                },
+            )
+            turn = self._make_turn(
+                turn_id=turn_id,
+                conv_id=conv.conversation_id,
+                message=message,
+                intent=intent,
+                trace_id=trace_id,
+                result=result,
+            )
+            self._store.add_turn(turn)
+            await self._publish("COPILOT_TURN_COMPLETE", "degraded=true insufficient_evidence", trace_id=trace_id)
+            return result, turn
+
+        # ── Resolve Operational Graph neighborhood (only when state is present) ─
+        _t_graph = time.monotonic()
         neighborhood = context_resolver.resolve(
             question=message,
             warehouse_id=warehouse_id,
             graph=self._graph,
         )
+        _graph_ms = (time.monotonic() - _t_graph) * 1000
 
         await self._publish(
             "COPILOT_CONTEXT_RESOLVED",
@@ -136,87 +208,6 @@ class CopilotService:
             f"graph_available={neighborhood.graph_available}",
             trace_id=trace_id,
         )
-
-        # ── Degrade if state is entirely unavailable ──────────────────────────
-        missing = _missing_context(state, scenario_name)
-
-        if state is None:
-            degradation = _build_degradation(state_degradation_reason, missing, neighborhood)
-            result = CopilotAskResult(
-                answer=(
-                    f"I cannot determine the answer because warehouse state is unavailable"
-                    f" for scenario '{scenario_name or warehouse_id}'. "
-                    + (state_degradation_reason or "")
-                ).strip(),
-                evidence=[],
-                neighborhood=neighborhood,
-                agent="OperationsCoordinationAgent",
-                skills_used=[],
-                skills_available=[],
-                model_id="none",
-                reasoning_level="MEDIUM",
-                routing_rule="none",
-                routing_reason="State unavailable — skipped",
-                trace_id=trace_id,
-                snapshot_id="none",
-                warehouse_id=warehouse_id,
-                latency_ms=(time.monotonic() - _t0) * 1000,
-                degraded=True,
-                degradation_reason=degradation,
-                answerability="insufficient_evidence",
-                missing_context=missing,
-            )
-            turn = self._make_turn(
-                turn_id=turn_id,
-                conv_id=conv.conversation_id,
-                message=message,
-                intent=intent,
-                trace_id=trace_id,
-                result=result,
-            )
-            self._store.add_turn(turn)
-            await self._publish("COPILOT_TURN_COMPLETE", "degraded=true insufficient_evidence", trace_id=trace_id)
-            return result, turn
-
-        # ── Answerability gate — refuse to call Nemotron on empty/zero state ──
-        if missing:
-            degradation = _build_degradation(state_degradation_reason, missing, neighborhood)
-            domain_str = ", ".join(missing)
-            result = CopilotAskResult(
-                answer=(
-                    f"I cannot determine the answer because the following context is unavailable: "
-                    f"{domain_str}. This usually means the scenario has not been started or "
-                    f"the requested data has not been loaded into the runtime."
-                ),
-                evidence=[],
-                neighborhood=neighborhood,
-                agent="OperationsCoordinationAgent",
-                skills_used=[],
-                skills_available=[],
-                model_id="none",
-                reasoning_level="MEDIUM",
-                routing_rule="none",
-                routing_reason="Answerability gate — empty state refused",
-                trace_id=trace_id,
-                snapshot_id="none",
-                warehouse_id=warehouse_id,
-                latency_ms=(time.monotonic() - _t0) * 1000,
-                degraded=True,
-                degradation_reason=degradation,
-                answerability="insufficient_evidence",
-                missing_context=missing,
-            )
-            turn = self._make_turn(
-                turn_id=turn_id,
-                conv_id=conv.conversation_id,
-                message=message,
-                intent=intent,
-                trace_id=trace_id,
-                result=result,
-            )
-            self._store.add_turn(turn)
-            await self._publish("COPILOT_TURN_COMPLETE", "degraded=true insufficient_evidence", trace_id=trace_id)
-            return result, turn
 
         # ── Seal snapshot and call agent ──────────────────────────────────────
         try:
@@ -267,6 +258,7 @@ class CopilotService:
             return result, turn
 
         # ── Build structured evidence from assessment facts ───────────────────
+        _total_ms = (time.monotonic() - _t0) * 1000
         evidence = _facts_to_evidence(assessment.facts_observed, assessment.severity)
 
         # Collect all degradation reasons: state domains + graph availability
@@ -288,11 +280,17 @@ class CopilotService:
             trace_id=trace_id,
             snapshot_id=assessment.snapshot_id,
             warehouse_id=assessment.warehouse_id,
-            latency_ms=assessment.latency_ms,
+            latency_ms=_total_ms,
             degraded=bool(full_degradation),
             degradation_reason=full_degradation or None,
             answerability=answerability,
             missing_context=partial_missing,
+            timing={
+                "state_assembly_ms": round(_state_ms, 1),
+                "graph_lookup_ms": round(_graph_ms, 1),
+                "model_inference_ms": round(assessment.latency_ms, 1),
+                "total_ms": round(_total_ms, 1),
+            },
         )
 
         turn = self._make_turn(
