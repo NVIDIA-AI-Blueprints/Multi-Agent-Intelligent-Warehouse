@@ -166,6 +166,20 @@ function ReplayControls({
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function DeveloperTraceView({ trace, onOpenExplanation }: DeveloperTraceViewProps) {
+  // Hooks must be called unconditionally — before any early return
+  const prefersReducedMotion = useMemo(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return true;
+    }
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }, []);
+
+  const replayState = useTraceReplay(trace?.events ?? [], {
+    charIntervalMs: 12,
+    eventDelayMs: 100,
+    reducedMotion: prefersReducedMotion,
+  });
+
   if (!trace) {
     return (
       <Box
@@ -199,20 +213,6 @@ export default function DeveloperTraceView({ trace, onOpenExplanation }: Develop
       </Box>
     );
   }
-
-  const prefersReducedMotion = useMemo(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-      // jsdom / SSR: skip animation, show all events immediately
-      return true;
-    }
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  }, []);
-
-  const replayState = useTraceReplay(trace.events, {
-    charIntervalMs: 12,
-    eventDelayMs: 100,
-    reducedMotion: prefersReducedMotion,
-  });
 
   const shortTraceId = trace.traceId
     ? `${trace.traceId.slice(0, 8)}…`
