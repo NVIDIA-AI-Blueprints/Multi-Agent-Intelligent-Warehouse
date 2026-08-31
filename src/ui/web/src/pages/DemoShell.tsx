@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box, CircularProgress, Typography } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDemoStatus } from '../hooks/useDemoStatus';
 import { useRuntimeStatus } from '../hooks/useRuntimeStatus';
@@ -79,6 +79,124 @@ function ExpertToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
         background: on ? '#58A6FF' : '#30363D',
         flexShrink: 0,
       }} />
+    </Box>
+  );
+}
+
+/**
+ * Phase15CopilotButton — reserved entry point for Phase 15.
+ * DISABLED. Must not imply any functional Copilot capability in Phase 14.
+ */
+function Phase15CopilotButton() {
+  return (
+    <Box
+      component="button"
+      disabled
+      aria-disabled="true"
+      aria-label="Copilot — available in Phase 15"
+      data-testid="phase15-copilot-button"
+      title="Coming in Phase 15 — not yet available"
+      sx={{
+        display: 'flex', alignItems: 'center', gap: 0.75,
+        background: 'transparent',
+        border: '1px solid #21262D',
+        borderRadius: '4px',
+        px: '10px', py: '4px',
+        fontFamily: 'monospace',
+        fontSize: '0.65rem',
+        color: '#30363D',
+        cursor: 'not-allowed',
+        letterSpacing: '0.06em',
+        textTransform: 'uppercase',
+        opacity: 0.5,
+      }}
+    >
+      Copilot
+      <Box component="span" sx={{
+        fontFamily: 'monospace', fontSize: '0.52rem', color: '#484F58',
+        border: '1px solid #21262D', borderRadius: '3px',
+        px: '4px', py: '0px', ml: 0.25, lineHeight: 1.6,
+      }}>
+        Phase 15
+      </Box>
+    </Box>
+  );
+}
+
+/**
+ * SSEStatusChip — shows SSE connection state when a scenario is active.
+ * Only renders during active scenario to avoid noise on idle screen.
+ */
+function SSEStatusChip({ connected, error }: { connected: boolean; error: string | null }) {
+  if (connected) {
+    return (
+      <Box
+        data-testid="sse-status-connected"
+        sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+      >
+        <Box sx={{ width: 5, height: 5, borderRadius: '50%', background: '#3FB950', flexShrink: 0, boxShadow: '0 0 4px #3FB950' }} />
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+          Live
+        </Typography>
+      </Box>
+    );
+  }
+  return (
+    <Box
+      data-testid="sse-status-disconnected"
+      sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+    >
+      <Box sx={{ width: 5, height: 5, borderRadius: '50%', background: '#D29922', flexShrink: 0 }} />
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#D29922', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+        {error ? 'Reconnecting' : 'Connecting'}
+      </Typography>
+    </Box>
+  );
+}
+
+/**
+ * BackendErrorBanner — shown when backend returns null/unavailable and initial load is done.
+ */
+function BackendErrorBanner({ onRetry }: { onRetry: () => void }) {
+  return (
+    <Box
+      data-testid="backend-error-banner"
+      role="alert"
+      sx={{
+        m: 3,
+        p: 2,
+        background: '#1A0A0A',
+        border: '1px solid #F8514944',
+        borderRadius: '6px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 1,
+        maxWidth: 480,
+      }}
+    >
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.72rem', fontWeight: 700, color: '#F85149', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+        Backend unavailable
+      </Typography>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: '#8B949E', lineHeight: 1.5 }}>
+        Cannot reach the MAIW demo API. Confirm the backend is running on port 8000 and the proxy is configured.
+      </Typography>
+      <Box
+        component="button"
+        onClick={onRetry}
+        data-testid="backend-retry-button"
+        sx={{
+          alignSelf: 'flex-start',
+          background: 'transparent',
+          border: '1px solid #30363D',
+          borderRadius: '4px',
+          px: '12px', py: '6px',
+          fontFamily: 'monospace', fontSize: '0.65rem',
+          color: '#8B949E', cursor: 'pointer',
+          '&:hover': { color: '#C9D1D9', borderColor: '#484F58' },
+        }}
+      >
+        ↺ Retry connection
+      </Box>
     </Box>
   );
 }
@@ -244,6 +362,9 @@ export default function DemoShell() {
   const freshnessSecs = demoStatus?.current_kpis?.state_freshness_seconds;
   const stateLabel = freshnessSecs != null && freshnessSecs < 120 ? 'FRESH' : 'STALE';
 
+  // Detect backend unavailable: load done, no data
+  const backendUnavailable = !demoLoading && demoStatus === null;
+
   // ── Handlers ────────────────────────────────────────────────────────────────
 
   const handleStart = useCallback(async (name: string) => {
@@ -323,6 +444,8 @@ export default function DemoShell() {
           Synthetic demo
         </Box>
         <Box sx={{ flexGrow: 1 }} />
+        <Phase15CopilotButton />
+        <Box sx={{ width: '1px', height: 14, background: '#21262D', flexShrink: 0 }} />
         <ModeSwitcher mode={mode} onChange={setMode} />
         <Box sx={{ width: '1px', height: 14, background: '#21262D', flexShrink: 0 }} />
         <ExpertToggle on={expertMode} onToggle={() => setExpertMode(e => !e)} />
@@ -338,16 +461,28 @@ export default function DemoShell() {
 
       {/* Content */}
       <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+        {/* ── Loading: initial connection ── */}
         {demoLoading && !demoStatus && (
-          <Box sx={{ p: 3 }}>
+          <Box
+            data-testid="demo-loading"
+            role="status"
+            aria-label="Connecting to demo backend"
+            sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 1.5 }}
+          >
+            <CircularProgress size={14} sx={{ color: '#484F58' }} />
             <Typography sx={{ fontFamily: 'monospace', fontSize: '0.72rem', color: '#484F58' }}>
               Connecting to demo backend...
             </Typography>
           </Box>
         )}
 
+        {/* ── Backend unavailable ── */}
+        {backendUnavailable && (
+          <BackendErrorBanner onRetry={() => queryClient.invalidateQueries({ queryKey: ['demo-status'] })} />
+        )}
+
         {/* ── First-run: scenario selection ── */}
-        {(!scenarioActive) && !demoLoading && (
+        {(!scenarioActive) && !demoLoading && !backendUnavailable && (
           <ScenarioSelector onStart={handleStart} />
         )}
 
@@ -447,6 +582,12 @@ export default function DemoShell() {
             </Typography>
           );
         })()}
+        {scenarioActive && (
+          <>
+            <Box sx={{ width: '1px', height: 10, background: '#21262D' }} />
+            <SSEStatusChip connected={sseState.connected} error={sseState.error} />
+          </>
+        )}
         <Box sx={{ flexGrow: 1 }} />
         <Typography sx={{
           fontFamily: 'monospace', fontSize: '0.62rem', color: '#484F58',
