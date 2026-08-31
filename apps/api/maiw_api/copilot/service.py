@@ -27,6 +27,7 @@ CopilotService: if we cannot inject real state, we degrade explicitly.
 from __future__ import annotations
 
 import logging
+import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -100,6 +101,7 @@ class CopilotService:
 
         Zero ActionProposals, zero DecisionEngine evaluations, zero writes.
         """
+        _t0 = time.monotonic()
         trace_id = str(uuid.uuid4())
         turn_id = str(uuid.uuid4())
 
@@ -158,7 +160,7 @@ class CopilotService:
                 trace_id=trace_id,
                 snapshot_id="none",
                 warehouse_id=warehouse_id,
-                latency_ms=0.0,
+                latency_ms=(time.monotonic() - _t0) * 1000,
                 degraded=True,
                 degradation_reason=degradation,
                 answerability="insufficient_evidence",
@@ -198,7 +200,7 @@ class CopilotService:
                 trace_id=trace_id,
                 snapshot_id="none",
                 warehouse_id=warehouse_id,
-                latency_ms=0.0,
+                latency_ms=(time.monotonic() - _t0) * 1000,
                 degraded=True,
                 degradation_reason=degradation,
                 answerability="insufficient_evidence",
@@ -246,7 +248,7 @@ class CopilotService:
                 trace_id=trace_id,
                 snapshot_id="none",
                 warehouse_id=warehouse_id,
-                latency_ms=0.0,
+                latency_ms=(time.monotonic() - _t0) * 1000,
                 degraded=True,
                 degradation_reason=str(exc),
                 answerability="insufficient_evidence",
@@ -452,12 +454,12 @@ def _build_degradation(
     """Compose a single degradation_reason string covering all missing context."""
     parts = []
     if state_reason:
-        parts.append(state_reason)
+        parts.append(state_reason.rstrip("."))
     if missing:
-        parts.append(f"Missing state domains: {', '.join(missing)}.")
+        parts.append(f"Missing state domains: {', '.join(missing)}")
     if neighborhood is not None and not getattr(neighborhood, "graph_available", True):
-        parts.append("Operational Graph unavailable — neighborhood context not shown.")
-    return "; ".join(parts) if parts else None
+        parts.append("Operational Graph unavailable — neighborhood context not shown")
+    return ". ".join(parts) + "." if parts else None
 
 
 # ── Evidence extraction ───────────────────────────────────────────────────────
