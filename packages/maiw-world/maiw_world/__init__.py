@@ -52,6 +52,11 @@ from .events import (
     OperationalEventType,
 )
 from .graph import CanonicalWarehouseGraph
+from .datapack import (
+    WarehouseDataPack,
+    compute_semantic_checksum,
+    DataPackVerificationResult,
+)
 from .validation import (
     FindingSeverity,
     ValidationFinding,
@@ -96,6 +101,10 @@ __all__ = [
     "OperationalEvent",
     # graph
     "CanonicalWarehouseGraph",
+    # datapack
+    "WarehouseDataPack",
+    "compute_semantic_checksum",
+    "DataPackVerificationResult",
     # validation
     "FindingSeverity",
     "ValidationFinding",
