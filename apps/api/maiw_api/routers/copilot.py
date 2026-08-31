@@ -87,6 +87,7 @@ async def copilot_turn(body: CopilotTurnRequest, request: Request):
         },
         agent=result.agent,
         skills_used=result.skills_used,
+        skills_available=result.skills_available,
         model_id=result.model_id,
         reasoning_level=result.reasoning_level,
         routing_rule=result.routing_rule,
@@ -94,5 +95,7 @@ async def copilot_turn(body: CopilotTurnRequest, request: Request):
         latency_ms=result.latency_ms,
         degraded=result.degraded,
         degradation_reason=result.degradation_reason,
+        answerability=result.answerability,
+        missing_context=result.missing_context,
         related_artifacts={},
     )

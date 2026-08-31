@@ -60,12 +60,24 @@ class CopilotAskResult:
 
     MUST contain zero ActionProposals, zero DecisionEngine evaluations,
     zero writes. These are enforced by architecture invariant tests.
+
+    Answerability
+    -------------
+    answerability = "answerable"           — state present, answer grounded
+    answerability = "insufficient_evidence" — state absent or all-zero; refused
+    answerability = "partial"              — some domains missing; answer may be incomplete
+
+    skills_used vs skills_available
+    --------------------------------
+    skills_used       — capabilities actually invoked during this turn (empty for ASK)
+    skills_available  — capabilities the agent reported as reachable
     """
     answer: str
     evidence: list[EvidenceFact]
     neighborhood: ContextNeighborhood
     agent: str
-    skills_used: list[str]
+    skills_used: list[str]           # actually invoked — always [] for ASK
+    skills_available: list[str]      # agent-reported reachable capabilities
     model_id: str
     reasoning_level: str
     routing_rule: str
@@ -76,6 +88,8 @@ class CopilotAskResult:
     latency_ms: float
     degraded: bool = False
     degradation_reason: str | None = None
+    answerability: str = "answerable"          # "answerable" | "insufficient_evidence" | "partial"
+    missing_context: list[str] = field(default_factory=list)  # e.g. ["wave_state", "labor_state"]
 
 
 # ── Turn / Conversation store models ─────────────────────────────────────────
@@ -151,7 +165,8 @@ class CopilotTurnResponse(BaseModel):
     evidence: list[dict] | None = None
     neighborhood: dict | None = None
     agent: str | None = None
-    skills_used: list[str] | None = None
+    skills_used: list[str] | None = None       # actually invoked — [] for ASK
+    skills_available: list[str] | None = None  # agent-reported reachable capabilities
     model_id: str | None = None
     reasoning_level: str | None = None
     routing_rule: str | None = None
@@ -159,6 +174,8 @@ class CopilotTurnResponse(BaseModel):
     latency_ms: float | None = None
     degraded: bool = False
     degradation_reason: str | None = None
+    answerability: str = "answerable"   # "answerable" | "insufficient_evidence" | "partial"
+    missing_context: list[str] = Field(default_factory=list)
 
     # Future: ANALYZE and ACT fields populated in 15C / 15D
     related_artifacts: dict = Field(default_factory=dict)

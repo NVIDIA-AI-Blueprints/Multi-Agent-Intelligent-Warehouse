@@ -116,6 +116,7 @@ class CopilotService:
         # ── Assemble WarehouseState ───────────────────────────────────────────
         state, state_degraded, state_degradation_reason = await self._get_state(
             warehouse_id=warehouse_id,
+            scenario_name=scenario_name,
             trace_id=trace_id,
         )
 
@@ -135,16 +136,21 @@ class CopilotService:
         )
 
         # ── Degrade if state is entirely unavailable ──────────────────────────
+        missing = _missing_context(state, scenario_name)
+
         if state is None:
+            degradation = _build_degradation(state_degradation_reason, missing, neighborhood)
             result = CopilotAskResult(
                 answer=(
-                    "I cannot answer this question right now. "
-                    + (state_degradation_reason or "Warehouse state is unavailable.")
-                ),
+                    f"I cannot determine the answer because warehouse state is unavailable"
+                    f" for scenario '{scenario_name or warehouse_id}'. "
+                    + (state_degradation_reason or "")
+                ).strip(),
                 evidence=[],
                 neighborhood=neighborhood,
                 agent="OperationsCoordinationAgent",
                 skills_used=[],
+                skills_available=[],
                 model_id="none",
                 reasoning_level="MEDIUM",
                 routing_rule="none",
@@ -154,7 +160,9 @@ class CopilotService:
                 warehouse_id=warehouse_id,
                 latency_ms=0.0,
                 degraded=True,
-                degradation_reason=state_degradation_reason,
+                degradation_reason=degradation,
+                answerability="insufficient_evidence",
+                missing_context=missing,
             )
             turn = self._make_turn(
                 turn_id=turn_id,
@@ -165,7 +173,47 @@ class CopilotService:
                 result=result,
             )
             self._store.add_turn(turn)
-            await self._publish("COPILOT_TURN_COMPLETE", "degraded=true", trace_id=trace_id)
+            await self._publish("COPILOT_TURN_COMPLETE", "degraded=true insufficient_evidence", trace_id=trace_id)
+            return result, turn
+
+        # ── Answerability gate — refuse to call Nemotron on empty/zero state ──
+        if missing:
+            degradation = _build_degradation(state_degradation_reason, missing, neighborhood)
+            domain_str = ", ".join(missing)
+            result = CopilotAskResult(
+                answer=(
+                    f"I cannot determine the answer because the following context is unavailable: "
+                    f"{domain_str}. This usually means the scenario has not been started or "
+                    f"the requested data has not been loaded into the runtime."
+                ),
+                evidence=[],
+                neighborhood=neighborhood,
+                agent="OperationsCoordinationAgent",
+                skills_used=[],
+                skills_available=[],
+                model_id="none",
+                reasoning_level="MEDIUM",
+                routing_rule="none",
+                routing_reason="Answerability gate — empty state refused",
+                trace_id=trace_id,
+                snapshot_id="none",
+                warehouse_id=warehouse_id,
+                latency_ms=0.0,
+                degraded=True,
+                degradation_reason=degradation,
+                answerability="insufficient_evidence",
+                missing_context=missing,
+            )
+            turn = self._make_turn(
+                turn_id=turn_id,
+                conv_id=conv.conversation_id,
+                message=message,
+                intent=intent,
+                trace_id=trace_id,
+                result=result,
+            )
+            self._store.add_turn(turn)
+            await self._publish("COPILOT_TURN_COMPLETE", "degraded=true insufficient_evidence", trace_id=trace_id)
             return result, turn
 
         # ── Seal snapshot and call agent ──────────────────────────────────────
@@ -190,6 +238,7 @@ class CopilotService:
                 neighborhood=neighborhood,
                 agent="OperationsCoordinationAgent",
                 skills_used=[],
+                skills_available=[],
                 model_id="none",
                 reasoning_level="MEDIUM",
                 routing_rule="none",
@@ -200,6 +249,8 @@ class CopilotService:
                 latency_ms=0.0,
                 degraded=True,
                 degradation_reason=str(exc),
+                answerability="insufficient_evidence",
+                missing_context=[],
             )
             turn = self._make_turn(
                 turn_id=turn_id,
@@ -216,20 +267,18 @@ class CopilotService:
         # ── Build structured evidence from assessment facts ───────────────────
         evidence = _facts_to_evidence(assessment.facts_observed, assessment.severity)
 
-        # Add explicit note if domains were degraded
-        full_degradation = state_degradation_reason
-        if neighborhood.graph_available is False:
-            note = "Operational Graph unavailable — neighborhood context not shown."
-            full_degradation = (
-                f"{full_degradation}; {note}" if full_degradation else note
-            )
+        # Collect all degradation reasons: state domains + graph availability
+        full_degradation = _build_degradation(state_degradation_reason, [], neighborhood)
+        partial_missing = [m for m in _missing_context(state, scenario_name)]
+        answerability = "partial" if (state_degradation_reason or not neighborhood.graph_available) else "answerable"
 
         result = CopilotAskResult(
             answer=assessment.summary,
             evidence=evidence,
             neighborhood=neighborhood,
             agent="OperationsCoordinationAgent",
-            skills_used=assessment.skills_consulted,
+            skills_used=[],                              # ASK invokes no tools
+            skills_available=assessment.skills_consulted,
             model_id=assessment.model_id,
             reasoning_level="MEDIUM",
             routing_rule=assessment.routing_rule,
@@ -240,6 +289,8 @@ class CopilotService:
             latency_ms=assessment.latency_ms,
             degraded=bool(full_degradation),
             degradation_reason=full_degradation or None,
+            answerability=answerability,
+            missing_context=partial_missing,
         )
 
         turn = self._make_turn(
@@ -260,6 +311,7 @@ class CopilotService:
         self,
         warehouse_id: str,
         trace_id: str,
+        scenario_name: str = "",
     ) -> tuple[Any | None, bool, str | None]:
         """
         Assemble WarehouseState. Returns (state, degraded, degradation_reason).
@@ -338,6 +390,74 @@ class CopilotService:
             response_summary=result.answer[:200],
             artifact_refs={},
         )
+
+
+# ── Answerability helpers ─────────────────────────────────────────────────────
+
+def _missing_context(state: Any | None, scenario_name: str) -> list[str]:
+    """
+    Return the list of context items that are absent or functionally empty.
+
+    A domain is "missing" if:
+    - state is None (completely unavailable), OR
+    - the domain attribute is None, OR
+    - all key numeric fields are zero (serialized absence, not legitimate empty)
+
+    Distinguishes empty-but-successful (legitimate zero records) from
+    unavailable (provider failed or scenario not loaded).
+
+    "Functionally empty" = all key counters are zero AND scenario_name is
+    provided but apparently not loaded. A real warehouse always has some
+    equipment, workers, or wave records; total-zero across all three domains
+    indicates the scenario was not loaded into the runtime.
+    """
+    if state is None:
+        return ["wave_state", "labor_state", "equipment_state"]
+
+    missing = []
+
+    # Check each domain: None attribute = missing
+    if getattr(state, "waves", None) is None:
+        missing.append("wave_state")
+    if getattr(state, "labor", None) is None:
+        missing.append("labor_state")
+    if getattr(state, "equipment", None) is None:
+        missing.append("equipment_state")
+
+    if missing:
+        return missing
+
+    # If all three domains are present but all counters are zero, treat as
+    # functionally unavailable — scenario not loaded into runtime.
+    waves = state.waves
+    labor = state.labor
+    equipment = state.equipment
+
+    wave_total = getattr(waves, "total_waves", None) or getattr(waves, "total_tasks", None) or 0
+    labor_total = getattr(labor, "total_workers", None) or getattr(labor, "total_labor", None) or 0
+    equip_total = getattr(equipment, "total_equipment", None) or getattr(equipment, "total", None) or 0
+
+    if wave_total == 0 and labor_total == 0 and equip_total == 0:
+        # All zeros across all three domains = scenario not loaded
+        return ["wave_state", "labor_state", "equipment_state"]
+
+    return missing
+
+
+def _build_degradation(
+    state_reason: str | None,
+    missing: list[str],
+    neighborhood: Any,
+) -> str | None:
+    """Compose a single degradation_reason string covering all missing context."""
+    parts = []
+    if state_reason:
+        parts.append(state_reason)
+    if missing:
+        parts.append(f"Missing state domains: {', '.join(missing)}.")
+    if neighborhood is not None and not getattr(neighborhood, "graph_available", True):
+        parts.append("Operational Graph unavailable — neighborhood context not shown.")
+    return "; ".join(parts) if parts else None
 
 
 # ── Evidence extraction ───────────────────────────────────────────────────────
