@@ -115,6 +115,9 @@ class MAIWRuntime:
     operations_agent: Any = None  # maiw_agents.operations.OperationsCoordinationAgent
     safety_agent: Any = None  # maiw_agents.safety.SafetyComplianceAgent
 
+    # Copilot service (Phase 15)
+    copilot_service: Any = None  # maiw_api.copilot.CopilotService
+
 
 async def get_runtime() -> MAIWRuntime:
     """
@@ -422,6 +425,34 @@ async def get_runtime() -> MAIWRuntime:
         logger.info("MAIW bootstrap: SafetyComplianceAgent ready")
     except Exception as exc:
         logger.warning("MAIW bootstrap: SafetyComplianceAgent unavailable — %s", exc)
+
+    # ── 12. CopilotService ────────────────────────────────────────────────────
+    try:
+        from maiw_api.copilot.service import CopilotService
+        from maiw_api.copilot.store import InMemoryCopilotStore
+
+        graph = None
+        try:
+            from maiw_api.demo.world_loader import load_canonical_graph
+            graph = load_canonical_graph()
+        except Exception as exc:
+            logger.warning("MAIW bootstrap: Copilot — canonical graph unavailable (%s). "
+                           "ASK turns will degrade on graph context.", exc)
+
+        event_bus = None
+        if runtime.demo_controller is not None:
+            event_bus = getattr(runtime.demo_controller, "event_bus", None)
+
+        runtime.copilot_service = CopilotService(
+            operations_agent=runtime.operations_agent,
+            state_provider=runtime.state_provider,
+            event_bus=event_bus,
+            graph=graph,
+            store=InMemoryCopilotStore(),
+        )
+        logger.info("MAIW bootstrap: CopilotService ready (graph=%s)", graph is not None)
+    except Exception as exc:
+        logger.warning("MAIW bootstrap: CopilotService unavailable — %s", exc)
 
     _runtime = runtime
     logger.info("MAIW bootstrap: runtime assembly complete")

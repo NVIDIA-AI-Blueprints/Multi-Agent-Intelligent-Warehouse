@@ -12,15 +12,118 @@
 
 ## What MAIW Is
 
-MAIW is a multi-agent system that lets warehouse operators ask natural-language questions and issue
-structured commands against live warehouse data. It does not answer from static knowledge. Instead,
-each agent assembles real-time state, reasons over it with a Nemotron model, proposes a concrete
-action, passes the proposal through a local decision engine, and — if approved — executes it
-through an MCP v2 capability server that writes to the backend database.
+**MAIW — Multi-Agent Intelligent Warehouse — is an operational AI architecture for reasoning about, governing, and acting on dynamic warehouse systems.**
 
-The system is designed around a single non-negotiable invariant: **the LLM never touches a write
-path directly**. Every mutation is proposed, evaluated by a deterministic policy engine, and
-executed by a typed executor that enforces four guards before a write reaches MCP.
+MAIW is designed around a simple question:
+
+> **What does it take for AI to participate safely in running a warehouse — not simply answer questions about one?**
+
+Warehouse operations are continuously changing. Workers move between tasks, equipment fails, inventory changes, orders arrive, waves approach carrier cutoffs, and the state observed when reasoning begins may no longer be valid when an action is ready to execute.
+
+MAIW addresses this by separating intelligence from operational authority.
+
+The core lifecycle is:
+
+**Observe → Reason → Propose → Decide → Approve → Execute → Observe Outcome**
+
+### Observe
+
+MAIW assembles a canonical `WarehouseState` across inventory, labor, equipment, and wave operations.
+
+In Demo Mode, this state originates from a reproducible Warehouse World:
+
+```
+WarehouseWorldConfig → Canonical Operational Graph → WarehouseDataPack
+        → ScenarioOverlay → Runtime World → WarehouseState
+```
+
+The Operational Graph models entities, relationships, events, and time — for example:
+
+```
+Worker → Task → Wave → Order → CarrierCutoff
+```
+
+This gives agents a coherent operational context rather than a collection of disconnected synthetic records.
+
+### Reason
+
+Agents request intelligence through a centralized **ModelGateway**, which selects the appropriate NVIDIA Nemotron model according to reasoning requirements, risk, and routing policy. Agents express what level of reasoning a decision requires; ModelGateway chooses the physical model.
+
+Agents interact with warehouse domains through typed skills and vendor-neutral MCP capabilities.
+
+### Propose
+
+AI recommendations do not directly mutate warehouse systems.
+
+They are converted into typed `ActionProposal` objects that explicitly describe the requested operational action, target, risk, and trace identity. A recommendation is intelligence; an `ActionProposal` is a governed operational artifact.
+
+### Decide
+
+Every proposal passes through a deterministic **DecisionEngine** that evaluates operational policy, state validity, risk, and invariants.
+
+The language model is not the authority that decides whether a consequential warehouse action may execute.
+
+### Approve
+
+Where human authority is required, approval is explicit, expirable, bound to the proposal and decision, and single-use.
+
+### Execute
+
+Only a guarded **ActionExecutor** may cross the execution boundary and invoke a write-capable MCP capability against the configured operational provider.
+
+The system maintains a non-negotiable invariant:
+
+> **The LLM never touches a write path directly.**
+
+AI recommends and proposes. The DecisionEngine governs. Human authority approves where required. The ActionExecutor executes.
+
+MCP capabilities connect MAIW to operational providers such as simulation backends, WMS/WES systems, enterprise services, or other warehouse control interfaces.
+
+### Observe Outcome
+
+Execution success is not necessarily operational success.
+
+MAIW observes the warehouse after execution and measures whether the intended operational outcome actually occurred: Did backlog fall? Did wave risk improve? Did throughput recover? Did the warehouse move toward the intended objective?
+
+This closes the operational loop.
+
+### Reliability and Provenance
+
+MAIW treats distributed-systems uncertainty as a first-class concern.
+
+If a write may have succeeded but its acknowledgement is lost, MAIW does not blindly retry:
+
+```
+UNKNOWN → suppress automatic retry → reread authoritative state → reconcile
+```
+
+Reconciliation may result in `CONFIRMED_EXECUTED` / `CONFIRMED_NOT_EXECUTED` / `INDETERMINATE`.
+
+The architecture also includes execution identity, idempotency protection, request deadlines, circuit breakers, graceful degradation, approval-state management, and deterministic fault-injection evaluation.
+
+Every operational interaction is traceable through:
+
+```
+Evidence → Agent Interpretation → Skills → Recommendation → ActionProposal
+        → Decision → Approval → Execution → Outcome
+```
+
+MAIW exposes structured reasoning artifacts and provenance — not hidden model chain-of-thought — through the Agentic Reasoning Canvas, Decision Graph, **Why This Decision?**, and Developer Trace.
+
+The Operational Graph and Decision Graph serve distinct purposes:
+
+- **Operational Graph** — warehouse reality and operational context.
+- **Decision Graph** — MAIW reasoning, governance, execution, and provenance.
+
+### Copilot (Phase 15 — in development)
+
+MAIW's Copilot architecture is designed as the conversational interaction layer over the same governed lifecycle. Natural-language requests may ask for explanation, analysis, or governed action, but Copilot never bypasses DecisionEngine, human approval, or ActionExecutor.
+
+---
+
+The result is not simply a collection of warehouse agents.
+
+**MAIW is a governed operational intelligence architecture that connects AI reasoning to safe, observable, traceable, and measurable warehouse action.**
 
 ---
 
@@ -1282,6 +1385,7 @@ package-based, MCP v2 system.
 | **DataPack + ScenarioOverlay** (`maiw-world` Phase 14C–D) | ✅ Done | Immutable `WarehouseDataPack` on disk; `ScenarioOverlay`; `ScenarioWorld` with entity-reference validation |
 | **Runtime projection** (`maiw-world` Phase 14E) | ✅ Done | `WarehouseProjectionBuilder`; `DemoWarehouseWorld` rebuilt from immutable sources on reset; providers and agents unchanged |
 | **v2 developer notebook + setup workflow** | 🔲 Phase 14F | `clone → configure → generate → validate → launch` journey |
+| **Copilot — ASK path** (Phase 15B) | 🔄 In development | `CopilotService`, `POST /api/v1/copilot/turn`, 41 architecture + behavior tests; on `feat/phase-15-copilot` |
 
 ---
 
@@ -1305,7 +1409,7 @@ package-based, MCP v2 system.
 ## Contributing
 
 1. Fork the repository and create a feature branch.
-2. All changes must keep CORE CI green: current baseline 990 CORE CI tests passing (197 maiw-world + API, 388 reliability Batches 1–7, and the remaining unit/contract/mcp suite) + 94 frontend tests; zero new failures.
+2. All changes must keep CORE CI green: current baseline 990 CORE CI tests passing + 258 maiw-world and API tests + 500 frontend tests; zero new failures.
 3. New canonical code goes in `packages/`, never in `src.*` for business logic.
 4. No `src.*` imports in any `packages/` code — enforced by the test suite.
 5. Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/).
