@@ -937,8 +937,8 @@ MAIW_MCP_TRANSPORT=streamable-http MAIW_MCP_WAVE_PORT=8768 \
 
 ### Demo mode (no database required)
 
-Demo mode uses synthetic simulation providers. No PostgreSQL, Redis, Kafka, or
-MCP servers are needed. **This is the recommended starting point.**
+Demo mode uses a deterministic Warehouse World DataPack and synthetic simulation providers.
+No PostgreSQL, Redis, Kafka, or MCP servers needed. **This is the recommended starting point.**
 
 ```bash
 git clone https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse.git
@@ -948,30 +948,31 @@ cd Multi-Agent-Intelligent-Warehouse
 python3 -m venv env && source env/bin/activate
 ./scripts/install_packages.sh
 
-# 2. Configure (set NVIDIA_API_KEY at minimum)
-cp .env.example .env
-# Edit .env → set NVIDIA_API_KEY=nvapi-...
+# 2. Configure API key
+export NVIDIA_API_KEY=nvapi-your-key-here
+# Or: cp .env.example .env  →  edit .env → set NVIDIA_API_KEY=nvapi-...
 
-# 3. Verify the environment is ready
-./scripts/check_demo_environment.sh
+# 3. Generate the Warehouse World DataPack (< 1s for the small preset, ~700ms for DC-47)
+./scripts/setup_demo_world.sh
+# Or: python -m maiw_world generate --config data/world-configs/dc47-demo.yaml
 
 # 4. Start the API in demo mode (terminal 1)
 ./scripts/start_demo_mode.sh
 
 # 5. Install and start the frontend (terminal 2)
-cd src/ui/web
-cp .env.example .env
-npm install && npm start
+cd src/ui/web && npm install && npm start
 ```
 
-Open http://localhost:3001, navigate to the **COMMAND** tab, select
-**Labor Constraint + Wave Risk** (recommended first scenario), and click **START**.
+Open http://localhost:3001/demo, select **Labor Constraint + Wave Risk** (recommended first
+scenario), and click **START**.
 
-See [docs/demo/DEMO_RUNBOOK.md](docs/demo/DEMO_RUNBOOK.md) for the full walkthrough.
+> **No PostgreSQL, Redis, Milvus, or Kafka required for Demo Mode.**
+> The canonical DC-47 warehouse world is generated locally from `data/world-configs/dc47-demo.yaml`.
+>
+> For an interactive setup walkthrough, open `notebooks/setup/maiw_v2_setup.ipynb`.
+> For the CLI reference, see `docs/developer/GETTING_STARTED.md`.
 
-> **Note (Phase 14F):** The MAIW v2 developer setup notebook and end-to-end Warehouse World
-> generation workflow (`clone → configure → generate → validate → launch`) are introduced in
-> Phase 14F. Full documentation of that journey will land there.
+See [docs/demo/DEMO_RUNBOOK.md](docs/demo/DEMO_RUNBOOK.md) for the full scenario walkthrough.
 
 ### Install all workspace packages (pip)
 
