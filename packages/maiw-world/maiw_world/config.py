@@ -9,6 +9,8 @@ No random/non-deterministic logic — the seed field controls all downstream RNG
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic import BaseModel, field_validator, model_validator
 
 
@@ -259,6 +261,14 @@ class WarehouseWorldConfig(BaseModel):
             waves=WaveConfig(active_wave_count=1, strategy="fifo", task_count=20),
             history=HistoryConfig(history_days=7),
         )
+
+    @classmethod
+    def from_yaml(cls, path: "str | Path") -> "WarehouseWorldConfig":
+        """Load config from a YAML file."""
+        import yaml
+        with open(path, "r") as f:
+            data = yaml.safe_load(f)
+        return cls(**data)
 
     @classmethod
     def large(cls) -> "WarehouseWorldConfig":

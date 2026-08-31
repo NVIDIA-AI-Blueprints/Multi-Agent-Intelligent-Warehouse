@@ -1,0 +1,34 @@
+# MAIW Small Developer World — for fast local validation
+# Use this when you want quick iteration without generating 25k SKUs.
+
+warehouse_id: DC-SMALL
+dataset_id: dc-small-v1
+seed: 42
+
+facility:
+  zone_count: 2
+  location_count: 20
+  dock_door_count: 2
+
+inventory:
+  sku_count: 100
+  low_stock_pct: 0.10
+
+labor:
+  workers_per_shift: 5
+  shift_count: 2
+
+equipment:
+  agv_count: 2
+  forklift_count: 2
+
+orders:
+  daily_order_count: 20
+  lines_per_order_mean: 2.0
+
+waves:
+  active_wave_count: 2
+  task_count: 10
+
+history:
+  history_days: 7
