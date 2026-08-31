@@ -47,8 +47,19 @@ from maiw_api.copilot.store import InMemoryCopilotStore
 
 @dataclass
 class _FakeDomainState:
-    """Non-None placeholder so _get_state doesn't flag domains as missing."""
-    pass
+    """
+    Non-None domain state with non-zero counters so _missing_context()
+    treats this as a loaded scenario (not functionally empty).
+    """
+    # Wave domain attributes
+    total_waves: int = 3
+    total_tasks: int = 120
+    # Labor domain attributes
+    total_workers: int = 120
+    total_labor: int = 120
+    # Equipment domain attributes
+    total_equipment: int = 24
+    total: int = 24
 
 
 @dataclass
@@ -664,3 +675,182 @@ class TestAskResultContract:
         assert "scratchpad" not in fields
         assert "hidden_reasoning" not in fields
         assert "reasoning_tokens" not in fields
+
+
+# ── 11. Answerability gate — release-blocking tests ───────────────────────────
+
+from maiw_api.copilot.service import _missing_context, _build_degradation
+
+
+class _ZeroDomainState:
+    """Domain state object with all-zero counters — simulates an unloaded scenario."""
+    total_waves: int = 0
+    total_tasks: int = 0
+    total_workers: int = 0
+    total_labor: int = 0
+    total_equipment: int = 0
+    total: int = 0
+
+
+@dataclass
+class _AllZeroState:
+    """State where every domain is present but all counters are zero."""
+    warehouse_id: str = "DC-47"
+    equipment: Any = None
+    labor: Any = None
+    waves: Any = None
+
+    def __post_init__(self):
+        if self.equipment is None:
+            self.equipment = _ZeroDomainState()
+        if self.labor is None:
+            self.labor = _ZeroDomainState()
+        if self.waves is None:
+            self.waves = _ZeroDomainState()
+
+
+class TestAnswerabilityGate:
+    """Release-blocking answerability tests from Phase 15B review."""
+
+    def test_missing_wave_state_never_produces_zero_total(self):
+        """If wave_state is absent, _missing_context must flag it — not report 0 total."""
+        state = _AllZeroState()
+        missing = _missing_context(state, "wave_disruption")
+        assert "wave_state" in missing, "All-zero state must be flagged as missing"
+
+    def test_missing_warehouse_state_returns_no_causal_claim(self):
+        """If state is None, ASK must refuse to produce a causal answer."""
+        missing = _missing_context(None, "wave_disruption")
+        assert "wave_state" in missing
+        assert "labor_state" in missing
+        assert "equipment_state" in missing
+
+    @pytest.mark.asyncio
+    async def test_all_zero_state_does_not_call_nemotron(self):
+        """Answerability gate must refuse to call the agent when state is all-zero."""
+        agent = MagicMock()
+        agent.analyze_disruption = AsyncMock()
+
+        provider = MagicMock()
+        provider.get_state = AsyncMock(return_value=_AllZeroState())
+
+        svc = CopilotService(
+            operations_agent=agent,
+            state_provider=provider,
+        )
+        result, _ = await svc.ask(
+            message="Why is Wave 17 at risk?",
+            conversation_id=None,
+            warehouse_id="DC-47",
+            scenario_name="wave_disruption",
+        )
+
+        agent.analyze_disruption.assert_not_called()
+        assert result.answerability == "insufficient_evidence"
+        assert result.degraded is True
+        assert "wave_state" in result.missing_context
+
+    @pytest.mark.asyncio
+    async def test_all_zero_state_produces_no_causal_claim(self):
+        """Zero-state response must not contain fabricated causal conclusions."""
+        provider = MagicMock()
+        provider.get_state = AsyncMock(return_value=_AllZeroState())
+
+        svc = CopilotService(
+            operations_agent=MagicMock(),
+            state_provider=provider,
+        )
+        result, _ = await svc.ask(
+            message="Why is Wave 17 at risk?",
+            conversation_id=None,
+            warehouse_id="DC-47",
+            scenario_name="wave_disruption",
+        )
+
+        # Must not contain invented operational conclusions
+        assert "no operational activity" not in result.answer.lower()
+        assert "complete absence" not in result.answer.lower()
+
+    def test_empty_successful_state_is_not_flagged(self):
+        """
+        A state with legitimate non-zero data must NOT be flagged as missing.
+        Distinguishes empty-but-successful from unavailable.
+        """
+        missing = _missing_context(_FakeState(), "wave_disruption")
+        assert missing == [], f"Loaded state should not be flagged; got {missing}"
+
+    @pytest.mark.asyncio
+    async def test_graph_unavailable_plus_valid_state_still_answers(self):
+        """Graph unavailable + valid state = partial answer, not refused."""
+        with patch("maiw_api.copilot.service.WarehouseStateSnapshot") as mock_snap:
+            mock_snap.seal.return_value = _FakeSnapshot.seal(_FakeState())
+            svc = _make_service(include_graph=False)  # graph=None
+            result, _ = await svc.ask(
+                message="Why is Wave 17 at risk?",
+                conversation_id=None,
+                warehouse_id="DC-47",
+            )
+
+        # Should answer (agent called), just with degraded=True for graph
+        assert result.answer == "Wave 17 is primarily constrained by labor availability."
+        assert result.answerability in ("answerable", "partial")
+        assert result.neighborhood.graph_available is False
+
+    def test_skills_used_empty_for_ask(self):
+        """ASK turns invoke no tools; skills_used must always be empty."""
+        from maiw_api.copilot.models import CopilotAskResult, ContextNeighborhood
+        neighborhood = ContextNeighborhood(
+            focus_entity_id=None, focus_entity_label=None,
+            entity_ids=[], relationship_summary={}, max_depth=2, graph_available=False,
+        )
+        result = CopilotAskResult(
+            answer="test",
+            evidence=[],
+            neighborhood=neighborhood,
+            agent="OperationsCoordinationAgent",
+            skills_used=[],
+            skills_available=["warehouse.wave.get_state"],
+            model_id="none",
+            reasoning_level="MEDIUM",
+            routing_rule="none",
+            routing_reason="test",
+            trace_id="t1",
+            snapshot_id="s1",
+            warehouse_id="DC-47",
+            latency_ms=0.0,
+        )
+        assert result.skills_used == []
+        assert "warehouse.wave.get_state" in result.skills_available
+
+    @pytest.mark.asyncio
+    async def test_skills_used_is_empty_in_ask_response(self):
+        """Service must return skills_used=[] for ASK turns."""
+        with patch("maiw_api.copilot.service.WarehouseStateSnapshot") as mock_snap:
+            mock_snap.seal.return_value = _FakeSnapshot.seal(_FakeState())
+            svc = _make_service()
+            result, _ = await svc.ask(
+                message="Why is Wave 17 at risk?",
+                conversation_id=None,
+                warehouse_id="DC-47",
+            )
+
+        assert result.skills_used == [], "ASK must report no invoked tools"
+        assert isinstance(result.skills_available, list)
+
+    def test_degradation_reason_includes_all_missing_domains(self):
+        """_build_degradation must expose missing state domains, not only graph."""
+        from maiw_api.copilot.service import _build_degradation
+        from maiw_api.copilot.models import ContextNeighborhood
+
+        neighborhood = ContextNeighborhood(
+            focus_entity_id=None, focus_entity_label=None,
+            entity_ids=[], relationship_summary={}, max_depth=2, graph_available=False,
+        )
+        reason = _build_degradation(
+            "Provider failed.",
+            ["wave_state", "labor_state"],
+            neighborhood,
+        )
+        assert "wave_state" in reason
+        assert "labor_state" in reason
+        assert "Operational Graph" in reason
