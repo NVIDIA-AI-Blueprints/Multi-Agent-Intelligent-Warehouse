@@ -24,7 +24,10 @@ import copy
 import random
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from maiw_world.scenario import ScenarioWorld
 
 # ── Default processing durations per task type ────────────────────────────────
 
@@ -165,7 +168,11 @@ class DemoWarehouseWorld:
     WAREHOUSE_ID = "DC-47"
     SOURCE = "simulation"
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        scenario_config: dict | None = None,          # existing — keep for backward compat
+        scenario_world: "ScenarioWorld | None" = None,  # NEW — Phase 14E path
+    ) -> None:
         self.clock = SimulationClock()
         self.inventory: dict[str, InventoryItem] = {}  # sku → item
         self.equipment: dict[str, EquipmentAsset] = {}  # asset_id → asset
@@ -182,6 +189,101 @@ class DemoWarehouseWorld:
         self._recovery_sim_time: int | None = (
             None  # first recovery-threshold-met sim clock time
         )
+        # Phase 14E: scenario world reference for projection-based init/reset
+        self._scenario_world: "ScenarioWorld | None" = scenario_world
+        self._datapack_checksum: str | None = None
+
+        if scenario_world is not None:
+            # Initialize from DataPack projections
+            try:
+                from maiw_world.projections import WarehouseProjectionBuilder
+                builder = WarehouseProjectionBuilder(scenario_world, at_offset=0.0)
+                self._init_from_projections(builder)
+                # Capture checksum from the base graph (DataPack must remain unchanged)
+                from maiw_world.datapack import compute_semantic_checksum
+                self._datapack_checksum = compute_semantic_checksum(
+                    scenario_world.base_graph
+                )
+            except ImportError:
+                pass  # maiw-world not installed — fall back to empty state
+
+        elif scenario_config is not None:
+            # Legacy: seed from scenario dict immediately
+            self.seed(scenario_config)
+
+    # ── Phase 14E: projection-based init ────────────────────────────────────
+
+    def _init_from_projections(self, builder: Any) -> None:
+        """Populate world collections from WarehouseProjectionBuilder output."""
+        self.inventory.clear()
+        self.equipment.clear()
+        self.workers.clear()
+        self.tasks.clear()
+        self._completion_log.clear()
+        self._disruption_sim_time = None
+        self._recovery_sim_time = None
+
+        inv_proj = builder.inventory()
+        for item in inv_proj.items:
+            inv_item = InventoryItem(
+                sku=item.sku_id,
+                name=item.sku_name,
+                zone=item.zone_id,
+                location_id=item.location_id,
+                quantity_available=item.quantity_available,
+                quantity_reserved=item.quantity_reserved,
+                reorder_point=item.reorder_point,
+            )
+            self.inventory[inv_item.sku] = inv_item
+
+        labor_proj = builder.labor()
+        for w in labor_proj.workers:
+            worker = WorkerState(
+                worker_id=w.worker_id,
+                username=w.username,
+                full_name=w.full_name,
+                role=w.role,
+                status="on_leave" if w.is_absent else "active",
+                zone=None,
+                current_task_id=w.assigned_task_ids[0] if w.assigned_task_ids else None,
+            )
+            self.workers[worker.worker_id] = worker
+
+        eq_proj = builder.equipment()
+        for eq in eq_proj.items:
+            asset = EquipmentAsset(
+                asset_id=eq.equipment_id,
+                equipment_type=eq.equipment_type,
+                model=eq.model,
+                zone=eq.zone_id or "",
+                status="offline" if eq.is_failed else "available",
+            )
+            self.equipment[asset.asset_id] = asset
+
+        wave_proj = builder.waves()
+        # TaskStatus values from graph are uppercase; demo world uses lowercase
+        _status_map = {
+            "PENDING": "pending",
+            "IN_PROGRESS": "in_progress",
+            "COMPLETED": "completed",
+            "BLOCKED": "pending",   # demo world has no BLOCKED status — treat as pending
+        }
+        for wave in wave_proj.waves:
+            for t in wave.tasks:
+                raw_status = t.status.upper()
+                demo_status = _status_map.get(raw_status, "pending")
+                task = TaskState(
+                    task_id=t.task_id,
+                    task_type=t.task_type,
+                    zone=t.zone_id,
+                    status=demo_status,
+                    assigned_to=t.assigned_worker_id,
+                    priority=t.priority,
+                )
+                task.processing_duration_seconds = _DEFAULT_PROCESSING_SECONDS.get(
+                    t.task_type, 300
+                )
+                self.tasks[task.task_id] = task
 
     # ── seeding ──────────────────────────────────────────────────────────────
 
@@ -255,16 +357,33 @@ class DemoWarehouseWorld:
             "_recovery_sim_time": self._recovery_sim_time,
         }
 
-    def reset(self, snap: dict[str, Any]) -> None:
-        """Restore world to a previously captured snapshot."""
-        self.clock.restore(snap["clock"])
-        self.inventory = copy.deepcopy(snap["inventory"])
-        self.equipment = copy.deepcopy(snap["equipment"])
-        self.workers = copy.deepcopy(snap["workers"])
-        self.tasks = copy.deepcopy(snap["tasks"])
-        self._completion_log = list(snap.get("_completion_log", []))
-        self._disruption_sim_time = snap.get("_disruption_sim_time")
-        self._recovery_sim_time = snap.get("_recovery_sim_time")
+    def reset(self, snap: dict[str, Any] | None = None) -> None:
+        """
+        Restore world state.
+
+        Phase 14E path: when scenario_world is set, rebuilds from projections
+        (not from a snapshot). DataPack checksum is unchanged.
+
+        Legacy path: restores from the provided ``snap`` dict.
+        """
+        if self._scenario_world is not None:
+            # Rebuild from projections — not from snapshot
+            try:
+                from maiw_world.projections import WarehouseProjectionBuilder
+                builder = WarehouseProjectionBuilder(self._scenario_world, at_offset=0.0)
+                self.clock = SimulationClock()
+                self._init_from_projections(builder)
+            except ImportError:
+                pass
+        elif snap is not None:
+            self.clock.restore(snap["clock"])
+            self.inventory = copy.deepcopy(snap["inventory"])
+            self.equipment = copy.deepcopy(snap["equipment"])
+            self.workers = copy.deepcopy(snap["workers"])
+            self.tasks = copy.deepcopy(snap["tasks"])
+            self._completion_log = list(snap.get("_completion_log", []))
+            self._disruption_sim_time = snap.get("_disruption_sim_time")
+            self._recovery_sim_time = snap.get("_recovery_sim_time")
 
     # ── convenience queries ───────────────────────────────────────────────────
 

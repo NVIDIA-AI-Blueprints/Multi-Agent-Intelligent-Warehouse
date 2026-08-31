@@ -1,0 +1,54 @@
+{
+  "config_snapshot": {
+    "dataset_id": "dc47-demo-v1",
+    "equipment": {
+      "agv_count": 8,
+      "conveyor_count": 4,
+      "forklift_count": 12
+    },
+    "facility": {
+      "dock_door_count": 8,
+      "location_count": 240,
+      "zone_count": 6
+    },
+    "history": {
+      "history_days": 30
+    },
+    "inventory": {
+      "inventory_profile": "standard",
+      "low_stock_pct": 0.04,
+      "sku_count": 25000
+    },
+    "labor": {
+      "shift_count": 3,
+      "skills": [
+        "pick",
+        "pack",
+        "putaway",
+        "cycle_count"
+      ],
+      "workers_per_shift": 40
+    },
+    "orders": {
+      "daily_order_count": 850,
+      "lines_per_order_mean": 4.2
+    },
+    "seed": 42,
+    "warehouse_id": "DC-47",
+    "waves": {
+      "active_wave_count": 3,
+      "strategy": "priority",
+      "task_count": 120
+    }
+  },
+  "dataset_id": "dc47-demo-v1",
+  "edge_count": 51726,
+  "entity_count": 51375,
+  "event_count": 172,
+  "generator_version": "0.1.0",
+  "maiw_world_schema_version": "1.0",
+  "pack_format": "maiw-datapack-v1",
+  "seed": 42,
+  "semantic_checksum": "b895d3c8cd56397d4938b52a519c682eae1365147cae506a6016750ee258ed1a",
+  "warehouse_id": "DC-47"
+}

@@ -206,7 +206,38 @@ class DemoScenarioController:
         defn = _load_scenario_file(files[scenario_name])
         self._cancel_tick_task()
 
-        self.world.seed(defn.initial_state, rng_seed=defn.rng_seed)
+        # ── Phase 14E: DataPack-native path ──────────────────────────────────
+        # Try to build world from canonical DataPack + scenario overlay.
+        # Falls back to legacy YAML-seeded path if maiw-world is unavailable
+        # or the scenario is not yet in SCENARIO_OVERLAYS.
+        _used_datapack = False
+        try:
+            from maiw_api.demo.world_loader import build_scenario_world, SCENARIO_OVERLAYS
+            if scenario_name in SCENARIO_OVERLAYS:
+                scenario_world = build_scenario_world(scenario_name)
+                self.world = DemoWarehouseWorld(scenario_world=scenario_world)
+                # Rewire all providers to the new world instance
+                from maiw_api.demo.providers.equipment import SimulationEquipmentProvider
+                from maiw_api.demo.providers.inventory import SimulationInventoryProvider
+                from maiw_api.demo.providers.labor import SimulationLaborProvider
+                from maiw_api.demo.providers.wave import SimulationWaveProvider
+                self.providers = SimulationProviders(
+                    inventory=SimulationInventoryProvider(self.world),
+                    equipment=SimulationEquipmentProvider(self.world, self.bus),
+                    labor=SimulationLaborProvider(self.world, self.bus),
+                    wave=SimulationWaveProvider(self.world, self.bus),
+                )
+                _used_datapack = True
+        except (ImportError, FileNotFoundError) as exc:
+            logger.debug(
+                "DataPack path unavailable for scenario '%s': %s — falling back to YAML",
+                scenario_name, exc,
+            )
+
+        if not _used_datapack:
+            # Legacy path: seed DemoWarehouseWorld from the scenario YAML initial_state
+            self.world.seed(defn.initial_state, rng_seed=defn.rng_seed)
+
         self._snapshot = self.world.snapshot()
         self._scenario = defn
         self._paused = False
@@ -215,7 +246,9 @@ class DemoScenarioController:
         self._pending_approvals = []
         self._scenario_run_id = str(_uuid.uuid4())
 
-        logger.info("Demo: started scenario '%s'", scenario_name)
+        logger.info(
+            "Demo: started scenario '%s' (datapack=%s)", scenario_name, _used_datapack
+        )
         await self.bus.publish_scenario(
             message=f"scenario:start:{scenario_name}",
             detail=defn.display_name,
@@ -242,7 +275,7 @@ class DemoScenarioController:
         if not self.active:
             raise RuntimeError("No active scenario")
         self._cancel_tick_task()
-        if self._snapshot is None:
+        if self._snapshot is None and self.world._scenario_world is None:
             raise RuntimeError("No snapshot available — call start() first")
         self.world.reset(self._snapshot)
         self._paused = False
