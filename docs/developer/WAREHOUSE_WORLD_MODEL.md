@@ -1,7 +1,7 @@
-# Warehouse World Model — Phase 14A
+# Warehouse World Model — Phase 14A–14E
 
 **Package:** `maiw-world` (`packages/maiw-world/`)
-**Status:** Phase 14A — Canonical typed models (stable)
+**Status:** Phase 14E — Canonical typed models + generated runtime architecture (stable)
 **Dependencies:** `pydantic>=2.0` only — no maiw-agents, maiw-decision, or maiw-execution
 
 ---
@@ -171,16 +171,22 @@ WarehouseWorldConfig.large()      # seed=99, 100k SKUs, 150w/shift, 30 AGVs, 40 
 
 ---
 
-## Known Gaps for Phase 14B+
-
 ---
 
 ## Projection Architecture (Phase 14E)
 
 ```
-CanonicalWarehouseGraph  (Operational Graph — immutable DataPack)
+WarehouseWorldConfig
         ↓
-ScenarioWorld  (base_graph + ScenarioOverlay disruption events)
+WarehouseWorldGenerator  (deterministic, seed-based)
+        ↓
+CanonicalWarehouseGraph  (Canonical Operational Graph)
+        ↓
+WarehouseDataPack  (immutable, on-disk, verifiable)
+        ↓
+ScenarioOverlay  (disruption events — applied on top of DataPack)
+        ↓
+ScenarioWorld  (base_graph + ScenarioOverlay disruption events — immutable view)
         ↓
 WarehouseProjectionBuilder  (at sim_time_offset)
         ├── inventory()    → InventoryProjection
@@ -188,11 +194,11 @@ WarehouseProjectionBuilder  (at sim_time_offset)
         ├── equipment()    → EquipmentProjection
         └── waves()        → WaveProjection
         ↓
-DemoWarehouseWorld  (mutable runtime state — agents act on this)
+DemoWarehouseWorld  (mutable runtime state — rebuilt from immutable sources on reset)
         ↓
 Simulation Providers  (existing, unchanged)
         ↓
-WarehouseState  (agent-facing contract, unchanged)
+WarehouseStateProvider → WarehouseState  (agent-facing contract, unchanged)
         ↓
 Agents  (unaware of maiw-world)
 ```
@@ -205,13 +211,103 @@ Agents  (unaware of maiw-world)
 | ScenarioWorld | `ScenarioWorld` | No | Baseline graph + overlay disruptions |
 | Runtime | `DemoWarehouseWorld` | Yes | Live state after MAIW actions |
 
+Summary:
+```
+DataPack          = what the warehouse is
+ScenarioWorld     = what happened to it
+DemoWarehouseWorld = what MAIW is currently operating on
+```
+
 **DataPack checksum** must remain unchanged throughout a demo run. All mutations happen in `DemoWarehouseWorld` only.
 
 **Projection builder** (`WarehouseProjectionBuilder`) is the ONLY place that translates graph → domain model. Providers consume projections, not raw graph entities.
 
 **Agents never know `maiw-world` exists.** The `WarehouseState` contract is unchanged.
 
-### Loading a Scenario (Phase 14E path)
+---
+
+## WarehouseDataPack
+
+`WarehouseDataPack` is the immutable, reproducible artifact generated from a `WarehouseWorldConfig` + seed. It contains the canonical graph, entity IDs, seed, and semantic checksum. Once written, it is never mutated by a demo run.
+
+### Immutability guarantee
+
+A `WarehouseDataPack` is written once during world generation and read-only thereafter. The demo runtime, scenario loading, and provider initialization all read from the DataPack. No agent action, executor call, or provider write ever modifies the DataPack on disk.
+
+### Semantic checksum
+
+The DataPack checksum is a SHA-256 digest computed over:
+- All entities (sorted by entity ID)
+- All edges (sorted by edge ID)
+- All operational events (sorted by event ID)
+
+Wall-clock timestamps (e.g. file creation time) are excluded from the checksum. The same config + seed always produces the same checksum, regardless of when generation runs.
+
+### On-disk structure
+
+```
+data/worlds/<dataset_id>/
+├── manifest.json          # dataset_id, warehouse_id, seed, generated_at, entity_count, edge_count
+├── checksums.json         # semantic_checksum (SHA-256), algorithm
+├── graph/
+│   ├── entities.jsonl     # one entity per line (newline-delimited JSON)
+│   ├── edges.jsonl        # one edge per line
+│   └── events.jsonl       # one operational event per line
+```
+
+### Atomic write
+
+DataPack generation writes to a temporary directory first, then renames it into place. A partially-written DataPack is never visible to readers.
+
+### Reload determinism
+
+Loading the same DataPack always produces the same `CanonicalWarehouseGraph`. Entity ID assignment is stable across process restarts. The same DataPack loaded twice in the same process or in different processes produces identical graph state.
+
+### DataPack location
+
+The canonical DC-47 DataPack is stored at `data/worlds/dc47-demo-v1/` (committed to the repo).
+
+Override with `MAIW_WORLD_DATAPACK_DIR` env var. Set `MAIW_WORLD_AUTO_GENERATE=true` for CI/local dev (generates on demand; never use in production).
+
+---
+
+## ScenarioOverlay
+
+A `ScenarioOverlay` is an ordered list of `DisruptionEvent` records that describe what happened to the warehouse. It is applied on top of an immutable DataPack base graph to produce a `ScenarioWorld`.
+
+### Base world + event overlay pattern
+
+```
+WarehouseDataPack (base graph — never mutated)
+        +
+ScenarioOverlay (disruption events)
+        ↓
+ScenarioWorld (immutable combined view)
+```
+
+The base graph is never mutated. ScenarioOverlay events are references into the base graph — they describe disruptions by entity ID, not by modifying entity state.
+
+### Entity reference validation
+
+At `ScenarioWorld` construction time, all entity IDs referenced by overlay events are validated against the base graph. A `ScenarioValidationError` is raised if an event references a non-existent entity. This prevents silent test-time mismatches when scenario definitions drift from the DataPack.
+
+### Scenario migration status
+
+| Scenario name | Status | Path |
+|---|---|---|
+| `labor_constraint_wave_risk` | DataPack-native | `labor_constraint_scenario()` overlay |
+| `equipment_failure` | DataPack-native | `equipment_failure_scenario()` overlay |
+| `healthy_baseline` | DataPack-native | No-disruption overlay |
+| `stale_state` | Compat adapter → healthy_baseline | Maps to no-disruption overlay |
+| `state_drift` | Compat adapter → healthy_baseline | Maps to no-disruption overlay |
+
+`stale_state` and `state_drift` use the healthy_baseline overlay as a compatibility adapter. They are not fully migrated to DataPack-native overlays.
+
+---
+
+## Runtime Projection and Reset Semantics
+
+### Loading a scenario (Phase 14E path)
 
 ```python
 # world_loader.py entry point
@@ -223,30 +319,87 @@ world = DemoWarehouseWorld(scenario_world=sw)
 # Providers wired to world as before — no changes needed
 ```
 
-### Scenario Migration Status
+`DemoWarehouseWorld.__init__()` accepts an optional `ScenarioWorld` and populates its internal state from projections via `WarehouseProjectionBuilder`. Providers continue reading the same internal dict structure they always have — no provider changes were required.
 
-| Scenario name | Status | Path |
-|---|---|---|
-| `labor_constraint_wave_risk` | DataPack-native | `labor_constraint_scenario()` overlay |
-| `equipment_failure` | DataPack-native | `equipment_failure_scenario()` overlay |
-| `healthy_baseline` | DataPack-native | No-disruption overlay |
-| `stale_state` | Compat adapter → healthy_baseline | Maps to no-disruption overlay |
-| `state_drift` | Compat adapter → healthy_baseline | Maps to no-disruption overlay |
+### Reset semantics
 
-### DataPack Location
+```
+Run starts  → DataPack + ScenarioOverlay → runtime world constructed from projections
+MAIW acts   → DemoWarehouseWorld state changes (providers read/write here)
+Reset       → DemoWarehouseWorld reconstructed from immutable sources
+              (DataPack + ScenarioOverlay, not from a snapshot)
+```
 
-The canonical DC-47 DataPack is stored at `data/worlds/dc47-demo-v1/` (17MB, committed to the repo).
-
-Override with `MAIW_WORLD_DATAPACK_DIR` env var. Set `MAIW_WORLD_AUTO_GENERATE=true` for CI/local dev (generates on demand; never use in production).
+Reset does not use a snapshot of the pre-disruption state. It re-runs the projection pipeline from the original immutable DataPack + ScenarioOverlay. This guarantees that the reset world is bit-for-bit identical to the initial world regardless of how many mutations occurred during the run.
 
 ---
 
-## Known Gaps
+## Provider Integration
 
-1. **No world generator** — `WarehouseWorldConfig` is a spec; Phase 14B will add a `WorldBuilder` that produces a populated `CanonicalWarehouseGraph` from config + seed.
-2. **No serialization to/from JSON** — edges and entities serialize individually (Pydantic `.model_dump()`), but there's no graph-level snapshot/restore yet.
-3. **No removal** — the graph is add-only in Phase 14A. Edge expiry is expressed temporally; explicit removal is not supported.
-4. **No thread safety** — the graph is not guarded by a lock. Safe for single-threaded simulation use.
-5. **No index on entity type** — `entities_by_type` is O(n). Phase 14B may add a secondary index for large graphs.
-6. **No cross-graph linking API** — the Operational Graph references the Decision Graph (Phase 13) only by shared IDs. A formal linking layer is deferred to Phase 14C.
-7. **No `Shipment` edges in tiny_world** — `SHIPPED_VIA` is defined but not exercised in the fixture. Phase 14B scenario generators will populate shipments.
+Providers remained unchanged through Phase 14E. The integration is:
+
+1. `DemoWarehouseWorld.__init__(scenario_world=sw)` runs `WarehouseProjectionBuilder` at `sim_time_offset=0` and populates the internal dicts.
+2. Providers (`InventorySimProvider`, `LaborSimProvider`, `EquipmentSimProvider`, `WaveSimProvider`) read from and write to those internal dicts exactly as before.
+3. `ActionExecutor` mutates `DemoWarehouseWorld` through the existing provider write paths — no new write path was introduced.
+
+The projection builder is the only translation boundary between the graph model and the provider model.
+
+---
+
+## Entity Identity Flow
+
+Canonical entity IDs flow through the full stack:
+
+```
+Operational Graph (worker-042)
+→ Projection (worker-042)
+→ Provider (worker-042)
+→ WarehouseState (worker-042)
+→ Proposal/Execution (worker-042)
+```
+
+Entity IDs assigned in the DataPack are stable across reloads, resets, and across the full MAIW pipeline. This enables future Copilot context and Operational Graph → Decision Graph provenance links.
+
+---
+
+## Reproducibility Identity
+
+```
+dataset_id + warehouse_id + seed  →  identifies the warehouse world (DataPack)
+scenario                          →  identifies the disruption overlay
+trace_id                          →  identifies one MAIW reasoning/execution interaction
+```
+
+These three identity dimensions are kept separate:
+- DataPack identity (`dataset_id + warehouse_id + seed`) is a property of the generated world artifact.
+- Scenario identity is a property of the overlay applied on top of it.
+- `trace_id` is a runtime correlation identifier that spans one OBSERVE→OUTCOME cycle. It does not identify a warehouse world or scenario.
+
+Do not conflate DataPack identity with trace identity.
+
+---
+
+## Known Semantic Gap
+
+```
+KNOWN SEMANTIC GAP
+
+TaskStatus.BLOCKED in the Operational Graph currently maps to "pending"
+in DemoWarehouseWorld's runtime representation, because the demo runtime
+has no BLOCKED state value.
+
+Blocked tasks remain accessible via ScenarioWorld.blocked_tasks(at_offset).
+
+This gap does not break any current scenario behavior. It will be
+addressed if a concrete runtime need arises.
+```
+
+---
+
+## Known Gaps (residual)
+
+1. **No removal** — the graph is add-only. Edge expiry is expressed temporally; explicit removal is not supported.
+2. **No thread safety** — the graph is not guarded by a lock. Safe for single-threaded simulation use.
+3. **No cross-graph linking API** — the Operational Graph references the Decision Graph (Phase 13) only by shared IDs. A formal linking layer is deferred to a future phase.
+4. **`stale_state` / `state_drift` scenarios** — these use the healthy_baseline overlay as a compatibility adapter. They are not DataPack-native overlays.
+5. **Automated reconciliation trigger** — not yet implemented (operator-initiated only; see Phase 10E).

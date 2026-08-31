@@ -1,0 +1,43 @@
+# MAIW Canonical Demo Warehouse — DC-47
+# dataset_id: dc47-demo-v1
+# seed: 42 (deterministic — same seed + generator version = same world)
+
+warehouse_id: DC-47
+dataset_id: dc47-demo-v1
+seed: 42
+
+facility:
+  zone_count: 6
+  location_count: 240
+  dock_door_count: 8
+
+inventory:
+  sku_count: 25000
+  low_stock_pct: 0.04
+  inventory_profile: standard
+
+labor:
+  workers_per_shift: 40
+  shift_count: 3
+  skills:
+    - pick
+    - pack
+    - putaway
+    - cycle_count
+
+equipment:
+  agv_count: 8
+  forklift_count: 12
+  conveyor_count: 4
+
+orders:
+  daily_order_count: 850
+  lines_per_order_mean: 4.2
+
+waves:
+  active_wave_count: 3
+  strategy: priority
+  task_count: 120
+
+history:
+  history_days: 30

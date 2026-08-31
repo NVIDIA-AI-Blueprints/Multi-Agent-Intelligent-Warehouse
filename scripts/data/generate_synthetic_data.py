@@ -17,6 +17,11 @@
 """
 Synthetic Data Generator for Warehouse Operational Assistant
 
+LEGACY — Demo Mode data generation
+As of Phase 14E, MAIW Demo Mode uses WarehouseDataPack from packages/maiw-world/
+instead of direct PostgreSQL seeding.
+This script is retained for reference but is NOT part of the v2 demo setup path.
+
 Generates comprehensive synthetic data across all databases:
 - PostgreSQL/TimescaleDB: Inventory, tasks, users, safety incidents, equipment telemetry
 - Milvus: Vector embeddings for documents and knowledge base

@@ -42,6 +42,83 @@ executed by a typed executor that enforces four guards before a write reaches MC
 
 ---
 
+## Warehouse World Model (Phase 14E)
+
+Demo Mode data flows through a layered, deterministic world model. The canonical path is:
+
+```
+WarehouseWorldConfig
+        ↓
+WarehouseWorldGenerator  (deterministic, seed-based)
+        ↓
+Canonical Operational Graph
+        ↓
+WarehouseDataPack  (immutable, on-disk, verifiable)
+        ↓
+ScenarioOverlay  (disruption events)
+        ↓
+ScenarioWorld  (base + overlay, immutable view)
+        ↓
+DemoWarehouseWorld  (mutable runtime execution world)
+        ↓
+Simulation Providers  (unchanged)
+        ↓
+WarehouseStateProvider → WarehouseState → Agents
+```
+
+The graph is the canonical synthetic-world representation. Scenarios are overlays applied on top of an immutable base world. The mutable demo runtime is **derived from immutable sources, not the other way around**. Agents consume the same `WarehouseState` contracts they always have — they do not know `maiw-world` exists.
+
+Demo Mode does **not** seed from YAML `initial_state` blocks or legacy SQL scripts. Those scripts (`scripts/data/quick_demo_data.py` etc.) are retained for reference but are not part of the v2 demo setup path.
+
+### Three-State Distinction
+
+**WarehouseDataPack** — `data/worlds/<dataset_id>/`
+
+Immutable, reproducible warehouse artifact. Contains the canonical graph, entity IDs, seed, and semantic checksum. Never mutated by a demo run.
+
+**ScenarioWorld**
+
+Immutable view: DataPack base graph + deterministic scenario event overlay. Validates entity references at construction. Does not modify the DataPack.
+
+**DemoWarehouseWorld**
+
+Mutable runtime execution world. Derived from DataPack + ScenarioOverlay at scenario start. Providers read this; ActionExecutor may mutate it. Reset reconstructs it from immutable sources — not from a snapshot.
+
+```
+DataPack           = what the warehouse is
+ScenarioWorld      = what happened to it
+DemoWarehouseWorld = what MAIW is currently operating on
+```
+
+### Operational Graph vs. Decision Graph
+
+These are separate models that share canonical IDs as linking artifacts.
+
+```
+Operational Graph  = warehouse reality and operational context
+                     Worker → Task → Wave → Order → CarrierCutoff
+
+Decision Graph     = MAIW reasoning and decision provenance
+                     Evidence → Assessment → Recommendation → Proposal
+                     → Decision → Approval → Execution → Outcome
+```
+
+They are never merged into a single structure.
+
+### Reproducibility Identity
+
+```
+dataset_id + warehouse_id + seed  →  identifies the warehouse world (DataPack)
+scenario                          →  identifies the disruption overlay
+trace_id                          →  identifies one MAIW reasoning/execution interaction
+```
+
+These three identity dimensions are kept separate. `trace_id` is a runtime correlation identifier — it does not identify a warehouse world or scenario.
+
+See [docs/developer/WAREHOUSE_WORLD_MODEL.md](docs/developer/WAREHOUSE_WORLD_MODEL.md) for the full specification.
+
+---
+
 ## Core Design Principles
 
 1. **LLMs propose, policy decides.** The `DecisionEngine` is synchronous, deterministic, and
@@ -860,8 +937,8 @@ MAIW_MCP_TRANSPORT=streamable-http MAIW_MCP_WAVE_PORT=8768 \
 
 ### Demo mode (no database required)
 
-Demo mode uses synthetic simulation providers. No PostgreSQL, Redis, Kafka, or
-MCP servers are needed. **This is the recommended starting point.**
+Demo mode uses a deterministic Warehouse World DataPack and synthetic simulation providers.
+No PostgreSQL, Redis, Kafka, or MCP servers needed. **This is the recommended starting point.**
 
 ```bash
 git clone https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse.git
@@ -871,26 +948,31 @@ cd Multi-Agent-Intelligent-Warehouse
 python3 -m venv env && source env/bin/activate
 ./scripts/install_packages.sh
 
-# 2. Configure (set NVIDIA_API_KEY at minimum)
-cp .env.example .env
-# Edit .env → set NVIDIA_API_KEY=nvapi-...
+# 2. Configure API key
+export NVIDIA_API_KEY=nvapi-your-key-here
+# Or: cp .env.example .env  →  edit .env → set NVIDIA_API_KEY=nvapi-...
 
-# 3. Verify the environment is ready
-./scripts/check_demo_environment.sh
+# 3. Generate the Warehouse World DataPack (< 1s for the small preset, ~700ms for DC-47)
+./scripts/setup_demo_world.sh
+# Or: python -m maiw_world generate --config data/world-configs/dc47-demo.yaml
 
 # 4. Start the API in demo mode (terminal 1)
 ./scripts/start_demo_mode.sh
 
 # 5. Install and start the frontend (terminal 2)
-cd src/ui/web
-cp .env.example .env
-npm install && npm start
+cd src/ui/web && npm install && npm start
 ```
 
-Open http://localhost:3001, navigate to the **COMMAND** tab, select
-**Labor Constraint + Wave Risk** (recommended first scenario), and click **START**.
+Open http://localhost:3001/demo, select **Labor Constraint + Wave Risk** (recommended first
+scenario), and click **START**.
 
-See [docs/demo/DEMO_RUNBOOK.md](docs/demo/DEMO_RUNBOOK.md) for the full walkthrough.
+> **No PostgreSQL, Redis, Milvus, or Kafka required for Demo Mode.**
+> The canonical DC-47 warehouse world is generated locally from `data/world-configs/dc47-demo.yaml`.
+>
+> For an interactive setup walkthrough, open `notebooks/setup/maiw_v2_setup.ipynb`.
+> For the CLI reference, see `docs/developer/GETTING_STARTED.md`.
+
+See [docs/demo/DEMO_RUNBOOK.md](docs/demo/DEMO_RUNBOOK.md) for the full scenario walkthrough.
 
 ### Install all workspace packages (pip)
 
@@ -940,11 +1022,15 @@ cp .env.example .env
 
 ### Required
 
-| Variable | Description |
-|----------|-------------|
-| `NVIDIA_API_KEY` | NVIDIA API key (`nvapi-...`), from [build.nvidia.com](https://build.nvidia.com/) |
-| `POSTGRES_PASSWORD` | PostgreSQL password |
-| `JWT_SECRET_KEY` | JWT signing secret (min 32 chars) |
+| Variable | Required for | Description |
+|----------|-------------|-------------|
+| `NVIDIA_API_KEY` | All modes | NVIDIA API key (`nvapi-...`), from [build.nvidia.com](https://build.nvidia.com/) |
+| `POSTGRES_PASSWORD` | Full-stack only | PostgreSQL password — **not required for Demo Mode** |
+| `JWT_SECRET_KEY` | Full-stack only | JWT signing secret (min 32 chars) — **not required for Demo Mode** |
+
+> **Demo Mode (`MAIW_DEMO_MODE=true`) does not require PostgreSQL, Redis, Milvus, or Kafka.**
+> Only `NVIDIA_API_KEY` is needed. All four infrastructure systems are bypassed by the
+> simulation providers.
 
 ### Model Configuration
 
@@ -1191,6 +1277,11 @@ package-based, MCP v2 system.
 | **SAP EWM connector** | 🔲 Future | `connectors/` — generic connector implemented; SAP planned |
 | **Manhattan / Blue Yonder** | 🔲 Future | Planned WMS connectors |
 | **apps/api as entrypoint** | ✅ Phase 9B | `maiw_api.app:app` is the canonical entrypoint; `MAIWRuntime` is the composition root |
+| **Warehouse World Model — typed graph** (`maiw-world` Phase 14A) | ✅ Done | `CanonicalWarehouseGraph`, 13 entity types, 13 relationship types, 11 operational event types |
+| **World Generator** (`maiw-world` Phase 14B) | ✅ Done | `WarehouseWorldGenerator` — deterministic, seed-based; `dc47_demo()` preset |
+| **DataPack + ScenarioOverlay** (`maiw-world` Phase 14C–D) | ✅ Done | Immutable `WarehouseDataPack` on disk; `ScenarioOverlay`; `ScenarioWorld` with entity-reference validation |
+| **Runtime projection** (`maiw-world` Phase 14E) | ✅ Done | `WarehouseProjectionBuilder`; `DemoWarehouseWorld` rebuilt from immutable sources on reset; providers and agents unchanged |
+| **v2 developer notebook + setup workflow** | 🔲 Phase 14F | `clone → configure → generate → validate → launch` journey |
 
 ---
 
@@ -1198,6 +1289,7 @@ package-based, MCP v2 system.
 
 | Document | Description |
 |----------|------------|
+| [WAREHOUSE_WORLD_MODEL.md](docs/developer/WAREHOUSE_WORLD_MODEL.md) | Warehouse World Model — canonical graph, DataPack, ScenarioOverlay, runtime projection |
 | [MODEL_GATEWAY.md](docs/architecture/MODEL_GATEWAY.md) | Nemotron roles, routing policy, telemetry |
 | [WAREHOUSE_STATE.md](docs/architecture/WAREHOUSE_STATE.md) | State assembly, freshness, provenance |
 | [CAPABILITY_MATRIX.md](docs/architecture/CAPABILITY_MATRIX.md) | All 12 capabilities, read/write classification |
@@ -1213,7 +1305,7 @@ package-based, MCP v2 system.
 ## Contributing
 
 1. Fork the repository and create a feature branch.
-2. All changes must keep CORE CI green: current baseline 388 reliability tests passing (Phase 10E Batches 1–7) + 94 frontend tests; zero new failures.
+2. All changes must keep CORE CI green: current baseline 990 CORE CI tests passing (197 maiw-world + API, 388 reliability Batches 1–7, and the remaining unit/contract/mcp suite) + 94 frontend tests; zero new failures.
 3. New canonical code goes in `packages/`, never in `src.*` for business logic.
 4. No `src.*` imports in any `packages/` code — enforced by the test suite.
 5. Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/).

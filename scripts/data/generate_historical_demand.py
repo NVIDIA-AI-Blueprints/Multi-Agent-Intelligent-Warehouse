@@ -17,6 +17,11 @@
 """
 Frito-Lay Historical Demand Data Generator
 
+LEGACY — Demo Mode data generation
+As of Phase 14E, MAIW Demo Mode uses WarehouseDataPack from packages/maiw-world/
+instead of direct PostgreSQL seeding.
+This script is retained for reference but is NOT part of the v2 demo setup path.
+
 Generates realistic historical inventory movement data for all Frito-Lay products
 with seasonal patterns, promotional spikes, and brand-specific characteristics.
 

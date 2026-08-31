@@ -19,6 +19,19 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV="${REPO_ROOT}/env/bin/python"
 DEMO_PORT="${DEMO_PORT:-8001}"
 
+# ── DataPack preflight ───────────────────────────────────────────────────────
+
+PACK_DIR="${MAIW_WORLD_OUTPUT:-data/worlds/dc47-demo-v1}"
+if [[ ! -f "${REPO_ROOT}/${PACK_DIR}/manifest.json" ]]; then
+  echo ""
+  echo "ERROR: Warehouse DataPack not found: ${PACK_DIR}"
+  echo ""
+  echo "Run setup first:"
+  echo "  ./scripts/setup_demo_world.sh"
+  echo ""
+  exit 1
+fi
+
 # ── Preflight ────────────────────────────────────────────────────────────────
 
 if [ ! -x "${VENV}" ]; then

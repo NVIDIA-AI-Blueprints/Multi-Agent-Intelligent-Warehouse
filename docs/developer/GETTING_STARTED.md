@@ -1,138 +1,246 @@
 # MAIW Developer Getting Started
 
-This guide orients a new developer in the codebase: what each package does,
-which file to edit for which concern, and how to verify changes.
+This guide walks through the MAIW v2 developer setup path. No PostgreSQL, Redis, Milvus, or Kafka required for Demo Mode.
+
+For architecture depth, see [WAREHOUSE_WORLD_MODEL.md](../WAREHOUSE_WORLD_MODEL.md).
 
 ---
 
-## Codebase Map
+## 1. Prerequisites
 
-```
-Multi-Agent-Intelligent-Warehouse/
-├── packages/               ← canonical Python packages — import from here, never from src.*
-│   ├── maiw-models/        ← ModelGateway, NIM provider, ModelRequest, ReasoningLevel, ModelRouter
-│   ├── maiw-mcp/           ← MCP contracts, ActionProposal, circuit breakers, deadlines
-│   ├── maiw-state/         ← WarehouseStateSnapshot, domain state (Equipment/Labor/Wave/Inventory)
-│   ├── maiw-skills/        ← domain skills (inventory lookup, equipment query, labor capacity, wave status)
-│   ├── maiw-decision/      ← DecisionEngine — APPROVED / REJECTED / DEFERRED outcomes
-│   ├── maiw-execution/     ← BaseActionExecutor (4-guard pattern), domain executors, ExecutionOutcome
-│   └── maiw-agents/        ← Equipment, Operations, Safety reasoning agents
-│       ├── equipment/      ← Equipment & Asset Operations Agent (EAO)
-│       ├── operations/     ← Operations Coordination Agent (OCA)
-│       └── safety/         ← Safety & Compliance Agent (SCA)
-│
-├── apps/api/maiw_api/      ← FastAPI composition root
-│   ├── bootstrap.py        ← wires packages together (gateway, agents, executors, circuit registry)
-│   ├── routers/demo.py     ← /demo/* endpoints (analyze, approve, reject, execute, reconcile, events)
-│   ├── demo/
-│   │   ├── scenarios/      ← YAML scenario definitions (add a new scenario here)
-│   │   ├── controller.py   ← DemoScenarioController — loads + runs scenarios
-│   │   ├── world.py        ← DemoWarehouseWorld — simulated warehouse state
-│   │   ├── providers/      ← SimulationProviders (equipment/labor/wave/inventory) — no real DB/MCP
-│   │   ├── events.py       ← EventCategory enum + SSE event emission
-│   │   └── kpi.py          ← KPI computation for counterfactual comparison
-│   └── config.py           ← all env-var configuration (timeouts, circuit thresholds, etc.)
-│
-├── mcp_servers/            ← independently deployable MCP 2.0 servers (stdio or HTTP)
-│   ├── equipment/server.py
-│   ├── labor/server.py
-│   ├── wave/server.py
-│   └── inventory/server.py
-│
-├── src/ui/web/src/         ← React frontend
-│   ├── pages/CommandCenter.tsx    ← main operator view (demo control, activity feed, reliability)
-│   ├── hooks/              ← useDemoSSE, useReliabilityCounters, useRuntime
-│   ├── components/reliability/   ← ReliabilityPanel, SafetyScorecard, FaultInjectionPanel, etc.
-│   └── services/api.ts     ← typed API client (RuntimeStatus, CircuitStats, DomainHealth)
-│
-└── tests/
-    ├── unit/reliability/   ← Phase 10E fault profiles, golden invariants (388 tests, no services needed)
-    ├── unit/               ← all other unit tests
-    └── contract/           ← MCP contract tests
-```
+- Python 3.10+
+- Node.js 20+ (for the UI)
+- NVIDIA API key (`nvapi-...`)
 
 ---
 
-## Dependency Flow (one-way — do not reverse)
-
-```
-maiw-models ──┐
-maiw-mcp   ──┤
-              ▼
-        maiw-state ──┐
-        maiw-skills ─┤
-                     ▼
-              maiw-decision ──┐
-              maiw-execution ─┤
-                              ▼
-                        maiw-agents
-                              │
-                              ▼
-                        apps/api (bootstrap.py)
-```
-
-Nothing in `packages/` imports from `apps/` or `src.*`.
-
----
-
-## The Pipeline (one request through the system)
-
-```
-POST /demo/analyze
-  → bootstrap injects: state_provider, agents, executors, approval_store
-  → WarehouseStateProvider.get_state()  [read-only MCP / SimulationProvider]
-  → WarehouseStateSnapshot.seal()       [immutable, UUID-stamped]
-  → agent.analyze_disruption(snapshot)
-      → ModelGateway.generate()         [NIM call, circuit-breaker wrapped]
-      → returns ActionProposal
-  → DecisionEngine.evaluate(proposal)   [deterministic, no I/O]
-      → APPROVED | REJECTED | DEFERRED
-  → POST /demo/approve  (human gate)
-  → POST /demo/execute
-      → BaseActionExecutor.execute(proposal, decision)
-          → guard 1: decision.outcome == APPROVED
-          → guard 2: decision.proposal_id == proposal.proposal_id
-          → guard 3: proposal.action in _ALLOWED_ACTIONS
-          → guard 4: decision not stale (snapshot age check)
-          → _do_execute() → MCP write tool call
-          → returns ExecutionOutcome: EXECUTED | NO_OP | CONFLICT | UNKNOWN | FAILED
-```
-
----
-
-## Running Tests
+## 2. Install
 
 ```bash
-# All CORE CI (no services):
-./scripts/testing/run_core_ci.sh
+git clone https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse
+cd Multi-Agent-Intelligent-Warehouse
 
-# Phase 10E reliability only:
-./scripts/testing/run_reliability.sh
-
-# Frontend:
-cd src/ui/web && npm test -- --watchAll=false
+pip install -e packages/maiw-world packages/maiw-state packages/maiw-agents \
+            packages/maiw-decision packages/maiw-execution packages/maiw-mcp
 ```
 
 ---
 
-## Environment Setup
+## 3. Configure your API key
 
 ```bash
-python3 -m venv env
-source env/bin/activate
-./scripts/install_packages.sh
+export NVIDIA_API_KEY=nvapi-your-key-here
+```
 
-cd src/ui/web
-cp .env.example .env
-npm install
+Or add it to `.env` in the repo root.
+
+---
+
+## 4. Configure your warehouse
+
+Warehouse worlds are defined by a YAML config. Two canonical configs ship with the repo:
+
+| Config | Path | Description |
+|--------|------|-------------|
+| DC-47 (canonical) | `data/world-configs/dc47-demo.yaml` | 25k SKUs, 120 workers, 24 equipment |
+| Small (fast) | `data/world-configs/small.yaml` | 100 SKUs — < 1s generation |
+
+You can also use Python presets directly:
+```python
+from maiw_world.config import WarehouseWorldConfig
+cfg = WarehouseWorldConfig.dc47_demo()   # canonical demo
+cfg = WarehouseWorldConfig.small()       # fast local iteration
+cfg = WarehouseWorldConfig.from_yaml("data/world-configs/dc47-demo.yaml")
+```
+
+### Custom worlds
+
+Copy `data/world-configs/dc47-demo.yaml` and edit the values. Change `warehouse_id`, `dataset_id`, and `seed`. Every config + seed combination produces a unique, deterministic world.
+
+---
+
+## 5. Generate the DataPack
+
+```bash
+# Quick setup (validates existing pack or generates new one)
+./scripts/setup_demo_world.sh
+
+# Or run directly
+python -m maiw_world generate --config data/world-configs/dc47-demo.yaml \
+                               --output data/worlds/dc47-demo-v1
+```
+
+The generator is deterministic: same config + same seed = same world every time.
+
+Progress output:
+```
+Generating facility...        done   (6 zones, 240 locations)
+Generating inventory...       done   (25000 SKUs)
+Generating labor...           done   (120 workers)
+Generating equipment...       done   (24 units)
+Generating orders...          done   (850 orders)
+Generating waves...           done   (3 waves, 120 tasks)
+Building historical events... done   (172 events)
+
+Validating...                 PASS
+
+DataPack written: data/worlds/dc47-demo-v1
 ```
 
 ---
 
-## Next Steps
+## 6. Inspect the graph
 
-- [ADDING_A_SCENARIO.md](ADDING_A_SCENARIO.md) — add a new demo scenario
-- [ADDING_A_CAPABILITY.md](ADDING_A_CAPABILITY.md) — add a new MCP tool / domain skill
-- [ADDING_A_PROVIDER.md](ADDING_A_PROVIDER.md) — add a new NIM or model provider
-- [ADDING_AN_AGENT_OR_SKILL.md](ADDING_AN_AGENT_OR_SKILL.md) — add a new agent or skill
-- [EVALUATION.md](EVALUATION.md) — run counterfactual evaluation
+```bash
+# Entity/edge summary
+python -m maiw_world inspect data/worlds/dc47-demo-v1
+
+# Inspect a specific entity
+python -m maiw_world inspect data/worlds/dc47-demo-v1 --entity DC-47
+python -m maiw_world inspect data/worlds/dc47-demo-v1 --entity wave-000
+```
+
+The inspect command shows all fields, outgoing edges, and incoming edges for any entity ID in the graph.
+
+---
+
+## 7. Validate the DataPack
+
+```bash
+python -m maiw_world validate data/worlds/dc47-demo-v1
+```
+
+Validation checks:
+1. **Manifest** — required fields present
+2. **File checksums** — content matches `checksums.json`
+3. **Semantic checksum** — graph content matches `manifest.json`
+4. **Graph validity** — structural rules (no orphan edges, required relationships present)
+
+Exit code 0 = PASS, 1 = FAIL.
+
+---
+
+## 8. List available scenarios
+
+```bash
+python -m maiw_world scenarios data/worlds/dc47-demo-v1
+```
+
+| Scenario | Type | Description |
+|----------|------|-------------|
+| `labor_constraint_wave_risk` | DataPack-native | Understaffed shift, wave at risk |
+| `equipment_failure` | DataPack-native | Forklift offline |
+| `healthy_baseline` | DataPack-native | All systems nominal |
+| `stale_state` | Compatibility | healthy_baseline adapter |
+| `state_drift` | Compatibility | healthy_baseline adapter |
+
+> **Note:** `stale_state` and `state_drift` currently use a healthy_baseline compatibility adapter.
+> Full migration is planned for a future phase.
+
+---
+
+## 9. Launch Demo Mode
+
+```bash
+./scripts/start_demo_mode.sh
+```
+
+In a separate terminal:
+```bash
+cd src/ui/web && npm start
+```
+
+Open http://localhost:3001/demo
+
+**Recommended scenario order:**
+1. `healthy_baseline` — confirm world is coherent
+2. `labor_constraint_wave_risk` — the primary demo scenario (Scenario 001)
+
+**What you'll see:** OBSERVE → REASON → PROPOSE → DECIDE → APPROVE → EXECUTE → OUTCOME
+
+---
+
+## 10. Reset and reproduce
+
+To reset to a known state:
+```bash
+python -m maiw_world generate \
+  --config data/world-configs/dc47-demo.yaml \
+  --output data/worlds/dc47-demo-v1 \
+  --overwrite
+```
+
+The `--overwrite` flag atomically replaces the existing DataPack.
+
+To verify the checksum matches across machines or developer environments:
+```bash
+python -m maiw_world checksum data/worlds/dc47-demo-v1
+```
+
+---
+
+## 11. Custom worlds
+
+Create your own config YAML:
+
+```yaml
+warehouse_id: MY-WH
+dataset_id: my-warehouse-v1
+seed: 7
+
+facility:
+  zone_count: 4
+  location_count: 100
+  dock_door_count: 4
+
+inventory:
+  sku_count: 5000
+  low_stock_pct: 0.05
+
+labor:
+  workers_per_shift: 20
+  shift_count: 2
+
+equipment:
+  agv_count: 4
+  forklift_count: 6
+
+orders:
+  daily_order_count: 200
+  lines_per_order_mean: 3.0
+
+waves:
+  active_wave_count: 2
+  strategy: fifo
+  task_count: 40
+
+history:
+  history_days: 14
+```
+
+Then generate:
+```bash
+python -m maiw_world generate --config my-warehouse.yaml --output data/worlds/my-warehouse-v1
+```
+
+---
+
+## Notebook walkthrough
+
+For an interactive walkthrough, open:
+```
+notebooks/setup/maiw_v2_setup.ipynb
+```
+
+This notebook covers environment check, configuration, generation, graph inspection, validation, reproducibility, and scenario preview — all without any external databases.
+
+---
+
+## Legacy path
+
+The pre-Phase 14 setup path (PostgreSQL, Redis, Milvus, Kafka) is documented in:
+```
+notebooks/setup/complete_setup_guide.ipynb
+```
+
+That notebook is deprecated for Demo Mode. Use `maiw_v2_setup.ipynb` instead.
