@@ -123,7 +123,7 @@ function kpiRows(pre: KPISnapshot | undefined, post: KPISnapshot | undefined, de
 
 // ── OutcomeStage ──────────────────────────────────────────────────────────────
 
-export default function OutcomeStage({ analysisResult, demoStatus, onReset }: StageContentPaneProps) {
+export default function OutcomeStage({ analysisResult, demoStatus, onReset, onOpenExplanation, onViewFullTrace }: StageContentPaneProps) {
   const [showCounterfactual, setShowCounterfactual] = useState(false);
 
   const pre = analysisResult?.pre_kpis;
@@ -161,6 +161,34 @@ export default function OutcomeStage({ analysisResult, demoStatus, onReset }: St
         </Box>
       </StageSection>
 
+      {/* Decision provenance CTA */}
+      {onOpenExplanation && (
+        <Box sx={{ mb: 1.5 }}>
+          <Box
+            component="button"
+            onClick={() => onOpenExplanation({ kind: 'stage', stage: 'OUTCOME' })}
+            data-testid="explain-outcome-button"
+            sx={{
+              background: 'transparent',
+              border: '1px solid #30363D',
+              borderRadius: '4px',
+              color: '#58A6FF',
+              cursor: 'pointer',
+              fontFamily: 'monospace',
+              fontSize: '0.65rem',
+              fontWeight: 600,
+              letterSpacing: '0.04em',
+              px: '12px',
+              py: '6px',
+              transition: 'all 0.12s ease',
+              '&:hover': { borderColor: '#58A6FF', background: '#0d2146' },
+            }}
+          >
+            VIEW DECISION PROVENANCE →
+          </Box>
+        </Box>
+      )}
+
       {/* Execution result — distinct from operational outcome */}
       {proposalResults.length > 0 && (
         <StageSection>
@@ -185,8 +213,32 @@ export default function OutcomeStage({ analysisResult, demoStatus, onReset }: St
             ))}
           </Box>
           {traceId && (
-            <Box sx={{ mt: 0.75 }}>
+            <Box sx={{ mt: 0.75, display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
               <IdText label="trace" value={traceId} />
+              {onViewFullTrace && (
+                <Box
+                  component="button"
+                  onClick={onViewFullTrace}
+                  data-testid="outcome-view-full-trace-button"
+                  sx={{
+                    background: 'transparent',
+                    border: '1px solid #30363D',
+                    borderRadius: '4px',
+                    color: '#58A6FF',
+                    cursor: 'pointer',
+                    fontFamily: 'monospace',
+                    fontSize: '0.62rem',
+                    fontWeight: 600,
+                    letterSpacing: '0.04em',
+                    px: '8px',
+                    py: '3px',
+                    transition: 'all 0.12s ease',
+                    '&:hover': { borderColor: '#58A6FF', background: '#0d2146' },
+                  }}
+                >
+                  VIEW FULL TRACE →
+                </Box>
+              )}
             </Box>
           )}
         </StageSection>

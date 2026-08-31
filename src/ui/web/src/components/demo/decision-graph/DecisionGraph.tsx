@@ -19,6 +19,10 @@ import { Box, Typography } from '@mui/material';
 import { DecisionGraph as DecisionGraphData, DecisionGraphNode, DecisionGraphEdge } from './graphTypes';
 import DecisionGraphNodeCard from './DecisionGraphNode';
 import DecisionGraphDetails from './DecisionGraphDetails';
+import StoryDecisionGraph from './StoryDecisionGraph';
+import { getSemanticZoomLevel } from './semanticZoom';
+import { ExplanationFocus } from '../decision-explanation/explanationTypes';
+import { AnalysisResult, PendingApproval, DemoStatus } from '../../../services/demoAPI';
 
 // ── Zoom constants ────────────────────────────────────────────────────────────
 
@@ -105,19 +109,33 @@ function execBoundaryX(canvasHeight: number): { x: number; h: number } {
 
 interface DecisionGraphProps {
   graph: DecisionGraphData;
+  analysisResult?: AnalysisResult | null;
+  pendingApprovals?: PendingApproval[];
+  demoStatus?: DemoStatus | null;
+  onOpenExplanation?: (focus: ExplanationFocus) => void;
 }
 
-export default function DecisionGraph({ graph }: DecisionGraphProps) {
+type GraphMode = 'story' | 'trace';
+
+export default function DecisionGraph({ graph, onOpenExplanation }: DecisionGraphProps) {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(ZOOM_DEFAULT);
+  const [graphMode, setGraphMode] = useState<GraphMode>('story');
+
+  const zoomLevel = getSemanticZoomLevel(zoom);
 
   const zoomIn  = useCallback(() => setZoom(z => Math.min(ZOOM_MAX, +(z + ZOOM_STEP).toFixed(2))), []);
   const zoomOut = useCallback(() => setZoom(z => Math.max(ZOOM_MIN, +(z - ZOOM_STEP).toFixed(2))), []);
   const zoomReset = useCallback(() => setZoom(ZOOM_DEFAULT), []);
+  const fitStory = useCallback(() => { setZoom(ZOOM_DEFAULT); setGraphMode('story'); }, []);
 
   const handleNodeClick = useCallback((nodeId: string) => {
-    setSelectedNodeId(prev => prev === nodeId ? null : nodeId);
-  }, []);
+    if (onOpenExplanation) {
+      onOpenExplanation({ kind: 'node', nodeId });
+    } else {
+      setSelectedNodeId(prev => prev === nodeId ? null : nodeId);
+    }
+  }, [onOpenExplanation]);
 
   const selectedNode = useMemo(
     () => graph.nodes.find(n => n.id === selectedNodeId) ?? null,
@@ -165,7 +183,7 @@ export default function DecisionGraph({ graph }: DecisionGraphProps) {
           minWidth: 0,
         }}
       >
-        {/* Zoom controls */}
+        {/* Control bar: [STORY] [TRACE]   [−] [85%] [+] [FIT] */}
         <Box sx={{
           display: 'flex',
           alignItems: 'center',
@@ -173,6 +191,55 @@ export default function DecisionGraph({ graph }: DecisionGraphProps) {
           mb: 1.5,
           userSelect: 'none',
         }}>
+          {/* Mode toggle: STORY */}
+          <Box
+            component="button"
+            onClick={() => setGraphMode('story')}
+            title="Story Graph view"
+            sx={{
+              background: graphMode === 'story' ? '#161B22' : 'transparent',
+              border: `1px solid ${graphMode === 'story' ? '#58A6FF' : '#30363D'}`,
+              borderRadius: '4px',
+              color: graphMode === 'story' ? '#58A6FF' : '#484F58',
+              cursor: 'pointer',
+              fontFamily: 'monospace',
+              fontSize: '0.6rem',
+              fontWeight: graphMode === 'story' ? 700 : 400,
+              letterSpacing: '0.06em',
+              px: '8px',
+              py: '3px',
+              '&:hover': { borderColor: '#58A6FF', color: '#58A6FF' },
+            }}
+          >
+            STORY
+          </Box>
+
+          {/* Mode toggle: TRACE */}
+          <Box
+            component="button"
+            onClick={() => setGraphMode('trace')}
+            title="Trace Graph view"
+            sx={{
+              background: graphMode === 'trace' ? '#161B22' : 'transparent',
+              border: `1px solid ${graphMode === 'trace' ? '#58A6FF' : '#30363D'}`,
+              borderRadius: '4px',
+              color: graphMode === 'trace' ? '#58A6FF' : '#484F58',
+              cursor: 'pointer',
+              fontFamily: 'monospace',
+              fontSize: '0.6rem',
+              fontWeight: graphMode === 'trace' ? 700 : 400,
+              letterSpacing: '0.06em',
+              px: '8px',
+              py: '3px',
+              '&:hover': { borderColor: '#58A6FF', color: '#58A6FF' },
+            }}
+          >
+            TRACE
+          </Box>
+
+          {/* Spacer */}
+          <Box sx={{ flexGrow: 1 }} />
+
           {/* Zoom out */}
           <Box
             component="button"
@@ -241,13 +308,52 @@ export default function DecisionGraph({ graph }: DecisionGraphProps) {
           >
             +
           </Box>
+
+          {/* FIT — resets zoom to default and switches to story mode */}
+          <Box
+            component="button"
+            onClick={fitStory}
+            data-testid="fit-btn"
+            title="Fit to story"
+            sx={{
+              background: 'transparent',
+              border: '1px solid #30363D',
+              borderRadius: '4px',
+              color: '#8B949E',
+              cursor: 'pointer',
+              fontFamily: 'monospace',
+              fontSize: '0.6rem',
+              letterSpacing: '0.06em',
+              px: '8px',
+              py: '3px',
+              '&:hover': { borderColor: '#58A6FF', color: '#58A6FF' },
+            }}
+          >
+            FIT
+          </Box>
         </Box>
 
-        {/* Scaled canvas wrapper — scrolls horizontally */}
-        <Box sx={{
-          overflow: 'auto',
-          width: '100%',
-        }}>
+        {/* Story Graph mode */}
+        {graphMode === 'story' && (
+          <Box sx={{ overflow: 'auto', width: '100%' }}>
+            <StoryDecisionGraph
+              graph={graph}
+              zoomLevel={zoomLevel}
+              selectedNodeId={selectedNodeId}
+              onNodeClick={handleNodeClick}
+            />
+          </Box>
+        )}
+
+        {/* Trace Graph mode — original SVG + positioned-div canvas */}
+        {graphMode === 'trace' && (
+        <Box
+          data-testid="decision-graph-trace"
+          sx={{
+            overflow: 'auto',
+            width: '100%',
+          }}
+        >
           <Box
             sx={{
               transformOrigin: 'top left',
@@ -356,10 +462,12 @@ export default function DecisionGraph({ graph }: DecisionGraphProps) {
         </Box>
           </Box>
         </Box>
+        )}
+
       </Box>
 
-      {/* Detail panel */}
-      {selectedNode && (
+      {/* Detail panel — shown only in standalone mode (when onOpenExplanation not provided) */}
+      {selectedNode && !onOpenExplanation && (
         <DecisionGraphDetails
           selectedNode={selectedNode}
           artifact={artifact}

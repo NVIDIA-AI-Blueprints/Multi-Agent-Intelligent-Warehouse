@@ -6,13 +6,15 @@
  * Phase 13C: STORY | DECISION GRAPH toggle for REASON through OUTCOME stages.
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Box, Typography } from '@mui/material';
 import { RailStage } from '../../hooks/useDemoLifecycle';
 import { SSEEvent } from '../../hooks/useDemoSSE';
 import { DemoStatus, AnalysisResult, PendingApproval } from '../../services/demoAPI';
 import DecisionGraph from './decision-graph/DecisionGraph';
 import { buildDecisionGraph } from './decision-graph/buildDecisionGraph';
+import DecisionExplanationDrawer from './decision-explanation/DecisionExplanationDrawer';
+import { ExplanationFocus } from './decision-explanation/explanationTypes';
 
 import ObserveStage  from './stages/ObserveStage';
 import ReasonStage   from './stages/ReasonStage';
@@ -187,6 +189,10 @@ export interface StageContentPaneProps {
   analyzing: boolean;
   onAnalyze: () => Promise<void>;
   onReset?: () => void;
+  /** Injected by StageContentPane — stage components may call this to open the explanation drawer. */
+  onOpenExplanation?: (focus: ExplanationFocus) => void;
+  /** Open the Expert Overlay pinned to the TRACE tab. */
+  onViewFullTrace?: () => void;
 }
 
 // ── Stages that support STORY/GRAPH toggle ────────────────────────────────────
@@ -238,11 +244,22 @@ function ViewModeToggle({
 // ── Router ─────────────────────────────────────────────────────────────────────
 
 export default function StageContentPane(props: StageContentPaneProps) {
-  const { currentStage, demoStatus, analysisResult, pendingApprovals } = props;
+  const { currentStage, demoStatus, analysisResult, pendingApprovals, onViewFullTrace } = props;
 
   // Reset to story mode whenever stage changes
   const [viewMode, setViewMode] = useState<'story' | 'graph'>('story');
   useEffect(() => { setViewMode('story'); }, [currentStage]);
+
+  // Explanation drawer state
+  const [explanationFocus, setExplanationFocus] = useState<ExplanationFocus | null>(null);
+  const handleOpenExplanation = useCallback((focus: ExplanationFocus) => {
+    setExplanationFocus(focus);
+  }, []);
+  const handleCloseExplanation = useCallback(() => {
+    setExplanationFocus(null);
+  }, []);
+  // Reset explanation on stage change
+  useEffect(() => { setExplanationFocus(null); }, [currentStage]);
 
   const showToggle = GRAPH_ENABLED_STAGES.has(currentStage);
 
@@ -256,6 +273,9 @@ export default function StageContentPane(props: StageContentPaneProps) {
       pendingApprovals,
     });
   }, [currentStage, demoStatus, analysisResult, pendingApprovals, showToggle]);
+
+  // Props enriched with explanation callback + trace callback
+  const stageProps = { ...props, onOpenExplanation: handleOpenExplanation, onViewFullTrace };
 
   return (
     <Box
@@ -285,22 +305,43 @@ export default function StageContentPane(props: StageContentPaneProps) {
         </Box>
       )}
 
-      {/* Content area */}
-      {viewMode === 'graph' && showToggle && graph ? (
-        <Box sx={{ px: 3, py: 2, overflow: 'auto' }}>
-          <DecisionGraph graph={graph} />
-        </Box>
-      ) : (
-        <Box sx={{ maxWidth: 880, width: '100%', mx: 'auto', px: 3, py: 2.5 }}>
-          {currentStage === 'OBSERVE'  && <ObserveStage  {...props} />}
-          {currentStage === 'REASON'   && <ReasonStage   {...props} />}
-          {currentStage === 'PROPOSE'  && <ProposeStage  {...props} />}
-          {currentStage === 'DECIDE'   && <DecideStage   {...props} />}
-          {currentStage === 'APPROVE'  && <ApproveStage  {...props} />}
-          {currentStage === 'EXECUTE'  && <ExecuteStage  {...props} />}
-          {currentStage === 'OUTCOME'  && <OutcomeStage  {...props} />}
-        </Box>
-      )}
+      {/* Content area — position: relative for explanation drawer overlay */}
+      <Box sx={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        {viewMode === 'graph' && showToggle && graph ? (
+          <Box sx={{ px: 3, py: 2, overflow: 'auto', flex: 1 }}>
+            <DecisionGraph
+              graph={graph}
+              analysisResult={analysisResult}
+              pendingApprovals={pendingApprovals}
+              demoStatus={demoStatus}
+              onOpenExplanation={handleOpenExplanation}
+            />
+          </Box>
+        ) : (
+          <Box sx={{ maxWidth: 880, width: '100%', mx: 'auto', px: 3, py: 2.5, flex: 1 }}>
+            {currentStage === 'OBSERVE'  && <ObserveStage  {...stageProps} />}
+            {currentStage === 'REASON'   && <ReasonStage   {...stageProps} />}
+            {currentStage === 'PROPOSE'  && <ProposeStage  {...stageProps} />}
+            {currentStage === 'DECIDE'   && <DecideStage   {...stageProps} />}
+            {currentStage === 'APPROVE'  && <ApproveStage  {...stageProps} />}
+            {currentStage === 'EXECUTE'  && <ExecuteStage  {...stageProps} />}
+            {currentStage === 'OUTCOME'  && <OutcomeStage  {...stageProps} />}
+          </Box>
+        )}
+
+        {/* Explanation drawer overlay */}
+        {explanationFocus !== null && graph && (
+          <DecisionExplanationDrawer
+            focus={explanationFocus}
+            graph={graph}
+            analysisResult={analysisResult}
+            pendingApprovals={pendingApprovals}
+            demoStatus={demoStatus}
+            onClose={handleCloseExplanation}
+            onViewFullTrace={onViewFullTrace}
+          />
+        )}
+      </Box>
     </Box>
   );
 }

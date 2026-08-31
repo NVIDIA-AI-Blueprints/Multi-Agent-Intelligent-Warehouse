@@ -339,6 +339,7 @@ export default function ApproveStage({
   pendingApprovals,
   demoStatus,
   analysisResult,
+  onOpenExplanation,
 }: StageContentPaneProps) {
   const queryClient = useQueryClient();
 
@@ -457,6 +458,34 @@ export default function ApproveStage({
           </StageSection>
         );
       })}
+
+      {/* Explain CTA */}
+      {onOpenExplanation && pendingApprovals.length > 0 && (
+        <Box sx={{ mb: 1.5 }}>
+          <Box
+            component="button"
+            onClick={() => onOpenExplanation({ kind: 'stage', stage: 'APPROVE' })}
+            data-testid="explain-approve-button"
+            sx={{
+              background: 'transparent',
+              border: '1px solid #30363D',
+              borderRadius: '4px',
+              color: '#58A6FF',
+              cursor: 'pointer',
+              fontFamily: 'monospace',
+              fontSize: '0.65rem',
+              fontWeight: 600,
+              letterSpacing: '0.04em',
+              px: '12px',
+              py: '6px',
+              transition: 'all 0.12s ease',
+              '&:hover': { borderColor: '#58A6FF', background: '#0d2146' },
+            }}
+          >
+            WHY IS APPROVAL REQUIRED? →
+          </Box>
+        </Box>
+      )}
 
       {/* Empty state — no pending approvals and nothing in-flight */}
       {pendingApprovals.length === 0 && Object.keys(results).length === 0 && (

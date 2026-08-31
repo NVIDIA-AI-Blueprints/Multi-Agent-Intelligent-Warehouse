@@ -109,7 +109,7 @@ function ProposalCard({ index, action, capability, target, riskLevel, proposalId
 
 // ── ProposeStage ──────────────────────────────────────────────────────────────
 
-export default function ProposeStage({ sseEvents, analysisResult }: StageContentPaneProps) {
+export default function ProposeStage({ sseEvents, analysisResult, onOpenExplanation }: StageContentPaneProps) {
   const proposeEvents = runWindowEvents(sseEvents, ['PROPOSE']);
 
   // Prefer structured lifecycle records when available
@@ -173,6 +173,32 @@ export default function ProposeStage({ sseEvents, analysisResult }: StageContent
               <ProposalCard key={c.index} {...c} />
             ))}
           </Box>
+          {onOpenExplanation && (
+            <Box sx={{ mt: 1.5 }}>
+              <Box
+                component="button"
+                onClick={() => onOpenExplanation({ kind: 'stage', stage: 'PROPOSE' })}
+                data-testid="explain-propose-button"
+                sx={{
+                  background: 'transparent',
+                  border: '1px solid #30363D',
+                  borderRadius: '4px',
+                  color: '#58A6FF',
+                  cursor: 'pointer',
+                  fontFamily: 'monospace',
+                  fontSize: '0.65rem',
+                  fontWeight: 600,
+                  letterSpacing: '0.04em',
+                  px: '12px',
+                  py: '6px',
+                  transition: 'all 0.12s ease',
+                  '&:hover': { borderColor: '#58A6FF', background: '#0d2146' },
+                }}
+              >
+                WHY THIS RECOMMENDATION? →
+              </Box>
+            </Box>
+          )}
         </StageSection>
       ) : (
         <StageSection last>
