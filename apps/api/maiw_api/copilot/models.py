@@ -90,6 +90,7 @@ class CopilotAskResult:
     degradation_reason: str | None = None
     answerability: str = "answerable"          # "answerable" | "insufficient_evidence" | "partial"
     missing_context: list[str] = field(default_factory=list)  # e.g. ["wave_state", "labor_state"]
+    timing: dict[str, float] = field(default_factory=dict)   # state_assembly_ms, graph_lookup_ms, model_inference_ms, total_ms
 
 
 # ── Turn / Conversation store models ─────────────────────────────────────────
@@ -176,6 +177,7 @@ class CopilotTurnResponse(BaseModel):
     degradation_reason: str | None = None
     answerability: str = "answerable"   # "answerable" | "insufficient_evidence" | "partial"
     missing_context: list[str] = Field(default_factory=list)
+    timing: dict = Field(default_factory=dict)  # state_assembly_ms, graph_lookup_ms, model_inference_ms, total_ms
 
     # Future: ANALYZE and ACT fields populated in 15C / 15D
     related_artifacts: dict = Field(default_factory=dict)
