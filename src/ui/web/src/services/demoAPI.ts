@@ -145,6 +145,55 @@ export interface AnalysisResult {
   timing?: KPITiming;
 }
 
+// ── Phase 15B Copilot types ───────────────────────────────────────────────────
+
+export interface CopilotEvidenceFact {
+  label: string;
+  value: string;
+  severity: string | null;  // "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | null — from backend, not derived
+}
+
+export interface CopilotNeighborhood {
+  focus_entity_id: string | null;
+  focus_entity_label: string | null;
+  entity_count: number;
+  relationship_summary: Record<string, string[]>;
+  graph_available: boolean;
+}
+
+export interface CopilotTurnResponse {
+  conversation_id: string;
+  turn_id: string;
+  trace_id: string;
+  intent: string;
+  status: string;                    // "complete" | "degraded" | "error"
+  answer: string | null;
+  evidence: CopilotEvidenceFact[] | null;
+  neighborhood: CopilotNeighborhood | null;
+  agent: string | null;
+  skills_used: string[] | null;
+  skills_available: string[] | null;
+  model_id: string | null;
+  reasoning_level: string | null;
+  routing_rule: string | null;
+  routing_reason: string | null;
+  latency_ms: number | null;
+  degraded: boolean;
+  degradation_reason: string | null;
+  answerability: string;             // "answerable" | "insufficient_evidence" | "partial"
+  missing_context: string[];
+  timing: Record<string, number>;
+  related_artifacts: Record<string, unknown>;
+  store_note: string;
+}
+
+export interface CopilotTurnRequest {
+  message: string;
+  conversation_id?: string | null;
+  warehouse_id?: string;
+  scenario_name?: string;
+}
+
 // ── Scenario listing ──────────────────────────────────────────────────────────
 
 async function listScenarios(): Promise<ScenarioMeta[]> {
@@ -311,6 +360,13 @@ async function getCounterfactualResult(): Promise<CounterfactualResult> {
   return r.data as CounterfactualResult;
 }
 
+// ── Copilot ASK ───────────────────────────────────────────────────────────────
+
+async function copilotAsk(req: CopilotTurnRequest): Promise<CopilotTurnResponse> {
+  const r = await http.post('/copilot/turn', req, { timeout: 120_000 });
+  return r.data;
+}
+
 // Returns null if demo mode is not active (503)
 async function getStatusSafe(): Promise<DemoStatus | null> {
   try {
@@ -336,4 +392,5 @@ export const demoAPI = {
   rejectPending,
   reconcile,
   getCounterfactualResult,
+  copilotAsk,
 };
