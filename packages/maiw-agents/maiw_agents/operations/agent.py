@@ -1213,8 +1213,9 @@ class OperationsCoordinationAgent:
 
         if state.labor is not None:
             lb = state.labor
+            # available_workers = idle (active + no current task) per LaborCapacityResult
             facts.append(
-                f"Labor: {lb.total_workers} total, {lb.available_workers} available, "
+                f"Labor: {lb.total_workers} total, {lb.available_workers} idle (active with no task), "
                 f"{lb.utilization_pct:.0f}% utilization"
             )
             if lb.utilization_pct > 85 or lb.available_workers < 2:
@@ -1228,16 +1229,25 @@ class OperationsCoordinationAgent:
             )
             if wv.at_risk_count > 0:
                 domains_affected.append("wave")
+
+            # Surface the soonest carrier cutoff so the model knows deadline pressure.
+            deadlines = sorted(
+                t.deadline for t in wv.tasks if getattr(t, "deadline", None)
+            )
+            if deadlines:
+                facts.append(f"Carrier cutoff (soonest deadline): {deadlines[0]}")
+
             # Explicitly surface unassigned pending tasks so the model knows
             # labor.allocate (not wave.reprioritize) is the correct remedy.
             unassigned = [
                 t for t in wv.tasks if t.status == "pending" and t.assigned_to is None
             ]
             if unassigned:
-                available_workers = state.labor.available_workers if state.labor else 0
+                # available_workers here is the corrected idle count from the labor provider
+                idle_workers = state.labor.available_workers if state.labor else 0
                 facts.append(
                     f"UNASSIGNED PENDING TASKS: {len(unassigned)} pending wave tasks have no worker "
-                    f"allocated (assigned_to=null); {available_workers} workers are idle. "
+                    f"allocated (assigned_to=null); {idle_workers} workers are idle. "
                     f"Use warehouse.labor.allocate to assign workers to these tasks."
                 )
                 if "labor" not in domains_affected:
@@ -1308,7 +1318,27 @@ class OperationsCoordinationAgent:
                     pass
 
         summary = parsed.get("summary", "Assessment produced — see facts_observed.")
-        severity = parsed.get("severity", "medium")
+        # Compute severity deterministically from observable state rather than
+        # trusting LLM free text, which produces inconsistent CRITICAL/HIGH mapping.
+        risk_score = 0
+        if state.waves is not None and state.waves.at_risk_count > 0:
+            risk_score += 50
+        if state.labor is not None and state.labor.available_workers < 2:
+            risk_score += 30
+        elif state.labor is not None and state.labor.utilization_pct > 85:
+            risk_score += 20
+        if state.equipment is not None and any(
+            a.status == "offline" for a in state.equipment.assets
+        ):
+            risk_score += 25
+        if risk_score >= 90:
+            severity = "CRITICAL"
+        elif risk_score >= 60:
+            severity = "HIGH"
+        elif risk_score >= 30:
+            severity = "MEDIUM"
+        else:
+            severity = parsed.get("severity", "low")
         raw_recs = parsed.get("recommendations", [])
 
         recommendations: list[RecommendedAction] = []

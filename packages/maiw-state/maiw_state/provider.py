@@ -150,36 +150,51 @@ class WarehouseStateProvider:
         StateAssemblyError
             When a required skill is not configured or a capability call fails.
         """
+        now = datetime.now(timezone.utc)
+
+        # Build list of domain coroutines that are actually required, then
+        # run them concurrently so total latency ≈ max(domain_latencies).
+        domain_coros = []
+        domain_names: list[str] = []
+        if requirements.inventory:
+            domain_coros.append(
+                self._assemble_inventory(warehouse_id, requirements, trace_id=trace_id, deadline=deadline)
+            )
+            domain_names.append("inventory")
+        if requirements.equipment:
+            domain_coros.append(
+                self._assemble_equipment(warehouse_id, requirements, trace_id=trace_id, deadline=deadline)
+            )
+            domain_names.append("equipment")
+        if requirements.labor:
+            domain_coros.append(
+                self._assemble_labor(warehouse_id, requirements, trace_id=trace_id, deadline=deadline)
+            )
+            domain_names.append("labor")
+        if requirements.waves:
+            domain_coros.append(
+                self._assemble_waves(warehouse_id, requirements, trace_id=trace_id, deadline=deadline)
+            )
+            domain_names.append("waves")
+
+        results = await asyncio.gather(*domain_coros)
+
         inventory_state: InventoryState | None = None
         equipment_state: EquipmentState | None = None
         labor_state: LaborState | None = None
         wave_state: WaveState | None = None
         provenance: list[StateProvenance] = []
-        now = datetime.now(timezone.utc)
 
-        if requirements.inventory:
-            inventory_state, prov = await self._assemble_inventory(
-                warehouse_id, requirements, trace_id=trace_id, deadline=deadline
-            )
+        for name, (state_obj, prov) in zip(domain_names, results):
             provenance.append(prov)
-
-        if requirements.equipment:
-            equipment_state, prov = await self._assemble_equipment(
-                warehouse_id, requirements, trace_id=trace_id, deadline=deadline
-            )
-            provenance.append(prov)
-
-        if requirements.labor:
-            labor_state, prov = await self._assemble_labor(
-                warehouse_id, requirements, trace_id=trace_id, deadline=deadline
-            )
-            provenance.append(prov)
-
-        if requirements.waves:
-            wave_state, prov = await self._assemble_waves(
-                warehouse_id, requirements, trace_id=trace_id, deadline=deadline
-            )
-            provenance.append(prov)
+            if name == "inventory":
+                inventory_state = state_obj
+            elif name == "equipment":
+                equipment_state = state_obj
+            elif name == "labor":
+                labor_state = state_obj
+            elif name == "waves":
+                wave_state = state_obj
 
         return WarehouseState(
             warehouse_id=warehouse_id,
