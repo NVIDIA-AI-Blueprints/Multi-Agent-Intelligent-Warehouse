@@ -157,6 +157,9 @@ class WarehouseStateProvider:
         provenance: list[StateProvenance] = []
         now = datetime.now(timezone.utc)
 
+        # Domains are assembled sequentially so that a deadline expiring during
+        # one read is detected before the next domain is started.  Each
+        # _assemble_* method also checks the deadline at its own entry point.
         if requirements.inventory:
             inventory_state, prov = await self._assemble_inventory(
                 warehouse_id, requirements, trace_id=trace_id, deadline=deadline
@@ -164,18 +167,30 @@ class WarehouseStateProvider:
             provenance.append(prov)
 
         if requirements.equipment:
+            if deadline is not None and deadline.expired:
+                raise RequestDeadlineExceeded(
+                    expired_by_ms=(deadline._clock() - deadline.deadline_at) * 1000.0  # type: ignore[operator]
+                )
             equipment_state, prov = await self._assemble_equipment(
                 warehouse_id, requirements, trace_id=trace_id, deadline=deadline
             )
             provenance.append(prov)
 
         if requirements.labor:
+            if deadline is not None and deadline.expired:
+                raise RequestDeadlineExceeded(
+                    expired_by_ms=(deadline._clock() - deadline.deadline_at) * 1000.0  # type: ignore[operator]
+                )
             labor_state, prov = await self._assemble_labor(
                 warehouse_id, requirements, trace_id=trace_id, deadline=deadline
             )
             provenance.append(prov)
 
         if requirements.waves:
+            if deadline is not None and deadline.expired:
+                raise RequestDeadlineExceeded(
+                    expired_by_ms=(deadline._clock() - deadline.deadline_at) * 1000.0  # type: ignore[operator]
+                )
             wave_state, prov = await self._assemble_waves(
                 warehouse_id, requirements, trace_id=trace_id, deadline=deadline
             )

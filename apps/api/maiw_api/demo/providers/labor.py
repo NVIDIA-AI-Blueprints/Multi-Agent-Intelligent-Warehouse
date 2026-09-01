@@ -56,9 +56,12 @@ class SimulationLaborProvider:
         )
         if request.status_filter == "active":
             workers = [w for w in workers if w.status == "active"]
-        available = sum(1 for w in workers if w.status == "active")
+        active_count = sum(1 for w in workers if w.status == "active")
+        # idle = active workers with no task currently assigned
+        available = sum(1 for w in workers if w.status == "active" and w.current_task_id is None)
         total = len(workers)
-        util = round((total - available) / max(total, 1) * 100, 1)
+        # utilization = fraction of active workers currently running a task
+        util = round((active_count - available) / max(active_count, 1) * 100, 1)
         return LaborCapacityResult(
             workers=[
                 LaborWorkerInfo(

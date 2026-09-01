@@ -241,17 +241,17 @@ describe('Phase 15 Copilot entry point', () => {
     expect(btn).toHaveAttribute('aria-disabled', 'true');
   });
 
-  it('Phase 15 Copilot button shows Phase 15 label', () => {
+  it('Phase 15 Copilot button shows Copilot and ASK label (Phase 15B)', () => {
     renderShell(inactiveDemoStatus);
     const btn = screen.getByTestId('phase15-copilot-button');
     expect(btn).toHaveTextContent('Copilot');
-    expect(btn).toHaveTextContent('Phase 15');
+    expect(btn).toHaveTextContent('ASK');
   });
 
-  it('Phase 15 Copilot button has accessible tooltip title mentioning Phase 15', () => {
+  it('Phase 15 Copilot button has accessible tooltip title when no scenario active', () => {
     renderShell(inactiveDemoStatus);
     const btn = screen.getByTestId('phase15-copilot-button');
-    expect(btn).toHaveAttribute('title', expect.stringContaining('Phase 15'));
+    expect(btn).toHaveAttribute('title', expect.stringContaining('scenario'));
   });
 
   it('Phase 15 Copilot button aria-label is accessible', () => {
@@ -259,7 +259,7 @@ describe('Phase 15 Copilot entry point', () => {
     const btn = screen.getByTestId('phase15-copilot-button');
     expect(btn).toHaveAttribute('aria-label');
     const label = btn.getAttribute('aria-label') ?? '';
-    expect(label.toLowerCase()).toMatch(/copilot|phase 15/i);
+    expect(label.toLowerCase()).toMatch(/copilot/i);
   });
 });
 

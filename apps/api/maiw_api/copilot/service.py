@@ -264,7 +264,9 @@ class CopilotService:
         # Collect all degradation reasons: state domains + graph availability
         full_degradation = _build_degradation(state_degradation_reason, [], neighborhood)
         partial_missing = [m for m in _missing_context(state, scenario_name)]
-        answerability = "partial" if (state_degradation_reason or not neighborhood.graph_available) else "answerable"
+        # Graph unavailability is captured in full_degradation; it must not
+        # demote answerability — the answer is still grounded in state facts.
+        answerability = "partial" if state_degradation_reason else "answerable"
 
         result = CopilotAskResult(
             answer=assessment.summary,

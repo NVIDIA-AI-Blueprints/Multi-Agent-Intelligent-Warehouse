@@ -31,6 +31,7 @@ class WaveTaskSummary(BaseModel):
     )
     priority: str = "medium"
     assigned_to: str | None = None
+    deadline: str | None = None  # ISO-8601 carrier cutoff; None if task has no deadline
 
 
 class WaveZoneSummary(BaseModel):
@@ -93,6 +94,7 @@ class WaveState(BaseModel):
                 status=t.status,
                 priority=t.priority,
                 assigned_to=t.assigned_to,
+                deadline=getattr(t, "deadline", None),
             )
             for t in result.tasks
         ]

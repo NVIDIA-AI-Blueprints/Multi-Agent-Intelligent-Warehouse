@@ -12,6 +12,7 @@ import OperationalContextStrip from '../components/demo/OperationalContextStrip'
 import StageContentPane from '../components/demo/StageContentPane';
 import ReliabilityPanel from '../components/demo/reliability/ReliabilityPanel';
 import ExpertOverlay from '../components/demo/ExpertOverlay';
+import CopilotDrawer from '../components/demo/copilot/CopilotDrawer';
 
 const WAREHOUSE_ID = process.env.REACT_APP_WAREHOUSE_ID || 'DC-47';
 
@@ -84,40 +85,51 @@ function ExpertToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
 }
 
 /**
- * Phase15CopilotButton — reserved entry point for Phase 15.
- * DISABLED. Must not imply any functional Copilot capability in Phase 14.
+ * Phase15CopilotButton — Phase 15B: functional Copilot ASK entry point.
+ * Enabled when a scenario is active; disabled otherwise.
  */
-function Phase15CopilotButton() {
+function Phase15CopilotButton({
+  active,
+  open,
+  onClick,
+}: {
+  active: boolean;
+  open: boolean;
+  onClick: () => void;
+}) {
   return (
     <Box
       component="button"
-      disabled
-      aria-disabled="true"
-      aria-label="Copilot — available in Phase 15"
+      disabled={!active}
+      aria-disabled={!active}
+      aria-label={active ? 'Open Copilot ASK panel' : 'Start a scenario to use Copilot'}
       data-testid="phase15-copilot-button"
-      title="Coming in Phase 15 — not yet available"
+      title={active ? 'Open Copilot ASK panel' : 'Start a scenario to use Copilot'}
+      onClick={active ? onClick : undefined}
       sx={{
         display: 'flex', alignItems: 'center', gap: 0.75,
-        background: 'transparent',
-        border: '1px solid #21262D',
+        background: open ? '#0d2146' : 'transparent',
+        border: open ? '1px solid #58A6FF' : '1px solid #21262D',
         borderRadius: '4px',
         px: '10px', py: '4px',
         fontFamily: 'monospace',
         fontSize: '0.65rem',
-        color: '#30363D',
-        cursor: 'not-allowed',
+        color: active ? (open ? '#58A6FF' : '#8B949E') : '#30363D',
+        cursor: active ? 'pointer' : 'not-allowed',
         letterSpacing: '0.06em',
         textTransform: 'uppercase',
-        opacity: 0.5,
+        opacity: active ? 1 : 0.5,
+        '&:hover': active ? { color: '#58A6FF', borderColor: '#58A6FF44' } : {},
       }}
     >
       Copilot
       <Box component="span" sx={{
-        fontFamily: 'monospace', fontSize: '0.52rem', color: '#484F58',
+        fontFamily: 'monospace', fontSize: '0.52rem',
+        color: active ? (open ? '#58A6FF' : '#6E7681') : '#484F58',
         border: '1px solid #21262D', borderRadius: '3px',
         px: '4px', py: '0px', ml: 0.25, lineHeight: 1.6,
       }}>
-        Phase 15
+        ASK
       </Box>
     </Box>
   );
@@ -336,6 +348,7 @@ export default function DemoShell() {
   const [showSelector, setShowSelector] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [copilotOpen, setCopilotOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { status: demoStatus, isLoading: demoLoading } = useDemoStatus();
@@ -444,7 +457,11 @@ export default function DemoShell() {
           Synthetic demo
         </Box>
         <Box sx={{ flexGrow: 1 }} />
-        <Phase15CopilotButton />
+        <Phase15CopilotButton
+          active={scenarioActive}
+          open={copilotOpen}
+          onClick={() => setCopilotOpen(o => !o)}
+        />
         <Box sx={{ width: '1px', height: 14, background: '#21262D', flexShrink: 0 }} />
         <ModeSwitcher mode={mode} onChange={setMode} />
         <Box sx={{ width: '1px', height: 14, background: '#21262D', flexShrink: 0 }} />
@@ -596,6 +613,15 @@ export default function DemoShell() {
           Details ›
         </Typography>
       </Box>
+
+      {/* ── Phase 15B: Copilot ASK drawer ───────────────────────────────────── */}
+      {copilotOpen && scenarioActive && (
+        <CopilotDrawer
+          warehouseId={WAREHOUSE_ID}
+          scenarioName={demoStatus?.scenario?.name ?? ''}
+          onClose={() => setCopilotOpen(false)}
+        />
+      )}
     </Box>
   );
 }
