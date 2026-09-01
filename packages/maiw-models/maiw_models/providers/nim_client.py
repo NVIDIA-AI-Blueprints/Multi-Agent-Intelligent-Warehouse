@@ -107,17 +107,34 @@ def _ensure_no_think_system_prompt(
 
 @dataclass
 class NIMConfig:
-    """NVIDIA NIM configuration."""
+    """NVIDIA NIM configuration.
 
-    llm_api_key: str = os.getenv("NVIDIA_API_KEY", "")
-    llm_base_url: str = os.getenv("LLM_NIM_URL", "https://integrate.api.nvidia.com/v1")
+    Deployment mode is controlled by MAIW_MODEL_PROVIDER:
+      nvidia_hosted    (default) — NVIDIA public cloud (integrate.api.nvidia.com)
+      local_nim                  — Self-hosted NIM; set MAIW_NIM_BASE_URL + MAIW_NIM_MODEL
+      openai_compatible          — Any OpenAI-compatible endpoint
+      enterprise                 — Enterprise NIM fleet; same env vars as local_nim
+
+    MAIW_NIM_BASE_URL overrides LLM_NIM_URL when set.
+    MAIW_NIM_MODEL overrides LLM_MODEL when set.
+    MAIW_NIM_API_KEY overrides NVIDIA_API_KEY for the LLM endpoint when set.
+    """
+
+    llm_api_key: str = os.getenv("MAIW_NIM_API_KEY") or os.getenv("NVIDIA_API_KEY", "")
+    llm_base_url: str = (
+        os.getenv("MAIW_NIM_BASE_URL")
+        or os.getenv("LLM_NIM_URL", "https://integrate.api.nvidia.com/v1")
+    )
     embedding_api_key: str = os.getenv("EMBEDDING_API_KEY") or os.getenv(
         "NVIDIA_API_KEY", ""
     )
     embedding_base_url: str = os.getenv(
         "EMBEDDING_NIM_URL", "https://integrate.api.nvidia.com/v1"
     )
-    llm_model: str = os.getenv("LLM_MODEL", "nvidia/nemotron-3-super-120b-a12b")
+    llm_model: str = (
+        os.getenv("MAIW_NIM_MODEL")
+        or os.getenv("LLM_MODEL", "nvidia/nemotron-3-super-120b-a12b")
+    )
     embedding_model: str = os.getenv(
         "EMBEDDING_MODEL", "nvidia/llama-nemotron-embed-vl-1b-v2"
     )

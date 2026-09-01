@@ -103,9 +103,13 @@ class _FakeAssessment:
     facts_observed: list = None
     skills_consulted: list = None
     recommendations: list = None
-    model_id: str = "nvidia/nemotron-3-nano-30b-a3b"
+    model_id: str = "nvidia/nemotron-3-super-120b-a12b"
     routing_rule: str = "medium_reasoning"
     routing_reason: str = "Copilot ASK — MEDIUM reasoning"
+    requested_role: str = "nano"
+    selected_role: str = "super"
+    fallback_from: str = "nano"
+    fallback_reason: str = "role=nano is disabled; escalated to super"
     latency_ms: float = 312.5
 
     def __post_init__(self):
