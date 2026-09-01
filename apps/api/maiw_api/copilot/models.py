@@ -88,6 +88,10 @@ class CopilotAskResult:
     latency_ms: float
     degraded: bool = False
     degradation_reason: str | None = None
+    requested_role: str | None = None
+    selected_role: str | None = None
+    fallback_from: str | None = None
+    fallback_reason: str | None = None
     answerability: str = "answerable"          # "answerable" | "insufficient_evidence" | "partial"
     missing_context: list[str] = field(default_factory=list)  # e.g. ["wave_state", "labor_state"]
     timing: dict[str, float] = field(default_factory=dict)   # state_assembly_ms, graph_lookup_ms, model_inference_ms, total_ms
@@ -172,6 +176,10 @@ class CopilotTurnResponse(BaseModel):
     reasoning_level: str | None = None
     routing_rule: str | None = None
     routing_reason: str | None = None
+    requested_role: str | None = None
+    selected_role: str | None = None
+    fallback_from: str | None = None
+    fallback_reason: str | None = None
     latency_ms: float | None = None
     degraded: bool = False
     degradation_reason: str | None = None

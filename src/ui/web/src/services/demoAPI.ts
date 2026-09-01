@@ -177,6 +177,10 @@ export interface CopilotTurnResponse {
   reasoning_level: string | null;
   routing_rule: string | null;
   routing_reason: string | null;
+  requested_role: string | null;
+  selected_role: string | null;
+  fallback_from: string | null;
+  fallback_reason: string | null;
   latency_ms: number | null;
   degraded: boolean;
   degradation_reason: string | null;

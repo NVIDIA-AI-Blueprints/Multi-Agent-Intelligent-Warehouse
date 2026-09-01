@@ -1369,5 +1369,9 @@ class OperationsCoordinationAgent:
             model_id=response.model_id,
             routing_rule=rd.routing_rule,
             routing_reason=rd.routing_reason,
+            requested_role=rd.requested_role,
+            selected_role=rd.selected_role,
+            fallback_from=rd.fallback_from,
+            fallback_reason=rd.fallback_reason,
             latency_ms=response.latency_ms,
         )

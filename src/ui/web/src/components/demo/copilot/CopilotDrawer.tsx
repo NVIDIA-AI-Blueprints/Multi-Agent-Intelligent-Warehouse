@@ -231,12 +231,16 @@ function CopilotAnswer({ turn, onViewTrace }: CopilotAnswerProps) {
             borderRadius: '4px', p: '8px',
           }}>
             {[
-              ['Agent',     turn.agent],
-              ['Model',     turn.model_id],
-              ['Reasoning', turn.reasoning_level],
-              ['Routing',   turn.routing_rule],
-              ['Reason',    turn.routing_reason],
-              ['Latency',   turn.latency_ms != null ? `${turn.latency_ms}ms` : null],
+              ['Agent',      turn.agent],
+              ['Model',      turn.model_id],
+              ['Reasoning',  turn.reasoning_level],
+              ['Routing',    turn.routing_rule],
+              ['Preferred',  turn.requested_role],
+              ['Selected',   turn.selected_role],
+              ['Reason',     turn.routing_reason],
+              ['Fallback',   turn.fallback_from ? `${turn.fallback_from} → ${turn.selected_role}` : null],
+              ['Fallback why', turn.fallback_reason],
+              ['Latency',    turn.latency_ms != null ? `${turn.latency_ms}ms` : null],
             ].map(([label, val]) => val != null && (
               <Box key={String(label)} sx={{ display: 'flex', gap: '8px' }}>
                 <Typography sx={{
