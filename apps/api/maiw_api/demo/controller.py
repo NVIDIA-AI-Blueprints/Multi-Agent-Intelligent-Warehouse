@@ -227,6 +227,21 @@ class DemoScenarioController:
                     labor=SimulationLaborProvider(self.world, self.bus),
                     wave=SimulationWaveProvider(self.world, self.bus),
                 )
+                # Re-wire MCP server globals to the new provider instances.
+                # The legacy YAML path mutates self.world in-place so existing
+                # provider references stay valid; the DataPack path creates a new
+                # DemoWarehouseWorld, so MCP servers must be updated explicitly.
+                try:
+                    from mcp_servers.equipment.server import configure_server as _cfg_eq
+                    from mcp_servers.inventory.server import configure_server as _cfg_inv
+                    from mcp_servers.labor.server import configure_server as _cfg_lab
+                    from mcp_servers.wave.server import configure_server as _cfg_wave
+                    _cfg_inv(self.providers.inventory)
+                    _cfg_eq(self.providers.equipment)
+                    _cfg_lab(self.providers.labor)
+                    _cfg_wave(self.providers.wave)
+                except Exception as _cfg_exc:
+                    logger.warning("Demo: MCP server rewire failed — %s", _cfg_exc)
                 _used_datapack = True
         except (ImportError, FileNotFoundError) as exc:
             logger.debug(

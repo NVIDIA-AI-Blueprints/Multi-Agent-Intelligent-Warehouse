@@ -131,7 +131,7 @@ def _resolve_with_graph(question: str, graph: Any) -> ContextNeighborhood:
             graph_available=True,
         )
 
-    focus_id = focus_entity.entity_id
+    focus_id = focus_entity.id
 
     # BFS up to max_depth hops in both directions
     neighbors = graph.neighbors(
@@ -142,7 +142,7 @@ def _resolve_with_graph(question: str, graph: Any) -> ContextNeighborhood:
 
     # Cap total entities
     neighbors = neighbors[:_MAX_ENTITIES]
-    entity_ids = [n.entity_id for n in neighbors]
+    entity_ids = [n.id for n in neighbors]
 
     # Build relationship summary grouped by entity type
     rel_summary: dict[str, list[str]] = {}
