@@ -150,51 +150,51 @@ class WarehouseStateProvider:
         StateAssemblyError
             When a required skill is not configured or a capability call fails.
         """
-        now = datetime.now(timezone.utc)
-
-        # Build list of domain coroutines that are actually required, then
-        # run them concurrently so total latency ≈ max(domain_latencies).
-        domain_coros = []
-        domain_names: list[str] = []
-        if requirements.inventory:
-            domain_coros.append(
-                self._assemble_inventory(warehouse_id, requirements, trace_id=trace_id, deadline=deadline)
-            )
-            domain_names.append("inventory")
-        if requirements.equipment:
-            domain_coros.append(
-                self._assemble_equipment(warehouse_id, requirements, trace_id=trace_id, deadline=deadline)
-            )
-            domain_names.append("equipment")
-        if requirements.labor:
-            domain_coros.append(
-                self._assemble_labor(warehouse_id, requirements, trace_id=trace_id, deadline=deadline)
-            )
-            domain_names.append("labor")
-        if requirements.waves:
-            domain_coros.append(
-                self._assemble_waves(warehouse_id, requirements, trace_id=trace_id, deadline=deadline)
-            )
-            domain_names.append("waves")
-
-        results = await asyncio.gather(*domain_coros)
-
         inventory_state: InventoryState | None = None
         equipment_state: EquipmentState | None = None
         labor_state: LaborState | None = None
         wave_state: WaveState | None = None
         provenance: list[StateProvenance] = []
+        now = datetime.now(timezone.utc)
 
-        for name, (state_obj, prov) in zip(domain_names, results):
+        # Domains are assembled sequentially so that a deadline expiring during
+        # one read is detected before the next domain is started.  Each
+        # _assemble_* method also checks the deadline at its own entry point.
+        if requirements.inventory:
+            inventory_state, prov = await self._assemble_inventory(
+                warehouse_id, requirements, trace_id=trace_id, deadline=deadline
+            )
             provenance.append(prov)
-            if name == "inventory":
-                inventory_state = state_obj
-            elif name == "equipment":
-                equipment_state = state_obj
-            elif name == "labor":
-                labor_state = state_obj
-            elif name == "waves":
-                wave_state = state_obj
+
+        if requirements.equipment:
+            if deadline is not None and deadline.expired:
+                raise RequestDeadlineExceeded(
+                    expired_by_ms=(deadline._clock() - deadline.deadline_at) * 1000.0  # type: ignore[operator]
+                )
+            equipment_state, prov = await self._assemble_equipment(
+                warehouse_id, requirements, trace_id=trace_id, deadline=deadline
+            )
+            provenance.append(prov)
+
+        if requirements.labor:
+            if deadline is not None and deadline.expired:
+                raise RequestDeadlineExceeded(
+                    expired_by_ms=(deadline._clock() - deadline.deadline_at) * 1000.0  # type: ignore[operator]
+                )
+            labor_state, prov = await self._assemble_labor(
+                warehouse_id, requirements, trace_id=trace_id, deadline=deadline
+            )
+            provenance.append(prov)
+
+        if requirements.waves:
+            if deadline is not None and deadline.expired:
+                raise RequestDeadlineExceeded(
+                    expired_by_ms=(deadline._clock() - deadline.deadline_at) * 1000.0  # type: ignore[operator]
+                )
+            wave_state, prov = await self._assemble_waves(
+                warehouse_id, requirements, trace_id=trace_id, deadline=deadline
+            )
+            provenance.append(prov)
 
         return WarehouseState(
             warehouse_id=warehouse_id,
