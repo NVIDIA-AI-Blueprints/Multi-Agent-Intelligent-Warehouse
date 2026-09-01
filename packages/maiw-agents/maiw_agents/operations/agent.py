@@ -1253,6 +1253,28 @@ class OperationsCoordinationAgent:
                 if "labor" not in domains_affected:
                     domains_affected.append("labor")
 
+        # Deterministic severity from observable state — computed here so both
+        # the stub path (no ModelGateway) and the real path use the same score.
+        _risk_score = 0
+        if state.waves is not None and state.waves.at_risk_count > 0:
+            _risk_score += 50
+        if state.labor is not None and state.labor.available_workers < 2:
+            _risk_score += 30
+        elif state.labor is not None and state.labor.utilization_pct > 85:
+            _risk_score += 20
+        if state.equipment is not None and any(
+            a.status == "offline" for a in state.equipment.assets
+        ):
+            _risk_score += 25
+        if _risk_score >= 90:
+            _deterministic_severity = "critical"
+        elif _risk_score >= 60:
+            _deterministic_severity = "high"
+        elif _risk_score >= 30:
+            _deterministic_severity = "medium"
+        else:
+            _deterministic_severity = "low"
+
         # Build system + user messages
         system_msg, user_msg = build_analyze_disruption_prompt(
             facts=facts,
@@ -1270,7 +1292,7 @@ class OperationsCoordinationAgent:
                 snapshot_id=snapshot_id,
                 warehouse_id=warehouse_id,
                 summary="ModelGateway unavailable — assessment skipped.",
-                severity="low",
+                severity=_deterministic_severity,
                 domains_affected=domains_affected,
                 facts_observed=facts,
                 skills_consulted=[],
@@ -1318,27 +1340,8 @@ class OperationsCoordinationAgent:
                     pass
 
         summary = parsed.get("summary", "Assessment produced — see facts_observed.")
-        # Compute severity deterministically from observable state rather than
-        # trusting LLM free text, which produces inconsistent CRITICAL/HIGH mapping.
-        risk_score = 0
-        if state.waves is not None and state.waves.at_risk_count > 0:
-            risk_score += 50
-        if state.labor is not None and state.labor.available_workers < 2:
-            risk_score += 30
-        elif state.labor is not None and state.labor.utilization_pct > 85:
-            risk_score += 20
-        if state.equipment is not None and any(
-            a.status == "offline" for a in state.equipment.assets
-        ):
-            risk_score += 25
-        if risk_score >= 90:
-            severity = "CRITICAL"
-        elif risk_score >= 60:
-            severity = "HIGH"
-        elif risk_score >= 30:
-            severity = "MEDIUM"
-        else:
-            severity = parsed.get("severity", "low")
+        # Use the deterministic severity computed before the model call.
+        severity = _deterministic_severity
         raw_recs = parsed.get("recommendations", [])
 
         recommendations: list[RecommendedAction] = []
