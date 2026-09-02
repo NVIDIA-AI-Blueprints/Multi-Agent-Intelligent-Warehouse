@@ -1,19 +1,20 @@
 /**
- * CopilotDrawer.tsx — Phase 15B Copilot ASK panel.
+ * CopilotDrawer.tsx — Phase 15C Copilot ASK + ANALYZE panel.
  *
- * Right-side overlay drawer for operator questions about warehouse state.
- * ASK mode only — no action proposals, no APPROVE/EXECUTE buttons.
+ * Right-side overlay drawer for operator questions and recommendations.
+ * ASK: read-only explanation. ANALYZE: grounded recommendations (no execution).
  *
  * Constraints:
  *   - No chain_of_thought / scratchpad / hidden_reasoning / reasoning_tokens
  *   - No APPROVE / EXECUTE / DO IT / ActionProposal buttons
  *   - Severity comes from fact.severity ONLY — never re-derived from value text
- *   - skills_used is always [] for ASK — "skills used: none" is not shown
+ *   - skills_used is always [] for ASK/ANALYZE — not shown
+ *   - Safety copy "No warehouse changes have been made." is always visible on ANALYZE
  */
 
 import React, { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react';
 import { Box, Typography } from '@mui/material';
-import { demoAPI, CopilotTurnResponse } from '../../../services/demoAPI';
+import { demoAPI, CopilotTurnResponse, CopilotRecommendation } from '../../../services/demoAPI';
 
 // ── Color constants (MAIW dark terminal aesthetic) ─────────────────────────────
 
@@ -24,14 +25,32 @@ const SEVERITY_COLOR: Record<string, string> = {
   LOW:      '#3FB950',
 };
 
-// ── Loading stages (cycle while request in-flight) ─────────────────────────────
+const PRIORITY_COLOR: Record<string, string> = {
+  CRITICAL: '#F85149',
+  HIGH:     '#F85149',
+  MEDIUM:   '#D29922',
+  LOW:      '#3FB950',
+};
 
-const LOADING_STAGES = [
+// ── Loading stage sequences ────────────────────────────────────────────────────
+
+const LOADING_STAGES_ASK = [
   'READING WAREHOUSE STATE',
   'RESOLVING CONTEXT',
   'REASONING',
   'COMPLETE',
 ];
+
+const LOADING_STAGES_ANALYZE = [
+  'READING STATE',
+  'RESOLVING CONTEXT',
+  'ANALYZING',
+  'COMPLETE',
+];
+
+// ── Suggested prompts (shown after a turn completes) ──────────────────────────
+
+const SUGGEST_AFTER_ASK = ['What should we do?'];
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -41,11 +60,10 @@ interface CopilotDrawerProps {
   onClose: () => void;
 }
 
-// ── CopilotAnswer sub-component ────────────────────────────────────────────────
+// ── Sub-components ─────────────────────────────────────────────────────────────
 
 interface CopilotAnswerProps {
   turn: CopilotTurnResponse;
-  onViewTrace?: () => void;
 }
 
 function SeverityBadge({ severity }: { severity: string }) {
@@ -62,24 +80,134 @@ function SeverityBadge({ severity }: { severity: string }) {
   );
 }
 
-function CopilotAnswer({ turn, onViewTrace }: CopilotAnswerProps) {
+function RecommendationCard({ rec, index }: { rec: CopilotRecommendation; index: number }) {
+  const [open, setOpen] = useState(false);
+  const priColor = PRIORITY_COLOR[rec.priority?.toUpperCase()] ?? '#484F58';
+
+  return (
+    <Box sx={{
+      background: '#161B22',
+      border: '1px solid #21262D',
+      borderLeft: `3px solid ${priColor}88`,
+      borderRadius: '4px',
+      p: '10px',
+    }}>
+      {/* Header row */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: '6px' }}>
+        <Typography sx={{
+          fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58',
+          textTransform: 'uppercase', letterSpacing: '0.1em',
+        }}>
+          RECOMMENDATION {index + 1}
+        </Typography>
+        <Box component="span" sx={{
+          fontFamily: 'monospace', fontSize: '0.58rem', fontWeight: 700,
+          color: priColor, border: `1px solid ${priColor}44`, borderRadius: '3px',
+          px: '4px', py: '1px', textTransform: 'uppercase', letterSpacing: '0.08em',
+        }}>
+          {rec.priority}
+        </Box>
+      </Box>
+
+      {/* Objective */}
+      <Typography sx={{
+        fontFamily: 'monospace', fontSize: '0.78rem', fontWeight: 600,
+        color: '#C9D1D9', lineHeight: 1.4, mb: '6px',
+      }}>
+        {rec.objective}
+      </Typography>
+
+      {/* Why */}
+      <Typography sx={{
+        fontFamily: 'monospace', fontSize: '0.68rem', color: '#8B949E',
+        lineHeight: 1.5, mb: '6px',
+      }}>
+        {rec.rationale}
+      </Typography>
+
+      {/* Capability + Target row */}
+      <Box sx={{ display: 'flex', gap: '8px', flexWrap: 'wrap', mb: '4px' }}>
+        <Box component="span" sx={{
+          fontFamily: 'monospace', fontSize: '0.6rem', color: '#58A6FF',
+          border: '1px solid #1F6FEB33', borderRadius: '3px',
+          px: '4px', py: '1px',
+        }}>
+          {rec.capability}
+        </Box>
+        <Box component="span" sx={{
+          fontFamily: 'monospace', fontSize: '0.6rem', color: '#3FB950',
+          border: '1px solid #3FB95033', borderRadius: '3px',
+          px: '4px', py: '1px',
+        }}>
+          {rec.target}
+        </Box>
+      </Box>
+
+      {/* Expert details toggle */}
+      <Box
+        component="button"
+        onClick={() => setOpen(o => !o)}
+        sx={{
+          background: 'transparent', border: 'none', cursor: 'pointer',
+          fontFamily: 'monospace', fontSize: '0.58rem', color: '#30363D',
+          p: 0, mt: '4px',
+          '&:hover': { color: '#484F58' },
+        }}
+      >
+        SOURCE {open ? '▾' : '▸'}
+      </Box>
+      {open && (
+        <Box sx={{ mt: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          {[
+            ['Snapshot',   rec.snapshot_id?.slice(0, 8)],
+            ['Trace',      rec.trace_id?.slice(0, 8)],
+            ['Focus',      rec.focus_entity_id],
+            ['Domain',     rec.domain],
+            ['ID',         rec.recommendation_id],
+          ].map(([label, val]) => val && (
+            <Box key={String(label)} sx={{ display: 'flex', gap: '6px' }}>
+              <Typography sx={{
+                fontFamily: 'monospace', fontSize: '0.58rem', color: '#30363D',
+                minWidth: '58px', flexShrink: 0,
+              }}>
+                {label}
+              </Typography>
+              <Typography sx={{
+                fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58',
+                wordBreak: 'break-all',
+              }}>
+                {String(val)}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+      )}
+    </Box>
+  );
+}
+
+function CopilotAnswer({ turn }: CopilotAnswerProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
 
+  const isAnalyze = turn.intent === 'analyze';
   const isInsufficient = turn.answerability === 'insufficient_evidence';
   const isPartial = turn.answerability === 'partial';
   const hasEvidence = turn.evidence && turn.evidence.length > 0 && !isInsufficient;
+  const hasRecs = isAnalyze && turn.recommendations && turn.recommendations.length > 0;
+
+  const answerLabel = isAnalyze ? 'ANALYSIS' : 'ANSWER';
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
 
-      {/* ── A. ANSWER section ──────────────────────────────────────────────── */}
+      {/* ── A. ANSWER / ANALYSIS section ──────────────────────────────────── */}
       <Box>
         <Typography sx={{
           fontFamily: 'monospace', fontSize: '0.58rem', fontWeight: 700,
           color: '#484F58', letterSpacing: '0.12em', textTransform: 'uppercase',
           mb: '4px',
         }}>
-          ANSWER
+          {answerLabel}
         </Typography>
 
         {isInsufficient ? (
@@ -105,6 +233,12 @@ function CopilotAnswer({ turn, onViewTrace }: CopilotAnswerProps) {
               }}>
                 ⚠ PARTIAL — missing: {turn.missing_context.join(', ')}
               </Typography>
+            )}
+            {/* severity badge for ANALYZE */}
+            {isAnalyze && turn.severity && (
+              <Box sx={{ mb: '6px' }}>
+                <SeverityBadge severity={turn.severity} />
+              </Box>
             )}
             {turn.answer && (
               <Typography sx={{
@@ -135,7 +269,6 @@ function CopilotAnswer({ turn, onViewTrace }: CopilotAnswerProps) {
                 borderRadius: '4px',
                 p: '8px',
               }}>
-                {/* Label row */}
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: '4px' }}>
                   <Typography sx={{
                     fontFamily: 'monospace', fontSize: '0.65rem', color: '#8B949E',
@@ -143,17 +276,14 @@ function CopilotAnswer({ turn, onViewTrace }: CopilotAnswerProps) {
                   }}>
                     {fact.label}
                   </Typography>
-                  {/* severity comes from fact.severity only — never re-derived */}
                   {fact.severity && <SeverityBadge severity={fact.severity} />}
                 </Box>
-                {/* Value */}
                 <Typography sx={{
                   fontFamily: 'monospace', fontSize: '0.75rem', color: '#C9D1D9',
                   lineHeight: 1.4, mb: '4px',
                 }}>
                   {fact.value}
                 </Typography>
-                {/* Source badge */}
                 <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
                   <Box component="span" sx={{
                     fontFamily: 'monospace', fontSize: '0.58rem', color: '#3FB950',
@@ -169,7 +299,41 @@ function CopilotAnswer({ turn, onViewTrace }: CopilotAnswerProps) {
         </Box>
       )}
 
-      {/* ── C. Graph neighborhood status ─────────────────────────────────── */}
+      {/* ── C. Recommendation cards (ANALYZE only) ────────────────────────── */}
+      {hasRecs && (
+        <Box>
+          <Typography sx={{
+            fontFamily: 'monospace', fontSize: '0.58rem', fontWeight: 700,
+            color: '#484F58', letterSpacing: '0.12em', textTransform: 'uppercase',
+            mb: '6px',
+          }}>
+            RECOMMENDED ACTIONS
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {turn.recommendations!.map((rec, i) => (
+              <RecommendationCard key={rec.recommendation_id} rec={rec} index={i} />
+            ))}
+          </Box>
+        </Box>
+      )}
+
+      {/* ── D. Safety note (ANALYZE only) ─────────────────────────────────── */}
+      {isAnalyze && !isInsufficient && (
+        <Box sx={{
+          background: '#0D1B0D',
+          border: '1px solid #3FB95044',
+          borderRadius: '4px',
+          px: '10px', py: '7px',
+        }}>
+          <Typography sx={{
+            fontFamily: 'monospace', fontSize: '0.7rem', color: '#3FB950',
+          }}>
+            ✓ {turn.safety_note ?? 'No warehouse changes have been made.'}
+          </Typography>
+        </Box>
+      )}
+
+      {/* ── E. Graph neighborhood status ──────────────────────────────────── */}
       {turn.neighborhood && (
         <Box>
           <Typography sx={{
@@ -182,7 +346,7 @@ function CopilotAnswer({ turn, onViewTrace }: CopilotAnswerProps) {
           <Typography sx={{
             fontFamily: 'monospace', fontSize: '0.7rem', color: '#8B949E',
           }}>
-            {turn.neighborhood.focus_entity_label ?? 'No entity focus'} · {turn.neighborhood.entity_count} entities
+            {turn.focus_entity_label ?? turn.neighborhood.focus_entity_label ?? 'No entity focus'} · {turn.neighborhood.entity_count} entities
           </Typography>
           {!turn.neighborhood.graph_available && (
             <Typography sx={{
@@ -194,7 +358,7 @@ function CopilotAnswer({ turn, onViewTrace }: CopilotAnswerProps) {
         </Box>
       )}
 
-      {/* ── Degraded banner ───────────────────────────────────────────────── */}
+      {/* ── F. Degraded banner ────────────────────────────────────────────── */}
       {turn.degraded && !isInsufficient && (
         <Box sx={{
           background: '#1A1200',
@@ -210,7 +374,7 @@ function CopilotAnswer({ turn, onViewTrace }: CopilotAnswerProps) {
         </Box>
       )}
 
-      {/* ── D. Metadata footer (collapsible) ─────────────────────────────── */}
+      {/* ── G. Details panel (collapsible) ────────────────────────────────── */}
       <Box>
         <Box
           component="button"
@@ -230,19 +394,19 @@ function CopilotAnswer({ turn, onViewTrace }: CopilotAnswerProps) {
             background: '#161B22', border: '1px solid #21262D',
             borderRadius: '4px', p: '8px',
           }}>
-            {[
-              ['Agent',      turn.agent],
-              ['Model',      turn.model_id],
-              ['Reasoning',  turn.reasoning_level],
-              ['Routing',    turn.routing_rule],
-              ['Preferred',  turn.requested_role],
-              ['Selected',   turn.selected_role],
-              ['Reason',     turn.routing_reason],
-              ['Fallback',   turn.fallback_from ? `${turn.fallback_from} → ${turn.selected_role}` : null],
+            {([
+              ['Agent',        turn.agent],
+              ['Model',        turn.model_id],
+              ['Reasoning',    turn.reasoning_level],
+              ['Routing',      turn.routing_rule],
+              ['Preferred',    turn.requested_role],
+              ['Selected',     turn.selected_role],
+              ['Reason',       turn.routing_reason],
+              ['Fallback',     turn.fallback_from ? `${turn.fallback_from} → ${turn.selected_role}` : null],
               ['Fallback why', turn.fallback_reason],
-              ['Latency',    turn.latency_ms != null ? `${turn.latency_ms}ms` : null],
-            ].map(([label, val]) => val != null && (
-              <Box key={String(label)} sx={{ display: 'flex', gap: '8px' }}>
+              ['Latency',      turn.latency_ms != null ? `${turn.latency_ms}ms` : null],
+            ] as [string, string | null | undefined][]).map(([label, val]) => val != null && (
+              <Box key={label} sx={{ display: 'flex', gap: '8px' }}>
                 <Typography sx={{
                   fontFamily: 'monospace', fontSize: '0.62rem', color: '#484F58',
                   minWidth: '70px', flexShrink: 0,
@@ -277,7 +441,7 @@ function CopilotAnswer({ turn, onViewTrace }: CopilotAnswerProps) {
         )}
       </Box>
 
-      {/* ── E. Trace link ────────────────────────────────────────────────── */}
+      {/* ── H. Trace link ─────────────────────────────────────────────────── */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: '2px' }}>
         <Typography sx={{
           fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58',
@@ -327,29 +491,32 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
   const [inputMessage, setInputMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingStageIdx, setLoadingStageIdx] = useState(0);
+  const [pendingIntent, setPendingIntent] = useState<'ask' | 'analyze'>('ask');
   const [error, setError] = useState<string | null>(null);
 
   const threadRef = useRef<HTMLDivElement>(null);
   const stageTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const activeStages = pendingIntent === 'analyze' ? LOADING_STAGES_ANALYZE : LOADING_STAGES_ASK;
 
   // Cycle loading stage label while loading
   useEffect(() => {
     if (loading) {
       setLoadingStageIdx(0);
       stageTimerRef.current = setInterval(() => {
-        setLoadingStageIdx(i => (i + 1) % (LOADING_STAGES.length - 1)); // cycle 0–2 while loading
+        setLoadingStageIdx(i => (i + 1) % (activeStages.length - 1));
       }, 800);
     } else {
       if (stageTimerRef.current) {
         clearInterval(stageTimerRef.current);
         stageTimerRef.current = null;
       }
-      setLoadingStageIdx(LOADING_STAGES.length - 1); // show COMPLETE briefly
+      setLoadingStageIdx(activeStages.length - 1);
     }
     return () => {
       if (stageTimerRef.current) clearInterval(stageTimerRef.current);
     };
-  }, [loading]);
+  }, [loading, activeStages.length]);
 
   // Auto-scroll to bottom on new content
   useEffect(() => {
@@ -358,38 +525,40 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
     }
   }, [turns, loading]);
 
-  const handleSend = useCallback(async () => {
-    const msg = inputMessage.trim();
-    if (!msg || loading) return;
+  const handleSend = useCallback(async (msg?: string) => {
+    const text = (msg ?? inputMessage).trim();
+    if (!text || loading) return;
+
+    // Detect intended intent client-side for loading stage label
+    const looksLikeAnalyze = /\b(recommend|what should (we|i|you)|how should (we|i|you)|best action|what actions?)\b/i.test(text);
+    setPendingIntent(looksLikeAnalyze ? 'analyze' : 'ask');
 
     const turnId = `turn-${Date.now()}`;
     setInputMessage('');
     setError(null);
     setLoading(true);
 
-    // Add pending turn entry
-    setTurns(prev => [...prev, { id: turnId, question: msg, response: null, error: null }]);
+    setTurns(prev => [...prev, { id: turnId, question: text, response: null, error: null }]);
 
     try {
       const resp = await demoAPI.copilotAsk({
-        message: msg,
+        message: text,
         conversation_id: conversationId,
         warehouse_id: warehouseId,
         scenario_name: scenarioName,
       });
 
-      // Persist conversation_id across turns
       if (!conversationId) setConversationId(resp.conversation_id);
 
       setTurns(prev => prev.map(t =>
         t.id === turnId ? { ...t, response: resp } : t
       ));
     } catch (err: any) {
-      const msg2 = err?.response?.data?.detail ?? err?.message ?? 'Request failed';
+      const errMsg = err?.response?.data?.detail ?? err?.message ?? 'Request failed';
       setTurns(prev => prev.map(t =>
-        t.id === turnId ? { ...t, error: String(msg2) } : t
+        t.id === turnId ? { ...t, error: String(errMsg) } : t
       ));
-      setError(String(msg2));
+      setError(String(errMsg));
     } finally {
       setLoading(false);
     }
@@ -402,11 +571,16 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
     }
   }, [handleSend]);
 
+  // Determine if last completed turn was ASK (for suggested prompt)
+  const lastResponse = turns.length > 0 ? turns[turns.length - 1].response : null;
+  const showSuggest = !loading && lastResponse?.intent === 'ask' &&
+    lastResponse?.answerability === 'answerable';
+
   return (
     <Box
       data-testid="copilot-drawer"
       role="complementary"
-      aria-label="Copilot ASK panel"
+      aria-label="Copilot panel"
       sx={{
         position: 'fixed',
         top: 0, right: 0,
@@ -440,7 +614,7 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
             border: '1px solid #1F6FEB44', borderRadius: '3px',
             px: '4px', py: '0px', lineHeight: 1.6,
           }}>
-            ASK
+            ASK · ANALYZE
           </Box>
         </Box>
         <Box
@@ -481,7 +655,7 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
               fontFamily: 'monospace', fontSize: '0.65rem', color: '#30363D',
               textAlign: 'center', letterSpacing: '0.06em',
             }}>
-              Ask about warehouse state
+              Ask about warehouse state or request recommendations
             </Typography>
             <Typography sx={{
               fontFamily: 'monospace', fontSize: '0.58rem', color: '#21262D',
@@ -513,7 +687,7 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
               </Box>
             </Box>
 
-            {/* ASK response */}
+            {/* Response */}
             <Box sx={{ maxWidth: '100%' }}>
               {turn.response ? (
                 <CopilotAnswer turn={turn.response} />
@@ -524,7 +698,6 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
                   ✗ {turn.error}
                 </Typography>
               ) : (
-                /* Loading state for this pending turn */
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Box sx={{
                     width: 6, height: 6, borderRadius: '50%',
@@ -539,7 +712,7 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
                     fontFamily: 'monospace', fontSize: '0.65rem', color: '#58A6FF',
                     letterSpacing: '0.08em',
                   }}>
-                    {LOADING_STAGES[loadingStageIdx]}
+                    {activeStages[loadingStageIdx]}
                   </Typography>
                 </Box>
               )}
@@ -547,7 +720,32 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
           </Box>
         ))}
 
-        {/* Global error (unexpected failure) */}
+        {/* Suggested prompt after ASK */}
+        {showSuggest && (
+          <Box sx={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {SUGGEST_AFTER_ASK.map(prompt => (
+              <Box
+                key={prompt}
+                component="button"
+                data-testid="copilot-suggested-prompt"
+                onClick={() => handleSend(prompt)}
+                sx={{
+                  background: 'transparent',
+                  border: '1px solid #21262D',
+                  borderRadius: '4px',
+                  px: '8px', py: '4px',
+                  fontFamily: 'monospace', fontSize: '0.65rem',
+                  color: '#484F58', cursor: 'pointer',
+                  '&:hover': { color: '#58A6FF', borderColor: '#58A6FF44' },
+                }}
+              >
+                {prompt}
+              </Box>
+            ))}
+          </Box>
+        )}
+
+        {/* Global error */}
         {error && turns.length === 0 && (
           <Typography sx={{
             fontFamily: 'monospace', fontSize: '0.7rem', color: '#F85149',
@@ -571,7 +769,7 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
           value={inputMessage}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInputMessage(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask about warehouse state…"
+          placeholder="Ask or request recommendations…"
           disabled={loading}
           aria-label="Copilot question input"
           sx={{
@@ -591,7 +789,7 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
         <Box
           component="button"
           data-testid="copilot-send"
-          onClick={handleSend}
+          onClick={() => handleSend()}
           disabled={loading || !inputMessage.trim()}
           aria-label="Send question"
           sx={{
@@ -606,7 +804,7 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
             '&:hover:not(:disabled)': { borderColor: '#30363D' },
           }}
         >
-          {loading ? '…' : 'ASK'}
+          {loading ? '…' : 'SEND'}
         </Box>
       </Box>
     </Box>

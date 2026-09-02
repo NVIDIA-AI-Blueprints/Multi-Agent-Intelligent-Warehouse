@@ -453,10 +453,12 @@ class WarehouseWorldGenerator:
 
         waves: list[Wave] = []
         statuses = ["active", "planning", "planning"]
+        wave_start = getattr(wc, "wave_number_start", 1)
         for wi in range(wc.active_wave_count):
+            wave_num = wave_start + wi
             wave = Wave(
-                id=f"wave-{wi:03d}",
-                wave_number=wi + 1,
+                id=f"wave-{wave_num:03d}",
+                wave_number=wave_num,
                 strategy=wc.strategy,
                 status=statuses[wi % len(statuses)],
             )

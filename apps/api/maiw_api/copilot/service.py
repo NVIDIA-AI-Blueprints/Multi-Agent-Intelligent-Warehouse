@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 """
-CopilotService — Phase 15B: ASK path only.
+CopilotService — Phase 15C: ASK + ANALYZE.
 
 Trust boundary enforced by explicit import restrictions:
     - MUST NOT import ActionExecutor
@@ -14,8 +14,8 @@ These are validated by architecture invariant tests in test_copilot_ask.py.
 Degradation policy
 ------------------
 If WarehouseState cannot be assembled (provider unavailable, state provider
-None, or exception), ASK returns a structured degraded response rather than
-falling back to any simulated/invented operational data.
+None, or exception), ASK/ANALYZE returns a structured degraded response rather
+than falling back to any simulated/invented operational data.
 
 If individual domains are unavailable, each missing domain is noted in
 degradation_reason; available domains still inform the answer.
@@ -40,11 +40,14 @@ except ImportError:
     _StateRequirements = None  # type: ignore[assignment]
 
 from . import context as context_resolver
+from . import intent as intent_classifier
 from .models import (
+    CopilotAnalyzeResult,
     CopilotAskResult,
     CopilotIntent,
     CopilotTurn,
     EvidenceFact,
+    RecommendedActionResult,
 )
 from .store import InMemoryCopilotStore
 
@@ -53,9 +56,9 @@ logger = logging.getLogger(__name__)
 
 class CopilotService:
     """
-    Orchestrates Copilot ASK turns.
+    Orchestrates Copilot ASK and ANALYZE turns.
 
-    Phase 15B scope: ASK only. ANALYZE and ACT will be added in 15C/15D.
+    Phase 15C scope: ASK + ANALYZE. ACT will be added in 15D.
 
     This class MUST NOT:
     - import or call ActionExecutor
@@ -108,11 +111,9 @@ class CopilotService:
         conv = self._store.get_or_create(
             conversation_id, warehouse_id, scenario_name
         )
+        parent_turn_id = conv.last_turn.turn_id if conv.last_turn else None
 
         await self._publish("COPILOT_TURN_STARTED", f"Copilot ASK — turn {turn_id[:8]}", trace_id=trace_id)
-
-        # ── Resolve intent ────────────────────────────────────────────────────
-        intent = CopilotIntent.ASK
         await self._publish("COPILOT_INTENT_RESOLVED", "intent=ASK", trace_id=trace_id)
 
         # ── Assemble WarehouseState ───────────────────────────────────────────
@@ -124,11 +125,10 @@ class CopilotService:
         )
         _state_ms = (time.monotonic() - _t_state) * 1000
 
-        # ── Early answerability check — skip graph lookup if state is missing ─
+        # ── Early answerability check ─────────────────────────────────────────
         missing = _missing_context(state, scenario_name)
 
         if state is None or missing:
-            # Build a null neighborhood — no graph lookup needed
             from maiw_api.copilot.models import ContextNeighborhood as _CN
             neighborhood = _CN(
                 focus_entity_id=None,
@@ -137,6 +137,7 @@ class CopilotService:
                 relationship_summary={},
                 max_depth=2,
                 graph_available=False,
+                entity_resolution=None,
             )
             degradation = _build_degradation(state_degradation_reason, missing, neighborhood)
             if state is None:
@@ -181,23 +182,22 @@ class CopilotService:
                 },
             )
             turn = self._make_turn(
-                turn_id=turn_id,
-                conv_id=conv.conversation_id,
-                message=message,
-                intent=intent,
-                trace_id=trace_id,
-                result=result,
+                turn_id=turn_id, conv_id=conv.conversation_id, message=message,
+                intent=CopilotIntent.ASK, trace_id=trace_id, summary=result.answer,
+                parent_turn_id=parent_turn_id,
             )
             self._store.add_turn(turn)
             await self._publish("COPILOT_TURN_COMPLETE", "degraded=true insufficient_evidence", trace_id=trace_id)
             return result, turn
 
-        # ── Resolve Operational Graph neighborhood (only when state is present) ─
+        # ── Resolve Operational Graph neighborhood ────────────────────────────
         _t_graph = time.monotonic()
         neighborhood = context_resolver.resolve(
             question=message,
             warehouse_id=warehouse_id,
             graph=self._graph,
+            focus_entity_id=conv.last_focus_entity_id,
+            focus_entity_label=conv.last_focus_entity_label,
         )
         _graph_ms = (time.monotonic() - _t_graph) * 1000
 
@@ -225,8 +225,9 @@ class CopilotService:
 
         except Exception as exc:
             logger.error("CopilotService.ask: agent call failed — %s", exc)
+            err_answer = "I encountered an error while analyzing the warehouse state."
             result = CopilotAskResult(
-                answer="I encountered an error while analyzing the warehouse state.",
+                answer=err_answer,
                 evidence=[],
                 neighborhood=neighborhood,
                 agent="OperationsCoordinationAgent",
@@ -246,26 +247,20 @@ class CopilotService:
                 missing_context=[],
             )
             turn = self._make_turn(
-                turn_id=turn_id,
-                conv_id=conv.conversation_id,
-                message=message,
-                intent=intent,
-                trace_id=trace_id,
-                result=result,
+                turn_id=turn_id, conv_id=conv.conversation_id, message=message,
+                intent=CopilotIntent.ASK, trace_id=trace_id, summary=err_answer,
+                parent_turn_id=parent_turn_id,
             )
             self._store.add_turn(turn)
             await self._publish("COPILOT_TURN_COMPLETE", "degraded=true error", trace_id=trace_id)
             return result, turn
 
-        # ── Build structured evidence from assessment facts ───────────────────
+        # ── Build result ──────────────────────────────────────────────────────
         _total_ms = (time.monotonic() - _t0) * 1000
         evidence = _facts_to_evidence(assessment.facts_observed, assessment.severity)
 
-        # Collect all degradation reasons: state domains + graph availability
         full_degradation = _build_degradation(state_degradation_reason, [], neighborhood)
         partial_missing = [m for m in _missing_context(state, scenario_name)]
-        # Graph unavailability is captured in full_degradation; it must not
-        # demote answerability — the answer is still grounded in state facts.
         answerability = "partial" if state_degradation_reason else "answerable"
 
         result = CopilotAskResult(
@@ -273,7 +268,7 @@ class CopilotService:
             evidence=evidence,
             neighborhood=neighborhood,
             agent="OperationsCoordinationAgent",
-            skills_used=[],                              # ASK invokes no tools
+            skills_used=[],
             skills_available=assessment.skills_consulted,
             model_id=assessment.model_id,
             reasoning_level="MEDIUM",
@@ -299,16 +294,249 @@ class CopilotService:
             },
         )
 
+        # ── Update focus continuity on conversation ───────────────────────────
+        if neighborhood.focus_entity_id:
+            conv.last_focus_entity_id = neighborhood.focus_entity_id
+            conv.last_focus_entity_label = neighborhood.focus_entity_label
+            er = neighborhood.entity_resolution
+            conv.last_focus_entity_type = er.entity_type if er else None
+
         turn = self._make_turn(
-            turn_id=turn_id,
-            conv_id=conv.conversation_id,
-            message=message,
-            intent=intent,
-            trace_id=trace_id,
-            result=result,
+            turn_id=turn_id, conv_id=conv.conversation_id, message=message,
+            intent=CopilotIntent.ASK, trace_id=trace_id, summary=result.answer,
+            parent_turn_id=parent_turn_id,
+            focus_entity_id=neighborhood.focus_entity_id,
+            focus_entity_type=conv.last_focus_entity_type,
+            focus_entity_label=neighborhood.focus_entity_label,
         )
         self._store.add_turn(turn)
         await self._publish("COPILOT_TURN_COMPLETE", f"model={result.model_id}", trace_id=trace_id)
+        return result, turn
+
+    async def analyze(
+        self,
+        *,
+        message: str,
+        conversation_id: str | None,
+        warehouse_id: str,
+        scenario_name: str = "",
+    ) -> tuple[CopilotAnalyzeResult, CopilotTurn]:
+        """
+        Process an ANALYZE turn: fresh state read → graph context → recommendations.
+
+        Zero ActionProposals, zero DecisionEngine evaluations, zero writes.
+        'No warehouse changes have been made.' is always true after this call.
+        """
+        _t0 = time.monotonic()
+        trace_id = str(uuid.uuid4())
+        turn_id = str(uuid.uuid4())
+
+        conv = self._store.get_or_create(
+            conversation_id, warehouse_id, scenario_name
+        )
+        parent_turn_id = conv.last_turn.turn_id if conv.last_turn else None
+
+        await self._publish("COPILOT_TURN_STARTED", f"Copilot ANALYZE — turn {turn_id[:8]}", trace_id=trace_id)
+        await self._publish("COPILOT_INTENT_RESOLVED", "intent=ANALYZE", trace_id=trace_id)
+
+        # ── Fresh WarehouseState read (do not reuse prior ASK snapshot) ───────
+        await self._publish("COPILOT_READING_STATE", "Reading warehouse state", trace_id=trace_id)
+        _t_state = time.monotonic()
+        state, state_degraded, state_degradation_reason = await self._get_state(
+            warehouse_id=warehouse_id,
+            scenario_name=scenario_name,
+            trace_id=trace_id,
+        )
+        _state_ms = (time.monotonic() - _t_state) * 1000
+
+        missing = _missing_context(state, scenario_name)
+
+        if state is None or missing:
+            from maiw_api.copilot.models import ContextNeighborhood as _CN
+            neighborhood = _CN(
+                focus_entity_id=None, focus_entity_label=None, entity_ids=[],
+                relationship_summary={}, max_depth=2, graph_available=False,
+                entity_resolution=None,
+            )
+            degradation = _build_degradation(state_degradation_reason, missing, neighborhood)
+            summary = (
+                "I cannot produce recommendations because warehouse state is unavailable. "
+                + (state_degradation_reason or "")
+            ).strip()
+            result = CopilotAnalyzeResult(
+                summary=summary, severity="UNKNOWN", evidence=[], recommendations=[],
+                neighborhood=neighborhood, agent="OperationsCoordinationAgent",
+                skills_used=[], skills_available=[], model_id="none",
+                reasoning_level="HIGH", routing_rule="none",
+                routing_reason="State unavailable — skipped",
+                trace_id=trace_id, snapshot_id="none", warehouse_id=warehouse_id,
+                latency_ms=(time.monotonic() - _t0) * 1000,
+                degraded=True, degradation_reason=degradation,
+                answerability="insufficient_evidence", missing_context=missing,
+                timing={
+                    "state_assembly_ms": round(_state_ms, 1),
+                    "graph_lookup_ms": 0.0, "model_inference_ms": 0.0,
+                    "total_ms": round((time.monotonic() - _t0) * 1000, 1),
+                },
+            )
+            turn = self._make_turn(
+                turn_id=turn_id, conv_id=conv.conversation_id, message=message,
+                intent=CopilotIntent.ANALYZE, trace_id=trace_id, summary=result.summary,
+                parent_turn_id=parent_turn_id,
+            )
+            self._store.add_turn(turn)
+            await self._publish("COPILOT_TURN_COMPLETE", "degraded=true insufficient_evidence", trace_id=trace_id)
+            return result, turn
+
+        # ── Resolve Operational Graph neighborhood with focus continuity ──────
+        await self._publish("COPILOT_RESOLVING_CONTEXT", "Resolving graph context", trace_id=trace_id)
+        _t_graph = time.monotonic()
+        neighborhood = context_resolver.resolve(
+            question=message,
+            warehouse_id=warehouse_id,
+            graph=self._graph,
+            focus_entity_id=conv.last_focus_entity_id,
+            focus_entity_label=conv.last_focus_entity_label,
+        )
+        _graph_ms = (time.monotonic() - _t_graph) * 1000
+
+        await self._publish(
+            "COPILOT_CONTEXT_RESOLVED",
+            f"focus={neighborhood.focus_entity_label or conv.last_focus_entity_label or 'none'} "
+            f"entities={len(neighborhood.entity_ids)} "
+            f"graph_available={neighborhood.graph_available}",
+            trace_id=trace_id,
+        )
+
+        # ── Seal snapshot and call agent with HIGH reasoning ──────────────────
+        await self._publish("COPILOT_ANALYZING", "Generating recommendations", trace_id=trace_id)
+        try:
+            from maiw_models import ReasoningLevel, RiskLevel
+
+            snapshot = WarehouseStateSnapshot.seal(state)
+
+            # ANALYZE uses HIGH reasoning and MEDIUM risk — the operator is asking
+            # for a recommendation that may influence a consequential decision.
+            assessment = await self._agent.analyze_disruption(
+                snapshot=snapshot,
+                scenario_context=message,
+                trace_id=trace_id,
+                reasoning_level=ReasoningLevel.HIGH,
+                risk_level=RiskLevel.MEDIUM,
+            )
+
+        except Exception as exc:
+            logger.error("CopilotService.analyze: agent call failed — %s", exc)
+            err_summary = "I encountered an error while generating recommendations."
+            result = CopilotAnalyzeResult(
+                summary=err_summary, severity="UNKNOWN", evidence=[], recommendations=[],
+                neighborhood=neighborhood, agent="OperationsCoordinationAgent",
+                skills_used=[], skills_available=[], model_id="none",
+                reasoning_level="HIGH", routing_rule="none",
+                routing_reason=f"Agent error: {exc}",
+                trace_id=trace_id, snapshot_id="none", warehouse_id=warehouse_id,
+                latency_ms=(time.monotonic() - _t0) * 1000,
+                degraded=True, degradation_reason=str(exc),
+                answerability="insufficient_evidence",
+                timing={
+                    "state_assembly_ms": round(_state_ms, 1),
+                    "graph_lookup_ms": round(_graph_ms, 1),
+                    "model_inference_ms": 0.0,
+                    "total_ms": round((time.monotonic() - _t0) * 1000, 1),
+                },
+            )
+            turn = self._make_turn(
+                turn_id=turn_id, conv_id=conv.conversation_id, message=message,
+                intent=CopilotIntent.ANALYZE, trace_id=trace_id, summary=err_summary,
+                parent_turn_id=parent_turn_id,
+            )
+            self._store.add_turn(turn)
+            await self._publish("COPILOT_TURN_COMPLETE", "degraded=true error", trace_id=trace_id)
+            return result, turn
+
+        # ── Build RecommendedActionResult list with provenance ────────────────
+        _total_ms = (time.monotonic() - _t0) * 1000
+        evidence = _facts_to_evidence(assessment.facts_observed, assessment.severity)
+        full_degradation = _build_degradation(state_degradation_reason, [], neighborhood)
+        answerability = "partial" if state_degradation_reason else "answerable"
+
+        effective_focus_id = (
+            neighborhood.focus_entity_id or conv.last_focus_entity_id
+        )
+        effective_focus_label = (
+            neighborhood.focus_entity_label or conv.last_focus_entity_label
+        )
+
+        recs: list[RecommendedActionResult] = []
+        for i, ra in enumerate(assessment.recommendations):
+            recs.append(RecommendedActionResult(
+                recommendation_id=f"{turn_id[:8]}-rec-{i:02d}",
+                domain=ra.domain.value if hasattr(ra.domain, "value") else str(ra.domain),
+                capability=ra.capability.value if hasattr(ra.capability, "value") else str(ra.capability),
+                target=ra.target,
+                objective=ra.objective,
+                rationale=ra.rationale,
+                priority=ra.priority.value if hasattr(ra.priority, "value") else str(ra.priority),
+                subtype=ra.subtype,
+                conversation_id=conv.conversation_id,
+                turn_id=turn_id,
+                trace_id=trace_id,
+                snapshot_id=assessment.snapshot_id,
+                focus_entity_id=effective_focus_id,
+            ))
+
+        result = CopilotAnalyzeResult(
+            summary=assessment.summary,
+            severity=assessment.severity.value if hasattr(assessment.severity, "value") else str(assessment.severity),
+            evidence=evidence,
+            recommendations=recs,
+            neighborhood=neighborhood,
+            agent="OperationsCoordinationAgent",
+            skills_used=[],
+            skills_available=assessment.skills_consulted,
+            model_id=assessment.model_id,
+            reasoning_level="HIGH",
+            routing_rule=assessment.routing_rule,
+            routing_reason=assessment.routing_reason,
+            requested_role=assessment.requested_role,
+            selected_role=assessment.selected_role,
+            fallback_from=assessment.fallback_from,
+            fallback_reason=assessment.fallback_reason,
+            trace_id=trace_id,
+            snapshot_id=assessment.snapshot_id,
+            warehouse_id=assessment.warehouse_id,
+            latency_ms=_total_ms,
+            degraded=bool(full_degradation),
+            degradation_reason=full_degradation or None,
+            answerability=answerability,
+            timing={
+                "state_assembly_ms": round(_state_ms, 1),
+                "graph_lookup_ms": round(_graph_ms, 1),
+                "model_inference_ms": round(assessment.latency_ms, 1),
+                "total_ms": round(_total_ms, 1),
+            },
+            focus_entity_id=effective_focus_id,
+            focus_entity_label=effective_focus_label,
+        )
+
+        # ── Update conversation: focus continuity + store recommendations ─────
+        if neighborhood.focus_entity_id:
+            conv.last_focus_entity_id = neighborhood.focus_entity_id
+            conv.last_focus_entity_label = neighborhood.focus_entity_label
+            er = neighborhood.entity_resolution
+            conv.last_focus_entity_type = er.entity_type if er else None
+        conv.last_recommendations = list(recs)
+
+        turn = self._make_turn(
+            turn_id=turn_id, conv_id=conv.conversation_id, message=message,
+            intent=CopilotIntent.ANALYZE, trace_id=trace_id, summary=result.summary,
+            parent_turn_id=parent_turn_id,
+            focus_entity_id=effective_focus_id,
+            focus_entity_type=conv.last_focus_entity_type,
+            focus_entity_label=effective_focus_label,
+        )
+        self._store.add_turn(turn)
+        await self._publish("COPILOT_TURN_COMPLETE", f"recommendations={len(recs)} model={result.model_id}", trace_id=trace_id)
         return result, turn
 
     # ── Private helpers ───────────────────────────────────────────────────────
@@ -384,7 +612,11 @@ class CopilotService:
         message: str,
         intent: CopilotIntent,
         trace_id: str,
-        result: CopilotAskResult,
+        summary: str,
+        parent_turn_id: str | None = None,
+        focus_entity_id: str | None = None,
+        focus_entity_type: str | None = None,
+        focus_entity_label: str | None = None,
     ) -> CopilotTurn:
         return CopilotTurn(
             turn_id=turn_id,
@@ -393,8 +625,12 @@ class CopilotService:
             intent=intent,
             created_at=datetime.now(timezone.utc),
             trace_id=trace_id,
-            response_summary=result.answer[:200],
+            response_summary=summary[:200],
             artifact_refs={},
+            parent_turn_id=parent_turn_id,
+            focus_entity_id=focus_entity_id,
+            focus_entity_type=focus_entity_type,
+            focus_entity_label=focus_entity_label,
         )
 
 

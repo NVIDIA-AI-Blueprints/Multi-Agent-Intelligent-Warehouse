@@ -49,6 +49,7 @@ class ContextNeighborhood:
     relationship_summary: dict[str, list[str]]  # e.g. {"Tasks": [...], "Workers": [...]}
     max_depth: int
     graph_available: bool
+    entity_resolution: Any | None = None  # EntityResolution from context.py
 
 
 # ── ASK result ────────────────────────────────────────────────────────────────
@@ -97,6 +98,73 @@ class CopilotAskResult:
     timing: dict[str, float] = field(default_factory=dict)   # state_assembly_ms, graph_lookup_ms, model_inference_ms, total_ms
 
 
+# ── ANALYZE result ────────────────────────────────────────────────────────────
+
+@dataclass
+class RecommendedActionResult:
+    """
+    A single recommendation from a Copilot ANALYZE turn.
+
+    Carries all RecommendedAction fields plus provenance fields needed for
+    future ACT stale-state detection. Does NOT contain ActionProposal,
+    proposal_id, decision_id, approval_id, or execution_id.
+    """
+    recommendation_id: str              # durable ID within this conversation
+    domain: str
+    capability: str
+    target: str
+    objective: str
+    rationale: str
+    priority: str
+    subtype: str | None
+    # Provenance (needed for 15D ACT stale-state check)
+    conversation_id: str
+    turn_id: str
+    trace_id: str
+    snapshot_id: str
+    focus_entity_id: str | None
+
+
+@dataclass
+class CopilotAnalyzeResult:
+    """
+    Structured result of a Copilot ANALYZE turn.
+
+    MUST contain zero ActionProposals, zero DecisionEngine evaluations,
+    zero writes. These are enforced by architecture invariant tests.
+
+    The safety invariant 'No warehouse changes have been made.' must be
+    communicated to the operator via the API response / UI.
+    """
+    summary: str
+    severity: str
+    evidence: list[EvidenceFact]
+    recommendations: list[RecommendedActionResult]
+    neighborhood: ContextNeighborhood
+    agent: str
+    skills_used: list[str]
+    skills_available: list[str]
+    model_id: str
+    reasoning_level: str
+    routing_rule: str
+    routing_reason: str
+    trace_id: str
+    snapshot_id: str
+    warehouse_id: str
+    latency_ms: float
+    degraded: bool = False
+    degradation_reason: str | None = None
+    requested_role: str | None = None
+    selected_role: str | None = None
+    fallback_from: str | None = None
+    fallback_reason: str | None = None
+    answerability: str = "answerable"
+    missing_context: list[str] = field(default_factory=list)
+    timing: dict[str, float] = field(default_factory=dict)
+    focus_entity_id: str | None = None
+    focus_entity_label: str | None = None
+
+
 # ── Turn / Conversation store models ─────────────────────────────────────────
 
 @dataclass
@@ -118,6 +186,10 @@ class CopilotTurn:
     # artifact_refs keys: proposal_id, decision_id, approval_id, execution_id
     parent_turn_id: str | None = None
     related_trace_ids: list[str] = field(default_factory=list)
+    # Focus entity resolved during this turn (for continuity in subsequent turns)
+    focus_entity_id: str | None = None
+    focus_entity_type: str | None = None
+    focus_entity_label: str | None = None
 
 
 @dataclass
@@ -135,6 +207,10 @@ class CopilotConversation:
     last_recommendations: list[Any] = field(default_factory=list)
     related_trace_ids: list[str] = field(default_factory=list)
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    # Focus continuity — updated on each turn that resolves an entity
+    last_focus_entity_id: str | None = None
+    last_focus_entity_type: str | None = None
+    last_focus_entity_label: str | None = None
 
     def add_turn(self, turn: CopilotTurn) -> None:
         self.turns.append(turn)
@@ -187,7 +263,14 @@ class CopilotTurnResponse(BaseModel):
     missing_context: list[str] = Field(default_factory=list)
     timing: dict = Field(default_factory=dict)  # state_assembly_ms, graph_lookup_ms, model_inference_ms, total_ms
 
-    # Future: ANALYZE and ACT fields populated in 15C / 15D
+    # ANALYZE fields (present when intent=analyze)
+    summary: str | None = None
+    severity: str | None = None
+    recommendations: list[dict] | None = None  # RecommendedActionResult as dicts
+    focus_entity_id: str | None = None
+    focus_entity_label: str | None = None
+    safety_note: str | None = None  # "No warehouse changes have been made."
+
     related_artifacts: dict = Field(default_factory=dict)
 
     # Explicitly NOT present: proposal, decision, approval, execution shortcuts

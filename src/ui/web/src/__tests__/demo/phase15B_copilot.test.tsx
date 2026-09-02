@@ -76,6 +76,13 @@ function buildTurn(overrides: Partial<CopilotTurnResponse> = {}): CopilotTurnRes
     timing: {},
     related_artifacts: {},
     store_note: '',
+    // ANALYZE fields (null for ASK turns)
+    summary: null,
+    severity: null,
+    recommendations: null,
+    focus_entity_id: null,
+    focus_entity_label: null,
+    safety_note: null,
     ...overrides,
   };
 }

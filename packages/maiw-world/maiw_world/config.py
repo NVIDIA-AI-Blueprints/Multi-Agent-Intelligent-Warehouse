@@ -155,6 +155,7 @@ class WaveConfig(BaseModel):
     active_wave_count: int
     strategy: str = "fifo"  # "fifo" | "priority" | "deadline"
     task_count: int
+    wave_number_start: int = 1  # first wave_number; dc47_demo uses 17 as canonical identity
 
     @field_validator("active_wave_count")
     @classmethod
@@ -240,7 +241,7 @@ class WarehouseWorldConfig(BaseModel):
             labor=LaborConfig(workers_per_shift=40, shift_count=3),
             equipment=EquipmentConfig(agv_count=8, forklift_count=12, conveyor_count=4),
             orders=OrderConfig(daily_order_count=850, lines_per_order_mean=4.2),
-            waves=WaveConfig(active_wave_count=3, strategy="priority", task_count=120),
+            waves=WaveConfig(active_wave_count=3, strategy="priority", task_count=120, wave_number_start=17),
             history=HistoryConfig(history_days=30),
         )
 

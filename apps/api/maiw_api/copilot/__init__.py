@@ -18,7 +18,10 @@ CopilotTurn       — per-turn state
 InMemoryCopilotStore — process-local conversation store
 """
 
-from .models import CopilotIntent, CopilotTurn, CopilotConversation, CopilotAskResult
+from .models import (
+    CopilotIntent, CopilotTurn, CopilotConversation,
+    CopilotAskResult, CopilotAnalyzeResult, RecommendedActionResult,
+)
 from .store import InMemoryCopilotStore
 from .service import CopilotService
 
@@ -27,6 +30,8 @@ __all__ = [
     "CopilotTurn",
     "CopilotConversation",
     "CopilotAskResult",
+    "CopilotAnalyzeResult",
+    "RecommendedActionResult",
     "InMemoryCopilotStore",
     "CopilotService",
 ]
