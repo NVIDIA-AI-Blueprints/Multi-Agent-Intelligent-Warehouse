@@ -1,15 +1,16 @@
 /**
- * CopilotDrawer.tsx — Phase 15C Copilot ASK + ANALYZE panel.
+ * CopilotDrawer.tsx — Phase 15D Copilot ASK + ANALYZE + ACT panel.
  *
- * Right-side overlay drawer for operator questions and recommendations.
- * ASK: read-only explanation. ANALYZE: grounded recommendations (no execution).
+ * Right-side overlay drawer for operator questions, recommendations, and governed
+ * action requests. ACT routes through GovernedActionOrchestrator — no inline
+ * APPROVE/EXECUTE buttons here. Approval happens in the existing MAIW approval UI.
  *
  * Constraints:
  *   - No chain_of_thought / scratchpad / hidden_reasoning / reasoning_tokens
- *   - No APPROVE / EXECUTE / DO IT / ActionProposal buttons
+ *   - No inline APPROVE / EXECUTE / force-action buttons in this drawer
+ *   - "No warehouse changes have been made." always visible before approval/execution
  *   - Severity comes from fact.severity ONLY — never re-derived from value text
  *   - skills_used is always [] for ASK/ANALYZE — not shown
- *   - Safety copy "No warehouse changes have been made." is always visible on ANALYZE
  */
 
 import React, { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react';
@@ -32,6 +33,23 @@ const PRIORITY_COLOR: Record<string, string> = {
   LOW:      '#3FB950',
 };
 
+const DECISION_OUTCOME_COLOR: Record<string, string> = {
+  REQUIRES_HUMAN_APPROVAL: '#D29922',
+  APPROVED:                '#3FB950',
+  REJECTED:                '#F85149',
+  REQUIRES_FRESH_STATE:    '#D29922',
+  STALE_STATE:             '#D29922',
+  CLARIFICATION_REQUIRED:  '#58A6FF',
+  NOT_IMPLEMENTED:         '#484F58',
+  ERROR:                   '#F85149',
+};
+
+const MUTATION_STATE_COLOR: Record<string, string> = {
+  NOT_ATTEMPTED: '#484F58',
+  CONFIRMED:     '#3FB950',
+  UNKNOWN:       '#D29922',
+};
+
 // ── Loading stage sequences ────────────────────────────────────────────────────
 
 const LOADING_STAGES_ASK = [
@@ -48,9 +66,19 @@ const LOADING_STAGES_ANALYZE = [
   'COMPLETE',
 ];
 
+const LOADING_STAGES_ACT = [
+  'RESOLVING RECOMMENDATION',
+  'READING CURRENT STATE',
+  'VALIDATING',
+  'PREPARING GOVERNED ACTION',
+  'EVALUATING POLICY',
+  'COMPLETE',
+];
+
 // ── Suggested prompts (shown after a turn completes) ──────────────────────────
 
-const SUGGEST_AFTER_ASK = ['What should we do?'];
+const SUGGEST_AFTER_ASK     = ['What should we do?'];
+const SUGGEST_AFTER_ANALYZE = ['Do it.'];
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -182,6 +210,179 @@ function RecommendationCard({ rec, index }: { rec: CopilotRecommendation; index:
           ))}
         </Box>
       )}
+    </Box>
+  );
+}
+
+function CopilotActAnswer({ turn }: CopilotAnswerProps) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
+  const outcome   = turn.act_decision_outcome ?? 'NOT_IMPLEMENTED';
+  const mutState  = turn.act_mutation_state   ?? 'NOT_ATTEMPTED';
+  const outColor  = DECISION_OUTCOME_COLOR[outcome]  ?? '#484F58';
+  const mutColor  = MUTATION_STATE_COLOR[mutState]   ?? '#484F58';
+  const safetyNote = turn.safety_note ?? 'No warehouse changes have been made.';
+  const confirmed = mutState === 'CONFIRMED';
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+
+      {/* Section header */}
+      <Typography sx={{
+        fontFamily: 'monospace', fontSize: '0.58rem', fontWeight: 700,
+        color: '#484F58', letterSpacing: '0.12em', textTransform: 'uppercase',
+        mb: '2px',
+      }}>
+        AI REQUEST
+      </Typography>
+
+      {/* Decision outcome badge */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px', mb: '2px' }}>
+        <Box component="span" sx={{
+          fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
+          color: outColor, border: `1px solid ${outColor}44`, borderRadius: '3px',
+          px: '5px', py: '1px', textTransform: 'uppercase', letterSpacing: '0.08em',
+        }}>
+          {outcome.replace(/_/g, ' ')}
+        </Box>
+        <Box component="span" sx={{
+          fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
+          color: mutColor, border: `1px solid ${mutColor}44`, borderRadius: '3px',
+          px: '5px', py: '1px', textTransform: 'uppercase', letterSpacing: '0.08em',
+        }}>
+          {mutState.replace(/_/g, ' ')}
+        </Box>
+      </Box>
+
+      {/* Answer text */}
+      {turn.answer && (
+        <Typography sx={{
+          fontFamily: 'monospace', fontSize: '0.78rem', color: '#C9D1D9', lineHeight: 1.5,
+        }}>
+          {turn.answer}
+        </Typography>
+      )}
+
+      {/* Safety note — always visible before approval/execution */}
+      <Box
+        data-testid="copilot-act-safety-note"
+        sx={{
+          background: confirmed ? '#0D1B0D' : '#1A1200',
+          border: `1px solid ${confirmed ? '#3FB95044' : '#D2992244'}`,
+          borderRadius: '4px',
+          px: '10px', py: '7px',
+        }}
+      >
+        <Typography sx={{
+          fontFamily: 'monospace', fontSize: '0.7rem',
+          color: confirmed ? '#3FB950' : '#D29922',
+        }}>
+          {confirmed ? '✓' : '⏳'} {safetyNote}
+        </Typography>
+      </Box>
+
+      {/* Pending approval link — no inline APPROVE button */}
+      {outcome === 'REQUIRES_HUMAN_APPROVAL' && turn.act_pending_approval_id && (
+        <Box sx={{
+          background: '#0D1117',
+          border: '1px solid #D2992244',
+          borderRadius: '4px',
+          px: '10px', py: '7px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <Typography sx={{
+            fontFamily: 'monospace', fontSize: '0.68rem', color: '#D29922',
+          }}>
+            Pending review: {turn.act_pending_approval_id.slice(0, 12)}…
+          </Typography>
+          <Box
+            component="button"
+            data-testid="copilot-act-review-approval"
+            onClick={() => console.log('[Copilot ACT] Review approval:', turn.act_pending_approval_id, turn)}
+            sx={{
+              background: 'transparent',
+              border: '1px solid #D2992244',
+              borderRadius: '3px',
+              px: '6px', py: '2px',
+              fontFamily: 'monospace', fontSize: '0.58rem',
+              color: '#D29922', cursor: 'pointer', flexShrink: 0,
+              '&:hover': { color: '#F0A400', borderColor: '#F0A40044' },
+            }}
+          >
+            REVIEW APPROVAL
+          </Box>
+        </Box>
+      )}
+
+      {/* Violations */}
+      {turn.act_violations && turn.act_violations.length > 0 && (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          {turn.act_violations.map((v, i) => (
+            <Typography key={i} sx={{
+              fontFamily: 'monospace', fontSize: '0.68rem', color: '#F85149', lineHeight: 1.4,
+            }}>
+              ✗ [{v.code}] {v.message}
+            </Typography>
+          ))}
+        </Box>
+      )}
+
+      {/* Governance details (collapsible) */}
+      <Box>
+        <Box
+          component="button"
+          onClick={() => setDetailsOpen(o => !o)}
+          sx={{
+            background: 'transparent', border: 'none', cursor: 'pointer',
+            fontFamily: 'monospace', fontSize: '0.62rem', color: '#484F58',
+            p: 0, textAlign: 'left',
+            '&:hover': { color: '#8B949E' },
+          }}
+        >
+          GOVERNANCE {detailsOpen ? '▾' : '▸'}
+        </Box>
+        {detailsOpen && (
+          <Box sx={{
+            mt: '4px', display: 'flex', flexDirection: 'column', gap: '3px',
+            background: '#161B22', border: '1px solid #21262D',
+            borderRadius: '4px', p: '8px',
+          }}>
+            {([
+              ['Capability',    turn.act_recommendation_id ? turn.recommendations?.[0]?.capability : null],
+              ['Proposal ID',   turn.act_proposal_id?.slice(0, 12)],
+              ['Decision ID',   turn.act_decision_id?.slice(0, 12)],
+              ['Pending ID',    turn.act_pending_approval_id?.slice(0, 12)],
+              ['Execution ID',  turn.act_execution_id?.slice(0, 12)],
+              ['Exec Status',   turn.act_execution_status],
+              ['Snapshot S1',   turn.act_source_snapshot_id?.slice(0, 8)],
+              ['Latency',       turn.latency_ms != null ? `${turn.latency_ms}ms` : null],
+            ] as [string, string | null | undefined][]).map(([label, val]) => val != null && (
+              <Box key={label} sx={{ display: 'flex', gap: '8px' }}>
+                <Typography sx={{
+                  fontFamily: 'monospace', fontSize: '0.62rem', color: '#484F58',
+                  minWidth: '80px', flexShrink: 0,
+                }}>
+                  {label}
+                </Typography>
+                <Typography sx={{
+                  fontFamily: 'monospace', fontSize: '0.62rem', color: '#8B949E',
+                  wordBreak: 'break-word',
+                }}>
+                  {String(val)}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+        )}
+      </Box>
+
+      {/* Trace */}
+      <Typography sx={{
+        fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58',
+        wordBreak: 'break-all',
+      }}>
+        trace: {turn.trace_id}
+      </Typography>
     </Box>
   );
 }
@@ -472,7 +673,7 @@ function CopilotAnswer({ turn }: CopilotAnswerProps) {
 }
 
 // Export for direct testing of the rendering logic
-export { CopilotAnswer };
+export { CopilotAnswer, CopilotActAnswer };
 
 // ── Turn entry in conversation thread ─────────────────────────────────────────
 
@@ -491,13 +692,16 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
   const [inputMessage, setInputMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingStageIdx, setLoadingStageIdx] = useState(0);
-  const [pendingIntent, setPendingIntent] = useState<'ask' | 'analyze'>('ask');
+  const [pendingIntent, setPendingIntent] = useState<'ask' | 'analyze' | 'act'>('ask');
   const [error, setError] = useState<string | null>(null);
 
   const threadRef = useRef<HTMLDivElement>(null);
   const stageTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const activeStages = pendingIntent === 'analyze' ? LOADING_STAGES_ANALYZE : LOADING_STAGES_ASK;
+  const activeStages =
+    pendingIntent === 'act'     ? LOADING_STAGES_ACT :
+    pendingIntent === 'analyze' ? LOADING_STAGES_ANALYZE :
+    LOADING_STAGES_ASK;
 
   // Cycle loading stage label while loading
   useEffect(() => {
@@ -530,8 +734,9 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
     if (!text || loading) return;
 
     // Detect intended intent client-side for loading stage label
+    const looksLikeAct     = /\b(do it|proceed|execute|apply|allocate the|reprioritize|prepare (that|this|the) action)\b/i.test(text);
     const looksLikeAnalyze = /\b(recommend|what should (we|i|you)|how should (we|i|you)|best action|what actions?)\b/i.test(text);
-    setPendingIntent(looksLikeAnalyze ? 'analyze' : 'ask');
+    setPendingIntent(looksLikeAct ? 'act' : looksLikeAnalyze ? 'analyze' : 'ask');
 
     const turnId = `turn-${Date.now()}`;
     setInputMessage('');
@@ -571,10 +776,12 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
     }
   }, [handleSend]);
 
-  // Determine if last completed turn was ASK (for suggested prompt)
+  // Determine if last completed turn was ASK or ANALYZE (for suggested prompts)
   const lastResponse = turns.length > 0 ? turns[turns.length - 1].response : null;
-  const showSuggest = !loading && lastResponse?.intent === 'ask' &&
+  const showAskSuggest     = !loading && lastResponse?.intent === 'ask' &&
     lastResponse?.answerability === 'answerable';
+  const showAnalyzeSuggest = !loading && lastResponse?.intent === 'analyze' &&
+    (lastResponse?.recommendations?.length ?? 0) > 0;
 
   return (
     <Box
@@ -614,7 +821,7 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
             border: '1px solid #1F6FEB44', borderRadius: '3px',
             px: '4px', py: '0px', lineHeight: 1.6,
           }}>
-            ASK · ANALYZE
+            ASK · ANALYZE · ACT
           </Box>
         </Box>
         <Box
@@ -690,7 +897,9 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
             {/* Response */}
             <Box sx={{ maxWidth: '100%' }}>
               {turn.response ? (
-                <CopilotAnswer turn={turn.response} />
+                turn.response.intent === 'act'
+                  ? <CopilotActAnswer turn={turn.response} />
+                  : <CopilotAnswer turn={turn.response} />
               ) : turn.error ? (
                 <Typography sx={{
                   fontFamily: 'monospace', fontSize: '0.72rem', color: '#F85149',
@@ -721,7 +930,7 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
         ))}
 
         {/* Suggested prompt after ASK */}
-        {showSuggest && (
+        {showAskSuggest && (
           <Box sx={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             {SUGGEST_AFTER_ASK.map(prompt => (
               <Box
@@ -737,6 +946,31 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
                   fontFamily: 'monospace', fontSize: '0.65rem',
                   color: '#484F58', cursor: 'pointer',
                   '&:hover': { color: '#58A6FF', borderColor: '#58A6FF44' },
+                }}
+              >
+                {prompt}
+              </Box>
+            ))}
+          </Box>
+        )}
+
+        {/* Suggested "Do it." after ANALYZE */}
+        {showAnalyzeSuggest && (
+          <Box sx={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {SUGGEST_AFTER_ANALYZE.map(prompt => (
+              <Box
+                key={prompt}
+                component="button"
+                data-testid="copilot-act-suggested-prompt"
+                onClick={() => handleSend(prompt)}
+                sx={{
+                  background: 'transparent',
+                  border: '1px solid #D2992244',
+                  borderRadius: '4px',
+                  px: '8px', py: '4px',
+                  fontFamily: 'monospace', fontSize: '0.65rem',
+                  color: '#D29922', cursor: 'pointer',
+                  '&:hover': { color: '#F0A400', borderColor: '#F0A40044' },
                 }}
               >
                 {prompt}

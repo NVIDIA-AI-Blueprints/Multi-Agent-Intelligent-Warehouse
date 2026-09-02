@@ -213,6 +213,18 @@ export interface CopilotTurnResponse {
   safety_note: string | null;
   related_artifacts: Record<string, unknown>;
   store_note: string;
+  // ACT fields (present only when intent === 'act')
+  act_recommendation_id?: string | null;
+  act_decision_outcome?: string | null;
+  act_proposal_id?: string | null;
+  act_decision_id?: string | null;
+  act_pending_approval_id?: string | null;
+  act_approval_required?: boolean;
+  act_execution_status?: string | null;
+  act_execution_id?: string | null;
+  act_mutation_state?: string | null;   // "NOT_ATTEMPTED" | "CONFIRMED" | "UNKNOWN"
+  act_violations?: Array<{ code: string; message: string }>;
+  act_source_snapshot_id?: string | null;
 }
 
 export interface CopilotTurnRequest {
