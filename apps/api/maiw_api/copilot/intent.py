@@ -23,6 +23,8 @@ _ACT_PATTERNS: list[re.Pattern] = [
     re.compile(r"\b(do it|execute|confirm|apply|approve|commit)\b", re.IGNORECASE),
     re.compile(r"\b(allocate|reassign|move|reprioritize|reprioritise|dispatch|cancel)\b", re.IGNORECASE),
     re.compile(r"\b(make it happen|go ahead|proceed with)\b", re.IGNORECASE),
+    re.compile(r"\bproceed\b", re.IGNORECASE),
+    re.compile(r"\bprepare (that|this|the) action\b", re.IGNORECASE),
 ]
 
 # ── ANALYZE markers — recommendation-oriented questions ───────────────────────

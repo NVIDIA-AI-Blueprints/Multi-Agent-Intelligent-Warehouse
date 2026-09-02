@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 """
-CopilotService — Phase 15C: ASK + ANALYZE.
+CopilotService — Phase 15D: ASK + ANALYZE + ACT.
 
 Trust boundary enforced by explicit import restrictions:
     - MUST NOT import ActionExecutor
@@ -9,7 +9,11 @@ Trust boundary enforced by explicit import restrictions:
     - MUST NOT call DecisionEngine.evaluate
     - MUST NOT create ActionProposal
 
-These are validated by architecture invariant tests in test_copilot_ask.py.
+ACT is handled via GovernedActionOrchestrator (injected at bootstrap time).
+CopilotService delegates governance to the orchestrator; it never holds
+references to ActionExecutor, ApprovalStore, or DecisionEngine.
+
+These are validated by architecture invariant tests in test_phase15d_act.py.
 
 Degradation policy
 ------------------
@@ -42,11 +46,14 @@ except ImportError:
 from . import context as context_resolver
 from . import intent as intent_classifier
 from .models import (
+    CopilotActResult,
     CopilotAnalyzeResult,
     CopilotAskResult,
     CopilotIntent,
     CopilotTurn,
     EvidenceFact,
+    GovernedActionRequest,
+    MutationState,
     RecommendedActionResult,
 )
 from .store import InMemoryCopilotStore
@@ -83,10 +90,23 @@ class CopilotService:
         self._event_bus = event_bus
         self._graph = graph
         self._store = store or InMemoryCopilotStore()
+        self._orchestrator: Any = None  # injected via set_orchestrator() at bootstrap
 
     @property
     def store(self) -> InMemoryCopilotStore:
         return self._store
+
+    def set_orchestrator(self, orchestrator: Any) -> None:
+        """
+        Inject the GovernedActionOrchestrator.
+
+        Called by bootstrap after both the service and orchestrator are
+        constructed. Using a setter keeps the constructor signature stable
+        and makes the governance boundary explicit.
+
+        CopilotService MUST NOT import GovernedActionOrchestrator directly.
+        """
+        self._orchestrator = orchestrator
 
     async def ask(
         self,
@@ -539,6 +559,294 @@ class CopilotService:
         await self._publish("COPILOT_TURN_COMPLETE", f"recommendations={len(recs)} model={result.model_id}", trace_id=trace_id)
         return result, turn
 
+    async def act(
+        self,
+        *,
+        message: str,
+        conversation_id: str | None,
+        warehouse_id: str,
+        scenario_name: str = "",
+    ) -> tuple[CopilotActResult, CopilotTurn]:
+        """
+        Process an ACT turn: resolve recommendation → validate state → governed request.
+
+        CopilotService MUST NOT call DecisionEngine, ApprovalStore, or ActionExecutor.
+        All governance is delegated to GovernedActionOrchestrator.
+
+        Returns (CopilotActResult, CopilotTurn). The turn is persisted internally.
+        """
+        _t0 = time.monotonic()
+        trace_id = str(uuid.uuid4())
+        turn_id = str(uuid.uuid4())
+        _safety_no_mutation = "No warehouse changes have been made."
+
+        conv = self._store.get_or_create(conversation_id, warehouse_id, scenario_name)
+        parent_turn_id = conv.last_turn.turn_id if conv.last_turn else None
+
+        await self._publish("COPILOT_TURN_STARTED", f"Copilot ACT — turn {turn_id[:8]}", trace_id=trace_id)
+        await self._publish("COPILOT_INTENT_RESOLVED", "intent=ACT", trace_id=trace_id)
+
+        def _make_act_error(
+            decision_outcome: str,
+            message_text: str,
+            *,
+            recommendation_id: str = "",
+            capability: str = "",
+            target: str = "",
+            source_snapshot_id: str = "none",
+            current_snapshot_id: str = "none",
+            degraded: bool = True,
+            degradation_reason: str | None = None,
+        ) -> CopilotActResult:
+            return CopilotActResult(
+                message=message_text,
+                recommendation_id=recommendation_id,
+                capability=capability,
+                target=target,
+                decision_outcome=decision_outcome,
+                proposal_id=None,
+                decision_id=None,
+                approval_required=False,
+                pending_approval_id=None,
+                execution_status=None,
+                execution_id=None,
+                mutation_state=MutationState.NOT_ATTEMPTED,
+                safety_note=_safety_no_mutation,
+                violations=[],
+                source_recommendation_id=recommendation_id,
+                source_snapshot_id=source_snapshot_id,
+                snapshot_id=current_snapshot_id,
+                conversation_id=conv.conversation_id,
+                turn_id=turn_id,
+                trace_id=trace_id,
+                warehouse_id=warehouse_id,
+                latency_ms=(time.monotonic() - _t0) * 1000,
+                degraded=degraded,
+                degradation_reason=degradation_reason,
+            )
+
+        # ── Orchestrator check ────────────────────────────────────────────────
+        if self._orchestrator is None:
+            result = _make_act_error(
+                "NOT_IMPLEMENTED",
+                (
+                    "Governed action handling is not available in this build. "
+                    "Ensure the MAIW runtime is fully initialized with a "
+                    "GovernedActionOrchestrator."
+                ),
+                degraded=True,
+            )
+            turn = self._make_turn(
+                turn_id=turn_id, conv_id=conv.conversation_id, message=message,
+                intent=CopilotIntent.ACT, trace_id=trace_id, summary=result.message,
+                parent_turn_id=parent_turn_id,
+            )
+            self._store.add_turn(turn)
+            await self._publish("COPILOT_TURN_COMPLETE", "not_implemented", trace_id=trace_id)
+            return result, turn
+
+        # ── Recommendation resolution ─────────────────────────────────────────
+        await self._publish("COPILOT_RESOLVING_RECOMMENDATION", "Resolving recommendation", trace_id=trace_id)
+        recs: list[RecommendedActionResult] = list(conv.last_recommendations)
+
+        if not recs:
+            result = _make_act_error(
+                "CLARIFICATION_REQUIRED",
+                (
+                    "I have no recommendations to act on. "
+                    "Please ask 'What should we do?' first to generate recommendations."
+                ),
+                degraded=False,
+            )
+            turn = self._make_turn(
+                turn_id=turn_id, conv_id=conv.conversation_id, message=message,
+                intent=CopilotIntent.ACT, trace_id=trace_id, summary=result.message,
+                parent_turn_id=parent_turn_id,
+            )
+            self._store.add_turn(turn)
+            await self._publish("COPILOT_TURN_COMPLETE", "no_recommendations", trace_id=trace_id)
+            return result, turn
+
+        selected_rec, resolution_reason = _select_recommendation(message, recs)
+
+        if selected_rec is None and resolution_reason == "ambiguous":
+            rec_list = "\n".join(
+                f"{i + 1}. {r.objective} ({r.capability})"
+                for i, r in enumerate(recs)
+            )
+            result = _make_act_error(
+                "CLARIFICATION_REQUIRED",
+                (
+                    f"I have {len(recs)} recommended actions. "
+                    f"Which would you like me to prepare?\n\n{rec_list}\n\n"
+                    "You can say 'Do the first one', 'Do the second one', "
+                    "or reference the action by name."
+                ),
+                degraded=False,
+            )
+            turn = self._make_turn(
+                turn_id=turn_id, conv_id=conv.conversation_id, message=message,
+                intent=CopilotIntent.ACT, trace_id=trace_id, summary=result.message,
+                parent_turn_id=parent_turn_id,
+            )
+            self._store.add_turn(turn)
+            await self._publish("COPILOT_TURN_COMPLETE", "clarification_required", trace_id=trace_id)
+            return result, turn
+
+        if selected_rec is None:
+            result = _make_act_error(
+                "ERROR",
+                "I could not identify which recommendation to act on.",
+                degraded=True,
+            )
+            turn = self._make_turn(
+                turn_id=turn_id, conv_id=conv.conversation_id, message=message,
+                intent=CopilotIntent.ACT, trace_id=trace_id, summary=result.message,
+                parent_turn_id=parent_turn_id,
+            )
+            self._store.add_turn(turn)
+            return result, turn
+
+        await self._publish(
+            "COPILOT_RESOLVING_RECOMMENDATION",
+            f"Resolved: {selected_rec.recommendation_id} via {resolution_reason}",
+            trace_id=trace_id,
+        )
+
+        # ── Re-read WarehouseState (S2) ───────────────────────────────────────
+        await self._publish("COPILOT_READING_STATE", "Reading current warehouse state", trace_id=trace_id)
+        state, state_degraded, state_degradation_reason = await self._get_state(
+            warehouse_id=warehouse_id,
+            scenario_name=scenario_name,
+            trace_id=trace_id,
+        )
+
+        if state is None:
+            result = _make_act_error(
+                "ERROR",
+                (
+                    "I cannot safely prepare this action because current warehouse state "
+                    "is unavailable. " + (state_degradation_reason or "")
+                ).strip(),
+                recommendation_id=selected_rec.recommendation_id,
+                capability=selected_rec.capability,
+                target=selected_rec.target,
+                source_snapshot_id=selected_rec.snapshot_id,
+                degraded=True,
+                degradation_reason=state_degradation_reason,
+            )
+            turn = self._make_turn(
+                turn_id=turn_id, conv_id=conv.conversation_id, message=message,
+                intent=CopilotIntent.ACT, trace_id=trace_id, summary=result.message,
+                parent_turn_id=parent_turn_id,
+            )
+            self._store.add_turn(turn)
+            await self._publish("COPILOT_TURN_COMPLETE", "state_unavailable", trace_id=trace_id)
+            return result, turn
+
+        # ── Seal S2 snapshot ──────────────────────────────────────────────────
+        snapshot = WarehouseStateSnapshot.seal(state)
+        current_snapshot_id = getattr(snapshot, "snapshot_id", "unknown")
+
+        # ── Validate state drift (S1 vs S2) ──────────────────────────────────
+        await self._publish("COPILOT_VALIDATING_STATE", "Validating against current state", trace_id=trace_id)
+        drift_reason = _check_state_drift(selected_rec, state)
+
+        if drift_reason:
+            result = _make_act_error(
+                "STALE_STATE",
+                (
+                    "The warehouse state has changed since this recommendation was generated.\n\n"
+                    f"{drift_reason}\n\n"
+                    "I need to re-evaluate the situation before preparing the action."
+                ),
+                recommendation_id=selected_rec.recommendation_id,
+                capability=selected_rec.capability,
+                target=selected_rec.target,
+                source_snapshot_id=selected_rec.snapshot_id,
+                current_snapshot_id=current_snapshot_id,
+                degraded=False,
+            )
+            turn = self._make_turn(
+                turn_id=turn_id, conv_id=conv.conversation_id, message=message,
+                intent=CopilotIntent.ACT, trace_id=trace_id, summary=result.message,
+                parent_turn_id=parent_turn_id,
+            )
+            self._store.add_turn(turn)
+            await self._publish("COPILOT_TURN_COMPLETE", "stale_state", trace_id=trace_id)
+            return result, turn
+
+        # ── Build GovernedActionRequest ───────────────────────────────────────
+        gov_request = GovernedActionRequest(
+            recommendation_id=selected_rec.recommendation_id,
+            capability=selected_rec.capability,
+            target=selected_rec.target,
+            domain=selected_rec.domain,
+            objective=selected_rec.objective,
+            rationale=selected_rec.rationale,
+            priority=selected_rec.priority,
+            subtype=selected_rec.subtype,
+            conversation_id=conv.conversation_id,
+            turn_id=turn_id,
+            trace_id=trace_id,
+            source_turn_id=selected_rec.turn_id,
+            source_trace_id=selected_rec.trace_id,
+            source_snapshot_id=selected_rec.snapshot_id,
+            current_snapshot_id=current_snapshot_id,
+            focus_entity_id=selected_rec.focus_entity_id,
+        )
+
+        # ── Delegate to GovernedActionOrchestrator ────────────────────────────
+        await self._publish("COPILOT_PREPARING_ACTION", "Preparing governed action", trace_id=trace_id)
+        try:
+            result = await self._orchestrator.govern(
+                request=gov_request,
+                snapshot=snapshot,
+                warehouse_id=warehouse_id,
+            )
+        except Exception as exc:
+            logger.error("CopilotService.act: orchestrator.govern failed — %s", exc)
+            result = _make_act_error(
+                "ERROR",
+                f"Governance failed: {exc}",
+                recommendation_id=selected_rec.recommendation_id,
+                capability=selected_rec.capability,
+                target=selected_rec.target,
+                source_snapshot_id=selected_rec.snapshot_id,
+                current_snapshot_id=current_snapshot_id,
+                degraded=True,
+                degradation_reason=str(exc),
+            )
+
+        # ── Persist turn with artifact refs ───────────────────────────────────
+        artifact_refs: dict[str, str | None] = {}
+        if result.proposal_id:
+            artifact_refs["proposal_id"] = result.proposal_id
+        if result.decision_id:
+            artifact_refs["decision_id"] = result.decision_id
+        if result.pending_approval_id:
+            artifact_refs["pending_approval_id"] = result.pending_approval_id
+        if result.execution_id:
+            artifact_refs["execution_id"] = result.execution_id
+
+        turn = self._make_turn(
+            turn_id=turn_id, conv_id=conv.conversation_id, message=message,
+            intent=CopilotIntent.ACT, trace_id=trace_id,
+            summary=result.message[:200],
+            parent_turn_id=parent_turn_id,
+            focus_entity_id=selected_rec.focus_entity_id,
+            focus_entity_type=conv.last_focus_entity_type,
+            focus_entity_label=conv.last_focus_entity_label,
+        )
+        turn.artifact_refs.update(artifact_refs)
+        self._store.add_turn(turn)
+        await self._publish(
+            "COPILOT_TURN_COMPLETE",
+            f"outcome={result.decision_outcome} mutation={result.mutation_state.value}",
+            trace_id=trace_id,
+        )
+        return result, turn
+
     # ── Private helpers ───────────────────────────────────────────────────────
 
     async def _get_state(
@@ -632,6 +940,116 @@ class CopilotService:
             focus_entity_type=focus_entity_type,
             focus_entity_label=focus_entity_label,
         )
+
+
+# ── ACT helpers ──────────────────────────────────────────────────────────────
+
+import re as _re
+
+_FIRST_PATTERNS = [
+    _re.compile(r"\bfirst\b", _re.IGNORECASE),
+    _re.compile(r"\bnumber\s*one\b|\b#?1\b|\b1st\b", _re.IGNORECASE),
+]
+_SECOND_PATTERNS = [
+    _re.compile(r"\bsecond\b", _re.IGNORECASE),
+    _re.compile(r"\bnumber\s*two\b|\b#?2\b|\b2nd\b", _re.IGNORECASE),
+]
+
+_CAPABILITY_KEYWORDS: dict[str, str] = {
+    "labor":        "warehouse.labor.allocate",
+    "allocat":      "warehouse.labor.allocate",
+    "worker":       "warehouse.labor.allocate",
+    "wave":         "warehouse.wave.reprioritize",
+    "reprioritiz":  "warehouse.wave.reprioritize",
+    "equipment":    "warehouse.equipment.assign",
+    "assign":       "warehouse.equipment.assign",
+    "maintenance":  "warehouse.equipment.schedule_maintenance",
+    "release":      "warehouse.equipment.release",
+}
+
+
+def _select_recommendation(
+    message: str,
+    recs: list[RecommendedActionResult],
+) -> tuple[RecommendedActionResult | None, str]:
+    """
+    Resolve an operator ACT message to a specific recommendation.
+
+    Returns (rec, reason) where reason is one of:
+      "single"           — exactly one recommendation; selected directly
+      "explicit_index"   — operator referenced first/second/etc.
+      "capability_match" — operator referenced capability domain keyword
+      "not_found"        — no recommendations available
+      "ambiguous"        — multiple recommendations, cannot resolve deterministically
+    """
+    if not recs:
+        return None, "not_found"
+    if len(recs) == 1:
+        return recs[0], "single"
+
+    msg_lower = message.lower()
+
+    # Explicit index: "first", "one", "#1", "1st", etc.
+    for p in _FIRST_PATTERNS:
+        if p.search(msg_lower):
+            return recs[0], "explicit_index"
+    if len(recs) >= 2:
+        for p in _SECOND_PATTERNS:
+            if p.search(msg_lower):
+                return recs[1], "explicit_index"
+
+    # Capability keyword match
+    for kw, cap in _CAPABILITY_KEYWORDS.items():
+        if kw in msg_lower:
+            for rec in recs:
+                if rec.capability == cap:
+                    return rec, "capability_match"
+
+    return None, "ambiguous"
+
+
+def _check_state_drift(rec: RecommendedActionResult, state: Any) -> str | None:
+    """
+    Heuristic pre-flight check: does current state make the recommendation unsafe?
+
+    Returns None if no obvious drift detected.
+    Returns a human-readable reason if material state drift is detected.
+
+    The DecisionEngine provides definitive authority; this is a fast
+    user-friendly guard before proposal construction.
+    """
+    cap = rec.capability
+
+    if cap == "warehouse.labor.allocate":
+        labor = getattr(state, "labor", None)
+        if labor is not None:
+            _sentinel = object()
+            idle = next(
+                (getattr(labor, attr, _sentinel) for attr in ("idle_workers", "workers_idle", "available_workers")
+                 if getattr(labor, attr, _sentinel) is not _sentinel),
+                None,
+            )
+            if idle is not None and idle == 0:
+                return (
+                    "No idle workers are currently available. "
+                    "The labor allocation recommendation may no longer be valid."
+                )
+
+    if cap == "warehouse.wave.reprioritize":
+        waves = getattr(state, "waves", None)
+        if waves is not None:
+            total = (
+                getattr(waves, "total_waves", None)
+                or getattr(waves, "total_tasks", None)
+                or 0
+            )
+            if total == 0:
+                return (
+                    "No active waves found in current state. "
+                    "The wave reprioritization recommendation may no longer be valid."
+                )
+
+    return None
 
 
 # ── Answerability helpers ─────────────────────────────────────────────────────

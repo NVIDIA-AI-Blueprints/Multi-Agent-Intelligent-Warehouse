@@ -21,6 +21,7 @@ InMemoryCopilotStore — process-local conversation store
 from .models import (
     CopilotIntent, CopilotTurn, CopilotConversation,
     CopilotAskResult, CopilotAnalyzeResult, RecommendedActionResult,
+    GovernedActionRequest, CopilotActResult, MutationState,
 )
 from .store import InMemoryCopilotStore
 from .service import CopilotService
@@ -32,6 +33,9 @@ __all__ = [
     "CopilotAskResult",
     "CopilotAnalyzeResult",
     "RecommendedActionResult",
+    "GovernedActionRequest",
+    "CopilotActResult",
+    "MutationState",
     "InMemoryCopilotStore",
     "CopilotService",
 ]

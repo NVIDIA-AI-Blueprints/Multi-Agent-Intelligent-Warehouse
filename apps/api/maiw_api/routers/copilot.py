@@ -1,18 +1,22 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 """
-Copilot API router — Phase 15C (ASK + ANALYZE; ACT gated to 15D).
+Copilot API router — Phase 15D (ASK + ANALYZE + ACT).
 
 Endpoint
 --------
 POST /api/v1/copilot/turn
 
 Explicitly absent (trust boundary):
-    /copilot/approve  — MUST NOT exist
-    /copilot/execute  — MUST NOT exist
+    /copilot/approve      — MUST NOT exist
+    /copilot/execute      — MUST NOT exist
     /copilot/force-action — MUST NOT exist
 
 These paths are validated by architecture invariant tests.
+
+ACT intent routes to CopilotService.act() which delegates governance to
+GovernedActionOrchestrator. The router has no direct access to DecisionEngine,
+ApprovalStore, or ActionExecutor.
 """
 
 from __future__ import annotations
@@ -63,23 +67,16 @@ async def copilot_turn(body: CopilotTurnRequest, request: Request):
     # ── Classify intent ───────────────────────────────────────────────────────
     detected_intent = intent_classifier.classify(body.message)
 
-    # ACT is gated — not implemented in 15C. Return safe refusal.
-    if detected_intent == CopilotIntent.ACT:
-        return CopilotTurnResponse(
-            conversation_id=body.conversation_id or "none",
-            turn_id="none",
-            trace_id="none",
-            intent="act",
-            status="not_implemented",
-            answer=(
-                "Governed action handling is not yet available in this build. "
-                "I can explain the situation (ASK) or recommend actions (ANALYZE), "
-                "but executing warehouse operations requires Phase 15D."
-            ),
-            safety_note=_SAFETY_NOTE,
-        )
-
     try:
+        if detected_intent == CopilotIntent.ACT:
+            result, turn = await svc.act(
+                message=body.message,
+                conversation_id=body.conversation_id,
+                warehouse_id=body.warehouse_id,
+                scenario_name=body.scenario_name,
+            )
+            return _act_response(result, turn)
+
         if detected_intent == CopilotIntent.ANALYZE:
             result, turn = await svc.analyze(
                 message=body.message,
@@ -102,6 +99,45 @@ async def copilot_turn(body: CopilotTurnRequest, request: Request):
     except Exception as exc:
         logger.error("copilot_turn: unexpected error — %s", exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+def _act_response(result, turn) -> CopilotTurnResponse:
+    related_artifacts: dict = {}
+    if result.proposal_id:
+        related_artifacts["proposal_id"] = result.proposal_id
+    if result.decision_id:
+        related_artifacts["decision_id"] = result.decision_id
+    if result.pending_approval_id:
+        related_artifacts["pending_approval_id"] = result.pending_approval_id
+    if result.execution_id:
+        related_artifacts["execution_id"] = result.execution_id
+
+    return CopilotTurnResponse(
+        conversation_id=turn.conversation_id,
+        turn_id=turn.turn_id,
+        trace_id=turn.trace_id,
+        intent=turn.intent.value,
+        status="degraded" if result.degraded else "complete",
+        answer=result.message,
+        # ACT fields
+        act_recommendation_id=result.recommendation_id or None,
+        act_decision_outcome=result.decision_outcome,
+        act_proposal_id=result.proposal_id,
+        act_decision_id=result.decision_id,
+        act_pending_approval_id=result.pending_approval_id,
+        act_approval_required=result.approval_required,
+        act_execution_status=result.execution_status,
+        act_execution_id=result.execution_id,
+        act_mutation_state=result.mutation_state.value,
+        act_violations=result.violations,
+        act_source_snapshot_id=result.source_snapshot_id,
+        # Safety note is context-sensitive for ACT
+        safety_note=result.safety_note,
+        latency_ms=result.latency_ms,
+        degraded=result.degraded,
+        degradation_reason=result.degradation_reason,
+        related_artifacts=related_artifacts,
+    )
 
 
 def _ask_response(result, turn) -> CopilotTurnResponse:
