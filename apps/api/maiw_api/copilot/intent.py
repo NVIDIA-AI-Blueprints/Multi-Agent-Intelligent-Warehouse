@@ -17,6 +17,21 @@ import re
 
 from .models import CopilotIntent
 
+# ── OBSERVE_OUTCOME markers — post-execution observation ─────────────────────
+# Must be checked BEFORE ACT so "did it work" doesn't match ACT's "execute"/"do" patterns.
+_OBSERVE_PATTERNS: list[re.Pattern] = [
+    re.compile(r"\bdid\s+it\s+(work|help|run|execute|succeed|go\s+through)\b", re.IGNORECASE),
+    re.compile(r"\bdid\s+that\s+(work|help|execute|succeed|happen)\b", re.IGNORECASE),
+    re.compile(r"\bdid\s+the\s+(action|execution|labor|allocation|worker)\b", re.IGNORECASE),
+    re.compile(r"\bwhat\s+happened\b", re.IGNORECASE),
+    re.compile(r"\bwhat\s+(was\s+the\s+|is\s+the\s+)?outcome\b", re.IGNORECASE),
+    re.compile(r"\bwhat\s+(was\s+the\s+)?result\b", re.IGNORECASE),
+    re.compile(r"\bany\s+(improvement|change|effect|impact)\b", re.IGNORECASE),
+    re.compile(r"\bdid\s+(it|that|the\s+action)\s+(improve|reduce|fix|resolve)\b", re.IGNORECASE),
+    re.compile(r"\b(show|check)\s+(me\s+)?(the\s+)?(outcome|result|improvement|effect)\b", re.IGNORECASE),
+    re.compile(r"\bis\s+(wave\s+17|the\s+backlog|the\s+risk)\s+(better|lower|improved|reduced)\b", re.IGNORECASE),
+]
+
 # ── ACT markers — explicit operational commands ───────────────────────────────
 # Match whole-word or start-of-phrase to avoid false positives like "movement".
 _ACT_PATTERNS: list[re.Pattern] = [
@@ -48,13 +63,18 @@ _ANALYZE_PATTERNS: list[re.Pattern] = [
 
 def classify(message: str) -> CopilotIntent:
     """
-    Classify a single operator message into ASK / ANALYZE / ACT.
+    Classify a single operator message into ASK / ANALYZE / ACT / OBSERVE_OUTCOME.
 
     Order of precedence:
-    1. ACT markers (explicit operational commands)
-    2. ANALYZE markers (recommendation-oriented questions)
-    3. Default: ASK (explanation / status / "why" / "what happened")
+    1. OBSERVE_OUTCOME markers (post-execution questions — checked before ACT)
+    2. ACT markers (explicit operational commands)
+    3. ANALYZE markers (recommendation-oriented questions)
+    4. Default: ASK (explanation / status / "why")
     """
+    for pattern in _OBSERVE_PATTERNS:
+        if pattern.search(message):
+            return CopilotIntent.OBSERVE_OUTCOME
+
     for pattern in _ACT_PATTERNS:
         if pattern.search(message):
             return CopilotIntent.ACT

@@ -68,6 +68,15 @@ async def copilot_turn(body: CopilotTurnRequest, request: Request):
     detected_intent = intent_classifier.classify(body.message)
 
     try:
+        if detected_intent == CopilotIntent.OBSERVE_OUTCOME:
+            result, turn = await svc.observe_outcome(
+                message=body.message,
+                conversation_id=body.conversation_id,
+                warehouse_id=body.warehouse_id,
+                scenario_name=body.scenario_name,
+            )
+            return _observe_response(result, turn)
+
         if detected_intent == CopilotIntent.ACT:
             result, turn = await svc.act(
                 message=body.message,
@@ -99,6 +108,49 @@ async def copilot_turn(body: CopilotTurnRequest, request: Request):
     except Exception as exc:
         logger.error("copilot_turn: unexpected error — %s", exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+def _observe_response(result, turn) -> CopilotTurnResponse:
+    return CopilotTurnResponse(
+        conversation_id=turn.conversation_id,
+        turn_id=turn.turn_id,
+        trace_id=turn.trace_id,
+        intent=turn.intent.value,
+        status="degraded" if result.degraded else "complete",
+        answer=result.answer,
+        evidence=[
+            {"label": e.label, "value": e.value, "severity": e.severity}
+            for e in result.evidence
+        ],
+        neighborhood={
+            "focus_entity_id": result.neighborhood.focus_entity_id,
+            "focus_entity_label": result.neighborhood.focus_entity_label,
+            "entity_count": len(result.neighborhood.entity_ids),
+            "relationship_summary": result.neighborhood.relationship_summary,
+            "graph_available": result.neighborhood.graph_available,
+        },
+        agent=result.agent,
+        model_id=result.model_id,
+        reasoning_level=result.reasoning_level,
+        routing_rule=result.routing_rule,
+        routing_reason=result.routing_reason,
+        latency_ms=result.latency_ms,
+        degraded=result.degraded,
+        degradation_reason=result.degradation_reason,
+        answerability=result.answerability,
+        missing_context=result.missing_context,
+        timing=result.timing,
+        safety_note=_SAFETY_NOTE,
+        observe_execution_confirmed=result.execution_confirmed,
+        observe_operational_improved=result.operational_improved,
+        observe_operational_summary=result.operational_summary,
+        observe_pre_metrics=result.pre_metrics,
+        observe_post_metrics=result.post_metrics,
+        observe_kpi_delta=result.kpi_delta,
+        observe_act_decision_outcome=result.act_decision_outcome,
+        observe_act_pending_approval_id=result.act_pending_approval_id,
+        related_artifacts={},
+    )
 
 
 def _act_response(result, turn) -> CopilotTurnResponse:
