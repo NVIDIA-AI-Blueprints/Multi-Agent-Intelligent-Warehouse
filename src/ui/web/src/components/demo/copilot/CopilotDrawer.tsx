@@ -253,14 +253,14 @@ function CopilotActAnswer({ turn }: CopilotAnswerProps) {
 
       {/* Decision outcome badge */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px', mb: '2px' }}>
-        <Box component="span" sx={{
+        <Box component="span" data-testid="copilot-act-decision-outcome" sx={{
           fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
           color: outColor, border: `1px solid ${outColor}44`, borderRadius: '3px',
           px: '5px', py: '1px', textTransform: 'uppercase', letterSpacing: '0.08em',
         }}>
           {outcome.replace(/_/g, ' ')}
         </Box>
-        <Box component="span" sx={{
+        <Box component="span" data-testid="copilot-act-mutation-state" sx={{
           fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
           color: mutColor, border: `1px solid ${mutColor}44`, borderRadius: '3px',
           px: '5px', py: '1px', textTransform: 'uppercase', letterSpacing: '0.08em',

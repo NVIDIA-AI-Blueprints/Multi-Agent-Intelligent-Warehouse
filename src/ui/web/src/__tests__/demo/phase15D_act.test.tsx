@@ -139,12 +139,16 @@ describe('Phase15D: CopilotActAnswer REQUIRES_HUMAN_APPROVAL', () => {
 
   it('renders REQUIRES HUMAN APPROVAL badge', () => {
     renderActAnswer(buildActTurn());
-    expect(screen.getByText(/REQUIRES HUMAN APPROVAL/i)).toBeInTheDocument();
+    const badge = screen.getByTestId('copilot-act-decision-outcome');
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveTextContent(/REQUIRES HUMAN APPROVAL/i);
   });
 
   it('renders NOT ATTEMPTED mutation state badge', () => {
     renderActAnswer(buildActTurn());
-    expect(screen.getByText(/NOT ATTEMPTED/i)).toBeInTheDocument();
+    const badge = screen.getByTestId('copilot-act-mutation-state');
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveTextContent(/NOT ATTEMPTED/i);
   });
 
   it('renders the answer text', () => {
