@@ -105,8 +105,8 @@ export function useTypewriterReveal(
   }, [turnKey, fullText, clearTimer]);
 
   useEffect(() => {
-    if (!fullText || alreadyDone || reduced) return;
-    if (state === 'complete' || state === 'skipped') return;
+    if (!fullText || alreadyDone || reduced) { return; }
+    if (state === 'complete' || state === 'skipped') { return; }
 
     setState('typing');
 

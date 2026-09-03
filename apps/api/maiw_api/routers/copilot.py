@@ -69,11 +69,32 @@ async def copilot_turn(body: CopilotTurnRequest, request: Request):
 
     try:
         if detected_intent == CopilotIntent.OBSERVE_OUTCOME:
+            # Determine whether the last ACT's pending approval is still in the queue.
+            # Injected here so CopilotService never imports ApprovalStore or Controller.
+            is_still_pending: bool | None = None
+            try:
+                from maiw_api.demo.controller import get_demo_controller
+                ctrl = get_demo_controller()
+                last_conv = svc.store.get_or_create(
+                    body.conversation_id,
+                    body.warehouse_id or "",
+                    body.scenario_name or "",
+                )
+                last_act = last_conv.last_act_result
+                if last_act is not None:
+                    pending_id = getattr(last_act, "pending_approval_id", None)
+                    if pending_id:
+                        live_ids = {p["pending_id"] for p in ctrl._pending_approvals}
+                        is_still_pending = pending_id in live_ids
+            except Exception:
+                pass  # controller unavailable — fall back to heuristic
+
             result, turn = await svc.observe_outcome(
                 message=body.message,
                 conversation_id=body.conversation_id,
                 warehouse_id=body.warehouse_id,
                 scenario_name=body.scenario_name,
+                is_still_pending=is_still_pending,
             )
             return _observe_response(result, turn)
 

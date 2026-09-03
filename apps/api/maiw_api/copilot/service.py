@@ -868,12 +868,18 @@ class CopilotService:
         conversation_id: str | None,
         warehouse_id: str,
         scenario_name: str = "",
+        is_still_pending: bool | None = None,
     ) -> tuple[CopilotObserveResult, CopilotTurn]:
         """
         Process an OBSERVE_OUTCOME turn: compare pre-ACT state with current state.
 
         Reads current WarehouseState, compares with pre_metrics captured at ACT time,
         and generates a narrative outcome assessment. Zero writes — read-only.
+
+        is_still_pending: injected by the router after checking the approval queue.
+            True  = pending_approval_id still queued (not yet decided)
+            False = no longer in queue (approved+executed, or rejected)
+            None  = status unknown (controller unavailable or no prior ACT)
         """
         _t0 = time.monotonic()
         trace_id = str(uuid.uuid4())
@@ -1011,6 +1017,7 @@ class CopilotService:
             post_metrics=post_metrics,
             kpi_delta=kpi_delta,
             last_act=last_act,
+            is_still_pending=is_still_pending,
         )
 
         evidence = _facts_to_evidence(
@@ -1452,6 +1459,7 @@ def _compose_observe_narrative(
     post_metrics: dict,
     kpi_delta: dict,
     last_act: Any,
+    is_still_pending: bool | None = None,
 ) -> tuple[str, bool, str]:
     """
     Compose the OBSERVE_OUTCOME narrative.
@@ -1500,20 +1508,34 @@ def _compose_observe_narrative(
         if operational_improved and improvement_signals:
             signals_str = "; ".join(improvement_signals)
             answer = (
-                f"Yes — the warehouse state improved after the governed labor action was executed.\n\n"
+                f"Yes — the warehouse state improved after the governed action was executed.\n\n"
                 f"OBSERVED OUTCOME\n{signals_str.capitalize()}.\n\n"
                 f"The action was approved and executed through the MAIW governance pipeline. "
                 f"The operational bottleneck has been partially resolved."
             )
             summary = f"Improvement confirmed: {improvement_signals[0]}"
-        elif pre_metrics == post_metrics or not kpi_delta:
-            answer = (
-                "The warehouse state has not changed since the action was submitted. "
-                "This means either the approval is still pending, or the action has not yet been executed.\n\n"
-                "If you have approved the action in the MAIW approval panel, "
-                "the execution may still be in progress. Check the approval status."
-            )
-            summary = "No state change detected — approval may be pending."
+        elif (not kpi_delta or pre_metrics == post_metrics):
+            # State unchanged — distinguish still-pending, rejected, or unknown
+            if is_still_pending is True:
+                answer = (
+                    "The action has not been executed. Human approval is still required.\n\n"
+                    "Open the APPROVE stage in MAIW to review and authorize the action."
+                )
+                summary = "Awaiting human approval — action not yet executed."
+            elif is_still_pending is False:
+                answer = (
+                    "No. The proposed action was rejected by the human reviewer and was never executed. "
+                    "No warehouse changes were made — the state is unchanged from before the action was requested."
+                )
+                summary = "Action rejected — no warehouse change."
+                operational_improved = False
+            else:
+                answer = (
+                    "The warehouse state has not changed since the action was submitted. "
+                    "Either the approval is still pending, or the action was not executed.\n\n"
+                    "Open the APPROVE stage in MAIW to check the approval status."
+                )
+                summary = "No state change detected — approval status unknown."
             operational_improved = False
         else:
             answer = (
