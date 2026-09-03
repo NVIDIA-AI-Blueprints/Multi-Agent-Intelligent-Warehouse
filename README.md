@@ -115,9 +115,19 @@ The Operational Graph and Decision Graph serve distinct purposes:
 - **Operational Graph** — warehouse reality and operational context.
 - **Decision Graph** — MAIW reasoning, governance, execution, and provenance.
 
-### Copilot (Phase 15 — in development)
+### Copilot
 
-MAIW's Copilot architecture is designed as the conversational interaction layer over the same governed lifecycle. Natural-language requests may ask for explanation, analysis, or governed action, but Copilot never bypasses DecisionEngine, human approval, or ActionExecutor.
+MAIW Copilot is the conversational interaction layer over the same governed lifecycle. Operators ask natural-language questions, receive evidence-grounded analysis with ranked recommendations, and initiate governed warehouse actions — all through a single endpoint (`POST /api/v1/copilot/turn`).
+
+**Three intents, one endpoint:**
+
+| Intent | What it does |
+|--------|-------------|
+| **ASK** | Graph-grounded answer about current warehouse state. Returns evidence facts and Operational Graph neighborhood context. |
+| **ANALYZE** | Deterministic severity assessment + ranked `RecommendedAction` list. Severity is computed before the LLM call; recommendations route through the standard governance pipeline when acted upon. |
+| **ACT** | Converts the selected recommendation into a governed `ActionProposal`, evaluates it through `DecisionEngine`, and either executes (if approved autonomously) or queues for human approval via the existing `/demo/approve` endpoint. |
+
+Copilot never bypasses `DecisionEngine`, human approval, or `ActionExecutor`. The trust boundary is enforced architecturally: `CopilotService` cannot import `ActionExecutor`, `ApprovalStore`, or `DecisionEngine` — only `GovernedActionOrchestrator` crosses that boundary, and only after a full policy evaluation.
 
 ---
 
@@ -256,13 +266,13 @@ All inference is routed through a centralized `ModelGateway`. Agents specify wha
 | Role | Default model | Status | Use case |
 |------|--------------|--------|----------|
 | `lightning` | `nvidia/nemotron-3.5-lightning-30b-a3b` | Enabled | Fast chat, intent classification |
-| `nano` | `nvidia/nemotron-3-nano-30b-a3b` | **Disabled** (EOL 2026-09-01) | Opt-in via `NEMOTRON_NANO_ENABLED=true` |
+| `nano` | `nvidia/nemotron-3-nano-30b-a3b` | Enabled | Lightweight reasoning, fast-path fallback |
 | `super` | `nvidia/nemotron-3-super-120b-a12b` | **Primary** | Standard operational reasoning |
 | `ultra` | `nvidia/nemotron-3-ultra-550b-a55b` | Opt-in | Deep analytical tasks (~31s latency) |
 
 Agents specify `ReasoningLevel` and `RiskLevel` — never a physical model ID. `ModelRouter`
-resolves the role. When a role is disabled (e.g. nano EOL), requests fall through the fallback
-chain (`nano → super`). The `CopilotTurnResponse` exposes `requested_role`, `selected_role`,
+resolves the role. When a role is disabled or unavailable, requests fall through the fallback
+chain (e.g. `nano → super`). The `CopilotTurnResponse` exposes `requested_role`, `selected_role`,
 `fallback_from`, and `fallback_reason` so every routing decision is observable.
 
 ### Deployment Modes
@@ -1399,8 +1409,10 @@ package-based, MCP v2 system.
 | **DataPack + ScenarioOverlay** (`maiw-world` Phase 14C–D) | ✅ Done | Immutable `WarehouseDataPack` on disk; `ScenarioOverlay`; `ScenarioWorld` with entity-reference validation |
 | **Runtime projection** (`maiw-world` Phase 14E) | ✅ Done | `WarehouseProjectionBuilder`; `DemoWarehouseWorld` rebuilt from immutable sources on reset; providers and agents unchanged |
 | **v2 developer notebook + setup workflow** | 🔲 Phase 14F | `clone → configure → generate → validate → launch` journey |
-| **Copilot — ASK path** (Phase 15B) | ✅ Done | `CopilotService`, `POST /api/v1/copilot/turn`; graph-grounded answers; full routing provenance (`requested_role`, `selected_role`, `fallback_from`); 532 tests |
-| **Model deployment modes** (Phase 15B.2) | ✅ Done | `DeploymentMode` enum; local NIM via `MAIW_NIM_BASE_URL/MODEL`; nano EOL default off; cache key fix; `scripts/models/`; `docs/developer/MODEL_DEPLOYMENT.md` |
+| **Copilot — ASK** (Phase 15B) | ✅ Done | `CopilotService`, `POST /api/v1/copilot/turn`; graph-grounded answers; full routing provenance (`requested_role`, `selected_role`, `fallback_from`); conversation continuity across turns |
+| **Copilot — ANALYZE** (Phase 15C) | ✅ Done | Deterministic severity scoring; ranked `RecommendedAction` list; `CopilotRecommendation` stored in conversation for ACT |
+| **Copilot — ACT** (Phase 15D) | ✅ Done | `GovernedActionOrchestrator`; proposal → `DecisionEngine` → `REQUIRES_HUMAN_APPROVAL` / `APPROVED`; trust boundary enforced architecturally; live 4-turn canonical demo validated |
+| **Model deployment modes** (Phase 15B.2) | ✅ Done | `DeploymentMode` enum; local NIM via `MAIW_NIM_BASE_URL/MODEL`; Nano enabled by default; cache key fix; `scripts/models/`; `docs/developer/MODEL_DEPLOYMENT.md` |
 
 ---
 
