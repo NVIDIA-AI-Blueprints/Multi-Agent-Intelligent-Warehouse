@@ -235,9 +235,13 @@ class CopilotService:
 
             snapshot = WarehouseStateSnapshot.seal(state)
 
+            # Enrich context when the operator is asking a comparative question
+            # about why a prior recommendation is the best option.
+            enriched_context = _enrich_with_recommendations(message, conv.last_recommendations)
+
             assessment = await self._agent.analyze_disruption(
                 snapshot=snapshot,
-                scenario_context=message,
+                scenario_context=enriched_context,
                 trace_id=trace_id,
                 reasoning_level=ReasoningLevel.MEDIUM,
                 risk_level=RiskLevel.LOW,
@@ -1050,6 +1054,40 @@ def _check_state_drift(rec: RecommendedActionResult, state: Any) -> str | None:
                 )
 
     return None
+
+
+# ── Recommendation context enrichment ────────────────────────────────────────
+
+_WHY_BEST_RE = _re.compile(
+    r"\b(why.*best|why.*option|why.*recommend|why.*that|explain.*recommend|best option|why not|compare)\b",
+    _re.IGNORECASE,
+)
+
+
+def _enrich_with_recommendations(message: str, recs: list) -> str:
+    """
+    When the operator asks why a recommendation is best, inject prior recommendation
+    context into scenario_context so the agent gives a comparative rationale.
+
+    Returns the original message when no enrichment is needed.
+    """
+    if not recs or not _WHY_BEST_RE.search(message):
+        return message
+    rec_lines = []
+    for i, r in enumerate(recs[:3]):
+        cap = getattr(r, "capability", "")
+        tgt = getattr(r, "target", "")
+        pri = getattr(r, "priority", "")
+        obj = getattr(r, "objective", "")
+        rec_lines.append(f"  #{i + 1}: {cap} → {tgt} ({pri} priority) — {obj}")
+    rec_summary = "\n".join(rec_lines)
+    return (
+        f"{message}\n\n"
+        f"Prior ANALYZE recommendations:\n{rec_summary}\n\n"
+        f"Explain why recommendation #1 is the best first action given the observed "
+        f"warehouse state. Compare it to the alternatives. Focus on which action unblocks "
+        f"the highest-impact bottleneck first. Do not repeat the full warehouse diagnosis."
+    )
 
 
 # ── Answerability helpers ─────────────────────────────────────────────────────

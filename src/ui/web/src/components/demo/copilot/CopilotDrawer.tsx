@@ -153,15 +153,30 @@ function RecommendationCard({ rec, index }: { rec: CopilotRecommendation; index:
         {rec.rationale}
       </Typography>
 
-      {/* Capability + Target row */}
-      <Box sx={{ display: 'flex', gap: '8px', flexWrap: 'wrap', mb: '4px' }}>
+      {/* Capability row */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px', mb: '3px' }}>
+        <Typography sx={{
+          fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58',
+          textTransform: 'uppercase', letterSpacing: '0.08em', minWidth: '68px', flexShrink: 0,
+        }}>
+          CAPABILITY
+        </Typography>
         <Box component="span" sx={{
           fontFamily: 'monospace', fontSize: '0.6rem', color: '#58A6FF',
           border: '1px solid #1F6FEB33', borderRadius: '3px',
-          px: '4px', py: '1px',
+          px: '4px', py: '1px', wordBreak: 'break-all',
         }}>
           {rec.capability}
         </Box>
+      </Box>
+      {/* Target row */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px', mb: '4px' }}>
+        <Typography sx={{
+          fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58',
+          textTransform: 'uppercase', letterSpacing: '0.08em', minWidth: '68px', flexShrink: 0,
+        }}>
+          TARGET
+        </Typography>
         <Box component="span" sx={{
           fontFamily: 'monospace', fontSize: '0.6rem', color: '#3FB950',
           border: '1px solid #3FB95033', borderRadius: '3px',

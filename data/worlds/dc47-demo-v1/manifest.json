@@ -38,7 +38,8 @@
     "waves": {
       "active_wave_count": 3,
       "strategy": "priority",
-      "task_count": 120
+      "task_count": 120,
+      "wave_number_start": 17
     }
   },
   "dataset_id": "dc47-demo-v1",
@@ -49,6 +50,6 @@
   "maiw_world_schema_version": "1.0",
   "pack_format": "maiw-datapack-v1",
   "seed": 42,
-  "semantic_checksum": "b895d3c8cd56397d4938b52a519c682eae1365147cae506a6016750ee258ed1a",
+  "semantic_checksum": "b8cf6e548faba05e71d728be8365e5806fff31a3599cd6456960937dc4b61912",
   "warehouse_id": "DC-47"
 }

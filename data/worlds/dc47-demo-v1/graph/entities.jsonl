@@ -51244,9 +51244,9 @@
 {"_entity_type":"task","entity_type":"task","id":"task-000117","priority":"normal","status":"PENDING","task_type":"PACK","zone_id":"zone-B1"}
 {"_entity_type":"task","entity_type":"task","id":"task-000118","priority":"normal","status":"PENDING","task_type":"PUTAWAY","zone_id":"zone-C1"}
 {"_entity_type":"task","entity_type":"task","id":"task-000119","priority":"normal","status":"PENDING","task_type":"PICK","zone_id":"zone-F1"}
-{"_entity_type":"wave","entity_type":"wave","id":"wave-000","status":"active","strategy":"priority","wave_number":1}
-{"_entity_type":"wave","entity_type":"wave","id":"wave-001","status":"planning","strategy":"priority","wave_number":2}
-{"_entity_type":"wave","entity_type":"wave","id":"wave-002","status":"planning","strategy":"priority","wave_number":3}
+{"_entity_type":"wave","entity_type":"wave","id":"wave-017","status":"active","strategy":"priority","wave_number":17}
+{"_entity_type":"wave","entity_type":"wave","id":"wave-018","status":"planning","strategy":"priority","wave_number":18}
+{"_entity_type":"wave","entity_type":"wave","id":"wave-019","status":"planning","strategy":"priority","wave_number":19}
 {"_entity_type":"worker","entity_type":"worker","full_name":"Worker 000000","id":"worker-000000","role":"supervisor","skills":["cycle_count","pick","pack"],"username":"w000000"}
 {"_entity_type":"worker","entity_type":"worker","full_name":"Worker 000001","id":"worker-000001","role":"operator","skills":["cycle_count","putaway","pack"],"username":"w000001"}
 {"_entity_type":"worker","entity_type":"worker","full_name":"Worker 000002","id":"worker-000002","role":"operator","skills":["putaway","cycle_count","pack"],"username":"w000002"}

@@ -1266,6 +1266,18 @@ class OperationsCoordinationAgent:
             a.status == "offline" for a in state.equipment.assets
         ):
             _risk_score += 25
+        # Labor allocation failure: idle workers + pending unassigned tasks is
+        # a HIGH operational risk even when at_risk_count==0.
+        if state.waves is not None and state.labor is not None:
+            _unassigned = len([
+                t for t in state.waves.tasks
+                if t.status == "pending" and t.assigned_to is None
+            ])
+            _idle = state.labor.available_workers
+            if _unassigned >= 10 and _idle > 0:
+                _risk_score += 60
+            elif _unassigned > 0 and _idle > 0:
+                _risk_score += 30
         if _risk_score >= 90:
             _deterministic_severity = "critical"
         elif _risk_score >= 60:
