@@ -120,7 +120,7 @@ LEGACY_NANO_VL = "nvidia/llama-nemotron-nano-vl-8b-v1"
 
 _ENABLED_DEFAULTS: dict[str, bool] = {
     _LIGHTNING_ENABLED_ENV: True,  # validated DEPLOYED; fast path now available
-    _NANO_ENABLED_ENV: True,  # validated DEPLOYED
+    _NANO_ENABLED_ENV: True,   # validated DEPLOYED; enabled by default (same tier as Lightning/Super)
     _SUPER_ENABLED_ENV: True,  # validated DEPLOYED; primary deployment
     _ULTRA_ENABLED_ENV: False,  # validated DEPLOYED but ~31s latency; operator opt-in
     _NANO_OMNI_ENABLED_ENV: False,  # NOT_CURRENTLY_DEPLOYED; requires operator model config

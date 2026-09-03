@@ -145,4 +145,8 @@ class OperationalAssessment(BaseModel):
     model_id: str
     routing_rule: str
     routing_reason: str
+    requested_role: str | None = None
+    selected_role: str | None = None
+    fallback_from: str | None = None
+    fallback_reason: str | None = None
     latency_ms: float

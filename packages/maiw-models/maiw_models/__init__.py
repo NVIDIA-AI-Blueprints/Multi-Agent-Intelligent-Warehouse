@@ -27,6 +27,7 @@ from .errors import (
 from .gateway import ModelGateway
 from .models import (
     CostClass,
+    DeploymentMode,
     DeploymentStatus,
     LatencyClass,
     ModelCapability,
@@ -116,6 +117,7 @@ __all__ = [
     "RiskLevel",
     "LatencyClass",
     "CostClass",
+    "DeploymentMode",
     "DeploymentStatus",
     # Errors
     "ModelGatewayError",

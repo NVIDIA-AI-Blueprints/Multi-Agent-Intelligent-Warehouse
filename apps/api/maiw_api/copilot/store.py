@@ -43,6 +43,14 @@ class InMemoryCopilotStore:
     ) -> CopilotConversation:
         if conversation_id and conversation_id in self._conversations:
             return self._conversations[conversation_id]
+        if conversation_id:
+            conv = CopilotConversation(
+                conversation_id=conversation_id,
+                warehouse_id=warehouse_id,
+                scenario_name=scenario_name,
+            )
+            self._conversations[conversation_id] = conv
+            return conv
         conv = self.create_conversation(warehouse_id, scenario_name)
         return conv
 

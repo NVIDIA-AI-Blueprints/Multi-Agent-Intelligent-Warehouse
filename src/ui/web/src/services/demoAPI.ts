@@ -161,13 +161,31 @@ export interface CopilotNeighborhood {
   graph_available: boolean;
 }
 
+export interface CopilotRecommendation {
+  recommendation_id: string;
+  domain: string;
+  capability: string;
+  target: string;
+  objective: string;
+  rationale: string;
+  priority: string;
+  subtype: string | null;
+  focus_entity_id: string | null;
+  snapshot_id: string;
+  trace_id: string;
+  conversation_id: string;
+  turn_id: string;
+}
+
+
 export interface CopilotTurnResponse {
   conversation_id: string;
   turn_id: string;
   trace_id: string;
-  intent: string;
-  status: string;                    // "complete" | "degraded" | "error"
+  intent: string;                    // "ask" | "analyze" | "act"
+  status: string;                    // "complete" | "degraded" | "error" | "not_implemented"
   answer: string | null;
+  // ASK fields
   evidence: CopilotEvidenceFact[] | null;
   neighborhood: CopilotNeighborhood | null;
   agent: string | null;
@@ -177,14 +195,37 @@ export interface CopilotTurnResponse {
   reasoning_level: string | null;
   routing_rule: string | null;
   routing_reason: string | null;
+  requested_role: string | null;
+  selected_role: string | null;
+  fallback_from: string | null;
+  fallback_reason: string | null;
   latency_ms: number | null;
   degraded: boolean;
   degradation_reason: string | null;
   answerability: string;             // "answerable" | "insufficient_evidence" | "partial"
   missing_context: string[];
   timing: Record<string, number>;
+  // ANALYZE fields
+  summary: string | null;
+  severity: string | null;
+  recommendations: CopilotRecommendation[] | null;
+  focus_entity_id: string | null;
+  focus_entity_label: string | null;
+  safety_note: string | null;
   related_artifacts: Record<string, unknown>;
   store_note: string;
+  // ACT fields (present only when intent === 'act')
+  act_recommendation_id?: string | null;
+  act_decision_outcome?: string | null;
+  act_proposal_id?: string | null;
+  act_decision_id?: string | null;
+  act_pending_approval_id?: string | null;
+  act_approval_required?: boolean;
+  act_execution_status?: string | null;
+  act_execution_id?: string | null;
+  act_mutation_state?: string | null;   // "NOT_ATTEMPTED" | "CONFIRMED" | "UNKNOWN"
+  act_violations?: Array<{ code: string; message: string }>;
+  act_source_snapshot_id?: string | null;
 }
 
 export interface CopilotTurnRequest {
@@ -360,12 +401,16 @@ async function getCounterfactualResult(): Promise<CounterfactualResult> {
   return r.data as CounterfactualResult;
 }
 
-// ── Copilot ASK ───────────────────────────────────────────────────────────────
+// ── Copilot turn (ASK + ANALYZE; intent classified server-side) ───────────────
 
 async function copilotAsk(req: CopilotTurnRequest): Promise<CopilotTurnResponse> {
   const r = await http.post('/copilot/turn', req, { timeout: 120_000 });
   return r.data;
 }
+
+/** Alias — copilotTurn makes intent-routing explicit at the call site. */
+const copilotTurn = copilotAsk;
+
 
 // Returns null if demo mode is not active (503)
 async function getStatusSafe(): Promise<DemoStatus | null> {
@@ -393,4 +438,5 @@ export const demoAPI = {
   reconcile,
   getCounterfactualResult,
   copilotAsk,
+  copilotTurn,
 };

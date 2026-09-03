@@ -68,6 +68,26 @@ class CostClass(str, Enum):
     HIGH = "high"
 
 
+class DeploymentMode(str, Enum):
+    """
+    How the operator connects MAIW to an LLM service.
+
+    nvidia_hosted    — NVIDIA NIM public cloud (integrate.api.nvidia.com).
+                       Requires NVIDIA_API_KEY.
+    local_nim        — Self-hosted NIM container (e.g. on-prem H100 fleet).
+                       Set MAIW_NIM_BASE_URL and MAIW_NIM_MODEL.
+    openai_compatible — Any OpenAI-compatible endpoint (vLLM, Ollama, etc.).
+                        Set MAIW_NIM_BASE_URL and MAIW_NIM_MODEL.
+    enterprise       — Enterprise-managed NIM (NGC private registry, fleet mgmt).
+                       Set MAIW_NIM_BASE_URL, MAIW_NIM_MODEL, and NVIDIA_API_KEY.
+    """
+
+    NVIDIA_HOSTED = "nvidia_hosted"
+    LOCAL_NIM = "local_nim"
+    OPENAI_COMPATIBLE = "openai_compatible"
+    ENTERPRISE = "enterprise"
+
+
 class DeploymentStatus(str, Enum):
     """
     Deployment availability of a model on the configured NIM infrastructure.

@@ -115,9 +115,19 @@ The Operational Graph and Decision Graph serve distinct purposes:
 - **Operational Graph** — warehouse reality and operational context.
 - **Decision Graph** — MAIW reasoning, governance, execution, and provenance.
 
-### Copilot (Phase 15 — in development)
+### Copilot
 
-MAIW's Copilot architecture is designed as the conversational interaction layer over the same governed lifecycle. Natural-language requests may ask for explanation, analysis, or governed action, but Copilot never bypasses DecisionEngine, human approval, or ActionExecutor.
+MAIW Copilot is the conversational interaction layer over the same governed lifecycle. Operators ask natural-language questions, receive evidence-grounded analysis with ranked recommendations, and initiate governed warehouse actions — all through a single endpoint (`POST /api/v1/copilot/turn`).
+
+**Three intents, one endpoint:**
+
+| Intent | What it does |
+|--------|-------------|
+| **ASK** | Graph-grounded answer about current warehouse state. Returns evidence facts and Operational Graph neighborhood context. |
+| **ANALYZE** | Deterministic severity assessment + ranked `RecommendedAction` list. Severity is computed before the LLM call; recommendations route through the standard governance pipeline when acted upon. |
+| **ACT** | Converts the selected recommendation into a governed `ActionProposal`, evaluates it through `DecisionEngine`, and either executes (if approved autonomously) or queues for human approval via the existing `/demo/approve` endpoint. |
+
+Copilot never bypasses `DecisionEngine`, human approval, or `ActionExecutor`. The trust boundary is enforced architecturally: `CopilotService` cannot import `ActionExecutor`, `ApprovalStore`, or `DecisionEngine` — only `GovernedActionOrchestrator` crosses that boundary, and only after a full policy evaluation.
 
 ---
 
@@ -253,25 +263,39 @@ All inference is routed through a centralized `ModelGateway`. Agents specify wha
 
 ### Model Roles
 
-| Role | Default model | Active params | Use case |
-|------|--------------|--------------|----------|
-| `lightning` | `nvidia/nemotron-3.5-lightning-30b-a3b` | 3B | Fast chat, intent classification |
-| `nano` | `nvidia/nemotron-3-nano-30b-a3b` | 3B | Low-latency reads, summaries |
-| `super` | `nvidia/nemotron-3-super-120b-a12b` | 12B | Standard operational reasoning |
-| `ultra` | `nvidia/nemotron-3-ultra-550b-a55b` | 55B | Deep analytical tasks (opt-in, slow) |
+| Role | Default model | Status | Use case |
+|------|--------------|--------|----------|
+| `lightning` | `nvidia/nemotron-3.5-lightning-30b-a3b` | Enabled | Fast chat, intent classification |
+| `nano` | `nvidia/nemotron-3-nano-30b-a3b` | Enabled | Lightweight reasoning, fast-path fallback |
+| `super` | `nvidia/nemotron-3-super-120b-a12b` | **Primary** | Standard operational reasoning |
+| `ultra` | `nvidia/nemotron-3-ultra-550b-a55b` | Opt-in | Deep analytical tasks (~31s latency) |
 
-All four models are confirmed live on `integrate.api.nvidia.com/v1` (validated 2026-08-20).
-The suffix `a3b / a12b / a55b` is active parameter count under the MoE architecture.
+Agents specify `ReasoningLevel` and `RiskLevel` — never a physical model ID. `ModelRouter`
+resolves the role. When a role is disabled or unavailable, requests fall through the fallback
+chain (e.g. `nano → super`). The `CopilotTurnResponse` exposes `requested_role`, `selected_role`,
+`fallback_from`, and `fallback_reason` so every routing decision is observable.
 
-Agents use `ReasoningLevel` (`FAST / STANDARD / DEEP / ANALYTICAL`) and `RiskLevel`; the
-`ModelRouter` resolves the appropriate role. Override any role via environment variable
-(see [Configuration](#configuration)).
+### Deployment Modes
+
+| Mode | When to use | Key env vars |
+|------|-------------|-------------|
+| `nvidia_hosted` (default) | NVIDIA public cloud | `NVIDIA_API_KEY` |
+| `local_nim` | Self-hosted NIM on-prem | `MAIW_NIM_BASE_URL`, `MAIW_NIM_MODEL` |
+| `openai_compatible` | vLLM, Ollama, any OAI endpoint | `MAIW_NIM_BASE_URL`, `MAIW_NIM_MODEL` |
+| `enterprise` | Enterprise NIM fleet | `MAIW_NIM_BASE_URL`, `MAIW_NIM_MODEL`, `MAIW_NIM_API_KEY` |
+
+```bash
+# Quick local NIM setup
+./scripts/models/setup_local_nim.sh --url http://localhost:8000/v1 --model nvidia/nemotron-3-super-120b-a12b --check
+```
+
+See [docs/developer/MODEL_DEPLOYMENT.md](docs/developer/MODEL_DEPLOYMENT.md) for the full guide.
 
 **Legacy models retired:** All `nvidia/llama-*` Nemotron model IDs return 404 or broken
 responses and are no longer used. Their identifiers are preserved as `LEGACY_*` constants in
 `packages/maiw-models/maiw_models/registry.py` for audit purposes only.
 
-See [docs/architecture/MODEL_GATEWAY.md](docs/architecture/MODEL_GATEWAY.md) for full routing
+See [docs/architecture/MODEL_GATEWAY.md](docs/architecture/MODEL_GATEWAY.md) for routing
 policy, telemetry schema, and role-to-model override documentation.
 
 ---
@@ -1385,7 +1409,10 @@ package-based, MCP v2 system.
 | **DataPack + ScenarioOverlay** (`maiw-world` Phase 14C–D) | ✅ Done | Immutable `WarehouseDataPack` on disk; `ScenarioOverlay`; `ScenarioWorld` with entity-reference validation |
 | **Runtime projection** (`maiw-world` Phase 14E) | ✅ Done | `WarehouseProjectionBuilder`; `DemoWarehouseWorld` rebuilt from immutable sources on reset; providers and agents unchanged |
 | **v2 developer notebook + setup workflow** | 🔲 Phase 14F | `clone → configure → generate → validate → launch` journey |
-| **Copilot — ASK path** (Phase 15B) | 🔄 In development | `CopilotService`, `POST /api/v1/copilot/turn`, 41 architecture + behavior tests; on `feat/phase-15-copilot` |
+| **Copilot — ASK** (Phase 15B) | ✅ Done | `CopilotService`, `POST /api/v1/copilot/turn`; graph-grounded answers; full routing provenance (`requested_role`, `selected_role`, `fallback_from`); conversation continuity across turns |
+| **Copilot — ANALYZE** (Phase 15C) | ✅ Done | Deterministic severity scoring; ranked `RecommendedAction` list; `CopilotRecommendation` stored in conversation for ACT |
+| **Copilot — ACT** (Phase 15D) | ✅ Done | `GovernedActionOrchestrator`; proposal → `DecisionEngine` → `REQUIRES_HUMAN_APPROVAL` / `APPROVED`; trust boundary enforced architecturally; live 4-turn canonical demo validated |
+| **Model deployment modes** (Phase 15B.2) | ✅ Done | `DeploymentMode` enum; local NIM via `MAIW_NIM_BASE_URL/MODEL`; Nano enabled by default; cache key fix; `scripts/models/`; `docs/developer/MODEL_DEPLOYMENT.md` |
 
 ---
 
@@ -1394,6 +1421,7 @@ package-based, MCP v2 system.
 | Document | Description |
 |----------|------------|
 | [WAREHOUSE_WORLD_MODEL.md](docs/developer/WAREHOUSE_WORLD_MODEL.md) | Warehouse World Model — canonical graph, DataPack, ScenarioOverlay, runtime projection |
+| [MODEL_DEPLOYMENT.md](docs/developer/MODEL_DEPLOYMENT.md) | Model deployment modes — hosted, local NIM, OpenAI-compatible, enterprise |
 | [MODEL_GATEWAY.md](docs/architecture/MODEL_GATEWAY.md) | Nemotron roles, routing policy, telemetry |
 | [WAREHOUSE_STATE.md](docs/architecture/WAREHOUSE_STATE.md) | State assembly, freshness, provenance |
 | [CAPABILITY_MATRIX.md](docs/architecture/CAPABILITY_MATRIX.md) | All 12 capabilities, read/write classification |

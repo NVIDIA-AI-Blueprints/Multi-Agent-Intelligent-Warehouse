@@ -107,17 +107,34 @@ def _ensure_no_think_system_prompt(
 
 @dataclass
 class NIMConfig:
-    """NVIDIA NIM configuration."""
+    """NVIDIA NIM configuration.
 
-    llm_api_key: str = os.getenv("NVIDIA_API_KEY", "")
-    llm_base_url: str = os.getenv("LLM_NIM_URL", "https://integrate.api.nvidia.com/v1")
+    Deployment mode is controlled by MAIW_MODEL_PROVIDER:
+      nvidia_hosted    (default) — NVIDIA public cloud (integrate.api.nvidia.com)
+      local_nim                  — Self-hosted NIM; set MAIW_NIM_BASE_URL + MAIW_NIM_MODEL
+      openai_compatible          — Any OpenAI-compatible endpoint
+      enterprise                 — Enterprise NIM fleet; same env vars as local_nim
+
+    MAIW_NIM_BASE_URL overrides LLM_NIM_URL when set.
+    MAIW_NIM_MODEL overrides LLM_MODEL when set.
+    MAIW_NIM_API_KEY overrides NVIDIA_API_KEY for the LLM endpoint when set.
+    """
+
+    llm_api_key: str = os.getenv("MAIW_NIM_API_KEY") or os.getenv("NVIDIA_API_KEY", "")
+    llm_base_url: str = (
+        os.getenv("MAIW_NIM_BASE_URL")
+        or os.getenv("LLM_NIM_URL", "https://integrate.api.nvidia.com/v1")
+    )
     embedding_api_key: str = os.getenv("EMBEDDING_API_KEY") or os.getenv(
         "NVIDIA_API_KEY", ""
     )
     embedding_base_url: str = os.getenv(
         "EMBEDDING_NIM_URL", "https://integrate.api.nvidia.com/v1"
     )
-    llm_model: str = os.getenv("LLM_MODEL", "nvidia/nemotron-3-super-120b-a12b")
+    llm_model: str = (
+        os.getenv("MAIW_NIM_MODEL")
+        or os.getenv("LLM_MODEL", "nvidia/nemotron-3-super-120b-a12b")
+    )
     embedding_model: str = os.getenv(
         "EMBEDDING_MODEL", "nvidia/llama-nemotron-embed-vl-1b-v2"
     )
@@ -285,33 +302,25 @@ class NIMClient:
         top_p: float,
         frequency_penalty: float,
         presence_penalty: float,
+        model: Optional[str] = None,
     ) -> str:
         """Generate a cache key from LLM request parameters."""
-        # Normalize messages for cache key generation
-        # Extract only the essential content, ignoring timestamps and other variable data
         normalized_messages = []
         for msg in messages:
-            # Only include role and content, normalize content
             content = msg.get("content", "").strip()
-            # Normalize content to remove variable data (timestamps, IDs, etc.)
             normalized_content = self._normalize_content_for_cache(content)
-
             normalized_messages.append(
                 {"role": msg.get("role", "user"), "content": normalized_content}
             )
 
-        # Create cache key from normalized parameters
-        # Only include parameters that affect the response
         cache_data = {
             "messages": normalized_messages,
-            "temperature": round(
-                temperature, 2
-            ),  # Round to avoid float precision issues
+            "temperature": round(temperature, 2),
             "max_tokens": max_tokens,
             "top_p": round(top_p, 2),
             "frequency_penalty": round(frequency_penalty, 2),
             "presence_penalty": round(presence_penalty, 2),
-            "model": self.config.llm_model,
+            "model": model or self.config.llm_model,
         }
 
         cache_string = json.dumps(cache_data, sort_keys=True)
@@ -438,6 +447,8 @@ class NIMClient:
             else self.config.default_presence_penalty
         )
 
+        effective_model = model_override or self.config.llm_model
+
         # Check cache first (skip for streaming)
         if not stream and self.enable_cache:
             cache_key = self._generate_cache_key(
@@ -447,6 +458,7 @@ class NIMClient:
                 top_p,
                 frequency_penalty,
                 presence_penalty,
+                model=effective_model,
             )
             cached_response = await self._get_cached_response(cache_key)
             if cached_response:
@@ -459,7 +471,6 @@ class NIMClient:
             if enable_thinking is None
             else enable_thinking
         )
-        effective_model = model_override or self.config.llm_model
         request_messages = messages
         if "nemotron" in effective_model.lower() and not resolved_enable_thinking:
             request_messages = _ensure_no_think_system_prompt(messages)
@@ -538,6 +549,7 @@ class NIMClient:
                         top_p,
                         frequency_penalty,
                         presence_penalty,
+                        model=effective_model,
                     )
                     await self._cache_response(cache_key, llm_response)
 

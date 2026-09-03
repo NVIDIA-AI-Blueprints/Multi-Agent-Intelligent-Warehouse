@@ -454,6 +454,29 @@ async def get_runtime() -> MAIWRuntime:
     except Exception as exc:
         logger.warning("MAIW bootstrap: CopilotService unavailable — %s", exc)
 
+    # ── 12b. GovernedActionOrchestrator (Phase 15D) ───────────────────────────
+    if runtime.copilot_service is not None:
+        try:
+            from maiw_api.copilot.orchestrator import GovernedActionOrchestrator
+
+            if runtime.decision_engine is not None and runtime.demo_controller is not None:
+                orchestrator = GovernedActionOrchestrator(
+                    decision_engine=runtime.decision_engine,
+                    demo_controller=runtime.demo_controller,
+                    runtime=runtime,
+                )
+                runtime.copilot_service.set_orchestrator(orchestrator)
+                logger.info("MAIW bootstrap: GovernedActionOrchestrator ready")
+            else:
+                logger.warning(
+                    "MAIW bootstrap: GovernedActionOrchestrator skipped — "
+                    "decision_engine=%s demo_controller=%s",
+                    runtime.decision_engine is not None,
+                    runtime.demo_controller is not None,
+                )
+        except Exception as exc:
+            logger.warning("MAIW bootstrap: GovernedActionOrchestrator unavailable — %s", exc)
+
     _runtime = runtime
     logger.info("MAIW bootstrap: runtime assembly complete")
     return _runtime

@@ -1266,6 +1266,15 @@ class OperationsCoordinationAgent:
             a.status == "offline" for a in state.equipment.assets
         ):
             _risk_score += 25
+        # Labor allocation failure: high pending backlog + idle workers is a HIGH
+        # operational risk even when at_risk_count==0 (no tasks formally flagged).
+        if state.waves is not None and state.labor is not None:
+            _pending = getattr(state.waves, "pending_count", 0) or 0
+            _idle = state.labor.available_workers
+            if _pending >= 10 and _idle > 0:
+                _risk_score += 60
+            elif _pending > 0 and _idle > 0:
+                _risk_score += 30
         if _risk_score >= 90:
             _deterministic_severity = "critical"
         elif _risk_score >= 60:
@@ -1369,5 +1378,9 @@ class OperationsCoordinationAgent:
             model_id=response.model_id,
             routing_rule=rd.routing_rule,
             routing_reason=rd.routing_reason,
+            requested_role=rd.requested_role,
+            selected_role=rd.selected_role,
+            fallback_from=rd.fallback_from,
+            fallback_reason=rd.fallback_reason,
             latency_ms=response.latency_ms,
         )

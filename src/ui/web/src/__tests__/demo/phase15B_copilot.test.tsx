@@ -64,6 +64,10 @@ function buildTurn(overrides: Partial<CopilotTurnResponse> = {}): CopilotTurnRes
     reasoning_level: 'standard',
     routing_rule: 'default',
     routing_reason: 'Default routing',
+    requested_role: null,
+    selected_role: null,
+    fallback_from: null,
+    fallback_reason: null,
     latency_ms: 350,
     degraded: false,
     degradation_reason: null,
@@ -72,6 +76,13 @@ function buildTurn(overrides: Partial<CopilotTurnResponse> = {}): CopilotTurnRes
     timing: {},
     related_artifacts: {},
     store_note: '',
+    // ANALYZE fields (null for ASK turns)
+    summary: null,
+    severity: null,
+    recommendations: null,
+    focus_entity_id: null,
+    focus_entity_label: null,
+    safety_note: null,
     ...overrides,
   };
 }
