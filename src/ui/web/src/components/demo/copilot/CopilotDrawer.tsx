@@ -749,7 +749,7 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
     if (!text || loading) return;
 
     // Detect intended intent client-side for loading stage label
-    const looksLikeAct     = /\b(do it|proceed|execute|apply|allocate the|reprioritize|prepare (that|this|the) action)\b/i.test(text);
+    const looksLikeAct     = /\b(do it|proceed|execute|apply|allocate the|reprioritize|prepare (that|this|the) action|do (the )?(first|second|third|1st|2nd|#?1|#?2|one|that))\b/i.test(text);
     const looksLikeAnalyze = /\b(recommend|what should (we|i|you)|how should (we|i|you)|best action|what actions?)\b/i.test(text);
     setPendingIntent(looksLikeAct ? 'act' : looksLikeAnalyze ? 'analyze' : 'ask');
 

@@ -305,6 +305,8 @@ class TestIntentClassifierPhase15D:
     @pytest.mark.parametrize("message", [
         "Proceed.",
         "Do it.",
+        "Do the first one.",
+        "Do #1.",
         "Allocate the workers.",
         "Reprioritize the wave.",
         "Go ahead and apply the fix.",

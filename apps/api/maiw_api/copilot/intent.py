@@ -25,6 +25,8 @@ _ACT_PATTERNS: list[re.Pattern] = [
     re.compile(r"\b(make it happen|go ahead|proceed with)\b", re.IGNORECASE),
     re.compile(r"\bproceed\b", re.IGNORECASE),
     re.compile(r"\bprepare (that|this|the) action\b", re.IGNORECASE),
+    # Explicit index reference to a listed recommendation: "do the first one", "do #1", etc.
+    re.compile(r"\bdo (the )?(first|second|third|1st|2nd|3rd|#?1|#?2|#?3|one|that)\b", re.IGNORECASE),
 ]
 
 # ── ANALYZE markers — recommendation-oriented questions ───────────────────────

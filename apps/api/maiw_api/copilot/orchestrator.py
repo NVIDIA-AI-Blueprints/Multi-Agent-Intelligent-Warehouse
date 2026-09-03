@@ -87,7 +87,7 @@ class GovernedActionOrchestrator:
 
         # ── 1. Build ActionProposal ───────────────────────────────────────────
         try:
-            proposal = await self._build_proposal(request, trace_id)
+            proposal = await self._build_proposal(request, trace_id, warehouse_id=warehouse_id)
         except ValueError as exc:
             logger.warning("GovernedActionOrchestrator: proposal build failed — %s", exc)
             return self._error_result(
@@ -348,7 +348,7 @@ class GovernedActionOrchestrator:
 
     # ── Proposal building ─────────────────────────────────────────────────────
 
-    async def _build_proposal(self, req: GovernedActionRequest, trace_id: str) -> Any:
+    async def _build_proposal(self, req: GovernedActionRequest, trace_id: str, *, warehouse_id: str = "default") -> Any:
         """
         Deterministic capability → ActionProposal mapping.
 
@@ -411,6 +411,7 @@ class GovernedActionOrchestrator:
                 priority=req.priority,
                 reason=req.rationale,
                 requested_by="copilot-operator",
+                warehouse_id=warehouse_id,
                 trace_id=trace_id,
             )
 
