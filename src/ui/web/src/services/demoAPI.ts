@@ -177,6 +177,7 @@ export interface CopilotRecommendation {
   turn_id: string;
 }
 
+
 export interface CopilotTurnResponse {
   conversation_id: string;
   turn_id: string;
@@ -409,6 +410,7 @@ async function copilotAsk(req: CopilotTurnRequest): Promise<CopilotTurnResponse>
 
 /** Alias — copilotTurn makes intent-routing explicit at the call site. */
 const copilotTurn = copilotAsk;
+
 
 // Returns null if demo mode is not active (503)
 async function getStatusSafe(): Promise<DemoStatus | null> {
