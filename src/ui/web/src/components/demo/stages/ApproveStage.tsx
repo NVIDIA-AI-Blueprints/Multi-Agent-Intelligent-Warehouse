@@ -105,6 +105,7 @@ interface ApprovalCardProps {
   stateAgeSeconds: number | null | undefined;
   onApprove: (pending_id: string) => void;
   onReject: (pending_id: string) => void;
+  highlighted?: boolean;
 }
 
 function ApprovalCard({
@@ -115,6 +116,7 @@ function ApprovalCard({
   stateAgeSeconds,
   onApprove,
   onReject,
+  highlighted,
 }: ApprovalCardProps) {
   const { pending_id, capability, target, domain, risk_level, objective, rationale, proposal_id, decision_id, priority, queued_at } = approval;
 
@@ -129,9 +131,10 @@ function ApprovalCard({
       data-testid="approval-card"
       sx={{
         background: '#161B22',
-        border: `1px solid ${expired ? '#484F58' : '#D2992244'}`,
+        border: `1px solid ${highlighted ? '#D29922' : expired ? '#484F58' : '#D2992244'}`,
         borderRadius: '6px',
         overflow: 'hidden',
+        boxShadow: highlighted ? '0 0 0 2px #D2992244' : 'none',
       }}
     >
       {/* Hero header */}
@@ -340,6 +343,7 @@ export default function ApproveStage({
   demoStatus,
   analysisResult,
   onOpenExplanation,
+  selectedApprovalId,
 }: StageContentPaneProps) {
   const queryClient = useQueryClient();
 
@@ -441,6 +445,7 @@ export default function ApproveStage({
             stateAgeSeconds={stateAgeSeconds}
             onApprove={handleApprove}
             onReject={handleReject}
+            highlighted={selectedApprovalId === approval.pending_id}
           />
         </StageSection>
       ))}

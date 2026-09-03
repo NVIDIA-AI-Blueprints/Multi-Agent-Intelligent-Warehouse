@@ -94,6 +94,7 @@ interface CopilotDrawerProps {
   warehouseId: string;
   scenarioName: string;
   onClose: () => void;
+  onReviewApproval?: (pendingApprovalId: string) => void;
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
@@ -237,7 +238,7 @@ function RecommendationCard({ rec, index }: { rec: CopilotRecommendation; index:
   );
 }
 
-function CopilotActAnswer({ turn, isLatest }: CopilotAnswerProps & { isLatest?: boolean }) {
+function CopilotActAnswer({ turn, isLatest, onReviewApproval }: CopilotAnswerProps & { isLatest?: boolean; onReviewApproval?: (pendingApprovalId: string) => void }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   const outcome   = turn.act_decision_outcome ?? 'NOT_IMPLEMENTED';
@@ -386,7 +387,7 @@ function CopilotActAnswer({ turn, isLatest }: CopilotAnswerProps & { isLatest?: 
           <Box
             component="button"
             data-testid="copilot-act-review-approval"
-            onClick={() => console.log('[Copilot ACT] Review approval:', turn.act_pending_approval_id, turn)}
+            onClick={() => onReviewApproval?.(turn.act_pending_approval_id!)}
             sx={{
               background: 'transparent',
               border: '1px solid #D2992244',
@@ -893,7 +894,7 @@ interface TurnEntry {
 
 // ── CopilotDrawer ─────────────────────────────────────────────────────────────
 
-export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: CopilotDrawerProps) {
+export default function CopilotDrawer({ warehouseId, scenarioName, onClose, onReviewApproval }: CopilotDrawerProps) {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [turns, setTurns] = useState<TurnEntry[]>([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -1112,7 +1113,7 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
             <Box sx={{ maxWidth: '100%' }}>
               {turn.response ? (
                 turn.response.intent === 'act'
-                  ? <CopilotActAnswer turn={turn.response} isLatest={isLatest} />
+                  ? <CopilotActAnswer turn={turn.response} isLatest={isLatest} onReviewApproval={onReviewApproval} />
                   : turn.response.intent === 'observe_outcome'
                   ? <CopilotObserveAnswer turn={turn.response} isLatest={isLatest} />
                   : <CopilotAnswer turn={turn.response} isLatest={isLatest} />

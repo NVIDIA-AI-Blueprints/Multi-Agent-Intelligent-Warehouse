@@ -1,10 +1,10 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDemoStatus } from '../hooks/useDemoStatus';
 import { useRuntimeStatus } from '../hooks/useRuntimeStatus';
 import { useDemoSSE } from '../hooks/useDemoSSE';
-import { useDemoLifecycle } from '../hooks/useDemoLifecycle';
+import { useDemoLifecycle, RailStage } from '../hooks/useDemoLifecycle';
 import { demoAPI, AnalysisResult } from '../services/demoAPI';
 import ScenarioSelector from '../components/demo/ScenarioSelector';
 import LifecycleRail from '../components/demo/LifecycleRail';
@@ -349,6 +349,8 @@ export default function DemoShell() {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [copilotOpen, setCopilotOpen] = useState(false);
+  const [selectedStage, setSelectedStage] = useState<RailStage | null>(null);
+  const [selectedApprovalId, setSelectedApprovalId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const { status: demoStatus, isLoading: demoLoading } = useDemoStatus();
@@ -365,6 +367,21 @@ export default function DemoShell() {
     sseState.events,
     pendingApprovals,
   );
+
+  // Clear stage override once the lifecycle naturally reaches or passes the selected stage
+  useEffect(() => {
+    if (selectedStage && currentStage === selectedStage) {
+      setSelectedStage(null);
+    }
+  }, [currentStage, selectedStage]);
+
+  const effectiveStage: RailStage = selectedStage ?? currentStage;
+
+  const handleReviewApproval = useCallback((pendingApprovalId: string) => {
+    setCopilotOpen(false);
+    setSelectedStage('APPROVE');
+    setSelectedApprovalId(pendingApprovalId);
+  }, []);
 
   // System health indicators
   const sysStatus = runtime?.maiw_operational_status ?? 'UNKNOWN';
@@ -384,6 +401,8 @@ export default function DemoShell() {
     await demoAPI.startScenario(name);
     setShowSelector(false);
     sseState.clear();
+    setSelectedStage(null);
+    setSelectedApprovalId(null);
     await queryClient.invalidateQueries({ queryKey: ['demo-status'] });
   }, [queryClient, sseState]);
 
@@ -392,6 +411,8 @@ export default function DemoShell() {
     sseState.clear();            // wipe SSE buffer so no stale events leak
     setAnalysisResult(null);     // clear pipeline result from previous run
     setAnalyzing(false);
+    setSelectedStage(null);
+    setSelectedApprovalId(null);
     await demoAPI.resetScenario();
     await queryClient.invalidateQueries({ queryKey: ['demo-status'] });
   }, [queryClient, sseState]);
@@ -517,7 +538,7 @@ export default function DemoShell() {
 
             {/* Lifecycle rail — driven by SSE events */}
             <LifecycleRail
-              currentStage={currentStage}
+              currentStage={effectiveStage}
               completedStages={completedStages}
               waitingForApproval={waitingForApproval}
             />
@@ -527,7 +548,7 @@ export default function DemoShell() {
 
             {/* Stage content — SSE-driven per-stage narrative */}
             <StageContentPane
-              currentStage={currentStage}
+              currentStage={effectiveStage}
               sseEvents={sseState.events}
               demoStatus={demoStatus}
               analysisResult={analysisResult}
@@ -536,6 +557,7 @@ export default function DemoShell() {
               onAnalyze={handleAnalyze}
               onReset={handleReset}
               onViewFullTrace={handleViewFullTrace}
+              selectedApprovalId={selectedApprovalId}
             />
           </>
         )}
@@ -620,6 +642,7 @@ export default function DemoShell() {
           warehouseId={WAREHOUSE_ID}
           scenarioName={demoStatus?.scenario?.name ?? ''}
           onClose={() => setCopilotOpen(false)}
+          onReviewApproval={handleReviewApproval}
         />
       )}
     </Box>

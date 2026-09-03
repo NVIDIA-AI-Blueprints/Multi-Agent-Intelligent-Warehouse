@@ -193,6 +193,8 @@ export interface StageContentPaneProps {
   onOpenExplanation?: (focus: ExplanationFocus) => void;
   /** Open the Expert Overlay pinned to the TRACE tab. */
   onViewFullTrace?: () => void;
+  /** Pending approval to highlight — set by Copilot REVIEW APPROVAL navigation. */
+  selectedApprovalId?: string | null;
 }
 
 // ── Stages that support STORY/GRAPH toggle ────────────────────────────────────
