@@ -416,23 +416,26 @@ describe('ApproveStage — in-flight button disabling', () => {
 // ── Expired approval ───────────────────────────────────────────────────────────
 
 describe('ApproveStage — expired approval', () => {
-  it('shows EXPIRED label for old approval', () => {
+  // TTL is now enforced by the backend (410 Gone), not the frontend.
+  // Old approvals remain actionable from the UI; the server validates expiry.
+
+  it('does NOT show EXPIRED label — backend is authoritative for TTL', () => {
     wrap(<ApproveStage {...makeProps({ pendingApprovals: [expiredApproval] })} />);
-    expect(screen.getByText('EXPIRED')).toBeInTheDocument();
+    expect(screen.queryByText('EXPIRED')).not.toBeInTheDocument();
   });
 
-  it('disables buttons for expired approval', () => {
+  it('does NOT disable buttons for old approval — backend enforces TTL via 410', () => {
     wrap(<ApproveStage {...makeProps({ pendingApprovals: [expiredApproval] })} />);
-    expect(screen.getByTestId('approve-execute-button')).toBeDisabled();
-    expect(screen.getByTestId('reject-button')).toBeDisabled();
+    expect(screen.getByTestId('approve-execute-button')).not.toBeDisabled();
+    expect(screen.getByTestId('reject-button')).not.toBeDisabled();
   });
 
-  it('does NOT call API if expired approval action attempted', async () => {
+  it('DOES call API when old approval is actioned — backend validates TTL', async () => {
+    demoAPI.approvePending = jest.fn().mockResolvedValue({ ok: true, status: 'executed', execution_id: 'ex-001' });
     wrap(<ApproveStage {...makeProps({ pendingApprovals: [expiredApproval] })} />);
-    // Try clicking (button is disabled so event won't fire the handler)
     fireEvent.click(screen.getByTestId('approve-execute-button'));
     await new Promise(r => setTimeout(r, 50));
-    expect(demoAPI.approvePending).not.toHaveBeenCalled();
+    expect(demoAPI.approvePending).toHaveBeenCalledWith('pa-expired', 'operator');
   });
 });
 

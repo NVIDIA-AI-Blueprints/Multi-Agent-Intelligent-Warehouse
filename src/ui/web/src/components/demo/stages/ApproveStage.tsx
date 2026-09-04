@@ -10,7 +10,7 @@
  *   - Never shows projected numeric impact (kpi_delta reserved for 12E / OUTCOME)
  *   - Rail advances only via SSE/backend events — never optimistically from UI
  *   - APPROVED (api ok) vs CONSUMED (404 / disappeared) are distinct states
- *   - Expired approvals (> 10 min old) are non-actionable
+ *   - Approval TTL is enforced by the backend (410 Gone); frontend does not gate the button
  *   - If approval disappears from queue without local action, resolves from backend truth
  */
 
@@ -26,10 +26,6 @@ import {
   IdText,
   StageContentPaneProps,
 } from '../StageContentPane';
-
-// ── Constants ──────────────────────────────────────────────────────────────────
-
-const EXPIRE_MS = 10 * 60 * 1000; // 10 minutes
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -120,20 +116,18 @@ function ApprovalCard({
   highlighted,
   onReturnToCopilot,
 }: ApprovalCardProps) {
-  const { pending_id, capability, target, domain, risk_level, objective, rationale, proposal_id, decision_id, priority, queued_at } = approval;
+  const { pending_id, capability, target, domain, risk_level, objective, rationale, proposal_id, decision_id, priority } = approval;
 
-  const approvalAgeMs = Date.now() - new Date(queued_at).getTime();
-  const expired = approvalAgeMs > EXPIRE_MS;
   const inFlight = actionStatus != null;
   const actioned = result != null;
-  const disableActions = inFlight || actioned || expired;
+  const disableActions = inFlight || actioned;
 
   return (
     <Box
       data-testid="approval-card"
       sx={{
         background: '#161B22',
-        border: `1px solid ${highlighted ? '#D29922' : expired ? '#484F58' : '#D2992244'}`,
+        border: `1px solid ${highlighted ? '#D29922' : '#D2992244'}`,
         borderRadius: '6px',
         overflow: 'hidden',
         boxShadow: highlighted ? '0 0 0 2px #D2992244' : 'none',
@@ -157,14 +151,6 @@ function ApprovalCard({
             }}>
               05 APPROVE
             </Typography>
-            {expired && (
-              <Box component="span" sx={{
-                fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58',
-                border: '1px solid #30363D', borderRadius: '3px', px: '4px', py: '1px',
-              }}>
-                EXPIRED
-              </Box>
-            )}
           </Box>
           <Typography sx={{
             fontFamily: 'monospace', fontSize: '0.85rem', fontWeight: 700,
@@ -310,7 +296,7 @@ function ApprovalCard({
               data-testid="approve-execute-button"
               sx={{
                 display: 'flex', alignItems: 'center', gap: 0.75,
-                background: disableActions ? '#0d1f0d' : '#162032',
+                background: '#162032',
                 border: `1px solid ${disableActions ? '#21262D' : '#1F6FEB'}`,
                 borderRadius: '4px',
                 px: '16px', py: '7px',
@@ -326,11 +312,6 @@ function ApprovalCard({
               APPROVE &amp; EXECUTE
             </Box>
 
-            {expired && (
-              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>
-                Approval expired — action not available
-              </Typography>
-            )}
           </Box>
         )}
       </Box>
@@ -395,12 +376,16 @@ export default function ApproveStage({
       setResults(res => ({ ...res, [pending_id]: { outcome, message, ok: r.ok } }));
       await queryClient.invalidateQueries({ queryKey: ['demo-status'] });
     } catch (e: any) {
-      const consumed = e?.response?.status === 404;
+      const status = e?.response?.status;
+      const consumed = status === 404;
+      const expired  = status === 410;
       setResults(res => ({
         ...res,
         [pending_id]: {
           outcome: consumed ? 'consumed' : 'error',
-          message: consumed
+          message: expired
+            ? 'Approval TTL elapsed — operator must resubmit the governed action'
+            : consumed
             ? 'Approval already consumed by another session'
             : (e?.message ?? 'Request failed'),
           ok: false,

@@ -70,8 +70,10 @@ async def copilot_turn(body: CopilotTurnRequest, request: Request):
     try:
         if detected_intent == CopilotIntent.OBSERVE_OUTCOME:
             # Determine whether the last ACT's pending approval is still in the queue.
+            # Also check the outcome cache so we can distinguish 'executed' from 'rejected'.
             # Injected here so CopilotService never imports ApprovalStore or Controller.
             is_still_pending: bool | None = None
+            pending_outcome: str | None = None
             try:
                 from maiw_api.demo.controller import get_demo_controller
                 ctrl = get_demo_controller()
@@ -85,7 +87,14 @@ async def copilot_turn(body: CopilotTurnRequest, request: Request):
                     pending_id = getattr(last_act, "pending_approval_id", None)
                     if pending_id:
                         live_ids = {p["pending_id"] for p in ctrl._pending_approvals}
-                        is_still_pending = pending_id in live_ids
+                        if pending_id in live_ids:
+                            is_still_pending = True
+                        else:
+                            # Not in live queue — check the terminal outcome cache.
+                            pending_outcome = ctrl._pending_approval_outcomes.get(pending_id)
+                            # is_still_pending=False only for rejected/expired (not executed).
+                            # For 'executed', let operational_improved guide the narrative.
+                            is_still_pending = False if pending_outcome in ("rejected", "expired") else None
             except Exception:
                 pass  # controller unavailable — fall back to heuristic
 
@@ -95,6 +104,7 @@ async def copilot_turn(body: CopilotTurnRequest, request: Request):
                 warehouse_id=body.warehouse_id,
                 scenario_name=body.scenario_name,
                 is_still_pending=is_still_pending,
+                pending_outcome=pending_outcome,
             )
             return _observe_response(result, turn)
 

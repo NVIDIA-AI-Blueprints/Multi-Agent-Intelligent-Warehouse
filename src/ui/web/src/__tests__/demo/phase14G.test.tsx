@@ -495,27 +495,28 @@ describe('ApproveStage — approval controls', () => {
     });
   });
 
-  it('expired approval: action buttons are disabled', () => {
-    const expiredApproval: PendingApproval = {
+  it('old approval: buttons remain enabled — TTL enforced by backend (410 Gone)', () => {
+    // TTL was previously enforced client-side; now the backend is authoritative.
+    const oldApproval: PendingApproval = {
       ...basePendingApproval,
       queued_at: new Date(Date.now() - 15 * 60 * 1000).toISOString(), // 15 min ago
     };
     wrap(
-      <ApproveStage {...stageProps({ pendingApprovals: [expiredApproval] })} />
+      <ApproveStage {...stageProps({ pendingApprovals: [oldApproval] })} />
     );
-    expect(screen.getByTestId('approve-execute-button')).toBeDisabled();
-    expect(screen.getByTestId('reject-button')).toBeDisabled();
+    expect(screen.getByTestId('approve-execute-button')).not.toBeDisabled();
+    expect(screen.getByTestId('reject-button')).not.toBeDisabled();
   });
 
-  it('expired approval: EXPIRED label shown', () => {
-    const expiredApproval: PendingApproval = {
+  it('old approval: no EXPIRED badge shown — frontend defers to backend TTL', () => {
+    const oldApproval: PendingApproval = {
       ...basePendingApproval,
       queued_at: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
     };
     wrap(
-      <ApproveStage {...stageProps({ pendingApprovals: [expiredApproval] })} />
+      <ApproveStage {...stageProps({ pendingApprovals: [oldApproval] })} />
     );
-    expect(screen.getAllByText('EXPIRED').length).toBeGreaterThan(0);
+    expect(screen.queryByText('EXPIRED')).not.toBeInTheDocument();
   });
 });
 

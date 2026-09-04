@@ -919,7 +919,7 @@ async def approve_proposal(request: ApproveRequest):
     - No post-construction trace injection.
     """
     from maiw_decision.models import DecisionOutcome, DecisionRequest
-    from maiw_decision.approval import ApprovalAlreadyDecided, ApprovalNotFound
+    from maiw_decision.approval import ApprovalAlreadyDecided, ApprovalExpired, ApprovalNotFound
     from maiw_mcp.contracts.actions import ActionProposal
     from maiw_api.demo.events import ScenarioEvent
 
@@ -951,6 +951,12 @@ async def approve_proposal(request: ApproveRequest):
         approval = ctrl.approval_store.approve(
             approval_id, approved_by=request.approved_by
         )
+    except ApprovalExpired as exc:
+        ctrl.record_approval_outcome(request.pending_id, "expired")
+        raise HTTPException(
+            status_code=410,
+            detail=f"Approval expired — the TTL elapsed before the operator acted: {exc}",
+        ) from exc
     except ApprovalAlreadyDecided as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ApprovalNotFound:
@@ -1038,6 +1044,7 @@ async def approve_proposal(request: ApproveRequest):
 
     # Consume the approval after execution — APPROVED → CONSUMED (single-use guarantee closes)
     ctrl.approval_store.consume(approval_id)
+    ctrl.record_approval_outcome(request.pending_id, "executed")
 
     # Publish EXECUTE SSE
     await bus.publish(
@@ -1090,6 +1097,8 @@ async def reject_proposal(request: ApproveRequest):
             ctrl.approval_store.reject(approval_id, rejected_by=request.approved_by)
         except ApprovalAlreadyDecided:
             pass  # Already decided — rejection is still the right outcome for the queue entry
+
+    ctrl.record_approval_outcome(request.pending_id, "rejected")
 
     await ctrl.bus.publish_reject(
         pending["capability"],

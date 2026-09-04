@@ -869,6 +869,7 @@ class CopilotService:
         warehouse_id: str,
         scenario_name: str = "",
         is_still_pending: bool | None = None,
+        pending_outcome: str | None = None,
     ) -> tuple[CopilotObserveResult, CopilotTurn]:
         """
         Process an OBSERVE_OUTCOME turn: compare pre-ACT state with current state.
@@ -878,8 +879,11 @@ class CopilotService:
 
         is_still_pending: injected by the router after checking the approval queue.
             True  = pending_approval_id still queued (not yet decided)
-            False = no longer in queue (approved+executed, or rejected)
-            None  = status unknown (controller unavailable or no prior ACT)
+            False = removed from queue AND outcome is 'rejected' or 'expired'
+            None  = outcome is 'executed' (let operational_improved guide narrative)
+                    or status unknown (controller unavailable / no prior ACT)
+        pending_outcome: 'executed' | 'rejected' | 'expired' | None
+            Terminal outcome from ctrl._pending_approval_outcomes, or None if unknown.
         """
         _t0 = time.monotonic()
         trace_id = str(uuid.uuid4())
@@ -1018,6 +1022,7 @@ class CopilotService:
             kpi_delta=kpi_delta,
             last_act=last_act,
             is_still_pending=is_still_pending,
+            pending_outcome=pending_outcome,
         )
 
         evidence = _facts_to_evidence(
@@ -1472,6 +1477,7 @@ def _compose_observe_narrative(
     kpi_delta: dict,
     last_act: Any,
     is_still_pending: bool | None = None,
+    pending_outcome: str | None = None,
 ) -> tuple[str, bool, str]:
     """
     Compose the OBSERVE_OUTCOME narrative.
@@ -1540,12 +1546,27 @@ def _compose_observe_narrative(
                 )
                 summary = "Awaiting human approval — action not yet executed."
             elif is_still_pending is False:
-                answer = (
-                    "No. The proposed action was rejected by the human reviewer and was never executed. "
-                    "No warehouse changes were made — the state is unchanged from before the action was requested."
-                )
-                summary = "Action rejected — no warehouse change."
+                if pending_outcome == "expired":
+                    answer = (
+                        "The approval window closed before the operator acted. "
+                        "The action was not executed — no warehouse changes were made.\n\n"
+                        "You can request a new governed action via the ACT command."
+                    )
+                    summary = "Approval expired — action not executed."
+                else:
+                    answer = (
+                        "No. The proposed action was rejected by the human reviewer and was never executed. "
+                        "No warehouse changes were made — the state is unchanged from before the action was requested."
+                    )
+                    summary = "Action rejected — no warehouse change."
                 operational_improved = False
+            elif pending_outcome == "executed":
+                answer = (
+                    "The action was approved and executed through the MAIW governance pipeline. "
+                    "No immediate warehouse KPI change was detected — the task may still be in progress "
+                    "or requires a clock tick to register the completed allocation."
+                )
+                summary = "Executed — no immediate KPI delta detected."
             else:
                 answer = (
                     "The warehouse state has not changed since the action was submitted. "
