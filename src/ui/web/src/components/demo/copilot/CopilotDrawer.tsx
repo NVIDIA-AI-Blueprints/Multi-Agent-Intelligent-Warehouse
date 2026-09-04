@@ -475,15 +475,18 @@ function CopilotActAnswer({ turn, isLatest, onReviewApproval }: CopilotAnswerPro
 function CopilotObserveAnswer({ turn, isLatest }: CopilotAnswerProps & { isLatest?: boolean }) {
   const improved = turn.observe_operational_improved ?? false;
   const improvedColor = improved ? '#3FB950' : '#D29922';
+  const executionConfirmed = turn.observe_execution_confirmed ?? false;
+  const decisionOutcome = turn.observe_act_decision_outcome ?? null;
   const pre = turn.observe_pre_metrics ?? {};
   const post = turn.observe_post_metrics ?? {};
   const delta = turn.observe_kpi_delta ?? {};
   const hasDelta = Object.keys(delta).length > 0;
 
   const metricRows: Array<[string, string | number | null, string | number | null, number | null]> = [
-    ['Pending tasks',  pre.pending_tasks  ?? null, post.pending_tasks  ?? null, typeof delta.pending_tasks === 'number' ? delta.pending_tasks : null],
-    ['Idle workers',   pre.idle_workers   ?? null, post.idle_workers   ?? null, typeof delta.idle_workers === 'number' ? delta.idle_workers : null],
-    ['Wave risk',      pre.wave_risk_level ?? null, post.wave_risk_level ?? null, null],
+    ['Pending backlog', pre.pending_tasks  ?? null, post.pending_tasks  ?? null, typeof delta.pending_tasks === 'number' ? delta.pending_tasks : null],
+    ['At-risk tasks',   pre.at_risk_tasks  ?? null, post.at_risk_tasks  ?? null, typeof delta.at_risk_tasks === 'number' ? delta.at_risk_tasks : null],
+    ['Idle workers',    pre.idle_workers   ?? null, post.idle_workers   ?? null, typeof delta.idle_workers === 'number' ? delta.idle_workers : null],
+    ['Wave risk level', pre.wave_risk_level ?? null, post.wave_risk_level ?? null, null],
   ].filter(([, pre]) => pre !== null) as Array<[string, string | number | null, string | number | null, number | null]>;
 
   return (
@@ -570,19 +573,51 @@ function CopilotObserveAnswer({ turn, isLatest }: CopilotAnswerProps & { isLates
         </Box>
       )}
 
-      {/* Safety note */}
-      <Box sx={{
-        background: '#0D1B0D',
-        border: '1px solid #3FB95044',
-        borderRadius: '3px',
-        px: '8px', py: '5px',
-      }}>
-        <Typography sx={{
-          fontFamily: 'monospace', fontSize: '0.68rem', color: '#3FB950',
+      {/* Execution / safety note — adapts to actual outcome */}
+      {executionConfirmed ? (
+        <Box sx={{
+          background: improved ? '#0D1B0D' : '#0D1117',
+          border: `1px solid ${improved ? '#3FB95044' : '#D2992244'}`,
+          borderRadius: '3px',
+          px: '8px', py: '5px',
         }}>
-          ✓ {turn.safety_note ?? 'No warehouse changes have been made.'}
-        </Typography>
-      </Box>
+          <Typography sx={{
+            fontFamily: 'monospace', fontSize: '0.68rem',
+            color: improved ? '#3FB950' : '#D29922',
+          }}>
+            {improved
+              ? '✓ Warehouse state changed — governed action executed and confirmed'
+              : '⚠ Execution confirmed — no measurable KPI change yet'}
+          </Typography>
+        </Box>
+      ) : decisionOutcome === 'REJECTED' ? (
+        <Box sx={{
+          background: '#0D1117', border: '1px solid #30363D',
+          borderRadius: '3px', px: '8px', py: '5px',
+        }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: '#6E7681' }}>
+            No warehouse changes — action rejected before execution
+          </Typography>
+        </Box>
+      ) : decisionOutcome === 'REQUIRES_HUMAN_APPROVAL' && !improved ? (
+        <Box sx={{
+          background: '#1A1200', border: '1px solid #D2992244',
+          borderRadius: '3px', px: '8px', py: '5px',
+        }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: '#D29922' }}>
+            ⚠ No warehouse changes yet — awaiting or pending human approval
+          </Typography>
+        </Box>
+      ) : (
+        <Box sx={{
+          background: '#0D1B0D', border: '1px solid #3FB95044',
+          borderRadius: '3px', px: '8px', py: '5px',
+        }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: '#3FB950' }}>
+            ✓ {turn.safety_note ?? 'No warehouse changes have been made.'}
+          </Typography>
+        </Box>
+      )}
 
       <Typography sx={{
         fontFamily: 'monospace', fontSize: '0.52rem', color: '#30363D',

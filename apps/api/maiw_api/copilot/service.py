@@ -1280,15 +1280,16 @@ def _check_state_drift(rec: RecommendedActionResult, state: Any) -> str | None:
 # ── Recommendation context enrichment ────────────────────────────────────────
 
 _WHY_BEST_RE = _re.compile(
-    r"\b(why.*best|why.*option|why.*recommend|why.*that|explain.*recommend|best option|why not|compare)\b",
+    r"\b(why\b|why.*best|why.*option|why.*recommend|why.*that|explain.*recommend"
+    r"|best option|why not|compare|makes.*better|instead of|versus|vs\.?|what.*differ)\b",
     _re.IGNORECASE,
 )
 
 
 def _enrich_with_recommendations(message: str, recs: list) -> str:
     """
-    When the operator asks why a recommendation is best, inject prior recommendation
-    context into scenario_context so the agent gives a comparative rationale.
+    Inject prior ANALYZE recommendation context when the operator asks a follow-up
+    explanation or comparison question (e.g. "Why REALLOCATE_LABOR?", "Why not X?").
 
     Returns the original message when no enrichment is needed.
     """
@@ -1302,12 +1303,23 @@ def _enrich_with_recommendations(message: str, recs: list) -> str:
         obj = getattr(r, "objective", "")
         rec_lines.append(f"  #{i + 1}: {cap} → {tgt} ({pri} priority) — {obj}")
     rec_summary = "\n".join(rec_lines)
+    is_comparison = _re.search(r"\b(why not|compare|instead|versus|vs\.?|differ|makes.*better)\b", message, _re.IGNORECASE)
+    if is_comparison:
+        directive = (
+            "Compare recommendation #1 against the alternatives. Explain which specific "
+            "bottleneck each addresses and why #1 delivers the highest operational impact "
+            "first. Be concise — do not repeat the full warehouse diagnosis."
+        )
+    else:
+        directive = (
+            "Explain why recommendation #1 is the best first action given the current "
+            "warehouse state. Reference the specific operational bottleneck it unblocks. "
+            "Do not repeat the full warehouse diagnosis."
+        )
     return (
         f"{message}\n\n"
         f"Prior ANALYZE recommendations:\n{rec_summary}\n\n"
-        f"Explain why recommendation #1 is the best first action given the observed "
-        f"warehouse state. Compare it to the alternatives. Focus on which action unblocks "
-        f"the highest-impact bottleneck first. Do not repeat the full warehouse diagnosis."
+        f"{directive}"
     )
 
 
@@ -1487,7 +1499,7 @@ def _compose_observe_narrative(
         operational_improved = True
         improvement_signals.append(f"idle workers reduced from {pre_idle} to {post_idle}")
     if risk_level_change:
-        improvement_signals.append(f"wave risk: {risk_level_change}")
+        improvement_signals.append(f"wave risk classification: {risk_level_change}")
         # Treat risk reduction as improvement
         risk_order = ["critical", "high", "medium", "low", "none", "unknown"]
         pre_idx = next((i for i, r in enumerate(risk_order) if r in str(pre_risk).lower()), 999)
@@ -1507,9 +1519,14 @@ def _compose_observe_narrative(
 
         if operational_improved and improvement_signals:
             signals_str = "; ".join(improvement_signals)
+            _one_task = (
+                "\n\nWhy only one task resolved? A single governed action unblocks the "
+                "highest-priority allocation bottleneck. Broader backlog reduction requires "
+                "additional reallocation cycles authorized through the governance pipeline."
+            ) if backlog_delta is not None and backlog_delta == -1 else ""
             answer = (
-                f"Yes — the warehouse state improved after the governed action was executed.\n\n"
-                f"OBSERVED OUTCOME\n{signals_str.capitalize()}.\n\n"
+                f"Yes — the warehouse state improved after the governed action was executed. "
+                f"{signals_str.capitalize()}.{_one_task}\n\n"
                 f"The action was approved and executed through the MAIW governance pipeline. "
                 f"The operational bottleneck has been partially resolved."
             )
@@ -1554,18 +1571,23 @@ def _compose_observe_narrative(
     if execution_confirmed:
         if operational_improved and improvement_signals:
             signals_str = "; ".join(improvement_signals)
+            _one_task = (
+                "\n\nWhy only one task resolved? A single governed action unblocks the "
+                "highest-priority allocation bottleneck. Broader backlog reduction requires "
+                "additional reallocation cycles authorized through the governance pipeline."
+            ) if backlog_delta is not None and backlog_delta == -1 else ""
             answer = (
-                f"Yes. The action executed successfully and the operational state improved.\n\n"
-                f"OBSERVED OUTCOME\n{signals_str.capitalize()}.\n\n"
+                f"Yes. The action executed and the operational state improved. "
+                f"{signals_str.capitalize()}.{_one_task}\n\n"
                 f"The labor allocation was executed through the MAIW governance pipeline."
             )
             summary = f"Execution confirmed; improvement observed: {improvement_signals[0]}"
         else:
             answer = (
                 "The action executed successfully (CONFIRMED), "
-                "but the key operational metrics have not yet changed measurably.\n\n"
-                f"Pending tasks: {pre_backlog} → {post_backlog}\n"
-                f"Idle workers: {pre_idle} → {post_idle}\n\n"
+                "but the key operational metrics have not yet changed measurably. "
+                f"Pending backlog: {pre_backlog} → {post_backlog}. "
+                f"Idle workers: {pre_idle} → {post_idle}.\n\n"
                 "This may indicate a processing delay in the warehouse system."
             )
             summary = "Execution confirmed; no measurable operational improvement yet."

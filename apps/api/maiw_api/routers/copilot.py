@@ -161,7 +161,11 @@ def _observe_response(result, turn) -> CopilotTurnResponse:
         answerability=result.answerability,
         missing_context=result.missing_context,
         timing=result.timing,
-        safety_note=_SAFETY_NOTE,
+        safety_note=(
+            "Warehouse state mutated — governed action executed and confirmed through MAIW pipeline."
+            if result.execution_confirmed
+            else _SAFETY_NOTE
+        ),
         observe_execution_confirmed=result.execution_confirmed,
         observe_operational_improved=result.operational_improved,
         observe_operational_summary=result.operational_summary,
