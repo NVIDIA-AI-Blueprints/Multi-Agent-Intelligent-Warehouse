@@ -1010,6 +1010,12 @@ class CopilotService:
             mutation_state is not None and
             getattr(mutation_state, "value", str(mutation_state)) == "CONFIRMED"
         )
+        # The last_act_result is written at ACT time (mutation_state=NOT_ATTEMPTED).
+        # After the human approves and execution runs, last_act_result is never updated.
+        # pending_outcome="executed" from ctrl._pending_approval_outcomes is the only
+        # authoritative signal that execution actually completed for this approval path.
+        if pending_outcome == "executed":
+            execution_confirmed = True
         pending_approval_id = getattr(last_act, "pending_approval_id", None)
 
         # ── Compose narrative ─────────────────────────────────────────────────
@@ -1306,7 +1312,9 @@ def _enrich_with_recommendations(message: str, recs: list) -> str:
         tgt = getattr(r, "target", "")
         pri = getattr(r, "priority", "")
         obj = getattr(r, "objective", "")
-        rec_lines.append(f"  #{i + 1}: {cap} → {tgt} ({pri} priority) — {obj}")
+        rat = getattr(r, "rationale", "") or ""
+        rat_clause = f" Rationale: {rat}" if rat else ""
+        rec_lines.append(f"  #{i + 1}: {cap} → {tgt} ({pri} priority) — {obj}.{rat_clause}")
     rec_summary = "\n".join(rec_lines)
     is_comparison = _re.search(r"\b(why not|compare|instead|versus|vs\.?|differ|makes.*better)\b", message, _re.IGNORECASE)
     if is_comparison:
