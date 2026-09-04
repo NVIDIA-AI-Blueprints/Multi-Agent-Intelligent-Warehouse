@@ -13,9 +13,11 @@
  *   - skills_used is always [] for ASK/ANALYZE — not shown
  */
 
-import React, { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react';
+import React, { useState, useRef, useEffect, useCallback, KeyboardEvent, Dispatch, SetStateAction } from 'react';
 import { Box, Typography } from '@mui/material';
 import { demoAPI, CopilotTurnResponse, CopilotRecommendation } from '../../../services/demoAPI';
+import TerminalTypewriter from './TerminalTypewriter';
+import { TurnEntry, CopilotSystemCard } from '../../../hooks/useCopilotConversation';
 
 // ── Color constants (MAIW dark terminal aesthetic) ─────────────────────────────
 
@@ -75,10 +77,17 @@ const LOADING_STAGES_ACT = [
   'COMPLETE',
 ];
 
+const LOADING_STAGES_OBSERVE = [
+  'READING CURRENT STATE',
+  'COMPARING STATE',
+  'COMPLETE',
+];
+
 // ── Suggested prompts (shown after a turn completes) ──────────────────────────
 
 const SUGGEST_AFTER_ASK     = ['What should we do?'];
 const SUGGEST_AFTER_ANALYZE = ['Do it.'];
+const SUGGEST_AFTER_ACT     = ['Did it work?'];
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -86,6 +95,14 @@ interface CopilotDrawerProps {
   warehouseId: string;
   scenarioName: string;
   onClose: () => void;
+  onReviewApproval?: (pendingApprovalId: string) => void;
+  // Lifted conversation state — owned by DemoShell so it survives drawer remount
+  conversationId: string | null;
+  setConversationId: (id: string | null) => void;
+  turns: TurnEntry[];
+  setTurns: Dispatch<SetStateAction<TurnEntry[]>>;
+  conversationError: string | null;
+  setConversationError: (e: string | null) => void;
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
@@ -229,7 +246,7 @@ function RecommendationCard({ rec, index }: { rec: CopilotRecommendation; index:
   );
 }
 
-function CopilotActAnswer({ turn }: CopilotAnswerProps) {
+function CopilotActAnswer({ turn, isLatest, onReviewApproval }: CopilotAnswerProps & { isLatest?: boolean; onReviewApproval?: (pendingApprovalId: string) => void }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   const outcome   = turn.act_decision_outcome ?? 'NOT_IMPLEMENTED';
@@ -239,88 +256,154 @@ function CopilotActAnswer({ turn }: CopilotAnswerProps) {
   const safetyNote = turn.safety_note ?? 'No warehouse changes have been made.';
   const confirmed = mutState === 'CONFIRMED';
 
+  // Governance badges render IMMEDIATELY — never delayed by typewriter
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
-      {/* Section header */}
-      <Typography sx={{
-        fontFamily: 'monospace', fontSize: '0.58rem', fontWeight: 700,
-        color: '#484F58', letterSpacing: '0.12em', textTransform: 'uppercase',
-        mb: '2px',
+      {/* ── AI REQUEST section ────────────────────────────────────────────── */}
+      <Box sx={{
+        background: '#0D1117',
+        border: '1px solid #21262D',
+        borderRadius: '4px',
+        p: '10px',
+        display: 'flex', flexDirection: 'column', gap: '6px',
       }}>
-        AI REQUEST
+        <Typography sx={{
+          fontFamily: 'monospace', fontSize: '0.52rem', fontWeight: 700,
+          color: '#484F58', letterSpacing: '0.14em', textTransform: 'uppercase',
+        }}>
+          AI REQUEST
+        </Typography>
+        {turn.answer ? (
+          isLatest ? (
+            <TerminalTypewriter
+              text={turn.answer}
+              turnKey={turn.turn_id}
+              sx={{ fontSize: '0.78rem', color: '#C9D1D9', lineHeight: 1.5 }}
+            />
+          ) : (
+            <Typography sx={{
+              fontFamily: 'monospace', fontSize: '0.78rem', color: '#C9D1D9', lineHeight: 1.5,
+              whiteSpace: 'pre-wrap',
+            }}>
+              {turn.answer}
+            </Typography>
+          )
+        ) : null}
+      </Box>
+
+      {/* ── Arrow ─────────────────────────────────────────────────────────── */}
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.7rem', color: '#30363D', textAlign: 'center' }}>
+        ↓
       </Typography>
 
-      {/* Decision outcome badge */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px', mb: '2px' }}>
+      {/* ── DECISION ENGINE section ───────────────────────────────────────── */}
+      <Box sx={{
+        background: '#0D1117',
+        border: `1px solid ${outColor}44`,
+        borderRadius: '4px',
+        p: '10px',
+        display: 'flex', flexDirection: 'column', gap: '6px',
+      }}>
+        <Typography sx={{
+          fontFamily: 'monospace', fontSize: '0.52rem', fontWeight: 700,
+          color: '#484F58', letterSpacing: '0.14em', textTransform: 'uppercase',
+        }}>
+          DECISION ENGINE
+        </Typography>
         <Box component="span" data-testid="copilot-act-decision-outcome" sx={{
-          fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
-          color: outColor, border: `1px solid ${outColor}44`, borderRadius: '3px',
-          px: '5px', py: '1px', textTransform: 'uppercase', letterSpacing: '0.08em',
+          fontFamily: 'monospace', fontSize: '0.65rem', fontWeight: 700,
+          color: outColor, letterSpacing: '0.08em', textTransform: 'uppercase',
+          display: 'inline-block',
         }}>
           {outcome.replace(/_/g, ' ')}
         </Box>
+        {turn.act_violations && turn.act_violations.length > 0 && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '3px', mt: '2px' }}>
+            {turn.act_violations.map((v, i) => (
+              <Typography key={i} sx={{
+                fontFamily: 'monospace', fontSize: '0.65rem', color: '#F85149', lineHeight: 1.4,
+              }}>
+                ✗ [{v.code}] {v.message}
+              </Typography>
+            ))}
+          </Box>
+        )}
+      </Box>
+
+      {/* ── Arrow ─────────────────────────────────────────────────────────── */}
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.7rem', color: '#30363D', textAlign: 'center' }}>
+        ↓
+      </Typography>
+
+      {/* ── EXECUTION section ─────────────────────────────────────────────── */}
+      <Box sx={{
+        background: '#0D1117',
+        border: `1px solid ${mutColor}22`,
+        borderRadius: '4px',
+        p: '10px',
+        display: 'flex', flexDirection: 'column', gap: '6px',
+      }}>
+        <Typography sx={{
+          fontFamily: 'monospace', fontSize: '0.52rem', fontWeight: 700,
+          color: '#484F58', letterSpacing: '0.14em', textTransform: 'uppercase',
+        }}>
+          EXECUTION
+        </Typography>
         <Box component="span" data-testid="copilot-act-mutation-state" sx={{
-          fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
-          color: mutColor, border: `1px solid ${mutColor}44`, borderRadius: '3px',
-          px: '5px', py: '1px', textTransform: 'uppercase', letterSpacing: '0.08em',
+          fontFamily: 'monospace', fontSize: '0.65rem', fontWeight: 700,
+          color: mutColor, letterSpacing: '0.08em', textTransform: 'uppercase',
+          display: 'inline-block',
         }}>
           {mutState.replace(/_/g, ' ')}
         </Box>
+
+        {/* Safety note — always visible */}
+        <Box
+          data-testid="copilot-act-safety-note"
+          sx={{
+            background: confirmed ? '#0D1B0D' : '#1A1200',
+            border: `1px solid ${confirmed ? '#3FB95044' : '#D2992244'}`,
+            borderRadius: '3px',
+            px: '8px', py: '5px',
+            mt: '2px',
+          }}
+        >
+          <Typography sx={{
+            fontFamily: 'monospace', fontSize: '0.68rem',
+            color: confirmed ? '#3FB950' : '#D29922',
+          }}>
+            {confirmed ? '✓' : '⏳'} {safetyNote}
+          </Typography>
+        </Box>
       </Box>
 
-      {/* Answer text */}
-      {turn.answer && (
-        <Typography sx={{
-          fontFamily: 'monospace', fontSize: '0.78rem', color: '#C9D1D9', lineHeight: 1.5,
-        }}>
-          {turn.answer}
-        </Typography>
-      )}
-
-      {/* Safety note — always visible before approval/execution */}
-      <Box
-        data-testid="copilot-act-safety-note"
-        sx={{
-          background: confirmed ? '#0D1B0D' : '#1A1200',
-          border: `1px solid ${confirmed ? '#3FB95044' : '#D2992244'}`,
-          borderRadius: '4px',
-          px: '10px', py: '7px',
-        }}
-      >
-        <Typography sx={{
-          fontFamily: 'monospace', fontSize: '0.7rem',
-          color: confirmed ? '#3FB950' : '#D29922',
-        }}>
-          {confirmed ? '✓' : '⏳'} {safetyNote}
-        </Typography>
-      </Box>
-
-      {/* Pending approval link — no inline APPROVE button */}
+      {/* ── Pending approval — no inline APPROVE button ───────────────────── */}
       {outcome === 'REQUIRES_HUMAN_APPROVAL' && turn.act_pending_approval_id && (
         <Box sx={{
           background: '#0D1117',
           border: '1px solid #D2992244',
           borderRadius: '4px',
-          px: '10px', py: '7px',
+          px: '10px', py: '8px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <Typography sx={{
-            fontFamily: 'monospace', fontSize: '0.68rem', color: '#D29922',
+            fontFamily: 'monospace', fontSize: '0.65rem', color: '#8B949E',
           }}>
-            Pending review: {turn.act_pending_approval_id.slice(0, 12)}…
+            Pending: {turn.act_pending_approval_id.slice(0, 12)}…
           </Typography>
           <Box
             component="button"
             data-testid="copilot-act-review-approval"
-            onClick={() => console.log('[Copilot ACT] Review approval:', turn.act_pending_approval_id, turn)}
+            onClick={() => onReviewApproval?.(turn.act_pending_approval_id!)}
             sx={{
               background: 'transparent',
               border: '1px solid #D2992244',
               borderRadius: '3px',
-              px: '6px', py: '2px',
-              fontFamily: 'monospace', fontSize: '0.58rem',
+              px: '8px', py: '3px',
+              fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
               color: '#D29922', cursor: 'pointer', flexShrink: 0,
+              letterSpacing: '0.08em',
               '&:hover': { color: '#F0A400', borderColor: '#F0A40044' },
             }}
           >
@@ -329,29 +412,16 @@ function CopilotActAnswer({ turn }: CopilotAnswerProps) {
         </Box>
       )}
 
-      {/* Violations */}
-      {turn.act_violations && turn.act_violations.length > 0 && (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {turn.act_violations.map((v, i) => (
-            <Typography key={i} sx={{
-              fontFamily: 'monospace', fontSize: '0.68rem', color: '#F85149', lineHeight: 1.4,
-            }}>
-              ✗ [{v.code}] {v.message}
-            </Typography>
-          ))}
-        </Box>
-      )}
-
-      {/* Governance details (collapsible) */}
+      {/* ── Governance details (collapsible) ─────────────────────────────── */}
       <Box>
         <Box
           component="button"
           onClick={() => setDetailsOpen(o => !o)}
           sx={{
             background: 'transparent', border: 'none', cursor: 'pointer',
-            fontFamily: 'monospace', fontSize: '0.62rem', color: '#484F58',
+            fontFamily: 'monospace', fontSize: '0.58rem', color: '#30363D',
             p: 0, textAlign: 'left',
-            '&:hover': { color: '#8B949E' },
+            '&:hover': { color: '#484F58' },
           }}
         >
           GOVERNANCE {detailsOpen ? '▾' : '▸'}
@@ -363,24 +433,23 @@ function CopilotActAnswer({ turn }: CopilotAnswerProps) {
             borderRadius: '4px', p: '8px',
           }}>
             {([
-              ['Capability',    turn.act_recommendation_id ? turn.recommendations?.[0]?.capability : null],
               ['Proposal ID',   turn.act_proposal_id?.slice(0, 12)],
               ['Decision ID',   turn.act_decision_id?.slice(0, 12)],
               ['Pending ID',    turn.act_pending_approval_id?.slice(0, 12)],
               ['Execution ID',  turn.act_execution_id?.slice(0, 12)],
               ['Exec Status',   turn.act_execution_status],
               ['Snapshot S1',   turn.act_source_snapshot_id?.slice(0, 8)],
-              ['Latency',       turn.latency_ms != null ? `${turn.latency_ms}ms` : null],
+              ['Latency',       turn.latency_ms != null ? `${Math.round(turn.latency_ms)}ms` : null],
             ] as [string, string | null | undefined][]).map(([label, val]) => val != null && (
               <Box key={label} sx={{ display: 'flex', gap: '8px' }}>
                 <Typography sx={{
-                  fontFamily: 'monospace', fontSize: '0.62rem', color: '#484F58',
+                  fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58',
                   minWidth: '80px', flexShrink: 0,
                 }}>
                   {label}
                 </Typography>
                 <Typography sx={{
-                  fontFamily: 'monospace', fontSize: '0.62rem', color: '#8B949E',
+                  fontFamily: 'monospace', fontSize: '0.6rem', color: '#8B949E',
                   wordBreak: 'break-word',
                 }}>
                   {String(val)}
@@ -391,9 +460,8 @@ function CopilotActAnswer({ turn }: CopilotAnswerProps) {
         )}
       </Box>
 
-      {/* Trace */}
       <Typography sx={{
-        fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58',
+        fontFamily: 'monospace', fontSize: '0.52rem', color: '#30363D',
         wordBreak: 'break-all',
       }}>
         trace: {turn.trace_id}
@@ -402,7 +470,166 @@ function CopilotActAnswer({ turn }: CopilotAnswerProps) {
   );
 }
 
-function CopilotAnswer({ turn }: CopilotAnswerProps) {
+// ── OBSERVE_OUTCOME answer ─────────────────────────────────────────────────────
+
+function CopilotObserveAnswer({ turn, isLatest }: CopilotAnswerProps & { isLatest?: boolean }) {
+  const improved = turn.observe_operational_improved ?? false;
+  const improvedColor = improved ? '#3FB950' : '#D29922';
+  const executionConfirmed = turn.observe_execution_confirmed ?? false;
+  const decisionOutcome = turn.observe_act_decision_outcome ?? null;
+  const pre = turn.observe_pre_metrics ?? {};
+  const post = turn.observe_post_metrics ?? {};
+  const delta = turn.observe_kpi_delta ?? {};
+  const hasDelta = Object.keys(delta).length > 0;
+
+  const metricRows: Array<[string, string | number | null, string | number | null, number | null]> = [
+    ['Pending backlog', pre.pending_tasks  ?? null, post.pending_tasks  ?? null, typeof delta.pending_tasks === 'number' ? delta.pending_tasks : null],
+    ['At-risk tasks',   pre.at_risk_tasks  ?? null, post.at_risk_tasks  ?? null, typeof delta.at_risk_tasks === 'number' ? delta.at_risk_tasks : null],
+    ['Idle workers',    pre.idle_workers   ?? null, post.idle_workers   ?? null, typeof delta.idle_workers === 'number' ? delta.idle_workers : null],
+    ['Wave risk level', pre.wave_risk_level ?? null, post.wave_risk_level ?? null, null],
+  ].filter(([, pre]) => pre !== null) as Array<[string, string | number | null, string | number | null, number | null]>;
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+
+      {/* Section header */}
+      <Typography sx={{
+        fontFamily: 'monospace', fontSize: '0.52rem', fontWeight: 700,
+        color: '#484F58', letterSpacing: '0.14em', textTransform: 'uppercase',
+      }}>
+        OBSERVED OUTCOME
+      </Typography>
+
+      {/* Outcome badge */}
+      {turn.observe_operational_summary && (
+        <Box component="span" sx={{
+          fontFamily: 'monospace', fontSize: '0.65rem', fontWeight: 700,
+          color: improvedColor, letterSpacing: '0.08em', textTransform: 'uppercase',
+        }}>
+          {improved ? '✓ ' : '⚠ '}{turn.observe_operational_summary}
+        </Box>
+      )}
+
+      {/* Narrative */}
+      {turn.answer && (
+        isLatest ? (
+          <TerminalTypewriter
+            text={turn.answer}
+            turnKey={turn.turn_id}
+            sx={{ fontSize: '0.78rem', color: '#C9D1D9', lineHeight: 1.5 }}
+          />
+        ) : (
+          <Typography sx={{
+            fontFamily: 'monospace', fontSize: '0.78rem', color: '#C9D1D9', lineHeight: 1.5,
+            whiteSpace: 'pre-wrap',
+          }}>
+            {turn.answer}
+          </Typography>
+        )
+      )}
+
+      {/* KPI delta table */}
+      {hasDelta && metricRows.length > 0 && (
+        <Box sx={{
+          background: '#0D1117',
+          border: '1px solid #21262D',
+          borderRadius: '4px',
+          p: '10px',
+        }}>
+          <Typography sx={{
+            fontFamily: 'monospace', fontSize: '0.52rem', fontWeight: 700,
+            color: '#484F58', letterSpacing: '0.12em', textTransform: 'uppercase', mb: '8px',
+          }}>
+            STATE DELTA
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+            {metricRows.map(([label, preval, postval, d]) => {
+              const dColor = d != null ? (d < 0 ? '#3FB950' : d > 0 ? '#F85149' : '#484F58') : '#484F58';
+              return (
+                <Box key={label} sx={{ display: 'flex', gap: '8px', alignItems: 'baseline' }}>
+                  <Typography sx={{
+                    fontFamily: 'monospace', fontSize: '0.62rem', color: '#8B949E',
+                    minWidth: '90px', flexShrink: 0,
+                  }}>
+                    {label}
+                  </Typography>
+                  <Typography sx={{
+                    fontFamily: 'monospace', fontSize: '0.68rem', color: '#C9D1D9',
+                  }}>
+                    {String(preval)} → {String(postval)}
+                  </Typography>
+                  {d != null && d !== 0 && (
+                    <Typography sx={{
+                      fontFamily: 'monospace', fontSize: '0.6rem', color: dColor,
+                      ml: 'auto', flexShrink: 0,
+                    }}>
+                      {d > 0 ? '+' : ''}{d}
+                    </Typography>
+                  )}
+                </Box>
+              );
+            })}
+          </Box>
+        </Box>
+      )}
+
+      {/* Execution / safety note — adapts to actual outcome */}
+      {executionConfirmed ? (
+        <Box sx={{
+          background: improved ? '#0D1B0D' : '#0D1117',
+          border: `1px solid ${improved ? '#3FB95044' : '#D2992244'}`,
+          borderRadius: '3px',
+          px: '8px', py: '5px',
+        }}>
+          <Typography sx={{
+            fontFamily: 'monospace', fontSize: '0.68rem',
+            color: improved ? '#3FB950' : '#D29922',
+          }}>
+            {improved
+              ? '✓ Warehouse state changed — governed action executed and confirmed'
+              : '⚠ Execution confirmed — no measurable KPI change yet'}
+          </Typography>
+        </Box>
+      ) : decisionOutcome === 'REJECTED' ? (
+        <Box sx={{
+          background: '#0D1117', border: '1px solid #30363D',
+          borderRadius: '3px', px: '8px', py: '5px',
+        }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: '#6E7681' }}>
+            No warehouse changes — action rejected before execution
+          </Typography>
+        </Box>
+      ) : decisionOutcome === 'REQUIRES_HUMAN_APPROVAL' && !improved ? (
+        <Box sx={{
+          background: '#1A1200', border: '1px solid #D2992244',
+          borderRadius: '3px', px: '8px', py: '5px',
+        }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: '#D29922' }}>
+            ⚠ No warehouse changes yet — awaiting or pending human approval
+          </Typography>
+        </Box>
+      ) : (
+        <Box sx={{
+          background: '#0D1B0D', border: '1px solid #3FB95044',
+          borderRadius: '3px', px: '8px', py: '5px',
+        }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: '#3FB950' }}>
+            ✓ {turn.safety_note ?? 'No warehouse changes have been made.'}
+          </Typography>
+        </Box>
+      )}
+
+      <Typography sx={{
+        fontFamily: 'monospace', fontSize: '0.52rem', color: '#30363D',
+        wordBreak: 'break-all',
+      }}>
+        trace: {turn.trace_id}
+      </Typography>
+    </Box>
+  );
+}
+
+function CopilotAnswer({ turn, isLatest }: CopilotAnswerProps & { isLatest?: boolean }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   const isAnalyze = turn.intent === 'analyze';
@@ -457,11 +684,20 @@ function CopilotAnswer({ turn }: CopilotAnswerProps) {
               </Box>
             )}
             {turn.answer && (
-              <Typography sx={{
-                fontFamily: 'monospace', fontSize: '0.8rem', color: '#C9D1D9', lineHeight: 1.5,
-              }}>
-                {turn.answer}
-              </Typography>
+              isLatest ? (
+                <TerminalTypewriter
+                  text={turn.answer}
+                  turnKey={turn.turn_id}
+                  sx={{ fontSize: '0.8rem', color: '#C9D1D9', lineHeight: 1.5 }}
+                />
+              ) : (
+                <Typography sx={{
+                  fontFamily: 'monospace', fontSize: '0.8rem', color: '#C9D1D9', lineHeight: 1.5,
+                  whiteSpace: 'pre-wrap',
+                }}>
+                  {turn.answer}
+                </Typography>
+              )
             )}
           </Box>
         )}
@@ -688,27 +924,26 @@ function CopilotAnswer({ turn }: CopilotAnswerProps) {
 }
 
 // Export for direct testing of the rendering logic
-export { CopilotAnswer, CopilotActAnswer };
-
-// ── Turn entry in conversation thread ─────────────────────────────────────────
-
-interface TurnEntry {
-  id: string;
-  question: string;
-  response: CopilotTurnResponse | null;
-  error: string | null;
-}
+export { CopilotAnswer, CopilotActAnswer, CopilotObserveAnswer };
 
 // ── CopilotDrawer ─────────────────────────────────────────────────────────────
 
-export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: CopilotDrawerProps) {
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const [turns, setTurns] = useState<TurnEntry[]>([]);
+export default function CopilotDrawer({
+  warehouseId,
+  scenarioName,
+  onClose,
+  onReviewApproval,
+  conversationId,
+  setConversationId,
+  turns,
+  setTurns,
+  conversationError,
+  setConversationError,
+}: CopilotDrawerProps) {
   const [inputMessage, setInputMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingStageIdx, setLoadingStageIdx] = useState(0);
-  const [pendingIntent, setPendingIntent] = useState<'ask' | 'analyze' | 'act'>('ask');
-  const [error, setError] = useState<string | null>(null);
+  const [pendingIntent, setPendingIntent] = useState<'ask' | 'analyze' | 'act' | 'observe'>('ask');
 
   const threadRef = useRef<HTMLDivElement>(null);
   const stageTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -716,6 +951,7 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
   const activeStages =
     pendingIntent === 'act'     ? LOADING_STAGES_ACT :
     pendingIntent === 'analyze' ? LOADING_STAGES_ANALYZE :
+    pendingIntent === 'observe' ? LOADING_STAGES_OBSERVE :
     LOADING_STAGES_ASK;
 
   // Cycle loading stage label while loading
@@ -749,13 +985,14 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
     if (!text || loading) return;
 
     // Detect intended intent client-side for loading stage label
+    const looksLikeObserve = /\b(did it work|did that work|what happened|any improvement|outcome|did it help)\b/i.test(text);
     const looksLikeAct     = /\b(do it|proceed|execute|apply|allocate the|reprioritize|prepare (that|this|the) action|do (the )?(first|second|third|1st|2nd|#?1|#?2|one|that))\b/i.test(text);
     const looksLikeAnalyze = /\b(recommend|what should (we|i|you)|how should (we|i|you)|best action|what actions?)\b/i.test(text);
-    setPendingIntent(looksLikeAct ? 'act' : looksLikeAnalyze ? 'analyze' : 'ask');
+    setPendingIntent(looksLikeObserve ? 'observe' : looksLikeAct ? 'act' : looksLikeAnalyze ? 'analyze' : 'ask');
 
     const turnId = `turn-${Date.now()}`;
     setInputMessage('');
-    setError(null);
+    setConversationError(null);
     setLoading(true);
 
     setTurns(prev => [...prev, { id: turnId, question: text, response: null, error: null }]);
@@ -778,7 +1015,7 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
       setTurns(prev => prev.map(t =>
         t.id === turnId ? { ...t, error: String(errMsg) } : t
       ));
-      setError(String(errMsg));
+      setConversationError(String(errMsg));
     } finally {
       setLoading(false);
     }
@@ -791,12 +1028,20 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
     }
   }, [handleSend]);
 
-  // Determine if last completed turn was ASK or ANALYZE (for suggested prompts)
+  // Determine if last completed turn was ASK / ANALYZE / ACT (for suggested prompts).
+  // Look through the last few turns so system cards don't suppress ACT suggestions.
   const lastResponse = turns.length > 0 ? turns[turns.length - 1].response : null;
+  const lastActResponse = [...turns].reverse().find(t => t.response?.intent === 'act')?.response ?? null;
   const showAskSuggest     = !loading && lastResponse?.intent === 'ask' &&
     lastResponse?.answerability === 'answerable';
   const showAnalyzeSuggest = !loading && lastResponse?.intent === 'analyze' &&
     (lastResponse?.recommendations?.length ?? 0) > 0;
+  // Show "Did it work?" after ACT with pending approval — survives system card injection
+  const showActSuggest     = !loading && !!lastActResponse &&
+    lastActResponse.act_decision_outcome === 'REQUIRES_HUMAN_APPROVAL' &&
+    !!lastActResponse.act_pending_approval_id &&
+    // Suppress once OBSERVE_OUTCOME has been answered in this conversation
+    !turns.some(t => t.response?.intent === 'observe_outcome');
 
   return (
     <Box
@@ -889,7 +1134,52 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
         )}
 
         {/* Turns */}
-        {turns.map((turn) => (
+        {turns.map((turn, idx) => {
+          const isLatest = idx === turns.length - 1;
+
+          // System card — governance boundary notification (injected by RETURN TO COPILOT)
+          if (turn.systemCard) {
+            const card = turn.systemCard;
+            const approved = card.decision === 'APPROVED';
+            return (
+              <Box
+                key={turn.id}
+                data-testid="copilot-system-card"
+                sx={{
+                  background: approved ? '#0D1B0D' : '#1A1200',
+                  border: `1px solid ${approved ? '#3FB95044' : '#D2992244'}`,
+                  borderRadius: '5px',
+                  px: '10px', py: '8px',
+                  display: 'flex', flexDirection: 'column', gap: '4px',
+                }}
+              >
+                <Typography sx={{
+                  fontFamily: 'monospace', fontSize: '0.52rem', fontWeight: 700,
+                  color: '#484F58', letterSpacing: '0.14em', textTransform: 'uppercase',
+                }}>
+                  GOVERNED ACTION RESOLVED
+                </Typography>
+                <Box sx={{ display: 'flex', gap: '12px', flexWrap: 'wrap', mt: '2px' }}>
+                  <Box sx={{ display: 'flex', gap: '4px' }}>
+                    <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>Decision</Typography>
+                    <Typography sx={{
+                      fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
+                      color: approved ? '#3FB950' : '#D29922',
+                    }}>{card.decision}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', gap: '4px' }}>
+                    <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>Execution</Typography>
+                    <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#8B949E' }}>{card.execution}</Typography>
+                  </Box>
+                </Box>
+                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: '#8B949E', mt: '2px' }}>
+                  {card.action}
+                </Typography>
+              </Box>
+            );
+          }
+
+          return (
           <Box key={turn.id} sx={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {/* User bubble */}
             <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -913,8 +1203,10 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
             <Box sx={{ maxWidth: '100%' }}>
               {turn.response ? (
                 turn.response.intent === 'act'
-                  ? <CopilotActAnswer turn={turn.response} />
-                  : <CopilotAnswer turn={turn.response} />
+                  ? <CopilotActAnswer turn={turn.response} isLatest={isLatest} onReviewApproval={onReviewApproval} />
+                  : turn.response.intent === 'observe_outcome'
+                  ? <CopilotObserveAnswer turn={turn.response} isLatest={isLatest} />
+                  : <CopilotAnswer turn={turn.response} isLatest={isLatest} />
               ) : turn.error ? (
                 <Typography sx={{
                   fontFamily: 'monospace', fontSize: '0.72rem', color: '#F85149',
@@ -942,7 +1234,8 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
               )}
             </Box>
           </Box>
-        ))}
+          );
+        })}
 
         {/* Suggested prompt after ASK */}
         {showAskSuggest && (
@@ -994,12 +1287,37 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose }: Co
           </Box>
         )}
 
+        {/* Suggested "Did it work?" after ACT pending approval */}
+        {showActSuggest && (
+          <Box sx={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {SUGGEST_AFTER_ACT.map(prompt => (
+              <Box
+                key={prompt}
+                component="button"
+                data-testid="copilot-observe-suggested-prompt"
+                onClick={() => handleSend(prompt)}
+                sx={{
+                  background: 'transparent',
+                  border: '1px solid #3FB95044',
+                  borderRadius: '4px',
+                  px: '8px', py: '4px',
+                  fontFamily: 'monospace', fontSize: '0.65rem',
+                  color: '#3FB950', cursor: 'pointer',
+                  '&:hover': { color: '#4BD661', borderColor: '#4BD66144' },
+                }}
+              >
+                {prompt}
+              </Box>
+            ))}
+          </Box>
+        )}
+
         {/* Global error */}
-        {error && turns.length === 0 && (
+        {conversationError && turns.length === 0 && (
           <Typography sx={{
             fontFamily: 'monospace', fontSize: '0.7rem', color: '#F85149',
           }}>
-            ✗ {error}
+            ✗ {conversationError}
           </Typography>
         )}
       </Box>

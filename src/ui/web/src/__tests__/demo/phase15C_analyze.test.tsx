@@ -118,17 +118,30 @@ function renderAnswer(turn: CopilotTurnResponse) {
   );
 }
 
-function renderDrawer(props: Partial<React.ComponentProps<typeof CopilotDrawer>> = {}) {
-  return render(
+function ConvWrapper({ drawerProps }: { drawerProps: Partial<React.ComponentProps<typeof CopilotDrawer>> }) {
+  const [conversationId, setConversationId] = React.useState<string | null>(null);
+  const [turns, setTurns] = React.useState<any[]>([]);
+  const [conversationError, setConversationError] = React.useState<string | null>(null);
+  return (
     <ThemeProvider theme={nvidiaTheme}>
       <CopilotDrawer
         warehouseId="DC-47"
         scenarioName="labor-constraint-wave-risk"
         onClose={jest.fn()}
-        {...props}
+        conversationId={conversationId}
+        setConversationId={setConversationId}
+        turns={turns}
+        setTurns={setTurns}
+        conversationError={conversationError}
+        setConversationError={setConversationError}
+        {...drawerProps}
       />
     </ThemeProvider>
   );
+}
+
+function renderDrawer(props: Partial<React.ComponentProps<typeof CopilotDrawer>> = {}) {
+  return render(<ConvWrapper drawerProps={props} />);
 }
 
 const mockCopilotAsk = demoAPI.copilotAsk as jest.Mock;
