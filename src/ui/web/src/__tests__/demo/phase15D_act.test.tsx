@@ -98,17 +98,39 @@ function renderActAnswer(turn: CopilotTurnResponse) {
   );
 }
 
-function renderDrawer(props: Partial<React.ComponentProps<typeof CopilotDrawer>> = {}) {
-  return render(
+function ConvWrapper({ drawerProps }: { drawerProps: Partial<React.ComponentProps<typeof CopilotDrawer>> }) {
+  const [conversationId, setConversationId] = React.useState<string | null>(null);
+  const [turns, setTurns] = React.useState<any[]>([]);
+  const [conversationError, setConversationError] = React.useState<string | null>(null);
+  return (
     <ThemeProvider theme={nvidiaTheme}>
       <CopilotDrawer
         warehouseId="DC-47"
         scenarioName="labor-constraint-wave-risk"
         onClose={jest.fn()}
-        {...props}
+        conversationId={conversationId}
+        setConversationId={setConversationId}
+        turns={turns}
+        setTurns={setTurns}
+        conversationError={conversationError}
+        setConversationError={setConversationError}
+        {...drawerProps}
       />
     </ThemeProvider>
   );
+}
+
+const DEFAULT_CONV_PROPS = {
+  conversationId: null as string | null,
+  setConversationId: jest.fn(),
+  turns: [] as any[],
+  setTurns: jest.fn(),
+  conversationError: null as string | null,
+  setConversationError: jest.fn(),
+};
+
+function renderDrawer(props: Partial<React.ComponentProps<typeof CopilotDrawer>> = {}) {
+  return render(<ConvWrapper drawerProps={props} />);
 }
 
 // ── 1. CopilotTurnResponse ACT fields type check ──────────────────────────────
@@ -373,6 +395,7 @@ describe('Phase15D: REVIEW APPROVAL navigation', () => {
             scenarioName="test"
             onClose={jest.fn()}
             onReviewApproval={onReviewApproval}
+            {...DEFAULT_CONV_PROPS}
           />
         </ThemeProvider>
       );

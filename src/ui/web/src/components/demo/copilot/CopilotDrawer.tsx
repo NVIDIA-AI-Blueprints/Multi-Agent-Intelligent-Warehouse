@@ -13,10 +13,11 @@
  *   - skills_used is always [] for ASK/ANALYZE — not shown
  */
 
-import React, { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react';
+import React, { useState, useRef, useEffect, useCallback, KeyboardEvent, Dispatch, SetStateAction } from 'react';
 import { Box, Typography } from '@mui/material';
 import { demoAPI, CopilotTurnResponse, CopilotRecommendation } from '../../../services/demoAPI';
 import TerminalTypewriter from './TerminalTypewriter';
+import { TurnEntry, CopilotSystemCard } from '../../../hooks/useCopilotConversation';
 
 // ── Color constants (MAIW dark terminal aesthetic) ─────────────────────────────
 
@@ -95,6 +96,13 @@ interface CopilotDrawerProps {
   scenarioName: string;
   onClose: () => void;
   onReviewApproval?: (pendingApprovalId: string) => void;
+  // Lifted conversation state — owned by DemoShell so it survives drawer remount
+  conversationId: string | null;
+  setConversationId: (id: string | null) => void;
+  turns: TurnEntry[];
+  setTurns: Dispatch<SetStateAction<TurnEntry[]>>;
+  conversationError: string | null;
+  setConversationError: (e: string | null) => void;
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
@@ -883,25 +891,24 @@ function CopilotAnswer({ turn, isLatest }: CopilotAnswerProps & { isLatest?: boo
 // Export for direct testing of the rendering logic
 export { CopilotAnswer, CopilotActAnswer, CopilotObserveAnswer };
 
-// ── Turn entry in conversation thread ─────────────────────────────────────────
-
-interface TurnEntry {
-  id: string;
-  question: string;
-  response: CopilotTurnResponse | null;
-  error: string | null;
-}
-
 // ── CopilotDrawer ─────────────────────────────────────────────────────────────
 
-export default function CopilotDrawer({ warehouseId, scenarioName, onClose, onReviewApproval }: CopilotDrawerProps) {
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const [turns, setTurns] = useState<TurnEntry[]>([]);
+export default function CopilotDrawer({
+  warehouseId,
+  scenarioName,
+  onClose,
+  onReviewApproval,
+  conversationId,
+  setConversationId,
+  turns,
+  setTurns,
+  conversationError,
+  setConversationError,
+}: CopilotDrawerProps) {
   const [inputMessage, setInputMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingStageIdx, setLoadingStageIdx] = useState(0);
   const [pendingIntent, setPendingIntent] = useState<'ask' | 'analyze' | 'act' | 'observe'>('ask');
-  const [error, setError] = useState<string | null>(null);
 
   const threadRef = useRef<HTMLDivElement>(null);
   const stageTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -950,7 +957,7 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose, onRe
 
     const turnId = `turn-${Date.now()}`;
     setInputMessage('');
-    setError(null);
+    setConversationError(null);
     setLoading(true);
 
     setTurns(prev => [...prev, { id: turnId, question: text, response: null, error: null }]);
@@ -973,7 +980,7 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose, onRe
       setTurns(prev => prev.map(t =>
         t.id === turnId ? { ...t, error: String(errMsg) } : t
       ));
-      setError(String(errMsg));
+      setConversationError(String(errMsg));
     } finally {
       setLoading(false);
     }
@@ -986,15 +993,20 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose, onRe
     }
   }, [handleSend]);
 
-  // Determine if last completed turn was ASK / ANALYZE / ACT (for suggested prompts)
+  // Determine if last completed turn was ASK / ANALYZE / ACT (for suggested prompts).
+  // Look through the last few turns so system cards don't suppress ACT suggestions.
   const lastResponse = turns.length > 0 ? turns[turns.length - 1].response : null;
+  const lastActResponse = [...turns].reverse().find(t => t.response?.intent === 'act')?.response ?? null;
   const showAskSuggest     = !loading && lastResponse?.intent === 'ask' &&
     lastResponse?.answerability === 'answerable';
   const showAnalyzeSuggest = !loading && lastResponse?.intent === 'analyze' &&
     (lastResponse?.recommendations?.length ?? 0) > 0;
-  const showActSuggest     = !loading && lastResponse?.intent === 'act' &&
-    lastResponse?.act_decision_outcome === 'REQUIRES_HUMAN_APPROVAL' &&
-    !!lastResponse?.act_pending_approval_id;
+  // Show "Did it work?" after ACT with pending approval — survives system card injection
+  const showActSuggest     = !loading && !!lastActResponse &&
+    lastActResponse.act_decision_outcome === 'REQUIRES_HUMAN_APPROVAL' &&
+    !!lastActResponse.act_pending_approval_id &&
+    // Suppress once OBSERVE_OUTCOME has been answered in this conversation
+    !turns.some(t => t.response?.intent === 'observe_outcome');
 
   return (
     <Box
@@ -1089,6 +1101,49 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose, onRe
         {/* Turns */}
         {turns.map((turn, idx) => {
           const isLatest = idx === turns.length - 1;
+
+          // System card — governance boundary notification (injected by RETURN TO COPILOT)
+          if (turn.systemCard) {
+            const card = turn.systemCard;
+            const approved = card.decision === 'APPROVED';
+            return (
+              <Box
+                key={turn.id}
+                data-testid="copilot-system-card"
+                sx={{
+                  background: approved ? '#0D1B0D' : '#1A1200',
+                  border: `1px solid ${approved ? '#3FB95044' : '#D2992244'}`,
+                  borderRadius: '5px',
+                  px: '10px', py: '8px',
+                  display: 'flex', flexDirection: 'column', gap: '4px',
+                }}
+              >
+                <Typography sx={{
+                  fontFamily: 'monospace', fontSize: '0.52rem', fontWeight: 700,
+                  color: '#484F58', letterSpacing: '0.14em', textTransform: 'uppercase',
+                }}>
+                  GOVERNED ACTION RESOLVED
+                </Typography>
+                <Box sx={{ display: 'flex', gap: '12px', flexWrap: 'wrap', mt: '2px' }}>
+                  <Box sx={{ display: 'flex', gap: '4px' }}>
+                    <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>Decision</Typography>
+                    <Typography sx={{
+                      fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
+                      color: approved ? '#3FB950' : '#D29922',
+                    }}>{card.decision}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', gap: '4px' }}>
+                    <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>Execution</Typography>
+                    <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#8B949E' }}>{card.execution}</Typography>
+                  </Box>
+                </Box>
+                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: '#8B949E', mt: '2px' }}>
+                  {card.action}
+                </Typography>
+              </Box>
+            );
+          }
+
           return (
           <Box key={turn.id} sx={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {/* User bubble */}
@@ -1223,11 +1278,11 @@ export default function CopilotDrawer({ warehouseId, scenarioName, onClose, onRe
         )}
 
         {/* Global error */}
-        {error && turns.length === 0 && (
+        {conversationError && turns.length === 0 && (
           <Typography sx={{
             fontFamily: 'monospace', fontSize: '0.7rem', color: '#F85149',
           }}>
-            ✗ {error}
+            ✗ {conversationError}
           </Typography>
         )}
       </Box>

@@ -106,6 +106,7 @@ interface ApprovalCardProps {
   onApprove: (pending_id: string) => void;
   onReject: (pending_id: string) => void;
   highlighted?: boolean;
+  onReturnToCopilot?: (card: { decision: string; execution: string; action: string }) => void;
 }
 
 function ApprovalCard({
@@ -117,6 +118,7 @@ function ApprovalCard({
   onApprove,
   onReject,
   highlighted,
+  onReturnToCopilot,
 }: ApprovalCardProps) {
   const { pending_id, capability, target, domain, risk_level, objective, rationale, proposal_id, decision_id, priority, queued_at } = approval;
 
@@ -246,6 +248,33 @@ function ApprovalCard({
                 Rail advances to EXECUTE when SSE confirms.
               </MonoText>
             )}
+            {onReturnToCopilot && (
+              <Box
+                component="button"
+                data-testid="return-to-copilot-button"
+                onClick={() => onReturnToCopilot({
+                  decision: result.outcome === 'approved' ? 'APPROVED' : 'REJECTED',
+                  execution: result.message,
+                  action: capability,
+                })}
+                sx={{
+                  mt: 1.5,
+                  display: 'inline-flex', alignItems: 'center', gap: 0.75,
+                  background: 'transparent',
+                  border: '1px solid #1F6FEB44',
+                  borderRadius: '4px',
+                  px: '10px', py: '5px',
+                  fontFamily: 'monospace', fontSize: '0.62rem', fontWeight: 600,
+                  color: '#58A6FF',
+                  cursor: 'pointer',
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                  '&:hover': { background: '#0d2146', borderColor: '#1F6FEB' },
+                }}
+              >
+                ← Return to Copilot
+              </Box>
+            )}
           </Box>
         ) : (
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', pt: 0.5 }}>
@@ -344,6 +373,7 @@ export default function ApproveStage({
   analysisResult,
   onOpenExplanation,
   selectedApprovalId,
+  onReturnToCopilot,
 }: StageContentPaneProps) {
   const queryClient = useQueryClient();
 
@@ -446,6 +476,7 @@ export default function ApproveStage({
             onApprove={handleApprove}
             onReject={handleReject}
             highlighted={selectedApprovalId === approval.pending_id}
+            onReturnToCopilot={onReturnToCopilot}
           />
         </StageSection>
       ))}

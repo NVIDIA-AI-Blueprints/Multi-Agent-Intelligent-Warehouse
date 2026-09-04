@@ -203,6 +203,7 @@ function renderShell(demoStatusValue: DemoStatus | null, isLoading = false) {
 }
 
 function stageProps(overrides: Partial<{
+  currentStage: import('../../hooks/useDemoLifecycle').RailStage;
   demoStatus: DemoStatus;
   pendingApprovals: PendingApproval[];
   sseEvents: SSEEvent[];

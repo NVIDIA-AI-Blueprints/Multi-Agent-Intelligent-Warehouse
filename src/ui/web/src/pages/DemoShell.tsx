@@ -13,6 +13,7 @@ import StageContentPane from '../components/demo/StageContentPane';
 import ReliabilityPanel from '../components/demo/reliability/ReliabilityPanel';
 import ExpertOverlay from '../components/demo/ExpertOverlay';
 import CopilotDrawer from '../components/demo/copilot/CopilotDrawer';
+import { useCopilotConversation, CopilotSystemCard } from '../hooks/useCopilotConversation';
 
 const WAREHOUSE_ID = process.env.REACT_APP_WAREHOUSE_ID || 'DC-47';
 
@@ -351,6 +352,7 @@ export default function DemoShell() {
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [selectedStage, setSelectedStage] = useState<RailStage | null>(null);
   const [selectedApprovalId, setSelectedApprovalId] = useState<string | null>(null);
+  const conversation = useCopilotConversation();
   const queryClient = useQueryClient();
 
   const { status: demoStatus, isLoading: demoLoading } = useDemoStatus();
@@ -383,6 +385,11 @@ export default function DemoShell() {
     setSelectedApprovalId(pendingApprovalId);
   }, []);
 
+  const handleReturnToCopilot = useCallback((card: CopilotSystemCard) => {
+    conversation.addSystemCard(card);
+    setCopilotOpen(true);
+  }, [conversation]);
+
   // System health indicators
   const sysStatus = runtime?.maiw_operational_status ?? 'UNKNOWN';
   const systemColor =
@@ -403,8 +410,9 @@ export default function DemoShell() {
     sseState.clear();
     setSelectedStage(null);
     setSelectedApprovalId(null);
+    conversation.reset();
     await queryClient.invalidateQueries({ queryKey: ['demo-status'] });
-  }, [queryClient, sseState]);
+  }, [queryClient, sseState, conversation]);
 
   const handleReset = useCallback(async () => {
     setShowSelector(true);       // show selector immediately
@@ -413,9 +421,10 @@ export default function DemoShell() {
     setAnalyzing(false);
     setSelectedStage(null);
     setSelectedApprovalId(null);
+    conversation.reset();
     await demoAPI.resetScenario();
     await queryClient.invalidateQueries({ queryKey: ['demo-status'] });
-  }, [queryClient, sseState]);
+  }, [queryClient, sseState, conversation]);
 
   const handleAnalyze = useCallback(async () => {
     if (analyzing) return;
@@ -558,6 +567,7 @@ export default function DemoShell() {
               onReset={handleReset}
               onViewFullTrace={handleViewFullTrace}
               selectedApprovalId={selectedApprovalId}
+              onReturnToCopilot={handleReturnToCopilot}
             />
           </>
         )}
@@ -643,6 +653,12 @@ export default function DemoShell() {
           scenarioName={demoStatus?.scenario?.name ?? ''}
           onClose={() => setCopilotOpen(false)}
           onReviewApproval={handleReviewApproval}
+          conversationId={conversation.conversationId}
+          setConversationId={conversation.setConversationId}
+          turns={conversation.turns}
+          setTurns={conversation.setTurns}
+          conversationError={conversation.conversationError}
+          setConversationError={conversation.setConversationError}
         />
       )}
     </Box>
