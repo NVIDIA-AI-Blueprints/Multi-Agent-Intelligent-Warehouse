@@ -8,7 +8,7 @@ import logging
 from typing import Any, Optional
 
 from maiw_decision.models import DecisionResult
-from maiw_mcp.contracts.actions import ActionProposal
+from maiw_decision.proposal import ActionProposal
 
 from .base import ActionConflict, ActionUnsupported, BaseActionExecutor
 from .outcome import ExecutionOutcome

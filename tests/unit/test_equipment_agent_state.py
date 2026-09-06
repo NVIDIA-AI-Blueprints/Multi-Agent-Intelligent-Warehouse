@@ -30,7 +30,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from maiw_decision import DecisionEngine, DecisionOutcome
-from maiw_mcp.contracts.actions import ActionProposal, RiskLevel
+from maiw_decision.proposal import ActionProposal, RiskLevel
 from maiw_mcp.contracts.equipment import EquipmentAssetInfo, EquipmentStatusResult
 from maiw_state import (
     EquipmentAssetSummary,

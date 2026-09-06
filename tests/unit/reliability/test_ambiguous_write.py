@@ -32,7 +32,7 @@ from maiw_execution import (
     LaborActionExecutor,
 )
 from maiw_execution.outcome import AmbiguousWriteError
-from maiw_mcp.contracts.actions import ActionProposal
+from maiw_decision.proposal import ActionProposal
 from maiw_mcp.contracts.labor import LaborAllocateResult
 from maiw_mcp.errors import BackendUnavailable
 

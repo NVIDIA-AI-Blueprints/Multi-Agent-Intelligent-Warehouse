@@ -493,7 +493,7 @@ class TestWarehouseStateProviderDeadline:
 
 
 def _make_proposal(action: str = "test.action") -> "ActionProposal":
-    from maiw_mcp.contracts.actions import ActionProposal, RiskLevel
+    from maiw_decision.proposal import ActionProposal, RiskLevel
 
     return ActionProposal(
         action=action,

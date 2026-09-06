@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from maiw_mcp.contracts.actions import ActionProposal, RiskLevel
+from maiw_decision.proposal import ActionProposal, RiskLevel
 from maiw_mcp.contracts.labor import (
     LABOR_ALLOCATE_METADATA,
     LABOR_GET_ALLOCATION_METADATA,

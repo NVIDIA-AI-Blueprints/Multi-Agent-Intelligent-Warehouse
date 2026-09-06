@@ -242,7 +242,7 @@ class MockEquipmentProvider:
     async def propose_equipment_assignment(
         self, request: EquipmentAssignmentRequest
     ) -> EquipmentAssignmentResult:
-        from maiw_mcp.contracts.actions import ActionProposal
+        from maiw_decision.proposal import ActionProposal
         proposal = ActionProposal.for_equipment_assign(
             asset_id=request.asset_id,
             assignee=request.assignee,

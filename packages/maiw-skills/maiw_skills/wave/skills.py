@@ -25,7 +25,7 @@ import logging
 import os
 
 from maiw_mcp.client.client import MAIWMCPClient
-from maiw_mcp.contracts.actions import ActionProposal
+from maiw_decision.proposal import ActionProposal
 from maiw_mcp.contracts.wave import (
     WAVE_GET_METADATA,
     WAVE_GET_RISK_METADATA,

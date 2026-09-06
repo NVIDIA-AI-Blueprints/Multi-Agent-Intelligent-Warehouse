@@ -34,7 +34,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
-from maiw_mcp.contracts.actions import ActionProposal
+from maiw_decision.proposal import ActionProposal
 from maiw_state.warehouse import WarehouseStateSnapshot
 
 

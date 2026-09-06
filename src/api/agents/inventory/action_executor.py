@@ -39,7 +39,7 @@ from typing import Any, Optional, Protocol, runtime_checkable
 from pydantic import BaseModel, Field
 
 from maiw_decision.models import DecisionOutcome, DecisionResult
-from maiw_mcp.contracts.actions import ActionProposal
+from maiw_decision.proposal import ActionProposal
 
 logger = logging.getLogger(__name__)
 

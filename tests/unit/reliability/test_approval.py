@@ -45,7 +45,7 @@ from maiw_decision.models import (
     DecisionResult,
 )
 from maiw_decision.engine import DecisionEngine
-from maiw_mcp.contracts.actions import ActionProposal
+from maiw_decision.proposal import ActionProposal
 from maiw_state.warehouse import WarehouseStateSnapshot
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────

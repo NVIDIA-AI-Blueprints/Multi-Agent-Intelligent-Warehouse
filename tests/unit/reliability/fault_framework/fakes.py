@@ -95,7 +95,7 @@ def make_test_proposal(
     domain: str = "test",
 ) -> Any:
     """Build a minimal ActionProposal stub for executor tests."""
-    from maiw_mcp.contracts.actions import ActionProposal, RiskLevel
+    from maiw_decision.proposal import ActionProposal, RiskLevel
 
     return ActionProposal(
         proposal_id=proposal_id or str(uuid.uuid4()),

@@ -822,7 +822,7 @@ async def _build_proposal(rec: Any, trace_id: str, runtime: Any) -> Any:
         return await skill.execute(req, trace_id=trace_id)
 
     if cap == "warehouse.equipment.release":
-        from maiw_mcp.contracts.actions import ActionProposal
+        from maiw_decision.proposal import ActionProposal
 
         return ActionProposal.for_equipment_release(
             asset_id=rec.target,
@@ -833,7 +833,7 @@ async def _build_proposal(rec: Any, trace_id: str, runtime: Any) -> Any:
         )
 
     if cap == "warehouse.equipment.schedule_maintenance":
-        from maiw_mcp.contracts.actions import ActionProposal
+        from maiw_decision.proposal import ActionProposal
 
         return ActionProposal.for_schedule_maintenance(
             asset_id=rec.target,
@@ -920,7 +920,7 @@ async def approve_proposal(request: ApproveRequest):
     """
     from maiw_decision.models import DecisionOutcome, DecisionRequest
     from maiw_decision.approval import ApprovalAlreadyDecided, ApprovalExpired, ApprovalNotFound
-    from maiw_mcp.contracts.actions import ActionProposal
+    from maiw_decision.proposal import ActionProposal
     from maiw_api.demo.events import ScenarioEvent
 
     ctrl = _get_controller()

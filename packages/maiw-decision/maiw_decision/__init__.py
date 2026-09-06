@@ -5,6 +5,8 @@ maiw-decision — deterministic rule-based evaluation of ActionProposals.
 
 Public surface
 --------------
+    ActionProposal          Typed warehouse write proposal (moved from maiw-mcp)
+    RiskLevel               Risk classification enum (moved from maiw-mcp)
     DecisionEngine          Pure in-memory rule evaluator
     DecisionRequest         Input: ActionProposal + WarehouseStateSnapshot
     DecisionResult          Output: outcome + violations
@@ -30,8 +32,10 @@ from .models import (
     DecisionRequest,
     DecisionResult,
 )
+from .proposal import ActionProposal, RiskLevel
 
 __all__ = [
+    "ActionProposal",
     "ApprovalRecord",
     "ApprovalState",
     "ApprovalStore",
@@ -43,4 +47,5 @@ __all__ = [
     "DecisionRequest",
     "DecisionResult",
     "InMemoryApprovalStore",
+    "RiskLevel",
 ]
