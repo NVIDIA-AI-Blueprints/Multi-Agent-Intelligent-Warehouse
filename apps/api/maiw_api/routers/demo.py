@@ -1260,7 +1260,7 @@ def _build_reconciliation_strategy(domain: str, runtime: Any) -> Any:
     if domain == "labor" and runtime.mcp_client is not None:
         try:
             from maiw_skills.labor.skills import LaborAllocationSkill
-            from maiw_mcp.contracts.labor import LaborAllocationRequest
+            from maiw_contracts.labor import LaborAllocationRequest
         except ImportError:
             return None
 
@@ -1295,7 +1295,7 @@ def _build_reconciliation_strategy(domain: str, runtime: Any) -> Any:
     if domain == "equipment" and runtime.mcp_client is not None:
         try:
             from maiw_skills.equipment.skills import EquipmentStatusSkill
-            from maiw_mcp.contracts.equipment import EquipmentStatusRequest
+            from maiw_contracts.equipment import EquipmentStatusRequest
         except ImportError:
             return None
 
@@ -1335,7 +1335,7 @@ def _build_reconciliation_strategy(domain: str, runtime: Any) -> Any:
     if domain == "wave" and runtime.mcp_client is not None:
         try:
             from maiw_skills.wave.skills import WaveGetSkill
-            from maiw_mcp.contracts.wave import WaveGetRequest
+            from maiw_contracts.wave import WaveGetRequest
         except ImportError:
             return None
 

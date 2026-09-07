@@ -42,7 +42,7 @@ from maiw_execution import (
 from maiw_execution.base import NoOpActionExecutor
 from maiw_execution.outcome import AmbiguousWriteError
 from maiw_decision.proposal import ActionProposal
-from maiw_mcp.contracts.labor import LaborAllocateResult
+from maiw_contracts.labor import LaborAllocateResult
 from maiw_mcp.errors import BackendUnavailable
 
 import uuid
@@ -226,7 +226,7 @@ class TestTraceIdOnAllPaths:
 
     def test_trace_id_on_no_op_path(self):
         """Provider returns no_op outcome; trace_id still present."""
-        from maiw_mcp.contracts.labor import LaborAllocateResult
+        from maiw_contracts.labor import LaborAllocateResult
 
         skill = MagicMock()
         skill.execute = AsyncMock(
@@ -331,38 +331,38 @@ class TestMCPTraceBoundary:
 
     def test_execution_id_present_in_labor_write_request_contract(self):
         """execution_id field exists on the write-request contract → crosses MCP."""
-        from maiw_mcp.contracts.labor import LaborAllocateRequest
+        from maiw_contracts.labor import LaborAllocateRequest
 
         fields = LaborAllocateRequest.model_fields
         assert "execution_id" in fields
 
     def test_trace_id_absent_from_labor_write_request_contract(self):
         """trace_id field is NOT on the write-request contract → stops at executor."""
-        from maiw_mcp.contracts.labor import LaborAllocateRequest
+        from maiw_contracts.labor import LaborAllocateRequest
 
         fields = LaborAllocateRequest.model_fields
         assert "trace_id" not in fields
 
     def test_execution_id_present_in_wave_write_request_contract(self):
-        from maiw_mcp.contracts.wave import WaveReprioritizeRequest
+        from maiw_contracts.wave import WaveReprioritizeRequest
 
         fields = WaveReprioritizeRequest.model_fields
         assert "execution_id" in fields
 
     def test_trace_id_absent_from_wave_write_request_contract(self):
-        from maiw_mcp.contracts.wave import WaveReprioritizeRequest
+        from maiw_contracts.wave import WaveReprioritizeRequest
 
         fields = WaveReprioritizeRequest.model_fields
         assert "trace_id" not in fields
 
     def test_execution_id_present_in_equipment_assign_request_contract(self):
-        from maiw_mcp.contracts.equipment import EquipmentExecuteAssignRequest
+        from maiw_contracts.equipment import EquipmentExecuteAssignRequest
 
         fields = EquipmentExecuteAssignRequest.model_fields
         assert "execution_id" in fields
 
     def test_trace_id_absent_from_equipment_assign_request_contract(self):
-        from maiw_mcp.contracts.equipment import EquipmentExecuteAssignRequest
+        from maiw_contracts.equipment import EquipmentExecuteAssignRequest
 
         fields = EquipmentExecuteAssignRequest.model_fields
         assert "trace_id" not in fields
@@ -376,7 +376,7 @@ class TestMCPTraceBoundary:
 
         async def capturing_skill(req):
             captured_requests.append(req)
-            from maiw_mcp.contracts.labor import LaborAllocateResult
+            from maiw_contracts.labor import LaborAllocateResult
 
             return LaborAllocateResult(
                 success=True,

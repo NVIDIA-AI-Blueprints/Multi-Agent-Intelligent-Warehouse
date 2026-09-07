@@ -36,7 +36,7 @@ from typing import Any
 
 from mcp.server import MCPServer
 
-from maiw_mcp.contracts.labor import (
+from maiw_contracts.labor import (
     LABOR_ALLOCATE_METADATA,
     LABOR_GET_ALLOCATION_METADATA,
     LABOR_GET_CAPACITY_METADATA,

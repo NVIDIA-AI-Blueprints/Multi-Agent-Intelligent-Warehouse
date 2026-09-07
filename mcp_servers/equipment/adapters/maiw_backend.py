@@ -45,7 +45,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from maiw_mcp.contracts.equipment import (
+from maiw_contracts.equipment import (
     ActionProposal,
     AvailableMetric,
     EquipmentAssetInfo,

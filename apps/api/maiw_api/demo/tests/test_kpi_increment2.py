@@ -255,7 +255,7 @@ def test_no_execution_no_recovery():
 async def test_labor_allocate_sets_started_at_sim_seconds():
     from maiw_api.demo.controller import DemoScenarioController
     from maiw_api.demo.providers.labor import SimulationLaborProvider
-    from maiw_mcp.contracts.labor import LaborAllocateRequest
+    from maiw_contracts.labor import LaborAllocateRequest
 
     ctrl = DemoScenarioController()
     await ctrl.start("labor_constraint_wave_risk")

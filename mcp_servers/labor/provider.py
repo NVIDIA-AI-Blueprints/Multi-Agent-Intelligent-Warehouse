@@ -19,7 +19,7 @@ from __future__ import annotations
 import uuid
 from typing import Protocol, runtime_checkable
 
-from maiw_mcp.contracts.labor import (
+from maiw_contracts.labor import (
     LaborAllocateRequest,
     LaborAllocateResult,
     LaborAllocationRequest,

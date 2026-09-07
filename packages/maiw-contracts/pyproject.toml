@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "maiw-contracts"
+version = "0.1.0"
+description = "MCP-independent warehouse domain capability contracts for MAIW"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.0.0",
+    "maiw-decision>=0.1.0",
+]
+# Note: maiw-decision is required only for ActionProposal in EquipmentAssignmentResult.
+# Future work: replace EquipmentAssignmentResult.proposal: ActionProposal with
+# proposal_id: str to make maiw-contracts fully governance-independent.
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["maiw_contracts*"]

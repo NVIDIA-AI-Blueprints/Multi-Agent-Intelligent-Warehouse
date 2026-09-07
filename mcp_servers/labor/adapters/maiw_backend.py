@@ -21,7 +21,7 @@ import logging
 import uuid
 from typing import Any
 
-from maiw_mcp.contracts.labor import (
+from maiw_contracts.labor import (
     LaborAllocateRequest,
     LaborAllocateResult,
     LaborAllocationRequest,

@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from maiw_decision.proposal import ActionProposal, RiskLevel
-from maiw_mcp.contracts.wave import (
+from maiw_contracts.wave import (
     WAVE_GET_METADATA,
     WAVE_GET_RISK_METADATA,
     WAVE_REPRIORITIZE_METADATA,

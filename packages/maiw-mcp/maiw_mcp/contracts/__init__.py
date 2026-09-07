@@ -1,52 +1,10 @@
-from .actions import ActionProposal, RiskLevel
-from .common import CapabilityMetadata
-from .equipment import (
-    EquipmentAssignmentRequest,
-    EquipmentAssignmentResult,
-    EquipmentAssetInfo,
-    EquipmentStatusRequest,
-    EquipmentStatusResult,
-    EquipmentTelemetryRequest,
-    EquipmentTelemetryResult,
-    TelemetryPoint,
-    AvailableMetric,
-    EQUIPMENT_GET_STATUS_METADATA,
-    EQUIPMENT_GET_TELEMETRY_METADATA,
-    EQUIPMENT_ASSIGN_METADATA,
-)
-from .inventory import (
-    InventoryLookupRequest,
-    InventoryLocateRequest,
-    InventoryLocation,
-    InventoryLookupResult,
-    INVENTORY_GET_METADATA,
-    INVENTORY_LOCATE_METADATA,
-)
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+"""
+Warehouse domain contracts have moved to maiw-contracts (Phase 16 — WS1).
+ActionProposal and RiskLevel have moved to maiw-decision (Phase 16 — WS1).
 
-__all__ = [
-    # actions
-    "ActionProposal",
-    "RiskLevel",
-    # common
-    "CapabilityMetadata",
-    # equipment
-    "EquipmentAssignmentRequest",
-    "EquipmentAssignmentResult",
-    "EquipmentAssetInfo",
-    "EquipmentStatusRequest",
-    "EquipmentStatusResult",
-    "EquipmentTelemetryRequest",
-    "EquipmentTelemetryResult",
-    "TelemetryPoint",
-    "AvailableMetric",
-    "EQUIPMENT_GET_STATUS_METADATA",
-    "EQUIPMENT_GET_TELEMETRY_METADATA",
-    "EQUIPMENT_ASSIGN_METADATA",
-    # inventory
-    "InventoryLookupRequest",
-    "InventoryLocateRequest",
-    "InventoryLocation",
-    "InventoryLookupResult",
-    "INVENTORY_GET_METADATA",
-    "INVENTORY_LOCATE_METADATA",
-]
+Import from the canonical locations:
+    from maiw_contracts import EquipmentStatusResult, LaborCapacityResult, ...
+    from maiw_decision.proposal import ActionProposal, RiskLevel
+"""

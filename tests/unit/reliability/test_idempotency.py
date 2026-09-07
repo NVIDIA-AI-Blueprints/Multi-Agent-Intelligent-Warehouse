@@ -28,7 +28,7 @@ from maiw_execution import (
     LaborActionExecutor,
 )
 from maiw_decision.proposal import ActionProposal, RiskLevel
-from maiw_mcp.contracts.labor import LaborAllocateResult
+from maiw_contracts.labor import LaborAllocateResult
 
 
 def _approved_decision(proposal_id: str) -> DecisionResult:

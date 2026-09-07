@@ -336,7 +336,7 @@ class EquipmentActionExecutor:
     ) -> dict[str, Any]:
         if self._assign_skill is None:
             raise ActionUnsupported("No assign_skill configured on EquipmentActionExecutor")
-        from maiw_mcp.contracts.equipment import EquipmentExecuteAssignRequest
+        from maiw_contracts.equipment import EquipmentExecuteAssignRequest
         req = EquipmentExecuteAssignRequest(
             asset_id=proposal.parameters["asset_id"],
             assignee=proposal.parameters["assignee"],
@@ -355,7 +355,7 @@ class EquipmentActionExecutor:
     ) -> dict[str, Any]:
         if self._release_skill is None:
             raise ActionUnsupported("No release_skill configured on EquipmentActionExecutor")
-        from maiw_mcp.contracts.equipment import EquipmentExecuteReleaseRequest
+        from maiw_contracts.equipment import EquipmentExecuteReleaseRequest
         req = EquipmentExecuteReleaseRequest(
             asset_id=proposal.parameters["asset_id"],
             released_by=proposal.parameters.get("released_by", "unknown"),
@@ -371,7 +371,7 @@ class EquipmentActionExecutor:
     ) -> dict[str, Any]:
         if self._maintenance_skill is None:
             raise ActionUnsupported("No maintenance_skill configured on EquipmentActionExecutor")
-        from maiw_mcp.contracts.equipment import EquipmentExecuteMaintenanceRequest
+        from maiw_contracts.equipment import EquipmentExecuteMaintenanceRequest
         req = EquipmentExecuteMaintenanceRequest(
             asset_id=proposal.parameters["asset_id"],
             maintenance_type=proposal.parameters.get("maintenance_type", "preventive"),

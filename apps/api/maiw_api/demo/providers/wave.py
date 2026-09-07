@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from maiw_mcp.contracts.wave import (
+from maiw_contracts.wave import (
     WaveGetRequest,
     WaveGetResult,
     WaveReprioritizeRequest,

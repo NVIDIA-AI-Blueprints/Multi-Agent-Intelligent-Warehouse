@@ -24,7 +24,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Protocol, runtime_checkable
 
-from maiw_mcp.contracts.equipment import (
+from maiw_contracts.equipment import (
     AvailableMetric,
     EquipmentAssetInfo,
     EquipmentAssignmentRequest,

@@ -137,7 +137,7 @@ class WaveActionExecutor:
     async def _do_reprioritize(
         self, proposal: ActionProposal, decision: DecisionResult
     ) -> dict:
-        from maiw_mcp.contracts.wave import WaveReprioritizeRequest
+        from maiw_contracts.wave import WaveReprioritizeRequest
 
         params = proposal.parameters
         req = WaveReprioritizeRequest(

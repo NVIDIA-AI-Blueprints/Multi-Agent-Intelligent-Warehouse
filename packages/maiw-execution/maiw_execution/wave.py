@@ -72,7 +72,7 @@ class WaveActionExecutor(BaseActionExecutor):
         decision: DecisionResult,
         execution_id: str,
     ) -> tuple[dict[str, Any], str | None, ExecutionOutcome]:
-        from maiw_mcp.contracts.wave import WaveReprioritizeRequest
+        from maiw_contracts.wave import WaveReprioritizeRequest
 
         params = proposal.parameters
         req = WaveReprioritizeRequest(

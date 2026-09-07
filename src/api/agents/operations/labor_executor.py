@@ -137,7 +137,7 @@ class LaborActionExecutor:
     async def _do_allocate(
         self, proposal: ActionProposal, decision: DecisionResult
     ) -> dict:
-        from maiw_mcp.contracts.labor import LaborAllocateRequest
+        from maiw_contracts.labor import LaborAllocateRequest
 
         params = proposal.parameters
         req = LaborAllocateRequest(

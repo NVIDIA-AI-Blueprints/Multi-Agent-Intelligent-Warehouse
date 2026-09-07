@@ -26,7 +26,7 @@ import os
 
 from maiw_mcp.client.client import MAIWMCPClient
 from maiw_decision.proposal import ActionProposal
-from maiw_mcp.contracts.labor import (
+from maiw_contracts.labor import (
     LABOR_ALLOCATE_METADATA,
     LABOR_GET_ALLOCATION_METADATA,
     LABOR_GET_CAPACITY_METADATA,

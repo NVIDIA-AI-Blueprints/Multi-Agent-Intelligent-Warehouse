@@ -115,7 +115,7 @@ def _make_equip_world(
 
 
 def _labor_req(**kwargs):
-    from maiw_mcp.contracts.labor import LaborAllocateRequest
+    from maiw_contracts.labor import LaborAllocateRequest
 
     defaults = dict(
         warehouse_id="default",
@@ -130,7 +130,7 @@ def _labor_req(**kwargs):
 
 
 def _wave_req(**kwargs):
-    from maiw_mcp.contracts.wave import WaveReprioritizeRequest
+    from maiw_contracts.wave import WaveReprioritizeRequest
 
     defaults = dict(
         warehouse_id="default",
@@ -144,7 +144,7 @@ def _wave_req(**kwargs):
 
 
 def _assign_req(**kwargs):
-    from maiw_mcp.contracts.equipment import EquipmentExecuteAssignRequest
+    from maiw_contracts.equipment import EquipmentExecuteAssignRequest
 
     defaults = dict(
         warehouse_id="default",
@@ -159,7 +159,7 @@ def _assign_req(**kwargs):
 
 
 def _release_req(**kwargs):
-    from maiw_mcp.contracts.equipment import EquipmentExecuteReleaseRequest
+    from maiw_contracts.equipment import EquipmentExecuteReleaseRequest
 
     defaults = dict(
         warehouse_id="default",
@@ -173,7 +173,7 @@ def _release_req(**kwargs):
 
 
 def _maint_req(**kwargs):
-    from maiw_mcp.contracts.equipment import EquipmentExecuteMaintenanceRequest
+    from maiw_contracts.equipment import EquipmentExecuteMaintenanceRequest
 
     defaults = dict(
         asset_id="FA-001",

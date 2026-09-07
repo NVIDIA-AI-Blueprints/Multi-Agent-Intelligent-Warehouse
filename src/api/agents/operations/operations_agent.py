@@ -45,8 +45,8 @@ from src.api.skills.equipment import (
     EquipmentStatusSkill,
     EquipmentTelemetrySkill,
 )
-from maiw_mcp.contracts.inventory import InventoryLookupRequest
-from maiw_mcp.contracts.equipment import EquipmentStatusRequest, EquipmentTelemetryRequest
+from maiw_contracts.inventory import InventoryLookupRequest
+from maiw_contracts.equipment import EquipmentStatusRequest, EquipmentTelemetryRequest
 from maiw_mcp.errors import MAIWMCPError
 from .action_tools import get_operations_action_tools, OperationsActionTools
 

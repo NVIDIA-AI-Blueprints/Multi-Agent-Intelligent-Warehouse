@@ -20,7 +20,7 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from maiw_mcp.contracts.labor import (
+from maiw_contracts.labor import (
     LaborAllocateRequest,
     LaborAllocateResult,
     LaborAllocationRequest,

@@ -38,7 +38,7 @@ import pytest
 from maiw_decision import DecisionEngine
 from maiw_decision.models import DecisionOutcome, DecisionRequest, DecisionResult
 from maiw_decision.proposal import ActionProposal, RiskLevel
-from maiw_mcp.contracts.equipment import EquipmentAssignmentRequest
+from maiw_contracts.equipment import EquipmentAssignmentRequest
 from mcp_servers.equipment.provider import MockEquipmentProvider
 from mcp_servers.equipment.server import mcp_server
 

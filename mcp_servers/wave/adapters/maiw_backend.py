@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from maiw_mcp.contracts.wave import (
+from maiw_contracts.wave import (
     WaveGetRequest,
     WaveGetResult,
     WaveReprioritizeRequest,

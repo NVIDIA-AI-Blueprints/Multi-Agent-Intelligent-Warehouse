@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from maiw_mcp.contracts.inventory import (
+from maiw_contracts.inventory import (
     InventoryLocation,
     InventoryLookupRequest,
     InventoryLookupResult,

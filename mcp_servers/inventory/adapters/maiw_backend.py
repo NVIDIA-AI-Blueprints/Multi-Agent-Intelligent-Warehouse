@@ -25,7 +25,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from maiw_mcp.contracts.inventory import (
+from maiw_contracts.inventory import (
     InventoryLocation,
     InventoryLookupRequest,
     InventoryLookupResult,

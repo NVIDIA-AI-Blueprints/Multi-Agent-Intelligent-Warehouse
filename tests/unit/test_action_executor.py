@@ -17,7 +17,7 @@ import pytest
 
 from maiw_decision.models import DecisionOutcome, DecisionResult
 from maiw_decision.proposal import ActionProposal, RiskLevel
-from maiw_mcp.contracts.equipment import (
+from maiw_contracts.equipment import (
     EquipmentExecuteAssignResult,
     EquipmentExecuteReleaseResult,
     EquipmentExecuteMaintenanceResult,
@@ -262,7 +262,7 @@ class TestStaleDecision:
 
 class TestStateDrift:
     def test_offline_asset_raises_conflict(self):
-        from maiw_mcp.contracts.equipment import (
+        from maiw_contracts.equipment import (
             EquipmentAssetInfo,
             EquipmentStatusResult,
         )

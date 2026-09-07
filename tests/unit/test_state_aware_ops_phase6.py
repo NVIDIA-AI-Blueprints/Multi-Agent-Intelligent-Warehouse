@@ -26,7 +26,7 @@ import pytest
 
 from maiw_decision import DecisionEngine
 from maiw_decision.proposal import ActionProposal, RiskLevel
-from maiw_mcp.contracts.equipment import (
+from maiw_contracts.equipment import (
     EquipmentAssetInfo,
     EquipmentExecuteAssignResult,
     EquipmentExecuteReleaseResult,

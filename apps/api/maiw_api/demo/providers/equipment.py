@@ -28,7 +28,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 
-from maiw_mcp.contracts.equipment import (
+from maiw_contracts.equipment import (
     AvailableMetric,
     EquipmentAssetInfo,
     EquipmentExecuteAssignRequest,

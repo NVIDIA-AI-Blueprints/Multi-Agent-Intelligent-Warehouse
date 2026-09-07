@@ -30,7 +30,7 @@ import os
 
 from maiw_mcp.client.client import MAIWMCPClient
 from maiw_decision.proposal import ActionProposal
-from maiw_mcp.contracts.equipment import (
+from maiw_contracts.equipment import (
     EQUIPMENT_ASSIGN_METADATA,
     EQUIPMENT_GET_STATUS_METADATA,
     EQUIPMENT_GET_TELEMETRY_METADATA,
