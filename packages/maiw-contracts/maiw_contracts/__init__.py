@@ -38,11 +38,6 @@ Public surface
         InventoryLocation
         INVENTORY_*_METADATA constants
 
-Architecture note
------------------
-EquipmentAssignmentResult.proposal carries an ActionProposal (from maiw-decision).
-This is a known coupling that should be resolved in a future workstream by replacing
-the embedded object with proposal_id: str.
 """
 
 from .common import CapabilityMetadata

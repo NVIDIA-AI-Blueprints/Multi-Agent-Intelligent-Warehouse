@@ -45,8 +45,8 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
+from maiw_decision.proposal import ActionProposal
 from maiw_contracts.equipment import (
-    ActionProposal,
     AvailableMetric,
     EquipmentAssetInfo,
     EquipmentAssignmentRequest,
@@ -210,7 +210,7 @@ class MAIWEquipmentAdapter:
             proposal.proposal_id,
         )
 
-        return EquipmentAssignmentResult(proposal=proposal, source="maiw-backend")
+        return EquipmentAssignmentResult(proposal_id=proposal.proposal_id, source="maiw-backend")
 
     async def execute_equipment_assignment(
         self, request: EquipmentExecuteAssignRequest

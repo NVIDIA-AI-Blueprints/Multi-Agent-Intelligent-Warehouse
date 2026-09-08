@@ -253,4 +253,4 @@ class MockEquipmentProvider:
             reason=request.reason,
             requested_by=request.requested_by,
         )
-        return EquipmentAssignmentResult(proposal=proposal, source="mock")
+        return EquipmentAssignmentResult(proposal_id=proposal.proposal_id, source="mock")

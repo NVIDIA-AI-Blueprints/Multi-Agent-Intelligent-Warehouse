@@ -25,7 +25,7 @@ Provides:
 Usage in agents:
     from maiw_mcp.client.client import MAIWMCPClient
     from maiw_mcp.registry.registry import CapabilityRegistry
-    from maiw_mcp.contracts.inventory import InventoryLookupRequest, InventoryLookupResult
+    from maiw_contracts.inventory import InventoryLookupRequest, InventoryLookupResult
 
     registry = CapabilityRegistry.from_env()
     client = MAIWMCPClient(registry)

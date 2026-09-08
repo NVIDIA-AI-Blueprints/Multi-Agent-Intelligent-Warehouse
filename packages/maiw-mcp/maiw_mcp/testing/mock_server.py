@@ -17,7 +17,7 @@ MCP v1 → v2 changes in this module
 Usage in tests
 --------------
     from maiw_mcp.testing.mock_server import MockInventoryServer
-    from maiw_mcp.contracts.inventory import InventoryLookupRequest
+    from maiw_contracts.inventory import InventoryLookupRequest
 
     mock = MockInventoryServer()
 
@@ -39,7 +39,7 @@ from typing import AsyncGenerator, Any
 from mcp.client import Client
 from mcp.server import MCPServer
 
-from maiw_mcp.contracts.inventory import InventoryLookupResult
+from maiw_contracts.inventory import InventoryLookupResult
 from maiw_mcp.testing.fixtures import make_inventory_result
 
 

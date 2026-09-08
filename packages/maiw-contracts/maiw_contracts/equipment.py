@@ -29,7 +29,6 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from maiw_decision.proposal import ActionProposal
 from .common import CapabilityMetadata
 
 # ── Read requests ─────────────────────────────────────────────────────────────
@@ -224,11 +223,11 @@ class EquipmentAssignmentResult(BaseModel):
     """
     Result of a warehouse.equipment.assign capability call.
 
-    The assignment is NOT executed — it returns an ActionProposal for the
-    DecisionEngine (future) or caller to act on.
+    The assignment is NOT executed — returns proposal_id for correlation with
+    the ActionProposal held by the caller (EquipmentAssignmentSkill).
     """
 
-    proposal: ActionProposal
+    proposal_id: str = Field(description="Proposal identifier for DecisionEngine correlation")
     source: str = Field(description="Backend identifier: 'maiw-backend', 'mock', …")
 
 
