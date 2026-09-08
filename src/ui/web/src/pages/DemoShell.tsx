@@ -12,19 +12,21 @@ import OperationalContextStrip from '../components/demo/OperationalContextStrip'
 import StageContentPane from '../components/demo/StageContentPane';
 import ReliabilityPanel from '../components/demo/reliability/ReliabilityPanel';
 import ExpertOverlay from '../components/demo/ExpertOverlay';
+import WorldShell from '../components/world/WorldShell';
 import CopilotDrawer from '../components/demo/copilot/CopilotDrawer';
 import { useCopilotConversation, CopilotSystemCard } from '../hooks/useCopilotConversation';
 
 const WAREHOUSE_ID = process.env.REACT_APP_WAREHOUSE_ID || 'DC-47';
 
-type DemoMode = 'operations' | 'reliability';
+type DemoMode = 'operations' | 'world' | 'reliability';
 
 // ── Chrome sub-components ──────────────────────────────────────────────────────
 
 function ModeSwitcher({ mode, onChange }: { mode: DemoMode; onChange: (m: DemoMode) => void }) {
+  const modes: DemoMode[] = ['operations', 'world', 'reliability'];
   return (
     <Box sx={{ display: 'flex', gap: 0 }} role="group" aria-label="Demo mode">
-      {(['operations', 'reliability'] as DemoMode[]).map((m, i) => (
+      {modes.map((m, i) => (
         <Box
           key={m}
           component="button"
@@ -33,8 +35,8 @@ function ModeSwitcher({ mode, onChange }: { mode: DemoMode; onChange: (m: DemoMo
           sx={{
             background: mode === m ? '#1C2128' : 'transparent',
             border: '1px solid #21262D',
-            borderRight: i === 0 ? 'none' : '1px solid #21262D',
-            borderRadius: i === 0 ? '4px 0 0 4px' : '0 4px 4px 0',
+            borderLeft: i > 0 ? 'none' : '1px solid #21262D',
+            borderRadius: i === 0 ? '4px 0 0 4px' : i === modes.length - 1 ? '0 4px 4px 0' : '0',
             px: '10px', py: '4px',
             fontFamily: 'monospace',
             fontSize: '0.65rem',
@@ -570,6 +572,10 @@ export default function DemoShell() {
               onReturnToCopilot={handleReturnToCopilot}
             />
           </>
+        )}
+
+        {mode === 'world' && (
+          <WorldShell />
         )}
 
         {scenarioActive && mode === 'reliability' && (
