@@ -226,6 +226,15 @@ export interface CopilotTurnResponse {
   act_mutation_state?: string | null;   // "NOT_ATTEMPTED" | "CONFIRMED" | "UNKNOWN"
   act_violations?: Array<{ code: string; message: string }>;
   act_source_snapshot_id?: string | null;
+  // OBSERVE_OUTCOME fields (present only when intent === 'observe_outcome')
+  observe_execution_confirmed?: boolean;
+  observe_operational_improved?: boolean;
+  observe_operational_summary?: string | null;
+  observe_pre_metrics?: Record<string, number | string | null>;
+  observe_post_metrics?: Record<string, number | string | null>;
+  observe_kpi_delta?: Record<string, number | string>;
+  observe_act_decision_outcome?: string | null;
+  observe_act_pending_approval_id?: string | null;
 }
 
 export interface CopilotTurnRequest {

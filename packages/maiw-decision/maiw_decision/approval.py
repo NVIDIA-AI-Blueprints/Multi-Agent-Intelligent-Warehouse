@@ -25,11 +25,15 @@ from .models import ApprovalRecord, ApprovalState, AuthorityType
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_TTL_SECONDS = 300
+_DEFAULT_TTL_SECONDS = 3600  # 1 hour — appropriate for live demo sessions
 
 
 class ApprovalAlreadyDecided(RuntimeError):
     """Raised when approve() or reject() is called on a non-PENDING record."""
+
+
+class ApprovalExpired(RuntimeError):
+    """Raised when approve() is called after the record's expires_at wall-clock TTL."""
 
 
 class ApprovalNotFound(KeyError):
@@ -115,6 +119,11 @@ class InMemoryApprovalStore:
             raise ApprovalAlreadyDecided(
                 f"Cannot approve approval_id={approval_id!r}: "
                 f"current state={record.state.value!r}"
+            )
+        if record.expires_at and datetime.now(timezone.utc) > record.expires_at:
+            record.state = ApprovalState.EXPIRED
+            raise ApprovalExpired(
+                f"approval_id={approval_id!r} expired at {record.expires_at.isoformat()}"
             )
         record.state = ApprovalState.APPROVED
         record.approved_by = approved_by

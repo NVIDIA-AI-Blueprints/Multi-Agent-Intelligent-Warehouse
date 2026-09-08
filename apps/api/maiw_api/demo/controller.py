@@ -162,6 +162,10 @@ class DemoScenarioController:
         self._recovery_sim_time: int | None = None
         self._pending_approvals: list[dict] = []
         self._approval_store: InMemoryApprovalStore = InMemoryApprovalStore()
+        # Terminal outcomes for pending_ids that have left the queue.
+        # Keys: pending_id → 'executed' | 'rejected' | 'expired'
+        # Cleared on start() and reset() so stale entries cannot bleed across runs.
+        self._pending_approval_outcomes: dict[str, str] = {}
         # Monotonically-incrementing run identity, reset on start() and reset().
         # Used as a dedup boundary so approvals from a previous run are never
         # confused with those from the current one.
@@ -259,6 +263,7 @@ class DemoScenarioController:
         self._next_event_idx = 0
         self._recovery_sim_time = None
         self._pending_approvals = []
+        self._pending_approval_outcomes = {}
         self._scenario_run_id = str(_uuid.uuid4())
 
         logger.info(
@@ -299,6 +304,7 @@ class DemoScenarioController:
         self._last_inject_wall_time = None
         self._recovery_sim_time = None
         self._pending_approvals = []
+        self._pending_approval_outcomes = {}
         self._approval_store.reset()
         self._scenario_run_id = str(_uuid.uuid4())
         await self.bus.publish_scenario(
@@ -459,6 +465,15 @@ class DemoScenarioController:
             if pa["pending_id"] == pending_id:
                 return self._pending_approvals.pop(i)
         return None
+
+    def record_approval_outcome(self, pending_id: str, outcome: str) -> None:
+        """Track the terminal outcome of a pending_id for observe_outcome queries.
+
+        outcome: 'executed' | 'rejected' | 'expired'
+        Called by the demo router after the approval lifecycle completes.
+        Cleared on start() and reset() so stale entries never bleed across runs.
+        """
+        self._pending_approval_outcomes[pending_id] = outcome
 
     # ── status ────────────────────────────────────────────────────────────────
 

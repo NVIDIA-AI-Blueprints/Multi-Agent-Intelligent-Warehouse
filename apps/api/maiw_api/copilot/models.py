@@ -26,9 +26,10 @@ from pydantic import BaseModel, Field
 # ── Intent ────────────────────────────────────────────────────────────────────
 
 class CopilotIntent(str, Enum):
-    ASK     = "ask"      # read-only explanation — no proposal, no execution
-    ANALYZE = "analyze"  # assessment + recommendations — no mutation
-    ACT     = "act"      # ActionProposal → DecisionEngine → governed lifecycle
+    ASK             = "ask"             # read-only explanation — no proposal, no execution
+    ANALYZE         = "analyze"         # assessment + recommendations — no mutation
+    ACT             = "act"             # ActionProposal → DecisionEngine → governed lifecycle
+    OBSERVE_OUTCOME = "observe_outcome" # post-execution outcome observation — compares pre/post state
 
 
 class MutationState(str, Enum):
@@ -262,6 +263,46 @@ class CopilotActResult:
     degradation_reason: str | None = None
 
 
+# ── OBSERVE_OUTCOME result ────────────────────────────────────────────────────
+
+@dataclass
+class CopilotObserveResult:
+    """
+    Structured result of a Copilot OBSERVE_OUTCOME turn.
+
+    Compares pre-ACT state metrics with current state to assess whether
+    the governed action produced the intended operational improvement.
+
+    Zero ActionProposals, zero DecisionEngine evaluations, zero writes.
+    The observation is read-only — it does NOT trigger further actions.
+    """
+    answer: str                          # narrative outcome assessment
+    execution_confirmed: bool            # whether execution was confirmed by ActionExecutor
+    pre_metrics: dict                    # state metrics captured before ACT (at proposal time)
+    post_metrics: dict                   # current state metrics (now)
+    kpi_delta: dict                      # post - pre for each metric
+    operational_improved: bool           # True if key bottleneck metrics improved
+    operational_summary: str             # one-line outcome summary (e.g. "Backlog reduced")
+    act_pending_approval_id: str | None  # the approval that was (or wasn't) acted on
+    act_decision_outcome: str | None     # what the DecisionEngine decided
+    evidence: list[EvidenceFact]
+    neighborhood: "ContextNeighborhood"
+    agent: str
+    model_id: str
+    reasoning_level: str
+    routing_rule: str
+    routing_reason: str
+    trace_id: str
+    snapshot_id: str
+    warehouse_id: str
+    latency_ms: float
+    degraded: bool = False
+    degradation_reason: str | None = None
+    answerability: str = "answerable"
+    missing_context: list[str] = field(default_factory=list)
+    timing: dict[str, float] = field(default_factory=dict)
+
+
 # ── Turn / Conversation store models ─────────────────────────────────────────
 
 @dataclass
@@ -308,6 +349,9 @@ class CopilotConversation:
     last_focus_entity_id: str | None = None
     last_focus_entity_type: str | None = None
     last_focus_entity_label: str | None = None
+    # ACT provenance — updated when an ACT turn completes, used by OBSERVE_OUTCOME
+    last_act_result: Any | None = None               # CopilotActResult from last ACT turn
+    last_act_pre_state_metrics: dict | None = None   # Key KPI values captured before ACT execution
 
     def add_turn(self, turn: CopilotTurn) -> None:
         self.turns.append(turn)
@@ -380,6 +424,16 @@ class CopilotTurnResponse(BaseModel):
     act_mutation_state: str | None = None     # MutationState.value
     act_violations: list[dict] = Field(default_factory=list)
     act_source_snapshot_id: str | None = None  # S1 snapshot when recommendation was created
+
+    # OBSERVE_OUTCOME fields (present when intent=observe_outcome)
+    observe_execution_confirmed: bool = False
+    observe_operational_improved: bool = False
+    observe_operational_summary: str | None = None
+    observe_pre_metrics: dict = Field(default_factory=dict)
+    observe_post_metrics: dict = Field(default_factory=dict)
+    observe_kpi_delta: dict = Field(default_factory=dict)
+    observe_act_decision_outcome: str | None = None
+    observe_act_pending_approval_id: str | None = None
 
     related_artifacts: dict = Field(default_factory=dict)
 

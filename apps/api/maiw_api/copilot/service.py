@@ -50,6 +50,7 @@ from .models import (
     CopilotAnalyzeResult,
     CopilotAskResult,
     CopilotIntent,
+    CopilotObserveResult,
     CopilotTurn,
     EvidenceFact,
     GovernedActionRequest,
@@ -802,6 +803,9 @@ class CopilotService:
             focus_entity_id=selected_rec.focus_entity_id,
         )
 
+        # ── Capture pre-ACT state metrics for OBSERVE_OUTCOME comparison ─────
+        pre_metrics = _extract_state_metrics(state)
+
         # ── Delegate to GovernedActionOrchestrator ────────────────────────────
         await self._publish("COPILOT_PREPARING_ACTION", "Preparing governed action", trace_id=trace_id)
         try:
@@ -823,6 +827,10 @@ class CopilotService:
                 degraded=True,
                 degradation_reason=str(exc),
             )
+
+        # ── Store ACT result in conversation for OBSERVE_OUTCOME ──────────────
+        conv.last_act_result = result
+        conv.last_act_pre_state_metrics = pre_metrics
 
         # ── Persist turn with artifact refs ───────────────────────────────────
         artifact_refs: dict[str, str | None] = {}
@@ -849,6 +857,228 @@ class CopilotService:
         await self._publish(
             "COPILOT_TURN_COMPLETE",
             f"outcome={result.decision_outcome} mutation={result.mutation_state.value}",
+            trace_id=trace_id,
+        )
+        return result, turn
+
+    async def observe_outcome(
+        self,
+        *,
+        message: str,
+        conversation_id: str | None,
+        warehouse_id: str,
+        scenario_name: str = "",
+        is_still_pending: bool | None = None,
+        pending_outcome: str | None = None,
+    ) -> tuple[CopilotObserveResult, CopilotTurn]:
+        """
+        Process an OBSERVE_OUTCOME turn: compare pre-ACT state with current state.
+
+        Reads current WarehouseState, compares with pre_metrics captured at ACT time,
+        and generates a narrative outcome assessment. Zero writes — read-only.
+
+        is_still_pending: injected by the router after checking the approval queue.
+            True  = pending_approval_id still queued (not yet decided)
+            False = removed from queue AND outcome is 'rejected' or 'expired'
+            None  = outcome is 'executed' (let operational_improved guide narrative)
+                    or status unknown (controller unavailable / no prior ACT)
+        pending_outcome: 'executed' | 'rejected' | 'expired' | None
+            Terminal outcome from ctrl._pending_approval_outcomes, or None if unknown.
+        """
+        _t0 = time.monotonic()
+        trace_id = str(uuid.uuid4())
+        turn_id = str(uuid.uuid4())
+
+        conv = self._store.get_or_create(conversation_id, warehouse_id, scenario_name)
+        parent_turn_id = conv.last_turn.turn_id if conv.last_turn else None
+        from maiw_api.copilot.models import ContextNeighborhood as _CN
+
+        await self._publish("COPILOT_TURN_STARTED", f"Copilot OBSERVE — turn {turn_id[:8]}", trace_id=trace_id)
+        await self._publish("COPILOT_INTENT_RESOLVED", "intent=OBSERVE_OUTCOME", trace_id=trace_id)
+
+        # ── No prior ACT on this conversation ─────────────────────────────────
+        last_act = conv.last_act_result
+        pre_metrics = conv.last_act_pre_state_metrics or {}
+
+        if last_act is None:
+            answer = (
+                "I have not performed any governed action in this conversation yet. "
+                "Ask 'What should we do?' to get recommendations, then 'Do it.' to request a governed action."
+            )
+            neighborhood = _CN(
+                focus_entity_id=None, focus_entity_label=None, entity_ids=[],
+                relationship_summary={}, max_depth=2, graph_available=False,
+                entity_resolution=None,
+            )
+            result = CopilotObserveResult(
+                answer=answer,
+                execution_confirmed=False,
+                pre_metrics={},
+                post_metrics={},
+                kpi_delta={},
+                operational_improved=False,
+                operational_summary="No prior action to observe.",
+                act_pending_approval_id=None,
+                act_decision_outcome=None,
+                evidence=[],
+                neighborhood=neighborhood,
+                agent="OperationsCoordinationAgent",
+                model_id="none",
+                reasoning_level="LOW",
+                routing_rule="none",
+                routing_reason="No prior ACT in conversation",
+                trace_id=trace_id,
+                snapshot_id="none",
+                warehouse_id=warehouse_id,
+                latency_ms=(time.monotonic() - _t0) * 1000,
+                degraded=False,
+                answerability="answerable",
+            )
+            turn = self._make_turn(
+                turn_id=turn_id, conv_id=conv.conversation_id, message=message,
+                intent=CopilotIntent.OBSERVE_OUTCOME, trace_id=trace_id, summary=answer,
+                parent_turn_id=parent_turn_id,
+            )
+            self._store.add_turn(turn)
+            await self._publish("COPILOT_TURN_COMPLETE", "no_prior_act", trace_id=trace_id)
+            return result, turn
+
+        # ── Read current state ────────────────────────────────────────────────
+        await self._publish("COPILOT_READING_STATE", "Reading current warehouse state for outcome", trace_id=trace_id)
+        _t_state = time.monotonic()
+        state, state_degraded, state_degradation_reason = await self._get_state(
+            warehouse_id=warehouse_id,
+            scenario_name=scenario_name,
+            trace_id=trace_id,
+        )
+        _state_ms = (time.monotonic() - _t_state) * 1000
+
+        neighborhood = context_resolver.resolve(
+            question=message,
+            warehouse_id=warehouse_id,
+            graph=self._graph,
+            focus_entity_id=conv.last_focus_entity_id,
+            focus_entity_label=conv.last_focus_entity_label,
+        )
+
+        if state is None:
+            answer = (
+                "I cannot assess the outcome because current warehouse state is unavailable. "
+                + (state_degradation_reason or "")
+            ).strip()
+            result = CopilotObserveResult(
+                answer=answer,
+                execution_confirmed=False,
+                pre_metrics=pre_metrics,
+                post_metrics={},
+                kpi_delta={},
+                operational_improved=False,
+                operational_summary="State unavailable — cannot compare.",
+                act_pending_approval_id=getattr(last_act, "pending_approval_id", None),
+                act_decision_outcome=getattr(last_act, "decision_outcome", None),
+                evidence=[],
+                neighborhood=neighborhood,
+                agent="OperationsCoordinationAgent",
+                model_id="none",
+                reasoning_level="LOW",
+                routing_rule="none",
+                routing_reason="State unavailable",
+                trace_id=trace_id,
+                snapshot_id="none",
+                warehouse_id=warehouse_id,
+                latency_ms=(time.monotonic() - _t0) * 1000,
+                degraded=True,
+                degradation_reason=state_degradation_reason,
+                answerability="insufficient_evidence",
+            )
+            turn = self._make_turn(
+                turn_id=turn_id, conv_id=conv.conversation_id, message=message,
+                intent=CopilotIntent.OBSERVE_OUTCOME, trace_id=trace_id, summary=answer,
+                parent_turn_id=parent_turn_id,
+            )
+            self._store.add_turn(turn)
+            await self._publish("COPILOT_TURN_COMPLETE", "state_unavailable", trace_id=trace_id)
+            return result, turn
+
+        # ── Compute post-metrics and delta ────────────────────────────────────
+        post_metrics = _extract_state_metrics(state)
+        kpi_delta = _compute_kpi_delta(pre_metrics, post_metrics)
+
+        decision_outcome = getattr(last_act, "decision_outcome", None)
+        mutation_state = getattr(last_act, "mutation_state", None)
+        execution_confirmed = (
+            mutation_state is not None and
+            getattr(mutation_state, "value", str(mutation_state)) == "CONFIRMED"
+        )
+        # The last_act_result is written at ACT time (mutation_state=NOT_ATTEMPTED).
+        # After the human approves and execution runs, last_act_result is never updated.
+        # pending_outcome="executed" from ctrl._pending_approval_outcomes is the only
+        # authoritative signal that execution actually completed for this approval path.
+        if pending_outcome == "executed":
+            execution_confirmed = True
+        pending_approval_id = getattr(last_act, "pending_approval_id", None)
+
+        # ── Compose narrative ─────────────────────────────────────────────────
+        answer, operational_improved, summary = _compose_observe_narrative(
+            decision_outcome=decision_outcome,
+            execution_confirmed=execution_confirmed,
+            pending_approval_id=pending_approval_id,
+            pre_metrics=pre_metrics,
+            post_metrics=post_metrics,
+            kpi_delta=kpi_delta,
+            last_act=last_act,
+            is_still_pending=is_still_pending,
+            pending_outcome=pending_outcome,
+        )
+
+        evidence = _facts_to_evidence(
+            _observe_facts(pre_metrics, post_metrics, kpi_delta), "HIGH"
+        )
+
+        result = CopilotObserveResult(
+            answer=answer,
+            execution_confirmed=execution_confirmed,
+            pre_metrics=pre_metrics,
+            post_metrics=post_metrics,
+            kpi_delta=kpi_delta,
+            operational_improved=operational_improved,
+            operational_summary=summary,
+            act_pending_approval_id=pending_approval_id,
+            act_decision_outcome=decision_outcome,
+            evidence=evidence,
+            neighborhood=neighborhood,
+            agent="OperationsCoordinationAgent",
+            model_id="state-comparison",
+            reasoning_level="LOW",
+            routing_rule="deterministic",
+            routing_reason="KPI delta comparison — no model inference",
+            trace_id=trace_id,
+            snapshot_id=post_metrics.get("snapshot_id", "unknown"),
+            warehouse_id=warehouse_id,
+            latency_ms=(time.monotonic() - _t0) * 1000,
+            degraded=state_degraded,
+            degradation_reason=state_degradation_reason,
+            answerability="answerable",
+            timing={
+                "state_assembly_ms": round(_state_ms, 1),
+                "graph_lookup_ms": 0.0,
+                "model_inference_ms": 0.0,
+                "total_ms": round((time.monotonic() - _t0) * 1000, 1),
+            },
+        )
+
+        turn = self._make_turn(
+            turn_id=turn_id, conv_id=conv.conversation_id, message=message,
+            intent=CopilotIntent.OBSERVE_OUTCOME, trace_id=trace_id, summary=summary,
+            parent_turn_id=parent_turn_id,
+            focus_entity_id=conv.last_focus_entity_id,
+            focus_entity_type=conv.last_focus_entity_type,
+            focus_entity_label=conv.last_focus_entity_label,
+        )
+        self._store.add_turn(turn)
+        await self._publish(
+            "COPILOT_TURN_COMPLETE",
+            f"improved={operational_improved} confirmed={execution_confirmed}",
             trace_id=trace_id,
         )
         return result, turn
@@ -1061,15 +1291,16 @@ def _check_state_drift(rec: RecommendedActionResult, state: Any) -> str | None:
 # ── Recommendation context enrichment ────────────────────────────────────────
 
 _WHY_BEST_RE = _re.compile(
-    r"\b(why.*best|why.*option|why.*recommend|why.*that|explain.*recommend|best option|why not|compare)\b",
+    r"\b(why\b|why.*best|why.*option|why.*recommend|why.*that|explain.*recommend"
+    r"|best option|why not|compare|makes.*better|instead of|versus|vs\.?|what.*differ)\b",
     _re.IGNORECASE,
 )
 
 
 def _enrich_with_recommendations(message: str, recs: list) -> str:
     """
-    When the operator asks why a recommendation is best, inject prior recommendation
-    context into scenario_context so the agent gives a comparative rationale.
+    Inject prior ANALYZE recommendation context when the operator asks a follow-up
+    explanation or comparison question (e.g. "Why REALLOCATE_LABOR?", "Why not X?").
 
     Returns the original message when no enrichment is needed.
     """
@@ -1081,14 +1312,27 @@ def _enrich_with_recommendations(message: str, recs: list) -> str:
         tgt = getattr(r, "target", "")
         pri = getattr(r, "priority", "")
         obj = getattr(r, "objective", "")
-        rec_lines.append(f"  #{i + 1}: {cap} → {tgt} ({pri} priority) — {obj}")
+        rat = getattr(r, "rationale", "") or ""
+        rat_clause = f" Rationale: {rat}" if rat else ""
+        rec_lines.append(f"  #{i + 1}: {cap} → {tgt} ({pri} priority) — {obj}.{rat_clause}")
     rec_summary = "\n".join(rec_lines)
+    is_comparison = _re.search(r"\b(why not|compare|instead|versus|vs\.?|differ|makes.*better)\b", message, _re.IGNORECASE)
+    if is_comparison:
+        directive = (
+            "Compare recommendation #1 against the alternatives. Explain which specific "
+            "bottleneck each addresses and why #1 delivers the highest operational impact "
+            "first. Be concise — do not repeat the full warehouse diagnosis."
+        )
+    else:
+        directive = (
+            "Explain why recommendation #1 is the best first action given the current "
+            "warehouse state. Reference the specific operational bottleneck it unblocks. "
+            "Do not repeat the full warehouse diagnosis."
+        )
     return (
         f"{message}\n\n"
         f"Prior ANALYZE recommendations:\n{rec_summary}\n\n"
-        f"Explain why recommendation #1 is the best first action given the observed "
-        f"warehouse state. Compare it to the alternatives. Focus on which action unblocks "
-        f"the highest-impact bottleneck first. Do not repeat the full warehouse diagnosis."
+        f"{directive}"
     )
 
 
@@ -1175,6 +1419,250 @@ _SEVERITY_KEYWORDS = {
     "MEDIUM": "MEDIUM",
     "medium": "MEDIUM",
 }
+
+
+def _extract_state_metrics(state: Any) -> dict:
+    """
+    Extract key KPI metrics from a WarehouseState for pre/post comparison.
+    Returns an empty dict for absent domains rather than raising.
+    """
+    metrics: dict = {}
+    if state is None:
+        return metrics
+
+    waves = getattr(state, "waves", None)
+    labor = getattr(state, "labor", None)
+    equipment = getattr(state, "equipment", None)
+
+    if waves:
+        metrics["pending_tasks"] = (
+            getattr(waves, "pending_count", None)
+            or getattr(waves, "pending_tasks", None)
+            or 0
+        )
+        metrics["wave_risk_score"] = getattr(waves, "risk_score", None) or 0
+        metrics["wave_risk_level"] = getattr(waves, "risk_level", None) or "unknown"
+        metrics["at_risk_tasks"] = getattr(waves, "at_risk_count", None) or 0
+
+    if labor:
+        idle = next(
+            (getattr(labor, attr, None) for attr in
+             ("idle_workers", "workers_idle", "available_workers")
+             if getattr(labor, attr, None) is not None),
+            None,
+        )
+        metrics["idle_workers"] = idle if idle is not None else 0
+        metrics["total_workers"] = getattr(labor, "total_workers", None) or 0
+        metrics["active_workers"] = getattr(labor, "active_workers", None) or 0
+
+    if equipment:
+        metrics["equipment_available"] = getattr(equipment, "available", None) or 0
+        metrics["equipment_offline"] = getattr(equipment, "offline", None) or 0
+
+    return metrics
+
+
+def _compute_kpi_delta(pre: dict, post: dict) -> dict:
+    """Compute post - pre for numeric KPIs shared between both snapshots."""
+    delta: dict = {}
+    for key in pre:
+        if key in post and isinstance(pre[key], (int, float)) and isinstance(post[key], (int, float)):
+            delta[key] = post[key] - pre[key]
+    # Include string fields with change markers
+    for key in ("wave_risk_level",):
+        if key in pre and key in post and pre[key] != post[key]:
+            delta[f"{key}_change"] = f"{pre[key]} → {post[key]}"
+    return delta
+
+
+def _compose_observe_narrative(
+    *,
+    decision_outcome: str | None,
+    execution_confirmed: bool,
+    pending_approval_id: str | None,
+    pre_metrics: dict,
+    post_metrics: dict,
+    kpi_delta: dict,
+    last_act: Any,
+    is_still_pending: bool | None = None,
+    pending_outcome: str | None = None,
+) -> tuple[str, bool, str]:
+    """
+    Compose the OBSERVE_OUTCOME narrative.
+    Returns (answer, operational_improved, summary).
+    """
+    backlog_delta = kpi_delta.get("pending_tasks", None)
+    idle_delta = kpi_delta.get("idle_workers", None)
+    risk_delta = kpi_delta.get("wave_risk_score", None)
+    risk_level_change = kpi_delta.get("wave_risk_level_change", None)
+
+    pre_backlog = pre_metrics.get("pending_tasks", "unknown")
+    post_backlog = post_metrics.get("pending_tasks", "unknown")
+    pre_idle = pre_metrics.get("idle_workers", "unknown")
+    post_idle = post_metrics.get("idle_workers", "unknown")
+    pre_risk = pre_metrics.get("wave_risk_level", "unknown")
+    post_risk = post_metrics.get("wave_risk_level", "unknown")
+
+    # Determine if operationally improved
+    operational_improved = False
+    improvement_signals = []
+    if backlog_delta is not None and backlog_delta < 0:
+        operational_improved = True
+        improvement_signals.append(f"pending backlog fell from {pre_backlog} to {post_backlog}")
+    if idle_delta is not None and idle_delta < 0:
+        operational_improved = True
+        improvement_signals.append(f"idle workers reduced from {pre_idle} to {post_idle}")
+    if risk_level_change:
+        improvement_signals.append(f"wave risk classification: {risk_level_change}")
+        # Treat risk reduction as improvement
+        risk_order = ["critical", "high", "medium", "low", "none", "unknown"]
+        pre_idx = next((i for i, r in enumerate(risk_order) if r in str(pre_risk).lower()), 999)
+        post_idx = next((i for i, r in enumerate(risk_order) if r in str(post_risk).lower()), 999)
+        if post_idx > pre_idx:
+            operational_improved = True
+
+    # Case 1: REQUIRES_HUMAN_APPROVAL — check if state changed (implies approval occurred)
+    if decision_outcome == "REQUIRES_HUMAN_APPROVAL":
+        if not pre_metrics or not post_metrics:
+            return (
+                "The action was submitted for human approval. "
+                "I cannot compare state because baseline metrics were not captured.",
+                False,
+                "State comparison unavailable.",
+            )
+
+        if operational_improved and improvement_signals:
+            signals_str = "; ".join(improvement_signals)
+            _one_task = (
+                "\n\nWhy only one task resolved? A single governed action unblocks the "
+                "highest-priority allocation bottleneck. Broader backlog reduction requires "
+                "additional reallocation cycles authorized through the governance pipeline."
+            ) if backlog_delta is not None and backlog_delta == -1 else ""
+            answer = (
+                f"Yes — the warehouse state improved after the governed action was executed. "
+                f"{signals_str.capitalize()}.{_one_task}\n\n"
+                f"The action was approved and executed through the MAIW governance pipeline. "
+                f"The operational bottleneck has been partially resolved."
+            )
+            summary = f"Improvement confirmed: {improvement_signals[0]}"
+        elif (not kpi_delta or pre_metrics == post_metrics):
+            # State unchanged — distinguish still-pending, rejected, or unknown
+            if is_still_pending is True:
+                answer = (
+                    "The action has not been executed. Human approval is still required.\n\n"
+                    "Open the APPROVE stage in MAIW to review and authorize the action."
+                )
+                summary = "Awaiting human approval — action not yet executed."
+            elif is_still_pending is False:
+                if pending_outcome == "expired":
+                    answer = (
+                        "The approval window closed before the operator acted. "
+                        "The action was not executed — no warehouse changes were made.\n\n"
+                        "You can request a new governed action via the ACT command."
+                    )
+                    summary = "Approval expired — action not executed."
+                else:
+                    answer = (
+                        "No. The proposed action was rejected by the human reviewer and was never executed. "
+                        "No warehouse changes were made — the state is unchanged from before the action was requested."
+                    )
+                    summary = "Action rejected — no warehouse change."
+                operational_improved = False
+            elif pending_outcome == "executed":
+                answer = (
+                    "The action was approved and executed through the MAIW governance pipeline. "
+                    "No immediate warehouse KPI change was detected — the task may still be in progress "
+                    "or requires a clock tick to register the completed allocation."
+                )
+                summary = "Executed — no immediate KPI delta detected."
+            else:
+                answer = (
+                    "The warehouse state has not changed since the action was submitted. "
+                    "Either the approval is still pending, or the action was not executed.\n\n"
+                    "Open the APPROVE stage in MAIW to check the approval status."
+                )
+                summary = "No state change detected — approval status unknown."
+            operational_improved = False
+        else:
+            answer = (
+                "The warehouse state changed after the action, but not all indicators improved.\n\n"
+                f"OBSERVED STATE\n"
+                f"Pending tasks: {pre_backlog} → {post_backlog}\n"
+                f"Idle workers: {pre_idle} → {post_idle}\n"
+                f"Wave risk: {pre_risk} → {post_risk}\n\n"
+                "The execution may have partially succeeded. Review the approval panel for details."
+            )
+            summary = "Partial state change observed."
+
+        return answer, operational_improved, summary
+
+    # Case 2: APPROVED + execution confirmed
+    if execution_confirmed:
+        if operational_improved and improvement_signals:
+            signals_str = "; ".join(improvement_signals)
+            _one_task = (
+                "\n\nWhy only one task resolved? A single governed action unblocks the "
+                "highest-priority allocation bottleneck. Broader backlog reduction requires "
+                "additional reallocation cycles authorized through the governance pipeline."
+            ) if backlog_delta is not None and backlog_delta == -1 else ""
+            answer = (
+                f"Yes. The action executed and the operational state improved. "
+                f"{signals_str.capitalize()}.{_one_task}\n\n"
+                f"The labor allocation was executed through the MAIW governance pipeline."
+            )
+            summary = f"Execution confirmed; improvement observed: {improvement_signals[0]}"
+        else:
+            answer = (
+                "The action executed successfully (CONFIRMED), "
+                "but the key operational metrics have not yet changed measurably. "
+                f"Pending backlog: {pre_backlog} → {post_backlog}. "
+                f"Idle workers: {pre_idle} → {post_idle}.\n\n"
+                "This may indicate a processing delay in the warehouse system."
+            )
+            summary = "Execution confirmed; no measurable operational improvement yet."
+        return answer, operational_improved, summary
+
+    # Case 3: REJECTED
+    if decision_outcome == "REJECTED":
+        return (
+            "The action was rejected by the MAIW decision engine and was never executed. "
+            "No warehouse changes were made. The warehouse state has not changed as a result of this action.",
+            False,
+            "Action rejected — no state change.",
+        )
+
+    # Case 4: UNKNOWN execution
+    if decision_outcome == "APPROVED" and not execution_confirmed:
+        return (
+            "The execution result is uncertain. The backend may have accepted the action, "
+            "but acknowledgement was not confirmed.\n\n"
+            "Automatic retry has been suppressed. Reconciliation is required before "
+            "I can confirm whether the operational state improved.",
+            False,
+            "Execution status uncertain — reconciliation required.",
+        )
+
+    # Fallback
+    return (
+        f"The last governed action outcome was: {decision_outcome or 'unknown'}. "
+        f"I cannot confirm operational improvement without execution confirmation.",
+        False,
+        f"Outcome: {decision_outcome or 'unknown'}",
+    )
+
+
+def _observe_facts(pre: dict, post: dict, delta: dict) -> list[str]:
+    """Build fact strings for OBSERVE_OUTCOME evidence cards."""
+    facts = []
+    if "pending_tasks" in pre and "pending_tasks" in post:
+        facts.append(f"Pending tasks: {pre['pending_tasks']} → {post['pending_tasks']}")
+    if "idle_workers" in pre and "idle_workers" in post:
+        facts.append(f"Idle workers: {pre['idle_workers']} → {post['idle_workers']}")
+    if "wave_risk_level" in pre and "wave_risk_level" in post:
+        facts.append(f"Wave risk: {pre['wave_risk_level']} → {post['wave_risk_level']}")
+    if "wave_risk_score" in pre and "wave_risk_score" in post:
+        facts.append(f"Wave risk score: {pre['wave_risk_score']} → {post['wave_risk_score']}")
+    return facts
 
 
 def _facts_to_evidence(facts: list[str], assessment_severity: str) -> list[EvidenceFact]:

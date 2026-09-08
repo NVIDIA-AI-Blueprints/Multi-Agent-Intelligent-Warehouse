@@ -19,7 +19,7 @@
  */
 
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { CopilotActAnswer } from '../../components/demo/copilot/CopilotDrawer';
 import CopilotDrawer from '../../components/demo/copilot/CopilotDrawer';
@@ -98,17 +98,39 @@ function renderActAnswer(turn: CopilotTurnResponse) {
   );
 }
 
-function renderDrawer(props: Partial<React.ComponentProps<typeof CopilotDrawer>> = {}) {
-  return render(
+function ConvWrapper({ drawerProps }: { drawerProps: Partial<React.ComponentProps<typeof CopilotDrawer>> }) {
+  const [conversationId, setConversationId] = React.useState<string | null>(null);
+  const [turns, setTurns] = React.useState<any[]>([]);
+  const [conversationError, setConversationError] = React.useState<string | null>(null);
+  return (
     <ThemeProvider theme={nvidiaTheme}>
       <CopilotDrawer
         warehouseId="DC-47"
         scenarioName="labor-constraint-wave-risk"
         onClose={jest.fn()}
-        {...props}
+        conversationId={conversationId}
+        setConversationId={setConversationId}
+        turns={turns}
+        setTurns={setTurns}
+        conversationError={conversationError}
+        setConversationError={setConversationError}
+        {...drawerProps}
       />
     </ThemeProvider>
   );
+}
+
+const DEFAULT_CONV_PROPS = {
+  conversationId: null as string | null,
+  setConversationId: jest.fn(),
+  turns: [] as any[],
+  setTurns: jest.fn(),
+  conversationError: null as string | null,
+  setConversationError: jest.fn(),
+};
+
+function renderDrawer(props: Partial<React.ComponentProps<typeof CopilotDrawer>> = {}) {
+  return render(<ConvWrapper drawerProps={props} />);
 }
 
 // ── 1. CopilotTurnResponse ACT fields type check ──────────────────────────────
@@ -315,5 +337,68 @@ describe('Phase15D: Suggested prompts', () => {
     // Full E2E flow validated in live acceptance test (spec req 64).
     expect(analyzeResp.recommendations!.length).toBeGreaterThan(0);
     expect(analyzeResp.intent).toBe('analyze');
+  });
+});
+
+// ── 9. REVIEW APPROVAL navigation — trust boundary ────────────────────────────
+
+describe('Phase15D: REVIEW APPROVAL navigation', () => {
+  it('calls onReviewApproval with the correct pending ID on click', () => {
+    const onReviewApproval = jest.fn();
+    render(
+      <ThemeProvider theme={nvidiaTheme}>
+        <CopilotActAnswer
+          turn={buildActTurn({ act_pending_approval_id: 'pending-nav-001' })}
+          onReviewApproval={onReviewApproval}
+        />
+      </ThemeProvider>
+    );
+    fireEvent.click(screen.getByTestId('copilot-act-review-approval'));
+    expect(onReviewApproval).toHaveBeenCalledTimes(1);
+    expect(onReviewApproval).toHaveBeenCalledWith('pending-nav-001');
+  });
+
+  it('does NOT call demoAPI.approvePending or rejectPending on REVIEW APPROVAL click', () => {
+    const { demoAPI: api } = require('../../services/demoAPI');
+    const onReviewApproval = jest.fn();
+    render(
+      <ThemeProvider theme={nvidiaTheme}>
+        <CopilotActAnswer
+          turn={buildActTurn({ act_pending_approval_id: 'pending-nav-002' })}
+          onReviewApproval={onReviewApproval}
+        />
+      </ThemeProvider>
+    );
+    fireEvent.click(screen.getByTestId('copilot-act-review-approval'));
+    expect(api.approvePending ?? jest.fn()).not.toHaveBeenCalled();
+    expect(api.rejectPending ?? jest.fn()).not.toHaveBeenCalled();
+  });
+
+  it('REVIEW APPROVAL without onReviewApproval prop does not throw', () => {
+    render(
+      <ThemeProvider theme={nvidiaTheme}>
+        <CopilotActAnswer turn={buildActTurn({ act_pending_approval_id: 'pending-safe-001' })} />
+      </ThemeProvider>
+    );
+    expect(() => {
+      fireEvent.click(screen.getByTestId('copilot-act-review-approval'));
+    }).not.toThrow();
+  });
+
+  it('CopilotDrawer accepts onReviewApproval prop without error', () => {
+    const onReviewApproval = jest.fn();
+    expect(() => {
+      render(
+        <ThemeProvider theme={nvidiaTheme}>
+          <CopilotDrawer
+            warehouseId="DC-47"
+            scenarioName="test"
+            onClose={jest.fn()}
+            onReviewApproval={onReviewApproval}
+            {...DEFAULT_CONV_PROPS}
+          />
+        </ThemeProvider>
+      );
+    }).not.toThrow();
   });
 });
