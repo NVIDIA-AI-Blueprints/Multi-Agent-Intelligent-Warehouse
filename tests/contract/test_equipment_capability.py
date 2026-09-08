@@ -379,6 +379,7 @@ class TestMockEquipmentProvider:
 
     def test_proposal_id_is_unique_per_request(self):
         import uuid
+
         async def run():
             provider = MockEquipmentProvider()
             r1 = await provider.propose_equipment_assignment(
