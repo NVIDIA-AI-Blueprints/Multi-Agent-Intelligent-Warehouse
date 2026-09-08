@@ -957,7 +957,8 @@ Multi-Agent-Intelligent-Warehouse/
 │
 ├── packages/                      # Canonical Python packages (uv workspace)
 │   ├── maiw-models/               # ModelGateway, NIMProvider, NIMClient, enums
-│   ├── maiw-mcp/                  # Capability contracts, ActionProposal, MCP client
+│   ├── maiw-contracts/            # Vendor-neutral warehouse capability contracts (domain types)
+│   ├── maiw-mcp/                  # MCP transport, circuit breaker, auth, telemetry, deadline
 │   ├── maiw-state/                # WarehouseState, StateSnapshot, StateFreshness
 │   ├── maiw-skills/               # Domain skills (read + write proposal factories)
 │   ├── maiw-decision/             # DecisionEngine, DecisionResult, constraints
@@ -1007,10 +1008,11 @@ Multi-Agent-Intelligent-Warehouse/
 | Package | Canonical import | Owns |
 |---------|----------------|------|
 | `maiw-models` | `from maiw_models import ModelGateway` | LLM gateway, routing, NIM provider, telemetry |
-| `maiw-mcp` | `from maiw_mcp.contracts.equipment import ...` | Capability contracts, ActionProposal, MCP client |
+| `maiw-contracts` | `from maiw_contracts.equipment import EquipmentAssignmentRequest` | Vendor-neutral warehouse capability contracts (equipment, labor, wave, inventory, CapabilityMetadata) |
+| `maiw-mcp` | `from maiw_mcp.client.client import MAIWMCPClient` | MCP transport, `MAIWMCPClient`, circuit breaker, auth, telemetry, `RequestDeadline` |
 | `maiw-state` | `from maiw_state import WarehouseState` | State assembly, snapshots, freshness, provenance |
 | `maiw-skills` | `from maiw_skills.equipment import EquipmentAssignmentSkill` | Read skills, write proposal factories |
-| `maiw-decision` | `from maiw_decision import DecisionEngine` | Constraint evaluation, DecisionResult |
+| `maiw-decision` | `from maiw_decision.proposal import ActionProposal` | `ActionProposal`, `RiskLevel`, `DecisionEngine`, `DecisionResult`, governance types |
 | `maiw-execution` | `from maiw_execution import EquipmentActionExecutor, ExecutionOutcome` | 4-guard executor, `ExecutionOutcome` enum, `ExecutionRegistry` (single-process idempotency), `AmbiguousWriteError` |
 | `maiw-agents` | `from maiw_agents.equipment import EquipmentAssetOperationsAgent` | Agent orchestration, state assembly coordination |
 
