@@ -8,7 +8,7 @@ import logging
 from typing import Any, Optional
 
 from maiw_decision.models import DecisionResult
-from maiw_mcp.contracts.actions import ActionProposal
+from maiw_decision.proposal import ActionProposal
 
 from .base import ActionConflict, ActionUnsupported, BaseActionExecutor
 from .outcome import ExecutionOutcome
@@ -147,7 +147,7 @@ class EquipmentActionExecutor(BaseActionExecutor):
             raise ActionUnsupported(
                 "No assign_skill configured on EquipmentActionExecutor"
             )
-        from maiw_mcp.contracts.equipment import EquipmentExecuteAssignRequest
+        from maiw_contracts.equipment import EquipmentExecuteAssignRequest
 
         req = EquipmentExecuteAssignRequest(
             asset_id=proposal.parameters["asset_id"],
@@ -170,7 +170,7 @@ class EquipmentActionExecutor(BaseActionExecutor):
             raise ActionUnsupported(
                 "No release_skill configured on EquipmentActionExecutor"
             )
-        from maiw_mcp.contracts.equipment import EquipmentExecuteReleaseRequest
+        from maiw_contracts.equipment import EquipmentExecuteReleaseRequest
 
         req = EquipmentExecuteReleaseRequest(
             asset_id=proposal.parameters["asset_id"],
@@ -190,7 +190,7 @@ class EquipmentActionExecutor(BaseActionExecutor):
             raise ActionUnsupported(
                 "No maintenance_skill configured on EquipmentActionExecutor"
             )
-        from maiw_mcp.contracts.equipment import EquipmentExecuteMaintenanceRequest
+        from maiw_contracts.equipment import EquipmentExecuteMaintenanceRequest
 
         req = EquipmentExecuteMaintenanceRequest(
             asset_id=proposal.parameters["asset_id"],

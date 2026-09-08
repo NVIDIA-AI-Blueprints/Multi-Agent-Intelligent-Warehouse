@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from maiw_mcp.contracts.inventory import InventoryLookupRequest, InventoryLookupResult
+from maiw_contracts.inventory import InventoryLookupRequest, InventoryLookupResult
 
 
 @runtime_checkable

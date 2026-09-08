@@ -27,7 +27,7 @@ from typing import Any
 
 from mcp.server import MCPServer
 
-from maiw_mcp.contracts.wave import (
+from maiw_contracts.wave import (
     WAVE_GET_METADATA,
     WAVE_GET_RISK_METADATA,
     WAVE_REPRIORITIZE_METADATA,

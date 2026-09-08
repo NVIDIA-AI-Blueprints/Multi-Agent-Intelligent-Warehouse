@@ -27,8 +27,8 @@ from typing import Any, Optional
 
 from maiw_decision import DecisionEngine
 from maiw_decision.models import DecisionOutcome, DecisionRequest
-from maiw_mcp.contracts.actions import ActionProposal
-from maiw_mcp.contracts.equipment import EquipmentAssignmentRequest
+from maiw_decision.proposal import ActionProposal
+from maiw_contracts.equipment import EquipmentAssignmentRequest
 from maiw_state import StateRequirements, WarehouseStateSnapshot
 
 logger = logging.getLogger(__name__)

@@ -49,10 +49,10 @@ from maiw_api.demo.controller import (
     list_scenario_files,
     reset_demo_controller,
 )
-from maiw_mcp.contracts.equipment import EquipmentStatusRequest
-from maiw_mcp.contracts.labor import LaborCapacityRequest
-from maiw_mcp.contracts.wave import WaveGetRequest
-from maiw_mcp.contracts.inventory import InventoryLookupRequest
+from maiw_contracts.equipment import EquipmentStatusRequest
+from maiw_contracts.labor import LaborCapacityRequest
+from maiw_contracts.wave import WaveGetRequest
+from maiw_contracts.inventory import InventoryLookupRequest
 
 
 # ── async helper (same pattern as tests/unit/demo/) ──────────────────────────

@@ -98,11 +98,11 @@ class TestPackageImportSmoke:
         assert WaveState is not None
 
     def test_canonical_mcp_import(self):
-        from maiw_mcp.contracts.actions import ActionProposal
-        from maiw_mcp.contracts.inventory import INVENTORY_GET_METADATA
-        from maiw_mcp.contracts.equipment import EQUIPMENT_ASSIGN_METADATA
-        from maiw_mcp.contracts.labor import LABOR_ALLOCATE_METADATA
-        from maiw_mcp.contracts.wave import WAVE_REPRIORITIZE_METADATA
+        from maiw_decision.proposal import ActionProposal
+        from maiw_contracts.inventory import INVENTORY_GET_METADATA
+        from maiw_contracts.equipment import EQUIPMENT_ASSIGN_METADATA
+        from maiw_contracts.labor import LABOR_ALLOCATE_METADATA
+        from maiw_contracts.wave import WAVE_REPRIORITIZE_METADATA
 
         assert ActionProposal is not None
 

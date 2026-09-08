@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from maiw_mcp.contracts.inventory import InventoryLocation, InventoryLookupResult
+from maiw_contracts.inventory import InventoryLocation, InventoryLookupResult
 
 
 def make_inventory_result(

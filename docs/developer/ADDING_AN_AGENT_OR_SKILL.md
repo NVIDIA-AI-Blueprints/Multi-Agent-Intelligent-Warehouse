@@ -20,7 +20,7 @@ packages/maiw-agents/maiw_agents/my_domain/agent.py
 from __future__ import annotations
 from maiw_models.gateway import ModelGateway
 from maiw_models.models import ModelRequest, ReasoningLevel, RiskLevel
-from maiw_mcp.contracts.actions import ActionProposal
+from maiw_decision.proposal import ActionProposal
 from maiw_state.snapshot import WarehouseStateSnapshot
 
 class MyDomainAgent:

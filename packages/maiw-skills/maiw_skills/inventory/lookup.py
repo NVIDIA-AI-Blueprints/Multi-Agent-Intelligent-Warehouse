@@ -16,7 +16,7 @@ The agent never knows about MCP servers, URLs, or transport.
 Usage in agents
 ---------------
     from src.api.skills.inventory import InventoryLookupSkill, get_inventory_skill
-    from maiw_mcp.contracts.inventory import InventoryLookupRequest
+    from maiw_contracts.inventory import InventoryLookupRequest
 
     skill = await get_inventory_skill()
     result = await skill.execute(InventoryLookupRequest(sku="SKU-001"))
@@ -47,7 +47,7 @@ import logging
 import os
 
 from maiw_mcp.client.client import MAIWMCPClient
-from maiw_mcp.contracts.inventory import (
+from maiw_contracts.inventory import (
     InventoryLookupRequest,
     InventoryLookupResult,
     INVENTORY_GET_METADATA,

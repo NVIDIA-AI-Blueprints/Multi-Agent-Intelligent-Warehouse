@@ -227,7 +227,7 @@ class WarehouseStateProvider:
         if deadline is not None and deadline.expired:
             raise RequestDeadlineExceeded(expired_by_ms=(deadline._clock() - deadline.deadline_at) * 1000.0)  # type: ignore[operator]
 
-        from maiw_mcp.contracts.equipment import EquipmentStatusRequest  # noqa: PLC0415
+        from maiw_contracts.equipment import EquipmentStatusRequest  # noqa: PLC0415
 
         req = EquipmentStatusRequest(
             asset_id=requirements.equipment_asset_id,
@@ -286,7 +286,7 @@ class WarehouseStateProvider:
         if deadline is not None and deadline.expired:
             raise RequestDeadlineExceeded(expired_by_ms=(deadline._clock() - deadline.deadline_at) * 1000.0)  # type: ignore[operator]
 
-        from maiw_mcp.contracts.inventory import InventoryLookupRequest  # noqa: PLC0415
+        from maiw_contracts.inventory import InventoryLookupRequest  # noqa: PLC0415
 
         req = InventoryLookupRequest(
             sku=requirements.inventory_sku or "",
@@ -343,7 +343,7 @@ class WarehouseStateProvider:
         if deadline is not None and deadline.expired:
             raise RequestDeadlineExceeded(expired_by_ms=(deadline._clock() - deadline.deadline_at) * 1000.0)  # type: ignore[operator]
 
-        from maiw_mcp.contracts.labor import LaborCapacityRequest  # noqa: PLC0415
+        from maiw_contracts.labor import LaborCapacityRequest  # noqa: PLC0415
 
         req = LaborCapacityRequest(
             warehouse_id=warehouse_id,
@@ -402,7 +402,7 @@ class WarehouseStateProvider:
         if deadline is not None and deadline.expired:
             raise RequestDeadlineExceeded(expired_by_ms=(deadline._clock() - deadline.deadline_at) * 1000.0)  # type: ignore[operator]
 
-        from maiw_mcp.contracts.wave import WaveGetRequest  # noqa: PLC0415
+        from maiw_contracts.wave import WaveGetRequest  # noqa: PLC0415
 
         req = WaveGetRequest(
             warehouse_id=warehouse_id,

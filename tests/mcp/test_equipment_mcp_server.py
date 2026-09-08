@@ -36,7 +36,7 @@ from datetime import datetime, timezone
 import pytest
 from mcp.client import Client
 
-from maiw_mcp.contracts.equipment import EquipmentAssetInfo, TelemetryPoint
+from maiw_contracts.equipment import EquipmentAssetInfo, TelemetryPoint
 from mcp_servers.equipment.provider import MockEquipmentProvider
 from mcp_servers.equipment.server import configure_server, mcp_server
 

@@ -31,7 +31,7 @@ import json
 
 import pytest
 
-from maiw_mcp.contracts.inventory import InventoryLookupRequest
+from maiw_contracts.inventory import InventoryLookupRequest
 from maiw_mcp.errors import BackendUnavailable
 from maiw_mcp.testing.conformance import run_inventory_conformance
 from maiw_mcp.testing.mock_server import MockInventoryServer

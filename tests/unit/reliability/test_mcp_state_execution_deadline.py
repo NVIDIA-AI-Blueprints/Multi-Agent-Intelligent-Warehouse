@@ -267,7 +267,7 @@ class TestWarehouseStateProviderDeadline:
     def test_no_deadline_equipment_succeeds(self):
         """Baseline: no deadline, equipment domain read works."""
         from maiw_state import WarehouseStateProvider, StateRequirements
-        from maiw_mcp.contracts.equipment import EquipmentStatusResult
+        from maiw_contracts.equipment import EquipmentStatusResult
 
         mock_result = MagicMock(spec=EquipmentStatusResult)
         mock_result.total_count = 0
@@ -304,7 +304,7 @@ class TestWarehouseStateProviderDeadline:
         deadline = RequestDeadline.from_timeout(5.0, clock=clock)
         clock.advance(10.0)  # expired
 
-        from maiw_mcp.contracts.equipment import EquipmentStatusResult
+        from maiw_contracts.equipment import EquipmentStatusResult
 
         mock_result = MagicMock(spec=EquipmentStatusResult)
         mock_result.total_count = 0
@@ -325,7 +325,7 @@ class TestWarehouseStateProviderDeadline:
         # 6 second budget; inventory takes 4s (advances clock) → 2s left → equipment check: expired
         deadline = RequestDeadline.from_timeout(6.0, clock=clock)
 
-        from maiw_mcp.contracts.equipment import EquipmentStatusResult
+        from maiw_contracts.equipment import EquipmentStatusResult
 
         inv_result = MagicMock()
         inv_result.sku = "SKU-001"
@@ -364,7 +364,7 @@ class TestWarehouseStateProviderDeadline:
         clock = FakeClock(1000.0)
         deadline = RequestDeadline.from_timeout(30.0, clock=clock)
 
-        from maiw_mcp.contracts.equipment import EquipmentStatusResult
+        from maiw_contracts.equipment import EquipmentStatusResult
 
         inv_result = MagicMock()
         inv_result.sku = "SKU-001"
@@ -416,7 +416,7 @@ class TestWarehouseStateProviderDeadline:
         # advance to leave only a tiny slice
         clock.advance(29.999)
 
-        from maiw_mcp.contracts.equipment import EquipmentStatusResult
+        from maiw_contracts.equipment import EquipmentStatusResult
 
         async def hanging_skill(*args, **kwargs):
             await asyncio.sleep(10.0)  # will be cancelled by wait_for
@@ -451,7 +451,7 @@ class TestWarehouseStateProviderDeadline:
         clock = FakeClock(1000.0)
         deadline = RequestDeadline.from_timeout(10.0, clock=clock)
 
-        from maiw_mcp.contracts.equipment import EquipmentStatusResult
+        from maiw_contracts.equipment import EquipmentStatusResult
 
         eq_result = MagicMock(spec=EquipmentStatusResult)
         eq_result.total_count = 1
@@ -471,7 +471,7 @@ class TestWarehouseStateProviderDeadline:
         clock = FakeClock(1000.0)
         deadline = RequestDeadline.unlimited(clock=clock)
 
-        from maiw_mcp.contracts.equipment import EquipmentStatusResult
+        from maiw_contracts.equipment import EquipmentStatusResult
 
         eq_result = MagicMock(spec=EquipmentStatusResult)
         eq_result.total_count = 0
@@ -493,7 +493,7 @@ class TestWarehouseStateProviderDeadline:
 
 
 def _make_proposal(action: str = "test.action") -> "ActionProposal":
-    from maiw_mcp.contracts.actions import ActionProposal, RiskLevel
+    from maiw_decision.proposal import ActionProposal, RiskLevel
 
     return ActionProposal(
         action=action,

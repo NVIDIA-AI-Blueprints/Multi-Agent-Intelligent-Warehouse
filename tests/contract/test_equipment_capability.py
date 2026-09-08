@@ -19,8 +19,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from maiw_mcp.contracts.actions import ActionProposal, RiskLevel
-from maiw_mcp.contracts.equipment import (
+from maiw_decision.proposal import ActionProposal, RiskLevel
+from maiw_contracts.equipment import (
     EQUIPMENT_ASSIGN_METADATA,
     EQUIPMENT_GET_STATUS_METADATA,
     EQUIPMENT_GET_TELEMETRY_METADATA,
@@ -374,13 +374,12 @@ class TestMockEquipmentProvider:
 
         result = asyncio.run(run())
         assert isinstance(result, EquipmentAssignmentResult)
-        assert result.proposal.action == "warehouse.equipment.assign"
-        assert result.proposal.parameters["asset_id"] == "FL-001"
-        assert result.proposal.requires_approval is True
-        assert result.proposal.risk_level == RiskLevel.MEDIUM
+        assert result.proposal_id  # non-empty UUID string
         assert result.source == "mock"
 
     def test_proposal_id_is_unique_per_request(self):
+        import uuid
+
         async def run():
             provider = MockEquipmentProvider()
             r1 = await provider.propose_equipment_assignment(
@@ -393,10 +392,12 @@ class TestMockEquipmentProvider:
                     asset_id="FL-001", assignee="op-1", reason="r1", requested_by="a"
                 )
             )
-            return r1.proposal.proposal_id, r2.proposal.proposal_id
+            return r1.proposal_id, r2.proposal_id
 
         id1, id2 = asyncio.run(run())
         assert id1 != id2
+        uuid.UUID(id1)
+        uuid.UUID(id2)
 
 
 # ── Contract: EquipmentStatusResult and EquipmentTelemetryResult ──────────────
@@ -608,9 +609,7 @@ class TestMAIWEquipmentAdapterMapping:
         result = asyncio.run(run())
         assert isinstance(result, EquipmentAssignmentResult)
         assert result.source == "maiw-backend"
-        assert result.proposal.action == "warehouse.equipment.assign"
-        assert result.proposal.parameters["asset_id"] == "FL-001"
-        assert result.proposal.requires_approval is True
+        assert result.proposal_id  # non-empty UUID string
 
 
 # ── Contract: Equipment Skill ─────────────────────────────────────────────────

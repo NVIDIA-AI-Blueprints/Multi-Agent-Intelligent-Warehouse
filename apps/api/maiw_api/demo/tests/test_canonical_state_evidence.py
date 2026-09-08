@@ -26,7 +26,7 @@ import pytest
 
 from maiw_api.demo.providers.labor import SimulationLaborProvider
 from maiw_api.demo.world import DemoWarehouseWorld
-from maiw_mcp.contracts.labor import LaborCapacityRequest
+from maiw_contracts.labor import LaborCapacityRequest
 
 _SCENARIOS_DIR = pathlib.Path(__file__).parent.parent / "scenarios"
 

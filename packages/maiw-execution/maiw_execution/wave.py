@@ -8,7 +8,7 @@ import logging
 from typing import Any
 
 from maiw_decision.models import DecisionResult
-from maiw_mcp.contracts.actions import ActionProposal
+from maiw_decision.proposal import ActionProposal
 
 from .base import BaseActionExecutor
 from .outcome import ExecutionOutcome
@@ -72,7 +72,7 @@ class WaveActionExecutor(BaseActionExecutor):
         decision: DecisionResult,
         execution_id: str,
     ) -> tuple[dict[str, Any], str | None, ExecutionOutcome]:
-        from maiw_mcp.contracts.wave import WaveReprioritizeRequest
+        from maiw_contracts.wave import WaveReprioritizeRequest
 
         params = proposal.parameters
         req = WaveReprioritizeRequest(

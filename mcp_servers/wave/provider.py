@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from maiw_mcp.contracts.wave import (
+from maiw_contracts.wave import (
     WaveGetRequest,
     WaveGetResult,
     WaveReprioritizeRequest,

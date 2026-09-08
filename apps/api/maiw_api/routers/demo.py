@@ -822,7 +822,7 @@ async def _build_proposal(rec: Any, trace_id: str, runtime: Any) -> Any:
         return await skill.execute(req, trace_id=trace_id)
 
     if cap == "warehouse.equipment.release":
-        from maiw_mcp.contracts.actions import ActionProposal
+        from maiw_decision.proposal import ActionProposal
 
         return ActionProposal.for_equipment_release(
             asset_id=rec.target,
@@ -833,7 +833,7 @@ async def _build_proposal(rec: Any, trace_id: str, runtime: Any) -> Any:
         )
 
     if cap == "warehouse.equipment.schedule_maintenance":
-        from maiw_mcp.contracts.actions import ActionProposal
+        from maiw_decision.proposal import ActionProposal
 
         return ActionProposal.for_schedule_maintenance(
             asset_id=rec.target,
@@ -920,7 +920,7 @@ async def approve_proposal(request: ApproveRequest):
     """
     from maiw_decision.models import DecisionOutcome, DecisionRequest
     from maiw_decision.approval import ApprovalAlreadyDecided, ApprovalExpired, ApprovalNotFound
-    from maiw_mcp.contracts.actions import ActionProposal
+    from maiw_decision.proposal import ActionProposal
     from maiw_api.demo.events import ScenarioEvent
 
     ctrl = _get_controller()
@@ -1260,7 +1260,7 @@ def _build_reconciliation_strategy(domain: str, runtime: Any) -> Any:
     if domain == "labor" and runtime.mcp_client is not None:
         try:
             from maiw_skills.labor.skills import LaborAllocationSkill
-            from maiw_mcp.contracts.labor import LaborAllocationRequest
+            from maiw_contracts.labor import LaborAllocationRequest
         except ImportError:
             return None
 
@@ -1295,7 +1295,7 @@ def _build_reconciliation_strategy(domain: str, runtime: Any) -> Any:
     if domain == "equipment" and runtime.mcp_client is not None:
         try:
             from maiw_skills.equipment.skills import EquipmentStatusSkill
-            from maiw_mcp.contracts.equipment import EquipmentStatusRequest
+            from maiw_contracts.equipment import EquipmentStatusRequest
         except ImportError:
             return None
 
@@ -1335,7 +1335,7 @@ def _build_reconciliation_strategy(domain: str, runtime: Any) -> Any:
     if domain == "wave" and runtime.mcp_client is not None:
         try:
             from maiw_skills.wave.skills import WaveGetSkill
-            from maiw_mcp.contracts.wave import WaveGetRequest
+            from maiw_contracts.wave import WaveGetRequest
         except ImportError:
             return None
 

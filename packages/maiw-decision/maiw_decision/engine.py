@@ -20,7 +20,7 @@ in-memory rule processing.
 
 from __future__ import annotations
 
-from maiw_mcp.contracts.actions import RiskLevel
+from maiw_decision.proposal import RiskLevel
 from maiw_state.errors import StateFreshnessError
 
 from .audit import DecisionAuditRecord

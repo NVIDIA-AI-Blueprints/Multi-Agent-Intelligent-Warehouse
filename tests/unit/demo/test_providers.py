@@ -11,13 +11,13 @@ from maiw_api.demo.providers.inventory import SimulationInventoryProvider
 from maiw_api.demo.providers.equipment import SimulationEquipmentProvider
 from maiw_api.demo.providers.labor import SimulationLaborProvider
 from maiw_api.demo.providers.wave import SimulationWaveProvider
-from maiw_mcp.contracts.inventory import InventoryLookupRequest
-from maiw_mcp.contracts.equipment import (
+from maiw_contracts.inventory import InventoryLookupRequest
+from maiw_contracts.equipment import (
     EquipmentStatusRequest,
     EquipmentExecuteAssignRequest,
 )
-from maiw_mcp.contracts.labor import LaborCapacityRequest, LaborAllocateRequest
-from maiw_mcp.contracts.wave import WaveRiskRequest, WaveReprioritizeRequest
+from maiw_contracts.labor import LaborCapacityRequest, LaborAllocateRequest
+from maiw_contracts.wave import WaveRiskRequest, WaveReprioritizeRequest
 from maiw_mcp.errors import BackendUnavailable
 
 _STATE = {

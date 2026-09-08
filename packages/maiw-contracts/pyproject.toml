@@ -3,13 +3,12 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "maiw-decision"
+name = "maiw-contracts"
 version = "0.1.0"
-description = "Deterministic decision engine for MAIW warehouse write operations"
+description = "MCP-independent warehouse domain capability contracts for MAIW"
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.0.0",
-    "maiw-state>=0.1.0",
 ]
 
 [project.optional-dependencies]
@@ -19,4 +18,4 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["maiw_decision*"]
+include = ["maiw_contracts*"]

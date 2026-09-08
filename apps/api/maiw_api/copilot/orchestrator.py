@@ -375,7 +375,7 @@ class GovernedActionOrchestrator:
             return await skill.execute(r, trace_id=trace_id)
 
         if cap == "warehouse.equipment.release":
-            from maiw_mcp.contracts.actions import ActionProposal
+            from maiw_decision.proposal import ActionProposal
 
             return ActionProposal.for_equipment_release(
                 asset_id=req.target,
@@ -386,7 +386,7 @@ class GovernedActionOrchestrator:
             )
 
         if cap == "warehouse.equipment.schedule_maintenance":
-            from maiw_mcp.contracts.actions import ActionProposal
+            from maiw_decision.proposal import ActionProposal
 
             return ActionProposal.for_schedule_maintenance(
                 asset_id=req.target,

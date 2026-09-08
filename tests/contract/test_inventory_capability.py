@@ -29,7 +29,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from maiw_mcp.contracts.inventory import (
+from maiw_contracts.inventory import (
     INVENTORY_GET_METADATA,
     INVENTORY_LOCATE_METADATA,
     InventoryLocation,

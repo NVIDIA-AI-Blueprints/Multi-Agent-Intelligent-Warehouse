@@ -24,7 +24,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Protocol, runtime_checkable
 
-from maiw_mcp.contracts.equipment import (
+from maiw_contracts.equipment import (
     AvailableMetric,
     EquipmentAssetInfo,
     EquipmentAssignmentRequest,
@@ -242,7 +242,7 @@ class MockEquipmentProvider:
     async def propose_equipment_assignment(
         self, request: EquipmentAssignmentRequest
     ) -> EquipmentAssignmentResult:
-        from maiw_mcp.contracts.actions import ActionProposal
+        from maiw_decision.proposal import ActionProposal
         proposal = ActionProposal.for_equipment_assign(
             asset_id=request.asset_id,
             assignee=request.assignee,
@@ -253,4 +253,4 @@ class MockEquipmentProvider:
             reason=request.reason,
             requested_by=request.requested_by,
         )
-        return EquipmentAssignmentResult(proposal=proposal, source="mock")
+        return EquipmentAssignmentResult(proposal_id=proposal.proposal_id, source="mock")

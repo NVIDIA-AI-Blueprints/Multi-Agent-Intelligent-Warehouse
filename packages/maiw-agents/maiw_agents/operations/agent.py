@@ -155,7 +155,7 @@ class OperationsCoordinationAgent:
         if self.inventory_skill is None:
             return None
         try:
-            from maiw_mcp.contracts.inventory import InventoryLookupRequest
+            from maiw_contracts.inventory import InventoryLookupRequest
 
             result = await self.inventory_skill.execute(
                 InventoryLookupRequest(warehouse_id=warehouse_id, sku=sku),
@@ -193,7 +193,7 @@ class OperationsCoordinationAgent:
         if self.equipment_status_skill is None:
             return None
         try:
-            from maiw_mcp.contracts.equipment import EquipmentStatusRequest
+            from maiw_contracts.equipment import EquipmentStatusRequest
 
             result = await self.equipment_status_skill.execute(
                 EquipmentStatusRequest(
@@ -235,7 +235,7 @@ class OperationsCoordinationAgent:
         if self.equipment_telemetry_skill is None:
             return None
         try:
-            from maiw_mcp.contracts.equipment import EquipmentTelemetryRequest
+            from maiw_contracts.equipment import EquipmentTelemetryRequest
 
             result = await self.equipment_telemetry_skill.execute(
                 EquipmentTelemetryRequest(

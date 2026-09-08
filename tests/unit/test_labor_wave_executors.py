@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from maiw_decision.models import DecisionOutcome, DecisionResult
-from maiw_mcp.contracts.actions import ActionProposal, RiskLevel
+from maiw_decision.proposal import ActionProposal, RiskLevel
 from src.api.agents.inventory.action_executor import (
     ActionDecisionMismatch,
     ActionExecutionResult,

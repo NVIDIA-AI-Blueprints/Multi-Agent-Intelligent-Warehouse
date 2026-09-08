@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from maiw_decision.models import DecisionOutcome, DecisionResult
-from maiw_mcp.contracts.actions import ActionProposal
+from maiw_decision.proposal import ActionProposal
 from src.api.agents.inventory.action_executor import (
     ActionConflict,
     ActionDecisionMismatch,
@@ -137,7 +137,7 @@ class WaveActionExecutor:
     async def _do_reprioritize(
         self, proposal: ActionProposal, decision: DecisionResult
     ) -> dict:
-        from maiw_mcp.contracts.wave import WaveReprioritizeRequest
+        from maiw_contracts.wave import WaveReprioritizeRequest
 
         params = proposal.parameters
         req = WaveReprioritizeRequest(

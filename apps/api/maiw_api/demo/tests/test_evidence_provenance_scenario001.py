@@ -87,9 +87,9 @@ from maiw_api.demo.providers.equipment import SimulationEquipmentProvider
 from maiw_api.demo.providers.labor import SimulationLaborProvider
 from maiw_api.demo.providers.wave import SimulationWaveProvider
 from maiw_api.demo.world import DemoWarehouseWorld
-from maiw_mcp.contracts.equipment import EquipmentStatusRequest
-from maiw_mcp.contracts.labor import LaborCapacityRequest
-from maiw_mcp.contracts.wave import WaveGetRequest
+from maiw_contracts.equipment import EquipmentStatusRequest
+from maiw_contracts.labor import LaborCapacityRequest
+from maiw_contracts.wave import WaveGetRequest
 
 _SCENARIOS_DIR = pathlib.Path(__file__).parent.parent / "scenarios"
 _SCENARIO_NAME = "labor_constraint_wave_risk"

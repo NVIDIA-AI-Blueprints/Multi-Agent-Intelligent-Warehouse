@@ -44,7 +44,7 @@ from typing import Any
 
 from mcp.server import MCPServer
 
-from maiw_mcp.contracts.inventory import (
+from maiw_contracts.inventory import (
     INVENTORY_GET_METADATA,
     INVENTORY_LOCATE_METADATA,
     InventoryLookupRequest,

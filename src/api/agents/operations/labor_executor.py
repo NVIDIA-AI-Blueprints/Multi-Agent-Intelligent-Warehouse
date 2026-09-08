@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from maiw_decision.models import DecisionOutcome, DecisionResult
-from maiw_mcp.contracts.actions import ActionProposal
+from maiw_decision.proposal import ActionProposal
 from src.api.agents.inventory.action_executor import (
     ActionConflict,
     ActionDecisionMismatch,
@@ -137,7 +137,7 @@ class LaborActionExecutor:
     async def _do_allocate(
         self, proposal: ActionProposal, decision: DecisionResult
     ) -> dict:
-        from maiw_mcp.contracts.labor import LaborAllocateRequest
+        from maiw_contracts.labor import LaborAllocateRequest
 
         params = proposal.parameters
         req = LaborAllocateRequest(
