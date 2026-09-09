@@ -56,6 +56,9 @@ jest.mock('../services/worldAPI', () => ({
     getConfig: jest.fn(),
     getSummary: jest.fn(),
     getChanges: jest.fn(),
+    searchGraph: jest.fn(),
+    getGraphEntity: jest.fn(),
+    getGraphNeighbors: jest.fn(),
   },
 }));
 
@@ -252,14 +255,15 @@ describe('Phase 17A — World Explorer', () => {
     });
   });
 
-  // ── 8. GRAPH and RAW tabs are disabled; CHANGES is now enabled (Phase 17B) ────
+  // ── 8. RAW tab is disabled; GRAPH and CHANGES are now enabled (Phase 17C) ────
 
-  it('GRAPH and RAW tabs are disabled in WorldShell', () => {
+  it('RAW tab is disabled in WorldShell (GRAPH and CHANGES are enabled)', () => {
     render(<WorldShell />, { wrapper: Wrapper });
-    const graphBtn = screen.getByRole('button', { name: /graph/i });
     const rawBtn = screen.getByRole('button', { name: /raw/i });
-    expect(graphBtn).toBeDisabled();
     expect(rawBtn).toBeDisabled();
+    // GRAPH is now enabled in Phase 17C
+    const graphBtn = screen.getByRole('button', { name: /^graph$/i });
+    expect(graphBtn).not.toBeDisabled();
   });
 
   // ── 9. No mutation controls in WORLD ─────────────────────────────────────────
