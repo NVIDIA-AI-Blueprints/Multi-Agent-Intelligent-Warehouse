@@ -14,7 +14,7 @@
 
 import React, { useMemo, useCallback, useState } from 'react';
 import { Box, Typography } from '@mui/material';
-import { GraphNodeDTO, GraphEdgeDTO } from '../../services/worldAPI';
+import { GraphNodeDTO, GraphEdgeDTO, ChangedEntityDTO } from '../../services/worldAPI';
 import { getSemanticZoomLevel } from '../demo/decision-graph/semanticZoom';
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -127,6 +127,37 @@ function ScenarioBadge({ x, y }: { x: number; y: number }) {
   );
 }
 
+// ── LIVE changed badge ────────────────────────────────────────────────────────
+
+function LiveChangedBadge({ x, y, w }: { x: number; y: number; w: number }) {
+  return (
+    <g>
+      <rect
+        x={x + w - 28}
+        y={y - 6}
+        width={26}
+        height={10}
+        rx={2}
+        fill="#E3B34122"
+        stroke="#E3B341"
+        strokeWidth={0.8}
+      />
+      <text
+        x={x + w - 15}
+        y={y - 1}
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fill="#E3B341"
+        fontFamily="monospace"
+        fontSize={5}
+        fontWeight="bold"
+      >
+        CHANGED
+      </text>
+    </g>
+  );
+}
+
 // ── Node card ─────────────────────────────────────────────────────────────────
 
 interface NodeCardProps {
@@ -137,18 +168,27 @@ interface NodeCardProps {
   zoom: number;
   zoomLevel: string;
   onClick: (id: string) => void;
+  liveChange?: ChangedEntityDTO | null;
 }
 
-function NodeCard({ node, isFocus, isSelected, pos, zoom, zoomLevel, onClick }: NodeCardProps) {
+function NodeCard({ node, isFocus, isSelected, pos, zoom, zoomLevel, onClick, liveChange }: NodeCardProps) {
   const color = entityColor(node.entity_type);
   const w = isFocus ? FOCUS_W : NODE_W;
   const h = isFocus ? FOCUS_H : NODE_H;
   const x = pos.x - w / 2;
   const y = pos.y - h / 2;
 
-  const borderColor = isSelected ? '#58A6FF' : node.scenario_affected ? '#F85149' : color;
+  const isLiveChanged = !!liveChange;
+  // Border priority: selected (blue) > live-changed (yellow) > scenario-affected (red) > type color
+  const borderColor = isSelected
+    ? '#58A6FF'
+    : isLiveChanged
+    ? '#E3B341'
+    : node.scenario_affected
+    ? '#F85149'
+    : color;
   const bgColor = isFocus ? '#1C2128' : '#161B22';
-  const borderWidth = isSelected ? 1.5 : 1;
+  const borderWidth = isSelected ? 1.5 : isLiveChanged ? 1.5 : 1;
 
   const labelFontSize = isFocus ? 8 : 7;
   const typeFontSize = 5.5;
@@ -210,9 +250,33 @@ function NodeCard({ node, isFocus, isSelected, pos, zoom, zoomLevel, onClick }: 
           {node.entity_type.toUpperCase()}
         </text>
       )}
-      {node.scenario_affected && (
+      {node.scenario_affected && !isLiveChanged && (
         <ScenarioBadge x={x + w - 3} y={y + 3} />
       )}
+      {isLiveChanged && (
+        <LiveChangedBadge x={x} y={y} w={w} />
+      )}
+      {/* LIVE state transition — show BASE→LIVE for status field when changed */}
+      {isLiveChanged && zoomLevel === 'DETAIL' && liveChange && (() => {
+        const statusField = liveChange.changed_fields.find((cf) => cf.field === 'status');
+        if (!statusField) return null;
+        return (
+          <text
+            x={pos.x}
+            y={pos.y + (isFocus ? 16 : 12)}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fill="#E3B341"
+            fontFamily="monospace"
+            fontSize={4.5}
+            opacity={0.85}
+          >
+            {String(statusField.before_value ?? '?').toUpperCase()}
+            {' → '}
+            {String(statusField.after_value ?? '?').toUpperCase()}
+          </text>
+        );
+      })()}
     </g>
   );
 }
@@ -227,6 +291,8 @@ interface OperationalGraphProps {
   truncatedFrom?: number | null;
   selectedNodeId?: string | null;
   onNodeClick?: (id: string) => void;
+  /** Phase 17D: LIVE changed entities by entity_id. Non-null when worldView=live. */
+  liveChangedEntities?: Map<string, ChangedEntityDTO>;
 }
 
 export default function OperationalGraph({
@@ -237,6 +303,7 @@ export default function OperationalGraph({
   truncatedFrom,
   selectedNodeId,
   onNodeClick,
+  liveChangedEntities,
 }: OperationalGraphProps) {
   const [zoom, setZoom] = useState(ZOOM_DEFAULT);
   const zoomLevel = getSemanticZoomLevel(zoom);
@@ -356,6 +423,7 @@ export default function OperationalGraph({
               const pos = positions.get(node.entity_id);
               if (!pos) return null;
               const isFocus = node.entity_id === focusNode.entity_id;
+              const liveChange = liveChangedEntities?.get(node.entity_id) ?? null;
               return (
                 <NodeCard
                   key={node.entity_id}
@@ -366,6 +434,7 @@ export default function OperationalGraph({
                   zoom={zoom}
                   zoomLevel={zoomLevel}
                   onClick={handleNodeClick}
+                  liveChange={liveChange}
                 />
               );
             })}

@@ -13,10 +13,10 @@
  *   not exact node/edge IDs at time of turn).
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Box, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import { worldAPI, GraphSearchResultDTO, GraphNodeDTO, GraphFocusContext } from '../../services/worldAPI';
+import { worldAPI, GraphSearchResultDTO, GraphNodeDTO, GraphFocusContext, ChangedEntityDTO } from '../../services/worldAPI';
 import { WorldView } from './WorldShell';
 import OperationalGraph from './OperationalGraph';
 import NodeInspector from './NodeInspector';
@@ -200,6 +200,25 @@ export default function WorldGraph({ worldView, focusContext, onReturnToCopilot 
     refetchInterval: focusEntityId ? 15_000 : false,
   });
 
+  // Phase 17D: LIVE data for graph annotations (only when worldView === 'live')
+  const { data: liveData } = useQuery({
+    queryKey: ['world-live-graph'],
+    queryFn: () => worldAPI.getLive(),
+    enabled: worldView === 'live',
+    refetchInterval: worldView === 'live' ? 15_000 : false,
+    staleTime: 10_000,
+  });
+
+  // Build entity_id → ChangedEntityDTO map for OperationalGraph
+  const liveChangedEntities = useMemo<Map<string, ChangedEntityDTO> | undefined>(() => {
+    if (worldView !== 'live' || !liveData) return undefined;
+    const m = new Map<string, ChangedEntityDTO>();
+    for (const e of liveData.changed_entities) {
+      m.set(e.entity_id, e);
+    }
+    return m;
+  }, [worldView, liveData]);
+
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
     setShowResults(true);
@@ -375,6 +394,7 @@ export default function WorldGraph({ worldView, focusContext, onReturnToCopilot 
               truncatedFrom={neighborhood.truncated_from}
               selectedNodeId={selectedNodeId}
               onNodeClick={handleNodeClick}
+              liveChangedEntities={liveChangedEntities}
             />
           </Box>
 
