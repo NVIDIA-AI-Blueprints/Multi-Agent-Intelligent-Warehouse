@@ -99,12 +99,21 @@ interface GraphFocusContextLocal {
   entityCount: number | null;
 }
 
+// Phase 17E: historical snapshot context passed to World view
+export interface SnapshotContextLocal {
+  turnId: string;
+  traceId: string;
+  entityLabel: string | null;
+  contextSnapshotId: string;
+}
+
 interface CopilotDrawerProps {
   warehouseId: string;
   scenarioName: string;
   onClose: () => void;
   onReviewApproval?: (pendingApprovalId: string) => void;
   onViewOperationalContext?: (ctx: GraphFocusContextLocal) => void;
+  onViewContextAtDecisionTime?: (ctx: SnapshotContextLocal) => void;  // Phase 17E
   // Lifted conversation state — owned by DemoShell so it survives drawer remount
   conversationId: string | null;
   setConversationId: (id: string | null) => void;
@@ -119,6 +128,7 @@ interface CopilotDrawerProps {
 interface CopilotAnswerProps {
   turn: CopilotTurnResponse;
   onViewOperationalContext?: (ctx: GraphFocusContextLocal) => void;
+  onViewContextAtDecisionTime?: (ctx: SnapshotContextLocal) => void;  // Phase 17E
 }
 
 function SeverityBadge({ severity }: { severity: string }) {
@@ -639,7 +649,7 @@ function CopilotObserveAnswer({ turn, isLatest }: CopilotAnswerProps & { isLates
   );
 }
 
-function CopilotAnswer({ turn, isLatest, onViewOperationalContext }: CopilotAnswerProps & { isLatest?: boolean; onViewOperationalContext?: (ctx: GraphFocusContextLocal) => void }) {
+function CopilotAnswer({ turn, isLatest, onViewOperationalContext, onViewContextAtDecisionTime }: CopilotAnswerProps & { isLatest?: boolean; onViewOperationalContext?: (ctx: GraphFocusContextLocal) => void; onViewContextAtDecisionTime?: (ctx: SnapshotContextLocal) => void }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   const isAnalyze = turn.intent === 'analyze';
@@ -805,34 +815,59 @@ function CopilotAnswer({ turn, isLatest, onViewOperationalContext }: CopilotAnsw
           }}>
             CONTEXT
           </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
             <Typography sx={{
               fontFamily: 'monospace', fontSize: '0.7rem', color: '#8B949E',
             }}>
               {turn.focus_entity_label ?? turn.neighborhood.focus_entity_label ?? 'No entity focus'} · {turn.neighborhood.entity_count} entities
             </Typography>
-            {turn.focus_entity_id && turn.neighborhood.graph_available && onViewOperationalContext && (
-              <Box
-                component="button"
-                data-testid="view-operational-context"
-                onClick={() => onViewOperationalContext({
-                  entityId: turn.focus_entity_id!,
-                  entityLabel: turn.focus_entity_label ?? null,
-                  turnId: turn.turn_id,
-                  traceId: turn.trace_id,
-                  entityCount: turn.neighborhood?.entity_count ?? null,
-                })}
-                sx={{
-                  background: 'transparent', border: '1px solid #1F3A5A',
-                  borderRadius: '3px', px: '6px', py: '2px', flexShrink: 0,
-                  fontFamily: 'monospace', fontSize: '0.58rem',
-                  color: '#58A6FF', cursor: 'pointer',
-                  '&:hover': { background: '#0F1923', borderColor: '#58A6FF' },
-                }}
-              >
-                VIEW OPERATIONAL CONTEXT
-              </Box>
-            )}
+            <Box sx={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {/* Phase 17E: VIEW CONTEXT AT DECISION TIME — historical snapshot */}
+              {turn.context_snapshot_id && onViewContextAtDecisionTime && (
+                <Box
+                  component="button"
+                  data-testid="view-context-at-decision-time"
+                  onClick={() => onViewContextAtDecisionTime({
+                    turnId: turn.turn_id,
+                    traceId: turn.trace_id,
+                    entityLabel: turn.focus_entity_label ?? null,
+                    contextSnapshotId: turn.context_snapshot_id!,
+                  })}
+                  sx={{
+                    background: 'transparent', border: '1px solid #1F6FEB44',
+                    borderRadius: '3px', px: '6px', py: '2px', flexShrink: 0,
+                    fontFamily: 'monospace', fontSize: '0.58rem',
+                    color: '#58A6FF', cursor: 'pointer', fontWeight: 600,
+                    '&:hover': { background: '#0D1420', borderColor: '#58A6FF' },
+                  }}
+                >
+                  VIEW CONTEXT AT DECISION TIME
+                </Box>
+              )}
+              {/* Existing: VIEW OPERATIONAL CONTEXT — current reconstruction */}
+              {turn.focus_entity_id && turn.neighborhood.graph_available && onViewOperationalContext && (
+                <Box
+                  component="button"
+                  data-testid="view-operational-context"
+                  onClick={() => onViewOperationalContext({
+                    entityId: turn.focus_entity_id!,
+                    entityLabel: turn.focus_entity_label ?? null,
+                    turnId: turn.turn_id,
+                    traceId: turn.trace_id,
+                    entityCount: turn.neighborhood?.entity_count ?? null,
+                  })}
+                  sx={{
+                    background: 'transparent', border: '1px solid #21262D',
+                    borderRadius: '3px', px: '6px', py: '2px', flexShrink: 0,
+                    fontFamily: 'monospace', fontSize: '0.58rem',
+                    color: '#484F58', cursor: 'pointer',
+                    '&:hover': { background: '#0F1923', color: '#8B949E', borderColor: '#484F58' },
+                  }}
+                >
+                  VIEW OPERATIONAL CONTEXT
+                </Box>
+              )}
+            </Box>
           </Box>
           {!turn.neighborhood.graph_available && (
             <Typography sx={{
@@ -968,6 +1003,7 @@ export default function CopilotDrawer({
   onClose,
   onReviewApproval,
   onViewOperationalContext,
+  onViewContextAtDecisionTime,
   conversationId,
   setConversationId,
   turns,
@@ -1241,7 +1277,7 @@ export default function CopilotDrawer({
                   ? <CopilotActAnswer turn={turn.response} isLatest={isLatest} onReviewApproval={onReviewApproval} />
                   : turn.response.intent === 'observe_outcome'
                   ? <CopilotObserveAnswer turn={turn.response} isLatest={isLatest} />
-                  : <CopilotAnswer turn={turn.response} isLatest={isLatest} onViewOperationalContext={onViewOperationalContext} />
+                  : <CopilotAnswer turn={turn.response} isLatest={isLatest} onViewOperationalContext={onViewOperationalContext} onViewContextAtDecisionTime={onViewContextAtDecisionTime} />
               ) : turn.error ? (
                 <Typography sx={{
                   fontFamily: 'monospace', fontSize: '0.72rem', color: '#F85149',

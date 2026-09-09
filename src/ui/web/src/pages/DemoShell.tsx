@@ -14,7 +14,8 @@ import ReliabilityPanel from '../components/demo/reliability/ReliabilityPanel';
 import ExpertOverlay from '../components/demo/ExpertOverlay';
 import WorldShell from '../components/world/WorldShell';
 import { GraphFocusContext } from '../services/worldAPI';
-import CopilotDrawer from '../components/demo/copilot/CopilotDrawer';
+import CopilotDrawer, { SnapshotContextLocal } from '../components/demo/copilot/CopilotDrawer';
+import { SnapshotViewContext } from '../components/world/WorldContextSnapshot';
 import { useCopilotConversation, CopilotSystemCard } from '../hooks/useCopilotConversation';
 
 const WAREHOUSE_ID = process.env.REACT_APP_WAREHOUSE_ID || 'DC-47';
@@ -356,6 +357,7 @@ export default function DemoShell() {
   const [selectedStage, setSelectedStage] = useState<RailStage | null>(null);
   const [selectedApprovalId, setSelectedApprovalId] = useState<string | null>(null);
   const [graphFocusContext, setGraphFocusContext] = useState<GraphFocusContext | null>(null);
+  const [snapshotViewContext, setSnapshotViewContext] = useState<SnapshotViewContext | null>(null);  // Phase 17E
   const conversation = useCopilotConversation();
   const queryClient = useQueryClient();
 
@@ -393,6 +395,25 @@ export default function DemoShell() {
     setGraphFocusContext(ctx);
     setMode('world');
     setCopilotOpen(false);
+  }, []);
+
+  // Phase 17E: navigate to historical context snapshot in World view
+  const handleViewContextAtDecisionTime = useCallback((ctx: SnapshotContextLocal) => {
+    setSnapshotViewContext({
+      turnId: ctx.turnId,
+      traceId: ctx.traceId,
+      entityLabel: ctx.entityLabel,
+    });
+    setMode('world');
+    setCopilotOpen(false);
+  }, []);
+
+  // Phase 17E: navigate from context snapshot back to Developer Trace
+  const handleViewDecisionTrace = useCallback((traceId: string) => {
+    // Return to operations mode — the Developer Trace is shown in ExpertOverlay
+    setMode('operations');
+    setCopilotOpen(true);
+    // The trace_id is available in the conversation turns via turn.trace_id
   }, []);
 
   const handleReturnFromGraph = useCallback(() => {
@@ -590,7 +611,9 @@ export default function DemoShell() {
         {mode === 'world' && (
           <WorldShell
             focusContext={graphFocusContext}
+            snapshotContext={snapshotViewContext}
             onReturnToCopilot={handleReturnFromGraph}
+            onViewDecisionTrace={handleViewDecisionTrace}
           />
         )}
 
@@ -676,6 +699,7 @@ export default function DemoShell() {
           onClose={() => setCopilotOpen(false)}
           onReviewApproval={handleReviewApproval}
           onViewOperationalContext={handleViewOperationalContext}
+          onViewContextAtDecisionTime={handleViewContextAtDecisionTime}
           conversationId={conversation.conversationId}
           setConversationId={conversation.setConversationId}
           turns={conversation.turns}

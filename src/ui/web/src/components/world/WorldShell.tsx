@@ -4,15 +4,17 @@ import WorldOverview from './WorldOverview';
 import WorldChanges from './WorldChanges';
 import WorldGraph from './WorldGraph';
 import WorldLive from './WorldLive';
+import WorldContextSnapshot, { SnapshotViewContext } from './WorldContextSnapshot';
 import { GraphFocusContext } from '../../services/worldAPI';
 
-type WorldTab = 'overview' | 'graph' | 'changes' | 'raw';
+type WorldTab = 'overview' | 'graph' | 'changes' | 'context' | 'raw';
 export type WorldView = 'base' | 'scenario' | 'live';
 
 const TABS: { id: WorldTab; label: string; available: boolean }[] = [
   { id: 'overview', label: 'OVERVIEW', available: true },
   { id: 'graph', label: 'GRAPH', available: true },
   { id: 'changes', label: 'CHANGES', available: true },
+  { id: 'context', label: 'CONTEXT', available: true },
   { id: 'raw', label: 'RAW', available: false },
 ];
 
@@ -140,10 +142,17 @@ function WorldViewSwitcher({
 
 interface WorldShellProps {
   focusContext?: GraphFocusContext | null;
+  snapshotContext?: SnapshotViewContext | null;  // Phase 17E: historical context
   onReturnToCopilot?: () => void;
+  onViewDecisionTrace?: (traceId: string) => void;  // Phase 17E: Decision Graph bridge
 }
 
-export default function WorldShell({ focusContext, onReturnToCopilot }: WorldShellProps = {}) {
+export default function WorldShell({
+  focusContext,
+  snapshotContext,
+  onReturnToCopilot,
+  onViewDecisionTrace,
+}: WorldShellProps = {}) {
   const [tab, setTab] = useState<WorldTab>('overview');
   const [worldView, setWorldView] = useState<WorldView>('base');
 
@@ -153,6 +162,13 @@ export default function WorldShell({ focusContext, onReturnToCopilot }: WorldShe
       setTab('graph');
     }
   }, [focusContext]);
+
+  // Phase 17E: When a snapshot context arrives, auto-switch to CONTEXT tab
+  useEffect(() => {
+    if (snapshotContext?.turnId) {
+      setTab('context');
+    }
+  }, [snapshotContext]);
 
   return (
     <Box
@@ -228,6 +244,26 @@ export default function WorldShell({ focusContext, onReturnToCopilot }: WorldShe
         )}
 
         {tab === 'changes' && <WorldChanges worldView={worldView} />}
+
+        {/* Phase 17E: CONTEXT tab — historical operational context snapshot */}
+        {tab === 'context' && snapshotContext && (
+          <WorldContextSnapshot
+            ctx={snapshotContext}
+            onViewDecisionTrace={onViewDecisionTrace}
+            onViewCurrentContext={focusContext ? undefined : undefined}
+            onReturnToCopilot={onReturnToCopilot}
+          />
+        )}
+        {tab === 'context' && !snapshotContext && (
+          <Box sx={{ p: 2 }}>
+            <Typography sx={{
+              fontFamily: 'monospace', fontSize: '0.7rem', color: '#484F58',
+            }}>
+              No context snapshot selected. Open the Copilot and click VIEW CONTEXT AT DECISION TIME
+              on a grounded ASK or ANALYZE turn.
+            </Typography>
+          </Box>
+        )}
 
         {tab === 'raw' && (
           <Box

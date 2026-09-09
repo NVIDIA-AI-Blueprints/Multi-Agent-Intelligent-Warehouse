@@ -235,6 +235,8 @@ export interface CopilotTurnResponse {
   observe_kpi_delta?: Record<string, number | string>;
   observe_act_decision_outcome?: string | null;
   observe_act_pending_approval_id?: string | null;
+  // Phase 17E: operational context snapshot ID — present on grounded turns
+  context_snapshot_id?: string | null;
 }
 
 export interface CopilotTurnRequest {
