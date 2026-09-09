@@ -12,8 +12,10 @@ No execution, decision, approval, or orchestration imports.
 
 from __future__ import annotations
 
+import re
+from collections import deque
 from typing import Any
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from maiw_api.bootstrap import MAIWRuntime, get_runtime
@@ -149,6 +151,62 @@ class WorldChangesResponse(BaseModel):
     affected_entity_count: int
     events: list[OverlayEventDTO]
     affected_entities: list[AffectedEntityDTO]
+
+
+# ── Phase 17C: Graph inspection models ────────────────────────────────────────
+
+class GraphSearchResultDTO(BaseModel):
+    entity_id: str
+    entity_type: str
+    label: str
+    match_type: str   # EXACT_ID | EXACT_ATTRIBUTE | ENTITY_TYPE | PREFIX_ID | NAME_MATCH
+
+class GraphSearchResponse(BaseModel):
+    query: str
+    results: list[GraphSearchResultDTO]
+
+class GraphNodeDTO(BaseModel):
+    entity_id: str
+    entity_type: str
+    label: str
+    attributes_summary: dict[str, str | int | float | bool | None]
+    scenario_affected: bool
+    scenario_severity: str | None = None
+    bfs_depth: int = 1   # 0=focus, 1=direct neighbor, 2=two-hop
+
+class GraphEdgeDTO(BaseModel):
+    edge_id: str
+    source_id: str
+    target_id: str
+    relationship_type: str
+    valid_from: str | None = None
+    valid_to: str | None = None
+    temporal: bool = False
+    active: bool = True
+
+class GraphEntityDetailResponse(BaseModel):
+    entity_id: str
+    entity_type: str
+    label: str
+    attributes: dict[str, str | int | float | bool | None]
+    incoming_count: int
+    outgoing_count: int
+    scenario_affected: bool
+    scenario_severity: str | None = None
+    direct_relationships: list[GraphEdgeDTO]
+
+class GraphNeighborhoodResponse(BaseModel):
+    focus_entity: GraphNodeDTO
+    nodes: list[GraphNodeDTO]
+    edges: list[GraphEdgeDTO]
+    depth: int
+    entity_count: int
+    relationship_count: int
+    truncated: bool
+    truncated_from: int | None = None
+    relationship_summary: dict[str, list[str]]
+    dataset_id: str
+    warehouse_id: str
 
 
 # ── Dependency ─────────────────────────────────────────────────────────────────
@@ -297,6 +355,321 @@ def _affected_entity_severity(kind: str) -> str | None:
         "INVENTORY_SHOCK":     "MODERATE",
     }
     return _SEV.get(kind)
+
+
+# ── Phase 17C: Graph inspection helpers ───────────────────────────────────────
+
+def _entity_label_full(entity: Any) -> str:
+    """Full human-readable label for graph display — used in all graph endpoints."""
+    et = entity.entity_type.value if hasattr(entity.entity_type, "value") else str(entity.entity_type)
+    if et == "worker":
+        return getattr(entity, "full_name", None) or entity.id
+    if et == "wave":
+        num = getattr(entity, "wave_number", None)
+        return f"Wave {num}" if num is not None else entity.id
+    if et == "equipment":
+        eq_type = getattr(entity, "equipment_type", None)
+        type_str = eq_type.value.upper() if hasattr(eq_type, "value") else str(eq_type).upper() if eq_type else ""
+        model = getattr(entity, "model", "") or ""
+        suffix = f" ({model})" if model else ""
+        return f"{type_str} {entity.id}{suffix}" if type_str else entity.id
+    if et == "task":
+        task_type = getattr(entity, "task_type", None)
+        type_str = task_type.value if hasattr(task_type, "value") else str(task_type) if task_type else ""
+        return f"{type_str} {entity.id}" if type_str else entity.id
+    if et == "carrier_cutoff":
+        carrier = getattr(entity, "carrier", "") or ""
+        return f"{carrier} cutoff" if carrier else entity.id
+    if et == "warehouse":
+        return getattr(entity, "name", entity.id) or entity.id
+    if et == "zone":
+        code = getattr(entity, "zone_code", "") or ""
+        return f"Zone {code}" if code else entity.id
+    if et == "order":
+        ref = getattr(entity, "order_reference", "") or ""
+        return f"Order {ref}" if ref else entity.id
+    if et == "sku":
+        return getattr(entity, "name", entity.id) or entity.id
+    if et == "location":
+        code = getattr(entity, "location_code", "") or ""
+        return f"Loc {code}" if code else entity.id
+    return entity.id
+
+
+def _entity_attributes_summary(entity: Any) -> dict[str, str | int | float | bool | None]:
+    """3-5 key display attributes per entity type for the graph canvas node."""
+    et = entity.entity_type.value if hasattr(entity.entity_type, "value") else str(entity.entity_type)
+
+    def _v(attr: str, default: Any = None) -> Any:
+        val = getattr(entity, attr, default)
+        if val is None:
+            return None
+        if hasattr(val, "value"):
+            return val.value
+        if isinstance(val, list):
+            return ", ".join(str(i) for i in val) if val else ""
+        return val
+
+    if et == "worker":
+        return {"role": _v("role"), "skills": _v("skills")}
+    if et == "wave":
+        return {"wave_number": _v("wave_number"), "status": _v("status"), "strategy": _v("strategy")}
+    if et == "equipment":
+        return {"equipment_type": _v("equipment_type"), "model": _v("model", "")}
+    if et == "task":
+        return {"task_type": _v("task_type"), "status": _v("status"), "priority": _v("priority")}
+    if et == "zone":
+        return {"zone_code": _v("zone_code"), "zone_type": _v("zone_type")}
+    if et == "location":
+        return {"location_code": _v("location_code"), "aisle": _v("aisle")}
+    if et == "warehouse":
+        return {"name": _v("name"), "timezone": _v("timezone")}
+    if et == "carrier_cutoff":
+        ct = _v("cutoff_time")
+        return {"carrier": _v("carrier"), "cutoff_time": ct.isoformat() if hasattr(ct, "isoformat") else str(ct) if ct else None}
+    if et == "order":
+        return {"order_reference": _v("order_reference"), "priority": _v("priority")}
+    if et == "sku":
+        return {"name": _v("name"), "category": _v("category")}
+    if et == "shift":
+        return {"shift_name": _v("shift_name"), "start_hour": _v("start_hour"), "end_hour": _v("end_hour")}
+    return {}
+
+
+def _entity_attributes_full(entity: Any) -> dict[str, str | int | float | bool | None]:
+    """All serializable attributes for the entity detail panel."""
+    result: dict[str, str | int | float | bool | None] = {}
+    skip = {"id", "entity_type"}
+    try:
+        for k, v in entity.model_dump().items():
+            if k in skip:
+                continue
+            if v is None:
+                result[k] = None
+            elif isinstance(v, (str, int, float, bool)):
+                result[k] = v
+            elif isinstance(v, list):
+                result[k] = ", ".join(str(i) for i in v) if v else ""
+            elif hasattr(v, "value"):
+                result[k] = v.value
+            elif hasattr(v, "isoformat"):
+                result[k] = v.isoformat()
+            else:
+                result[k] = str(v)
+    except Exception:
+        pass
+    return result
+
+
+def _scenario_affected_map(runtime: MAIWRuntime) -> dict[str, str]:
+    """Returns {entity_id: severity} for all scenario-affected entities."""
+    try:
+        ctrl = runtime.demo_controller
+        if not ctrl or not getattr(ctrl, "active", False):
+            return {}
+        world = getattr(ctrl, "world", None)
+        if not world:
+            return {}
+        sw = getattr(world, "_scenario_world", None)
+        if not sw:
+            return {}
+        result: dict[str, str] = {}
+        for ev in sw.overlay.events:
+            if ev.entity_id not in result:
+                kind = ev.kind.value if hasattr(ev.kind, "value") else str(ev.kind)
+                result[ev.entity_id] = _affected_entity_severity(kind) or "LOW"
+        return result
+    except Exception:
+        return {}
+
+
+def _build_node_dto(entity: Any, scenario_map: dict[str, str], bfs_depth: int = 1) -> GraphNodeDTO:
+    sev = scenario_map.get(entity.id)
+    return GraphNodeDTO(
+        entity_id=entity.id,
+        entity_type=entity.entity_type.value,
+        label=_entity_label_full(entity),
+        attributes_summary=_entity_attributes_summary(entity),
+        scenario_affected=entity.id in scenario_map,
+        scenario_severity=sev,
+        bfs_depth=bfs_depth,
+    )
+
+
+def _build_edge_dto_graph(edge: Any) -> GraphEdgeDTO:
+    """Build a GraphEdgeDTO from a WarehouseEdge."""
+    temporal_rels = {"ASSIGNED_TO", "SUPPORTS"}
+    rel = edge.relationship_type.value if hasattr(edge.relationship_type, "value") else str(edge.relationship_type)
+    temporal = rel in temporal_rels
+    vf = edge.valid_from
+    vt = edge.valid_to
+    active = vt is None  # open-ended edges are active
+    return GraphEdgeDTO(
+        edge_id=edge.id,
+        source_id=edge.source_id,
+        target_id=edge.target_id,
+        relationship_type=rel,
+        valid_from=vf.isoformat() if vf else None,
+        valid_to=vt.isoformat() if vt else None,
+        temporal=temporal,
+        active=active,
+    )
+
+
+def _bounded_bfs(
+    graph: Any,
+    focus_id: str,
+    depth: int,
+    max_entities: int,
+    max_relationships: int,
+) -> tuple[list[tuple[Any, int]], int, list[Any]]:
+    """
+    BFS from focus_id returning capped neighbors with their BFS depth.
+
+    Returns:
+        (neighbor_pairs, total_available, edges)
+        neighbor_pairs = [(entity, bfs_depth), ...] capped at max_entities
+        total_available = uncapped neighbor count (for truncated flag)
+        edges = edges between nodes in the capped set, capped at max_relationships
+    """
+    visited: dict[str, int] = {focus_id: 0}
+    queue: deque[tuple[str, int]] = deque([(focus_id, 0)])
+    ordered: list[tuple[Any, int]] = []
+
+    while queue:
+        current_id, current_depth = queue.popleft()
+        if current_depth >= depth:
+            continue
+        neighbor_ids: set[str] = set()
+        for edge in graph.outgoing_edges(current_id):
+            neighbor_ids.add(edge.target_id)
+        for edge in graph.incoming_edges(current_id):
+            neighbor_ids.add(edge.source_id)
+        for nid in sorted(neighbor_ids):
+            if nid not in visited:
+                visited[nid] = current_depth + 1
+                entity = graph.get_entity(nid)
+                if entity is not None:
+                    ordered.append((entity, current_depth + 1))
+                queue.append((nid, current_depth + 1))
+
+    total_available = len(ordered)
+    # Stable order: (bfs_depth, entity_type, entity_id)
+    ordered_sorted = sorted(ordered, key=lambda x: (x[1], x[0].entity_type.value, x[0].id))
+    capped = ordered_sorted[:max_entities]
+
+    # Edges where both endpoints are in capped set (including focus)
+    capped_ids = {focus_id} | {e[0].id for e in capped}
+    edges: list[Any] = []
+    seen_edges: set[str] = set()
+    focus_entity = graph.get_entity(focus_id)
+    all_in_set = ([focus_entity] if focus_entity else []) + [e[0] for e in capped]
+    for entity in all_in_set:
+        for edge in graph.outgoing_edges(entity.id):
+            if edge.id not in seen_edges and edge.target_id in capped_ids:
+                edges.append(edge)
+                seen_edges.add(edge.id)
+        if len(edges) >= max_relationships:
+            break
+
+    return capped, total_available, edges[:max_relationships]
+
+
+_ENTITY_TYPE_KEYWORDS: dict[str, str] = {
+    "warehouse": "warehouse", "zone": "zone", "location": "location",
+    "worker": "worker", "workers": "worker", "shift": "shift",
+    "equipment": "equipment", "agv": "equipment", "forklift": "equipment", "conveyor": "equipment",
+    "sku": "sku", "skus": "sku", "wave": "wave", "waves": "wave",
+    "task": "task", "tasks": "task", "order": "order", "orders": "order",
+    "carrier": "carrier_cutoff", "carrier_cutoff": "carrier_cutoff", "cutoff": "carrier_cutoff",
+}
+_EQUIP_SUBTYPES = {"agv", "forklift", "conveyor"}
+
+
+def _graph_search(q: str, graph: Any, limit: int) -> list[GraphSearchResultDTO]:
+    """
+    Search the canonical graph. Reuses same canonical ID semantics as Copilot.
+
+    Priority: EXACT_ID > wave/canonical resolution > ENTITY_TYPE keyword > PREFIX_ID > NAME_MATCH
+    """
+    from maiw_world.entities import EntityType
+
+    results: list[GraphSearchResultDTO] = []
+    seen: set[str] = set()
+    q = q.strip()
+    if not q:
+        return results
+
+    q_lower = q.lower()
+
+    def add(entity: Any, match_type: str) -> None:
+        if entity.id in seen or len(results) >= limit:
+            return
+        seen.add(entity.id)
+        results.append(GraphSearchResultDTO(
+            entity_id=entity.id,
+            entity_type=entity.entity_type.value,
+            label=_entity_label_full(entity),
+            match_type=match_type,
+        ))
+
+    # 1. Exact entity ID
+    e = graph.get_entity(q)
+    if e:
+        add(e, "EXACT_ID")
+
+    # 2. Wave number reference ("Wave 17", "wave 17", "wave-017")
+    wave_m = re.search(r"\bwave\s*[-_]?(\d+)\b", q_lower)
+    if wave_m and len(results) < limit:
+        num = int(wave_m.group(1))
+        canonical = f"wave-{num:03d}"
+        cw = graph.get_entity(canonical)
+        if cw:
+            add(cw, "EXACT_ID")
+        else:
+            for w in graph.entities_by_type(EntityType.WAVE):
+                if getattr(w, "wave_number", None) == num:
+                    add(w, "EXACT_ATTRIBUTE")
+                    break
+
+    # 3. Entity type keyword → list instances
+    if len(results) < limit:
+        matched_type_str = _ENTITY_TYPE_KEYWORDS.get(q_lower)
+        if matched_type_str:
+            try:
+                et = EntityType(matched_type_str)
+                candidates = graph.entities_by_type(et)
+                if q_lower in _EQUIP_SUBTYPES:
+                    candidates = [
+                        c for c in candidates
+                        if getattr(getattr(c, "equipment_type", None), "value", "") == q_lower
+                    ]
+                for c in sorted(candidates, key=lambda x: x.id):
+                    add(c, "ENTITY_TYPE")
+                    if len(results) >= limit:
+                        break
+            except ValueError:
+                pass
+
+    # 4. Prefix match on entity IDs (deterministic: sorted)
+    if len(results) < limit:
+        for et in EntityType:
+            for e in sorted(graph.entities_by_type(et), key=lambda x: x.id):
+                if len(results) >= limit:
+                    break
+                if e.id.lower().startswith(q_lower):
+                    add(e, "PREFIX_ID")
+
+    # 5. Worker full_name contains query
+    if len(results) < limit:
+        for w in sorted(graph.entities_by_type(EntityType.WORKER), key=lambda x: x.id):
+            if len(results) >= limit:
+                break
+            fn = (getattr(w, "full_name", "") or "").lower()
+            if q_lower in fn:
+                add(w, "NAME_MATCH")
+
+    return results[:limit]
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -559,4 +932,130 @@ async def get_world_changes(runtime: MAIWRuntime = Depends(_runtime)) -> WorldCh
         affected_entity_count=len(seen_entity),
         events=event_dtos,
         affected_entities=list(seen_entity.values()),
+    )
+
+
+# ── Phase 17C: Graph inspection endpoints ─────────────────────────────────────
+
+@router.get("/graph/search", response_model=GraphSearchResponse, summary="Search entities in the operational graph")
+async def search_graph_entities(
+    q: str = Query(..., min_length=1, max_length=200, description="Entity search query (name, type, or ID prefix)"),
+    limit: int = Query(default=10, ge=1, le=20, description="Max results"),
+    runtime: MAIWRuntime = Depends(_runtime),
+) -> GraphSearchResponse:
+    """
+    Search the canonical Operational Graph by name, type keyword, or ID prefix.
+
+    Examples: 'Wave 17', 'worker', 'agv', 'sku', 'task-000042', 'Jane'.
+    Uses the same canonical entity-ID semantics as Copilot context resolution.
+    GET-only — no graph mutations possible.
+    """
+    graph = runtime.world_graph
+    if graph is None:
+        raise HTTPException(status_code=503, detail="Operational graph not available")
+    results = _graph_search(q, graph, limit)
+    return GraphSearchResponse(query=q, results=results)
+
+
+@router.get("/graph/entity/{entity_id}", response_model=GraphEntityDetailResponse, summary="Entity detail")
+async def get_graph_entity(
+    entity_id: str,
+    runtime: MAIWRuntime = Depends(_runtime),
+) -> GraphEntityDetailResponse:
+    """
+    Return full detail for a single canonical entity.
+
+    Includes type-specific attributes, relationship counts, bounded direct edges,
+    and current scenario annotation if an overlay is active.
+    GET-only.
+    """
+    graph = runtime.world_graph
+    if graph is None:
+        raise HTTPException(status_code=503, detail="Operational graph not available")
+    entity = graph.get_entity(entity_id)
+    if entity is None:
+        raise HTTPException(status_code=404, detail=f"Entity '{entity_id}' not found")
+
+    scenario_map = _scenario_affected_map(runtime)
+    outgoing = graph.outgoing_edges(entity_id)
+    incoming = graph.incoming_edges(entity_id)
+    direct_edges = (outgoing + incoming)[:100]
+
+    return GraphEntityDetailResponse(
+        entity_id=entity.id,
+        entity_type=entity.entity_type.value,
+        label=_entity_label_full(entity),
+        attributes=_entity_attributes_full(entity),
+        incoming_count=len(incoming),
+        outgoing_count=len(outgoing),
+        scenario_affected=entity_id in scenario_map,
+        scenario_severity=scenario_map.get(entity_id),
+        direct_relationships=[_build_edge_dto_graph(e) for e in direct_edges],
+    )
+
+
+@router.get("/graph/neighbors/{entity_id}", response_model=GraphNeighborhoodResponse, summary="Bounded entity neighborhood")
+async def get_graph_neighbors(
+    entity_id: str,
+    depth: int = Query(default=1, ge=1, le=2, description="BFS depth — server clamps to 2"),
+    max_entities: int = Query(default=50, ge=1, le=50, description="Max neighbor entities — server clamps to 50"),
+    max_relationships: int = Query(default=100, ge=1, le=100, description="Max edges — server clamps to 100"),
+    runtime: MAIWRuntime = Depends(_runtime),
+) -> GraphNeighborhoodResponse:
+    """
+    Return a bounded BFS neighborhood for an entity.
+
+    Hard server caps: depth≤2, entities≤50, edges≤100.
+    Client parameters are clamped — the full DataPack is never returned.
+
+    When truncated=true, truncated_from shows how many neighbors exist before the cap.
+    """
+    graph = runtime.world_graph
+    if graph is None:
+        raise HTTPException(status_code=503, detail="Operational graph not available")
+    focus = graph.get_entity(entity_id)
+    if focus is None:
+        raise HTTPException(status_code=404, detail=f"Entity '{entity_id}' not found")
+
+    # Server-side hard clamp (Query validators already enforce the max, but belt+suspenders)
+    depth = min(depth, 2)
+    max_entities = min(max_entities, 50)
+    max_relationships = min(max_relationships, 100)
+
+    scenario_map = _scenario_affected_map(runtime)
+    manifest = runtime.world_datapack_manifest
+
+    capped, total_available, edges = _bounded_bfs(graph, entity_id, depth, max_entities, max_relationships)
+
+    focus_dto = _build_node_dto(focus, scenario_map, bfs_depth=0)
+    node_dtos = [_build_node_dto(e, scenario_map, bfs_depth=d) for e, d in capped]
+    edge_dtos = [_build_edge_dto_graph(e) for e in edges]
+
+    # Relationship summary: entity_type_group → [label, ...]
+    rel_summary: dict[str, list[str]] = {}
+    for edge in edges:
+        other_id = edge.target_id if edge.source_id == entity_id else edge.source_id
+        if other_id == entity_id:
+            continue
+        other = graph.get_entity(other_id)
+        if other is None:
+            continue
+        group = other.entity_type.value.replace("_", " ").title() + "s"
+        label = _entity_label_full(other)
+        rel_summary.setdefault(group, [])
+        if label not in rel_summary[group]:
+            rel_summary[group].append(label)
+
+    return GraphNeighborhoodResponse(
+        focus_entity=focus_dto,
+        nodes=node_dtos,
+        edges=edge_dtos,
+        depth=depth,
+        entity_count=len(capped),
+        relationship_count=len(edges),
+        truncated=total_available > max_entities,
+        truncated_from=total_available if total_available > max_entities else None,
+        relationship_summary=rel_summary,
+        dataset_id=manifest.get("dataset_id", "dc47-demo-v1"),
+        warehouse_id=manifest.get("warehouse_id", "DC-47"),
     )
