@@ -5,7 +5,7 @@
  *  1. CHANGES tab is enabled in WorldShell
  *  2. BASE selector renders in WorldShell
  *  3. SCENARIO selector renders in WorldShell
- *  4. LIVE selector is disabled
+ *  4. LIVE selector is enabled (Phase 17D)
  *  5. WorldChanges shows no-scenario state when scenario_active=false
  *  6. WorldChanges shows scenario identity when active
  *  7. WorldChanges shows event timeline when scenario active
@@ -203,11 +203,11 @@ describe('Phase 17B — WorldChanges', () => {
     expect(screen.getByRole('button', { name: /scenario/i })).toBeInTheDocument();
   });
 
-  // 4. LIVE selector is disabled
-  it('LIVE selector is disabled', () => {
+  // 4. LIVE selector is enabled (Phase 17D: LIVE view implemented)
+  it('LIVE selector is enabled', () => {
     render(<WorldShell />, { wrapper: Wrapper });
     const liveBtn = screen.getByRole('button', { name: /live/i });
-    expect(liveBtn).toBeDisabled();
+    expect(liveBtn).not.toBeDisabled();
   });
 
   // 5. No-scenario state when scenario_active=false
