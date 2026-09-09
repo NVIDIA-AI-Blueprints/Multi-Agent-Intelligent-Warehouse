@@ -148,6 +148,76 @@ export interface WorldChangesResponse {
   affected_entities: AffectedEntityDTO[];
 }
 
+// ── Phase 17C: Graph inspection types ────────────────────────────────────────
+
+export interface GraphSearchResultDTO {
+  entity_id: string;
+  entity_type: string;
+  label: string;
+  match_type: string;  // EXACT_ID | EXACT_ATTRIBUTE | ENTITY_TYPE | PREFIX_ID | NAME_MATCH
+}
+
+export interface GraphSearchResponse {
+  query: string;
+  results: GraphSearchResultDTO[];
+}
+
+export interface GraphNodeDTO {
+  entity_id: string;
+  entity_type: string;
+  label: string;
+  attributes_summary: Record<string, string | number | boolean | null>;
+  scenario_affected: boolean;
+  scenario_severity: string | null;
+  bfs_depth: number;  // 0=focus, 1=direct, 2=two-hop
+}
+
+export interface GraphEdgeDTO {
+  edge_id: string;
+  source_id: string;
+  target_id: string;
+  relationship_type: string;
+  valid_from: string | null;
+  valid_to: string | null;
+  temporal: boolean;
+  active: boolean;
+}
+
+export interface GraphEntityDetailResponse {
+  entity_id: string;
+  entity_type: string;
+  label: string;
+  attributes: Record<string, string | number | boolean | null>;
+  incoming_count: number;
+  outgoing_count: number;
+  scenario_affected: boolean;
+  scenario_severity: string | null;
+  direct_relationships: GraphEdgeDTO[];
+}
+
+export interface GraphNeighborhoodResponse {
+  focus_entity: GraphNodeDTO;
+  nodes: GraphNodeDTO[];
+  edges: GraphEdgeDTO[];
+  depth: number;
+  entity_count: number;
+  relationship_count: number;
+  truncated: boolean;
+  truncated_from: number | null;
+  relationship_summary: Record<string, string[]>;
+  dataset_id: string;
+  warehouse_id: string;
+}
+
+// Context passed from Copilot to WORLD graph
+export interface GraphFocusContext {
+  entityId: string;
+  entityLabel: string | null;
+  turnId: string;
+  traceId: string;
+  entityCount: number | null;
+}
+
 // ── API methods ───────────────────────────────────────────────────────────────
 
 async function getConfig(): Promise<WorldConfigResponse> {
@@ -165,8 +235,33 @@ async function getChanges(): Promise<WorldChangesResponse> {
   return r.data as WorldChangesResponse;
 }
 
+async function searchGraph(q: string, limit = 10): Promise<GraphSearchResponse> {
+  const r = await http.get('/world/graph/search', { params: { q, limit } });
+  return r.data as GraphSearchResponse;
+}
+
+async function getGraphEntity(entityId: string): Promise<GraphEntityDetailResponse> {
+  const r = await http.get(`/world/graph/entity/${encodeURIComponent(entityId)}`);
+  return r.data as GraphEntityDetailResponse;
+}
+
+async function getGraphNeighbors(
+  entityId: string,
+  depth = 1,
+  maxEntities = 50,
+  maxRelationships = 100,
+): Promise<GraphNeighborhoodResponse> {
+  const r = await http.get(`/world/graph/neighbors/${encodeURIComponent(entityId)}`, {
+    params: { depth, max_entities: maxEntities, max_relationships: maxRelationships },
+  });
+  return r.data as GraphNeighborhoodResponse;
+}
+
 export const worldAPI = {
   getConfig,
   getSummary,
   getChanges,
+  searchGraph,
+  getGraphEntity,
+  getGraphNeighbors,
 };

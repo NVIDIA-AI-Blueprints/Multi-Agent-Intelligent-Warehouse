@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Typography } from '@mui/material';
 import WorldOverview from './WorldOverview';
 import WorldChanges from './WorldChanges';
+import WorldGraph from './WorldGraph';
+import { GraphFocusContext } from '../../services/worldAPI';
 
 type WorldTab = 'overview' | 'graph' | 'changes' | 'raw';
 export type WorldView = 'base' | 'scenario' | 'live';
 
 const TABS: { id: WorldTab; label: string; available: boolean }[] = [
   { id: 'overview', label: 'OVERVIEW', available: true },
-  { id: 'graph', label: 'GRAPH', available: false },
+  { id: 'graph', label: 'GRAPH', available: true },
   { id: 'changes', label: 'CHANGES', available: true },
   { id: 'raw', label: 'RAW', available: false },
 ];
@@ -135,9 +137,21 @@ function WorldViewSwitcher({
   );
 }
 
-export default function WorldShell() {
+interface WorldShellProps {
+  focusContext?: GraphFocusContext | null;
+  onReturnToCopilot?: () => void;
+}
+
+export default function WorldShell({ focusContext, onReturnToCopilot }: WorldShellProps = {}) {
   const [tab, setTab] = useState<WorldTab>('overview');
   const [worldView, setWorldView] = useState<WorldView>('base');
+
+  // When Copilot sends a graph focus context, auto-switch to GRAPH tab
+  useEffect(() => {
+    if (focusContext?.entityId) {
+      setTab('graph');
+    }
+  }, [focusContext]);
 
   return (
     <Box
@@ -203,9 +217,17 @@ export default function WorldShell() {
       <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
         {tab === 'overview' && <WorldOverview />}
 
+        {tab === 'graph' && (
+          <WorldGraph
+            worldView={worldView}
+            focusContext={focusContext}
+            onReturnToCopilot={onReturnToCopilot}
+          />
+        )}
+
         {tab === 'changes' && <WorldChanges worldView={worldView} />}
 
-        {tab !== 'overview' && tab !== 'changes' && (
+        {tab === 'raw' && (
           <Box
             sx={{
               display: 'flex',
@@ -225,7 +247,7 @@ export default function WorldShell() {
                 letterSpacing: '0.08em',
               }}
             >
-              {TABS.find((t) => t.id === tab)?.label ?? tab}
+              RAW
             </Typography>
             <Typography
               sx={{
