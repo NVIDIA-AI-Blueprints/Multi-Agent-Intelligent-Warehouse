@@ -13,6 +13,7 @@ import StageContentPane from '../components/demo/StageContentPane';
 import ReliabilityPanel from '../components/demo/reliability/ReliabilityPanel';
 import ExpertOverlay from '../components/demo/ExpertOverlay';
 import WorldShell from '../components/world/WorldShell';
+import { GraphFocusContext } from '../services/worldAPI';
 import CopilotDrawer from '../components/demo/copilot/CopilotDrawer';
 import { useCopilotConversation, CopilotSystemCard } from '../hooks/useCopilotConversation';
 
@@ -354,6 +355,7 @@ export default function DemoShell() {
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [selectedStage, setSelectedStage] = useState<RailStage | null>(null);
   const [selectedApprovalId, setSelectedApprovalId] = useState<string | null>(null);
+  const [graphFocusContext, setGraphFocusContext] = useState<GraphFocusContext | null>(null);
   const conversation = useCopilotConversation();
   const queryClient = useQueryClient();
 
@@ -385,6 +387,17 @@ export default function DemoShell() {
     setCopilotOpen(false);
     setSelectedStage('APPROVE');
     setSelectedApprovalId(pendingApprovalId);
+  }, []);
+
+  const handleViewOperationalContext = useCallback((ctx: GraphFocusContext) => {
+    setGraphFocusContext(ctx);
+    setMode('world');
+    setCopilotOpen(false);
+  }, []);
+
+  const handleReturnFromGraph = useCallback(() => {
+    setMode('operations');
+    setCopilotOpen(true);
   }, []);
 
   const handleReturnToCopilot = useCallback((card: CopilotSystemCard) => {
@@ -575,7 +588,10 @@ export default function DemoShell() {
         )}
 
         {mode === 'world' && (
-          <WorldShell />
+          <WorldShell
+            focusContext={graphFocusContext}
+            onReturnToCopilot={handleReturnFromGraph}
+          />
         )}
 
         {scenarioActive && mode === 'reliability' && (
@@ -659,6 +675,7 @@ export default function DemoShell() {
           scenarioName={demoStatus?.scenario?.name ?? ''}
           onClose={() => setCopilotOpen(false)}
           onReviewApproval={handleReviewApproval}
+          onViewOperationalContext={handleViewOperationalContext}
           conversationId={conversation.conversationId}
           setConversationId={conversation.setConversationId}
           turns={conversation.turns}

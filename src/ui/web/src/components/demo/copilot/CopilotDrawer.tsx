@@ -91,11 +91,20 @@ const SUGGEST_AFTER_ACT     = ['Did it work?'];
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
+interface GraphFocusContextLocal {
+  entityId: string;
+  entityLabel: string | null;
+  turnId: string;
+  traceId: string;
+  entityCount: number | null;
+}
+
 interface CopilotDrawerProps {
   warehouseId: string;
   scenarioName: string;
   onClose: () => void;
   onReviewApproval?: (pendingApprovalId: string) => void;
+  onViewOperationalContext?: (ctx: GraphFocusContextLocal) => void;
   // Lifted conversation state — owned by DemoShell so it survives drawer remount
   conversationId: string | null;
   setConversationId: (id: string | null) => void;
@@ -109,6 +118,7 @@ interface CopilotDrawerProps {
 
 interface CopilotAnswerProps {
   turn: CopilotTurnResponse;
+  onViewOperationalContext?: (ctx: GraphFocusContextLocal) => void;
 }
 
 function SeverityBadge({ severity }: { severity: string }) {
@@ -629,7 +639,7 @@ function CopilotObserveAnswer({ turn, isLatest }: CopilotAnswerProps & { isLates
   );
 }
 
-function CopilotAnswer({ turn, isLatest }: CopilotAnswerProps & { isLatest?: boolean }) {
+function CopilotAnswer({ turn, isLatest, onViewOperationalContext }: CopilotAnswerProps & { isLatest?: boolean; onViewOperationalContext?: (ctx: GraphFocusContextLocal) => void }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   const isAnalyze = turn.intent === 'analyze';
@@ -795,11 +805,35 @@ function CopilotAnswer({ turn, isLatest }: CopilotAnswerProps & { isLatest?: boo
           }}>
             CONTEXT
           </Typography>
-          <Typography sx={{
-            fontFamily: 'monospace', fontSize: '0.7rem', color: '#8B949E',
-          }}>
-            {turn.focus_entity_label ?? turn.neighborhood.focus_entity_label ?? 'No entity focus'} · {turn.neighborhood.entity_count} entities
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+            <Typography sx={{
+              fontFamily: 'monospace', fontSize: '0.7rem', color: '#8B949E',
+            }}>
+              {turn.focus_entity_label ?? turn.neighborhood.focus_entity_label ?? 'No entity focus'} · {turn.neighborhood.entity_count} entities
+            </Typography>
+            {turn.focus_entity_id && turn.neighborhood.graph_available && onViewOperationalContext && (
+              <Box
+                component="button"
+                data-testid="view-operational-context"
+                onClick={() => onViewOperationalContext({
+                  entityId: turn.focus_entity_id!,
+                  entityLabel: turn.focus_entity_label ?? null,
+                  turnId: turn.turn_id,
+                  traceId: turn.trace_id,
+                  entityCount: turn.neighborhood?.entity_count ?? null,
+                })}
+                sx={{
+                  background: 'transparent', border: '1px solid #1F3A5A',
+                  borderRadius: '3px', px: '6px', py: '2px', flexShrink: 0,
+                  fontFamily: 'monospace', fontSize: '0.58rem',
+                  color: '#58A6FF', cursor: 'pointer',
+                  '&:hover': { background: '#0F1923', borderColor: '#58A6FF' },
+                }}
+              >
+                VIEW OPERATIONAL CONTEXT
+              </Box>
+            )}
+          </Box>
           {!turn.neighborhood.graph_available && (
             <Typography sx={{
               fontFamily: 'monospace', fontSize: '0.7rem', color: '#D29922', mt: '3px',
@@ -933,6 +967,7 @@ export default function CopilotDrawer({
   scenarioName,
   onClose,
   onReviewApproval,
+  onViewOperationalContext,
   conversationId,
   setConversationId,
   turns,
@@ -1206,7 +1241,7 @@ export default function CopilotDrawer({
                   ? <CopilotActAnswer turn={turn.response} isLatest={isLatest} onReviewApproval={onReviewApproval} />
                   : turn.response.intent === 'observe_outcome'
                   ? <CopilotObserveAnswer turn={turn.response} isLatest={isLatest} />
-                  : <CopilotAnswer turn={turn.response} isLatest={isLatest} />
+                  : <CopilotAnswer turn={turn.response} isLatest={isLatest} onViewOperationalContext={onViewOperationalContext} />
               ) : turn.error ? (
                 <Typography sx={{
                   fontFamily: 'monospace', fontSize: '0.72rem', color: '#F85149',
