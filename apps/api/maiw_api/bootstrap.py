@@ -464,6 +464,7 @@ async def get_runtime() -> MAIWRuntime:
             event_bus=event_bus,
             graph=graph,
             store=InMemoryCopilotStore(),
+            datapack_manifest=runtime.world_datapack_manifest,  # Phase 17E: provenance
         )
         logger.info("MAIW bootstrap: CopilotService ready (graph=%s)", graph is not None)
     except Exception as exc:

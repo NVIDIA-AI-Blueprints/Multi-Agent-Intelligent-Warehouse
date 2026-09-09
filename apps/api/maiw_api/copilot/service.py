@@ -52,9 +52,12 @@ from .models import (
     CopilotIntent,
     CopilotObserveResult,
     CopilotTurn,
+    ContextSnapshotEdge,
+    ContextSnapshotNode,
     EvidenceFact,
     GovernedActionRequest,
     MutationState,
+    OperationalContextSnapshot,
     RecommendedActionResult,
 )
 from .store import InMemoryCopilotStore
@@ -85,6 +88,7 @@ class CopilotService:
         event_bus: Any | None = None,
         graph: Any | None = None,
         store: InMemoryCopilotStore | None = None,
+        datapack_manifest: dict | None = None,  # Phase 17E: DataPack metadata for snapshot provenance
     ) -> None:
         self._agent = operations_agent
         self._state_provider = state_provider
@@ -92,6 +96,7 @@ class CopilotService:
         self._graph = graph
         self._store = store or InMemoryCopilotStore()
         self._orchestrator: Any = None  # injected via set_orchestrator() at bootstrap
+        self._datapack_manifest: dict = datapack_manifest or {}  # Phase 17E
 
     @property
     def store(self) -> InMemoryCopilotStore:
@@ -231,10 +236,24 @@ class CopilotService:
         )
 
         # ── Seal snapshot and call agent ──────────────────────────────────────
+        _ctx_snapshot: OperationalContextSnapshot | None = None  # Phase 17E
         try:
             from maiw_models import ReasoningLevel, RiskLevel
 
             snapshot = WarehouseStateSnapshot.seal(state)
+            _warehouse_state_snapshot_id = getattr(snapshot, "snapshot_id", None)
+
+            # Phase 17E: capture exact operational context BEFORE model call
+            _ctx_snapshot = self._capture_context_snapshot(
+                conversation_id=conv.conversation_id,
+                turn_id=turn_id,
+                trace_id=trace_id,
+                warehouse_id=warehouse_id,
+                neighborhood=neighborhood,
+                warehouse_state_snapshot_id=_warehouse_state_snapshot_id,
+            )
+            if _ctx_snapshot is not None:
+                self._store.store_context_snapshot(_ctx_snapshot)
 
             # Enrich context when the operator is asking a comparative question
             # about why a prior recommendation is the best option.
@@ -335,6 +354,7 @@ class CopilotService:
             focus_entity_id=neighborhood.focus_entity_id,
             focus_entity_type=conv.last_focus_entity_type,
             focus_entity_label=neighborhood.focus_entity_label,
+            context_snapshot_id=_ctx_snapshot.context_snapshot_id if _ctx_snapshot is not None else None,
         )
         self._store.add_turn(turn)
         await self._publish("COPILOT_TURN_COMPLETE", f"model={result.model_id}", trace_id=trace_id)
@@ -437,10 +457,24 @@ class CopilotService:
 
         # ── Seal snapshot and call agent with HIGH reasoning ──────────────────
         await self._publish("COPILOT_ANALYZING", "Generating recommendations", trace_id=trace_id)
+        _ctx_snapshot_analyze: OperationalContextSnapshot | None = None  # Phase 17E
         try:
             from maiw_models import ReasoningLevel, RiskLevel
 
             snapshot = WarehouseStateSnapshot.seal(state)
+            _warehouse_state_snapshot_id = getattr(snapshot, "snapshot_id", None)
+
+            # Phase 17E: capture exact operational context BEFORE model call
+            _ctx_snapshot_analyze = self._capture_context_snapshot(
+                conversation_id=conv.conversation_id,
+                turn_id=turn_id,
+                trace_id=trace_id,
+                warehouse_id=warehouse_id,
+                neighborhood=neighborhood,
+                warehouse_state_snapshot_id=_warehouse_state_snapshot_id,
+            )
+            if _ctx_snapshot_analyze is not None:
+                self._store.store_context_snapshot(_ctx_snapshot_analyze)
 
             # ANALYZE uses HIGH reasoning and MEDIUM risk — the operator is asking
             # for a recommendation that may influence a consequential decision.
@@ -561,6 +595,7 @@ class CopilotService:
             focus_entity_id=effective_focus_id,
             focus_entity_type=conv.last_focus_entity_type,
             focus_entity_label=effective_focus_label,
+            context_snapshot_id=_ctx_snapshot_analyze.context_snapshot_id if _ctx_snapshot_analyze is not None else None,
         )
         self._store.add_turn(turn)
         await self._publish("COPILOT_TURN_COMPLETE", f"recommendations={len(recs)} model={result.model_id}", trace_id=trace_id)
@@ -1085,6 +1120,132 @@ class CopilotService:
 
     # ── Private helpers ───────────────────────────────────────────────────────
 
+    def _capture_context_snapshot(
+        self,
+        *,
+        conversation_id: str,
+        turn_id: str,
+        trace_id: str,
+        warehouse_id: str,
+        neighborhood: Any,
+        warehouse_state_snapshot_id: str | None,
+    ) -> OperationalContextSnapshot | None:
+        """
+        Capture exact operational context snapshot BEFORE the model call.
+
+        Serializes the bounded node set and edges from the canonical graph at
+        the moment context is assembled.  Returns None when the graph is
+        unavailable or the neighborhood has no focus entity.
+
+        Phase 17E: This is the historical context — it must not be called again
+        after the model responds.  The snapshot is immutable once captured.
+
+        Bounds enforced: ≤50 nodes, ≤100 edges.
+        Only reasoning-relevant attributes are captured (reduced projection).
+        """
+        if self._graph is None or not getattr(neighborhood, "graph_available", False):
+            return None
+        focus_id = getattr(neighborhood, "focus_entity_id", None)
+        if not focus_id:
+            return None
+
+        import uuid as _uuid
+        from datetime import datetime as _dt, timezone as _tz
+
+        graph = self._graph
+        manifest = self._datapack_manifest
+
+        # ── Capture nodes (focus + neighborhood) ─────────────────────────────
+        focus_entity = graph.get_entity(focus_id)
+        if focus_entity is None:
+            return None
+
+        entity_ids: list[str] = list(getattr(neighborhood, "entity_ids", []))
+        all_ids = [focus_id] + [eid for eid in entity_ids if eid != focus_id]
+        all_ids = all_ids[:50]  # hard cap
+
+        nodes: list[ContextSnapshotNode] = []
+        for eid in all_ids:
+            ent = graph.get_entity(eid)
+            if ent is None:
+                continue
+            et = ent.entity_type.value if hasattr(ent.entity_type, "value") else str(ent.entity_type)
+            label = _snapshot_entity_label(ent)
+            attrs = _snapshot_entity_attributes(ent)
+            nodes.append(ContextSnapshotNode(
+                entity_id=eid,
+                entity_type=et,
+                label=label,
+                attributes=attrs,
+            ))
+
+        # ── Capture edges between nodes in the bounded set ────────────────────
+        capped_ids = {focus_id} | set(all_ids)
+        edges: list[ContextSnapshotEdge] = []
+        seen_edges: set[str] = set()
+        for eid in all_ids:
+            ent = graph.get_entity(eid)
+            if ent is None:
+                continue
+            try:
+                for edge in graph.outgoing_edges(eid):
+                    if edge.id in seen_edges or edge.target_id not in capped_ids:
+                        continue
+                    if len(edges) >= 100:
+                        break
+                    rel = edge.relationship_type.value if hasattr(edge.relationship_type, "value") else str(edge.relationship_type)
+                    vf = edge.valid_from
+                    vt = edge.valid_to
+                    edges.append(ContextSnapshotEdge(
+                        source_id=edge.source_id,
+                        target_id=edge.target_id,
+                        relationship_type=rel,
+                        valid_from=vf.isoformat() if vf else None,
+                        valid_to=vt.isoformat() if vt else None,
+                    ))
+                    seen_edges.add(edge.id)
+            except Exception:
+                pass
+            if len(edges) >= 100:
+                break
+
+        # ── Focus entity identity ─────────────────────────────────────────────
+        focus_et = focus_entity.entity_type.value if hasattr(focus_entity.entity_type, "value") else str(focus_entity.entity_type)
+        focus_label = getattr(neighborhood, "focus_entity_label", None) or _snapshot_entity_label(focus_entity)
+
+        # ── DataPack identity ─────────────────────────────────────────────────
+        dataset_id = manifest.get("dataset_id", "unknown")
+        checksum = (
+            manifest.get("semantic_checksum")
+            or manifest.get("checksums", {}).get("semantic_checksum")
+            or "unknown"
+        )
+
+        # ── Build snapshot ────────────────────────────────────────────────────
+        truncated = len(entity_ids) > 50
+        snapshot = OperationalContextSnapshot(
+            context_snapshot_id=str(_uuid.uuid4()),
+            conversation_id=conversation_id,
+            turn_id=turn_id,
+            trace_id=trace_id,
+            warehouse_id=warehouse_id,
+            dataset_id=dataset_id,
+            datapack_checksum=checksum,
+            warehouse_state_snapshot_id=warehouse_state_snapshot_id,
+            focus_entity_id=focus_id,
+            focus_entity_type=focus_et,
+            focus_label=focus_label,
+            depth=getattr(neighborhood, "max_depth", 2),
+            truncated=truncated,
+            nodes=nodes,
+            edges=edges,
+            entity_count=len(nodes),
+            relationship_count=len(edges),
+            relationship_summary=dict(getattr(neighborhood, "relationship_summary", {})),
+            captured_at=_dt.now(_tz.utc).isoformat(),
+        )
+        return snapshot
+
     async def _get_state(
         self,
         warehouse_id: str,
@@ -1161,6 +1322,7 @@ class CopilotService:
         focus_entity_id: str | None = None,
         focus_entity_type: str | None = None,
         focus_entity_label: str | None = None,
+        context_snapshot_id: str | None = None,  # Phase 17E
     ) -> CopilotTurn:
         return CopilotTurn(
             turn_id=turn_id,
@@ -1175,6 +1337,7 @@ class CopilotService:
             focus_entity_id=focus_entity_id,
             focus_entity_type=focus_entity_type,
             focus_entity_label=focus_entity_label,
+            context_snapshot_id=context_snapshot_id,  # Phase 17E
         )
 
 
@@ -1704,3 +1867,62 @@ def _facts_to_evidence(facts: list[str], assessment_severity: str) -> list[Evide
             ))
 
     return evidence
+
+# ── Phase 17E: snapshot entity helpers ───────────────────────────────────────
+
+def _snapshot_entity_label(entity: Any) -> str:
+    """Human-readable label for a graph entity — used in context snapshot nodes."""
+    et = entity.entity_type.value if hasattr(entity.entity_type, "value") else str(entity.entity_type)
+    if et == "worker":
+        return getattr(entity, "full_name", None) or entity.id
+    if et == "wave":
+        num = getattr(entity, "wave_number", None)
+        return f"Wave {num}" if num is not None else entity.id
+    if et == "equipment":
+        eq_type = getattr(entity, "equipment_type", None)
+        type_str = eq_type.value.upper() if hasattr(eq_type, "value") else str(eq_type).upper() if eq_type else ""
+        return f"{type_str} {entity.id}" if type_str else entity.id
+    if et == "task":
+        task_type = getattr(entity, "task_type", None)
+        type_str = task_type.value if hasattr(task_type, "value") else str(task_type) if task_type else ""
+        return f"{type_str} {entity.id}" if type_str else entity.id
+    if et == "zone":
+        code = getattr(entity, "zone_code", "") or ""
+        return f"Zone {code}" if code else entity.id
+    return getattr(entity, "name", entity.id) or entity.id
+
+
+def _snapshot_entity_attributes(entity: Any) -> dict:
+    """
+    Reduced attribute projection for context snapshot.
+
+    Only captures attributes actually used for reasoning — NOT the full canonical
+    entity payload.  Bounded to 5 attributes per entity.
+    """
+    def _v(attr: str) -> Any:
+        val = getattr(entity, attr, None)
+        if val is None:
+            return None
+        if hasattr(val, "value"):
+            return val.value
+        if isinstance(val, list):
+            return [str(i) for i in val[:5]]  # cap list attrs
+        if isinstance(val, (str, int, float, bool)):
+            return val
+        return str(val)
+
+    et = entity.entity_type.value if hasattr(entity.entity_type, "value") else str(entity.entity_type)
+
+    if et == "worker":
+        return {k: _v(k) for k in ("role", "skills", "shift_id") if _v(k) is not None}
+    if et == "wave":
+        return {k: _v(k) for k in ("wave_number", "status", "strategy", "priority") if _v(k) is not None}
+    if et == "equipment":
+        return {k: _v(k) for k in ("equipment_type", "model", "status") if _v(k) is not None}
+    if et == "task":
+        return {k: _v(k) for k in ("task_type", "status", "priority") if _v(k) is not None}
+    if et == "zone":
+        return {k: _v(k) for k in ("zone_code", "zone_type") if _v(k) is not None}
+    if et == "carrier_cutoff":
+        return {k: _v(k) for k in ("carrier",) if _v(k) is not None}
+    return {}
