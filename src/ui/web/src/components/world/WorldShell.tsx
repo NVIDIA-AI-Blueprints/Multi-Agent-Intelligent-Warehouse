@@ -3,6 +3,7 @@ import { Box, Typography } from '@mui/material';
 import WorldOverview from './WorldOverview';
 import WorldChanges from './WorldChanges';
 import WorldGraph from './WorldGraph';
+import WorldLive from './WorldLive';
 import { GraphFocusContext } from '../../services/worldAPI';
 
 type WorldTab = 'overview' | 'graph' | 'changes' | 'raw';
@@ -18,7 +19,7 @@ const TABS: { id: WorldTab; label: string; available: boolean }[] = [
 const WORLD_VIEWS: { id: WorldView; label: string; disabled: boolean; tooltip?: string }[] = [
   { id: 'base', label: 'BASE', disabled: false },
   { id: 'scenario', label: 'SCENARIO', disabled: false },
-  { id: 'live', label: 'LIVE', disabled: true, tooltip: 'COMING NEXT' },
+  { id: 'live', label: 'LIVE', disabled: false },
 ];
 
 function WorldTabSwitcher({
@@ -215,7 +216,8 @@ export default function WorldShell({ focusContext, onReturnToCopilot }: WorldShe
 
       {/* Tab content */}
       <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
-        {tab === 'overview' && <WorldOverview />}
+        {tab === 'overview' && worldView !== 'live' && <WorldOverview />}
+        {tab === 'overview' && worldView === 'live' && <WorldLive />}
 
         {tab === 'graph' && (
           <WorldGraph

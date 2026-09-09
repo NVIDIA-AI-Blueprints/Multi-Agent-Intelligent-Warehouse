@@ -209,6 +209,54 @@ export interface GraphNeighborhoodResponse {
   warehouse_id: string;
 }
 
+// ── Phase 17D: LIVE world types ───────────────────────────────────────────────
+
+export interface ChangedFieldDTO {
+  field: string;
+  before_value: string | number | boolean | null;
+  after_value: string | number | boolean | null;
+}
+
+export interface ChangedEntityDTO {
+  entity_id: string;
+  entity_type: string;  // "worker" | "task"
+  label: string;
+  changed_fields: ChangedFieldDTO[];
+  note: string;
+}
+
+export interface LiveSummaryDTO {
+  workers: number;
+  idle_workers: number;
+  equipment: number;
+  available_equipment: number;
+  tasks: number;
+  pending_tasks: number;
+  in_progress_tasks: number;
+}
+
+export interface LastExecutionDTO {
+  execution_id: string | null;
+  trace_id: string | null;
+  outcome: string;  // EXECUTED | FAILED | UNKNOWN | REJECTED | PENDING
+  pre_kpi: Record<string, number> | null;
+  post_kpi: Record<string, number> | null;
+  kpi_delta: Record<string, number> | null;
+}
+
+export interface WorldLiveResponse {
+  warehouse_id: string;
+  dataset_id: string;
+  base_checksum: string | null;
+  scenario_id: string | null;
+  scenario_active: boolean;
+  runtime_status: string;   // IDLE | ACTIVE | PAUSED
+  world_clock: string | null;
+  summary: LiveSummaryDTO;
+  changed_entities: ChangedEntityDTO[];
+  last_execution: LastExecutionDTO | null;
+}
+
 // Context passed from Copilot to WORLD graph
 export interface GraphFocusContext {
   entityId: string;
@@ -257,6 +305,11 @@ async function getGraphNeighbors(
   return r.data as GraphNeighborhoodResponse;
 }
 
+async function getLive(): Promise<WorldLiveResponse> {
+  const r = await http.get('/world/live');
+  return r.data as WorldLiveResponse;
+}
+
 export const worldAPI = {
   getConfig,
   getSummary,
@@ -264,4 +317,5 @@ export const worldAPI = {
   searchGraph,
   getGraphEntity,
   getGraphNeighbors,
+  getLive,
 };
