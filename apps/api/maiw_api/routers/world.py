@@ -1059,3 +1059,254 @@ async def get_graph_neighbors(
         dataset_id=manifest.get("dataset_id", "dc47-demo-v1"),
         warehouse_id=manifest.get("warehouse_id", "DC-47"),
     )
+
+
+# ── Phase 17D: LIVE world models ──────────────────────────────────────────────
+
+class ChangedFieldDTO(BaseModel):
+    field: str
+    before_value: str | int | float | bool | None
+    after_value: str | int | float | bool | None
+
+
+class ChangedEntityDTO(BaseModel):
+    entity_id: str
+    entity_type: str          # "worker" | "task"
+    label: str
+    changed_fields: list[ChangedFieldDTO]
+    note: str = "changed from scenario initial state"
+
+
+class LiveSummaryDTO(BaseModel):
+    workers: int
+    idle_workers: int
+    equipment: int
+    available_equipment: int
+    tasks: int
+    pending_tasks: int
+    in_progress_tasks: int
+
+
+class LastExecutionDTO(BaseModel):
+    execution_id: str | None = None
+    trace_id: str | None = None
+    outcome: str = "UNKNOWN"   # EXECUTED | FAILED | UNKNOWN | REJECTED | PENDING
+    pre_kpi: dict | None = None
+    post_kpi: dict | None = None
+    kpi_delta: dict | None = None
+
+
+class WorldLiveResponse(BaseModel):
+    warehouse_id: str
+    dataset_id: str
+    base_checksum: str | None
+    scenario_id: str | None
+    scenario_active: bool
+    runtime_status: str        # IDLE | ACTIVE | PAUSED
+    world_clock: str | None    # ISO-8601 current simulation time
+    summary: LiveSummaryDTO
+    changed_entities: list[ChangedEntityDTO]
+    last_execution: LastExecutionDTO | None
+
+
+# ── Phase 17D: helpers ────────────────────────────────────────────────────────
+
+def _compute_changed_entities(world: Any, snapshot: dict | None, graph: Any) -> list[ChangedEntityDTO]:
+    """
+    Compare current world.workers / world.tasks against the scenario initial
+    snapshot.  Returns a list of entities with at least one changed field.
+    Labels "changed from scenario initial state" — NOT relative to last execution.
+    """
+    if snapshot is None:
+        return []
+
+    result: list[ChangedEntityDTO] = []
+    snap_workers: dict = snapshot.get("workers", {})
+    snap_tasks: dict = snapshot.get("tasks", {})
+
+    for worker_id, worker in world.workers.items():
+        snap_w = snap_workers.get(worker_id)
+        if snap_w is None:
+            continue
+        changed_fields: list[ChangedFieldDTO] = []
+        if worker.status != snap_w.status:
+            changed_fields.append(ChangedFieldDTO(
+                field="status",
+                before_value=snap_w.status,
+                after_value=worker.status,
+            ))
+        if worker.current_task_id != snap_w.current_task_id:
+            changed_fields.append(ChangedFieldDTO(
+                field="current_task_id",
+                before_value=snap_w.current_task_id,
+                after_value=worker.current_task_id,
+            ))
+        if changed_fields:
+            label = worker.full_name or worker.username or worker_id
+            # Prefer canonical graph label if graph is available
+            if graph is not None:
+                label = _entity_label(graph, worker_id, fallback=label)
+            result.append(ChangedEntityDTO(
+                entity_id=worker_id,
+                entity_type="worker",
+                label=label,
+                changed_fields=changed_fields,
+            ))
+
+    for task_id, task in world.tasks.items():
+        snap_t = snap_tasks.get(task_id)
+        if snap_t is None:
+            continue
+        changed_fields = []
+        if task.status != snap_t.status:
+            changed_fields.append(ChangedFieldDTO(
+                field="status",
+                before_value=snap_t.status,
+                after_value=task.status,
+            ))
+        if task.assigned_to != snap_t.assigned_to:
+            changed_fields.append(ChangedFieldDTO(
+                field="assigned_to",
+                before_value=snap_t.assigned_to,
+                after_value=task.assigned_to,
+            ))
+        if changed_fields:
+            label = f"{task.task_type} {task_id}"
+            if graph is not None:
+                label = _entity_label(graph, task_id, fallback=label)
+            result.append(ChangedEntityDTO(
+                entity_id=task_id,
+                entity_type="task",
+                label=label,
+                changed_fields=changed_fields,
+            ))
+
+    return result
+
+
+def _build_last_execution(ctrl: Any) -> LastExecutionDTO | None:
+    """Extract last execution record from the controller. Returns None if no execution."""
+    rec = getattr(ctrl, "_last_execution_record", None)
+    if rec is None:
+        return None
+    return LastExecutionDTO(
+        execution_id=rec.get("execution_id"),
+        trace_id=rec.get("trace_id"),
+        outcome=rec.get("outcome", "UNKNOWN"),
+        pre_kpi=rec.get("pre_kpi"),
+        post_kpi=rec.get("post_kpi"),
+        kpi_delta=rec.get("kpi_delta"),
+    )
+
+
+# ── Phase 17D: LIVE endpoint ──────────────────────────────────────────────────
+
+@router.get("/live", response_model=WorldLiveResponse, summary="LIVE runtime world state")
+async def get_world_live(runtime: MAIWRuntime = Depends(_runtime)) -> WorldLiveResponse:
+    """
+    Return the LIVE mutable runtime state of the warehouse simulation.
+
+    Polls-safe for 15-second intervals from the World Explorer LIVE view.
+
+    Immutability:
+    - base_checksum: DataPack checksum — never changes during session
+    - changed_entities: entities that differ from scenario initial state
+      (labeled 'changed from scenario initial state')
+    - last_execution: populated only after executor.execute() completes;
+      None = no execution has run since last start/reset
+
+    Boundary: this endpoint does not import ActionExecutor, DecisionEngine,
+    ApprovalStore, or GovernedActionOrchestrator.  GET-only.
+    """
+    manifest = runtime.world_datapack_manifest
+    base_checksum = manifest.get("semantic_checksum") or manifest.get("checksums", {}).get("semantic_checksum")
+    warehouse_id = manifest.get("warehouse_id", "DC-47")
+    dataset_id = manifest.get("dataset_id", "dc47-demo-v1")
+    graph = runtime.world_graph
+
+    ctrl = runtime.demo_controller
+    if ctrl is None or not ctrl.active:
+        return WorldLiveResponse(
+            warehouse_id=warehouse_id,
+            dataset_id=dataset_id,
+            base_checksum=base_checksum,
+            scenario_id=None,
+            scenario_active=False,
+            runtime_status="IDLE",
+            world_clock=None,
+            summary=LiveSummaryDTO(
+                workers=0,
+                idle_workers=0,
+                equipment=0,
+                available_equipment=0,
+                tasks=0,
+                pending_tasks=0,
+                in_progress_tasks=0,
+            ),
+            changed_entities=[],
+            last_execution=None,
+        )
+
+    world = ctrl.world
+
+    # ── Scenario identity ─────────────────────────────────────────────────────
+    scenario_id: str | None = None
+    scenario_active = ctrl.active
+    sw = getattr(world, "_scenario_world", None)
+    if sw is not None:
+        try:
+            scenario_id = sw.overlay.scenario_id
+        except Exception:
+            pass
+
+    # ── Runtime status ────────────────────────────────────────────────────────
+    if getattr(ctrl, "_paused", False):
+        runtime_status = "PAUSED"
+    elif ctrl.active:
+        runtime_status = "ACTIVE"
+    else:
+        runtime_status = "IDLE"
+
+    # ── World clock ───────────────────────────────────────────────────────────
+    try:
+        world_clock = world.clock.now().isoformat()
+    except Exception:
+        world_clock = None
+
+    # ── Live summary — direct counts from world ────────────────────────────────
+    workers_list = list(world.workers.values())
+    equipment_list = list(world.equipment.values())
+    tasks_list = list(world.tasks.values())
+
+    idle_workers = sum(
+        1 for w in workers_list if w.status == "active" and w.current_task_id is None
+    )
+    summary = LiveSummaryDTO(
+        workers=len(workers_list),
+        idle_workers=idle_workers,
+        equipment=len(equipment_list),
+        available_equipment=sum(1 for e in equipment_list if e.status == "available"),
+        tasks=len(tasks_list),
+        pending_tasks=sum(1 for t in tasks_list if t.status == "pending"),
+        in_progress_tasks=sum(1 for t in tasks_list if t.status == "in_progress"),
+    )
+
+    # ── Changed entities — compare current vs snapshot ────────────────────────
+    snapshot = getattr(ctrl, "_snapshot", None)
+    changed_entities = _compute_changed_entities(world, snapshot, graph)
+
+    # ── Last execution record ─────────────────────────────────────────────────
+    last_execution = _build_last_execution(ctrl)
+
+    return WorldLiveResponse(
+        warehouse_id=warehouse_id,
+        dataset_id=dataset_id,
+        base_checksum=base_checksum,
+        scenario_id=scenario_id,
+        scenario_active=scenario_active,
+        runtime_status=runtime_status,
+        world_clock=world_clock,
+        summary=summary,
+        changed_entities=changed_entities,
+        last_execution=last_execution,
+    )
