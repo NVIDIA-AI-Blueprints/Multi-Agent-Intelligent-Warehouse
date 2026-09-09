@@ -266,6 +266,46 @@ export interface GraphFocusContext {
   entityCount: number | null;
 }
 
+// ── Phase 17E: Operational Context Snapshot ───────────────────────────────────
+
+export interface ContextSnapshotNode {
+  entity_id: string;
+  entity_type: string;
+  label: string;
+  attributes: Record<string, unknown>;
+}
+
+export interface ContextSnapshotEdge {
+  source_id: string;
+  target_id: string;
+  relationship_type: string;
+  valid_from: string | null;
+  valid_to: string | null;
+}
+
+export interface OperationalContextSnapshotResponse {
+  context_snapshot_id: string;
+  conversation_id: string;
+  turn_id: string;
+  trace_id: string;
+  warehouse_id: string;
+  dataset_id: string;
+  datapack_checksum: string;
+  warehouse_state_snapshot_id: string | null;
+  focus_entity_id: string;
+  focus_entity_type: string;
+  focus_label: string;
+  depth: number;
+  truncated: boolean;
+  nodes: ContextSnapshotNode[];
+  edges: ContextSnapshotEdge[];
+  entity_count: number;
+  relationship_count: number;
+  relationship_summary: Record<string, string[]>;
+  captured_at: string;
+  store_note: string;
+}
+
 // ── API methods ───────────────────────────────────────────────────────────────
 
 async function getConfig(): Promise<WorldConfigResponse> {
@@ -310,6 +350,12 @@ async function getLive(): Promise<WorldLiveResponse> {
   return r.data as WorldLiveResponse;
 }
 
+// Phase 17E: historical operational context snapshot
+async function getContextByTurn(turnId: string): Promise<OperationalContextSnapshotResponse> {
+  const r = await http.get(`/world/context/by-turn/${encodeURIComponent(turnId)}`);
+  return r.data as OperationalContextSnapshotResponse;
+}
+
 export const worldAPI = {
   getConfig,
   getSummary,
@@ -318,4 +364,5 @@ export const worldAPI = {
   getGraphEntity,
   getGraphNeighbors,
   getLive,
+  getContextByTurn,  // Phase 17E
 };

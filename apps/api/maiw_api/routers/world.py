@@ -1310,3 +1310,125 @@ async def get_world_live(runtime: MAIWRuntime = Depends(_runtime)) -> WorldLiveR
         changed_entities=changed_entities,
         last_execution=last_execution,
     )
+
+# ── Phase 17E: Operational Context Snapshot (historical context) ──────────────
+
+class ContextSnapshotNodeDTO(BaseModel):
+    entity_id: str
+    entity_type: str
+    label: str
+    attributes: dict[str, Any]
+
+class ContextSnapshotEdgeDTO(BaseModel):
+    source_id: str
+    target_id: str
+    relationship_type: str
+    valid_from: str | None = None
+    valid_to: str | None = None
+
+class OperationalContextSnapshotResponse(BaseModel):
+    """
+    Exact operational context snapshot for one historical Copilot turn.
+
+    This is what MAIW actually saw at decision time — not a reconstruction.
+    """
+    context_snapshot_id: str
+    conversation_id: str
+    turn_id: str
+    trace_id: str
+    warehouse_id: str
+    dataset_id: str
+    datapack_checksum: str
+    warehouse_state_snapshot_id: str | None = None
+    focus_entity_id: str
+    focus_entity_type: str
+    focus_label: str
+    depth: int
+    truncated: bool
+    nodes: list[ContextSnapshotNodeDTO]
+    edges: list[ContextSnapshotEdgeDTO]
+    entity_count: int
+    relationship_count: int
+    relationship_summary: dict[str, list[str]]
+    captured_at: str
+    # Lifecycle note
+    store_note: str = "Snapshot is process-local; not persisted across API restart."
+
+
+@router.get(
+    "/context/by-turn/{turn_id}",
+    response_model=OperationalContextSnapshotResponse,
+    summary="Exact operational context snapshot for a historical Copilot turn",
+)
+async def get_context_by_turn(
+    turn_id: str,
+    runtime: MAIWRuntime = Depends(_runtime),
+) -> OperationalContextSnapshotResponse:
+    """
+    Return the exact operational context snapshot captured for a specific Copilot turn.
+
+    This is what MAIW actually saw at decision time — the bounded graph neighborhood
+    that was assembled BEFORE the model call.  It is never reconstructed: if this
+    endpoint returns data, it reflects the exact context supplied to reasoning.
+
+    Phase 17E: OPERATIONAL CONTEXT AT DECISION TIME
+    - Linked to turn_id, trace_id, and warehouse_state_snapshot_id
+    - Immutable after capture — LIVE mutations do NOT change this snapshot
+    - Returns 404 when turn_id is unknown or no snapshot was captured (e.g. degraded turn)
+
+    GET-only.  No governance, execution, or orchestration symbols imported.
+    """
+    svc = getattr(runtime, "copilot_service", None)
+    if svc is None:
+        raise HTTPException(status_code=503, detail="Copilot service not available")
+
+    store = getattr(svc, "store", None)
+    if store is None:
+        raise HTTPException(status_code=503, detail="Copilot store not available")
+
+    snapshot = store.get_context_snapshot_by_turn(turn_id)
+    if snapshot is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No operational context snapshot found for turn '{turn_id}'. "
+                   "This turn may not have been grounded, or the snapshot was not captured.",
+        )
+
+    return OperationalContextSnapshotResponse(
+        context_snapshot_id=snapshot.context_snapshot_id,
+        conversation_id=snapshot.conversation_id,
+        turn_id=snapshot.turn_id,
+        trace_id=snapshot.trace_id,
+        warehouse_id=snapshot.warehouse_id,
+        dataset_id=snapshot.dataset_id,
+        datapack_checksum=snapshot.datapack_checksum,
+        warehouse_state_snapshot_id=snapshot.warehouse_state_snapshot_id,
+        focus_entity_id=snapshot.focus_entity_id,
+        focus_entity_type=snapshot.focus_entity_type,
+        focus_label=snapshot.focus_label,
+        depth=snapshot.depth,
+        truncated=snapshot.truncated,
+        nodes=[
+            ContextSnapshotNodeDTO(
+                entity_id=n.entity_id,
+                entity_type=n.entity_type,
+                label=n.label,
+                attributes=n.attributes,
+            )
+            for n in snapshot.nodes
+        ],
+        edges=[
+            ContextSnapshotEdgeDTO(
+                source_id=e.source_id,
+                target_id=e.target_id,
+                relationship_type=e.relationship_type,
+                valid_from=e.valid_from,
+                valid_to=e.valid_to,
+            )
+            for e in snapshot.edges
+        ],
+        entity_count=snapshot.entity_count,
+        relationship_count=snapshot.relationship_count,
+        relationship_summary=snapshot.relationship_summary,
+        captured_at=snapshot.captured_at,
+    )
