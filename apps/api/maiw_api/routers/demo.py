@@ -1037,6 +1037,13 @@ async def approve_proposal(request: ApproveRequest):
             "approval_id": approval_id,
         }
 
+    # Capture pre-execution KPI snapshot for WORLD LIVE projection
+    from maiw_api.demo.kpi import DemoKPIEngine
+    from datetime import datetime, timezone as _tz
+
+    _pre_kpi = DemoKPIEngine(ctrl.world, ctrl._last_analyze_wall_time).compute()
+    _pre_kpi_dict = _pre_kpi.to_dict()
+
     try:
         exec_result = await executor.execute(proposal, auth_result, trace_id=trace_id)
     except Exception as exc:
@@ -1057,14 +1064,41 @@ async def approve_proposal(request: ApproveRequest):
     )
 
     # Compute and publish fresh KPI
-    from maiw_api.demo.kpi import DemoKPIEngine
-
     kpi = DemoKPIEngine(ctrl.world, ctrl._last_analyze_wall_time).compute()
     kpi_dict = kpi.to_dict()
     ctrl._kpi_history.append(kpi_dict)
     if len(ctrl._kpi_history) > ctrl._MAX_KPI_HISTORY:
         ctrl._kpi_history = ctrl._kpi_history[-ctrl._MAX_KPI_HISTORY :]
     await bus.publish_kpi(kpi_dict, sim_t)
+
+    # Store LiveExecutionRecord for WORLD LIVE projection
+    _outcome_str = (
+        exec_result.outcome.value
+        if hasattr(exec_result.outcome, "value")
+        else str(exec_result.outcome)
+    )
+    _kpi_delta: dict = {}
+    for _k in _pre_kpi_dict:
+        if _k in kpi_dict:
+            _pv, _qv = _pre_kpi_dict[_k], kpi_dict[_k]
+            if isinstance(_pv, (int, float)) and isinstance(_qv, (int, float)):
+                _kpi_delta[_k] = round(_qv - _pv, 2)
+    ctrl.set_execution_record({
+        "proposal_id": proposal.proposal_id,
+        "decision_id": pending["decision_id"],
+        "execution_id": exec_result.execution_id,
+        "trace_id": trace_id,
+        "capability": pending["capability"],
+        "target": pending.get("target", ""),
+        "domain": pending["domain"],
+        "outcome": _outcome_str,
+        "execution_confirmed": exec_result.executed if hasattr(exec_result, "executed") else exec_result.success,
+        "pre_kpi": _pre_kpi_dict,
+        "post_kpi": kpi_dict,
+        "kpi_delta": _kpi_delta,
+        "executed_at": datetime.now(_tz.utc).isoformat(),
+        "pending_id": request.pending_id,
+    })
 
     return {
         "ok": True,
