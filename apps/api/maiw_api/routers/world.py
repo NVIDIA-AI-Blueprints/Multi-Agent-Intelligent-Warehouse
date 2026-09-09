@@ -1212,11 +1212,11 @@ async def get_world_live(runtime: MAIWRuntime = Depends(_runtime)) -> WorldLiveR
     - base_checksum: DataPack checksum — never changes during session
     - changed_entities: entities that differ from scenario initial state
       (labeled 'changed from scenario initial state')
-    - last_execution: populated only after executor.execute() completes;
+    - last_execution: populated only after execution completes;
       None = no execution has run since last start/reset
 
-    Boundary: this endpoint does not import ActionExecutor, DecisionEngine,
-    ApprovalStore, or GovernedActionOrchestrator.  GET-only.
+    Read-only boundary: no governance, execution, or orchestration symbols
+    are imported by this router.  GET-only.
     """
     manifest = runtime.world_datapack_manifest
     base_checksum = manifest.get("semantic_checksum") or manifest.get("checksums", {}).get("semantic_checksum")
