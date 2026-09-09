@@ -85,6 +85,10 @@ export interface DeveloperTraceEvent {
 
 export interface TraceArtifactLineage {
   snapshotId?: string | null;
+  // Phase 17E: operational context snapshot linked by trace_id
+  contextSnapshotId?: string | null;
+  contextSnapshotFocus?: string | null;      // focus_label from snapshot
+  contextSnapshotEntityCount?: number | null; // entity_count from snapshot
   proposalIds: Array<{ proposalId: string; action?: string | null }>;
   decisionIds: Array<{ decisionId: string; proposalId?: string | null; outcome?: string | null }>;
   approvalIds: Array<{ approvalId: string; decisionId?: string | null; state: string }>;
