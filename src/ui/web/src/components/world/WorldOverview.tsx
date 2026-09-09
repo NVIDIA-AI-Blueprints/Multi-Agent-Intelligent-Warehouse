@@ -213,9 +213,9 @@ const JOURNEY_STEPS = [
   { n: '06', label: 'OPERATE' },
   { n: '07', label: 'OBSERVE' },
 ];
-const COMPLETED_STEPS = 3; // 01–03
+// Steps 01-03 always complete; step 05 (index 4 = DISRUPT) highlighted when scenarioActive
 
-function JourneyStrip() {
+function JourneyStrip({ scenarioActive }: { scenarioActive: boolean }) {
   return (
     <Box
       sx={{
@@ -233,7 +233,8 @@ function JourneyStrip() {
       }}
     >
       {JOURNEY_STEPS.map((step, i) => {
-        const done = i < COMPLETED_STEPS;
+        // Steps 01-03 (indices 0-2) always highlighted; step 05 (index 4) highlighted when scenario active
+        const done = i < 3 || (i === 4 && scenarioActive);
         return (
           <React.Fragment key={step.n}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
@@ -265,7 +266,7 @@ function JourneyStrip() {
                 sx={{
                   fontFamily: C.mono,
                   fontSize: '0.6rem',
-                  color: i < COMPLETED_STEPS - 1 ? C.dim : '#21262D',
+                  color: (i < 2) ? C.dim : '#21262D',
                   mx: 0.75,
                   flexShrink: 0,
                 }}
@@ -562,7 +563,7 @@ export default function WorldOverview() {
       </Box>
 
       {/* Journey strip */}
-      <JourneyStrip />
+      <JourneyStrip scenarioActive={scenarioActive} />
 
       {/* Error state */}
       {hasError && !isLoading && (

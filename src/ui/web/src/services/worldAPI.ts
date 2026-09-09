@@ -110,6 +110,44 @@ export interface WorldSummaryResponse {
   runtime: RuntimeSummaryData;
 }
 
+export interface OverlayEventDTO {
+  event_id: string;
+  event_type: string;
+  entity_id: string;
+  entity_type: string;
+  entity_label: string;
+  sim_time_offset_seconds: number;
+  before_state: string | null;
+  after_state: string | null;
+  label: string;
+  payload: Record<string, string | number | boolean | null>;
+}
+
+export interface AffectedEntityDTO {
+  entity_id: string;
+  entity_type: string;
+  entity_label: string;
+  disruption_type: string;
+  before_state: string | null;
+  after_state: string | null;
+  severity: string | null;
+}
+
+export interface WorldChangesResponse {
+  warehouse_id: string;
+  dataset_id: string;
+  scenario_id: string | null;
+  scenario_name: string | null;
+  scenario_active: boolean;
+  scenario_severity: string;
+  base_checksum: string | null;
+  world_clock_seconds: number;
+  overlay_event_count: number;
+  affected_entity_count: number;
+  events: OverlayEventDTO[];
+  affected_entities: AffectedEntityDTO[];
+}
+
 // ── API methods ───────────────────────────────────────────────────────────────
 
 async function getConfig(): Promise<WorldConfigResponse> {
@@ -122,7 +160,13 @@ async function getSummary(): Promise<WorldSummaryResponse> {
   return r.data as WorldSummaryResponse;
 }
 
+async function getChanges(): Promise<WorldChangesResponse> {
+  const r = await http.get('/world/changes');
+  return r.data as WorldChangesResponse;
+}
+
 export const worldAPI = {
   getConfig,
   getSummary,
+  getChanges,
 };

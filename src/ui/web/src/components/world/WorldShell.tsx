@@ -1,14 +1,22 @@
 import React, { useState } from 'react';
 import { Box, Typography } from '@mui/material';
 import WorldOverview from './WorldOverview';
+import WorldChanges from './WorldChanges';
 
 type WorldTab = 'overview' | 'graph' | 'changes' | 'raw';
+export type WorldView = 'base' | 'scenario' | 'live';
 
 const TABS: { id: WorldTab; label: string; available: boolean }[] = [
   { id: 'overview', label: 'OVERVIEW', available: true },
   { id: 'graph', label: 'GRAPH', available: false },
-  { id: 'changes', label: 'CHANGES', available: false },
+  { id: 'changes', label: 'CHANGES', available: true },
   { id: 'raw', label: 'RAW', available: false },
+];
+
+const WORLD_VIEWS: { id: WorldView; label: string; disabled: boolean; tooltip?: string }[] = [
+  { id: 'base', label: 'BASE', disabled: false },
+  { id: 'scenario', label: 'SCENARIO', disabled: false },
+  { id: 'live', label: 'LIVE', disabled: true, tooltip: 'COMING NEXT' },
 ];
 
 function WorldTabSwitcher({
@@ -75,8 +83,61 @@ function WorldTabSwitcher({
   );
 }
 
+function WorldViewSwitcher({
+  worldView,
+  onChange,
+}: {
+  worldView: WorldView;
+  onChange: (v: WorldView) => void;
+}) {
+  return (
+    <Box
+      sx={{ display: 'flex', gap: 0 }}
+      role="group"
+      aria-label="World view selector"
+      data-testid="world-view-switcher"
+    >
+      {WORLD_VIEWS.map((v, i) => (
+        <Box
+          key={v.id}
+          component="button"
+          disabled={v.disabled}
+          aria-pressed={!v.disabled && worldView === v.id}
+          aria-disabled={v.disabled}
+          title={v.disabled ? v.tooltip : undefined}
+          onClick={!v.disabled ? () => onChange(v.id) : undefined}
+          sx={{
+            background: !v.disabled && worldView === v.id ? '#1C2128' : 'transparent',
+            border: '1px solid #21262D',
+            borderLeft: i > 0 ? 'none' : '1px solid #21262D',
+            borderRadius:
+              i === 0
+                ? '4px 0 0 4px'
+                : i === WORLD_VIEWS.length - 1
+                ? '0 4px 4px 0'
+                : '0',
+            px: '10px',
+            py: '3px',
+            fontFamily: 'monospace',
+            fontSize: '0.62rem',
+            fontWeight: !v.disabled && worldView === v.id ? 700 : 400,
+            color: v.disabled ? '#30363D' : worldView === v.id ? '#58A6FF' : '#6E7681',
+            cursor: v.disabled ? 'not-allowed' : 'pointer',
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            '&:hover': !v.disabled ? { color: '#58A6FF' } : {},
+          }}
+        >
+          {v.label}
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
 export default function WorldShell() {
   const [tab, setTab] = useState<WorldTab>('overview');
+  const [worldView, setWorldView] = useState<WorldView>('base');
 
   return (
     <Box
@@ -111,11 +172,40 @@ export default function WorldShell() {
         <WorldTabSwitcher tab={tab} onChange={setTab} />
       </Box>
 
+      {/* World view switcher — shown below sub-tabs */}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 2,
+          px: 2,
+          py: '6px',
+          borderBottom: '1px solid #21262D',
+          background: '#0D1117',
+        }}
+      >
+        <Typography
+          sx={{
+            fontFamily: 'monospace',
+            fontSize: '0.58rem',
+            color: '#484F58',
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+            flexShrink: 0,
+          }}
+        >
+          View
+        </Typography>
+        <WorldViewSwitcher worldView={worldView} onChange={setWorldView} />
+      </Box>
+
       {/* Tab content */}
       <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
         {tab === 'overview' && <WorldOverview />}
 
-        {tab !== 'overview' && (
+        {tab === 'changes' && <WorldChanges worldView={worldView} />}
+
+        {tab !== 'overview' && tab !== 'changes' && (
           <Box
             sx={{
               display: 'flex',

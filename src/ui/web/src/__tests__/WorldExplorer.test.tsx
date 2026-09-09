@@ -55,6 +55,7 @@ jest.mock('../services/worldAPI', () => ({
   worldAPI: {
     getConfig: jest.fn(),
     getSummary: jest.fn(),
+    getChanges: jest.fn(),
   },
 }));
 
@@ -251,15 +252,13 @@ describe('Phase 17A — World Explorer', () => {
     });
   });
 
-  // ── 8. GRAPH, CHANGES, RAW tabs are disabled/deferred ────────────────────────
+  // ── 8. GRAPH and RAW tabs are disabled; CHANGES is now enabled (Phase 17B) ────
 
-  it('GRAPH, CHANGES, RAW tabs are disabled in WorldShell', () => {
+  it('GRAPH and RAW tabs are disabled in WorldShell', () => {
     render(<WorldShell />, { wrapper: Wrapper });
     const graphBtn = screen.getByRole('button', { name: /graph/i });
-    const changesBtn = screen.getByRole('button', { name: /changes/i });
     const rawBtn = screen.getByRole('button', { name: /raw/i });
     expect(graphBtn).toBeDisabled();
-    expect(changesBtn).toBeDisabled();
     expect(rawBtn).toBeDisabled();
   });
 

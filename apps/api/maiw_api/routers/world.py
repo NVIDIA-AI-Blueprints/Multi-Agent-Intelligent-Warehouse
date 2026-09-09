@@ -115,6 +115,42 @@ class WorldSummaryResponse(BaseModel):
     runtime: RuntimeSummaryModel
 
 
+class OverlayEventDTO(BaseModel):
+    event_id: str
+    event_type: str          # OverlayEventKind value
+    entity_id: str
+    entity_type: str         # derived from event kind
+    entity_label: str        # human-readable from graph or event label
+    sim_time_offset_seconds: float
+    before_state: str | None = None   # BASE state
+    after_state: str | None = None    # SCENARIO state
+    label: str               # overlay event label
+    payload: dict[str, str | int | float | bool | None] = {}
+
+class AffectedEntityDTO(BaseModel):
+    entity_id: str
+    entity_type: str
+    entity_label: str
+    disruption_type: str     # e.g. WORKER_ABSENCE, EQUIPMENT_FAILURE
+    before_state: str | None = None
+    after_state: str | None = None
+    severity: str | None = None
+
+class WorldChangesResponse(BaseModel):
+    warehouse_id: str
+    dataset_id: str
+    scenario_id: str | None
+    scenario_name: str | None
+    scenario_active: bool
+    scenario_severity: str
+    base_checksum: str | None
+    world_clock_seconds: float
+    overlay_event_count: int
+    affected_entity_count: int
+    events: list[OverlayEventDTO]
+    affected_entities: list[AffectedEntityDTO]
+
+
 # ── Dependency ─────────────────────────────────────────────────────────────────
 
 async def _runtime() -> MAIWRuntime:
@@ -164,6 +200,103 @@ def _split_summary(summary: dict) -> tuple[dict[str, int], dict[str, int], int]:
         else:
             entity_counts[key] = int(val)
     return entity_counts, relationship_counts, event_count
+
+
+# ── Phase 17B helpers ─────────────────────────────────────────────────────────
+
+def _event_kind_to_entity_type(kind: str) -> str:
+    _MAP = {
+        "WORKER_ABSENCE": "worker",
+        "WORKER_RETURN": "worker",
+        "LABOR_SURGE": "worker",
+        "EQUIPMENT_FAILURE": "equipment",
+        "EQUIPMENT_RESTORED": "equipment",
+        "TASK_BLOCK": "task",
+        "TASK_UNBLOCK": "task",
+        "CARRIER_CUTOFF_MISS": "carrier_cutoff",
+        "INVENTORY_SHOCK": "inventory_position",
+        "WAVE_PRIORITY_BUMP": "wave",
+    }
+    return _MAP.get(kind, "unknown")
+
+
+def _event_kind_to_states(kind: str) -> tuple[str | None, str | None]:
+    """Return (before_state, after_state) for a given overlay event kind."""
+    _STATES = {
+        "WORKER_ABSENCE":       ("ACTIVE",    "ABSENT"),
+        "WORKER_RETURN":        ("ABSENT",    "ACTIVE"),
+        "EQUIPMENT_FAILURE":    ("AVAILABLE", "FAILED"),
+        "EQUIPMENT_RESTORED":   ("FAILED",    "AVAILABLE"),
+        "TASK_BLOCK":           ("READY",     "BLOCKED"),
+        "TASK_UNBLOCK":         ("BLOCKED",   "READY"),
+        "CARRIER_CUTOFF_MISS":  ("AT_RISK",   "MISSED"),
+        "INVENTORY_SHOCK":      ("NORMAL",    "SHOCK"),
+        "WAVE_PRIORITY_BUMP":   ("PLANNING",  "ACTIVE"),
+        "LABOR_SURGE":          (None,        "SURGE"),
+    }
+    return _STATES.get(kind, (None, None))
+
+
+def _entity_label(graph: Any, entity_id: str, fallback: str = "") -> str:
+    """Derive a human-readable label for an entity from the canonical graph."""
+    if graph is None:
+        return fallback or entity_id
+    try:
+        ent = graph.get_entity(entity_id)
+        if ent is None:
+            return fallback or entity_id
+        etype = getattr(ent, "entity_type", None)
+        if etype is not None:
+            etype_val = etype.value if hasattr(etype, "value") else str(etype)
+            if etype_val == "worker":
+                return getattr(ent, "full_name", None) or getattr(ent, "username", entity_id)
+            if etype_val == "equipment":
+                eq_type = getattr(ent, "equipment_type", "")
+                eq_type_val = eq_type.value if hasattr(eq_type, "value") else str(eq_type)
+                model = getattr(ent, "model", "")
+                return f"{eq_type_val.upper()} {entity_id}" + (f" ({model})" if model else "")
+            if etype_val == "task":
+                task_type = getattr(ent, "task_type", "")
+                task_type_val = task_type.value if hasattr(task_type, "value") else str(task_type)
+                return f"{task_type_val} {entity_id}"
+            if etype_val == "wave":
+                wave_num = getattr(ent, "wave_number", "")
+                return f"Wave {wave_num}"
+            if etype_val == "carrier_cutoff":
+                carrier = getattr(ent, "carrier", "")
+                return f"{carrier} cutoff" if carrier else entity_id
+    except Exception:
+        pass
+    return fallback or entity_id
+
+
+def _build_event_dto(event: Any, graph: Any) -> OverlayEventDTO:
+    kind = event.kind.value if hasattr(event.kind, "value") else str(event.kind)
+    before, after = _event_kind_to_states(kind)
+    label = _entity_label(graph, event.entity_id, fallback=event.label or event.entity_id)
+    return OverlayEventDTO(
+        event_id=event.event_id,
+        event_type=kind,
+        entity_id=event.entity_id,
+        entity_type=_event_kind_to_entity_type(kind),
+        entity_label=label,
+        sim_time_offset_seconds=event.sim_time_offset_seconds,
+        before_state=before,
+        after_state=after,
+        label=event.label or f"{kind}: {event.entity_id}",
+        payload=dict(event.payload),
+    )
+
+
+def _affected_entity_severity(kind: str) -> str | None:
+    _SEV = {
+        "EQUIPMENT_FAILURE":   "HIGH",
+        "CARRIER_CUTOFF_MISS": "CRITICAL",
+        "WORKER_ABSENCE":      "MODERATE",
+        "TASK_BLOCK":          "MODERATE",
+        "INVENTORY_SHOCK":     "MODERATE",
+    }
+    return _SEV.get(kind)
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -328,4 +461,102 @@ async def get_world_summary(runtime: MAIWRuntime = Depends(_runtime)) -> WorldSu
         ),
         scenario=scenario_summary,
         runtime=runtime_summary,
+    )
+
+
+@router.get("/changes", response_model=WorldChangesResponse, summary="Scenario overlay changes")
+async def get_world_changes(runtime: MAIWRuntime = Depends(_runtime)) -> WorldChangesResponse:
+    """
+    Return the current scenario overlay as a bounded, typed response.
+
+    Immutability invariant: base_checksum equals runtime.world_datapack_manifest
+    semantic_checksum — DataPack is never modified by scenario activation.
+
+    Returns a degraded response (scenario_active=False, empty events) when:
+    - No scenario is active
+    - Scenario used the legacy YAML path (no ScenarioWorld)
+    - DataPack not loaded
+    """
+    manifest = runtime.world_datapack_manifest
+    base_checksum = manifest.get("semantic_checksum")
+    graph = runtime.world_graph
+    warehouse_id = manifest.get("warehouse_id", "DC-47")
+    dataset_id = manifest.get("dataset_id", "dc47-demo-v1")
+
+    # ── No controller / no scenario ───────────────────────────────────────────
+    if runtime.demo_controller is None or not runtime.demo_controller.active:
+        return WorldChangesResponse(
+            warehouse_id=warehouse_id,
+            dataset_id=dataset_id,
+            scenario_id=None,
+            scenario_name=None,
+            scenario_active=False,
+            scenario_severity="NOMINAL",
+            base_checksum=base_checksum,
+            world_clock_seconds=0.0,
+            overlay_event_count=0,
+            affected_entity_count=0,
+            events=[],
+            affected_entities=[],
+        )
+
+    world = runtime.demo_controller.world
+    elapsed = float(world.clock.elapsed_seconds)
+    scenario_world = getattr(world, "_scenario_world", None)
+
+    # ── Overlay not available (legacy YAML path) ──────────────────────────────
+    if scenario_world is None:
+        return WorldChangesResponse(
+            warehouse_id=warehouse_id,
+            dataset_id=dataset_id,
+            scenario_id=None,
+            scenario_name=runtime.demo_controller.scenario_name,
+            scenario_active=True,
+            scenario_severity="UNKNOWN",
+            base_checksum=base_checksum,
+            world_clock_seconds=elapsed,
+            overlay_event_count=0,
+            affected_entity_count=0,
+            events=[],
+            affected_entities=[],
+        )
+
+    overlay = scenario_world.overlay
+    severity = scenario_world.disruption_severity(at_offset=elapsed)
+
+    # ── Build event DTOs — temporal order ────────────────────────────────────
+    sorted_events = sorted(overlay.events, key=lambda e: (e.sim_time_offset_seconds, e.event_id))
+    event_dtos = [_build_event_dto(ev, graph) for ev in sorted_events]
+
+    # ── Affected entities — deduplicated ─────────────────────────────────────
+    seen_entity: dict[str, AffectedEntityDTO] = {}
+    for ev in sorted_events:
+        eid = ev.entity_id
+        if eid in seen_entity:
+            continue
+        kind = ev.kind.value if hasattr(ev.kind, "value") else str(ev.kind)
+        before, after = _event_kind_to_states(kind)
+        seen_entity[eid] = AffectedEntityDTO(
+            entity_id=eid,
+            entity_type=_event_kind_to_entity_type(kind),
+            entity_label=_entity_label(graph, eid, fallback=ev.label or eid),
+            disruption_type=kind,
+            before_state=before,
+            after_state=after,
+            severity=_affected_entity_severity(kind),
+        )
+
+    return WorldChangesResponse(
+        warehouse_id=warehouse_id,
+        dataset_id=dataset_id,
+        scenario_id=overlay.scenario_id,
+        scenario_name=overlay.name,
+        scenario_active=True,
+        scenario_severity=severity,
+        base_checksum=base_checksum,
+        world_clock_seconds=elapsed,
+        overlay_event_count=len(overlay.events),
+        affected_entity_count=len(seen_entity),
+        events=event_dtos,
+        affected_entities=list(seen_entity.values()),
     )
