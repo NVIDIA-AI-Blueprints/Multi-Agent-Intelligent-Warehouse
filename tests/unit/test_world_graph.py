@@ -73,6 +73,7 @@ def runtime(graph):
 
 # ── G1. Exact ID search ───────────────────────────────────────────────────────
 
+
 def test_g1_search_exact_id(graph):
     results = _graph_search("wave-017", graph, 10)
     assert len(results) >= 1
@@ -81,6 +82,7 @@ def test_g1_search_exact_id(graph):
 
 
 # ── G2. Wave number resolution ────────────────────────────────────────────────
+
 
 def test_g2_search_wave_17_label(graph):
     results = _graph_search("Wave 17", graph, 10)
@@ -92,6 +94,7 @@ def test_g2_search_wave_17_label(graph):
 
 
 # ── G3. Entity type keyword ───────────────────────────────────────────────────
+
 
 def test_g3_search_entity_type_keyword(graph):
     results = _graph_search("worker", graph, 5)
@@ -110,12 +113,14 @@ def test_g3_agv_subtype_keyword(graph):
 
 # ── G4. Unknown query → empty (not error) ────────────────────────────────────
 
+
 def test_g4_unknown_query_empty(graph):
     results = _graph_search("zzz-nonexistent-xyzabc999", graph, 10)
     assert results == []
 
 
 # ── G5. Entity detail attributes ─────────────────────────────────────────────
+
 
 def test_g5_entity_detail_wave017(runtime):
     resp = run(get_graph_entity("wave-017", runtime=runtime))
@@ -131,8 +136,10 @@ def test_g5_entity_detail_wave017(runtime):
 
 # ── G6. Entity detail 404 ────────────────────────────────────────────────────
 
+
 def test_g6_entity_detail_not_found(runtime):
     from fastapi import HTTPException
+
     with pytest.raises(HTTPException) as exc_info:
         run(get_graph_entity("does-not-exist-xyzabc", runtime=runtime))
     assert exc_info.value.status_code == 404
@@ -140,8 +147,13 @@ def test_g6_entity_detail_not_found(runtime):
 
 # ── G7. Neighbors depth=1 ≤50 entities ───────────────────────────────────────
 
+
 def test_g7_neighbors_depth1_capped(runtime):
-    resp = run(get_graph_neighbors("wave-017", depth=1, max_entities=50, max_relationships=100, runtime=runtime))
+    resp = run(
+        get_graph_neighbors(
+            "wave-017", depth=1, max_entities=50, max_relationships=100, runtime=runtime
+        )
+    )
     assert resp.focus_entity.entity_id == "wave-017"
     assert len(resp.nodes) <= 50
     assert resp.depth == 1
@@ -149,13 +161,19 @@ def test_g7_neighbors_depth1_capped(runtime):
 
 # ── G8. Neighbors depth=2 ≤50 entities ───────────────────────────────────────
 
+
 def test_g8_neighbors_depth2_capped(runtime):
-    resp = run(get_graph_neighbors("wave-017", depth=2, max_entities=50, max_relationships=100, runtime=runtime))
+    resp = run(
+        get_graph_neighbors(
+            "wave-017", depth=2, max_entities=50, max_relationships=100, runtime=runtime
+        )
+    )
     assert len(resp.nodes) <= 50
     assert resp.depth == 2
 
 
 # ── G9. Server clamps max_entities ───────────────────────────────────────────
+
 
 def test_g9_server_clamps_max_entities(graph):
     capped, total, _ = _bounded_bfs(graph, "wave-017", 2, 50, 100)
@@ -165,6 +183,7 @@ def test_g9_server_clamps_max_entities(graph):
 
 # ── G10. Server clamps max_relationships ──────────────────────────────────────
 
+
 def test_g10_server_clamps_max_relationships(graph):
     _, _, edges = _bounded_bfs(graph, "wave-017", 2, 50, 100)
     assert len(edges) <= 100
@@ -172,14 +191,20 @@ def test_g10_server_clamps_max_relationships(graph):
 
 # ── G11. Truncated flag when available > capped ───────────────────────────────
 
+
 def test_g11_truncated_flag(runtime):
-    resp = run(get_graph_neighbors("wave-017", depth=1, max_entities=50, max_relationships=100, runtime=runtime))
+    resp = run(
+        get_graph_neighbors(
+            "wave-017", depth=1, max_entities=50, max_relationships=100, runtime=runtime
+        )
+    )
     assert resp.truncated is True
     assert resp.truncated_from is not None
     assert resp.truncated_from > 50
 
 
 # ── G12. Deterministic ordering ───────────────────────────────────────────────
+
 
 def test_g12_deterministic_ordering(graph):
     c1, _, _ = _bounded_bfs(graph, "wave-017", 1, 50, 100)
@@ -190,6 +215,7 @@ def test_g12_deterministic_ordering(graph):
 
 
 # ── G13. Scenario annotation with mocked overlay ─────────────────────────────
+
 
 def test_g13_scenario_annotation(graph):
     mock_ev = MagicMock()
@@ -214,15 +240,24 @@ def test_g13_scenario_annotation(graph):
     rt.world_datapack_manifest = {"dataset_id": "dc47-demo-v1", "warehouse_id": "DC-47"}
     rt.demo_controller = mock_ctrl
 
-    resp = run(get_graph_neighbors("wave-017", depth=1, max_entities=50, max_relationships=100, runtime=rt))
+    resp = run(
+        get_graph_neighbors(
+            "wave-017", depth=1, max_entities=50, max_relationships=100, runtime=rt
+        )
+    )
     assert resp.focus_entity.scenario_affected is True
     assert resp.focus_entity.scenario_severity is not None
 
 
 # ── G14. No full graph serialization ─────────────────────────────────────────
 
+
 def test_g14_no_full_graph_serialization(runtime):
-    resp = run(get_graph_neighbors("wave-017", depth=2, max_entities=50, max_relationships=100, runtime=runtime))
+    resp = run(
+        get_graph_neighbors(
+            "wave-017", depth=2, max_entities=50, max_relationships=100, runtime=runtime
+        )
+    )
     assert len(resp.nodes) <= 50
     assert len(resp.edges) <= 100
     # Never the whole DataPack
@@ -231,19 +266,26 @@ def test_g14_no_full_graph_serialization(runtime):
 
 # ── G15. GET-only routes ──────────────────────────────────────────────────────
 
+
 def test_g15_get_only_routes():
     from fastapi.routing import APIRoute
+
     for route in router.routes:
         if isinstance(route, APIRoute):
-            assert route.methods == {"GET"}, (
-                f"Route {route.path} must be GET-only, got {route.methods}"
-            )
+            assert route.methods == {
+                "GET"
+            }, f"Route {route.path} must be GET-only, got {route.methods}"
 
 
 # ── G16. Temporal edge fields ─────────────────────────────────────────────────
 
+
 def test_g16_temporal_edge_fields(runtime):
-    resp = run(get_graph_neighbors("wave-017", depth=1, max_entities=50, max_relationships=100, runtime=runtime))
+    resp = run(
+        get_graph_neighbors(
+            "wave-017", depth=1, max_entities=50, max_relationships=100, runtime=runtime
+        )
+    )
     assert len(resp.edges) > 0
     for edge in resp.edges[:5]:
         assert edge.edge_id
@@ -256,8 +298,13 @@ def test_g16_temporal_edge_fields(runtime):
 
 # ── G17. Focus entity bfs_depth=0 ────────────────────────────────────────────
 
+
 def test_g17_focus_entity_bfs_depth_zero(runtime):
-    resp = run(get_graph_neighbors("wave-017", depth=1, max_entities=50, max_relationships=100, runtime=runtime))
+    resp = run(
+        get_graph_neighbors(
+            "wave-017", depth=1, max_entities=50, max_relationships=100, runtime=runtime
+        )
+    )
     assert resp.focus_entity.bfs_depth == 0
     for node in resp.nodes:
         assert node.bfs_depth >= 1
@@ -265,8 +312,13 @@ def test_g17_focus_entity_bfs_depth_zero(runtime):
 
 # ── G18. Relationship summary ─────────────────────────────────────────────────
 
+
 def test_g18_relationship_summary(runtime):
-    resp = run(get_graph_neighbors("wave-017", depth=1, max_entities=50, max_relationships=100, runtime=runtime))
+    resp = run(
+        get_graph_neighbors(
+            "wave-017", depth=1, max_entities=50, max_relationships=100, runtime=runtime
+        )
+    )
     assert isinstance(resp.relationship_summary, dict)
     assert len(resp.relationship_summary) > 0
     for group, labels in resp.relationship_summary.items():

@@ -30,6 +30,7 @@ REPO_ROOT = Path(__file__).parents[2]
 
 def _make_overlay_event(event_id, kind, entity_id, offset, label=""):
     from maiw_world.scenario import OverlayEvent, OverlayEventKind
+
     return OverlayEvent(
         event_id=event_id,
         kind=OverlayEventKind[kind],
@@ -41,6 +42,7 @@ def _make_overlay_event(event_id, kind, entity_id, offset, label=""):
 
 def _make_overlay(scenario_id, name, events):
     from maiw_world.scenario import ScenarioOverlay
+
     return ScenarioOverlay(
         scenario_id=scenario_id,
         name=name,
@@ -60,9 +62,15 @@ def _make_scenario_world(overlay, graph=None):
     return sw
 
 
-def _make_runtime(scenario_world=None, active=True, checksum="abc123", elapsed=0.0, graph=None):
+def _make_runtime(
+    scenario_world=None, active=True, checksum="abc123", elapsed=0.0, graph=None
+):
     rt = MagicMock()
-    rt.world_datapack_manifest = {"semantic_checksum": checksum, "warehouse_id": "DC-47", "dataset_id": "dc47-demo-v1"}
+    rt.world_datapack_manifest = {
+        "semantic_checksum": checksum,
+        "warehouse_id": "DC-47",
+        "dataset_id": "dc47-demo-v1",
+    }
     rt.world_graph = graph
 
     if scenario_world is not None or active:
@@ -86,8 +94,13 @@ class TestWorldChangesGETOnly:
     def test_changes_endpoint_is_get_only(self):
         from maiw_api.routers import world as world_module
         from fastapi.routing import APIRoute
+
         changes_route = next(
-            (r for r in world_module.router.routes if isinstance(r, APIRoute) and "/changes" in r.path),
+            (
+                r
+                for r in world_module.router.routes
+                if isinstance(r, APIRoute) and "/changes" in r.path
+            ),
             None,
         )
         assert changes_route is not None, "/world/changes route must exist"
@@ -99,6 +112,7 @@ class TestWorldChangesNoScenario:
 
     def test_no_scenario_returns_not_active(self):
         from maiw_api.routers.world import get_world_changes
+
         rt = _make_runtime(active=False, scenario_world=None)
         result = asyncio.run(get_world_changes(runtime=rt))
         assert result.scenario_active is False
@@ -108,8 +122,13 @@ class TestWorldChangesNoScenario:
 
     def test_no_controller_returns_not_active(self):
         from maiw_api.routers.world import get_world_changes
+
         rt = MagicMock()
-        rt.world_datapack_manifest = {"semantic_checksum": "x", "warehouse_id": "DC-47", "dataset_id": "ds1"}
+        rt.world_datapack_manifest = {
+            "semantic_checksum": "x",
+            "warehouse_id": "DC-47",
+            "dataset_id": "ds1",
+        }
         rt.world_graph = None
         rt.demo_controller = None
         result = asyncio.run(get_world_changes(runtime=rt))
@@ -117,6 +136,7 @@ class TestWorldChangesNoScenario:
 
     def test_no_scenario_severity_is_nominal(self):
         from maiw_api.routers.world import get_world_changes
+
         rt = _make_runtime(active=False)
         result = asyncio.run(get_world_changes(runtime=rt))
         assert result.scenario_severity == "NOMINAL"
@@ -127,15 +147,26 @@ class TestWorldChangesLaborScenario:
 
     def _make_labor_overlay(self):
         events = [
-            _make_overlay_event("e1", "WORKER_ABSENCE", "worker-001", 0.0, "Worker 001 absent"),
-            _make_overlay_event("e2", "WORKER_ABSENCE", "worker-002", 30.0, "Worker 002 absent"),
-            _make_overlay_event("e3", "TASK_BLOCK", "task-001", 300.0, "Task 001 blocked"),
-            _make_overlay_event("e4", "CARRIER_CUTOFF_MISS", "cutoff-001", 1800.0, "Cutoff missed"),
+            _make_overlay_event(
+                "e1", "WORKER_ABSENCE", "worker-001", 0.0, "Worker 001 absent"
+            ),
+            _make_overlay_event(
+                "e2", "WORKER_ABSENCE", "worker-002", 30.0, "Worker 002 absent"
+            ),
+            _make_overlay_event(
+                "e3", "TASK_BLOCK", "task-001", 300.0, "Task 001 blocked"
+            ),
+            _make_overlay_event(
+                "e4", "CARRIER_CUTOFF_MISS", "cutoff-001", 1800.0, "Cutoff missed"
+            ),
         ]
-        return _make_overlay("labor-constraint-wave-risk", "Labor Constraint + Wave Risk", events)
+        return _make_overlay(
+            "labor-constraint-wave-risk", "Labor Constraint + Wave Risk", events
+        )
 
     def test_labor_scenario_returns_active(self):
         from maiw_api.routers.world import get_world_changes
+
         overlay = self._make_labor_overlay()
         sw = _make_scenario_world(overlay)
         rt = _make_runtime(scenario_world=sw)
@@ -145,6 +176,7 @@ class TestWorldChangesLaborScenario:
 
     def test_labor_scenario_event_count(self):
         from maiw_api.routers.world import get_world_changes
+
         overlay = self._make_labor_overlay()
         sw = _make_scenario_world(overlay)
         rt = _make_runtime(scenario_world=sw)
@@ -154,6 +186,7 @@ class TestWorldChangesLaborScenario:
 
     def test_labor_scenario_affected_entities_deduplicated(self):
         from maiw_api.routers.world import get_world_changes
+
         # Two events for same worker should still be one affected entity
         events = [
             _make_overlay_event("e1", "WORKER_ABSENCE", "worker-001", 0.0),
@@ -167,13 +200,16 @@ class TestWorldChangesLaborScenario:
 
     def test_labor_scenario_worker_absence_has_before_after(self):
         from maiw_api.routers.world import get_world_changes
+
         events = [_make_overlay_event("e1", "WORKER_ABSENCE", "worker-001", 0.0)]
         overlay = _make_overlay("test", "Test", events)
         sw = _make_scenario_world(overlay)
         rt = _make_runtime(scenario_world=sw)
         result = asyncio.run(get_world_changes(runtime=rt))
-        absence_event = next(e for e in result.events if e.event_type == "WORKER_ABSENCE")
-        assert absence_event.before_state == "ACTIVE"   # C11
+        absence_event = next(
+            e for e in result.events if e.event_type == "WORKER_ABSENCE"
+        )
+        assert absence_event.before_state == "ACTIVE"  # C11
         assert absence_event.after_state == "ABSENT"
 
 
@@ -182,9 +218,14 @@ class TestWorldChangesEquipmentScenario:
 
     def test_equipment_failure_events_present(self):
         from maiw_api.routers.world import get_world_changes
+
         events = [
-            _make_overlay_event("e1", "EQUIPMENT_FAILURE", "agv-001", 0.0, "AGV offline"),
-            _make_overlay_event("e2", "EQUIPMENT_RESTORED", "agv-001", 1800.0, "AGV restored"),
+            _make_overlay_event(
+                "e1", "EQUIPMENT_FAILURE", "agv-001", 0.0, "AGV offline"
+            ),
+            _make_overlay_event(
+                "e2", "EQUIPMENT_RESTORED", "agv-001", 1800.0, "AGV restored"
+            ),
         ]
         overlay = _make_overlay("agv-fleet-failure", "AGV Fleet Failure", events)
         sw = _make_scenario_world(overlay)
@@ -196,12 +237,15 @@ class TestWorldChangesEquipmentScenario:
 
     def test_equipment_failure_has_before_after(self):
         from maiw_api.routers.world import get_world_changes
+
         events = [_make_overlay_event("e1", "EQUIPMENT_FAILURE", "agv-001", 0.0)]
         overlay = _make_overlay("test", "Test", events)
         sw = _make_scenario_world(overlay)
         rt = _make_runtime(scenario_world=sw)
         result = asyncio.run(get_world_changes(runtime=rt))
-        failure_event = next(e for e in result.events if e.event_type == "EQUIPMENT_FAILURE")
+        failure_event = next(
+            e for e in result.events if e.event_type == "EQUIPMENT_FAILURE"
+        )
         assert failure_event.before_state == "AVAILABLE"
         assert failure_event.after_state == "FAILED"
 
@@ -211,6 +255,7 @@ class TestWorldChangesOrdering:
 
     def test_events_ordered_by_offset(self):
         from maiw_api.routers.world import get_world_changes
+
         events = [
             _make_overlay_event("e3", "CARRIER_CUTOFF_MISS", "cutoff-001", 1800.0),
             _make_overlay_event("e1", "WORKER_ABSENCE", "worker-001", 0.0),
@@ -229,6 +274,7 @@ class TestWorldChangesChecksumInvariant:
 
     def test_base_checksum_matches_manifest_checksum(self):
         from maiw_api.routers.world import get_world_changes
+
         events = [_make_overlay_event("e1", "WORKER_ABSENCE", "worker-001", 0.0)]
         overlay = _make_overlay("test", "Test", events)
         sw = _make_scenario_world(overlay)
@@ -240,6 +286,7 @@ class TestWorldChangesChecksumInvariant:
 
     def test_checksum_same_with_and_without_scenario(self):
         from maiw_api.routers.world import get_world_changes
+
         checksum = "test-checksum-xyz"
         # With scenario
         events = [_make_overlay_event("e1", "WORKER_ABSENCE", "w1", 0.0)]
@@ -258,10 +305,12 @@ class TestWorldChangesNoFullGraph:
 
     def test_response_has_no_entities_field(self):
         from maiw_api.routers.world import WorldChangesResponse
+
         assert "entities" not in WorldChangesResponse.model_fields
 
     def test_response_has_no_edges_field(self):
         from maiw_api.routers.world import WorldChangesResponse
+
         assert "edges" not in WorldChangesResponse.model_fields
 
 
@@ -270,6 +319,7 @@ class TestWorldChangesLegacyPath:
 
     def test_legacy_path_no_scenario_world(self):
         from maiw_api.routers.world import get_world_changes
+
         # scenario_world=None but active=True simulates legacy YAML path
         rt = _make_runtime(active=True, scenario_world=None)
         result = asyncio.run(get_world_changes(runtime=rt))

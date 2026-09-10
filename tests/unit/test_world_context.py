@@ -37,6 +37,7 @@ REPO_ROOT = Path(__file__).parents[2]
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_snapshot(
     *,
     context_snapshot_id: str = "ctx-snap-0001",
@@ -103,6 +104,7 @@ def _make_snapshot(
 # C1. OperationalContextSnapshot model stores all required fields
 # ---------------------------------------------------------------------------
 
+
 class TestOperationalContextSnapshotModel:
     def test_c1_all_required_fields_present(self):
         snap = _make_snapshot()
@@ -126,6 +128,7 @@ class TestOperationalContextSnapshotModel:
 
     def test_c10_context_snapshot_node_is_frozen(self):
         from maiw_api.copilot.models import ContextSnapshotNode
+
         node = ContextSnapshotNode(
             entity_id="w1",
             entity_type="worker",
@@ -137,6 +140,7 @@ class TestOperationalContextSnapshotModel:
 
     def test_c11_context_snapshot_edge_is_frozen(self):
         from maiw_api.copilot.models import ContextSnapshotEdge
+
         edge = ContextSnapshotEdge(
             source_id="w1",
             target_id="t1",
@@ -156,9 +160,11 @@ class TestOperationalContextSnapshotModel:
 # C2–C6. InMemoryCopilotStore snapshot methods
 # ---------------------------------------------------------------------------
 
+
 class TestInMemoryCopilotStoreSnapshots:
     def test_c2_store_indexes_by_turn_id(self):
         from maiw_api.copilot.store import InMemoryCopilotStore
+
         store = InMemoryCopilotStore()
         snap = _make_snapshot(turn_id="turn-abc", context_snapshot_id="ctx-abc")
         store.store_context_snapshot(snap)
@@ -167,6 +173,7 @@ class TestInMemoryCopilotStoreSnapshots:
 
     def test_c3_store_indexes_by_context_snapshot_id(self):
         from maiw_api.copilot.store import InMemoryCopilotStore
+
         store = InMemoryCopilotStore()
         snap = _make_snapshot(turn_id="turn-xyz", context_snapshot_id="ctx-xyz")
         store.store_context_snapshot(snap)
@@ -175,16 +182,19 @@ class TestInMemoryCopilotStoreSnapshots:
 
     def test_c4_get_by_turn_returns_none_on_miss(self):
         from maiw_api.copilot.store import InMemoryCopilotStore
+
         store = InMemoryCopilotStore()
         assert store.get_context_snapshot_by_turn("nonexistent-turn-id") is None
 
     def test_c5_get_by_id_returns_none_on_miss(self):
         from maiw_api.copilot.store import InMemoryCopilotStore
+
         store = InMemoryCopilotStore()
         assert store.get_context_snapshot_by_id("nonexistent-ctx-id") is None
 
     def test_c6_reset_clears_context_snapshots(self):
         from maiw_api.copilot.store import InMemoryCopilotStore
+
         store = InMemoryCopilotStore()
         snap = _make_snapshot(turn_id="turn-reset", context_snapshot_id="ctx-reset")
         store.store_context_snapshot(snap)
@@ -195,6 +205,7 @@ class TestInMemoryCopilotStoreSnapshots:
 
     def test_c16_two_distinct_snapshots_do_not_collide(self):
         from maiw_api.copilot.store import InMemoryCopilotStore
+
         store = InMemoryCopilotStore()
         snap_a = _make_snapshot(turn_id="turn-A", context_snapshot_id="ctx-A")
         snap_b = _make_snapshot(turn_id="turn-B", context_snapshot_id="ctx-B")
@@ -210,10 +221,12 @@ class TestInMemoryCopilotStoreSnapshots:
 # C7–C9. World router /context/by-turn endpoint
 # ---------------------------------------------------------------------------
 
+
 class TestWorldContextByTurnEndpoint:
     def _make_runtime(self, snap=None):
         """Build a minimal runtime mock with copilot_service.store wired."""
         from maiw_api.copilot.store import InMemoryCopilotStore
+
         store = InMemoryCopilotStore()
         if snap is not None:
             store.store_context_snapshot(snap)
@@ -236,9 +249,7 @@ class TestWorldContextByTurnEndpoint:
         )
         runtime = self._make_runtime(snap)
 
-        result = asyncio.run(
-            get_context_by_turn(turn_id="turn-known", runtime=runtime)
-        )
+        result = asyncio.run(get_context_by_turn(turn_id="turn-known", runtime=runtime))
         assert result.context_snapshot_id == "ctx-known"
         assert result.turn_id == "turn-known"
         assert result.focus_label == "Bob (Sorter)"
@@ -267,19 +278,21 @@ class TestWorldContextByTurnEndpoint:
                 context_route = route
                 break
         assert context_route is not None, "Route /context/by-turn/{turn_id} not found"
-        assert context_route.methods == {"GET"}, (
-            f"Expected GET-only, got {context_route.methods}"
-        )
+        assert context_route.methods == {
+            "GET"
+        }, f"Expected GET-only, got {context_route.methods}"
 
 
 # ---------------------------------------------------------------------------
 # C13–C14. CopilotTurn / CopilotTurnResponse carry context_snapshot_id
 # ---------------------------------------------------------------------------
 
+
 class TestContextSnapshotIdOnTurnModels:
     def test_c13_copilot_turn_has_context_snapshot_id_field(self):
         from maiw_api.copilot.models import CopilotTurn, CopilotIntent
         from datetime import datetime, timezone
+
         turn = CopilotTurn(
             turn_id="t1",
             conversation_id="c1",
@@ -295,6 +308,7 @@ class TestContextSnapshotIdOnTurnModels:
     def test_c13_copilot_turn_context_snapshot_id_defaults_to_none(self):
         from maiw_api.copilot.models import CopilotTurn, CopilotIntent
         from datetime import datetime, timezone
+
         turn = CopilotTurn(
             turn_id="t2",
             conversation_id="c2",
@@ -308,6 +322,7 @@ class TestContextSnapshotIdOnTurnModels:
 
     def test_c14_copilot_turn_response_has_context_snapshot_id_field(self):
         from maiw_api.copilot.models import CopilotTurnResponse
+
         resp = CopilotTurnResponse(
             conversation_id="c1",
             turn_id="t1",
@@ -320,6 +335,7 @@ class TestContextSnapshotIdOnTurnModels:
 
     def test_c14b_copilot_turn_response_context_snapshot_id_defaults_to_none(self):
         from maiw_api.copilot.models import CopilotTurnResponse
+
         resp = CopilotTurnResponse(
             conversation_id="c1",
             turn_id="t1",
@@ -334,6 +350,7 @@ class TestContextSnapshotIdOnTurnModels:
 # C15. World router import boundary (architecture invariant)
 # ---------------------------------------------------------------------------
 
+
 class TestWorldRouterImportBoundary:
     def test_c15_world_router_does_not_import_governance_symbols(self):
         router_path = REPO_ROOT / "apps" / "api" / "maiw_api" / "routers" / "world.py"
@@ -345,6 +362,6 @@ class TestWorldRouterImportBoundary:
             "GovernedActionOrchestrator",
         ]
         found = [sym for sym in forbidden if sym in content]
-        assert found == [], (
-            f"world.py must not import governance/execution symbols: {found}"
-        )
+        assert (
+            found == []
+        ), f"world.py must not import governance/execution symbols: {found}"
