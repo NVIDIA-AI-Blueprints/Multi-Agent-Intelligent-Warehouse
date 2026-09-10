@@ -437,13 +437,13 @@ describe('Phase 17C — World Graph Explorer', () => {
     expect(screen.getByTestId('return-to-copilot')).toBeInTheDocument();
   });
 
-  // 17. Context provenance banner shows WHAT MAIW SAW
+  // 17. Context provenance banner shows CURRENT OPERATIONAL CONTEXT (Phase 17F: renamed)
   it('shows context provenance banner when focusContext and neighborhood loaded', async () => {
     const ctx = { entityId: 'wave-017', entityLabel: 'Wave 17', turnId: 'turn-abc123', traceId: 'trace-xyz456', entityCount: 22 };
     render(<WorldGraph worldView="base" focusContext={ctx} />, { wrapper: Wrapper });
     await waitFor(() => {
       expect(screen.getByTestId('context-provenance-banner')).toBeInTheDocument();
-      expect(screen.getByText(/WHAT MAIW SAW/i)).toBeInTheDocument();
+      expect(screen.getByText(/CURRENT OPERATIONAL CONTEXT/i)).toBeInTheDocument();
     });
   });
 

@@ -98,7 +98,7 @@ function ContextProvenanceBanner({
       }}
     >
       <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700, color: '#58A6FF', letterSpacing: '0.1em' }}>
-        WHAT MAIW SAW
+        CURRENT OPERATIONAL CONTEXT
       </Typography>
       {[
         ['Turn', focusContext.turnId.slice(0, 8)],
@@ -123,7 +123,7 @@ function ContextProvenanceBanner({
 
 // ── Empty / search state ──────────────────────────────────────────────────────
 
-function SearchEmptyState() {
+function SearchEmptyState({ onSearch }: { onSearch: (q: string) => void }) {
   return (
     <Box
       data-testid="graph-search-empty"
@@ -140,15 +140,19 @@ function SearchEmptyState() {
       </Typography>
       <Box sx={{ mt: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center' }}>
         {['Wave 17', 'worker', 'agv', 'task'].map((ex) => (
-          <Typography
+          <Box
             key={ex}
+            component="button"
+            onClick={() => onSearch(ex)}
             sx={{
-              fontFamily: 'monospace', fontSize: '0.58rem', color: '#30363D',
-              border: '1px solid #21262D', borderRadius: '3px', px: '6px', py: '2px',
+              fontFamily: 'monospace', fontSize: '0.58rem', color: '#6E7681',
+              border: '1px solid #30363D', borderRadius: '3px', px: '6px', py: '2px',
+              background: 'transparent', cursor: 'pointer',
+              '&:hover': { color: '#C9D1D9', borderColor: '#58A6FF' },
             }}
           >
             {ex}
-          </Typography>
+          </Box>
         ))}
       </Box>
     </Box>
@@ -380,7 +384,9 @@ export default function WorldGraph({ worldView, focusContext, onReturnToCopilot 
         </Box>
       )}
 
-      {!focusEntityId && !neighborhoodLoading && <SearchEmptyState />}
+      {!focusEntityId && !neighborhoodLoading && (
+        <SearchEmptyState onSearch={(q) => { setSearchQuery(q); setShowResults(true); }} />
+      )}
 
       {focusNode && neighborhood && !neighborhoodLoading && (
         <Box sx={{ display: 'flex', gap: '8px', flexGrow: 1, minHeight: 0 }}>
