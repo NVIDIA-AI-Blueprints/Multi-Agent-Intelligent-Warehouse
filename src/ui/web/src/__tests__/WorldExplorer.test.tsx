@@ -59,6 +59,10 @@ jest.mock('../services/worldAPI', () => ({
     searchGraph: jest.fn(),
     getGraphEntity: jest.fn(),
     getGraphNeighbors: jest.fn(),
+    getLive: jest.fn(),
+    getContextByTurn: jest.fn(),
+    getEntities: jest.fn(),           // Phase 17F
+    getContextSnapshots: jest.fn(),   // Phase 17F
   },
 }));
 
@@ -255,13 +259,16 @@ describe('Phase 17A — World Explorer', () => {
     });
   });
 
-  // ── 8. RAW tab is disabled; GRAPH and CHANGES are now enabled (Phase 17C) ────
+  // ── 8. RAW tab is now enabled (Phase 17F); GRAPH and CHANGES remain enabled ──
 
-  it('RAW tab is disabled in WorldShell (GRAPH and CHANGES are enabled)', () => {
+  it('RAW tab is enabled in WorldShell (Phase 17F)', () => {
+    const { worldAPI: mockWorldAPI } = require('../services/worldAPI');
+    mockWorldAPI.getEntities.mockResolvedValue({ items: [], total: 0, limit: 20, offset: 0, has_more: false, entity_type_filter: null });
+    mockWorldAPI.getContextSnapshots.mockResolvedValue({ snapshots: [], total: 0, store_note: '' });
     render(<WorldShell />, { wrapper: Wrapper });
     const rawBtn = screen.getByRole('button', { name: /raw/i });
-    expect(rawBtn).toBeDisabled();
-    // GRAPH is now enabled in Phase 17C
+    expect(rawBtn).not.toBeDisabled();
+    // GRAPH remains enabled
     const graphBtn = screen.getByRole('button', { name: /^graph$/i });
     expect(graphBtn).not.toBeDisabled();
   });

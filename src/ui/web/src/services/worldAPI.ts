@@ -257,6 +257,44 @@ export interface WorldLiveResponse {
   last_execution: LastExecutionDTO | null;
 }
 
+// ── Phase 17F: Paginated entity browser ──────────────────────────────────────
+
+export interface EntityBrowserItemDTO {
+  entity_id: string;
+  entity_type: string;
+  label: string;
+  key_state: Record<string, string | number | boolean | null>;
+}
+
+export interface EntityPageResponse {
+  items: EntityBrowserItemDTO[];
+  total: number;
+  limit: number;
+  offset: number;
+  has_more: boolean;
+  entity_type_filter: string | null;
+}
+
+// ── Phase 17F: Context snapshot list ─────────────────────────────────────────
+
+export interface ContextSnapshotListItemDTO {
+  context_snapshot_id: string;
+  turn_id: string;
+  trace_id: string;
+  focus_entity_id: string;
+  focus_entity_type: string;
+  focus_label: string;
+  entity_count: number;
+  captured_at: string;
+  truncated: boolean;
+}
+
+export interface ContextSnapshotListResponse {
+  snapshots: ContextSnapshotListItemDTO[];
+  total: number;
+  store_note: string;
+}
+
 // Context passed from Copilot to WORLD graph
 export interface GraphFocusContext {
   entityId: string;
@@ -356,6 +394,24 @@ async function getContextByTurn(turnId: string): Promise<OperationalContextSnaps
   return r.data as OperationalContextSnapshotResponse;
 }
 
+// Phase 17F: paginated entity browser
+async function getEntities(
+  entityType?: string,
+  limit = 20,
+  offset = 0,
+): Promise<EntityPageResponse> {
+  const params: Record<string, string | number> = { limit, offset };
+  if (entityType) params.entity_type = entityType;
+  const r = await http.get('/world/graph/entities', { params });
+  return r.data as EntityPageResponse;
+}
+
+// Phase 17F: context snapshot list
+async function getContextSnapshots(): Promise<ContextSnapshotListResponse> {
+  const r = await http.get('/world/context/snapshots');
+  return r.data as ContextSnapshotListResponse;
+}
+
 export const worldAPI = {
   getConfig,
   getSummary,
@@ -364,5 +420,7 @@ export const worldAPI = {
   getGraphEntity,
   getGraphNeighbors,
   getLive,
-  getContextByTurn,  // Phase 17E
+  getContextByTurn,      // Phase 17E
+  getEntities,           // Phase 17F
+  getContextSnapshots,   // Phase 17F
 };

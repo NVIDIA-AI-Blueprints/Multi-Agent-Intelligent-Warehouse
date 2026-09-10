@@ -1355,6 +1355,222 @@ class OperationalContextSnapshotResponse(BaseModel):
     store_note: str = "Snapshot is process-local; not persisted across API restart."
 
 
+# ── Phase 17F: paginated entity browser ───────────────────────────────────────
+
+VALID_ENTITY_TYPES = {
+    "Warehouse", "Zone", "Location", "Worker", "Equipment",
+    "SKU", "InventoryPosition", "Order", "Wave", "Task",
+    "CarrierCutoff", "Shift",
+}
+
+class EntityBrowserItemDTO(BaseModel):
+    entity_id: str
+    entity_type: str
+    label: str
+    key_state: dict[str, str | int | float | bool | None]
+
+class EntityPageResponse(BaseModel):
+    items: list[EntityBrowserItemDTO]
+    total: int
+    limit: int
+    offset: int
+    has_more: bool
+    entity_type_filter: str | None
+
+
+def _entity_key_state(entity: Any) -> dict[str, str | int | float | bool | None]:
+    """Return the single most-relevant state field for the entity browser list."""
+    et = entity.entity_type.value if hasattr(entity.entity_type, "value") else str(entity.entity_type)
+    def _v(attr: str) -> Any:
+        val = getattr(entity, attr, None)
+        if val is None:
+            return None
+        if hasattr(val, "value"):
+            return val.value
+        return val
+
+    if et == "worker":
+        return {"status": _v("status"), "role": _v("role")}
+    if et == "equipment":
+        return {"status": _v("status"), "equipment_type": _v("equipment_type")}
+    if et == "task":
+        return {"status": _v("status"), "task_type": _v("task_type"), "priority": _v("priority")}
+    if et == "wave":
+        return {"wave_number": _v("wave_number"), "status": _v("status")}
+    if et == "order":
+        return {"priority": _v("priority"), "order_reference": _v("order_reference")}
+    if et == "sku":
+        return {"category": _v("category")}
+    if et == "inventory_position":
+        return {"on_hand": _v("on_hand"), "reserved": _v("reserved")}
+    if et == "zone":
+        return {"zone_type": _v("zone_type")}
+    if et == "location":
+        return {"location_code": _v("location_code")}
+    if et == "carrier_cutoff":
+        ct = _v("cutoff_time")
+        return {"carrier": _v("carrier"), "cutoff_time": ct.isoformat() if hasattr(ct, "isoformat") else str(ct) if ct else None}
+    return {}
+
+
+@router.get(
+    "/graph/entities",
+    response_model=EntityPageResponse,
+    summary="Paginated entity browser (bounded to 50 per page)",
+)
+async def get_graph_entities(
+    entity_type: str | None = Query(default=None, description="Filter by entity type (e.g. Worker, Wave, Task)"),
+    limit: int = Query(default=20, ge=1, le=50, description="Page size — server hard max is 50"),
+    offset: int = Query(default=0, ge=0, description="Pagination offset"),
+    runtime: MAIWRuntime = Depends(_runtime),
+) -> EntityPageResponse:
+    """
+    Return a bounded, paginated list of entities from the canonical Operational Graph.
+
+    Hard server cap: limit ≤ 50. Never returns the full 25k entity set.
+    Supports filtering by entity_type (case-insensitive).
+    Each item includes entity_id, entity_type, label, and key_state summary.
+
+    Use GET /graph/entity/{id} or GET /graph/neighbors/{id} for full entity detail.
+
+    GET-only. No graph mutations.
+    """
+    from maiw_world.entities import EntityType
+
+    graph = runtime.world_graph
+    if graph is None:
+        raise HTTPException(status_code=503, detail="Operational graph not available")
+
+    # Clamp limit server-side regardless of Query validation
+    limit = min(limit, 50)
+
+    # Resolve entity type filter
+    et_filter: "EntityType | None" = None
+    if entity_type:
+        # Normalize: accept "Worker" or "worker"
+        et_lower = entity_type.lower().replace(" ", "_")
+        try:
+            et_filter = EntityType(et_lower)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown entity_type '{entity_type}'. "
+                       f"Valid types: {', '.join(sorted(VALID_ENTITY_TYPES))}",
+            )
+
+    if et_filter is not None:
+        all_entities = sorted(graph.entities_by_type(et_filter), key=lambda e: e.id)
+    else:
+        all_entities = []
+        for et in EntityType:
+            all_entities.extend(graph.entities_by_type(et))
+        all_entities = sorted(all_entities, key=lambda e: (e.entity_type.value, e.id))
+
+    total = len(all_entities)
+    page = all_entities[offset : offset + limit]
+
+    items = [
+        EntityBrowserItemDTO(
+            entity_id=e.id,
+            entity_type=e.entity_type.value,
+            label=_entity_label_full(e),
+            key_state=_entity_key_state(e),
+        )
+        for e in page
+    ]
+
+    return EntityPageResponse(
+        items=items,
+        total=total,
+        limit=limit,
+        offset=offset,
+        has_more=(offset + limit) < total,
+        entity_type_filter=et_filter.value if et_filter else None,
+    )
+
+
+# ── Phase 17F: context snapshot list ─────────────────────────────────────────
+
+class ContextSnapshotListItemDTO(BaseModel):
+    context_snapshot_id: str
+    turn_id: str
+    trace_id: str
+    focus_entity_id: str
+    focus_entity_type: str
+    focus_label: str
+    entity_count: int
+    captured_at: str
+    truncated: bool
+
+
+class ContextSnapshotListResponse(BaseModel):
+    snapshots: list[ContextSnapshotListItemDTO]
+    total: int
+    store_note: str = "Snapshots are process-local; cleared on API restart or demo reset."
+
+
+@router.get(
+    "/context/snapshots",
+    response_model=ContextSnapshotListResponse,
+    summary="List all in-memory operational context snapshots (newest first)",
+)
+async def list_context_snapshots(
+    runtime: MAIWRuntime = Depends(_runtime),
+) -> ContextSnapshotListResponse:
+    """
+    Return a bounded list of all captured OperationalContextSnapshots.
+
+    These are the exact bounded graph contexts supplied to Copilot/agent turns.
+    Sorted newest first.  Deduplicated by turn_id (each turn produces one snapshot).
+
+    Use GET /context/by-turn/{turn_id} to fetch full snapshot detail.
+
+    GET-only.  No governance, execution, or orchestration symbols imported.
+    """
+    svc = getattr(runtime, "copilot_service", None)
+    if svc is None:
+        # No copilot service — return empty list (degraded but not 503)
+        return ContextSnapshotListResponse(snapshots=[], total=0)
+
+    store = getattr(svc, "store", None)
+    if store is None:
+        return ContextSnapshotListResponse(snapshots=[], total=0)
+
+    # Deduplicate: _context_snapshots is keyed by both turn_id AND context_snapshot_id
+    # Collect only unique snapshots via context_snapshot_id dedup
+    raw: dict = getattr(store, "_context_snapshots", {})
+    seen_ids: set[str] = set()
+    unique: list = []
+    for snap in raw.values():
+        cid = snap.context_snapshot_id
+        if cid not in seen_ids:
+            seen_ids.add(cid)
+            unique.append(snap)
+
+    # Sort newest first
+    unique.sort(key=lambda s: s.captured_at, reverse=True)
+
+    items = [
+        ContextSnapshotListItemDTO(
+            context_snapshot_id=s.context_snapshot_id,
+            turn_id=s.turn_id,
+            trace_id=s.trace_id,
+            focus_entity_id=s.focus_entity_id,
+            focus_entity_type=s.focus_entity_type,
+            focus_label=s.focus_label,
+            entity_count=s.entity_count,
+            captured_at=s.captured_at,
+            truncated=s.truncated,
+        )
+        for s in unique
+    ]
+
+    return ContextSnapshotListResponse(
+        snapshots=items,
+        total=len(items),
+    )
+
+
 @router.get(
     "/context/by-turn/{turn_id}",
     response_model=OperationalContextSnapshotResponse,

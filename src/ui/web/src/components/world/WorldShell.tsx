@@ -5,6 +5,7 @@ import WorldChanges from './WorldChanges';
 import WorldGraph from './WorldGraph';
 import WorldLive from './WorldLive';
 import WorldContextSnapshot, { SnapshotViewContext } from './WorldContextSnapshot';
+import WorldRaw from './WorldRaw';
 import { GraphFocusContext } from '../../services/worldAPI';
 
 type WorldTab = 'overview' | 'graph' | 'changes' | 'context' | 'raw';
@@ -15,7 +16,7 @@ const TABS: { id: WorldTab; label: string; available: boolean }[] = [
   { id: 'graph', label: 'GRAPH', available: true },
   { id: 'changes', label: 'CHANGES', available: true },
   { id: 'context', label: 'CONTEXT', available: true },
-  { id: 'raw', label: 'RAW', available: false },
+  { id: 'raw', label: 'RAW', available: true },
 ];
 
 const WORLD_VIEWS: { id: WorldView; label: string; disabled: boolean; tooltip?: string }[] = [
@@ -145,6 +146,7 @@ interface WorldShellProps {
   snapshotContext?: SnapshotViewContext | null;  // Phase 17E: historical context
   onReturnToCopilot?: () => void;
   onViewDecisionTrace?: (traceId: string) => void;  // Phase 17E: Decision Graph bridge
+  onSelectSnapshotFromRaw?: (turnId: string) => void;  // Phase 17F: RAW snapshot → CONTEXT
 }
 
 export default function WorldShell({
@@ -152,6 +154,7 @@ export default function WorldShell({
   snapshotContext,
   onReturnToCopilot,
   onViewDecisionTrace,
+  onSelectSnapshotFromRaw,
 }: WorldShellProps = {}) {
   const [tab, setTab] = useState<WorldTab>('overview');
   const [worldView, setWorldView] = useState<WorldView>('base');
@@ -265,40 +268,16 @@ export default function WorldShell({
           </Box>
         )}
 
+        {/* Phase 17F: RAW developer inspection surface */}
         {tab === 'raw' && (
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              minHeight: 240,
-              gap: 1,
+          <WorldRaw
+            onSelectSnapshot={(turnId) => {
+              if (turnId && onSelectSnapshotFromRaw) {
+                onSelectSnapshotFromRaw(turnId);
+                setTab('context');
+              }
             }}
-          >
-            <Typography
-              sx={{
-                fontFamily: 'monospace',
-                fontSize: '0.72rem',
-                color: '#30363D',
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em',
-              }}
-            >
-              RAW
-            </Typography>
-            <Typography
-              sx={{
-                fontFamily: 'monospace',
-                fontSize: '0.62rem',
-                color: '#21262D',
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-              }}
-            >
-              Coming next
-            </Typography>
-          </Box>
+          />
         )}
       </Box>
     </Box>
