@@ -879,6 +879,29 @@ function CopilotAnswer({ turn, isLatest, onViewOperationalContext, onViewContext
         </Box>
       )}
 
+      {/* ── E2. VIEW CONTEXT AT DECISION TIME (standalone — shown even without neighborhood) */}
+      {turn.context_snapshot_id && onViewContextAtDecisionTime && !turn.neighborhood && (
+        <Box
+          component="button"
+          data-testid="view-context-at-decision-time"
+          onClick={() => onViewContextAtDecisionTime({
+            turnId: turn.turn_id,
+            traceId: turn.trace_id,
+            entityLabel: turn.focus_entity_label ?? null,
+            contextSnapshotId: turn.context_snapshot_id!,
+          })}
+          sx={{
+            background: 'transparent', border: '1px solid #1F6FEB44',
+            borderRadius: '3px', px: '6px', py: '2px',
+            fontFamily: 'monospace', fontSize: '0.58rem',
+            color: '#58A6FF', cursor: 'pointer', fontWeight: 600,
+            '&:hover': { background: '#0D1420', borderColor: '#58A6FF' },
+          }}
+        >
+          VIEW CONTEXT AT DECISION TIME
+        </Box>
+      )}
+
       {/* ── F. Degraded banner ────────────────────────────────────────────── */}
       {turn.degraded && !isInsufficient && (
         <Box sx={{
