@@ -18,7 +18,7 @@
  * 14.  Copilot VIEW OPERATIONAL CONTEXT button renders when focus_entity_id set
  * 15.  Copilot context switches mode to WORLD and opens GRAPH
  * 16.  RETURN TO COPILOT button rendered in WorldGraph
- * 17.  Context provenance banner shows WHAT MAIW SAW
+ * 17.  Context provenance banner shows CURRENT OPERATIONAL NEIGHBORHOOD
  * 18.  Node inspector opens on node click
  * 19.  No mutation controls in WORLD GRAPH
  */
