@@ -236,7 +236,7 @@ class TestWorldContextByTurnEndpoint:
         )
         runtime = self._make_runtime(snap)
 
-        result = asyncio.get_event_loop().run_until_complete(
+        result = asyncio.run(
             get_context_by_turn(turn_id="turn-known", runtime=runtime)
         )
         assert result.context_snapshot_id == "ctx-known"
@@ -252,7 +252,7 @@ class TestWorldContextByTurnEndpoint:
         runtime = self._make_runtime(snap=None)
 
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.get_event_loop().run_until_complete(
+            asyncio.run(
                 get_context_by_turn(turn_id="nonexistent-turn-id", runtime=runtime)
             )
         assert exc_info.value.status_code == 404
