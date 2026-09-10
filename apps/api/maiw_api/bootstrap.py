@@ -118,6 +118,10 @@ class MAIWRuntime:
     # Copilot service (Phase 15)
     copilot_service: Any = None  # maiw_api.copilot.CopilotService
 
+    # World graph + DataPack metadata (Phase 17A — read-only world inspection)
+    world_graph: Any = None  # maiw_world.graph.CanonicalWarehouseGraph
+    world_datapack_manifest: dict = field(default_factory=dict)
+
 
 async def get_runtime() -> MAIWRuntime:
     """
@@ -443,12 +447,24 @@ async def get_runtime() -> MAIWRuntime:
         if runtime.demo_controller is not None:
             event_bus = getattr(runtime.demo_controller, "event_bus", None)
 
+        runtime.world_graph = graph
+        if graph is not None:
+            try:
+                from maiw_api.demo.world_loader import get_datapack_dir, CANONICAL_DATASET_ID
+                from maiw_world.datapack import WarehouseDataPack
+                pack_dir = get_datapack_dir() / CANONICAL_DATASET_ID
+                if pack_dir.exists():
+                    runtime.world_datapack_manifest = WarehouseDataPack.read_manifest(pack_dir)
+            except Exception as exc:
+                logger.warning("MAIW bootstrap: DataPack manifest unavailable — %s", exc)
+
         runtime.copilot_service = CopilotService(
             operations_agent=runtime.operations_agent,
             state_provider=runtime.state_provider,
             event_bus=event_bus,
             graph=graph,
             store=InMemoryCopilotStore(),
+            datapack_manifest=runtime.world_datapack_manifest,  # Phase 17E: provenance
         )
         logger.info("MAIW bootstrap: CopilotService ready (graph=%s)", graph is not None)
     except Exception as exc:

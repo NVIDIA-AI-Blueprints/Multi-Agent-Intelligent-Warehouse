@@ -12,19 +12,23 @@ import OperationalContextStrip from '../components/demo/OperationalContextStrip'
 import StageContentPane from '../components/demo/StageContentPane';
 import ReliabilityPanel from '../components/demo/reliability/ReliabilityPanel';
 import ExpertOverlay from '../components/demo/ExpertOverlay';
-import CopilotDrawer from '../components/demo/copilot/CopilotDrawer';
+import WorldShell from '../components/world/WorldShell';
+import { GraphFocusContext } from '../services/worldAPI';
+import CopilotDrawer, { SnapshotContextLocal } from '../components/demo/copilot/CopilotDrawer';
+import { SnapshotViewContext } from '../components/world/WorldContextSnapshot';
 import { useCopilotConversation, CopilotSystemCard } from '../hooks/useCopilotConversation';
 
 const WAREHOUSE_ID = process.env.REACT_APP_WAREHOUSE_ID || 'DC-47';
 
-type DemoMode = 'operations' | 'reliability';
+type DemoMode = 'operations' | 'world' | 'reliability';
 
 // ── Chrome sub-components ──────────────────────────────────────────────────────
 
 function ModeSwitcher({ mode, onChange }: { mode: DemoMode; onChange: (m: DemoMode) => void }) {
+  const modes: DemoMode[] = ['operations', 'world', 'reliability'];
   return (
     <Box sx={{ display: 'flex', gap: 0 }} role="group" aria-label="Demo mode">
-      {(['operations', 'reliability'] as DemoMode[]).map((m, i) => (
+      {modes.map((m, i) => (
         <Box
           key={m}
           component="button"
@@ -33,8 +37,8 @@ function ModeSwitcher({ mode, onChange }: { mode: DemoMode; onChange: (m: DemoMo
           sx={{
             background: mode === m ? '#1C2128' : 'transparent',
             border: '1px solid #21262D',
-            borderRight: i === 0 ? 'none' : '1px solid #21262D',
-            borderRadius: i === 0 ? '4px 0 0 4px' : '0 4px 4px 0',
+            borderLeft: i > 0 ? 'none' : '1px solid #21262D',
+            borderRadius: i === 0 ? '4px 0 0 4px' : i === modes.length - 1 ? '0 4px 4px 0' : '0',
             px: '10px', py: '4px',
             fontFamily: 'monospace',
             fontSize: '0.65rem',
@@ -352,6 +356,8 @@ export default function DemoShell() {
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [selectedStage, setSelectedStage] = useState<RailStage | null>(null);
   const [selectedApprovalId, setSelectedApprovalId] = useState<string | null>(null);
+  const [graphFocusContext, setGraphFocusContext] = useState<GraphFocusContext | null>(null);
+  const [snapshotViewContext, setSnapshotViewContext] = useState<SnapshotViewContext | null>(null);  // Phase 17E
   const conversation = useCopilotConversation();
   const queryClient = useQueryClient();
 
@@ -383,6 +389,36 @@ export default function DemoShell() {
     setCopilotOpen(false);
     setSelectedStage('APPROVE');
     setSelectedApprovalId(pendingApprovalId);
+  }, []);
+
+  const handleViewOperationalContext = useCallback((ctx: GraphFocusContext) => {
+    setGraphFocusContext(ctx);
+    setMode('world');
+    setCopilotOpen(false);
+  }, []);
+
+  // Phase 17E: navigate to historical context snapshot in World view
+  const handleViewContextAtDecisionTime = useCallback((ctx: SnapshotContextLocal) => {
+    setSnapshotViewContext({
+      turnId: ctx.turnId,
+      traceId: ctx.traceId,
+      entityLabel: ctx.entityLabel,
+    });
+    setMode('world');
+    setCopilotOpen(false);
+  }, []);
+
+  // Phase 17E: navigate from context snapshot back to Developer Trace
+  const handleViewDecisionTrace = useCallback((traceId: string) => {
+    // Return to operations mode — the Developer Trace is shown in ExpertOverlay
+    setMode('operations');
+    setCopilotOpen(true);
+    // The trace_id is available in the conversation turns via turn.trace_id
+  }, []);
+
+  const handleReturnFromGraph = useCallback(() => {
+    setMode('operations');
+    setCopilotOpen(true);
   }, []);
 
   const handleReturnToCopilot = useCallback((card: CopilotSystemCard) => {
@@ -572,6 +608,15 @@ export default function DemoShell() {
           </>
         )}
 
+        {mode === 'world' && (
+          <WorldShell
+            focusContext={graphFocusContext}
+            snapshotContext={snapshotViewContext}
+            onReturnToCopilot={handleReturnFromGraph}
+            onViewDecisionTrace={handleViewDecisionTrace}
+          />
+        )}
+
         {scenarioActive && mode === 'reliability' && (
           <>
             <ScenarioHeader
@@ -653,6 +698,8 @@ export default function DemoShell() {
           scenarioName={demoStatus?.scenario?.name ?? ''}
           onClose={() => setCopilotOpen(false)}
           onReviewApproval={handleReviewApproval}
+          onViewOperationalContext={handleViewOperationalContext}
+          onViewContextAtDecisionTime={handleViewContextAtDecisionTime}
           conversationId={conversation.conversationId}
           setConversationId={conversation.setConversationId}
           turns={conversation.turns}

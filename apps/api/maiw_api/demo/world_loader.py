@@ -122,3 +122,12 @@ def build_scenario_world(scenario_name: str):
         raise ValueError(f"Unknown scenario overlay kind: {overlay_kind!r}")
 
     return ScenarioWorld(graph, overlay)
+
+
+def read_datapack_manifest() -> dict:
+    """Read manifest.json from the canonical DataPack without loading the full graph."""
+    from maiw_world.datapack import WarehouseDataPack
+    pack_dir = get_datapack_dir() / CANONICAL_DATASET_ID
+    if not pack_dir.exists():
+        return {}
+    return WarehouseDataPack.read_manifest(pack_dir)

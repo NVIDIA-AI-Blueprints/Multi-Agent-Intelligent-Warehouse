@@ -170,6 +170,10 @@ class DemoScenarioController:
         # Used as a dedup boundary so approvals from a previous run are never
         # confused with those from the current one.
         self._scenario_run_id: str = str(_uuid.uuid4())
+        # Phase 17D: last execution record — set by copilot execution pipeline.
+        # Structure: {execution_id, trace_id, outcome, pre_kpi, post_kpi, kpi_delta}
+        # None when no execution has completed since last start/reset.
+        self._last_execution_record: dict[str, Any] | None = None
 
     # ── Properties ───────────────────────────────────────────────────────────
 
@@ -265,6 +269,7 @@ class DemoScenarioController:
         self._pending_approvals = []
         self._pending_approval_outcomes = {}
         self._scenario_run_id = str(_uuid.uuid4())
+        self._last_execution_record = None
 
         logger.info(
             "Demo: started scenario '%s' (datapack=%s)", scenario_name, _used_datapack
@@ -307,6 +312,7 @@ class DemoScenarioController:
         self._pending_approval_outcomes = {}
         self._approval_store.reset()
         self._scenario_run_id = str(_uuid.uuid4())
+        self._last_execution_record = None
         await self.bus.publish_scenario(
             message="scenario:reset",
             detail=self._scenario.name if self._scenario else "",
@@ -474,6 +480,15 @@ class DemoScenarioController:
         Cleared on start() and reset() so stale entries never bleed across runs.
         """
         self._pending_approval_outcomes[pending_id] = outcome
+
+    def set_execution_record(self, record: dict[str, Any]) -> None:
+        """Phase 17D: store the last completed execution record for LIVE inspection.
+
+        Called by the copilot execution pipeline after executor.execute() completes.
+        record keys: execution_id, trace_id, outcome, pre_kpi, post_kpi, kpi_delta
+        Cleared on start() and reset().
+        """
+        self._last_execution_record = record
 
     # ── status ────────────────────────────────────────────────────────────────
 
