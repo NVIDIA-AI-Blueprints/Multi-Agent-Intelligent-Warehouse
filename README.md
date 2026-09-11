@@ -1382,7 +1382,7 @@ package-based, MCP v2 system.
 
 | Area | Status | Notes |
 |------|--------|-------|
-| **ModelGateway** (`maiw-models`) | ✅ Done | Nemotron 3 roles, routing policy, NIM provider, telemetry |
+| **ModelGateway** (`maiw-models`) | ✅ Done | Nemotron 3 roles, routing policy, NIM provider, telemetry. Phase 18B: policy-constrained model routing with explicit candidate filtering, deployment abstraction (`DeploymentMode`), and full routing provenance (`routing_strategy`, `candidate_models`, `routing_latency_ms`). See `docs/developer/MODEL_GATEWAY_EVALUATION.md`. |
 | **WarehouseState** (`maiw-state`) | ✅ Done | Snapshot sealing, freshness, provenance, all 4 domains |
 | **Skills** (`maiw-skills`) | ✅ Done | Read skills, write proposal factories, all 4 domains |
 | **DecisionEngine** (`maiw-decision`) | ✅ Done | All constraint rules, APPROVED/REJECTED/DEFERRED |
