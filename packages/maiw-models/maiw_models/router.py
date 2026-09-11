@@ -49,6 +49,7 @@ Telemetry fields:
 from __future__ import annotations
 
 import logging
+import time
 
 from .errors import ModelUnavailable
 from .models import (
@@ -60,6 +61,7 @@ from .models import (
     RiskLevel,
 )
 from .registry import ModelRegistry
+from .routing import PolicyFilter
 
 logger = logging.getLogger(__name__)
 
@@ -88,13 +90,32 @@ class ModelRouter:
 
     def __init__(self, registry: ModelRegistry) -> None:
         self._registry = registry
+        self._policy_filter = PolicyFilter(registry)
 
     def route(self, request: ModelRequest) -> ModelRouteDecision:
-        """Select a model and record the full routing decision."""
+        """
+        Select a model and record the full routing decision.
+
+        Phase 18B: measures routing latency, populates candidate_models
+        (eligible set after policy filtering), routing_strategy, and
+        routing_latency_ms in the returned decision.
+
+        Routing behaviour is UNCHANGED from pre-18B — this is instrumentation only.
+        """
+        routing_start = time.monotonic()
+
         preferred_role, routing_rule, routing_reason = self._select_role(request)
         capability, final_role, fallback_from, fallback_reason = (
             self._resolve_with_fallback(preferred_role)
         )
+
+        # Candidate models = eligible set after policy filter.
+        # This is the source of truth for later evaluation reproducibility.
+        candidate_model_ids = self._policy_filter.candidate_model_ids(
+            request, request.deployment_mode
+        )
+
+        routing_latency_ms = (time.monotonic() - routing_start) * 1000.0
 
         decision = ModelRouteDecision(
             selected_model_id=capability.model_id,
@@ -107,17 +128,25 @@ class ModelRouter:
             task=request.task,
             requested_reasoning=request.reasoning,
             requested_risk_level=request.risk_level,
+            # Phase 18B provenance.
+            routing_strategy="rules",
+            routing_latency_ms=round(routing_latency_ms, 3),
+            candidate_models=candidate_model_ids,
         )
 
         logger.info(
             "ModelRouter: task=%s requested_role=%s selected_role=%s "
-            "model=%s rule=%s fallback_from=%s",
+            "model=%s rule=%s fallback_from=%s strategy=%s "
+            "candidates=%s routing_latency_ms=%.3f",
             request.task,
             preferred_role,
             final_role,
             capability.model_id,
             routing_rule,
             fallback_from,
+            decision.routing_strategy,
+            candidate_model_ids,
+            routing_latency_ms,
         )
         return decision
 

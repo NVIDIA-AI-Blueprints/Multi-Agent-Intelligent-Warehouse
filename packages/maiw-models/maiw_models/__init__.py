@@ -42,6 +42,7 @@ from .providers.nim import NIMProvider
 from .providers.nim_client import NIMClient, LLMResponse
 from .registry import ModelRegistry
 from .router import ModelRouter
+from .routing import ModelCandidate, PolicyFilter, RoutingContext, RoutingStrategy
 from .telemetry import GatewayTelemetry
 
 logger = logging.getLogger(__name__)
@@ -134,4 +135,9 @@ __all__ = [
     "ModelRegistry",
     "ModelRouter",
     "GatewayTelemetry",
+    # Phase 18B: routing protocol + policy
+    "RoutingStrategy",
+    "PolicyFilter",
+    "ModelCandidate",
+    "RoutingContext",
 ]
