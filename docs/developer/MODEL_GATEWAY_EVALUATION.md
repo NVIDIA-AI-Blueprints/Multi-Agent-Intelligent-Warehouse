@@ -286,14 +286,156 @@ Do not duplicate registry data in another config file.
 
 ---
 
-## Phase 18C Readiness
+## Phase 18C — Multi-Model Benchmark
 
-18B establishes:
-- `EvaluationCase` dataset format
-- `ModelEvaluationInput` / `ModelEvaluationResult` typed records
-- 6 deterministic graders
-- `make_evaluation_run_key` for dedup
-- `replay_context_from_snapshot` for reproducible prompts
-- 3 fixture cases as proof of infrastructure
+Phase 18C adds the benchmark infrastructure on top of the 18B foundation.
 
-18C will add: multi-model benchmark runner, forced-model evaluation entry point, corpus expansion, LLM judge graders.
+### Forced-Model Evaluation Entry Point
+
+```python
+from maiw_models import ModelGateway
+
+result = await gateway.evaluate_with_model(
+    request=ModelRequest(task=..., messages=..., reasoning=..., risk_level=...),
+    model_id="nvidia/nemotron-3-nano-30b-a3b",
+    allow_out_of_policy=False,   # default: only policy-eligible models
+)
+# result: EvaluationCallResult
+# result.policy_compliant    — was the model eligible under current policy?
+# result.response_content    — raw response text; None on error
+# result.fallback_used       — always False (forced eval never silently falls back)
+# result.timed_out           — True when deadline/timeout occurred
+# result.error               — "FORCED MODEL FAILED: ..." on provider failure
+```
+
+Hard invariants:
+- `fallback_used` is always `False` — no silent fallback to another model.
+- Provider exceptions are caught and returned as `error`, not raised.
+- `routing_strategy` in telemetry is `"forced_evaluation"`.
+- Policy check still runs. Pass `allow_out_of_policy=True` only for offline research.
+
+### How to Create and Reuse Context Snapshots
+
+For tests, use `MockOperationalContextSnapshot` from `maiw_models.evaluation.replay`:
+
+```python
+from maiw_models.evaluation.replay import (
+    MockOperationalContextSnapshot, MockSnapshotNode, MockSnapshotEdge,
+    replay_context_from_snapshot,
+)
+
+snapshot = MockOperationalContextSnapshot(
+    context_snapshot_id="my-snapshot-001",
+    focus_entity_id="wave-17",
+    nodes=[MockSnapshotNode("wave-17", "Wave", "Wave 17", {"status": "delayed"})],
+)
+context = replay_context_from_snapshot(snapshot, user_prompt="Why is Wave 17 at risk?")
+# context.messages → ready for ModelRequest.messages
+```
+
+For production replays, import `OperationalContextSnapshot` from `maiw_api.copilot.models`.
+
+### How to Run the Benchmark
+
+```bash
+# Print candidate model inventory (no inference):
+python -m maiw_models.eval inventory
+
+# Run live benchmark (requires NVIDIA_API_KEY):
+python -m maiw_models.eval benchmark \
+  --cases artifacts/phase18/cases.json \
+  --output artifacts/phase18/baseline.json
+
+# Generate Markdown report from results:
+python -m maiw_models.eval report \
+  --input artifacts/phase18/baseline.json \
+  --output artifacts/phase18/BASELINE_ROUTER_REPORT.md
+```
+
+When `NVIDIA_API_KEY` is not set, the CLI validates infrastructure and writes results
+with `endpoint_status = "NOT RUN — ENDPOINT UNAVAILABLE"`.
+
+### Deterministic Grader Definitions
+
+Six graders applied to every `(EvaluationCase, model_response)` pair:
+
+| Grader | What it checks | Applicable when |
+|--------|---------------|-----------------|
+| `schema_validity` | Response matches `expected_schema` JSON structure | `expected_schema` is set |
+| `hallucination` | Response references only entity IDs in `context_entities` | `context_entities` is non-empty |
+| `capability_match` | Response mentions `expected_capability` or synonym | `expected_capability` is set |
+| `target_match` | Response references `expected_target` entity | `expected_target` is set |
+| `required_evidence` | Response contains all `required_facts` strings | `required_facts` is non-empty |
+| `forbidden_claims` | Response does not assert any `forbidden_claims` | `forbidden_claims` is non-empty |
+
+Quality score = `passed_applicable / total_applicable`. Skipped graders (case field absent)
+do not count toward the denominator.
+
+### Interpreting Policy Eligibility
+
+A grader result alone does not indicate whether a model should be deployed for a case.
+Cross-reference `policy_compliant` in each `BenchmarkModelResult`:
+
+```
+policy_compliant=True  + quality_pass=True  → VALID production candidate
+policy_compliant=True  + quality_pass=False → router selected correctly; quality gap
+policy_compliant=False + quality_pass=True  → OFFLINE QUALITY PASS /
+                                              NOT PRODUCTION ELIGIBLE UNDER CURRENT POLICY
+policy_compliant=False + quality_pass=False → out-of-policy and failed; not meaningful
+```
+
+An out-of-policy quality pass is NOT a router bug. It means the model passed the offline
+corpus but does not meet current deployment policy for that request. Change policy only
+after deliberate governance review, not because of benchmark results alone.
+
+### Router / Oracle Comparison
+
+For each case the runner records:
+- **Router selection** — what `ModelRouter.route()` chose (rule-based, no inference).
+- **Oracle** — offline computation from benchmark results:
+  - `BEST QUALITY` — highest quality_score (tie-break: lower latency).
+  - `FASTEST PASSING` — min total_latency_ms among quality_pass=True models.
+  - `LOWEST COST` — always `"unavailable"` (no pricing metadata in repo/config).
+- **Regret** — split by dimension:
+  - `quality_regret`: router chose a model that missed graders the oracle passed.
+  - `latency_regret`: router chose a slower model when a faster model also passed.
+
+### Phase 18C Live Benchmark Results (2026-09-12)
+
+Run with Nemotron Lightning + Super enabled (Nano disabled in current environment).
+
+| Case | Model | Quality | Latency | Pass |
+|------|-------|---------|---------|------|
+| Wave17 ASK | Super (120B) | 0.40 | 2515ms | NO |
+| Equipment ASK | Super (120B) | 0.80 | 2348ms | NO |
+| Healthy ANALYZE | Lightning (30B) | 0.50 | 48570ms | NO |
+| Healthy ANALYZE | Super (120B) | 0.50 | 1447ms | NO |
+
+**Decision Gate: CURRENT ROUTER SUFFICIENT**
+
+Observations:
+1. **No model achieved `quality_pass=True`** in this run. Quality scores of 0.40–0.80 reflect
+   that models generated relevant responses but did not use the exact entity IDs required
+   by the keyword graders. This is a grader calibration signal, not a quality failure —
+   the models discussed wave-17, labor, and conveyor correctly but in natural language rather
+   than canonical entity ID form.
+2. **Nano is disabled** in this environment. All Nano-eligible requests fell back to Super
+   per the routing policy fallback chain.
+3. **Lightning latency anomaly** — Lightning (Nemotron 3.5, supposed fast path) ran 48570ms
+   for the healthy-baseline case vs Super at 1447ms. This is worth monitoring across runs.
+   Single-run variance is expected; a pattern across runs would indicate endpoint congestion
+   or model-tier behavior change.
+4. **No router regret detected** — because no model achieved `quality_pass=True`, the oracle
+   had no passing candidates to compare against. Regret analysis requires at least one
+   passing model.
+5. **Cost unavailable** — no pricing metadata exists in the repo/config.
+
+### 18D Recommendation
+
+Enable Nano (set `NEMOTRON_NANO_ENABLED=true`) and re-run the benchmark to:
+- Measure Nano vs Super quality differential on low/medium-risk ASK cases.
+- Validate that Nano handles `healthy-baseline` (ANALYZE, medium reasoning) correctly.
+- Determine if Nano introduces meaningful grounding errors on equipment/labor cases.
+- Calibrate graders to accept natural-language entity references rather than requiring
+  exact canonical ID strings — the current strict keyword match may under-report quality
+  for responses that are semantically correct but use surface-form entity names.

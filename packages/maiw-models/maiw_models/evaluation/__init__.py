@@ -38,6 +38,7 @@ from .graders import (
     run_graders,
 )
 from .models import (
+    EvaluationCallResult,
     EvaluationCase,
     GraderResult,
     ModelEvaluationInput,
@@ -54,13 +55,15 @@ from .replay import (
 )
 
 __all__ = [
-    # Data models
+    # Data models (18B)
     "ModelEvaluationInput",
     "ModelEvaluationResult",
     "EvaluationCase",
     "GraderResult",
     "TaskFamily",
     "make_evaluation_run_key",
+    # Phase 18C: forced-model evaluation result
+    "EvaluationCallResult",
     # Replay
     "ReplayContext",
     "replay_context_from_snapshot",

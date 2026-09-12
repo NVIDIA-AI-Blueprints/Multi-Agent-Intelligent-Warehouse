@@ -38,15 +38,14 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-
 # ── Task family ───────────────────────────────────────────────────────────────
 
 
 class TaskFamily(str, Enum):
     """High-level classification of evaluation task type."""
 
-    ASK = "ASK"            # Operator question — "Why is Wave 17 at risk?"
-    ANALYZE = "ANALYZE"    # Analytical request — deep inspection of warehouse state
+    ASK = "ASK"  # Operator question — "Why is Wave 17 at risk?"
+    ANALYZE = "ANALYZE"  # Analytical request — deep inspection of warehouse state
     OUTCOME_EXPLAIN = "OUTCOME_EXPLAIN"  # Explain a past decision or outcome
 
 
@@ -67,17 +66,17 @@ class ModelEvaluationInput:
     populated from the WS2 snapshot at capture time.
     """
 
-    evaluation_input_id: str       # human-readable stable ID
-    dataset_id: str                # WS2 DataPack dataset identifier
-    datapack_checksum: str         # semantic_checksum from DataPack (immutable)
-    scenario_id: str               # scenario label (e.g. "wave17-labor-bottleneck")
-    warehouse_state_snapshot_id: str | None   # from WarehouseStateSnapshot if available
-    context_snapshot_id: str | None           # from OperationalContextSnapshot if available
-    prompt: str                    # the exact prompt text
-    prompt_hash: str               # SHA-256 of prompt (hex); populated by make_prompt_hash()
-    reasoning_level: str           # "low" | "medium" | "high"
-    risk_level: str                # "low" | "medium" | "high" | "critical"
-    deployment_mode: str           # "nvidia_hosted" | "local_nim" | ...
+    evaluation_input_id: str  # human-readable stable ID
+    dataset_id: str  # WS2 DataPack dataset identifier
+    datapack_checksum: str  # semantic_checksum from DataPack (immutable)
+    scenario_id: str  # scenario label (e.g. "wave17-labor-bottleneck")
+    warehouse_state_snapshot_id: str | None  # from WarehouseStateSnapshot if available
+    context_snapshot_id: str | None  # from OperationalContextSnapshot if available
+    prompt: str  # the exact prompt text
+    prompt_hash: str  # SHA-256 of prompt (hex); populated by make_prompt_hash()
+    reasoning_level: str  # "low" | "medium" | "high"
+    risk_level: str  # "low" | "medium" | "high" | "critical"
+    deployment_mode: str  # "nvidia_hosted" | "local_nim" | ...
     task_family: TaskFamily = TaskFamily.ASK
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -125,17 +124,21 @@ class ModelEvaluationResult:
 
     evaluation_input_id: str
     model_id: str
-    deployment_id: str         # e.g. "nvidia_hosted", "local_nim/server-a", ...
-    response: str | None       # raw model response text; None on error
-    latency_ms: float          # end-to-end latency for this model call
+    deployment_id: str  # e.g. "nvidia_hosted", "local_nim/server-a", ...
+    response: str | None  # raw model response text; None on error
+    latency_ms: float  # end-to-end latency for this model call
     routing_latency_ms: float  # routing-only latency from ModelRouteDecision
-    routing_strategy: str      # "rules" (from ModelRouteDecision)
+    routing_strategy: str  # "rules" (from ModelRouteDecision)
     candidate_models: list[str]  # eligible candidates at routing time
-    input_tokens: int | None = None    # from usage dict if returned by provider
-    output_tokens: int | None = None   # from usage dict if returned by provider
-    error: str | None = None           # error message; None on success
-    structured_output_valid: bool | None = None  # None when structured output not expected
-    grader_results: list[dict[str, Any]] = field(default_factory=list)  # from EvaluationGrader
+    input_tokens: int | None = None  # from usage dict if returned by provider
+    output_tokens: int | None = None  # from usage dict if returned by provider
+    error: str | None = None  # error message; None on success
+    structured_output_valid: bool | None = (
+        None  # None when structured output not expected
+    )
+    grader_results: list[dict[str, Any]] = field(
+        default_factory=list
+    )  # from EvaluationGrader
 
 
 # ── Case ──────────────────────────────────────────────────────────────────────
@@ -162,14 +165,16 @@ class EvaluationCase:
     context_snapshot_id: str | None = None
     reasoning_level: str = "medium"
     risk_level: str = "low"
-    expected_capability: str | None = None   # e.g. "wave_recovery", "labor_reallocation"
-    expected_target: str | None = None       # canonical entity ID expected in response
+    expected_capability: str | None = None  # e.g. "wave_recovery", "labor_reallocation"
+    expected_target: str | None = None  # canonical entity ID expected in response
     required_facts: list[str] = field(default_factory=list)
     forbidden_claims: list[str] = field(default_factory=list)
     # Structured output schema (JSON Schema dict) — if set, schema grader uses this.
     expected_schema: dict[str, Any] | None = None
     # Context supplied to the graders (reduced projection; no PII).
-    context_entities: list[str] = field(default_factory=list)   # canonical entity IDs in scope
+    context_entities: list[str] = field(
+        default_factory=list
+    )  # canonical entity IDs in scope
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -187,8 +192,8 @@ class GraderResult:
 
     grader_name: str
     passed: bool
-    score: float | None = None    # 0.0–1.0 where meaningful; None for pure pass/fail
-    reason: str = ""              # human-readable explanation
+    score: float | None = None  # 0.0–1.0 where meaningful; None for pure pass/fail
+    reason: str = ""  # human-readable explanation
     evidence: list[str] = field(default_factory=list)  # supporting text fragments
 
 
@@ -219,3 +224,40 @@ def make_evaluation_run_key(
     }
     canonical = json.dumps(identity, sort_keys=True)
     return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+# ── Phase 18C: Forced-model evaluation result ─────────────────────────────────
+
+
+@dataclass
+class EvaluationCallResult:
+    """
+    Result of a forced-model evaluation call via ModelGateway.evaluate_with_model().
+
+    This wraps the raw provider response with evaluation-specific metadata:
+      - policy_compliant: was the forced model eligible under current policy?
+      - fallback_used: always False for forced evaluation (no silent fallback)
+      - forced_model_id: the model that was explicitly requested
+      - inference_latency_ms: provider call time only (excludes policy check)
+      - routing_latency_ms: policy eligibility check time
+      - timed_out: True when RequestDeadlineExceeded or timeout error occurred
+
+    Architecture invariants:
+      - forced evaluation NEVER silently falls back to another model
+      - if the forced model fails, error is set and response is None
+      - policy_compliant=False + response is not None means allow_out_of_policy=True was used
+    """
+
+    forced_model_id: str  # the model_id explicitly requested
+    policy_compliant: bool  # True when model passed PolicyFilter
+    response_content: str | None  # raw response text; None on error
+    routing_latency_ms: float  # policy check time (ms)
+    inference_latency_ms: float  # provider call time (ms); 0.0 on error
+    total_latency_ms: float  # routing + inference
+    candidate_models: list[str]  # eligible candidates at evaluation time
+    fallback_used: bool = False  # always False — forced eval never silently falls back
+    timed_out: bool = False  # True when deadline exceeded or provider timed out
+    error: str | None = None  # error message; None on success
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    finish_reason: str | None = None
