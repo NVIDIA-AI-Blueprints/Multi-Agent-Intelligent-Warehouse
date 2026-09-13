@@ -14,23 +14,28 @@
 # limitations under the License.
 
 """
-Phase 18B evaluation fixture cases.
+Phase 18B/18D evaluation fixture cases.
 
 A small deterministic test corpus that proves evaluation infrastructure works.
-NOT the full benchmark corpus — that is 18C.
+NOT the full benchmark corpus — that is 18C/18D.
 
-Fixtures:
+18B Fixtures:
   1. wave17_labor_risk   — ASK: "Why is Wave 17 at risk?"
   2. equipment_failure   — ASK: "Is equipment contributing to the delay?"
   3. healthy_baseline    — ANALYZE: baseline scenario, no intervention needed
 
-These fixtures use mock entity IDs that match the test context below.
+18D Additions (§6 benchmark corpus expansion):
+  4. evidence_ask_labor  — Case B: Evidence ASK "What evidence shows labor constraint?"
+  5. analyze_action      — Case C: ANALYZE "What should we do?" (low risk, medium reasoning)
+  6. comparative_reasoning — Case D: "Why is that the best option?" (low risk)
+
+All 18D cases use the same context entities as 18B for fixed-context invariant (§5).
+Cases 4–6 are designed with low/medium risk so Nano is POLICY ELIGIBLE.
 """
 
 from __future__ import annotations
 
 from .models import EvaluationCase, ModelEvaluationInput, TaskFamily
-
 
 # ── Canonical test context ────────────────────────────────────────────────────
 
@@ -161,7 +166,7 @@ healthy_baseline = EvaluationCase(
     prompt=HEALTHY_BASELINE_PROMPT,
     reasoning_level="medium",
     risk_level="low",
-    expected_capability=None,    # no specific capability expected (model may say "no action needed")
+    expected_capability=None,  # no specific capability expected (model may say "no action needed")
     expected_target="wave-17",
     required_facts=[
         "wave-17",
@@ -197,6 +202,166 @@ healthy_baseline_input = ModelEvaluationInput(
 )
 
 
+# ── Case 4 (18D): Evidence ASK — labor constraint ─────────────────────────────
+
+EVIDENCE_ASK_LABOR_PROMPT = (
+    "What evidence shows that labor is the primary constraint on Wave 17? "
+    "Cite the specific workers, shifts, and tasks that support this conclusion."
+)
+
+evidence_ask_labor = EvaluationCase(
+    case_id="evidence-ask-labor-v1",
+    task_family=TaskFamily.ASK,
+    prompt=EVIDENCE_ASK_LABOR_PROMPT,
+    reasoning_level="medium",
+    risk_level="low",
+    expected_capability="labor_reallocation",
+    expected_target="wave-17",
+    required_facts=[
+        "labor",
+        "wave-17",
+        "worker",
+    ],
+    forbidden_claims=[
+        "wave-18",
+        "wave-99",
+        "worker-Z999",
+        "external-agency",
+    ],
+    context_entities=FIXTURE_CONTEXT_ENTITIES,
+    metadata={
+        "fixture": True,
+        "phase": "18D",
+        "scenario": "labor-bottleneck",
+        "policy_eligibility_nano": "POLICY ELIGIBLE",
+        "benchmark_case": "B",
+        "description": "Evidence ASK — labor constraint evidence for Wave 17",
+    },
+)
+
+evidence_ask_labor_input = ModelEvaluationInput(
+    evaluation_input_id="evidence-ask-labor-v1",
+    dataset_id=FIXTURE_DATASET_ID,
+    datapack_checksum=FIXTURE_DATAPACK_CHECKSUM,
+    scenario_id="wave17-labor-bottleneck",
+    warehouse_state_snapshot_id=None,
+    context_snapshot_id="fixture-ctx-wave17-001",
+    prompt=EVIDENCE_ASK_LABOR_PROMPT,
+    prompt_hash=ModelEvaluationInput.make_prompt_hash(EVIDENCE_ASK_LABOR_PROMPT),
+    reasoning_level="medium",
+    risk_level="low",
+    deployment_mode="nvidia_hosted",
+    task_family=TaskFamily.ASK,
+)
+
+
+# ── Case 5 (18D): ANALYZE — what should we do ────────────────────────────────
+
+ANALYZE_ACTION_PROMPT = (
+    "Based on the current state of Wave 17, what is the recommended course of action? "
+    "Explain why this action addresses the root cause."
+)
+
+analyze_action = EvaluationCase(
+    case_id="analyze-action-v1",
+    task_family=TaskFamily.ANALYZE,
+    prompt=ANALYZE_ACTION_PROMPT,
+    reasoning_level="medium",
+    risk_level="medium",
+    expected_capability="labor_reallocation",
+    expected_target="wave-17",
+    required_facts=[
+        "wave-17",
+        "labor",
+    ],
+    forbidden_claims=[
+        "wave-18",
+        "wave-99",
+        "emergency shutdown",
+        "evacuate",
+        "external-agency",
+    ],
+    context_entities=FIXTURE_CONTEXT_ENTITIES,
+    metadata={
+        "fixture": True,
+        "phase": "18D",
+        "scenario": "labor-bottleneck",
+        "policy_eligibility_nano": "POLICY ELIGIBLE",
+        "benchmark_case": "C",
+        "description": "ANALYZE — recommended action for Wave 17 labor constraint",
+    },
+)
+
+analyze_action_input = ModelEvaluationInput(
+    evaluation_input_id="analyze-action-v1",
+    dataset_id=FIXTURE_DATASET_ID,
+    datapack_checksum=FIXTURE_DATAPACK_CHECKSUM,
+    scenario_id="wave17-labor-bottleneck",
+    warehouse_state_snapshot_id=None,
+    context_snapshot_id="fixture-ctx-wave17-001",
+    prompt=ANALYZE_ACTION_PROMPT,
+    prompt_hash=ModelEvaluationInput.make_prompt_hash(ANALYZE_ACTION_PROMPT),
+    reasoning_level="medium",
+    risk_level="medium",
+    deployment_mode="nvidia_hosted",
+    task_family=TaskFamily.ANALYZE,
+)
+
+
+# ── Case 6 (18D): Comparative reasoning ──────────────────────────────────────
+
+COMPARATIVE_REASONING_PROMPT = (
+    "Compare labor reallocation vs equipment bypass as interventions for Wave 17. "
+    "Which is more appropriate given current conditions, and why?"
+)
+
+comparative_reasoning = EvaluationCase(
+    case_id="comparative-reasoning-v1",
+    task_family=TaskFamily.ANALYZE,
+    prompt=COMPARATIVE_REASONING_PROMPT,
+    reasoning_level="medium",
+    risk_level="low",
+    expected_capability=None,  # either labor_reallocation or equipment_bypass valid
+    expected_target="wave-17",
+    required_facts=[
+        "wave-17",
+        "labor",
+        "conveyor",
+    ],
+    forbidden_claims=[
+        "wave-18",
+        "wave-99",
+        "emergency shutdown",
+        "evacuate",
+        "external-agency",
+    ],
+    context_entities=FIXTURE_CONTEXT_ENTITIES,
+    metadata={
+        "fixture": True,
+        "phase": "18D",
+        "scenario": "labor-bottleneck",
+        "policy_eligibility_nano": "POLICY ELIGIBLE",
+        "benchmark_case": "D",
+        "description": "Comparative reasoning — labor vs equipment intervention for Wave 17",
+    },
+)
+
+comparative_reasoning_input = ModelEvaluationInput(
+    evaluation_input_id="comparative-reasoning-v1",
+    dataset_id=FIXTURE_DATASET_ID,
+    datapack_checksum=FIXTURE_DATAPACK_CHECKSUM,
+    scenario_id="wave17-labor-bottleneck",
+    warehouse_state_snapshot_id=None,
+    context_snapshot_id="fixture-ctx-wave17-001",
+    prompt=COMPARATIVE_REASONING_PROMPT,
+    prompt_hash=ModelEvaluationInput.make_prompt_hash(COMPARATIVE_REASONING_PROMPT),
+    reasoning_level="medium",
+    risk_level="low",
+    deployment_mode="nvidia_hosted",
+    task_family=TaskFamily.ANALYZE,
+)
+
+
 # ── Fixture registry ──────────────────────────────────────────────────────────
 
 
@@ -212,18 +377,35 @@ ALL_FIXTURE_INPUTS = [
     healthy_baseline_input,
 ]
 
+# 18D additions — Nano-eligible cases (low/medium risk + medium reasoning)
+ALL_18D_FIXTURE_CASES = [
+    evidence_ask_labor,
+    analyze_action,
+    comparative_reasoning,
+]
+
+ALL_18D_FIXTURE_INPUTS = [
+    evidence_ask_labor_input,
+    analyze_action_input,
+    comparative_reasoning_input,
+]
+
+# Combined registry (all 18B + 18D cases)
+ALL_KNOWN_CASES = ALL_FIXTURE_CASES + ALL_18D_FIXTURE_CASES
+ALL_KNOWN_INPUTS = ALL_FIXTURE_INPUTS + ALL_18D_FIXTURE_INPUTS
+
 
 def get_fixture_case(case_id: str) -> EvaluationCase:
-    """Look up a fixture case by ID."""
-    for case in ALL_FIXTURE_CASES:
+    """Look up a fixture case by ID (18B + 18D)."""
+    for case in ALL_KNOWN_CASES:
         if case.case_id == case_id:
             return case
     raise KeyError(f"No fixture case with case_id={case_id!r}")
 
 
 def get_fixture_input(evaluation_input_id: str) -> ModelEvaluationInput:
-    """Look up a fixture input by ID."""
-    for inp in ALL_FIXTURE_INPUTS:
+    """Look up a fixture input by ID (18B + 18D)."""
+    for inp in ALL_KNOWN_INPUTS:
         if inp.evaluation_input_id == evaluation_input_id:
             return inp
     raise KeyError(f"No fixture input with evaluation_input_id={evaluation_input_id!r}")

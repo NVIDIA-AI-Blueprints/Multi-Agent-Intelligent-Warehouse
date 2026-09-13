@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 """
-maiw_models.evaluation — Phase 18B evaluation foundation.
+maiw_models.evaluation — Phase 18B/18D evaluation foundation.
 
 Typed infrastructure for offline multi-model benchmarking (18C+).
 
@@ -14,11 +14,32 @@ Architecture invariants:
 
 from __future__ import annotations
 
+from .calibration import (
+    CRITICAL_GRADERS,
+    NON_CRITICAL_GRADERS,
+    CalibratedCaseResult,
+    LatencySample,
+    RegradeRecord,
+    compute_latency_stats,
+    is_critical,
+    policy_label,
+    regrade_result,
+)
 from .fixtures import (
+    ALL_18D_FIXTURE_CASES,
+    ALL_18D_FIXTURE_INPUTS,
     ALL_FIXTURE_CASES,
     ALL_FIXTURE_INPUTS,
+    ALL_KNOWN_CASES,
+    ALL_KNOWN_INPUTS,
+    analyze_action,
+    analyze_action_input,
+    comparative_reasoning,
+    comparative_reasoning_input,
     equipment_failure,
     equipment_failure_input,
+    evidence_ask_labor,
+    evidence_ask_labor_input,
     get_fixture_case,
     get_fixture_input,
     healthy_baseline,
@@ -53,6 +74,13 @@ from .replay import (
     ReplayContext,
     replay_context_from_snapshot,
 )
+from .resolver import (
+    ContextEntity,
+    EntityResolver,
+    ResolvedEntity,
+    build_allowed_surface_forms,
+    resolve_entity_reference,
+)
 
 __all__ = [
     # Data models (18B)
@@ -80,7 +108,7 @@ __all__ = [
     "ForbiddenClaimsGrader",
     "default_graders",
     "run_graders",
-    # Fixtures
+    # 18B Fixtures
     "ALL_FIXTURE_CASES",
     "ALL_FIXTURE_INPUTS",
     "wave17_labor_risk",
@@ -91,4 +119,31 @@ __all__ = [
     "healthy_baseline_input",
     "get_fixture_case",
     "get_fixture_input",
+    # 18D Fixtures
+    "ALL_18D_FIXTURE_CASES",
+    "ALL_18D_FIXTURE_INPUTS",
+    "ALL_KNOWN_CASES",
+    "ALL_KNOWN_INPUTS",
+    "evidence_ask_labor",
+    "evidence_ask_labor_input",
+    "analyze_action",
+    "analyze_action_input",
+    "comparative_reasoning",
+    "comparative_reasoning_input",
+    # 18D Resolver
+    "ContextEntity",
+    "EntityResolver",
+    "ResolvedEntity",
+    "build_allowed_surface_forms",
+    "resolve_entity_reference",
+    # 18D Calibration
+    "CRITICAL_GRADERS",
+    "NON_CRITICAL_GRADERS",
+    "CalibratedCaseResult",
+    "LatencySample",
+    "RegradeRecord",
+    "compute_latency_stats",
+    "is_critical",
+    "policy_label",
+    "regrade_result",
 ]

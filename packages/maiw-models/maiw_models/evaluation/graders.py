@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """
-Phase 18B deterministic graders.
+Phase 18B/18D deterministic graders.
 
 Six composable graders that evaluate ModelEvaluationResult against an
 EvaluationCase deterministically (no LLM judge required in 18B).
@@ -31,6 +31,19 @@ Graders:
     6. ForbiddenClaimsGrader     — does response avoid all forbidden_claims?
 
 All graders are deterministic: same input → same output, no randomness, no I/O.
+
+Phase 18D calibration changes (§8–§16):
+  - HallucinationGrader: uses EntityResolver to expand allowed surface forms.
+    A model that says "Wave 17" for entity "wave-17" is NOT hallucinating.
+    Words like "in-scope", "labor-bottleneck" must not produce false failures
+    when they are not warehouse entity references.
+  - RequiredEvidenceGrader: applies canonical alias matching for required_facts
+    that look like entity IDs, so "wave 17" satisfies fact "wave-17".
+  - TargetMatchGrader: emits diagnostic fields (model_reference,
+    resolved_entity_id, expected_entity_id, match) per §13.
+  - CapabilityMatchGrader: extended synonym list for equipment_bypass.
+
+These changes reduce false negatives without increasing false positives (§15).
 """
 
 from __future__ import annotations
@@ -40,7 +53,7 @@ import re
 from typing import Protocol, runtime_checkable
 
 from .models import EvaluationCase, GraderResult, ModelEvaluationResult
-
+from .resolver import EntityResolver, ResolvedEntity, build_allowed_surface_forms
 
 # ── Protocol ──────────────────────────────────────────────────────────────────
 
@@ -197,15 +210,26 @@ class HallucinationGrader:
     """
     Grader 2 — Canonical entity hallucination.
 
-    Checks whether the model response references entity IDs or names that
-    are NOT present in EvaluationCase.context_entities.
+    Checks whether the model response references entity IDs that are NOT
+    resolvable to any entity in EvaluationCase.context_entities.
 
-    Only checks for entity IDs (structured references) — free-text phrases
-    are not hallucination-checked by this deterministic grader (that requires
-    an LLM judge, deferred to 18C+).
+    Phase 18D calibration (§8–§12):
+      The grader uses EntityResolver to expand the allowed set beyond exact
+      canonical IDs.  A response that says "Wave 17" for entity "wave-17" is
+      NOT hallucinating — it is a canonical surface-form variant.
 
-    Entity IDs that appear in the response but NOT in context_entities are
-    flagged as potential hallucinations.
+      The grader ONLY flags tokens that:
+        (a) match the entity ID pattern (alphanumeric + hyphen/underscore), AND
+        (b) are NOT resolvable to any known context entity via canonical aliases.
+
+      This eliminates false failures from common English hyphenated words
+      (e.g. "in-scope", "well-known") that are not warehouse entity references.
+
+    Strict behaviour preserved:
+      - "Wave 18" → fails if wave-18 is not in context (correct rejection).
+      - "wave-17" → passes if wave-17 is in context (correct pass).
+      - "wave 17" → passes via canonical alias (false-failure eliminated).
+      - "in-scope" → passes (not a warehouse entity reference in any context).
 
     When context_entities is empty, the grader passes unconditionally
     (no entity whitelist defined for this case).
@@ -213,8 +237,8 @@ class HallucinationGrader:
 
     grader_name = "hallucination"
 
-    # Pattern: entity IDs are typically alphanumeric with dashes/underscores.
-    # Matches patterns like: wave-17, equip-001, labor-shift-3, SKU-ABC123.
+    # Pattern: structured entity IDs — alphanumeric with dashes/underscores.
+    # Matches: wave-17, equip-001, labor-shift-3, SKU-ABC123, conveyor-main.
     _ENTITY_ID_PATTERN = re.compile(
         r"\b([a-zA-Z][a-zA-Z0-9]*[-_][a-zA-Z0-9][-a-zA-Z0-9]*)\b"
     )
@@ -239,11 +263,18 @@ class HallucinationGrader:
                 reason="Empty response — no entity IDs to check.",
             )
 
-        allowed = {e.lower() for e in case.context_entities}
+        # 18D: Build expanded allowed surface forms via EntityResolver.
+        # This includes exact canonical IDs and all approved aliases
+        # (hyphen↔space↔underscore substitution only — no fuzzy matching).
+        allowed_surface_forms = build_allowed_surface_forms(case.context_entities)
+
         found_ids = self._ENTITY_ID_PATTERN.findall(response)
-        hallucinated = [
-            eid for eid in found_ids if eid.lower() not in allowed
-        ]
+        hallucinated = []
+        for eid in found_ids:
+            eid_lower = eid.lower()
+            # Pass if resolvable to a known entity via any approved alias.
+            if eid_lower not in allowed_surface_forms:
+                hallucinated.append(eid)
 
         if hallucinated:
             # Deduplicate while preserving order.
@@ -257,7 +288,10 @@ class HallucinationGrader:
             return GraderResult(
                 grader_name=self.grader_name,
                 passed=False,
-                reason=f"Response references {len(unique_hallucinated)} entity ID(s) not in context.",
+                reason=(
+                    f"Response references {len(unique_hallucinated)} entity ID(s) "
+                    f"not resolvable to any known context entity."
+                ),
                 evidence=unique_hallucinated[:10],  # cap evidence list
             )
 
@@ -286,14 +320,62 @@ class CapabilityMatchGrader:
     grader_name = "capability_match"
 
     # Synonym expansions: capability slug → additional keywords.
+    # 18D calibration (§15): extended equipment_bypass synonyms to cover
+    # natural phrasings ("backup conveyor", "switch to backup") that are
+    # semantically equivalent but missed in 18C. Strict: only operationally
+    # correct synonyms — not generic words that could match unrelated content.
     _SYNONYMS: dict[str, list[str]] = {
-        "wave_recovery": ["wave recovery", "recover wave", "wave replan", "reschedule wave"],
-        "labor_reallocation": ["labor reallocation", "reallocate labor", "reassign workers",
-                               "shift workers", "move workers"],
-        "equipment_bypass": ["bypass", "reroute", "alternate conveyor", "alternate equipment"],
-        "equipment_shutdown": ["shut down", "shutdown", "take offline", "remove from service"],
-        "wave_prioritization": ["prioritize", "reprioritize", "priority wave"],
-        "safety_alert": ["safety alert", "alert", "warning", "hazard notification"],
+        "wave_recovery": [
+            "wave recovery",
+            "recover wave",
+            "wave replan",
+            "reschedule wave",
+        ],
+        "labor_reallocation": [
+            "labor reallocation",
+            "reallocate labor",
+            "reassign workers",
+            "shift workers",
+            "move workers",
+            "reallocate workers",
+            "redistribute labor",
+            "labor redistribution",
+        ],
+        "equipment_bypass": [
+            "bypass",
+            "reroute",
+            "alternate conveyor",
+            "alternate equipment",
+            # 18D additions — operationally equivalent phrasings:
+            "backup conveyor",
+            "backup system",
+            "switch to backup",
+            "use backup",
+            "use the backup",
+            "alternate path",
+            "conveyor-backup",
+            "conveyor backup",
+        ],
+        "equipment_shutdown": [
+            "shut down",
+            "shutdown",
+            "take offline",
+            "remove from service",
+            "decommission",
+            "halt equipment",
+        ],
+        "wave_prioritization": [
+            "prioritize",
+            "reprioritize",
+            "priority wave",
+            "wave priority",
+        ],
+        "safety_alert": [
+            "safety alert",
+            "alert",
+            "warning",
+            "hazard notification",
+        ],
     }
 
     def grade(
@@ -351,7 +433,19 @@ class TargetMatchGrader:
     When EvaluationCase.expected_target is set, checks that the model's
     response references the expected target entity (by ID or label).
 
-    Matching is case-insensitive substring search.
+    Phase 18D calibration (§13):
+      Uses EntityResolver to find the first surface form from context_entities
+      that appears in the response and resolves to expected_target.  Emits
+      diagnostic fields: model_reference, resolved_entity_id,
+      expected_entity_id, match — stored in GraderResult.evidence as a
+      structured JSON string.
+
+    Matching hierarchy:
+      1. Exact canonical ID substring (case-insensitive)
+      2. Canonical alias variants (hyphen↔space↔underscore)
+      3. Resolver scan: each alias of expected_target checked in response
+
+    Never broadens beyond deterministic alias derivation.
     """
 
     grader_name = "target_match"
@@ -371,30 +465,53 @@ class TargetMatchGrader:
         response = _normalize(_response_text(result))
         target = case.expected_target.lower()
 
-        if target in response:
+        # Build resolver for expected_target entity (or all context entities).
+        context_ids = case.context_entities if case.context_entities else [target]
+        resolver = EntityResolver.from_context_ids(context_ids)
+
+        # Check exact canonical ID and all approved aliases of expected_target.
+        from .resolver import _canonical_aliases
+
+        target_aliases = _canonical_aliases(target)
+
+        matched_reference: str | None = None
+        for alias in sorted(target_aliases):  # deterministic order
+            if alias in response:
+                matched_reference = alias
+                break
+
+        if matched_reference is not None:
+            # 18D: emit diagnostic record (§13).
+            resolved = resolver.resolve(matched_reference) or target
+            diagnostic = ResolvedEntity(
+                model_reference=matched_reference,
+                resolved_entity_id=resolved,
+                expected_entity_id=target,
+                match=(resolved == target),
+            )
+            import json as _json
+
+            diag_str = _json.dumps(
+                {
+                    "model_reference": diagnostic.model_reference,
+                    "resolved_entity_id": diagnostic.resolved_entity_id,
+                    "expected_entity_id": diagnostic.expected_entity_id,
+                    "match": diagnostic.match,
+                }
+            )
+            verb = (
+                "exactly"
+                if matched_reference == target
+                else f"(variant '{matched_reference}')"
+            )
             return GraderResult(
                 grader_name=self.grader_name,
                 passed=True,
-                reason=f"Response references expected target: {case.expected_target}",
+                reason=(
+                    f"Response references expected target {verb}: {case.expected_target}"
+                ),
+                evidence=[matched_reference, diag_str],
             )
-
-        # Also try underscore/hyphen variants.
-        variants = [
-            target.replace("-", " "),
-            target.replace("_", " "),
-            target.replace("-", "_"),
-        ]
-        for variant in variants:
-            if variant in response:
-                return GraderResult(
-                    grader_name=self.grader_name,
-                    passed=True,
-                    reason=(
-                        f"Response references expected target "
-                        f"(variant '{variant}'): {case.expected_target}"
-                    ),
-                    evidence=[variant],
-                )
 
         return GraderResult(
             grader_name=self.grader_name,
@@ -402,7 +519,34 @@ class TargetMatchGrader:
             reason=(
                 f"Response does not reference expected target: {case.expected_target}"
             ),
+            evidence=[
+                _json_diagnostic(
+                    model_reference="(none found)",
+                    resolved_entity_id=None,
+                    expected_entity_id=target,
+                    match=False,
+                )
+            ],
         )
+
+
+def _json_diagnostic(
+    model_reference: str,
+    resolved_entity_id: str | None,
+    expected_entity_id: str,
+    match: bool,
+) -> str:
+    """Serialize a target grader diagnostic to JSON string."""
+    import json as _json
+
+    return _json.dumps(
+        {
+            "model_reference": model_reference,
+            "resolved_entity_id": resolved_entity_id,
+            "expected_entity_id": expected_entity_id,
+            "match": match,
+        }
+    )
 
 
 # ── Grader 5: Required evidence ───────────────────────────────────────────────
@@ -418,10 +562,45 @@ class RequiredEvidenceGrader:
     Each fact is a string (keyword, phrase, or metric) that must appear
     in the response.  Matching is case-insensitive.
 
+    Phase 18D calibration (§12, §14):
+      For facts that resemble entity IDs (contain hyphens or underscores),
+      canonical alias variants are also checked (hyphen↔space↔underscore).
+      This prevents false failures when a model says "Wave 17" for fact "wave-17".
+
+      Only the SAME deterministic alias derivation used in EntityResolver is
+      applied — no fuzzy matching, no edit distance, no LLM.
+
+      For non-entity-like facts (plain words, numbers, phrases), exact
+      case-insensitive substring match is preserved.
+
+      If deterministic semantic interpretation is impossible for a fact,
+      that fact is left graded as-is and reported as unresolvable (§14).
+
     score = fraction of required facts found (1.0 = all present).
     """
 
     grader_name = "required_evidence"
+
+    @staticmethod
+    def _fact_found_in_response(fact: str, response: str) -> bool:
+        """
+        Return True if fact is found in the normalized response.
+
+        For entity-like facts (hyphen/underscore separated), also checks
+        canonical alias variants.  For plain words, checks exact substring.
+        """
+        fact_lower = fact.lower()
+        # Direct match always wins.
+        if fact_lower in response:
+            return True
+        # If the fact contains a hyphen or underscore, try canonical aliases.
+        if "-" in fact or "_" in fact:
+            from .resolver import _canonical_aliases
+
+            for alias in _canonical_aliases(fact):
+                if alias in response:
+                    return True
+        return False
 
     def grade(
         self,
@@ -436,8 +615,14 @@ class RequiredEvidenceGrader:
             )
 
         response = _normalize(_response_text(result))
-        found = [f for f in case.required_facts if f.lower() in response]
-        missing = [f for f in case.required_facts if f.lower() not in response]
+        found = [
+            f for f in case.required_facts if self._fact_found_in_response(f, response)
+        ]
+        missing = [
+            f
+            for f in case.required_facts
+            if not self._fact_found_in_response(f, response)
+        ]
         score = len(found) / len(case.required_facts)
 
         if missing:
