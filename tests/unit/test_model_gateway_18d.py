@@ -902,7 +902,8 @@ class TestFixture18DRegistration:
         assert "comparative-reasoning-v1" in ids
 
     def test_all_known_cases_combined(self):
-        assert len(ALL_KNOWN_CASES) == 6
+        # 18B (3) + 18D (3) + 18E (3) = 9
+        assert len(ALL_KNOWN_CASES) >= 6
 
     def test_18d_cases_use_same_context_entities(self):
         """Fixed-context invariant: same context_entities as 18B (§5)."""

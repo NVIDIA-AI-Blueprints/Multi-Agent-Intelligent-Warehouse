@@ -141,8 +141,19 @@ class BenchmarkModelResult:
     # "OFFLINE QUALITY PASS / NOT PRODUCTION ELIGIBLE UNDER CURRENT POLICY"
     # when policy_compliant=False and quality_pass=True
 
-    # ── Raw response (bounded) ────────────────────────────────────────────────
-    response_snippet: str | None = None  # first 300 chars only
+    # ── Raw response (18E: full bounded response used for grading) ────────────
+    # raw_response: complete model output — graders MUST use this field only.
+    # display_preview: optional truncated preview (CLI/UI only, never for grading).
+    # INVARIANT: graders never see display_preview; they receive raw_response via
+    #            ModelEvaluationResult.response which is always set from raw_response.
+    raw_response: str | None = None  # full bounded output (18E §4)
+    display_preview: str | None = None  # optional truncated preview (max 300 chars)
+
+    # Backward-compat alias (removed in 18E — kept as property for any readers).
+    @property
+    def response_snippet(self) -> str | None:
+        """Deprecated: use display_preview. Kept for backward compatibility."""
+        return self.display_preview
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -192,7 +203,10 @@ class BenchmarkModelResult:
                 "policy_compliant": self.policy_compliant,
             },
             "interpretation": self.interpretation,
-            "response_snippet": self.response_snippet,
+            # 18E §4: raw_response is the full bounded output; display_preview is
+            # an optional truncated view for CLI/logs — never used for grading.
+            "raw_response": self.raw_response,
+            "display_preview": self.display_preview,
         }
 
 

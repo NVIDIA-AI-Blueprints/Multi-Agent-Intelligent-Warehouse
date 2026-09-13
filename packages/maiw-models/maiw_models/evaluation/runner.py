@@ -124,16 +124,25 @@ def _build_fixture_messages(case: EvaluationCase) -> list[dict[str, Any]]:
     For the fixture corpus, we use a system prompt derived from the case's
     context_entities and a user turn with the case prompt.  This is
     deterministic across all models for the same case.
+
+    18E §2 PROMPT ISOLATION INVARIANT:
+      The model MUST NOT receive any evaluator-only fields:
+        - case_id, fixture label, benchmark metadata
+        - expected_target, expected_capability, required_facts, forbidden_claims
+        - grader names, expected answers, pass/fail criteria
+        - policy_eligibility, benchmark_case, phase labels
+      Only the operational context (entity IDs) and the user prompt are sent.
+      Grading metadata remains evaluator-only and is never included here.
     """
-    # Build a compact system prompt from the fixture context.
+    # Build a compact system prompt from the fixture context only.
+    # NO case_id, NO metadata, NO grader expectations.
     entity_list = "\n".join(f"  - {e}" for e in case.context_entities)
     system = (
         "You are MAIW Copilot, an AI assistant for warehouse operations.\n"
         "Answer questions using ONLY the operational context provided below.\n"
         "Do not fabricate entity IDs, names, or facts not present in the context.\n\n"
-        f"OPERATIONAL CONTEXT (fixture: {case.case_id}):\n"
-        f"In-scope entity IDs:\n{entity_list}\n"
-        f"Evaluation case metadata: {case.metadata}"
+        "OPERATIONAL CONTEXT:\n"
+        f"In-scope entity IDs:\n{entity_list}"
     )
     return [
         {"role": "system", "content": system},
@@ -314,6 +323,10 @@ class EvaluationRunner:
             if not eval_result.policy_compliant and quality_pass:
                 interpretation = "OFFLINE QUALITY PASS / NOT PRODUCTION ELIGIBLE UNDER CURRENT POLICY"
 
+            # 18E §4: raw_response = full bounded output used by graders.
+            #         display_preview = optional ≤300-char truncation for CLI/logs.
+            #         Graders ALWAYS receive raw_response (via grader_input.response).
+            _raw = eval_result.response_content
             benchmark_result = BenchmarkModelResult(
                 evaluation_run_key=eval_run_key,
                 case_id=case.case_id,
@@ -344,11 +357,8 @@ class EvaluationRunner:
                 fallback_used=False,  # forced evaluation never falls back
                 policy_compliant=eval_result.policy_compliant,
                 interpretation=interpretation,
-                response_snippet=(
-                    eval_result.response_content[:300]
-                    if eval_result.response_content
-                    else None
-                ),
+                raw_response=_raw,  # full output — graders used this
+                display_preview=(_raw[:300] if _raw else None),  # display only
             )
             results.append(benchmark_result)
 

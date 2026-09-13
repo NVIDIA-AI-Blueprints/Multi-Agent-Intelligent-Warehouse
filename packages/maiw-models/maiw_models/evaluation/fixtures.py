@@ -14,10 +14,10 @@
 # limitations under the License.
 
 """
-Phase 18B/18D evaluation fixture cases.
+Phase 18B/18D/18E evaluation fixture cases.
 
 A small deterministic test corpus that proves evaluation infrastructure works.
-NOT the full benchmark corpus — that is 18C/18D.
+NOT the full benchmark corpus — that is 18C/18D/18E.
 
 18B Fixtures:
   1. wave17_labor_risk   — ASK: "Why is Wave 17 at risk?"
@@ -26,11 +26,20 @@ NOT the full benchmark corpus — that is 18C/18D.
 
 18D Additions (§6 benchmark corpus expansion):
   4. evidence_ask_labor  — Case B: Evidence ASK "What evidence shows labor constraint?"
-  5. analyze_action      — Case C: ANALYZE "What should we do?" (low risk, medium reasoning)
-  6. comparative_reasoning — Case D: "Why is that the best option?" (low risk)
+  5. analyze_action      — Case E: ANALYZE "What should we do?" (medium risk, medium reasoning)
+  6. comparative_reasoning — Case F: "Why is that the best option?" (low risk)
 
-All 18D cases use the same context entities as 18B for fixed-context invariant (§5).
-Cases 4–6 are designed with low/medium risk so Nano is POLICY ELIGIBLE.
+18E Additions (§7 Nano qualification corpus):
+  7. wave17_risk_low     — Case A: Wave 17 low-risk ASK (medium reasoning) POLICY ELIGIBLE
+  8. equipment_ask_low   — Case C: Equipment ASK (low risk, medium reasoning) POLICY ELIGIBLE
+  9. healthy_baseline_ask — Case D: Healthy baseline ASK POLICY ELIGIBLE
+
+All cases use the same context entities for fixed-context invariant (§5).
+Cases 4–9 are designed with low/medium risk so Nano is POLICY ELIGIBLE (when available).
+
+Policy eligibility labels (18E §7):
+  POLICY ELIGIBLE       — low/medium risk + medium reasoning → Nano-routable when enabled
+  RESEARCH ONLY         — high/critical risk or high reasoning → Super/Ultra only
 """
 
 from __future__ import annotations
@@ -362,6 +371,199 @@ comparative_reasoning_input = ModelEvaluationInput(
 )
 
 
+# ── Case 7 (18E): Case A — Wave 17 low-risk ASK ──────────────────────────────
+# 18E §7 Case A: "Why is Wave 17 at risk?" — low risk, medium reasoning.
+# NOTE: wave17_labor_risk (18B) uses high risk/reasoning → RESEARCH ONLY.
+# This 18E variant uses low risk/medium reasoning → POLICY ELIGIBLE for Nano.
+
+WAVE17_RISK_LOW_PROMPT = (
+    "Why is Wave 17 at risk? "
+    "Summarize the primary bottleneck based on available labor and shift data."
+)
+
+wave17_risk_low = EvaluationCase(
+    case_id="wave17-risk-low-v1",
+    task_family=TaskFamily.ASK,
+    prompt=WAVE17_RISK_LOW_PROMPT,
+    reasoning_level="medium",
+    risk_level="low",
+    expected_capability="labor_reallocation",
+    expected_target="wave-17",
+    required_facts=[
+        "wave-17",
+        "labor",
+    ],
+    forbidden_claims=[
+        "wave-18",
+        "wave-99",
+        "worker-Z999",
+        "external-agency",
+        "emergency shutdown",
+        "evacuate",
+    ],
+    context_entities=FIXTURE_CONTEXT_ENTITIES,
+    metadata={
+        "fixture": True,
+        "phase": "18E",
+        "scenario": "labor-bottleneck",
+        "policy_eligibility": "POLICY ELIGIBLE",
+        "benchmark_case": "A",
+        "description": "18E Case A — Wave 17 at-risk ASK (low risk, medium reasoning)",
+    },
+)
+
+wave17_risk_low_input = ModelEvaluationInput(
+    evaluation_input_id="wave17-risk-low-v1",
+    dataset_id=FIXTURE_DATASET_ID,
+    datapack_checksum=FIXTURE_DATAPACK_CHECKSUM,
+    scenario_id="wave17-labor-bottleneck",
+    warehouse_state_snapshot_id=None,
+    context_snapshot_id="fixture-ctx-wave17-001",
+    prompt=WAVE17_RISK_LOW_PROMPT,
+    prompt_hash=ModelEvaluationInput.make_prompt_hash(WAVE17_RISK_LOW_PROMPT),
+    reasoning_level="medium",
+    risk_level="low",
+    deployment_mode="nvidia_hosted",
+    task_family=TaskFamily.ASK,
+)
+
+
+# ── Case 8 (18E): Case C — Equipment ASK ─────────────────────────────────────
+# 18E §7 Case C: "What is causing the equipment-related disruption?"
+# Low risk, medium reasoning → POLICY ELIGIBLE.
+# NOTE: equipment_failure (18B) uses high risk/reasoning → RESEARCH ONLY.
+
+EQUIPMENT_ASK_LOW_PROMPT = (
+    "What is causing the equipment-related disruption in the warehouse? "
+    "Which equipment is affected and what is the recommended response?"
+)
+
+equipment_ask_low = EvaluationCase(
+    case_id="equipment-ask-low-v1",
+    task_family=TaskFamily.ASK,
+    prompt=EQUIPMENT_ASK_LOW_PROMPT,
+    reasoning_level="medium",
+    risk_level="low",
+    expected_capability="equipment_bypass",
+    expected_target="conveyor-main",
+    required_facts=[
+        "conveyor",
+        "wave-17",
+    ],
+    forbidden_claims=[
+        "fire suppression",
+        "structural damage",
+        "evacuation",
+        "wave-18",
+        "wave-99",
+    ],
+    context_entities=FIXTURE_CONTEXT_ENTITIES,
+    metadata={
+        "fixture": True,
+        "phase": "18E",
+        "scenario": "equipment-failure",
+        "policy_eligibility": "POLICY ELIGIBLE",
+        "benchmark_case": "C",
+        "description": "18E Case C — Equipment disruption ASK (low risk, medium reasoning)",
+    },
+)
+
+equipment_ask_low_input = ModelEvaluationInput(
+    evaluation_input_id="equipment-ask-low-v1",
+    dataset_id=FIXTURE_DATASET_ID,
+    datapack_checksum=FIXTURE_DATAPACK_CHECKSUM,
+    scenario_id="equipment-failure-wave17",
+    warehouse_state_snapshot_id=None,
+    context_snapshot_id="fixture-ctx-equipment-001",
+    prompt=EQUIPMENT_ASK_LOW_PROMPT,
+    prompt_hash=ModelEvaluationInput.make_prompt_hash(EQUIPMENT_ASK_LOW_PROMPT),
+    reasoning_level="medium",
+    risk_level="low",
+    deployment_mode="nvidia_hosted",
+    task_family=TaskFamily.ASK,
+)
+
+
+# ── Case 9 (18E): Case D — Healthy baseline ASK ──────────────────────────────
+# 18E §7 Case D: "Is there an operational problem that requires intervention?"
+# Low risk, medium reasoning → POLICY ELIGIBLE.
+# healthy_baseline (18B) is an ANALYZE case; this 18E variant is ASK.
+
+HEALTHY_BASELINE_ASK_PROMPT = (
+    "Is there an operational problem with Wave 17 that requires immediate intervention? "
+    "Based on current labor and equipment status, what is your assessment?"
+)
+
+healthy_baseline_ask = EvaluationCase(
+    case_id="healthy-baseline-ask-v1",
+    task_family=TaskFamily.ASK,
+    prompt=HEALTHY_BASELINE_ASK_PROMPT,
+    reasoning_level="medium",
+    risk_level="low",
+    expected_capability=None,  # correct answer is "no urgent action needed" — capability may be absent
+    expected_target="wave-17",
+    required_facts=[
+        "wave-17",
+    ],
+    forbidden_claims=[
+        "emergency shutdown",
+        "evacuate",
+        "crisis",
+        "wave-18",
+        "wave-99",
+    ],
+    context_entities=FIXTURE_CONTEXT_ENTITIES,
+    metadata={
+        "fixture": True,
+        "phase": "18E",
+        "scenario": "healthy-baseline",
+        "policy_eligibility": "POLICY ELIGIBLE",
+        "benchmark_case": "D",
+        "description": "18E Case D — Healthy baseline ASK (low risk, medium reasoning)",
+    },
+)
+
+healthy_baseline_ask_input = ModelEvaluationInput(
+    evaluation_input_id="healthy-baseline-ask-v1",
+    dataset_id=FIXTURE_DATASET_ID,
+    datapack_checksum=FIXTURE_DATAPACK_CHECKSUM,
+    scenario_id="healthy-baseline",
+    warehouse_state_snapshot_id=None,
+    context_snapshot_id="fixture-ctx-healthy-001",
+    prompt=HEALTHY_BASELINE_ASK_PROMPT,
+    prompt_hash=ModelEvaluationInput.make_prompt_hash(HEALTHY_BASELINE_ASK_PROMPT),
+    reasoning_level="medium",
+    risk_level="low",
+    deployment_mode="nvidia_hosted",
+    task_family=TaskFamily.ASK,
+)
+
+
+# ── Policy eligibility labels (18E §7) ───────────────────────────────────────
+
+# Map case_id → policy eligibility label for the qualification corpus.
+# POLICY ELIGIBLE: low/medium risk + medium reasoning → Nano-routable when enabled.
+# RESEARCH ONLY — NOT PRODUCTION ELIGIBLE: high/critical risk or high reasoning.
+POLICY_ELIGIBILITY: dict[str, str] = {
+    # 18B high-risk cases — RESEARCH ONLY
+    "wave17-labor-risk-v1": "RESEARCH ONLY — NOT PRODUCTION ELIGIBLE",
+    "equipment-failure-v1": "RESEARCH ONLY — NOT PRODUCTION ELIGIBLE",
+    # 18B baseline — POLICY ELIGIBLE (low risk, medium reasoning)
+    "healthy-baseline-v1": "POLICY ELIGIBLE",
+    # 18D cases — POLICY ELIGIBLE
+    "evidence-ask-labor-v1": "POLICY ELIGIBLE",
+    "analyze-action-v1": "POLICY ELIGIBLE",
+    "comparative-reasoning-v1": "POLICY ELIGIBLE",
+    # 18E corpus (Cases A–F)
+    "wave17-risk-low-v1": "POLICY ELIGIBLE",        # Case A
+    # Case B = evidence-ask-labor-v1 (18D)          # Case B
+    "equipment-ask-low-v1": "POLICY ELIGIBLE",       # Case C
+    "healthy-baseline-ask-v1": "POLICY ELIGIBLE",    # Case D
+    # Case E = analyze-action-v1 (18D)               # Case E
+    # Case F = comparative-reasoning-v1 (18D)        # Case F
+}
+
+
 # ── Fixture registry ──────────────────────────────────────────────────────────
 
 
@@ -390,13 +592,36 @@ ALL_18D_FIXTURE_INPUTS = [
     comparative_reasoning_input,
 ]
 
-# Combined registry (all 18B + 18D cases)
-ALL_KNOWN_CASES = ALL_FIXTURE_CASES + ALL_18D_FIXTURE_CASES
-ALL_KNOWN_INPUTS = ALL_FIXTURE_INPUTS + ALL_18D_FIXTURE_INPUTS
+# 18E additions — Nano qualification corpus (Cases A, C, D; B/E/F reuse 18D)
+ALL_18E_FIXTURE_CASES = [
+    wave17_risk_low,       # Case A
+    equipment_ask_low,     # Case C
+    healthy_baseline_ask,  # Case D
+]
+
+ALL_18E_FIXTURE_INPUTS = [
+    wave17_risk_low_input,
+    equipment_ask_low_input,
+    healthy_baseline_ask_input,
+]
+
+# 18E qualification corpus — all 6 policy-eligible cases (A–F)
+NANO_QUALIFICATION_CORPUS: list[EvaluationCase] = [
+    wave17_risk_low,          # A
+    evidence_ask_labor,       # B
+    equipment_ask_low,        # C
+    healthy_baseline_ask,     # D
+    analyze_action,           # E
+    comparative_reasoning,    # F
+]
+
+# Combined registry (all 18B + 18D + 18E cases)
+ALL_KNOWN_CASES = ALL_FIXTURE_CASES + ALL_18D_FIXTURE_CASES + ALL_18E_FIXTURE_CASES
+ALL_KNOWN_INPUTS = ALL_FIXTURE_INPUTS + ALL_18D_FIXTURE_INPUTS + ALL_18E_FIXTURE_INPUTS
 
 
 def get_fixture_case(case_id: str) -> EvaluationCase:
-    """Look up a fixture case by ID (18B + 18D)."""
+    """Look up a fixture case by ID (18B + 18D + 18E)."""
     for case in ALL_KNOWN_CASES:
         if case.case_id == case_id:
             return case
@@ -404,8 +629,13 @@ def get_fixture_case(case_id: str) -> EvaluationCase:
 
 
 def get_fixture_input(evaluation_input_id: str) -> ModelEvaluationInput:
-    """Look up a fixture input by ID (18B + 18D)."""
+    """Look up a fixture input by ID (18B + 18D + 18E)."""
     for inp in ALL_KNOWN_INPUTS:
         if inp.evaluation_input_id == evaluation_input_id:
             return inp
     raise KeyError(f"No fixture input with evaluation_input_id={evaluation_input_id!r}")
+
+
+def get_policy_eligibility(case_id: str) -> str:
+    """Return policy eligibility label for a case_id (18E §7)."""
+    return POLICY_ELIGIBILITY.get(case_id, "UNKNOWN — NOT IN ELIGIBILITY MAP")

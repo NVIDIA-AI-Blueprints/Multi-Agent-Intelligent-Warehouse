@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 """
-maiw_models.evaluation — Phase 18B/18D evaluation foundation.
+maiw_models.evaluation — Phase 18B/18D/18E evaluation foundation.
 
 Typed infrastructure for offline multi-model benchmarking (18C+).
 
@@ -28,24 +28,35 @@ from .calibration import (
 from .fixtures import (
     ALL_18D_FIXTURE_CASES,
     ALL_18D_FIXTURE_INPUTS,
+    ALL_18E_FIXTURE_CASES,
+    ALL_18E_FIXTURE_INPUTS,
     ALL_FIXTURE_CASES,
     ALL_FIXTURE_INPUTS,
     ALL_KNOWN_CASES,
     ALL_KNOWN_INPUTS,
+    NANO_QUALIFICATION_CORPUS,
+    POLICY_ELIGIBILITY,
     analyze_action,
     analyze_action_input,
     comparative_reasoning,
     comparative_reasoning_input,
+    equipment_ask_low,
+    equipment_ask_low_input,
     equipment_failure,
     equipment_failure_input,
     evidence_ask_labor,
     evidence_ask_labor_input,
     get_fixture_case,
     get_fixture_input,
+    get_policy_eligibility,
     healthy_baseline,
+    healthy_baseline_ask,
+    healthy_baseline_ask_input,
     healthy_baseline_input,
     wave17_labor_risk,
     wave17_labor_risk_input,
+    wave17_risk_low,
+    wave17_risk_low_input,
 )
 from .graders import (
     CapabilityMatchGrader,
@@ -73,6 +84,16 @@ from .replay import (
     MockSnapshotNode,
     ReplayContext,
     replay_context_from_snapshot,
+)
+from .qualification import (
+    CaseComparisonRow,
+    MATERIAL_LATENCY_ADVANTAGE_THRESHOLD,
+    NanoQualificationConfig,
+    QualificationRunResult,
+    QualificationSample,
+    build_comparison_row,
+    classify_case_comparison,
+    compute_qualification_run,
 )
 from .resolver import (
     ContextEntity,
@@ -130,6 +151,27 @@ __all__ = [
     "analyze_action_input",
     "comparative_reasoning",
     "comparative_reasoning_input",
+    # 18E Fixtures
+    "ALL_18E_FIXTURE_CASES",
+    "ALL_18E_FIXTURE_INPUTS",
+    "NANO_QUALIFICATION_CORPUS",
+    "POLICY_ELIGIBILITY",
+    "wave17_risk_low",
+    "wave17_risk_low_input",
+    "equipment_ask_low",
+    "equipment_ask_low_input",
+    "healthy_baseline_ask",
+    "healthy_baseline_ask_input",
+    "get_policy_eligibility",
+    # 18E Qualification
+    "NanoQualificationConfig",
+    "QualificationSample",
+    "QualificationRunResult",
+    "CaseComparisonRow",
+    "MATERIAL_LATENCY_ADVANTAGE_THRESHOLD",
+    "compute_qualification_run",
+    "classify_case_comparison",
+    "build_comparison_row",
     # 18D Resolver
     "ContextEntity",
     "EntityResolver",
