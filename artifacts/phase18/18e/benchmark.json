@@ -1,0 +1,159 @@
+{
+  "phase": "18E",
+  "run_type": "METHODOLOGY_VERIFICATION",
+  "run_timestamp": "2026-09-13T00:00:00Z",
+  "description": "Phase 18E benchmark methodology verification. No live Nano calls made — Nano model reached EOL 2026-09-01 and is operator-disabled. Methodology corrections applied and validated via 53 offline tests.",
+
+  "nano_endpoint_status": {
+    "verdict": "NANO ENDPOINT UNAVAILABLE",
+    "model_id": "nvidia/nemotron-3-nano-30b-a3b",
+    "deployment_status": "DEPLOYED_IN_REGISTRY",
+    "enabled_in_registry": false,
+    "env_var": "NEMOTRON_NANO_ENABLED=false",
+    "reason": "EOL 2026-09-01T09:00:00Z — model disabled by operator via .env. Registry still shows DEPLOYED (endpoint may persist post-EOL), but operator has explicitly disabled. Endpoint probe impossible without re-enabling. Per spec §6: return NANO ENDPOINT UNAVAILABLE.",
+    "endpoint_probe_attempted": false,
+    "note": "Enabling a model at EOL without operator authorization is outside 18E scope. No secrets committed."
+  },
+
+  "methodology_corrections": {
+    "prompt_isolation": {
+      "status": "FIXED",
+      "blocking": true,
+      "description": "runner._build_fixture_messages() previously leaked case_id, metadata dict (including policy_eligibility_nano, benchmark_case, fixture, phase labels) and 'Evaluation case metadata' verbatim into the model system prompt.",
+      "fix": "Removed case.case_id label ('fixture: <id>') and entire case.metadata injection from system prompt. Only OPERATIONAL CONTEXT entity list + user prompt are sent to model.",
+      "tests": "TestPromptIsolation — 14 tests covering all corpus cases",
+      "regression_confirmed": true
+    },
+    "response_completeness": {
+      "status": "FIXED",
+      "blocking": true,
+      "description": "BenchmarkModelResult had response_snippet (first 300 chars). Although graders used grader_input.response (full response), the field naming was ambiguous and lacked explicit raw_response semantics.",
+      "fix": "Added raw_response (full bounded output; graders use this) and display_preview (≤300 char truncation, display/logs only). Deprecated response_snippet as backward-compat property → display_preview. Runner now sets raw_response=full, display_preview=[:300].",
+      "tests": "TestResponseCompleteness — 7 tests including post-300-char evidence regression",
+      "regression_confirmed": true
+    },
+    "context_size_invariance": {
+      "status": "VERIFIED",
+      "blocking": false,
+      "description": "All 18E corpus cases verified to use FIXTURE_CONTEXT_ENTITIES (same 14 entities as 18B/18D). Context is built once per case and sent identically to all models.",
+      "tests": "TestContextInvariance — 3 tests",
+      "regression_confirmed": true
+    }
+  },
+
+  "qualification_corpus": {
+    "cases": [
+      {
+        "label": "A",
+        "case_id": "wave17-risk-low-v1",
+        "task_family": "ASK",
+        "risk_level": "low",
+        "reasoning_level": "medium",
+        "policy_eligibility": "POLICY ELIGIBLE",
+        "prompt": "Why is Wave 17 at risk? Summarize the primary bottleneck based on available labor and shift data."
+      },
+      {
+        "label": "B",
+        "case_id": "evidence-ask-labor-v1",
+        "task_family": "ASK",
+        "risk_level": "low",
+        "reasoning_level": "medium",
+        "policy_eligibility": "POLICY ELIGIBLE",
+        "prompt": "What evidence shows that labor is the primary constraint on Wave 17? Cite the specific workers, shifts, and tasks that support this conclusion."
+      },
+      {
+        "label": "C",
+        "case_id": "equipment-ask-low-v1",
+        "task_family": "ASK",
+        "risk_level": "low",
+        "reasoning_level": "medium",
+        "policy_eligibility": "POLICY ELIGIBLE",
+        "prompt": "What is causing the equipment-related disruption in the warehouse? Which equipment is affected and what is the recommended response?"
+      },
+      {
+        "label": "D",
+        "case_id": "healthy-baseline-ask-v1",
+        "task_family": "ASK",
+        "risk_level": "low",
+        "reasoning_level": "medium",
+        "policy_eligibility": "POLICY ELIGIBLE",
+        "prompt": "Is there an operational problem with Wave 17 that requires immediate intervention? Based on current labor and equipment status, what is your assessment?"
+      },
+      {
+        "label": "E",
+        "case_id": "analyze-action-v1",
+        "task_family": "ANALYZE",
+        "risk_level": "medium",
+        "reasoning_level": "medium",
+        "policy_eligibility": "POLICY ELIGIBLE",
+        "prompt": "Based on the current state of Wave 17, what is the recommended course of action? Explain why this action addresses the root cause."
+      },
+      {
+        "label": "F",
+        "case_id": "comparative-reasoning-v1",
+        "task_family": "ANALYZE",
+        "risk_level": "low",
+        "reasoning_level": "medium",
+        "policy_eligibility": "POLICY ELIGIBLE",
+        "prompt": "Compare labor reallocation vs equipment bypass as interventions for Wave 17. Which is more appropriate given current conditions, and why?"
+      }
+    ],
+    "all_policy_eligible": true,
+    "context_entities": 14,
+    "fixed_context_invariant": true
+  },
+
+  "live_benchmark_results": {
+    "nano": {
+      "status": "NOT RUN — NANO ENDPOINT UNAVAILABLE (EOL 2026-09-01)",
+      "cases_run": 0,
+      "reason": "Model reached EOL and is operator-disabled. Cannot produce Nano qualification data."
+    },
+    "super": {
+      "status": "NOT RUN — DEFERRED (no comparative value without Nano)",
+      "cases_run": 0,
+      "reason": "Super-only benchmark has no comparative value for qualification conclusion without Nano. Methodology verified offline. Live Super run deferred to 18F Evaluation Lab."
+    },
+    "lightning": {
+      "status": "NOT RUN — DEFERRED (warm-up follow-up deferred to 18F)",
+      "cases_run": 0,
+      "reason": "Lightning warm-up hypothesis follow-up (spec §15) requires live endpoint calls. Deferred to 18F Evaluation Lab where live runs are planned. Methodology improvements (warm-up exclusion, N=5 repetitions) are in place."
+    }
+  },
+
+  "methodology_validation": {
+    "tests_added": 53,
+    "tests_total_phase_18": 336,
+    "tests_passing": 336,
+    "pre_existing_failures": {
+      "file": "test_mcp_integrated_planner_graph.py",
+      "count": 10,
+      "classification": "PRE-EXISTING",
+      "confirmed_pre_existing": true
+    }
+  },
+
+  "material_latency_threshold": {
+    "defined_before_results": true,
+    "threshold_pct": 20,
+    "threshold_fraction": 0.20,
+    "description": "Nano must show >=20% median latency improvement over Super to count as material. Defined in qualification.py:MATERIAL_LATENCY_ADVANTAGE_THRESHOLD before any results collected."
+  },
+
+  "warm_up_methodology": {
+    "warmup_reps": 1,
+    "measured_reps": 5,
+    "alternating_order": true,
+    "fallback_exclusion": true,
+    "warmup_excluded_from_latency": true,
+    "warmup_excluded_from_quality": true,
+    "implemented": true,
+    "tested": true
+  },
+
+  "verdicts": {
+    "nano": "NANO ENDPOINT UNAVAILABLE",
+    "lightning": "LIGHTNING STILL INCONCLUSIVE",
+    "router": "INSUFFICIENT EVIDENCE"
+  }
+}

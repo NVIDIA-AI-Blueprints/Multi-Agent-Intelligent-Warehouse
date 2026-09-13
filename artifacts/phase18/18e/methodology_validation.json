@@ -1,0 +1,187 @@
+{
+  "phase": "18E",
+  "artifact": "methodology_validation",
+  "generated": "2026-09-13T00:00:00Z",
+
+  "invariants": [
+    {
+      "id": "INV-1",
+      "name": "Prompt isolation",
+      "spec_section": "§2",
+      "blocking": true,
+      "status": "PASS",
+      "description": "Fixture metadata not present in model prompt",
+      "what_was_checked": [
+        "case_id not in system prompt",
+        "case.metadata dict not serialized into prompt",
+        "policy_eligibility labels (POLICY ELIGIBLE, RESEARCH ONLY) not in prompt",
+        "expected_capability values not in prompt",
+        "forbidden_claims field label not in prompt",
+        "required_facts field label not in prompt",
+        "fixture: <case_id> pattern not in system prompt",
+        "messages are exactly [system, user] — no extra turns",
+        "user turn is exactly case.prompt — no appended metadata"
+      ],
+      "test_class": "TestPromptIsolation",
+      "test_count": 14,
+      "all_passed": true
+    },
+    {
+      "id": "INV-2",
+      "name": "Expected outputs remain evaluator-only",
+      "spec_section": "§2",
+      "blocking": true,
+      "status": "PASS",
+      "description": "expected_target, expected_capability, required_facts, forbidden_claims never sent to model",
+      "what_was_checked": [
+        "expected_capability not in model prompt text",
+        "forbidden_claims list not serialized into prompt",
+        "required_facts list not serialized into prompt",
+        "benchmark_case key not in prompt"
+      ],
+      "test_class": "TestPromptIsolation",
+      "all_passed": true
+    },
+    {
+      "id": "INV-3",
+      "name": "Full raw_response reaches graders",
+      "spec_section": "§4",
+      "blocking": true,
+      "status": "PASS",
+      "description": "Graders use raw_response (full bounded output), never display_preview",
+      "what_was_checked": [
+        "RequiredEvidenceGrader passes when fact only appears after char 300",
+        "HallucinationGrader catches hallucination appearing after char 300",
+        "BenchmarkModelResult has separate raw_response and display_preview fields",
+        "to_dict() outputs raw_response and display_preview, not response_snippet",
+        "response_snippet property returns display_preview (backward compat)"
+      ],
+      "test_class": "TestResponseCompleteness",
+      "test_count": 7,
+      "all_passed": true
+    },
+    {
+      "id": "INV-4",
+      "name": "Preview truncation does not affect grading",
+      "spec_section": "§4",
+      "blocking": true,
+      "status": "PASS",
+      "description": "display_preview is max 300 chars but graders receive raw_response",
+      "what_was_checked": [
+        "display_preview != raw_response for responses > 300 chars",
+        "display_preview is exactly [:300] of raw_response"
+      ],
+      "test_class": "TestResponseCompleteness",
+      "all_passed": true
+    },
+    {
+      "id": "INV-5",
+      "name": "Identical context used across models",
+      "spec_section": "§5",
+      "blocking": false,
+      "status": "PASS",
+      "description": "Same FIXTURE_CONTEXT_ENTITIES used for all models on same case",
+      "what_was_checked": [
+        "All 18E cases use FIXTURE_CONTEXT_ENTITIES",
+        "Message content hash is stable across two calls for same case",
+        "System prompt content identical for same case across calls"
+      ],
+      "test_class": "TestContextInvariance",
+      "test_count": 3,
+      "all_passed": true
+    },
+    {
+      "id": "INV-6",
+      "name": "Deterministic run identity is stable",
+      "spec_section": "§17",
+      "blocking": false,
+      "status": "PASS",
+      "description": "Message hash is stable across repeated calls to _build_fixture_messages",
+      "what_was_checked": [
+        "SHA-256 of messages JSON is identical across two calls for all corpus cases"
+      ],
+      "test_class": "TestPromptIsolation.test_messages_hash_stable",
+      "all_passed": true
+    },
+    {
+      "id": "INV-7",
+      "name": "Warm-up samples excluded",
+      "spec_section": "§8",
+      "blocking": false,
+      "status": "PASS",
+      "description": "warmup=True samples are excluded from latency and quality statistics",
+      "what_was_checked": [
+        "Warm-up latency 9999ms not in computed stats",
+        "Warm-up acceptable=True not counted in accept_count",
+        "warmup_count preserved in result for audit",
+        "Empty sample list handled gracefully"
+      ],
+      "test_class": "TestWarmupMethodology",
+      "test_count": 5,
+      "all_passed": true
+    },
+    {
+      "id": "INV-8",
+      "name": "Fallback samples flagged",
+      "spec_section": "§17",
+      "blocking": false,
+      "status": "PASS",
+      "description": "fallback_used=True samples are excluded from qualification metrics",
+      "what_was_checked": [
+        "Fallback latency 9999ms not in computed stats",
+        "fallback_count preserved in result",
+        "Fallback sample excluded from n_measured"
+      ],
+      "test_class": "TestWarmupMethodology.test_fallback_samples_excluded",
+      "all_passed": true
+    },
+    {
+      "id": "INV-9",
+      "name": "Deployment metadata preserved",
+      "spec_section": "§17, §18",
+      "blocking": false,
+      "status": "PASS",
+      "description": "Deployment, model_id, warmup flag, fallback flag all in artifact",
+      "what_was_checked": [
+        "QualificationSample.deployment preserved in to_dict()",
+        "warmup flag in to_dict()",
+        "fallback_used flag in to_dict()",
+        "raw_response and display_preview separate in QualificationSample"
+      ],
+      "test_class": "TestDeploymentMetadataPreservation",
+      "test_count": 4,
+      "all_passed": true
+    },
+    {
+      "id": "INV-10",
+      "name": "Material latency threshold defined before results",
+      "spec_section": "§13",
+      "blocking": false,
+      "status": "PASS",
+      "description": "20% threshold defined in qualification.py before any results collected",
+      "what_was_checked": [
+        "MATERIAL_LATENCY_ADVANTAGE_THRESHOLD == 0.20",
+        "NanoQualificationConfig default material_threshold == 0.20"
+      ],
+      "test_class": "TestQualificationClassification.test_material_latency_threshold_defined",
+      "all_passed": true
+    }
+  ],
+
+  "corpus_validation": {
+    "cases_count": 6,
+    "all_policy_eligible": true,
+    "all_low_or_medium_risk": true,
+    "all_medium_reasoning": true,
+    "high_risk_cases_correctly_labeled_research_only": true,
+    "context_entities_invariant": true,
+    "test_class": "TestNanoQualificationCorpus",
+    "test_count": 9,
+    "all_passed": true
+  },
+
+  "total_methodology_tests": 53,
+  "all_passed": true,
+  "blocking_invariants_passed": 4,
+  "blocking_invariants_total": 4
+}
