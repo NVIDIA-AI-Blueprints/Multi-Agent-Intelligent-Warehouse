@@ -439,3 +439,137 @@ Enable Nano (set `NEMOTRON_NANO_ENABLED=true`) and re-run the benchmark to:
 - Calibrate graders to accept natural-language entity references rather than requiring
   exact canonical ID strings — the current strict keyword match may under-report quality
   for responses that are semantically correct but use surface-form entity names.
+
+---
+
+## Phase 18E — Methodology Verification
+
+Phase 18E identified and corrected two blocking methodology defects carried forward from 18C/18D, then re-ran the qualification corpus using the fixed pipeline. All 53 offline tests passed; no live model calls were made (Nano EOL, Lightning and Super live runs deferred to 18F).
+
+### Methodology Corrections
+
+| Issue | Status | Blocking | Fix |
+|-------|--------|----------|-----|
+| **Prompt metadata leakage** | FIXED | YES | `runner._build_fixture_messages()` previously injected `case_id`, `metadata` dict (including `policy_eligibility_nano`, benchmark labels, fixture IDs) into the model system prompt. Removed — only OPERATIONAL CONTEXT entity list + user prompt are sent to model. |
+| **Response completeness** | FIXED | YES | `BenchmarkModelResult` had only `response_snippet` (first 300 chars). Added `raw_response` (full bounded output) and `display_preview` (≤300 chars for logs). Graders now use `raw_response`. |
+| **Context size invariance** | VERIFIED | NO | All 18E corpus cases use the same 14 FIXTURE_CONTEXT_ENTITIES. Context is built once per case and sent identically to all models. |
+
+### Nano Status
+
+- Model ID: `nvidia/nemotron-3-nano-30b-a3b`
+- Registry: DEPLOYED (endpoint may still exist post-EOL)
+- Operator status: DISABLED via `NEMOTRON_NANO_ENABLED=false` in `.env`
+- EOL date: 2026-09-01
+- Endpoint probe: NOT ATTEMPTED (enabling an EOL model without operator authorization is out of scope)
+- **Quality inference: NONE** — Nano was not tested. No performance conclusions may be drawn.
+
+### 18E Verdicts
+
+```
+nano:      NANO ENDPOINT UNAVAILABLE
+lightning: LIGHTNING STILL INCONCLUSIVE
+router:    INSUFFICIENT EVIDENCE
+```
+
+**Interpretation:** No measured production routing defect was established. Current policy is preserved. Deterministic router retained. Lightning warm-up follow-up (N=5 repetitions, warm-up exclusion) deferred to 18F Evaluation Lab.
+
+---
+
+## Phase 18F — Model Gateway Lab
+
+Phase 18F adds a developer-facing **MODEL GATEWAY LAB** for read-only inspection of evaluation artifacts from 18C, 18D, 18E. It is the developer surface for Workstream 3.
+
+### Accessing the Lab
+
+Navigate to `/models/lab` in the MAIW UI, or click the **MODEL GATEWAY LAB** button at the top of the `/models` page.
+
+### Architecture: ProductionPath + EvaluationPath
+
+```
+ProductionPath:
+    ModelRequest → PolicyFilter → ModelRouter → NIMProvider → ModelResponse
+
+EvaluationPath (offline, read-only):
+    EvaluationCase → BenchmarkRunner → DeterministicGraders → BenchmarkModelResult
+    artifacts/phase18/baseline.json  (18C)
+    artifacts/phase18/18d/benchmark.json  (18D)
+    artifacts/phase18/18e/benchmark.json  (18E)
+```
+
+The Evaluation Lab reads from the EvaluationPath artifacts only. No code path in the Lab touches the ProductionPath.
+
+### Policy vs Routing Distinction
+
+| Concept | Owner | What it does |
+|---------|-------|--------------|
+| **Policy** | `PolicyFilter` | Decides which models are **eligible** for a given request (risk level, reasoning level, deployment mode, capabilities). Hard gate — not overridable at runtime. |
+| **Routing** | `ModelRouter` (RuleBasedRoutingStrategy) | Selects **one** model from the eligible candidates. Deterministic, traceable, rule-based. |
+
+A model passing the offline benchmark does NOT change policy eligibility. Policy changes require deliberate governance review.
+
+### Fixed Benchmark Protocol (10 steps)
+
+1. Load `EvaluationCase` from fixture corpus
+2. Build OPERATIONAL CONTEXT from `context_entities` (no metadata injection)
+3. Call model via `NIMProvider` with isolated prompt
+4. Record `raw_response` (full, bounded at 10,000 chars) and `display_preview` (≤300 chars)
+5. Exclude warm-up call (first call per model per session)
+6. Repeat N=5 times for latency measurement; exclude outliers
+7. Run all applicable deterministic graders against `raw_response`
+8. Compute `quality_score = passed_applicable / total_applicable`
+9. Record `policy_compliant` from `PolicyFilter.filter(candidates)`
+10. Write `BenchmarkModelResult` to artifact JSON
+
+### Architecture Decision Records
+
+| Decision | Outcome | Rationale |
+|----------|---------|-----------|
+| Switchyard (external routing proxy) | **NOT ADOPTED** | Requires external control plane, not air-gap compatible, doesn't support per-request policy constraints |
+| Adaptive routing (dynamic model selection via benchmark feedback) | **NOT ADOPTED** | Benchmark results are offline artifacts, not live signals; adaptive routing would violate determinism requirement |
+| Current deterministic router | **RETAINED** | Policy-constrained, traceable, auditable, air-gap compatible |
+| Evaluation framework | **ADOPTED** | Reproducible offline benchmarking, fixed protocol, artifact storage |
+
+### Nano Documentation
+
+- **Registry status**: `DEPLOYED` (registry entry retained for potential re-enablement)
+- **Operator status**: DISABLED via `NEMOTRON_NANO_ENABLED=false`
+- **EOL date**: 2026-09-01T09:00:00Z
+- **Routing behavior**: All Nano-eligible requests fall back to Super per the policy fallback chain
+- **Quality status**: NOT TESTED — no inference calls were made during qualification
+- **Lab display**: Shows `UNAVAILABLE / NOT TESTED` — never `FAILED`
+
+### Model Availability Semantics
+
+| Status | Meaning |
+|--------|---------|
+| `AVAILABLE` | Endpoint reachable, operator enabled, policy eligible for at least one request type |
+| `UNAVAILABLE` | Endpoint unreachable OR operator disabled OR EOL |
+| `NOT TESTED` | No inference calls completed during qualification — no quality data exists |
+| `TESTED-NOT-ACCEPTABLE` | Inference calls completed but quality_pass=False across all corpus cases |
+
+### Workstream 3 Final Verdict
+
+```
+ROUTER ASSESSMENT — Phase 18F
+==============================
+No measured production routing defect established.
+
+Nano:      ENDPOINT UNAVAILABLE (EOL 2026-09-01, operator-disabled)
+Lightning: STILL INCONCLUSIVE (warm-up follow-up pending)
+Router:    INSUFFICIENT EVIDENCE
+
+Current policy preserved. Deterministic router retained.
+Evaluation framework adopted for ongoing monitoring.
+```
+
+### Lab API Endpoints (Read-Only)
+
+```
+GET /api/v1/model-lab/runs                          — list all runs
+GET /api/v1/model-lab/runs/{run_id}                 — run summary (18c|18d|18e)
+GET /api/v1/model-lab/runs/{run_id}/cases           — case list for run
+GET /api/v1/model-lab/runs/{run_id}/cases/{case_id} — full case detail
+GET /api/v1/model-lab/model-status                  — current model availability
+```
+
+All endpoints are GET-only. No write operations exist. `raw_response` fields are bounded at 10,000 characters. Secret fields (`api_key`, `authorization`, `password`) are stripped before response.
