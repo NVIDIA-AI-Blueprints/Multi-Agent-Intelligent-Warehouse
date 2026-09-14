@@ -19,11 +19,32 @@ from __future__ import annotations
 
 import ast
 import pathlib
+import sys
 from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
+# ── Ensure worktree apps/api takes precedence over the editable-installed copy ──
+# When running tests inside a git worktree the editable install of maiw_api
+# points at the main-repo path.  Insert the worktree's apps/api first so that
+# `maiw_api.routers.model_lab` (added in 18F) is importable even before the
+# branch is merged back.
+_worktree_api = str(Path(__file__).resolve().parent.parent.parent / "apps" / "api")
+if _worktree_api not in sys.path:
+    sys.path.insert(0, _worktree_api)
+
+# Reload maiw_api.routers to pick up the worktree version if it was already
+# cached pointing at the main-repo path.
+import importlib
+import maiw_api.routers
+if str(Path(maiw_api.routers.__file__).parent) != str(Path(_worktree_api) / "maiw_api" / "routers"):
+    # Force reimport from worktree path
+    for mod_name in list(sys.modules.keys()):
+        if mod_name.startswith("maiw_api"):
+            del sys.modules[mod_name]
+    import maiw_api.routers  # noqa: F811
 
 # ── Build a minimal test app ──────────────────────────────────────────────────
 from maiw_api.routers.model_lab import router as model_lab_router
