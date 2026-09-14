@@ -657,4 +657,117 @@ export const userAPI = {
   },
 };
 
+// ── Model Lab types ──────────────────────────────────────────────────────────
+
+export interface ModelLabGrader {
+  name: string;
+  passed: boolean;
+  score: number | null;
+  reason: string;
+  evidence: string[];
+}
+
+export interface ModelLabModelResult {
+  model_id: string;
+  deployment?: string;
+  quality?: {
+    score: number;
+    pass: boolean;
+    applicable_graders: number;
+    passed_graders: number;
+    graders: ModelLabGrader[];
+  };
+  raw_response?: string;
+  display_preview?: string;
+  raw_response_truncated?: boolean;
+  raw_response_original_length?: number;
+  latency_ms?: number;
+  tokens?: number;
+  routing_info?: Record<string, unknown>;
+  policy_eligible?: boolean;
+}
+
+export interface ModelLabCase {
+  case_id: string;
+  prompt: string;
+  task_family: string;
+  risk_level: string;
+  reasoning_level: string;
+  policy_eligibility?: string;
+  label?: string;
+  model_results?: ModelLabModelResult[];
+  model_results_summary?: Array<{
+    model_id: string;
+    quality_score: number | null;
+    quality_pass: boolean | null;
+    passed_graders: number | null;
+    applicable_graders: number | null;
+  }>;
+  nano_policy_label?: string;
+}
+
+export interface ModelLabRun {
+  run_id: string;
+  phase: string;
+  description: string;
+  methodology_valid: boolean;
+  methodology_note: string;
+  artifact_available?: boolean;
+  dataset_id?: string;
+  checksum?: string;
+  timestamp?: string;
+  case_count?: number;
+  models_evaluated?: string[];
+  verdicts?: Record<string, string>;
+  decision_gate?: unknown;
+  model_status?: unknown[];
+  policy_filter_pipeline?: unknown;
+  nano_endpoint_status?: Record<string, unknown>;
+  methodology_corrections?: Record<string, unknown>;
+  live_benchmark_results?: Record<string, unknown>;
+}
+
+export interface ModelStatus {
+  model: string;
+  model_id: string;
+  status: 'AVAILABLE' | 'UNAVAILABLE' | string;
+  role?: string;
+  reason?: string;
+  note?: string;
+}
+
+// Model Lab API uses /model-lab prefix relative to base
+const modelLabBase = '/model-lab';
+
+export const modelLabAPI = {
+  getRuns: async (): Promise<ModelLabRun[]> => {
+    const response = await api.get(`${modelLabBase}/runs`);
+    return response.data;
+  },
+
+  getRun: async (runId: string): Promise<ModelLabRun> => {
+    const safe = validatePathParam(runId, 'run_id');
+    const response = await api.get(`${modelLabBase}/runs/${safe}`);
+    return response.data;
+  },
+
+  getRunCases: async (runId: string): Promise<ModelLabCase[]> => {
+    const safe = validatePathParam(runId, 'run_id');
+    const response = await api.get(`${modelLabBase}/runs/${safe}/cases`);
+    return response.data;
+  },
+
+  getRunCase: async (runId: string, caseId: string): Promise<ModelLabCase> => {
+    const safeRun = validatePathParam(runId, 'run_id');
+    const safeCase = validatePathParam(caseId, 'case_id');
+    const response = await api.get(`${modelLabBase}/runs/${safeRun}/cases/${safeCase}`);
+    return response.data;
+  },
+
+  getModelStatus: async (): Promise<ModelStatus[]> => {
+    const response = await api.get(`${modelLabBase}/model-status`);
+    return response.data;
+  },
+};
+
 export default api;
