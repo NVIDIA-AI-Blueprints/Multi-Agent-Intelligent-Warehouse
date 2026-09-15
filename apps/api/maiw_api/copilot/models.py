@@ -11,6 +11,12 @@ trace_id         One MAIW reasoning trace (threaded to ModelGateway + proposals)
 
 These are never the same value. A three-turn conversation has one
 conversation_id and three (turn_id, trace_id) pairs.
+
+Phase 17E additions
+-------------------
+OperationalContextSnapshot — exact bounded graph context passed into reasoning
+for one grounded Copilot turn.  Captured BEFORE the model call; never updated
+after the fact.  Linked to turn_id and trace_id.  Not a reconstruction.
 """
 
 from __future__ import annotations
@@ -303,6 +309,65 @@ class CopilotObserveResult:
     timing: dict[str, float] = field(default_factory=dict)
 
 
+# ── Phase 17E: Operational Context Snapshot ──────────────────────────────────
+
+@dataclass(frozen=True)
+class ContextSnapshotNode:
+    """One entity node as it appeared in the bounded neighborhood at decision time."""
+    entity_id: str
+    entity_type: str
+    label: str
+    attributes: dict  # Reduced projection — only reasoning-relevant attributes
+
+
+@dataclass(frozen=True)
+class ContextSnapshotEdge:
+    """One relationship edge in the bounded neighborhood at decision time."""
+    source_id: str
+    target_id: str
+    relationship_type: str
+    valid_from: str | None
+    valid_to: str | None
+
+
+@dataclass
+class OperationalContextSnapshot:
+    """
+    Exact bounded graph context supplied to one grounded Copilot/agent turn.
+
+    Captured BEFORE the model call — not reconstructed afterward.
+    Linked to turn_id (one-to-one) and trace_id.
+
+    Lifecycle: retained in process memory for the duration of the API session.
+    Cleared/reset with InMemoryCopilotStore.reset().
+    NOT persisted across API restart (same scope as conversation state).
+
+    Do NOT expose: chain_of_thought, scratchpad, hidden_reasoning, reasoning_tokens.
+    Nodes contain only attributes used for reasoning (reduced projection).
+
+    Bounds: ≤50 nodes, ≤100 edges (enforced at capture time).
+    """
+    context_snapshot_id: str
+    conversation_id: str
+    turn_id: str
+    trace_id: str
+    warehouse_id: str
+    dataset_id: str
+    datapack_checksum: str            # semantic_checksum of the immutable DataPack
+    warehouse_state_snapshot_id: str | None  # WarehouseStateSnapshot.snapshot_id, if available
+    focus_entity_id: str
+    focus_entity_type: str
+    focus_label: str
+    depth: int
+    truncated: bool                   # True when BFS was capped at max_entities
+    nodes: list[ContextSnapshotNode]
+    edges: list[ContextSnapshotEdge]
+    entity_count: int
+    relationship_count: int
+    relationship_summary: dict        # group → [label, ...] — mirrors ContextNeighborhood
+    captured_at: str                  # ISO-8601 UTC timestamp
+
+
 # ── Turn / Conversation store models ─────────────────────────────────────────
 
 @dataclass
@@ -328,6 +393,8 @@ class CopilotTurn:
     focus_entity_id: str | None = None
     focus_entity_type: str | None = None
     focus_entity_label: str | None = None
+    # Phase 17E: operational context snapshot captured before model call
+    context_snapshot_id: str | None = None
 
 
 @dataclass
@@ -441,3 +508,6 @@ class CopilotTurnResponse(BaseModel):
     # See PHASE_15_COPILOT_ARCHITECTURE.md — trust boundary
 
     store_note: str = "Conversation state is process-local and will not survive API restart."
+
+    # Phase 17E: context snapshot ID — present on grounded turns where graph was available
+    context_snapshot_id: str | None = None

@@ -12,12 +12,14 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from .models import CopilotConversation, CopilotTurn
+from .models import CopilotConversation, CopilotTurn, OperationalContextSnapshot
 
 
 class InMemoryCopilotStore:
     def __init__(self) -> None:
         self._conversations: dict[str, CopilotConversation] = {}
+        # Phase 17E: exact operational context snapshots keyed by turn_id
+        self._context_snapshots: dict[str, OperationalContextSnapshot] = {}
 
     def create_conversation(
         self,
@@ -59,5 +61,25 @@ class InMemoryCopilotStore:
         if conv is not None:
             conv.add_turn(turn)
 
+    # ── Phase 17E: context snapshot store ─────────────────────────────────────
+
+    def store_context_snapshot(self, snapshot: OperationalContextSnapshot) -> None:
+        """Persist exact operational context snapshot for one turn.
+
+        Keyed by turn_id (one snapshot per grounded turn).
+        Also indexed by context_snapshot_id for direct lookup.
+        """
+        self._context_snapshots[snapshot.turn_id] = snapshot
+        self._context_snapshots[snapshot.context_snapshot_id] = snapshot
+
+    def get_context_snapshot_by_turn(self, turn_id: str) -> OperationalContextSnapshot | None:
+        """Return exact stored snapshot for turn_id. Returns None if not found."""
+        return self._context_snapshots.get(turn_id)
+
+    def get_context_snapshot_by_id(self, context_snapshot_id: str) -> OperationalContextSnapshot | None:
+        """Return snapshot by context_snapshot_id. Returns None if not found."""
+        return self._context_snapshots.get(context_snapshot_id)
+
     def reset(self) -> None:
         self._conversations.clear()
+        self._context_snapshots.clear()

@@ -12,12 +12,6 @@ import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { TraceArtifactLineage } from './developerTraceTypes';
 
-// ── Props ──────────────────────────────────────────────────────────────────────
-
-interface DeveloperTraceArtifactsProps {
-  artifacts: TraceArtifactLineage;
-}
-
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 const BRANCH_LABELS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -129,11 +123,54 @@ function EmptyLayer() {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export default function DeveloperTraceArtifacts({ artifacts }: DeveloperTraceArtifactsProps) {
+interface DeveloperTraceArtifactsProps {
+  artifacts: TraceArtifactLineage;
+  onViewContextSnapshot?: (contextSnapshotId: string) => void;  // Phase 17E: bridge
+}
+
+export default function DeveloperTraceArtifacts({ artifacts, onViewContextSnapshot }: DeveloperTraceArtifactsProps) {
   const multiProposal = artifacts.proposalIds.length > 1;
 
   return (
     <Box>
+      {/* Phase 17E: Operational Context Snapshot reference */}
+      {artifacts.contextSnapshotId && (
+        <>
+          <LayerLabel label="Operational Context Snapshot" />
+          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75, mb: '4px' }}>
+            <IdEntry id={artifacts.contextSnapshotId} color="#58A6FF" />
+            {artifacts.contextSnapshotFocus && (
+              <Typography sx={{
+                fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58',
+                ml: '4px',
+              }}>
+                {artifacts.contextSnapshotFocus}
+                {artifacts.contextSnapshotEntityCount != null && (
+                  <> · {artifacts.contextSnapshotEntityCount} entities</>
+                )}
+              </Typography>
+            )}
+            {onViewContextSnapshot && (
+              <Box
+                component="button"
+                data-testid="view-context-from-trace"
+                onClick={() => onViewContextSnapshot(artifacts.contextSnapshotId!)}
+                sx={{
+                  background: 'transparent', border: '1px solid #1F6FEB33',
+                  borderRadius: '3px', px: '5px', py: '1px', ml: '6px',
+                  fontFamily: 'monospace', fontSize: '0.55rem',
+                  color: '#58A6FF', cursor: 'pointer',
+                  '&:hover': { borderColor: '#58A6FF' },
+                }}
+              >
+                VIEW CONTEXT
+              </Box>
+            )}
+          </Box>
+          <Arrow />
+        </>
+      )}
+
       {/* snapshot_id */}
       <LayerLabel label="snapshot_id" />
       {artifacts.snapshotId ? (

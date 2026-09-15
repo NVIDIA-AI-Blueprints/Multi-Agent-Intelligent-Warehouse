@@ -264,6 +264,7 @@ def _ask_response(result, turn) -> CopilotTurnResponse:
         missing_context=result.missing_context,
         timing=result.timing,
         related_artifacts={},
+        context_snapshot_id=turn.context_snapshot_id,  # Phase 17E
     )
 
 
@@ -328,4 +329,5 @@ def _analyze_response(result, turn) -> CopilotTurnResponse:
         focus_entity_label=result.focus_entity_label,
         safety_note=_SAFETY_NOTE,
         related_artifacts={},
+        context_snapshot_id=turn.context_snapshot_id,  # Phase 17E
     )

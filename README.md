@@ -232,6 +232,51 @@ See [docs/developer/WAREHOUSE_WORLD_MODEL.md](docs/developer/WAREHOUSE_WORLD_MOD
 
 ---
 
+## Warehouse World Explorer (Phase 17)
+
+The **Warehouse World Explorer** is the operational observability UI for the running world. It is accessed from the WORLD tab in the demo shell and provides read-only inspection of the entire operational lifecycle — from the immutable DataPack through scenario overlays to the live runtime state.
+
+### What the Explorer exposes
+
+| Tab | Purpose |
+|-----|---------|
+| **OVERVIEW** | Warehouse identity (`dataset_id`, `seed`, `semantic_checksum`), entity/edge/event counts, scenario summary |
+| **CHANGES** | Full scenario overlay events and affected-entity list (BASE → SCENARIO transitions) |
+| **GRAPH** | Search-first entity browser backed by the Canonical Operational Graph; bounded neighborhood visualization |
+| **LIVE** | Runtime state delta (field-level changes from governed execution: before/after KPIs, changed entities) |
+| **RAW** | Paginated entity browser; hard server cap of 50 entities per page — never returns the full 51k entity set |
+| **CONTEXT** | OperationalContextSnapshot list; exact bounded graph context captured BEFORE each model call, linked by `turn_id` and `trace_id` |
+
+### WORLD API
+
+All World Explorer data is served by a read-only API at `GET /api/v1/world/*`. The router imports no execution, decision, approval, or orchestration symbols. Key routes:
+
+| Route | Purpose | Bound |
+|-------|---------|-------|
+| `GET /config` | Warehouse identity, config, DataPack checksum | — |
+| `GET /summary` | Live entity counts, scenario state | — |
+| `GET /changes` | Scenario overlay events (SCENARIO layer) | — |
+| `GET /live` | LIVE runtime delta with KPI before/after | — |
+| `GET /graph/search` | Entity search | — |
+| `GET /graph/entity/{id}` | Single entity detail + direct edges | — |
+| `GET /graph/neighbors/{id}` | Bounded BFS neighborhood | Truncated to 50 nodes |
+| `GET /graph/entities` | Paginated entity browser | Hard cap: 50 per page |
+| `GET /context/snapshots` | List all operational context snapshots | — |
+| `GET /context/by-turn/{turn_id}` | Exact context snapshot for a Copilot turn | — |
+
+### OperationalContextSnapshot
+
+Each Copilot turn that reaches the model produces one `OperationalContextSnapshot`. It is captured **before the model call** — not reconstructed afterward. It is:
+
+- Linked to the turn via `turn_id`, `trace_id`, and `context_snapshot_id`
+- Linked to the DataPack via `datapack_checksum` (the same immutable `semantic_checksum`)
+- Immutable after capture — LIVE mutations do not change historical snapshots
+- Inspectable in the CONTEXT tab or via `GET /context/by-turn/{turn_id}`
+
+See [docs/developer/WAREHOUSE_WORLD_EXPLORER.md](docs/developer/WAREHOUSE_WORLD_EXPLORER.md) for the full developer reference.
+
+---
+
 ## Core Design Principles
 
 1. **LLMs propose, policy decides.** The `DecisionEngine` is synchronous, deterministic, and
