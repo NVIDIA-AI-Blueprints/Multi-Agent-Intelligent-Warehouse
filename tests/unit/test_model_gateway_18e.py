@@ -65,7 +65,11 @@ from maiw_models.evaluation.graders import (
     default_graders,
     run_graders,
 )
-from maiw_models.evaluation.models import EvaluationCase, ModelEvaluationResult, TaskFamily
+from maiw_models.evaluation.models import (
+    EvaluationCase,
+    ModelEvaluationResult,
+    TaskFamily,
+)
 from maiw_models.evaluation.qualification import (
     MATERIAL_LATENCY_ADVANTAGE_THRESHOLD,
     NanoQualificationConfig,
@@ -157,11 +161,11 @@ class TestPromptIsolation:
         "analyze-action-v1",
         "comparative-reasoning-v1",
         "healthy-baseline-ask-v1",
-        "labor_reallocation",         # expected_capability value
+        "labor_reallocation",  # expected_capability value
         "equipment_bypass",
-        "wave-18",                    # forbidden_claims values
+        "wave-18",  # forbidden_claims values
         "worker-Z999",
-        "Evaluation case metadata",   # verbatim metadata key from old prompt
+        "Evaluation case metadata",  # verbatim metadata key from old prompt
         "benchmark_case",
         "policy_eligibility_nano",
     ]
@@ -175,9 +179,9 @@ class TestPromptIsolation:
         messages = _build_fixture_messages(wave17_risk_low)
         text = self._get_all_message_text(messages)
         # case_id should not be in the system prompt
-        assert "wave17-risk-low-v1" not in text, (
-            "case_id 'wave17-risk-low-v1' leaked into model prompt"
-        )
+        assert (
+            "wave17-risk-low-v1" not in text
+        ), "case_id 'wave17-risk-low-v1' leaked into model prompt"
 
     def test_case_id_not_in_prompt_equipment_ask(self) -> None:
         messages = _build_fixture_messages(equipment_ask_low)
@@ -203,27 +207,27 @@ class TestPromptIsolation:
         """18E §2: case.metadata dict must not be serialized into the model prompt."""
         messages = _build_fixture_messages(wave17_risk_low)
         text = self._get_all_message_text(messages)
-        assert "Evaluation case metadata" not in text, (
-            "Verbatim 'Evaluation case metadata' leaked into prompt"
-        )
-        assert "benchmark_case" not in text, (
-            "'benchmark_case' metadata key leaked into prompt"
-        )
-        assert "policy_eligibility" not in text, (
-            "'policy_eligibility' metadata key leaked into prompt"
-        )
+        assert (
+            "Evaluation case metadata" not in text
+        ), "Verbatim 'Evaluation case metadata' leaked into prompt"
+        assert (
+            "benchmark_case" not in text
+        ), "'benchmark_case' metadata key leaked into prompt"
+        assert (
+            "policy_eligibility" not in text
+        ), "'policy_eligibility' metadata key leaked into prompt"
 
     def test_policy_eligibility_label_not_in_prompt(self) -> None:
         """18E §2: Policy eligibility labels (POLICY ELIGIBLE, RESEARCH ONLY) must not appear."""
         for case in NANO_QUALIFICATION_CORPUS:
             messages = _build_fixture_messages(case)
             text = self._get_all_message_text(messages)
-            assert "POLICY ELIGIBLE" not in text, (
-                f"Policy eligibility label leaked into prompt for {case.case_id}"
-            )
-            assert "RESEARCH ONLY" not in text, (
-                f"Research-only label leaked into prompt for {case.case_id}"
-            )
+            assert (
+                "POLICY ELIGIBLE" not in text
+            ), f"Policy eligibility label leaked into prompt for {case.case_id}"
+            assert (
+                "RESEARCH ONLY" not in text
+            ), f"Research-only label leaked into prompt for {case.case_id}"
 
     def test_expected_capability_not_in_prompt(self) -> None:
         """18E §2: expected_capability values must not appear in model prompt."""
@@ -232,9 +236,9 @@ class TestPromptIsolation:
                 continue
             messages = _build_fixture_messages(case)
             text = self._get_all_message_text(messages)
-            assert case.expected_capability not in text, (
-                f"expected_capability '{case.expected_capability}' leaked into prompt for {case.case_id}"
-            )
+            assert (
+                case.expected_capability not in text
+            ), f"expected_capability '{case.expected_capability}' leaked into prompt for {case.case_id}"
 
     def test_expected_target_not_in_grading_context(self) -> None:
         """
@@ -251,35 +255,35 @@ class TestPromptIsolation:
                 # list itself should not be passed to the model as instructions.
                 # (The user prompt may organically mention them; we check that
                 # "forbidden_claims" as a field label is not exposed.)
-                assert "forbidden_claims" not in text, (
-                    f"'forbidden_claims' key leaked for {case.case_id}"
-                )
+                assert (
+                    "forbidden_claims" not in text
+                ), f"'forbidden_claims' key leaked for {case.case_id}"
 
     def test_required_facts_list_not_in_prompt(self) -> None:
         """18E §2: required_facts field label must not appear in model prompt."""
         for case in NANO_QUALIFICATION_CORPUS:
             messages = _build_fixture_messages(case)
             text = self._get_all_message_text(messages)
-            assert "required_facts" not in text, (
-                f"'required_facts' key leaked into prompt for {case.case_id}"
-            )
+            assert (
+                "required_facts" not in text
+            ), f"'required_facts' key leaked into prompt for {case.case_id}"
 
     def test_fixture_label_not_in_system_prompt(self) -> None:
         """18E §2: 'fixture: <case_id>' pattern from old runner must be absent."""
         for case in ALL_KNOWN_CASES:
             messages = _build_fixture_messages(case)
             system_content = messages[0]["content"]
-            assert f"fixture: {case.case_id}" not in system_content, (
-                f"'fixture: {case.case_id}' label leaked into system prompt"
-            )
+            assert (
+                f"fixture: {case.case_id}" not in system_content
+            ), f"'fixture: {case.case_id}' label leaked into system prompt"
 
     def test_prompt_contains_only_system_and_user_turns(self) -> None:
         """18E §2: Messages must be exactly [system, user] — no extra leakage turns."""
         for case in NANO_QUALIFICATION_CORPUS:
             messages = _build_fixture_messages(case)
-            assert len(messages) == 2, (
-                f"Expected 2 messages (system+user) for {case.case_id}, got {len(messages)}"
-            )
+            assert (
+                len(messages) == 2
+            ), f"Expected 2 messages (system+user) for {case.case_id}, got {len(messages)}"
             assert messages[0]["role"] == "system"
             assert messages[1]["role"] == "user"
 
@@ -287,9 +291,9 @@ class TestPromptIsolation:
         """18E §2: User turn must be exactly case.prompt — no appended metadata."""
         for case in NANO_QUALIFICATION_CORPUS:
             messages = _build_fixture_messages(case)
-            assert messages[1]["content"] == case.prompt, (
-                f"User turn for {case.case_id} does not match case.prompt"
-            )
+            assert (
+                messages[1]["content"] == case.prompt
+            ), f"User turn for {case.case_id} does not match case.prompt"
 
     def test_same_messages_for_all_models(self) -> None:
         """
@@ -302,9 +306,9 @@ class TestPromptIsolation:
         for case in NANO_QUALIFICATION_CORPUS:
             msgs_a = _build_fixture_messages(case)
             msgs_b = _build_fixture_messages(case)
-            assert msgs_a == msgs_b, (
-                f"Message builder is non-deterministic for {case.case_id}"
-            )
+            assert (
+                msgs_a == msgs_b
+            ), f"Message builder is non-deterministic for {case.case_id}"
 
     def test_messages_hash_stable(self) -> None:
         """18E §17: Deterministic run identity — message content hash must be stable."""
@@ -316,9 +320,7 @@ class TestPromptIsolation:
             messages2 = _build_fixture_messages(case)
             content2 = json.dumps(messages2, sort_keys=True)
             hash_b = hashlib.sha256(content2.encode()).hexdigest()
-            assert hash_a == hash_b, (
-                f"Message hash not stable for {case.case_id}"
-            )
+            assert hash_a == hash_b, f"Message hash not stable for {case.case_id}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -372,6 +374,7 @@ class TestResponseCompleteness:
 
         # Grader sees full response → should pass.
         from maiw_models.evaluation.graders import RequiredEvidenceGrader
+
         grader = RequiredEvidenceGrader()
         gr = grader.grade(case, result)
         assert gr.passed, (
@@ -381,9 +384,9 @@ class TestResponseCompleteness:
 
         # Verify that truncated preview at 300 chars would NOT contain the fact.
         preview = long_resp[:300]
-        assert "labor-shift-afternoon" not in preview, (
-            "Test is invalid: fact appears within first 300 chars"
-        )
+        assert (
+            "labor-shift-afternoon" not in preview
+        ), "Test is invalid: fact appears within first 300 chars"
 
     def test_hallucination_grader_uses_full_response(self) -> None:
         """
@@ -406,12 +409,12 @@ class TestResponseCompleteness:
 
         grader = HallucinationGrader()
         gr = grader.grade(case, result)
-        assert not gr.passed, (
-            "HallucinationGrader must detect hallucination appearing after char 300"
-        )
-        assert "wave-99" in " ".join(gr.evidence), (
-            f"Evidence must include 'wave-99', got: {gr.evidence}"
-        )
+        assert (
+            not gr.passed
+        ), "HallucinationGrader must detect hallucination appearing after char 300"
+        assert "wave-99" in " ".join(
+            gr.evidence
+        ), f"Evidence must include 'wave-99', got: {gr.evidence}"
 
     def test_benchmark_model_result_raw_response_field(self) -> None:
         """
@@ -436,7 +439,9 @@ class TestResponseCompleteness:
             display_preview=long_text[:300],
         )
         assert result.raw_response == long_text, "raw_response must be full text"
-        assert result.display_preview == long_text[:300], "display_preview must be truncated"
+        assert (
+            result.display_preview == long_text[:300]
+        ), "display_preview must be truncated"
         assert len(result.display_preview) == 300
         assert len(result.raw_response) == 500
 
@@ -457,9 +462,9 @@ class TestResponseCompleteness:
             raw_response=long_text,
             display_preview=long_text[:300],
         )
-        assert result.raw_response != result.display_preview, (
-            "raw_response and display_preview must differ for responses > 300 chars"
-        )
+        assert (
+            result.raw_response != result.display_preview
+        ), "raw_response and display_preview must differ for responses > 300 chars"
 
     def test_to_dict_includes_raw_response_not_response_snippet(self) -> None:
         """18E §4: to_dict() must output 'raw_response' and 'display_preview', not 'response_snippet'."""
@@ -509,12 +514,12 @@ class TestNanoQualificationCorpus:
     """18E §7: Cases A–F are registered and correctly labeled."""
 
     EXPECTED_CASE_IDS = {
-        "wave17-risk-low-v1",        # A
-        "evidence-ask-labor-v1",      # B
-        "equipment-ask-low-v1",       # C
-        "healthy-baseline-ask-v1",    # D
-        "analyze-action-v1",          # E
-        "comparative-reasoning-v1",   # F
+        "wave17-risk-low-v1",  # A
+        "evidence-ask-labor-v1",  # B
+        "equipment-ask-low-v1",  # C
+        "healthy-baseline-ask-v1",  # D
+        "analyze-action-v1",  # E
+        "comparative-reasoning-v1",  # F
     }
 
     def test_qualification_corpus_has_6_cases(self) -> None:
@@ -524,39 +529,41 @@ class TestNanoQualificationCorpus:
     def test_qualification_corpus_case_ids(self) -> None:
         """18E §7: All six required case IDs present."""
         corpus_ids = {c.case_id for c in NANO_QUALIFICATION_CORPUS}
-        assert corpus_ids == self.EXPECTED_CASE_IDS, (
-            f"Corpus case IDs mismatch. Got: {corpus_ids}"
-        )
+        assert (
+            corpus_ids == self.EXPECTED_CASE_IDS
+        ), f"Corpus case IDs mismatch. Got: {corpus_ids}"
 
     def test_all_corpus_cases_policy_eligible(self) -> None:
         """18E §7: All qualification corpus cases must be POLICY ELIGIBLE."""
         for case in NANO_QUALIFICATION_CORPUS:
             eligibility = get_policy_eligibility(case.case_id)
-            assert eligibility == "POLICY ELIGIBLE", (
-                f"Case {case.case_id} expected POLICY ELIGIBLE, got: {eligibility}"
-            )
+            assert (
+                eligibility == "POLICY ELIGIBLE"
+            ), f"Case {case.case_id} expected POLICY ELIGIBLE, got: {eligibility}"
 
     def test_all_corpus_cases_low_or_medium_risk(self) -> None:
         """18E §7: Policy eligibility requires low/medium risk."""
         for case in NANO_QUALIFICATION_CORPUS:
-            assert case.risk_level in ("low", "medium"), (
-                f"Case {case.case_id}: risk_level={case.risk_level!r} is not low/medium"
-            )
+            assert case.risk_level in (
+                "low",
+                "medium",
+            ), f"Case {case.case_id}: risk_level={case.risk_level!r} is not low/medium"
 
     def test_all_corpus_cases_medium_reasoning(self) -> None:
         """18E §7: Policy eligibility requires low/medium reasoning."""
         for case in NANO_QUALIFICATION_CORPUS:
-            assert case.reasoning_level in ("low", "medium"), (
-                f"Case {case.case_id}: reasoning_level={case.reasoning_level!r} is not low/medium"
-            )
+            assert case.reasoning_level in (
+                "low",
+                "medium",
+            ), f"Case {case.case_id}: reasoning_level={case.reasoning_level!r} is not low/medium"
 
     def test_18b_high_risk_cases_research_only(self) -> None:
         """18E §7: 18B high-risk cases (wave17-labor-risk, equipment-failure) are RESEARCH ONLY."""
         for case_id in ["wave17-labor-risk-v1", "equipment-failure-v1"]:
             label = get_policy_eligibility(case_id)
-            assert label == "RESEARCH ONLY — NOT PRODUCTION ELIGIBLE", (
-                f"Expected RESEARCH ONLY for {case_id}, got: {label}"
-            )
+            assert (
+                label == "RESEARCH ONLY — NOT PRODUCTION ELIGIBLE"
+            ), f"Expected RESEARCH ONLY for {case_id}, got: {label}"
 
     def test_case_a_wave17_risk_low(self) -> None:
         """18E §7 Case A: wave17-risk-low has correct fields."""
@@ -586,9 +593,9 @@ class TestNanoQualificationCorpus:
     def test_18e_cases_use_fixture_context_entities(self) -> None:
         """18E §5: New 18E cases must use the same FIXTURE_CONTEXT_ENTITIES."""
         for case in ALL_18E_FIXTURE_CASES:
-            assert case.context_entities == FIXTURE_CONTEXT_ENTITIES, (
-                f"Case {case.case_id} uses different context entities"
-            )
+            assert (
+                case.context_entities == FIXTURE_CONTEXT_ENTITIES
+            ), f"Case {case.case_id} uses different context entities"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -602,29 +609,53 @@ class TestWarmupMethodology:
     def test_warmup_samples_excluded_from_latency(self) -> None:
         """Warm-up samples must not contribute to latency stats."""
         samples = [
-            _make_sample("case-a", "nano", 0, warmup=True, acceptable=False, latency_ms=9999.0),
-            _make_sample("case-a", "nano", 1, warmup=False, acceptable=True, latency_ms=200.0),
-            _make_sample("case-a", "nano", 2, warmup=False, acceptable=True, latency_ms=210.0),
-            _make_sample("case-a", "nano", 3, warmup=False, acceptable=True, latency_ms=195.0),
-            _make_sample("case-a", "nano", 4, warmup=False, acceptable=True, latency_ms=205.0),
-            _make_sample("case-a", "nano", 5, warmup=False, acceptable=True, latency_ms=200.0),
+            _make_sample(
+                "case-a", "nano", 0, warmup=True, acceptable=False, latency_ms=9999.0
+            ),
+            _make_sample(
+                "case-a", "nano", 1, warmup=False, acceptable=True, latency_ms=200.0
+            ),
+            _make_sample(
+                "case-a", "nano", 2, warmup=False, acceptable=True, latency_ms=210.0
+            ),
+            _make_sample(
+                "case-a", "nano", 3, warmup=False, acceptable=True, latency_ms=195.0
+            ),
+            _make_sample(
+                "case-a", "nano", 4, warmup=False, acceptable=True, latency_ms=205.0
+            ),
+            _make_sample(
+                "case-a", "nano", 5, warmup=False, acceptable=True, latency_ms=200.0
+            ),
         ]
         result = compute_qualification_run(samples)
         # Warm-up latency (9999ms) must not appear in stats.
-        assert result.latency_max_ms < 500.0, (
-            f"Warm-up latency leaked into stats: max={result.latency_max_ms}"
-        )
+        assert (
+            result.latency_max_ms < 500.0
+        ), f"Warm-up latency leaked into stats: max={result.latency_max_ms}"
         assert result.warmup_count == 1
 
     def test_warmup_samples_excluded_from_accept_count(self) -> None:
         """Warm-up acceptable=True must not increment accept_count."""
         samples = [
-            _make_sample("case-a", "nano", 0, warmup=True, acceptable=True, latency_ms=100.0),
-            _make_sample("case-a", "nano", 1, warmup=False, acceptable=True, latency_ms=100.0),
-            _make_sample("case-a", "nano", 2, warmup=False, acceptable=True, latency_ms=100.0),
-            _make_sample("case-a", "nano", 3, warmup=False, acceptable=True, latency_ms=100.0),
-            _make_sample("case-a", "nano", 4, warmup=False, acceptable=False, latency_ms=100.0),
-            _make_sample("case-a", "nano", 5, warmup=False, acceptable=False, latency_ms=100.0),
+            _make_sample(
+                "case-a", "nano", 0, warmup=True, acceptable=True, latency_ms=100.0
+            ),
+            _make_sample(
+                "case-a", "nano", 1, warmup=False, acceptable=True, latency_ms=100.0
+            ),
+            _make_sample(
+                "case-a", "nano", 2, warmup=False, acceptable=True, latency_ms=100.0
+            ),
+            _make_sample(
+                "case-a", "nano", 3, warmup=False, acceptable=True, latency_ms=100.0
+            ),
+            _make_sample(
+                "case-a", "nano", 4, warmup=False, acceptable=False, latency_ms=100.0
+            ),
+            _make_sample(
+                "case-a", "nano", 5, warmup=False, acceptable=False, latency_ms=100.0
+            ),
         ]
         result = compute_qualification_run(samples)
         assert result.n_measured == 5, f"Expected 5 measured, got {result.n_measured}"
@@ -634,21 +665,38 @@ class TestWarmupMethodology:
     def test_fallback_samples_excluded(self) -> None:
         """18E §17: Fallback samples must be flagged and excluded from qualification metrics."""
         samples = [
-            _make_sample("case-a", "nano", 0, warmup=True, acceptable=True, latency_ms=100.0),
+            _make_sample(
+                "case-a", "nano", 0, warmup=True, acceptable=True, latency_ms=100.0
+            ),
             # Fallback sample — excluded from metrics.
-            _make_sample("case-a", "nano", 1, warmup=False, acceptable=True,
-                         fallback_used=True, latency_ms=9999.0),
-            _make_sample("case-a", "nano", 2, warmup=False, acceptable=True, latency_ms=200.0),
-            _make_sample("case-a", "nano", 3, warmup=False, acceptable=True, latency_ms=210.0),
-            _make_sample("case-a", "nano", 4, warmup=False, acceptable=True, latency_ms=195.0),
-            _make_sample("case-a", "nano", 5, warmup=False, acceptable=True, latency_ms=205.0),
+            _make_sample(
+                "case-a",
+                "nano",
+                1,
+                warmup=False,
+                acceptable=True,
+                fallback_used=True,
+                latency_ms=9999.0,
+            ),
+            _make_sample(
+                "case-a", "nano", 2, warmup=False, acceptable=True, latency_ms=200.0
+            ),
+            _make_sample(
+                "case-a", "nano", 3, warmup=False, acceptable=True, latency_ms=210.0
+            ),
+            _make_sample(
+                "case-a", "nano", 4, warmup=False, acceptable=True, latency_ms=195.0
+            ),
+            _make_sample(
+                "case-a", "nano", 5, warmup=False, acceptable=True, latency_ms=205.0
+            ),
         ]
         result = compute_qualification_run(samples)
         assert result.fallback_count == 1
         # Fallback latency (9999ms) must not appear in stats.
-        assert result.latency_max_ms < 500.0, (
-            f"Fallback latency leaked into stats: max={result.latency_max_ms}"
-        )
+        assert (
+            result.latency_max_ms < 500.0
+        ), f"Fallback latency leaked into stats: max={result.latency_max_ms}"
         assert result.n_measured == 4  # 5 non-warmup, 1 fallback → 4 measured
 
     def test_warmup_count_preserved_in_result(self) -> None:
@@ -679,20 +727,28 @@ class TestQualificationClassification:
 
     def test_material_latency_threshold_defined(self) -> None:
         """18E §13: Material latency advantage threshold is defined before results."""
-        assert MATERIAL_LATENCY_ADVANTAGE_THRESHOLD == 0.20, (
-            "Threshold must be 20% as defined in spec §13"
-        )
+        assert (
+            MATERIAL_LATENCY_ADVANTAGE_THRESHOLD == 0.20
+        ), "Threshold must be 20% as defined in spec §13"
 
     def test_nano_qualified_when_faster_and_passes(self) -> None:
         """18E §14: NANO QUALIFIED when Nano passes all critical graders and is ≥20% faster."""
         nano = QualificationRunResult(
-            case_id="c", model_id="nano",
-            accept_count=5, n_measured=5, accept_rate=1.0, qualified=True,
+            case_id="c",
+            model_id="nano",
+            accept_count=5,
+            n_measured=5,
+            accept_rate=1.0,
+            qualified=True,
             latency_median_ms=150.0,
         )
         super_ = QualificationRunResult(
-            case_id="c", model_id="super",
-            accept_count=5, n_measured=5, accept_rate=1.0, qualified=True,
+            case_id="c",
+            model_id="super",
+            accept_count=5,
+            n_measured=5,
+            accept_rate=1.0,
+            qualified=True,
             latency_median_ms=200.0,  # 25% improvement
         )
         result = classify_case_comparison(nano, super_)
@@ -701,13 +757,21 @@ class TestQualificationClassification:
     def test_super_required_when_nano_fails_critical(self) -> None:
         """18E §13: Quality dominates — failing critical grader → SUPER REQUIRED."""
         nano = QualificationRunResult(
-            case_id="c", model_id="nano",
-            accept_count=3, n_measured=5, accept_rate=0.6, qualified=False,
+            case_id="c",
+            model_id="nano",
+            accept_count=3,
+            n_measured=5,
+            accept_rate=0.6,
+            qualified=False,
             latency_median_ms=100.0,  # faster but fails
         )
         super_ = QualificationRunResult(
-            case_id="c", model_id="super",
-            accept_count=5, n_measured=5, accept_rate=1.0, qualified=True,
+            case_id="c",
+            model_id="super",
+            accept_count=5,
+            n_measured=5,
+            accept_rate=1.0,
+            qualified=True,
             latency_median_ms=200.0,
         )
         result = classify_case_comparison(nano, super_)
@@ -716,13 +780,21 @@ class TestQualificationClassification:
     def test_no_material_difference_when_both_qualify_similar_latency(self) -> None:
         """18E §14: NO MATERIAL DIFFERENCE when both qualify and latency diff < 20%."""
         nano = QualificationRunResult(
-            case_id="c", model_id="nano",
-            accept_count=5, n_measured=5, accept_rate=1.0, qualified=True,
+            case_id="c",
+            model_id="nano",
+            accept_count=5,
+            n_measured=5,
+            accept_rate=1.0,
+            qualified=True,
             latency_median_ms=190.0,  # only 5% faster than super
         )
         super_ = QualificationRunResult(
-            case_id="c", model_id="super",
-            accept_count=5, n_measured=5, accept_rate=1.0, qualified=True,
+            case_id="c",
+            model_id="super",
+            accept_count=5,
+            n_measured=5,
+            accept_rate=1.0,
+            qualified=True,
             latency_median_ms=200.0,
         )
         result = classify_case_comparison(nano, super_)
@@ -731,12 +803,19 @@ class TestQualificationClassification:
     def test_inconclusive_when_nano_not_run(self) -> None:
         """18E §14: INCONCLUSIVE when Nano has no measured samples."""
         nano = QualificationRunResult(
-            case_id="c", model_id="nano",
-            n_measured=0, accept_rate=0.0, qualified=False,
+            case_id="c",
+            model_id="nano",
+            n_measured=0,
+            accept_rate=0.0,
+            qualified=False,
         )
         super_ = QualificationRunResult(
-            case_id="c", model_id="super",
-            accept_count=5, n_measured=5, accept_rate=1.0, qualified=True,
+            case_id="c",
+            model_id="super",
+            accept_count=5,
+            n_measured=5,
+            accept_rate=1.0,
+            qualified=True,
             latency_median_ms=200.0,
         )
         result = classify_case_comparison(nano, super_)
@@ -745,8 +824,12 @@ class TestQualificationClassification:
     def test_inconclusive_when_nano_none(self) -> None:
         """18E §14: INCONCLUSIVE when Nano result is None (endpoint unavailable)."""
         super_ = QualificationRunResult(
-            case_id="c", model_id="super",
-            accept_count=5, n_measured=5, accept_rate=1.0, qualified=True,
+            case_id="c",
+            model_id="super",
+            accept_count=5,
+            n_measured=5,
+            accept_rate=1.0,
+            qualified=True,
             latency_median_ms=200.0,
         )
         result = classify_case_comparison(None, super_)
@@ -760,7 +843,9 @@ class TestQualificationClassification:
             _make_sample("c", "nano", i, warmup=(i == 0), acceptable=(i > 1))
             for i in range(6)
         ]
-        result = compute_qualification_run(samples_4_of_5, acceptance_rate=config.acceptance_rate)
+        result = compute_qualification_run(
+            samples_4_of_5, acceptance_rate=config.acceptance_rate
+        )
         # measured: 5, accept: 4 → rate=0.8 < 0.9
         assert result.accept_rate < 0.90
         assert result.qualified is False
@@ -770,7 +855,9 @@ class TestQualificationClassification:
             _make_sample("c", "nano", i, warmup=(i == 0), acceptable=(i > 0))
             for i in range(6)
         ]
-        result2 = compute_qualification_run(samples_5_of_5, acceptance_rate=config.acceptance_rate)
+        result2 = compute_qualification_run(
+            samples_5_of_5, acceptance_rate=config.acceptance_rate
+        )
         assert result2.accept_rate == 1.0
         assert result2.qualified is True
 
@@ -835,7 +922,9 @@ class TestDeploymentMetadataPreservation:
 
     def test_sample_fallback_flag_in_dict(self) -> None:
         """QualificationSample.fallback_used flag preserved in to_dict."""
-        sample = _make_sample("c", "m", 1, warmup=False, acceptable=True, fallback_used=True)
+        sample = _make_sample(
+            "c", "m", 1, warmup=False, acceptable=True, fallback_used=True
+        )
         d = sample.to_dict()
         assert d["fallback_used"] is True
 
@@ -868,18 +957,18 @@ class TestContextInvariance:
     def test_all_qualification_corpus_cases_share_context_entities(self) -> None:
         """18E §5: All corpus cases use the same FIXTURE_CONTEXT_ENTITIES."""
         for case in NANO_QUALIFICATION_CORPUS:
-            assert sorted(case.context_entities) == sorted(FIXTURE_CONTEXT_ENTITIES), (
-                f"Case {case.case_id} has different context entities"
-            )
+            assert sorted(case.context_entities) == sorted(
+                FIXTURE_CONTEXT_ENTITIES
+            ), f"Case {case.case_id} has different context entities"
 
     def test_message_system_content_identical_for_same_case(self) -> None:
         """18E §5: Two calls to _build_fixture_messages for same case must produce identical system prompt."""
         for case in NANO_QUALIFICATION_CORPUS:
             m1 = _build_fixture_messages(case)
             m2 = _build_fixture_messages(case)
-            assert m1[0]["content"] == m2[0]["content"], (
-                f"System prompt not identical for {case.case_id}"
-            )
+            assert (
+                m1[0]["content"] == m2[0]["content"]
+            ), f"System prompt not identical for {case.case_id}"
 
     def test_entity_list_in_system_prompt(self) -> None:
         """18E §5: Each fixture entity ID must appear in the system prompt."""
@@ -887,6 +976,6 @@ class TestContextInvariance:
             messages = _build_fixture_messages(case)
             system = messages[0]["content"]
             for entity in FIXTURE_CONTEXT_ENTITIES:
-                assert entity in system, (
-                    f"Entity '{entity}' missing from system prompt for {case.case_id}"
-                )
+                assert (
+                    entity in system
+                ), f"Entity '{entity}' missing from system prompt for {case.case_id}"

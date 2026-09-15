@@ -39,7 +39,10 @@ if _worktree_api not in sys.path:
 # cached pointing at the main-repo path.
 import importlib
 import maiw_api.routers
-if str(Path(maiw_api.routers.__file__).parent) != str(Path(_worktree_api) / "maiw_api" / "routers"):
+
+if str(Path(maiw_api.routers.__file__).parent) != str(
+    Path(_worktree_api) / "maiw_api" / "routers"
+):
     # Force reimport from worktree path
     for mod_name in list(sys.modules.keys()):
         if mod_name.startswith("maiw_api"):
@@ -56,12 +59,17 @@ _client = TestClient(_test_app)
 
 # ── Architecture invariant ─────────────────────────────────────────────────────
 
+
 class TestArchitectureInvariants:
     """model_lab.py must not import forbidden production modules."""
 
     _ROUTER_PATH = (
         pathlib.Path(__file__).parent.parent.parent
-        / "apps" / "api" / "maiw_api" / "routers" / "model_lab.py"
+        / "apps"
+        / "api"
+        / "maiw_api"
+        / "routers"
+        / "model_lab.py"
     )
 
     def _parse_imports(self) -> list[str]:
@@ -81,17 +89,17 @@ class TestArchitectureInvariants:
         imports = self._parse_imports()
         for imp in imports:
             assert "DecisionEngine" not in imp, f"Forbidden import found: {imp}"
-            assert "decision_engine" not in imp.lower() or "maiw_decision" not in imp, (
-                f"Unexpected decision engine import: {imp}"
-            )
+            assert (
+                "decision_engine" not in imp.lower() or "maiw_decision" not in imp
+            ), f"Unexpected decision engine import: {imp}"
 
     def test_no_approval_store_import(self):
         imports = self._parse_imports()
         for imp in imports:
             assert "ApprovalStore" not in imp, f"Forbidden import found: {imp}"
-            assert "approval" not in imp.lower() or "maiw_decision" not in imp, (
-                f"Unexpected approval import: {imp}"
-            )
+            assert (
+                "approval" not in imp.lower() or "maiw_decision" not in imp
+            ), f"Unexpected approval import: {imp}"
 
     def test_no_action_executor_import(self):
         imports = self._parse_imports()
@@ -109,9 +117,9 @@ class TestArchitectureInvariants:
         ]
         for imp in imports:
             for fragment in forbidden_module_fragments:
-                assert fragment not in imp.lower(), (
-                    f"Forbidden import fragment '{fragment}' found in import: {imp}"
-                )
+                assert (
+                    fragment not in imp.lower()
+                ), f"Forbidden import fragment '{fragment}' found in import: {imp}"
 
     def test_all_endpoints_are_get_only(self):
         source = self._ROUTER_PATH.read_text(encoding="utf-8")
@@ -124,6 +132,7 @@ class TestArchitectureInvariants:
 
 
 # ── /runs ─────────────────────────────────────────────────────────────────────
+
 
 class TestListRuns:
     def test_returns_200(self):
@@ -161,12 +170,13 @@ class TestListRuns:
         resp = _client.get("/api/v1/model-lab/runs")
         response_text = resp.text.lower()
         for secret in ["api_key", "authorization", "password", "token", "secret"]:
-            assert f'"{secret}"' not in response_text, (
-                f"Secret field '{secret}' found in /runs response"
-            )
+            assert (
+                f'"{secret}"' not in response_text
+            ), f"Secret field '{secret}' found in /runs response"
 
 
 # ── /runs/18c ────────────────────────────────────────────────────────────────
+
 
 class TestGetRun18C:
     def test_returns_200(self):
@@ -197,6 +207,7 @@ class TestGetRun18C:
 
 
 # ── /runs/18e ────────────────────────────────────────────────────────────────
+
 
 class TestGetRun18E:
     def test_returns_200(self):
@@ -230,6 +241,7 @@ class TestGetRun18E:
 
 # ── /runs/nonexistent ─────────────────────────────────────────────────────────
 
+
 class TestNotFound:
     def test_nonexistent_run_returns_404(self):
         resp = _client.get("/api/v1/model-lab/runs/nonexistent")
@@ -251,6 +263,7 @@ class TestNotFound:
 
 
 # ── /model-status ─────────────────────────────────────────────────────────────
+
 
 class TestModelStatus:
     def test_returns_200(self):
@@ -294,6 +307,7 @@ class TestModelStatus:
 
 # ── raw_response bounding ─────────────────────────────────────────────────────
 
+
 class TestRawResponseBounding:
     def test_bound_raw_response_truncates_long_strings(self):
         from maiw_api.routers.model_lab import _bound_raw_response
@@ -322,6 +336,7 @@ class TestRawResponseBounding:
 
 # ── secret stripping ──────────────────────────────────────────────────────────
 
+
 class TestSecretStripping:
     def test_strips_api_key(self):
         from maiw_api.routers.model_lab import _strip_secrets
@@ -348,6 +363,7 @@ class TestSecretStripping:
 
 
 # ── runs/{run_id}/cases ───────────────────────────────────────────────────────
+
 
 class TestRunCases:
     def test_18c_cases_returns_list(self):

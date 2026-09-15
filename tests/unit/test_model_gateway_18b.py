@@ -59,7 +59,12 @@ from maiw_models.models import (
 )
 from maiw_models.registry import ModelRegistry
 from maiw_models.router import ModelRouter
-from maiw_models.routing import ModelCandidate, PolicyFilter, RoutingContext, RoutingStrategy
+from maiw_models.routing import (
+    ModelCandidate,
+    PolicyFilter,
+    RoutingContext,
+    RoutingStrategy,
+)
 from maiw_models.gateway import ModelGateway
 from maiw_models.telemetry import GatewayTelemetry
 from maiw_models.providers.nim import NIMProvider
@@ -99,7 +104,6 @@ from maiw_models.evaluation.fixtures import (
     get_fixture_case,
     get_fixture_input,
 )
-
 
 # ── Test helpers ──────────────────────────────────────────────────────────────
 
@@ -189,17 +193,83 @@ class TestBehavioralEquivalence:
     # Representative warehouse workloads with expected roles.
     _ROUTING_MATRIX = [
         # (task, reasoning, risk, modality, expected_role)
-        ("warehouse.forecasting.summarize_demand", ReasoningLevel.LOW, RiskLevel.LOW, Modality.TEXT, "lightning"),
-        ("warehouse.forecasting.analyze_anomaly", ReasoningLevel.MEDIUM, RiskLevel.LOW, Modality.TEXT, "nano"),
-        ("warehouse.operations.recover_wave", ReasoningLevel.HIGH, RiskLevel.HIGH, Modality.TEXT, "super"),
-        ("warehouse.equipment.diagnose_failure", ReasoningLevel.HIGH, RiskLevel.HIGH, Modality.TEXT, "super"),
-        ("warehouse.safety.broadcast_alert", ReasoningLevel.HIGH, RiskLevel.CRITICAL, Modality.TEXT, "super"),
-        ("warehouse.operations.summarize_state", ReasoningLevel.LOW, RiskLevel.LOW, Modality.TEXT, "lightning"),
-        ("warehouse.safety.summarize_event", ReasoningLevel.MEDIUM, RiskLevel.MEDIUM, Modality.TEXT, "nano"),
-        ("warehouse.documents.summarize_text", ReasoningLevel.LOW, RiskLevel.LOW, Modality.TEXT, "lightning"),
-        ("warehouse.documents.inspect_image", ReasoningLevel.MEDIUM, RiskLevel.LOW, Modality.IMAGE, "nano-omni"),
-        ("warehouse.eval.judge_trajectory", ReasoningLevel.HIGH, RiskLevel.LOW, Modality.TEXT, "ultra"),
-        ("warehouse.wave.reprioritize", ReasoningLevel.LOW, RiskLevel.CRITICAL, Modality.TEXT, "super"),
+        (
+            "warehouse.forecasting.summarize_demand",
+            ReasoningLevel.LOW,
+            RiskLevel.LOW,
+            Modality.TEXT,
+            "lightning",
+        ),
+        (
+            "warehouse.forecasting.analyze_anomaly",
+            ReasoningLevel.MEDIUM,
+            RiskLevel.LOW,
+            Modality.TEXT,
+            "nano",
+        ),
+        (
+            "warehouse.operations.recover_wave",
+            ReasoningLevel.HIGH,
+            RiskLevel.HIGH,
+            Modality.TEXT,
+            "super",
+        ),
+        (
+            "warehouse.equipment.diagnose_failure",
+            ReasoningLevel.HIGH,
+            RiskLevel.HIGH,
+            Modality.TEXT,
+            "super",
+        ),
+        (
+            "warehouse.safety.broadcast_alert",
+            ReasoningLevel.HIGH,
+            RiskLevel.CRITICAL,
+            Modality.TEXT,
+            "super",
+        ),
+        (
+            "warehouse.operations.summarize_state",
+            ReasoningLevel.LOW,
+            RiskLevel.LOW,
+            Modality.TEXT,
+            "lightning",
+        ),
+        (
+            "warehouse.safety.summarize_event",
+            ReasoningLevel.MEDIUM,
+            RiskLevel.MEDIUM,
+            Modality.TEXT,
+            "nano",
+        ),
+        (
+            "warehouse.documents.summarize_text",
+            ReasoningLevel.LOW,
+            RiskLevel.LOW,
+            Modality.TEXT,
+            "lightning",
+        ),
+        (
+            "warehouse.documents.inspect_image",
+            ReasoningLevel.MEDIUM,
+            RiskLevel.LOW,
+            Modality.IMAGE,
+            "nano-omni",
+        ),
+        (
+            "warehouse.eval.judge_trajectory",
+            ReasoningLevel.HIGH,
+            RiskLevel.LOW,
+            Modality.TEXT,
+            "ultra",
+        ),
+        (
+            "warehouse.wave.reprioritize",
+            ReasoningLevel.LOW,
+            RiskLevel.CRITICAL,
+            Modality.TEXT,
+            "super",
+        ),
     ]
 
     def test_routing_decisions_unchanged(self):
@@ -232,18 +302,28 @@ class TestBehavioralEquivalence:
         router = ModelRouter(registry)
 
         for task, reasoning, risk, modality, _ in self._ROUTING_MATRIX:
-            req = ModelRequest(task=task, messages=[], reasoning=reasoning,
-                               risk_level=risk, modality=modality)
-            decision = router.route(req)
-            assert decision.routing_strategy == "rules", (
-                f"routing_strategy must be 'rules', got {decision.routing_strategy!r}"
+            req = ModelRequest(
+                task=task,
+                messages=[],
+                reasoning=reasoning,
+                risk_level=risk,
+                modality=modality,
             )
+            decision = router.route(req)
+            assert (
+                decision.routing_strategy == "rules"
+            ), f"routing_strategy must be 'rules', got {decision.routing_strategy!r}"
 
     def test_routing_latency_present_and_positive(self):
         """routing_latency_ms must be set and >= 0 after 18B."""
         registry = _make_registry(super_enabled=True)
         router = ModelRouter(registry)
-        req = ModelRequest(task="t", messages=[], reasoning=ReasoningLevel.HIGH, risk_level=RiskLevel.LOW)
+        req = ModelRequest(
+            task="t",
+            messages=[],
+            reasoning=ReasoningLevel.HIGH,
+            risk_level=RiskLevel.LOW,
+        )
         decision = router.route(req)
         assert decision.routing_latency_ms >= 0.0
 
@@ -251,7 +331,12 @@ class TestBehavioralEquivalence:
         """candidate_models must be a non-empty list for any routable request."""
         registry = _make_registry(super_enabled=True)
         router = ModelRouter(registry)
-        req = ModelRequest(task="t", messages=[], reasoning=ReasoningLevel.HIGH, risk_level=RiskLevel.LOW)
+        req = ModelRequest(
+            task="t",
+            messages=[],
+            reasoning=ReasoningLevel.HIGH,
+            risk_level=RiskLevel.LOW,
+        )
         decision = router.route(req)
         assert isinstance(decision.candidate_models, list)
         assert len(decision.candidate_models) >= 1
@@ -287,21 +372,35 @@ class TestBehavioralEquivalence:
 class TestPolicyFilter:
     """Tests for the PolicyFilter hard policy layer."""
 
-    def _filter(self, registry: ModelRegistry, request: ModelRequest, mode: DeploymentMode) -> list[ModelCandidate]:
+    def _filter(
+        self, registry: ModelRegistry, request: ModelRequest, mode: DeploymentMode
+    ) -> list[ModelCandidate]:
         return PolicyFilter(registry).filter(request, mode)
 
     def test_disabled_models_excluded(self):
         """Disabled models must not appear in policy filter output."""
         registry = _make_registry(super_enabled=True, nano_enabled=False)
-        req = ModelRequest(task="t", messages=[], reasoning=ReasoningLevel.MEDIUM, risk_level=RiskLevel.LOW)
+        req = ModelRequest(
+            task="t",
+            messages=[],
+            reasoning=ReasoningLevel.MEDIUM,
+            risk_level=RiskLevel.LOW,
+        )
         candidates = self._filter(registry, req, DeploymentMode.NVIDIA_HOSTED)
         roles = {c.role for c in candidates}
         assert "nano" not in roles
 
     def test_enabled_models_included(self):
         """Enabled models matching constraints must appear in candidates."""
-        registry = _make_registry(super_enabled=True, nano_enabled=True, lightning_enabled=True)
-        req = ModelRequest(task="t", messages=[], reasoning=ReasoningLevel.LOW, risk_level=RiskLevel.LOW)
+        registry = _make_registry(
+            super_enabled=True, nano_enabled=True, lightning_enabled=True
+        )
+        req = ModelRequest(
+            task="t",
+            messages=[],
+            reasoning=ReasoningLevel.LOW,
+            risk_level=RiskLevel.LOW,
+        )
         candidates = self._filter(registry, req, DeploymentMode.NVIDIA_HOSTED)
         roles = {c.role for c in candidates}
         # All text-capable enabled models pass for LOW reasoning, LOW risk
@@ -311,8 +410,15 @@ class TestPolicyFilter:
 
     def test_critical_risk_blocks_lightning_and_nano(self):
         """BLOCKING: CRITICAL risk must exclude lightning and nano from candidates."""
-        registry = _make_registry(super_enabled=True, nano_enabled=True, lightning_enabled=True)
-        req = ModelRequest(task="t", messages=[], reasoning=ReasoningLevel.LOW, risk_level=RiskLevel.CRITICAL)
+        registry = _make_registry(
+            super_enabled=True, nano_enabled=True, lightning_enabled=True
+        )
+        req = ModelRequest(
+            task="t",
+            messages=[],
+            reasoning=ReasoningLevel.LOW,
+            risk_level=RiskLevel.CRITICAL,
+        )
         candidates = self._filter(registry, req, DeploymentMode.NVIDIA_HOSTED)
         roles = {c.role for c in candidates}
         assert "lightning" not in roles, "CRITICAL risk must block lightning"
@@ -321,8 +427,15 @@ class TestPolicyFilter:
 
     def test_high_reasoning_blocks_lightning_and_nano(self):
         """BLOCKING: HIGH reasoning must exclude lightning and nano from candidates."""
-        registry = _make_registry(super_enabled=True, nano_enabled=True, lightning_enabled=True)
-        req = ModelRequest(task="t", messages=[], reasoning=ReasoningLevel.HIGH, risk_level=RiskLevel.LOW)
+        registry = _make_registry(
+            super_enabled=True, nano_enabled=True, lightning_enabled=True
+        )
+        req = ModelRequest(
+            task="t",
+            messages=[],
+            reasoning=ReasoningLevel.HIGH,
+            risk_level=RiskLevel.LOW,
+        )
         candidates = self._filter(registry, req, DeploymentMode.NVIDIA_HOSTED)
         roles = {c.role for c in candidates}
         assert "lightning" not in roles, "HIGH reasoning must block lightning"
@@ -332,8 +445,13 @@ class TestPolicyFilter:
     def test_multimodal_excludes_text_only_models(self):
         """IMAGE modality request must exclude text-only models."""
         registry = _make_registry(super_enabled=True, nano_omni_enabled=True)
-        req = ModelRequest(task="t", messages=[], reasoning=ReasoningLevel.LOW,
-                           risk_level=RiskLevel.LOW, modality=Modality.IMAGE)
+        req = ModelRequest(
+            task="t",
+            messages=[],
+            reasoning=ReasoningLevel.LOW,
+            risk_level=RiskLevel.LOW,
+            modality=Modality.IMAGE,
+        )
         candidates = self._filter(registry, req, DeploymentMode.NVIDIA_HOSTED)
         roles = {c.role for c in candidates}
         assert "super" not in roles, "Text-only super must not match IMAGE modality"
@@ -341,20 +459,32 @@ class TestPolicyFilter:
 
     def test_tool_use_required_excludes_nano(self):
         """required_capabilities={'tool_use'} must exclude nano (tool_use=False)."""
-        registry = _make_registry(super_enabled=True, nano_enabled=True, lightning_enabled=True)
+        registry = _make_registry(
+            super_enabled=True, nano_enabled=True, lightning_enabled=True
+        )
         req = ModelRequest(
-            task="t", messages=[], reasoning=ReasoningLevel.LOW, risk_level=RiskLevel.LOW,
+            task="t",
+            messages=[],
+            reasoning=ReasoningLevel.LOW,
+            risk_level=RiskLevel.LOW,
             required_capabilities={"tool_use"},
         )
         candidates = self._filter(registry, req, DeploymentMode.NVIDIA_HOSTED)
         roles = {c.role for c in candidates}
-        assert "nano" not in roles, "nano.tool_use=False must be excluded when tool_use required"
+        assert (
+            "nano" not in roles
+        ), "nano.tool_use=False must be excluded when tool_use required"
         assert "lightning" in roles, "lightning.tool_use=True must be included"
 
     def test_empty_candidates_when_all_disabled(self):
         """When no models are enabled, policy filter returns empty list."""
         registry = _make_registry(super_enabled=False)  # all disabled
-        req = ModelRequest(task="t", messages=[], reasoning=ReasoningLevel.LOW, risk_level=RiskLevel.LOW)
+        req = ModelRequest(
+            task="t",
+            messages=[],
+            reasoning=ReasoningLevel.LOW,
+            risk_level=RiskLevel.LOW,
+        )
         candidates = self._filter(registry, req, DeploymentMode.NVIDIA_HOSTED)
         assert candidates == []
 
@@ -362,7 +492,12 @@ class TestPolicyFilter:
         """candidate_model_ids must return list of strings."""
         registry = _make_registry(super_enabled=True)
         policy = PolicyFilter(registry)
-        req = ModelRequest(task="t", messages=[], reasoning=ReasoningLevel.HIGH, risk_level=RiskLevel.LOW)
+        req = ModelRequest(
+            task="t",
+            messages=[],
+            reasoning=ReasoningLevel.HIGH,
+            risk_level=RiskLevel.LOW,
+        )
         ids = policy.candidate_model_ids(req, DeploymentMode.NVIDIA_HOSTED)
         assert isinstance(ids, list)
         assert all(isinstance(mid, str) for mid in ids)
@@ -383,30 +518,43 @@ class TestDeploymentMode:
 
     def test_local_nim_mode_accepted(self):
         """LOCAL_NIM deployment mode must be accepted on ModelRequest."""
-        req = ModelRequest(task="t", messages=[], deployment_mode=DeploymentMode.LOCAL_NIM)
+        req = ModelRequest(
+            task="t", messages=[], deployment_mode=DeploymentMode.LOCAL_NIM
+        )
         assert req.deployment_mode == DeploymentMode.LOCAL_NIM
 
     def test_hosted_mode_accepted(self):
         """NVIDIA_HOSTED deployment mode must be accepted."""
-        req = ModelRequest(task="t", messages=[], deployment_mode=DeploymentMode.NVIDIA_HOSTED)
+        req = ModelRequest(
+            task="t", messages=[], deployment_mode=DeploymentMode.NVIDIA_HOSTED
+        )
         assert req.deployment_mode == DeploymentMode.NVIDIA_HOSTED
 
     def test_enterprise_mode_accepted(self):
         """ENTERPRISE deployment mode must be accepted."""
-        req = ModelRequest(task="t", messages=[], deployment_mode=DeploymentMode.ENTERPRISE)
+        req = ModelRequest(
+            task="t", messages=[], deployment_mode=DeploymentMode.ENTERPRISE
+        )
         assert req.deployment_mode == DeploymentMode.ENTERPRISE
 
     def test_openai_compatible_mode_accepted(self):
         """OPENAI_COMPATIBLE deployment mode must be accepted."""
-        req = ModelRequest(task="t", messages=[], deployment_mode=DeploymentMode.OPENAI_COMPATIBLE)
+        req = ModelRequest(
+            task="t", messages=[], deployment_mode=DeploymentMode.OPENAI_COMPATIBLE
+        )
         assert req.deployment_mode == DeploymentMode.OPENAI_COMPATIBLE
 
     def test_local_nim_policy_filter_returns_candidates(self):
         """LOCAL_NIM filter must return candidates for standard nvidia-nim models."""
         registry = _make_registry(super_enabled=True)
         policy = PolicyFilter(registry)
-        req = ModelRequest(task="t", messages=[], reasoning=ReasoningLevel.HIGH,
-                           risk_level=RiskLevel.LOW, deployment_mode=DeploymentMode.LOCAL_NIM)
+        req = ModelRequest(
+            task="t",
+            messages=[],
+            reasoning=ReasoningLevel.HIGH,
+            risk_level=RiskLevel.LOW,
+            deployment_mode=DeploymentMode.LOCAL_NIM,
+        )
         candidates = policy.filter(req, DeploymentMode.LOCAL_NIM)
         assert len(candidates) >= 1
 
@@ -414,7 +562,12 @@ class TestDeploymentMode:
         """NVIDIA_HOSTED filter must return candidates."""
         registry = _make_registry(super_enabled=True)
         policy = PolicyFilter(registry)
-        req = ModelRequest(task="t", messages=[], reasoning=ReasoningLevel.HIGH, risk_level=RiskLevel.LOW)
+        req = ModelRequest(
+            task="t",
+            messages=[],
+            reasoning=ReasoningLevel.HIGH,
+            risk_level=RiskLevel.LOW,
+        )
         candidates = policy.filter(req, DeploymentMode.NVIDIA_HOSTED)
         assert len(candidates) >= 1
 
@@ -422,7 +575,12 @@ class TestDeploymentMode:
         """Default NVIDIA_HOSTED routing must produce same decision as before 18B."""
         registry = _make_registry(super_enabled=True)
         router = ModelRouter(registry)
-        req = ModelRequest(task="t", messages=[], reasoning=ReasoningLevel.HIGH, risk_level=RiskLevel.LOW)
+        req = ModelRequest(
+            task="t",
+            messages=[],
+            reasoning=ReasoningLevel.HIGH,
+            risk_level=RiskLevel.LOW,
+        )
         decision = router.route(req)
         assert decision.selected_role == "super"
         assert decision.routing_strategy == "rules"
@@ -436,7 +594,9 @@ class TestDeploymentMode:
         """PolicyFilter with no enabled models returns empty — existing error path fires."""
         registry = _make_registry(super_enabled=False)  # all disabled
         policy = PolicyFilter(registry)
-        req = ModelRequest(task="t", messages=[], deployment_mode=DeploymentMode.LOCAL_NIM)
+        req = ModelRequest(
+            task="t", messages=[], deployment_mode=DeploymentMode.LOCAL_NIM
+        )
         candidates = policy.filter(req, DeploymentMode.LOCAL_NIM)
         assert candidates == []
 
@@ -456,56 +616,94 @@ class TestRiskLevelAuthority:
 
     def test_critical_risk_routes_to_super_minimum(self):
         """CRITICAL risk with LOW reasoning must still route to super (not lightning/nano)."""
-        router = ModelRouter(_make_registry(super_enabled=True, nano_enabled=True, lightning_enabled=True))
-        decision = router.route(ModelRequest(
-            task="warehouse.emergency.shutdown",
-            messages=[],
-            reasoning=ReasoningLevel.LOW,
-            risk_level=RiskLevel.CRITICAL,
-        ))
-        assert decision.selected_role == "super", (
-            f"CRITICAL risk must route to super minimum; got {decision.selected_role}"
+        router = ModelRouter(
+            _make_registry(
+                super_enabled=True, nano_enabled=True, lightning_enabled=True
+            )
         )
+        decision = router.route(
+            ModelRequest(
+                task="warehouse.emergency.shutdown",
+                messages=[],
+                reasoning=ReasoningLevel.LOW,
+                risk_level=RiskLevel.CRITICAL,
+            )
+        )
+        assert (
+            decision.selected_role == "super"
+        ), f"CRITICAL risk must route to super minimum; got {decision.selected_role}"
         assert decision.routing_rule == "critical_risk"
 
     def test_critical_risk_candidate_models_excludes_weak(self):
         """candidate_models for CRITICAL risk must not include lightning or nano."""
-        router = ModelRouter(_make_registry(super_enabled=True, nano_enabled=True, lightning_enabled=True))
-        decision = router.route(ModelRequest(
-            task="t", messages=[], reasoning=ReasoningLevel.LOW, risk_level=RiskLevel.CRITICAL,
-        ))
+        router = ModelRouter(
+            _make_registry(
+                super_enabled=True, nano_enabled=True, lightning_enabled=True
+            )
+        )
+        decision = router.route(
+            ModelRequest(
+                task="t",
+                messages=[],
+                reasoning=ReasoningLevel.LOW,
+                risk_level=RiskLevel.CRITICAL,
+            )
+        )
         weak_ids = {"test/nano-model", "test/lightning-model"}
         overlap = set(decision.candidate_models) & weak_ids
-        assert not overlap, (
-            f"CRITICAL risk candidate_models must not include weak models; found {overlap}"
-        )
+        assert (
+            not overlap
+        ), f"CRITICAL risk candidate_models must not include weak models; found {overlap}"
 
     def test_high_risk_allows_routing_to_super(self):
         """HIGH risk with HIGH reasoning routes to super — no change from pre-18B."""
         router = ModelRouter(_make_registry(super_enabled=True))
-        decision = router.route(ModelRequest(
-            task="t", messages=[], reasoning=ReasoningLevel.HIGH, risk_level=RiskLevel.HIGH,
-        ))
+        decision = router.route(
+            ModelRequest(
+                task="t",
+                messages=[],
+                reasoning=ReasoningLevel.HIGH,
+                risk_level=RiskLevel.HIGH,
+            )
+        )
         assert decision.selected_role == "super"
 
     def test_low_risk_allows_all_models(self):
         """LOW risk must not restrict model selection — lightning still valid."""
         router = ModelRouter(_make_registry(lightning_enabled=True, super_enabled=True))
-        decision = router.route(ModelRequest(
-            task="t", messages=[], reasoning=ReasoningLevel.LOW, risk_level=RiskLevel.LOW,
-        ))
+        decision = router.route(
+            ModelRequest(
+                task="t",
+                messages=[],
+                reasoning=ReasoningLevel.LOW,
+                risk_level=RiskLevel.LOW,
+            )
+        )
         assert decision.selected_role == "lightning"
 
     def test_policy_filter_critical_risk_invariant(self):
         """PolicyFilter must enforce CRITICAL risk regardless of DeploymentMode."""
-        registry = _make_registry(super_enabled=True, nano_enabled=True, lightning_enabled=True)
+        registry = _make_registry(
+            super_enabled=True, nano_enabled=True, lightning_enabled=True
+        )
         policy = PolicyFilter(registry)
-        for mode in [DeploymentMode.NVIDIA_HOSTED, DeploymentMode.LOCAL_NIM, DeploymentMode.ENTERPRISE]:
-            req = ModelRequest(task="t", messages=[], reasoning=ReasoningLevel.LOW,
-                               risk_level=RiskLevel.CRITICAL, deployment_mode=mode)
+        for mode in [
+            DeploymentMode.NVIDIA_HOSTED,
+            DeploymentMode.LOCAL_NIM,
+            DeploymentMode.ENTERPRISE,
+        ]:
+            req = ModelRequest(
+                task="t",
+                messages=[],
+                reasoning=ReasoningLevel.LOW,
+                risk_level=RiskLevel.CRITICAL,
+                deployment_mode=mode,
+            )
             candidates = policy.filter(req, mode)
             roles = {c.role for c in candidates}
-            assert "lightning" not in roles, f"CRITICAL risk must block lightning in {mode}"
+            assert (
+                "lightning" not in roles
+            ), f"CRITICAL risk must block lightning in {mode}"
             assert "nano" not in roles, f"CRITICAL risk must block nano in {mode}"
 
 
@@ -523,36 +721,63 @@ class TestReasoningLevelAuthority:
 
     def test_high_reasoning_routes_to_super(self):
         """HIGH reasoning must route to super — routing strategy cannot downgrade."""
-        router = ModelRouter(_make_registry(super_enabled=True, nano_enabled=True, lightning_enabled=True))
-        decision = router.route(ModelRequest(
-            task="t", messages=[], reasoning=ReasoningLevel.HIGH, risk_level=RiskLevel.LOW,
-        ))
-        assert decision.selected_role == "super", (
-            f"HIGH reasoning must select super; got {decision.selected_role}"
+        router = ModelRouter(
+            _make_registry(
+                super_enabled=True, nano_enabled=True, lightning_enabled=True
+            )
         )
+        decision = router.route(
+            ModelRequest(
+                task="t",
+                messages=[],
+                reasoning=ReasoningLevel.HIGH,
+                risk_level=RiskLevel.LOW,
+            )
+        )
+        assert (
+            decision.selected_role == "super"
+        ), f"HIGH reasoning must select super; got {decision.selected_role}"
 
     def test_high_reasoning_candidate_models_excludes_weak(self):
         """candidate_models for HIGH reasoning must not include lightning or nano."""
-        router = ModelRouter(_make_registry(super_enabled=True, nano_enabled=True, lightning_enabled=True))
-        decision = router.route(ModelRequest(
-            task="t", messages=[], reasoning=ReasoningLevel.HIGH, risk_level=RiskLevel.LOW,
-        ))
+        router = ModelRouter(
+            _make_registry(
+                super_enabled=True, nano_enabled=True, lightning_enabled=True
+            )
+        )
+        decision = router.route(
+            ModelRequest(
+                task="t",
+                messages=[],
+                reasoning=ReasoningLevel.HIGH,
+                risk_level=RiskLevel.LOW,
+            )
+        )
         weak_ids = {"test/nano-model", "test/lightning-model"}
         overlap = set(decision.candidate_models) & weak_ids
-        assert not overlap, (
-            f"HIGH reasoning candidate_models must not include weak models; found {overlap}"
-        )
+        assert (
+            not overlap
+        ), f"HIGH reasoning candidate_models must not include weak models; found {overlap}"
 
     def test_policy_filter_high_reasoning_invariant(self):
         """PolicyFilter must exclude weak models for HIGH reasoning across all modes."""
-        registry = _make_registry(super_enabled=True, nano_enabled=True, lightning_enabled=True)
+        registry = _make_registry(
+            super_enabled=True, nano_enabled=True, lightning_enabled=True
+        )
         policy = PolicyFilter(registry)
         for mode in [DeploymentMode.NVIDIA_HOSTED, DeploymentMode.LOCAL_NIM]:
-            req = ModelRequest(task="t", messages=[], reasoning=ReasoningLevel.HIGH,
-                               risk_level=RiskLevel.LOW, deployment_mode=mode)
+            req = ModelRequest(
+                task="t",
+                messages=[],
+                reasoning=ReasoningLevel.HIGH,
+                risk_level=RiskLevel.LOW,
+                deployment_mode=mode,
+            )
             candidates = policy.filter(req, mode)
             roles = {c.role for c in candidates}
-            assert "lightning" not in roles, f"HIGH reasoning must block lightning in {mode}"
+            assert (
+                "lightning" not in roles
+            ), f"HIGH reasoning must block lightning in {mode}"
             assert "nano" not in roles, f"HIGH reasoning must block nano in {mode}"
 
 
@@ -565,47 +790,77 @@ class TestFallbackBehaviorUnchanged:
     """Verify fallback chain is unchanged from pre-18B behavior."""
 
     def test_lightning_fallback_to_nano(self):
-        router = ModelRouter(_make_registry(lightning_enabled=False, nano_enabled=True, super_enabled=True))
-        decision = router.route(ModelRequest(
-            task="t", messages=[], reasoning=ReasoningLevel.LOW, risk_level=RiskLevel.LOW,
-        ))
+        router = ModelRouter(
+            _make_registry(
+                lightning_enabled=False, nano_enabled=True, super_enabled=True
+            )
+        )
+        decision = router.route(
+            ModelRequest(
+                task="t",
+                messages=[],
+                reasoning=ReasoningLevel.LOW,
+                risk_level=RiskLevel.LOW,
+            )
+        )
         assert decision.selected_role == "nano"
         assert decision.fallback_from == "lightning"
         assert decision.requested_role == "lightning"
 
     def test_nano_fallback_to_super(self):
         router = ModelRouter(_make_registry(nano_enabled=False, super_enabled=True))
-        decision = router.route(ModelRequest(
-            task="t", messages=[], reasoning=ReasoningLevel.MEDIUM, risk_level=RiskLevel.LOW,
-        ))
+        decision = router.route(
+            ModelRequest(
+                task="t",
+                messages=[],
+                reasoning=ReasoningLevel.MEDIUM,
+                risk_level=RiskLevel.LOW,
+            )
+        )
         assert decision.selected_role == "super"
         assert decision.fallback_from == "nano"
 
     def test_ultra_fallback_to_super(self):
         router = ModelRouter(_make_registry(ultra_enabled=False, super_enabled=True))
-        decision = router.route(ModelRequest(
-            task="warehouse.eval.judge_quality", messages=[],
-            reasoning=ReasoningLevel.HIGH, risk_level=RiskLevel.LOW,
-        ))
+        decision = router.route(
+            ModelRequest(
+                task="warehouse.eval.judge_quality",
+                messages=[],
+                reasoning=ReasoningLevel.HIGH,
+                risk_level=RiskLevel.LOW,
+            )
+        )
         assert decision.selected_role == "super"
         assert decision.fallback_from == "ultra"
         assert decision.routing_rule == "judge_task"
 
     def test_nano_omni_fallback_to_super(self):
-        router = ModelRouter(_make_registry(nano_omni_enabled=False, super_enabled=True))
-        decision = router.route(ModelRequest(
-            task="t", messages=[], reasoning=ReasoningLevel.LOW,
-            risk_level=RiskLevel.LOW, modality=Modality.IMAGE,
-        ))
+        router = ModelRouter(
+            _make_registry(nano_omni_enabled=False, super_enabled=True)
+        )
+        decision = router.route(
+            ModelRequest(
+                task="t",
+                messages=[],
+                reasoning=ReasoningLevel.LOW,
+                risk_level=RiskLevel.LOW,
+                modality=Modality.IMAGE,
+            )
+        )
         assert decision.selected_role == "super"
         assert decision.fallback_from == "nano-omni"
 
     def test_fallback_decision_has_18b_fields(self):
         """Fallback decisions must also populate 18B provenance fields."""
         router = ModelRouter(_make_registry(nano_enabled=False, super_enabled=True))
-        decision = router.route(ModelRequest(
-            task="t", messages=[], reasoning=ReasoningLevel.MEDIUM, risk_level=RiskLevel.LOW,
-        ))
+        decision = router.route(
+            ModelRequest(
+                task="t",
+                messages=[],
+                reasoning=ReasoningLevel.MEDIUM,
+                risk_level=RiskLevel.LOW,
+            )
+        )
         assert decision.routing_strategy == "rules"
         assert decision.routing_latency_ms >= 0.0
         assert isinstance(decision.candidate_models, list)
@@ -622,16 +877,30 @@ class TestRoutingLatency:
     def test_routing_latency_is_non_negative(self):
         registry = _make_registry(super_enabled=True)
         router = ModelRouter(registry)
-        decision = router.route(ModelRequest(task="t", messages=[],
-                                             reasoning=ReasoningLevel.HIGH, risk_level=RiskLevel.LOW))
+        decision = router.route(
+            ModelRequest(
+                task="t",
+                messages=[],
+                reasoning=ReasoningLevel.HIGH,
+                risk_level=RiskLevel.LOW,
+            )
+        )
         assert decision.routing_latency_ms >= 0.0
 
     def test_routing_latency_is_small(self):
         """Rule-based routing should be extremely fast (< 100ms in practice)."""
-        registry = _make_registry(super_enabled=True, nano_enabled=True, lightning_enabled=True)
+        registry = _make_registry(
+            super_enabled=True, nano_enabled=True, lightning_enabled=True
+        )
         router = ModelRouter(registry)
-        decision = router.route(ModelRequest(task="t", messages=[],
-                                             reasoning=ReasoningLevel.LOW, risk_level=RiskLevel.LOW))
+        decision = router.route(
+            ModelRequest(
+                task="t",
+                messages=[],
+                reasoning=ReasoningLevel.LOW,
+                risk_level=RiskLevel.LOW,
+            )
+        )
         # No strict performance assertion — prove instrumentation does not materially add latency.
         # Anything under 500ms is acceptable for a deterministic rule lookup.
         assert decision.routing_latency_ms < 500.0
@@ -640,8 +909,14 @@ class TestRoutingLatency:
         """routing_latency_ms must be a float (0.0 is acceptable for fast machines)."""
         registry = _make_registry(super_enabled=True)
         router = ModelRouter(registry)
-        decision = router.route(ModelRequest(task="t", messages=[],
-                                             reasoning=ReasoningLevel.HIGH, risk_level=RiskLevel.LOW))
+        decision = router.route(
+            ModelRequest(
+                task="t",
+                messages=[],
+                reasoning=ReasoningLevel.HIGH,
+                risk_level=RiskLevel.LOW,
+            )
+        )
         assert isinstance(decision.routing_latency_ms, float)
 
     def test_routing_latency_excludes_inference(self):
@@ -649,13 +924,20 @@ class TestRoutingLatency:
         routing_latency_ms must be much smaller than inference latency.
         Run 10 routing calls and confirm max < 100ms.
         """
-        registry = _make_registry(super_enabled=True, nano_enabled=True, lightning_enabled=True)
+        registry = _make_registry(
+            super_enabled=True, nano_enabled=True, lightning_enabled=True
+        )
         router = ModelRouter(registry)
         latencies = []
         for _ in range(10):
-            decision = router.route(ModelRequest(
-                task="t", messages=[], reasoning=ReasoningLevel.LOW, risk_level=RiskLevel.LOW,
-            ))
+            decision = router.route(
+                ModelRequest(
+                    task="t",
+                    messages=[],
+                    reasoning=ReasoningLevel.LOW,
+                    risk_level=RiskLevel.LOW,
+                )
+            )
             latencies.append(decision.routing_latency_ms)
         max_latency = max(latencies)
         assert max_latency < 100.0, f"Routing latency too high: max={max_latency:.3f}ms"
@@ -673,13 +955,17 @@ class TestRoutingStrategyProtocol:
         """RoutingStrategy must be a runtime-checkable Protocol."""
         from typing import runtime_checkable, Protocol
         import inspect
-        assert hasattr(RoutingStrategy, '__protocol_attrs__') or \
-               getattr(RoutingStrategy, '_is_protocol', False) or \
-               isinstance(RoutingStrategy, type)
+
+        assert (
+            hasattr(RoutingStrategy, "__protocol_attrs__")
+            or getattr(RoutingStrategy, "_is_protocol", False)
+            or isinstance(RoutingStrategy, type)
+        )
 
     def test_model_candidate_frozen(self):
         """ModelCandidate must be a frozen dataclass (immutable)."""
         import dataclasses
+
         cap = _make_registry(super_enabled=True).get_by_role("super")
         candidate = ModelCandidate(
             model_id="test/super-model",
@@ -717,32 +1003,53 @@ class TestCandidateModelsSemantics:
 
     def test_candidate_models_subset_of_registry(self):
         """candidate_models must be a subset of enabled registry models."""
-        registry = _make_registry(super_enabled=True, nano_enabled=True, lightning_enabled=True)
+        registry = _make_registry(
+            super_enabled=True, nano_enabled=True, lightning_enabled=True
+        )
         router = ModelRouter(registry)
-        decision = router.route(ModelRequest(
-            task="t", messages=[], reasoning=ReasoningLevel.HIGH, risk_level=RiskLevel.LOW,
-        ))
+        decision = router.route(
+            ModelRequest(
+                task="t",
+                messages=[],
+                reasoning=ReasoningLevel.HIGH,
+                risk_level=RiskLevel.LOW,
+            )
+        )
         all_enabled_ids = {c.model_id for c in registry.all_enabled()}
         for mid in decision.candidate_models:
             assert mid in all_enabled_ids, f"{mid} not in enabled registry"
 
     def test_candidate_models_excludes_disabled(self):
         """candidate_models must never include disabled model IDs."""
-        registry = _make_registry(super_enabled=True, nano_enabled=False, lightning_enabled=False)
+        registry = _make_registry(
+            super_enabled=True, nano_enabled=False, lightning_enabled=False
+        )
         router = ModelRouter(registry)
-        decision = router.route(ModelRequest(
-            task="t", messages=[], reasoning=ReasoningLevel.HIGH, risk_level=RiskLevel.LOW,
-        ))
+        decision = router.route(
+            ModelRequest(
+                task="t",
+                messages=[],
+                reasoning=ReasoningLevel.HIGH,
+                risk_level=RiskLevel.LOW,
+            )
+        )
         assert "test/nano-model" not in decision.candidate_models
         assert "test/lightning-model" not in decision.candidate_models
 
     def test_candidate_models_respects_risk_level(self):
         """CRITICAL risk reduces candidates to high-capability models only."""
-        registry = _make_registry(super_enabled=True, nano_enabled=True, lightning_enabled=True)
+        registry = _make_registry(
+            super_enabled=True, nano_enabled=True, lightning_enabled=True
+        )
         router = ModelRouter(registry)
-        decision = router.route(ModelRequest(
-            task="t", messages=[], reasoning=ReasoningLevel.LOW, risk_level=RiskLevel.CRITICAL,
-        ))
+        decision = router.route(
+            ModelRequest(
+                task="t",
+                messages=[],
+                reasoning=ReasoningLevel.LOW,
+                risk_level=RiskLevel.CRITICAL,
+            )
+        )
         # Only super should be in candidates for CRITICAL risk with these enabled models
         assert "test/lightning-model" not in decision.candidate_models
         assert "test/nano-model" not in decision.candidate_models
@@ -751,9 +1058,14 @@ class TestCandidateModelsSemantics:
         """The selected model must be in candidate_models when no fallback outside policy."""
         registry = _make_registry(super_enabled=True)
         router = ModelRouter(registry)
-        decision = router.route(ModelRequest(
-            task="t", messages=[], reasoning=ReasoningLevel.HIGH, risk_level=RiskLevel.LOW,
-        ))
+        decision = router.route(
+            ModelRequest(
+                task="t",
+                messages=[],
+                reasoning=ReasoningLevel.HIGH,
+                risk_level=RiskLevel.LOW,
+            )
+        )
         # Selected model must be in candidates when policy allows it.
         assert decision.selected_model_id in decision.candidate_models
 
@@ -777,66 +1089,83 @@ class TestArchitectureInvariants:
         policy = PolicyFilter(registry)
         # If filter were to call a model, it would need async. It's sync — invariant holds.
         import inspect
+
         assert not inspect.iscoroutinefunction(policy.filter)
 
     def test_routing_strategy_select_is_synchronous(self):
         """RoutingStrategy.select must be synchronous (no model calls allowed)."""
         # ModelRouter.route is the reference implementation of select.
         import inspect
+
         router = ModelRouter(_make_registry(super_enabled=True))
         assert not inspect.iscoroutinefunction(router.route)
 
     def test_evaluation_graders_are_synchronous(self):
         """All deterministic graders must be synchronous (no LLM calls)."""
         import inspect
+
         for grader in default_graders():
-            assert not inspect.iscoroutinefunction(grader.grade), (
-                f"{type(grader).__name__}.grade must be synchronous"
-            )
+            assert not inspect.iscoroutinefunction(
+                grader.grade
+            ), f"{type(grader).__name__}.grade must be synchronous"
 
     def test_evaluation_grader_does_not_import_action_modules(self):
         """Grader module must not import ActionProposal, DecisionEngine, ActionExecutor."""
         import importlib
         import sys
+
         grader_mod = sys.modules.get("maiw_models.evaluation.graders")
         if grader_mod is None:
             grader_mod = importlib.import_module("maiw_models.evaluation.graders")
-        forbidden_attrs = ["ActionProposal", "DecisionEngine", "ActionExecutor", "ApprovalStore"]
+        forbidden_attrs = [
+            "ActionProposal",
+            "DecisionEngine",
+            "ActionExecutor",
+            "ApprovalStore",
+        ]
         for attr in forbidden_attrs:
-            assert not hasattr(grader_mod, attr), (
-                f"Evaluation graders must not reference {attr}"
-            )
+            assert not hasattr(
+                grader_mod, attr
+            ), f"Evaluation graders must not reference {attr}"
 
     def test_evaluation_models_do_not_import_mcp_writes(self):
         """Evaluation models must not import MCP write capabilities."""
         import importlib
         import sys
+
         eval_mod = sys.modules.get("maiw_models.evaluation.models")
         if eval_mod is None:
             eval_mod = importlib.import_module("maiw_models.evaluation.models")
-        forbidden_attrs = ["ActionExecutor", "MCPWrite", "ApprovalStore", "DecisionEngine"]
+        forbidden_attrs = [
+            "ActionExecutor",
+            "MCPWrite",
+            "ApprovalStore",
+            "DecisionEngine",
+        ]
         for attr in forbidden_attrs:
-            assert not hasattr(eval_mod, attr), (
-                f"Evaluation models must not reference {attr}"
-            )
+            assert not hasattr(
+                eval_mod, attr
+            ), f"Evaluation models must not reference {attr}"
 
     def test_routing_module_does_not_import_action_modules(self):
         """PolicyFilter/RoutingStrategy must not reference governance modules."""
         import importlib
         import sys
+
         routing_mod = sys.modules.get("maiw_models.routing")
         if routing_mod is None:
             routing_mod = importlib.import_module("maiw_models.routing")
         forbidden_attrs = ["ActionProposal", "DecisionEngine", "ActionExecutor"]
         for attr in forbidden_attrs:
-            assert not hasattr(routing_mod, attr), (
-                f"Routing module must not reference {attr}"
-            )
+            assert not hasattr(
+                routing_mod, attr
+            ), f"Routing module must not reference {attr}"
 
     def test_gateway_is_sole_inference_boundary(self):
         """ModelGateway must be the only class with a provider call path."""
         from maiw_models.routing import PolicyFilter, RoutingStrategy
         from maiw_models.router import ModelRouter
+
         # PolicyFilter and ModelRouter must not have a provider/call attribute
         registry = _make_registry(super_enabled=True)
         policy = PolicyFilter(registry)
@@ -854,12 +1183,20 @@ class TestArchitectureInvariants:
         a method that returns ActionProposal.
         """
         from maiw_models.evaluation.models import (
-            ModelEvaluationInput, ModelEvaluationResult, EvaluationCase
+            ModelEvaluationInput,
+            ModelEvaluationResult,
+            EvaluationCase,
         )
         import dataclasses
+
         for cls in [ModelEvaluationInput, ModelEvaluationResult, EvaluationCase]:
             field_names = {f.name for f in dataclasses.fields(cls)}
-            forbidden = {"proposal_id", "action_proposal", "decision_engine", "approval_id"}
+            forbidden = {
+                "proposal_id",
+                "action_proposal",
+                "decision_engine",
+                "approval_id",
+            }
             overlap = field_names & forbidden
             assert not overlap, f"{cls.__name__} must not have fields: {overlap}"
 
@@ -875,32 +1212,56 @@ class TestRoutingProvenance:
     def test_provenance_strategy_rules(self):
         """routing_strategy must be 'rules'."""
         router = ModelRouter(_make_registry(super_enabled=True))
-        decision = router.route(ModelRequest(task="t", messages=[],
-                                             reasoning=ReasoningLevel.HIGH, risk_level=RiskLevel.LOW))
+        decision = router.route(
+            ModelRequest(
+                task="t",
+                messages=[],
+                reasoning=ReasoningLevel.HIGH,
+                risk_level=RiskLevel.LOW,
+            )
+        )
         assert decision.routing_strategy == "rules"
 
     def test_provenance_candidates_populated(self):
         """candidate_models must be a non-empty list."""
         router = ModelRouter(_make_registry(super_enabled=True))
-        decision = router.route(ModelRequest(task="t", messages=[],
-                                             reasoning=ReasoningLevel.HIGH, risk_level=RiskLevel.LOW))
+        decision = router.route(
+            ModelRequest(
+                task="t",
+                messages=[],
+                reasoning=ReasoningLevel.HIGH,
+                risk_level=RiskLevel.LOW,
+            )
+        )
         assert len(decision.candidate_models) > 0
 
     def test_provenance_latency_populated(self):
         """routing_latency_ms must be >= 0.0."""
         router = ModelRouter(_make_registry(super_enabled=True))
-        decision = router.route(ModelRequest(task="t", messages=[],
-                                             reasoning=ReasoningLevel.HIGH, risk_level=RiskLevel.LOW))
+        decision = router.route(
+            ModelRequest(
+                task="t",
+                messages=[],
+                reasoning=ReasoningLevel.HIGH,
+                risk_level=RiskLevel.LOW,
+            )
+        )
         assert decision.routing_latency_ms >= 0.0
 
     def test_route_decision_embedded_in_response(self):
         """ModelResponse.route_decision must contain new 18B fields."""
         registry = _make_registry(super_enabled=True)
         gateway, _ = _make_gateway(registry)
-        response = asyncio.run(gateway.generate(ModelRequest(
-            task="t", messages=[{"role": "user", "content": "test"}],
-            reasoning=ReasoningLevel.HIGH, risk_level=RiskLevel.LOW,
-        )))
+        response = asyncio.run(
+            gateway.generate(
+                ModelRequest(
+                    task="t",
+                    messages=[{"role": "user", "content": "test"}],
+                    reasoning=ReasoningLevel.HIGH,
+                    risk_level=RiskLevel.LOW,
+                )
+            )
+        )
         assert response.route_decision.routing_strategy == "rules"
         assert response.route_decision.routing_latency_ms >= 0.0
         assert isinstance(response.route_decision.candidate_models, list)
@@ -908,10 +1269,16 @@ class TestRoutingProvenance:
     def test_telemetry_includes_18b_fields(self):
         """GatewayTelemetry must emit routing_strategy, routing_latency_ms, candidate_models."""
         import logging
+
         telemetry = GatewayTelemetry()
         registry = _make_registry(super_enabled=True)
         router = ModelRouter(registry)
-        request = ModelRequest(task="t", messages=[], reasoning=ReasoningLevel.HIGH, risk_level=RiskLevel.LOW)
+        request = ModelRequest(
+            task="t",
+            messages=[],
+            reasoning=ReasoningLevel.HIGH,
+            risk_level=RiskLevel.LOW,
+        )
         decision = router.route(request)
 
         captured_records: list = []
@@ -923,6 +1290,7 @@ class TestRoutingProvenance:
         handler = CapturingHandler()
         handler.setLevel(logging.DEBUG)
         import maiw_models.telemetry as tele_module
+
         log = logging.getLogger(tele_module.__name__)
         old_level = log.level
         log.setLevel(logging.DEBUG)
@@ -943,9 +1311,15 @@ class TestRoutingProvenance:
         assert len(captured_records) >= 1, "Telemetry must emit at least one log record"
         record = captured_records[0]
         # extra fields are added to the LogRecord __dict__ by Python's logging infrastructure
-        assert hasattr(record, "routing_strategy"), "telemetry must emit routing_strategy"
-        assert hasattr(record, "routing_latency_ms"), "telemetry must emit routing_latency_ms"
-        assert hasattr(record, "candidate_models"), "telemetry must emit candidate_models"
+        assert hasattr(
+            record, "routing_strategy"
+        ), "telemetry must emit routing_strategy"
+        assert hasattr(
+            record, "routing_latency_ms"
+        ), "telemetry must emit routing_latency_ms"
+        assert hasattr(
+            record, "candidate_models"
+        ), "telemetry must emit candidate_models"
         assert record.routing_strategy == "rules"
         assert record.routing_latency_ms >= 0.0
 
@@ -1053,7 +1427,9 @@ class TestSchemaValidityGrader:
 
     def test_passes_when_required_fields_present(self):
         case = _make_case(expected_schema={"required": ["action", "target"]})
-        result = _make_grader_result(response='{"action": "reallocate", "target": "wave-17"}')
+        result = _make_grader_result(
+            response='{"action": "reallocate", "target": "wave-17"}'
+        )
         gr = self.grader.grade(case, result)
         assert gr.passed
 
@@ -1094,7 +1470,9 @@ class TestHallucinationGrader:
 
     def test_passes_when_all_entities_in_context(self):
         case = _make_case(context_entities=["wave-17", "conveyor-main"])
-        result = _make_grader_result(response="wave-17 is at risk due to conveyor-main failure")
+        result = _make_grader_result(
+            response="wave-17 is at risk due to conveyor-main failure"
+        )
         gr = self.grader.grade(case, result)
         assert gr.passed
 
@@ -1123,13 +1501,17 @@ class TestCapabilityMatchGrader:
 
     def test_passes_when_capability_mentioned(self):
         case = _make_case(expected_capability="labor_reallocation")
-        result = _make_grader_result(response="I recommend labor reallocation to resolve the bottleneck")
+        result = _make_grader_result(
+            response="I recommend labor reallocation to resolve the bottleneck"
+        )
         gr = self.grader.grade(case, result)
         assert gr.passed
 
     def test_passes_when_synonym_mentioned(self):
         case = _make_case(expected_capability="wave_recovery")
-        result = _make_grader_result(response="You should recover wave 17 by replanning")
+        result = _make_grader_result(
+            response="You should recover wave 17 by replanning"
+        )
         gr = self.grader.grade(case, result)
         assert gr.passed
 
@@ -1151,7 +1533,9 @@ class TestTargetMatchGrader:
 
     def test_passes_when_target_mentioned(self):
         case = _make_case(expected_target="wave-17")
-        result = _make_grader_result(response="Wave-17 is at risk due to labor shortfall")
+        result = _make_grader_result(
+            response="Wave-17 is at risk due to labor shortfall"
+        )
         gr = self.grader.grade(case, result)
         assert gr.passed
 
@@ -1179,7 +1563,9 @@ class TestRequiredEvidenceGrader:
 
     def test_passes_when_all_facts_present(self):
         case = _make_case(required_facts=["wave-17", "labor"])
-        result = _make_grader_result(response="wave-17 has a labor shortage causing delay")
+        result = _make_grader_result(
+            response="wave-17 has a labor shortage causing delay"
+        )
         gr = self.grader.grade(case, result)
         assert gr.passed
         assert gr.score == 1.0
@@ -1275,7 +1661,9 @@ class TestReplayHelper:
         if nodes is None:
             nodes = [
                 MockSnapshotNode("wave-17", "Wave", "Wave 17", {"status": "at_risk"}),
-                MockSnapshotNode("worker-A001", "Worker", "Alice", {"shift": "morning"}),
+                MockSnapshotNode(
+                    "worker-A001", "Worker", "Alice", {"shift": "morning"}
+                ),
             ]
         if edges is None:
             edges = [
@@ -1322,7 +1710,9 @@ class TestReplayHelper:
 
     def test_replay_context_custom_system_prompt(self):
         snap = self._make_snapshot()
-        ctx = replay_context_from_snapshot(snap, "test", system_prompt="Custom system prompt")
+        ctx = replay_context_from_snapshot(
+            snap, "test", system_prompt="Custom system prompt"
+        )
         system_msgs = [m for m in ctx.messages if m["role"] == "system"]
         assert system_msgs[0]["content"] == "Custom system prompt"
 
@@ -1331,6 +1721,7 @@ class TestReplayHelper:
         snap = self._make_snapshot()
         # replay_context_from_snapshot is synchronous — proves no async graph call
         import inspect
+
         assert not inspect.iscoroutinefunction(replay_context_from_snapshot)
 
     def test_replay_context_dataset_id(self):
@@ -1459,10 +1850,14 @@ class TestEvaluationEndToEnd:
         # Schema check: no expected_schema → passes
         assert grader_results[0].passed  # SchemaValidityGrader
         # Target match: "wave-17" in response → passes
-        target_result = next(gr for gr in grader_results if gr.grader_name == "target_match")
+        target_result = next(
+            gr for gr in grader_results if gr.grader_name == "target_match"
+        )
         assert target_result.passed
         # Capability match: "labor reallocation" mentioned → passes
-        cap_result = next(gr for gr in grader_results if gr.grader_name == "capability_match")
+        cap_result = next(
+            gr for gr in grader_results if gr.grader_name == "capability_match"
+        )
         assert cap_result.passed
 
     def test_evaluate_healthy_baseline_no_intervention(self):
@@ -1485,8 +1880,12 @@ class TestEvaluationEndToEnd:
             candidate_models=["test/super-model"],
         )
         grader_results = run_graders(case, result)
-        forbidden_result = next(gr for gr in grader_results if gr.grader_name == "forbidden_claims")
-        assert forbidden_result.passed, "Healthy baseline response must not contain forbidden crisis claims"
+        forbidden_result = next(
+            gr for gr in grader_results if gr.grader_name == "forbidden_claims"
+        )
+        assert (
+            forbidden_result.passed
+        ), "Healthy baseline response must not contain forbidden crisis claims"
 
     def test_evaluation_grader_result_completeness(self):
         """Each GraderResult must have grader_name and passed fields."""
