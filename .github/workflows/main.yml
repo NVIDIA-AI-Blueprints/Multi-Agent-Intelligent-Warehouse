@@ -162,7 +162,7 @@ jobs:
         run: |
           set -e
           images=(
-            "minio/minio:RELEASE.2024-03-15T01-07-19Z"
+            "minio/minio:RELEASE.2024-05-28T17-19-04Z"
             "apache/kafka:3.7.0"
             "redis:7"
             "nginx:1.25.3-alpine"
