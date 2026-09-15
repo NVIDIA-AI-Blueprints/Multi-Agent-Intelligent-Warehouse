@@ -23,6 +23,7 @@ import WarehouseStatePage from './pages/WarehouseStatePage';
 import DecisionCenter from './pages/DecisionCenter';
 import ModelGateway from './pages/ModelGateway';
 import ModelGatewayLab from './pages/ModelGatewayLab';
+import WorldShell from './components/world/WorldShell';
 import CapabilityPlane from './pages/CapabilityPlane';
 import ActivityFeed from './pages/ActivityFeed';
 import SystemHealth from './pages/SystemHealth';
@@ -43,6 +44,7 @@ function App() {
                   <Route path="/decisions" element={<DecisionCenter />} />
                   <Route path="/models" element={<ModelGateway />} />
                   <Route path="/models/lab" element={<ModelGatewayLab />} />
+                  <Route path="/world" element={<WorldShell />} />
                   <Route path="/capabilities" element={<CapabilityPlane />} />
                   <Route path="/activity" element={<ActivityFeed />} />
                   <Route path="/health" element={<SystemHealth />} />

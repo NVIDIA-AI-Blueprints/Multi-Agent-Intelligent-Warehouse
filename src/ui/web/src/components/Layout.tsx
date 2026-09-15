@@ -15,6 +15,7 @@ const NAV = [
   { label: 'STATE', path: '/state' },
   { label: 'DECISIONS', path: '/decisions' },
   { label: 'MODELS', path: '/models' },
+  { label: 'WORLD', path: '/world' },
   { label: 'CAPABILITIES', path: '/capabilities' },
   { label: 'ACTIVITY', path: '/activity' },
 ];
