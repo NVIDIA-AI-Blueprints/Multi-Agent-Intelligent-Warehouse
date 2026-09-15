@@ -136,6 +136,36 @@ jobs:
               print("Patched llm-nim: inserted NGC_API_KEY after NVIDIA_API_KEY")
           PY
 
+      # Authenticate to Docker Hub and Quay to avoid rate limits / pull access denied
+      - name: "Authenticate to Docker Hub and Quay (public image registries)"
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
+          QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
+          QUAY_PASSWORD: ${{ secrets.QUAY_PASSWORD }}
+        run: |
+          if [ -n "${DOCKERHUB_USERNAME}" ] && [ -n "${DOCKERHUB_PASSWORD}" ]; then
+            echo "${DOCKERHUB_PASSWORD}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
+            echo "✅ Authenticated to Docker Hub"
+          else
+            echo "⚠️  DOCKERHUB_USERNAME/DOCKERHUB_PASSWORD not set — pulling Docker Hub images anonymously (rate limits may apply)"
+          fi
+          if [ -n "${QUAY_USERNAME}" ] && [ -n "${QUAY_PASSWORD}" ]; then
+            echo "${QUAY_PASSWORD}" | docker login quay.io -u "${QUAY_USERNAME}" --password-stdin
+            echo "✅ Authenticated to quay.io"
+          else
+            echo "⚠️  QUAY_USERNAME/QUAY_PASSWORD not set — pulling quay.io images anonymously (rate limits may apply)"
+          fi
+
+      # Pre-pull infrastructure images from compose file — single source of truth, no tag drift
+      - name: "Pre-pull required compose images"
+        run: |
+          set -e
+          # Pull only infrastructure services (exclude llm-nim which needs GPU profile)
+          docker compose -f deploy/compose/docker-compose.dev.yaml pull \
+            etcd minio redis timescaledb kafka nginx milvus
+          echo "✅ All compose images pre-pulled"
+
       # Step 5: Start infrastructure services
       - name: "Step 5: Start infrastructure services"
         run: |
