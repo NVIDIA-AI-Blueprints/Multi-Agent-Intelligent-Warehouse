@@ -157,24 +157,13 @@ jobs:
             echo "⚠️  QUAY_USERNAME/QUAY_PASSWORD not set — pulling quay.io images anonymously (rate limits may apply)"
           fi
 
-      # Pre-pull all compose images before dev_up.sh so failures are explicit and fast
+      # Pre-pull infrastructure images from compose file — single source of truth, no tag drift
       - name: "Pre-pull required compose images"
         run: |
           set -e
-          images=(
-            "minio/minio:RELEASE.2024-05-28T17-19-04Z"
-            "apache/kafka:3.7.0"
-            "redis:7"
-            "nginx:1.25.3-alpine"
-            "timescale/timescaledb:2.15.2-pg16"
-            "quay.io/coreos/etcd:v3.5.9"
-            "milvusdb/milvus:v2.4.3"
-          )
-          for img in "${images[@]}"; do
-            echo "Pulling ${img}..."
-            docker pull "${img}"
-            echo "✅ ${img}"
-          done
+          # Pull only infrastructure services (exclude llm-nim which needs GPU profile)
+          docker compose -f deploy/compose/docker-compose.dev.yaml pull \
+            etcd minio redis timescaledb kafka nginx milvus
           echo "✅ All compose images pre-pulled"
 
       # Step 5: Start infrastructure services
