@@ -275,7 +275,7 @@ function SectionEvalInput({ run, caseData }: { run: ModelLabRun | null; caseData
                 overflow: 'auto',
               }}
             >
-              {caseData?.prompt || 'Select a case to view prompt.'}
+              {caseData?.prompt || (caseData as any)?.case_prompt || 'Select a case to view prompt.'}
             </Box>
           </Grid>
         </Grid>
@@ -681,7 +681,7 @@ const ModelGatewayLab: React.FC = () => {
   const navigate = useNavigate();
 
   const [runs, setRuns] = useState<ModelLabRun[]>([]);
-  const [selectedRunId, setSelectedRunId] = useState<string>('18e');
+  const [selectedRunId, setSelectedRunId] = useState<string>('18f');
   const [currentRun, setCurrentRun] = useState<ModelLabRun | null>(null);
   const [cases, setCases] = useState<ModelLabCase[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState<string>('');
@@ -753,7 +753,7 @@ const ModelGatewayLab: React.FC = () => {
   const runLabel = (r: ModelLabRun) => {
     const prefix = r.phase === '18C' ? '18C — LEGACY METHODOLOGY' :
                    r.phase === '18D' ? '18D — CALIBRATED' :
-                   r.phase === '18E' ? '18E — FINAL METHODOLOGY' : r.phase;
+                   r.phase === '18E' ? '18E — FINAL METHODOLOGY' : r.phase === '18F' ? '18F — CLEAN LIVE RUN' : r.phase;
     return prefix;
   };
 

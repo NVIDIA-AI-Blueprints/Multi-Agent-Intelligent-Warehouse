@@ -1,0 +1,525 @@
+{
+  "metadata": {
+    "phase": "18C",
+    "dataset_id": "eval-fixture-dataset-v1",
+    "semantic_checksum": "fixture-checksum-abc123",
+    "run_timestamp": "2026-09-15T05:13:39.624207+00:00",
+    "cases_count": 3,
+    "models_evaluated": [
+      "nvidia/nemotron-3-super-120b-a12b",
+      "nvidia/nemotron-3.5-lightning-30b-a3b"
+    ],
+    "deployment_mode": "nvidia_hosted",
+    "endpoint_status": "LIVE \u2014 deployment_mode=nvidia_hosted"
+  },
+  "cases": [
+    {
+      "case_id": "wave17-labor-risk-v1",
+      "case_prompt": "Why is Wave 17 at risk? Based on the current labor allocation and shift assignments, what is the primary bottleneck and what action would you recommend?",
+      "task_family": "ASK",
+      "model_results": [
+        {
+          "evaluation_run_key": "a9d914ada5f41cdd1de5330019f4a27eaf049eb9646d4b606ee96eb4d40b96da",
+          "case_id": "wave17-labor-risk-v1",
+          "dataset_id": "eval-fixture-dataset-v1",
+          "semantic_checksum": "fixture-checksum-abc123",
+          "scenario_id": "wave17-labor-risk-v1",
+          "context_snapshot_id": null,
+          "warehouse_state_snapshot_id": null,
+          "prompt_hash": "5c31af4fbb75bd9936d13e1f074e3341b4c40adf8e45bad09ac073736723e0be",
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "deployment": "nvidia_hosted",
+          "quality": {
+            "score": 0.8,
+            "pass": false,
+            "applicable_graders": 5,
+            "passed_graders": 4,
+            "graders": [
+              {
+                "name": "schema_validity",
+                "passed": true,
+                "score": null,
+                "reason": "No expected_schema defined \u2014 schema check skipped.",
+                "evidence": []
+              },
+              {
+                "name": "hallucination",
+                "passed": true,
+                "score": null,
+                "reason": "No entity IDs outside context detected.",
+                "evidence": []
+              },
+              {
+                "name": "capability_match",
+                "passed": false,
+                "score": null,
+                "reason": "Response does not mention expected capability 'labor_reallocation' or its synonyms.",
+                "evidence": []
+              },
+              {
+                "name": "target_match",
+                "passed": true,
+                "score": null,
+                "reason": "Response references expected target (variant 'wave 17'): wave-17",
+                "evidence": [
+                  "wave 17",
+                  "{\"model_reference\": \"wave 17\", \"resolved_entity_id\": \"wave-17\", \"expected_entity_id\": \"wave-17\", \"match\": true}"
+                ]
+              },
+              {
+                "name": "required_evidence",
+                "passed": true,
+                "score": 1.0,
+                "reason": "All 2 required facts found.",
+                "evidence": [
+                  "wave-17",
+                  "labor"
+                ]
+              },
+              {
+                "name": "forbidden_claims",
+                "passed": true,
+                "score": null,
+                "reason": "No forbidden claims detected (4 checked).",
+                "evidence": []
+              }
+            ]
+          },
+          "latency": {
+            "routing_ms": 0.008,
+            "inference_ms": 3636.259,
+            "total_ms": 3636.267
+          },
+          "provider": "nvidia-nim",
+          "routing_strategy": "forced_evaluation",
+          "candidate_models": [
+            "nvidia/nemotron-3-super-120b-a12b"
+          ],
+          "tokens": {
+            "input": 201,
+            "output": 204,
+            "cost": "unavailable"
+          },
+          "outcome": {
+            "timeout": false,
+            "error": null,
+            "fallback_used": false,
+            "policy_compliant": true
+          },
+          "interpretation": "",
+          "raw_response": "Based on the operational context provided, I cannot determine why Wave 17 is at risk, identify the primary bottleneck, or recommend any actions. The context only lists entity IDs (including wave-17, labor-shift-morning, labor-shift-afternoon, and various workers and equipment) but provides no information about:\n\n- Current labor allocation or shift assignments\n- Wave 17's status, progress, or risk factors\n- Any bottlenecks in the system\n- Performance metrics or operational data\n\nTo answer your question about Wave 17's risk status, bottlenecks, or recommended actions, I would need additional context such as:\n- Labor assignment details for each shift\n- Wave 17's current progress or completion status\n- Equipment availability or downtime information\n- Throughput rates or processing times\n- Any reported issues or delays\n\nWithout this operational data in the provided context, I cannot make any determinations about Wave 17's risk factors or recommend specific actions.",
+          "display_preview": "Based on the operational context provided, I cannot determine why Wave 17 is at risk, identify the primary bottleneck, or recommend any actions. The context only lists entity IDs (including wave-17, labor-shift-morning, labor-shift-afternoon, and various workers and equipment) but provides no inform"
+        }
+      ],
+      "router_selection": {
+        "case_id": "wave17-labor-risk-v1",
+        "selected_model_id": "nvidia/nemotron-3-super-120b-a12b",
+        "selected_role": "super",
+        "routing_rule": "high_reasoning",
+        "routing_reason": "reasoning=HIGH requires Super",
+        "routing_strategy": "rules",
+        "routing_latency_ms": 0.02,
+        "candidate_models": [
+          "nvidia/nemotron-3-super-120b-a12b"
+        ],
+        "policy_compliant": true
+      },
+      "oracle": {
+        "best_quality": {
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "quality_score": 0.8
+        },
+        "fastest_passing": {
+          "model_id": null,
+          "total_latency_ms": 0.0
+        },
+        "lowest_cost_passing": {
+          "model_id": "unavailable",
+          "note": "Cost metadata unavailable in current repo/config."
+        },
+        "passing_models": []
+      },
+      "regret": {
+        "router_model": "nvidia/nemotron-3-super-120b-a12b",
+        "quality_regret": false,
+        "latency_regret": false,
+        "quality_regret_detail": "",
+        "latency_regret_detail": "",
+        "quality_regret_policy_note": ""
+      }
+    },
+    {
+      "case_id": "equipment-failure-v1",
+      "case_prompt": "Is equipment contributing to the delay in Wave 17? Check the conveyor system and forklift status and explain whether any equipment issues are on the critical path.",
+      "task_family": "ASK",
+      "model_results": [
+        {
+          "evaluation_run_key": "0644b71c461920ee8b2fa0d011306d38a940b4f719467a144efe0464afaefb51",
+          "case_id": "equipment-failure-v1",
+          "dataset_id": "eval-fixture-dataset-v1",
+          "semantic_checksum": "fixture-checksum-abc123",
+          "scenario_id": "equipment-failure-v1",
+          "context_snapshot_id": null,
+          "warehouse_state_snapshot_id": null,
+          "prompt_hash": "74d6c804273e447926d3669a814be996bc2911d86f8002e50060b8280d4d6753",
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "deployment": "nvidia_hosted",
+          "quality": {
+            "score": 0.8,
+            "pass": false,
+            "applicable_graders": 5,
+            "passed_graders": 4,
+            "graders": [
+              {
+                "name": "schema_validity",
+                "passed": true,
+                "score": null,
+                "reason": "No expected_schema defined \u2014 schema check skipped.",
+                "evidence": []
+              },
+              {
+                "name": "hallucination",
+                "passed": false,
+                "score": null,
+                "reason": "Response references 1 entity ID(s) not resolvable to any known context entity.",
+                "evidence": [
+                  "in-scope"
+                ]
+              },
+              {
+                "name": "capability_match",
+                "passed": true,
+                "score": 0.8,
+                "reason": "Response mentions synonym for equipment_bypass: 'conveyor-backup'",
+                "evidence": [
+                  "conveyor-backup"
+                ]
+              },
+              {
+                "name": "target_match",
+                "passed": true,
+                "score": null,
+                "reason": "Response references expected target exactly: conveyor-main",
+                "evidence": [
+                  "conveyor-main",
+                  "{\"model_reference\": \"conveyor-main\", \"resolved_entity_id\": \"conveyor-main\", \"expected_entity_id\": \"conveyor-main\", \"match\": true}"
+                ]
+              },
+              {
+                "name": "required_evidence",
+                "passed": true,
+                "score": 1.0,
+                "reason": "All 2 required facts found.",
+                "evidence": [
+                  "conveyor",
+                  "wave-17"
+                ]
+              },
+              {
+                "name": "forbidden_claims",
+                "passed": true,
+                "score": null,
+                "reason": "No forbidden claims detected (3 checked).",
+                "evidence": []
+              }
+            ]
+          },
+          "latency": {
+            "routing_ms": 0.012,
+            "inference_ms": 2143.773,
+            "total_ms": 2143.786
+          },
+          "provider": "nvidia-nim",
+          "routing_strategy": "forced_evaluation",
+          "candidate_models": [
+            "nvidia/nemotron-3-super-120b-a12b"
+          ],
+          "tokens": {
+            "input": 203,
+            "output": 225,
+            "cost": "unavailable"
+          },
+          "outcome": {
+            "timeout": false,
+            "error": null,
+            "fallback_used": false,
+            "policy_compliant": true
+          },
+          "interpretation": "",
+          "raw_response": "Based on the operational context provided, I cannot determine whether equipment is contributing to delays in Wave 17 or assess the status of the conveyor system and forklift.\n\nThe context only lists in-scope entity IDs, including:\n- wave-17\n- conveyor-main\n- conveyor-backup\n- equip-forklift-001\n\nHowever, it does not contain any operational status information, performance data, delay reports, or critical path analysis for these entities. There are no details about:\n- Current status of conveyor-main or conveyor-backup\n- Operational state of equip-forklift-001\n- Any reported equipment issues\n- Impact assessments on Wave 17\n- Critical path dependencies\n\nTo answer whether equipment is contributing to delays in Wave 17, I would need additional operational context such as equipment status logs, maintenance reports, delay timestamps, or bottleneck analyses - none of which are present in the provided context.\n\nTherefore, with the information given, I cannot confirm or deny whether equipment issues are affecting Wave 17 or are on the critical path.",
+          "display_preview": "Based on the operational context provided, I cannot determine whether equipment is contributing to delays in Wave 17 or assess the status of the conveyor system and forklift.\n\nThe context only lists in-scope entity IDs, including:\n- wave-17\n- conveyor-main\n- conveyor-backup\n- equip-forklift-001\n\nHow"
+        }
+      ],
+      "router_selection": {
+        "case_id": "equipment-failure-v1",
+        "selected_model_id": "nvidia/nemotron-3-super-120b-a12b",
+        "selected_role": "super",
+        "routing_rule": "high_reasoning",
+        "routing_reason": "reasoning=HIGH requires Super",
+        "routing_strategy": "rules",
+        "routing_latency_ms": 0.025,
+        "candidate_models": [
+          "nvidia/nemotron-3-super-120b-a12b"
+        ],
+        "policy_compliant": true
+      },
+      "oracle": {
+        "best_quality": {
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "quality_score": 0.8
+        },
+        "fastest_passing": {
+          "model_id": null,
+          "total_latency_ms": 0.0
+        },
+        "lowest_cost_passing": {
+          "model_id": "unavailable",
+          "note": "Cost metadata unavailable in current repo/config."
+        },
+        "passing_models": []
+      },
+      "regret": {
+        "router_model": "nvidia/nemotron-3-super-120b-a12b",
+        "quality_regret": false,
+        "latency_regret": false,
+        "quality_regret_detail": "",
+        "latency_regret_detail": "",
+        "quality_regret_policy_note": ""
+      }
+    },
+    {
+      "case_id": "healthy-baseline-v1",
+      "case_prompt": "Analyze the current operational state of Wave 17. Is the wave on track? Are there any issues that require intervention?",
+      "task_family": "ANALYZE",
+      "model_results": [
+        {
+          "evaluation_run_key": "2fd00e2bc3e2bdd6fec2da02e28d51e5a1ba9fce1289023a255c7115122ca50b",
+          "case_id": "healthy-baseline-v1",
+          "dataset_id": "eval-fixture-dataset-v1",
+          "semantic_checksum": "fixture-checksum-abc123",
+          "scenario_id": "healthy-baseline-v1",
+          "context_snapshot_id": null,
+          "warehouse_state_snapshot_id": null,
+          "prompt_hash": "a1f8f936cd3885a83f457134e2838646cbb1ae13af6a0dc8b1cdda2521cb1a6c",
+          "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "deployment": "nvidia_hosted",
+          "quality": {
+            "score": 1.0,
+            "pass": true,
+            "applicable_graders": 4,
+            "passed_graders": 4,
+            "graders": [
+              {
+                "name": "schema_validity",
+                "passed": true,
+                "score": null,
+                "reason": "No expected_schema defined \u2014 schema check skipped.",
+                "evidence": []
+              },
+              {
+                "name": "hallucination",
+                "passed": true,
+                "score": null,
+                "reason": "No entity IDs outside context detected.",
+                "evidence": []
+              },
+              {
+                "name": "capability_match",
+                "passed": true,
+                "score": null,
+                "reason": "No expected_capability defined \u2014 capability check skipped.",
+                "evidence": []
+              },
+              {
+                "name": "target_match",
+                "passed": true,
+                "score": null,
+                "reason": "Response references expected target (variant 'wave 17'): wave-17",
+                "evidence": [
+                  "wave 17",
+                  "{\"model_reference\": \"wave 17\", \"resolved_entity_id\": \"wave-17\", \"expected_entity_id\": \"wave-17\", \"match\": true}"
+                ]
+              },
+              {
+                "name": "required_evidence",
+                "passed": true,
+                "score": 1.0,
+                "reason": "All 1 required facts found.",
+                "evidence": [
+                  "wave-17"
+                ]
+              },
+              {
+                "name": "forbidden_claims",
+                "passed": true,
+                "score": null,
+                "reason": "No forbidden claims detected (3 checked).",
+                "evidence": []
+              }
+            ]
+          },
+          "latency": {
+            "routing_ms": 0.012,
+            "inference_ms": 10131.285,
+            "total_ms": 10131.296
+          },
+          "provider": "nvidia-nim",
+          "routing_strategy": "forced_evaluation",
+          "candidate_models": [
+            "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "nvidia/nemotron-3-super-120b-a12b"
+          ],
+          "tokens": {
+            "input": 200,
+            "output": 336,
+            "cost": "unavailable"
+          },
+          "outcome": {
+            "timeout": false,
+            "error": null,
+            "fallback_used": false,
+            "policy_compliant": true
+          },
+          "interpretation": "",
+          "raw_response": "# Wave 17 Operational Analysis\n\n## Current Status: **ON TRACK**\n\n### Wave Overview\n- **Wave ID**: wave-17\n- **Status**: Active and progressing normally\n- **Overall Progress**: Moving through picking operations as expected\n\n### Operational Metrics\n- **Zone Activity**: \n  - zone-picking: Active operations\n  - zone-receiving: No active wave operations\n  - zone-shipping: No active wave operations\n\n- **Equipment Status**:\n  - conveyor-main: Operational\n  - conveyor-backup: Standby (available if needed)\n  - equip-forklift-001: Available\n\n- **Labor Resources**:\n  - labor-shift-morning: Active shift\n  - labor-shift-afternoon: Active shift\n  - Workers (A001, A002, A003): Assigned and active\n\n### SKU Handling\n- **sku-high-priority**: Being processed within wave\n- **sku-standard**: Being processed within wave\n\n### Issues Requiring Intervention: **NONE**\n\n### Recommendations\n1. **Continue monitoring** wave progress through normal channels\n2. **Maintain equipment readiness** - conveyor-main operational, backup available\n3. **Labor shift coordination** - both morning and afternoon shifts active as needed\n4. **No immediate intervention required** - wave progressing according to schedule\n\n### Summary\nWave 17 is **on track** with no issues requiring intervention. All systems are operational, labor resources are allocated, and SKUs are being processed normally. The wave should continue without requiring additional attention unless unexpected deviations occur.",
+          "display_preview": "# Wave 17 Operational Analysis\n\n## Current Status: **ON TRACK**\n\n### Wave Overview\n- **Wave ID**: wave-17\n- **Status**: Active and progressing normally\n- **Overall Progress**: Moving through picking operations as expected\n\n### Operational Metrics\n- **Zone Activity**: \n  - zone-picking: Active operat"
+        },
+        {
+          "evaluation_run_key": "c27f5dfc55947372359d0cdbff675d526d20e20dbc12d1f51e2978e97a1253e8",
+          "case_id": "healthy-baseline-v1",
+          "dataset_id": "eval-fixture-dataset-v1",
+          "semantic_checksum": "fixture-checksum-abc123",
+          "scenario_id": "healthy-baseline-v1",
+          "context_snapshot_id": null,
+          "warehouse_state_snapshot_id": null,
+          "prompt_hash": "a1f8f936cd3885a83f457134e2838646cbb1ae13af6a0dc8b1cdda2521cb1a6c",
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "deployment": "nvidia_hosted",
+          "quality": {
+            "score": 0.75,
+            "pass": false,
+            "applicable_graders": 4,
+            "passed_graders": 3,
+            "graders": [
+              {
+                "name": "schema_validity",
+                "passed": true,
+                "score": null,
+                "reason": "No expected_schema defined \u2014 schema check skipped.",
+                "evidence": []
+              },
+              {
+                "name": "hallucination",
+                "passed": false,
+                "score": null,
+                "reason": "Response references 2 entity ID(s) not resolvable to any known context entity.",
+                "evidence": [
+                  "real-time",
+                  "in-scope"
+                ]
+              },
+              {
+                "name": "capability_match",
+                "passed": true,
+                "score": null,
+                "reason": "No expected_capability defined \u2014 capability check skipped.",
+                "evidence": []
+              },
+              {
+                "name": "target_match",
+                "passed": true,
+                "score": null,
+                "reason": "Response references expected target (variant 'wave 17'): wave-17",
+                "evidence": [
+                  "wave 17",
+                  "{\"model_reference\": \"wave 17\", \"resolved_entity_id\": \"wave-17\", \"expected_entity_id\": \"wave-17\", \"match\": true}"
+                ]
+              },
+              {
+                "name": "required_evidence",
+                "passed": true,
+                "score": 1.0,
+                "reason": "All 1 required facts found.",
+                "evidence": [
+                  "wave-17"
+                ]
+              },
+              {
+                "name": "forbidden_claims",
+                "passed": true,
+                "score": null,
+                "reason": "No forbidden claims detected (3 checked).",
+                "evidence": []
+              }
+            ]
+          },
+          "latency": {
+            "routing_ms": 0.035,
+            "inference_ms": 1890.917,
+            "total_ms": 1890.952
+          },
+          "provider": "nvidia-nim",
+          "routing_strategy": "forced_evaluation",
+          "candidate_models": [
+            "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "nvidia/nemotron-3-super-120b-a12b"
+          ],
+          "tokens": {
+            "input": 200,
+            "output": 258,
+            "cost": "unavailable"
+          },
+          "outcome": {
+            "timeout": false,
+            "error": null,
+            "fallback_used": false,
+            "policy_compliant": true
+          },
+          "interpretation": "",
+          "raw_response": "I cannot analyze the current operational state of Wave 17 because the provided operational context does not include any real-time or dynamic data about Wave 17\u2019s status, progress, performance metrics, or issues.\n\nThe context only lists in-scope entity IDs (e.g., wave-17, labor-shift-morning, worker-A001, etc.) but provides no information about:\n- Wave 17\u2019s current progress (e.g., % complete, items picked/packed)\n- Scheduled vs. actual timing\n- Resource allocation (e.g., which workers or equipment are assigned)\n- Bottlenecks, delays, or exceptions\n- System alerts or performance indicators\n\nWithout operational data such as wave status, throughput, labor utilization, equipment uptime, or exception logs, I cannot determine if Wave 17 is on track or if intervention is required.\n\nTo answer this question accurately, I would need additional context such as:\n- Wave 17\u2019s start time, target completion time, and current elapsed time\n- Number of orders/tasks assigned vs. completed\n- Current labor and equipment assignments to Wave 17\n- Any reported delays, system errors, or staffing shortages affecting the wave\n\nPlease provide this operational data for a meaningful analysis.",
+          "display_preview": "I cannot analyze the current operational state of Wave 17 because the provided operational context does not include any real-time or dynamic data about Wave 17\u2019s status, progress, performance metrics, or issues.\n\nThe context only lists in-scope entity IDs (e.g., wave-17, labor-shift-morning, worker-"
+        }
+      ],
+      "router_selection": {
+        "case_id": "healthy-baseline-v1",
+        "selected_model_id": "nvidia/nemotron-3-super-120b-a12b",
+        "selected_role": "super",
+        "routing_rule": "medium_reasoning",
+        "routing_reason": "reasoning=MEDIUM prefers Nano",
+        "routing_strategy": "rules",
+        "routing_latency_ms": 0.068,
+        "candidate_models": [
+          "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "nvidia/nemotron-3-super-120b-a12b"
+        ],
+        "policy_compliant": true
+      },
+      "oracle": {
+        "best_quality": {
+          "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "quality_score": 1.0
+        },
+        "fastest_passing": {
+          "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "total_latency_ms": 10131.296
+        },
+        "lowest_cost_passing": {
+          "model_id": "unavailable",
+          "note": "Cost metadata unavailable in current repo/config."
+        },
+        "passing_models": [
+          "nvidia/nemotron-3.5-lightning-30b-a3b"
+        ]
+      },
+      "regret": {
+        "router_model": "nvidia/nemotron-3-super-120b-a12b",
+        "quality_regret": true,
+        "latency_regret": true,
+        "quality_regret_detail": "Router chose nvidia/nemotron-3-super-120b-a12b (quality=0.75) but nvidia/nemotron-3.5-lightning-30b-a3b achieved quality=1.00.",
+        "latency_regret_detail": "Router chose nvidia/nemotron-3-super-120b-a12b which did not pass quality check. nvidia/nemotron-3.5-lightning-30b-a3b passed at 10131ms.",
+        "quality_regret_policy_note": ""
+      }
+    }
+  ],
+  "decision_gate": "CURRENT ROUTER HAS MEASURABLE GAPS"
+}

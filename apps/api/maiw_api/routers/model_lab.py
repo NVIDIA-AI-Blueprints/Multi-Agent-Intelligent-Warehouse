@@ -40,6 +40,7 @@ _ARTIFACT_PATHS: dict[str, Path] = {
     "18c": _ARTIFACT_BASE / "baseline.json",
     "18d": _ARTIFACT_BASE / "18d" / "benchmark.json",
     "18e": _ARTIFACT_BASE / "18e" / "benchmark.json",
+    "18f": _ARTIFACT_BASE / "18f" / "benchmark.json",
 }
 
 _CASES_PATH = _ARTIFACT_BASE / "cases.json"
@@ -66,6 +67,13 @@ _RUN_METADATA: dict[str, dict[str, Any]] = {
         "description": "Phase 18E — Final methodology. Prompt isolation fixed, raw_response semantics established, warm-up exclusion added.",
         "methodology_valid": True,
         "methodology_note": "All methodology blockers resolved. 53 offline tests validate corrections.",
+    },
+    "18f": {
+        "run_id": "18f",
+        "phase": "18F",
+        "description": "Phase 18F — Clean benchmark. Live inference with corrected methodology: no prompt leakage, full raw_response.",
+        "methodology_valid": True,
+        "methodology_note": "Re-run of 18C cases with 18E methodology fixes applied. First clean live comparison.",
     },
 }
 
@@ -101,7 +109,7 @@ _RAW_RESPONSE_LIMIT = 10_000
 def _load_artifact(run_id: str) -> dict[str, Any]:
     """Load and parse artifact JSON for a run. Raises HTTPException on failure."""
     if run_id not in _ARTIFACT_PATHS:
-        raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found. Valid run IDs: 18c, 18d, 18e")
+        raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found. Valid run IDs: 18c, 18d, 18e, 18f")
     path = _ARTIFACT_PATHS[run_id]
     if not path.exists():
         raise HTTPException(
@@ -208,6 +216,31 @@ def _get_cases_for_run(run_id: str, artifact: dict[str, Any]) -> list[dict[str, 
             }
             for c in raw_cases
         ]
+    elif run_id == "18f":
+        raw_cases = artifact.get("cases", [])
+        result = []
+        for case in raw_cases:
+            case_id = case.get("case_id", "unknown")
+            model_results = case.get("model_results", [])
+            summary_models = []
+            for mr in model_results:
+                quality = mr.get("quality", {})
+                summary_models.append({
+                    "model_id": mr.get("model_id"),
+                    "quality_score": quality.get("score"),
+                    "quality_pass": quality.get("pass"),
+                    "passed_graders": quality.get("passed_graders"),
+                    "applicable_graders": quality.get("applicable_graders"),
+                })
+            result.append({
+                "case_id": case_id,
+                "prompt": case.get("case_prompt", ""),
+                "task_family": case.get("task_family", ""),
+                "risk_level": case.get("risk_level", "high"),
+                "reasoning_level": case.get("reasoning_level", "high"),
+                "model_results_summary": summary_models,
+            })
+        return result
     return []
 
 
@@ -252,6 +285,17 @@ def _build_run_summary(run_id: str, artifact: dict[str, Any]) -> dict[str, Any]:
         meta["methodology_validation"] = artifact.get("methodology_validation")
         qc = artifact.get("qualification_corpus", {})
         meta["case_count"] = len(qc.get("cases", []))
+
+    elif run_id == "18f":
+        metadata = artifact.get("metadata", {})
+        meta["dataset_id"] = metadata.get("dataset_id")
+        meta["checksum"] = metadata.get("semantic_checksum")
+        meta["timestamp"] = metadata.get("run_timestamp")
+        meta["models_evaluated"] = metadata.get("models_evaluated", [])
+        meta["deployment_mode"] = metadata.get("deployment_mode")
+        meta["decision_gate"] = artifact.get("decision_gate")
+        cases = artifact.get("cases", [])
+        meta["case_count"] = len(cases)
 
     return _safe_artifact(meta)
 
@@ -299,6 +343,14 @@ async def list_runs() -> list[dict[str, Any]]:
                     entry["case_count"] = len(qc.get("cases", []))
                     entry["models_evaluated"] = ["nvidia/nemotron-3-super-120b-a12b", "nvidia/nemotron-3.5-lightning-30b-a3b"]
                     entry["verdicts"] = artifact.get("verdicts")
+                elif run_id == "18f":
+                    artifact_meta = artifact.get("metadata", {})
+                    entry["dataset_id"] = artifact_meta.get("dataset_id")
+                    entry["checksum"] = artifact_meta.get("semantic_checksum")
+                    entry["timestamp"] = artifact_meta.get("run_timestamp")
+                    entry["models_evaluated"] = artifact_meta.get("models_evaluated", [])
+                    entry["case_count"] = len(artifact.get("cases", []))
+                    entry["decision_gate"] = artifact.get("decision_gate")
             except HTTPException:
                 entry["artifact_available"] = False
                 entry["error"] = "Artifact unreadable"
@@ -312,7 +364,7 @@ async def get_run(run_id: str) -> dict[str, Any]:
     if run_id not in _RUN_METADATA:
         raise HTTPException(
             status_code=404,
-            detail=f"Run '{run_id}' not found. Valid run IDs: 18c, 18d, 18e",
+            detail=f"Run '{run_id}' not found. Valid run IDs: 18c, 18d, 18e, 18f",
         )
     artifact = _load_artifact(run_id)
     return _build_run_summary(run_id, artifact)
@@ -324,7 +376,7 @@ async def list_run_cases(run_id: str) -> list[dict[str, Any]]:
     if run_id not in _RUN_METADATA:
         raise HTTPException(
             status_code=404,
-            detail=f"Run '{run_id}' not found. Valid run IDs: 18c, 18d, 18e",
+            detail=f"Run '{run_id}' not found. Valid run IDs: 18c, 18d, 18e, 18f",
         )
     artifact = _load_artifact(run_id)
     return _safe_artifact(_get_cases_for_run(run_id, artifact))
@@ -336,7 +388,7 @@ async def get_run_case(run_id: str, case_id: str) -> dict[str, Any]:
     if run_id not in _RUN_METADATA:
         raise HTTPException(
             status_code=404,
-            detail=f"Run '{run_id}' not found. Valid run IDs: 18c, 18d, 18e",
+            detail=f"Run '{run_id}' not found. Valid run IDs: 18c, 18d, 18e, 18f",
         )
     artifact = _load_artifact(run_id)
 
@@ -362,6 +414,17 @@ async def get_run_case(run_id: str, case_id: str) -> dict[str, Any]:
                 if case_id in calibration:
                     detail["calibration_results"] = calibration[case_id]
                 return _safe_artifact(detail)
+        raise HTTPException(
+            status_code=404,
+            detail=f"Case '{case_id}' not found in run '{run_id}'",
+        )
+
+    # For 18F: same structure as 18C
+    if run_id == "18f":
+        cases = artifact.get("cases", [])
+        for case in cases:
+            if case.get("case_id") == case_id:
+                return _safe_artifact(case)
         raise HTTPException(
             status_code=404,
             detail=f"Case '{case_id}' not found in run '{run_id}'",
