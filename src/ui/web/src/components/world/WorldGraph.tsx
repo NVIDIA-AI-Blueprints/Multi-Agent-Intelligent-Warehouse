@@ -16,7 +16,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Box, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import { worldAPI, GraphSearchResultDTO, GraphNodeDTO, GraphFocusContext, ChangedEntityDTO } from '../../services/worldAPI';
+import { worldAPI, GraphSearchResultDTO, GraphFocusContext, ChangedEntityDTO } from '../../services/worldAPI';
 import { WorldView } from './WorldShell';
 import OperationalGraph from './OperationalGraph';
 import NodeInspector from './NodeInspector';

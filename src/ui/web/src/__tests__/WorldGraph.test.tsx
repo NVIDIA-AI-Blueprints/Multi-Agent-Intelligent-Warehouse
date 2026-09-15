@@ -30,7 +30,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@mui/material/styles';
 import { nvidiaTheme } from '../theme/nvidiaTheme';
 
-import DemoShell from '../pages/DemoShell';
 import WorldShell from '../components/world/WorldShell';
 import WorldGraph from '../components/world/WorldGraph';
 import { worldAPI } from '../services/worldAPI';

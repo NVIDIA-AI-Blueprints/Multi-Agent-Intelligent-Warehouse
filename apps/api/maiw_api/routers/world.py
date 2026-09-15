@@ -240,7 +240,7 @@ def _graph_summary(runtime: MAIWRuntime) -> dict[str, Any]:
         return {}
     try:
         return runtime.world_graph.summary()
-    except Exception:
+    except Exception:  # noqa: BLE001 — return safe default on any graph error
         return {}
 
 
@@ -479,7 +479,7 @@ def _scenario_affected_map(runtime: MAIWRuntime) -> dict[str, str]:
                 kind = ev.kind.value if hasattr(ev.kind, "value") else str(ev.kind)
                 result[ev.entity_id] = _affected_entity_severity(kind) or "LOW"
         return result
-    except Exception:
+    except Exception:  # noqa: BLE001 — return safe default on any graph error
         return {}
 
 
@@ -653,7 +653,7 @@ def _graph_search(q: str, graph: Any, limit: int) -> list[GraphSearchResultDTO]:
 
     # 4. Prefix match on entity IDs (deterministic: sorted)
     if len(results) < limit:
-        for et in EntityType:
+        for et in list(EntityType):
             for e in sorted(graph.entities_by_type(et), key=lambda x: x.id):
                 if len(results) >= limit:
                     break
@@ -1462,7 +1462,7 @@ async def get_graph_entities(
         all_entities = sorted(graph.entities_by_type(et_filter), key=lambda e: e.id)
     else:
         all_entities = []
-        for et in EntityType:
+        for et in list(EntityType):
             all_entities.extend(graph.entities_by_type(et))
         all_entities = sorted(all_entities, key=lambda e: (e.entity_type.value, e.id))
 
