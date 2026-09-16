@@ -692,6 +692,7 @@ const ModelGatewayLab: React.FC = () => {
 
   // Load initial data
   useEffect(() => {
+    let mounted = true;
     const load = async () => {
       try {
         setLoading(true);
@@ -699,36 +700,43 @@ const ModelGatewayLab: React.FC = () => {
           modelLabAPI.getRuns(),
           modelLabAPI.getModelStatus(),
         ]);
+        if (!mounted) return;
         setRuns(runsData);
         setModelStatus(statusData);
         setError(null);
       } catch (e: any) {
+        if (!mounted) return;
         setError(`Failed to load Model Lab data: ${e?.message || 'Unknown error'}`);
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     };
     load();
+    return () => { mounted = false; };
   }, []);
 
   // Load run detail when run selection changes
   useEffect(() => {
     if (!selectedRunId) return;
+    let mounted = true;
     const load = async () => {
       try {
         const [runData, casesData] = await Promise.all([
           modelLabAPI.getRun(selectedRunId),
           modelLabAPI.getRunCases(selectedRunId),
         ]);
+        if (!mounted) return;
         setCurrentRun(runData);
         setCases(casesData);
         setSelectedCaseId(casesData[0]?.case_id || '');
         setCurrentCase(null);
       } catch (e: any) {
+        if (!mounted) return;
         setError(`Failed to load run ${selectedRunId}: ${e?.message || 'Unknown error'}`);
       }
     };
     load();
+    return () => { mounted = false; };
   }, [selectedRunId]);
 
   // Load case detail when case selection changes
@@ -737,17 +745,21 @@ const ModelGatewayLab: React.FC = () => {
       setCurrentCase(null);
       return;
     }
+    let mounted = true;
     const load = async () => {
       try {
         const caseData = await modelLabAPI.getRunCase(selectedRunId, selectedCaseId);
+        if (!mounted) return;
         setCurrentCase(caseData);
       } catch {
+        if (!mounted) return;
         // Case detail may not have full model results for all runs — use summary
         const summary = cases.find((c) => c.case_id === selectedCaseId) || null;
         setCurrentCase(summary);
       }
     };
     load();
+    return () => { mounted = false; };
   }, [selectedRunId, selectedCaseId, cases]);
 
   const runLabel = (r: ModelLabRun) => {
