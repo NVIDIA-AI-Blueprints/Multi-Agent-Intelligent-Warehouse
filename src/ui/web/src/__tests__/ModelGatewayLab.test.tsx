@@ -149,19 +149,19 @@ function renderLab() {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-// afterEach rejects this to unblock any async load() still awaiting it.
-// A never-resolving promise whose executor is never called keeps Node's
-// event loop alive (the awaiting coroutine is still "alive").  Rejecting
-// it in afterEach lets the async function resume, hit the isMounted guard,
-// and exit — allowing the worker process to shut down cleanly.
-let _rejectPending: ((e: Error) => void) | null = null;
+// afterEach resolves this to unblock any async load() still awaiting it.
+// A never-resolving promise keeps Node's event loop alive (the awaiting
+// coroutine stays suspended).  Resolving (not rejecting) it lets load()
+// resume, hit the isMounted guard, and return cleanly — no unhandled
+// rejection, no worker crash.
+let _resolvePending: (() => void) | null = null;
 
 beforeEach(() => {
   jest.clearAllMocks();
   jest.clearAllTimers();
   // Default all API methods to a controllable pending promise.
-  const pending: Promise<never> = new Promise<never>((_, reject) => {
-    _rejectPending = reject;
+  const pending = new Promise<void>((resolve) => {
+    _resolvePending = resolve;
   });
   mockedAPI.getRuns.mockReturnValue(pending as any);
   mockedAPI.getModelStatus.mockReturnValue(pending as any);
@@ -171,9 +171,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  // Unblock any component effect still awaiting the pending mock promise.
-  _rejectPending?.(new Error('test cleanup'));
-  _rejectPending = null;
+  // Resolve (not reject) so load() exits via the isMounted guard, not a throw.
+  _resolvePending?.();
+  _resolvePending = null;
   jest.clearAllTimers();
   jest.useRealTimers();
 });
@@ -197,10 +197,11 @@ describe('ModelGatewayLab', () => {
     });
 
     it('shows loading state initially', () => {
-      // beforeEach already sets all mocks to never-resolving promises,
-      // so no override needed here — just render and assert.
-      renderLab();
+      // beforeEach sets all mocks to pending. Unmount explicitly so the
+      // component's cleanup runs before afterEach resolves the promise.
+      const { unmount } = renderLab();
       expect(screen.getByText(/Loading evaluation artifacts/i)).toBeInTheDocument();
+      unmount();
     });
   });
 
