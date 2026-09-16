@@ -87,6 +87,10 @@ class GatewayTelemetry:
                 "fallback_reason": decision.fallback_reason,
                 # Physical model
                 "selected_model": decision.selected_model_id,
+                # Phase 18B: strategy provenance + performance + candidates
+                "routing_strategy": decision.routing_strategy,
+                "routing_latency_ms": decision.routing_latency_ms,
+                "candidate_models": decision.candidate_models,
                 # Outcome
                 "latency_ms": round(latency_ms, 1),
                 "prompt_tokens": usage.get("prompt_tokens"),
@@ -122,6 +126,9 @@ class GatewayTelemetry:
                 "routing_reason": decision.routing_reason if decision else None,
                 "fallback_from": decision.fallback_from if decision else None,
                 "selected_model": decision.selected_model_id if decision else None,
+                "routing_strategy": decision.routing_strategy if decision else None,
+                "routing_latency_ms": decision.routing_latency_ms if decision else None,
+                "candidate_models": decision.candidate_models if decision else None,
                 "latency_ms": round(latency_ms, 1),
                 "error_type": error_type,
                 "error_message": error_message,

@@ -1,0 +1,1 @@
+{"note": "Phase 18E: No live samples collected. Nano model nvidia/nemotron-3-nano-30b-a3b reached EOL 2026-09-01T09:00:00Z and is operator-disabled (NEMOTRON_NANO_ENABLED=false). Super and Lightning live runs deferred to 18F Evaluation Lab. Methodology verified offline via 53 tests. See benchmark.json for full status."}
