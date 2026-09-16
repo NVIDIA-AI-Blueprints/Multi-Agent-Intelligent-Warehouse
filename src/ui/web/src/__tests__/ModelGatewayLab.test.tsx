@@ -149,13 +149,20 @@ function renderLab() {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
+// afterEach rejects this to unblock any async load() still awaiting it.
+// A never-resolving promise whose executor is never called keeps Node's
+// event loop alive (the awaiting coroutine is still "alive").  Rejecting
+// it in afterEach lets the async function resume, hit the isMounted guard,
+// and exit — allowing the worker process to shut down cleanly.
+let _rejectPending: ((e: Error) => void) | null = null;
+
 beforeEach(() => {
   jest.clearAllMocks();
   jest.clearAllTimers();
-  // Default all API methods to a never-resolving promise so state updates
-  // never fire outside act() in tests that don't call setupDefaultMocks().
-  // Fresh promise per test so no module-level handle survives the suite.
-  const pending: Promise<never> = new Promise(() => {});
+  // Default all API methods to a controllable pending promise.
+  const pending: Promise<never> = new Promise<never>((_, reject) => {
+    _rejectPending = reject;
+  });
   mockedAPI.getRuns.mockReturnValue(pending as any);
   mockedAPI.getModelStatus.mockReturnValue(pending as any);
   mockedAPI.getRun.mockReturnValue(pending as any);
@@ -164,6 +171,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // Unblock any component effect still awaiting the pending mock promise.
+  _rejectPending?.(new Error('test cleanup'));
+  _rejectPending = null;
   jest.clearAllTimers();
   jest.useRealTimers();
 });
