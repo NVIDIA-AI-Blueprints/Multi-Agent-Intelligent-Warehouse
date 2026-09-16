@@ -149,33 +149,20 @@ function renderLab() {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-// afterEach resolves this to unblock any async load() still awaiting it.
-// A never-resolving promise keeps Node's event loop alive (the awaiting
-// coroutine stays suspended).  Resolving (not rejecting) it lets load()
-// resume, hit the isMounted guard, and return cleanly — no unhandled
-// rejection, no worker crash.
-let _resolvePending: (() => void) | null = null;
-
 beforeEach(() => {
   jest.useFakeTimers();
   jest.clearAllMocks();
-  // Default all API methods to a controllable pending promise.
-  const pending = new Promise<void>((resolve) => {
-    _resolvePending = resolve;
-  });
-  mockedAPI.getRuns.mockReturnValue(pending as any);
-  mockedAPI.getModelStatus.mockReturnValue(pending as any);
-  mockedAPI.getRun.mockReturnValue(pending as any);
-  mockedAPI.getRunCases.mockReturnValue(pending as any);
-  mockedAPI.getRunCase.mockReturnValue(pending as any);
+  // Default all mocks to resolved values so async effects complete within
+  // act() scope and no promise or coroutine is left pending at teardown.
+  mockedAPI.getRuns.mockResolvedValue(MOCK_RUNS as any);
+  mockedAPI.getModelStatus.mockResolvedValue(MOCK_MODEL_STATUS as any);
+  mockedAPI.getRun.mockResolvedValue(MOCK_18E_RUN as any);
+  mockedAPI.getRunCases.mockResolvedValue(MOCK_18E_CASES as any);
+  mockedAPI.getRunCase.mockResolvedValue(MOCK_18E_CASES[0] as any);
 });
 
 afterEach(() => {
-  // Flush any pending fake timers, then resolve the pending promise so
-  // component effects can exit cleanly before real timers are restored.
   jest.runOnlyPendingTimers();
-  _resolvePending?.();
-  _resolvePending = null;
   jest.useRealTimers();
 });
 
@@ -198,8 +185,12 @@ describe('ModelGatewayLab', () => {
     });
 
     it('shows loading state initially', () => {
-      // beforeEach sets all mocks to pending. Unmount explicitly so the
-      // component's cleanup runs before afterEach resolves the promise.
+      // Override with never-resolving promises just for this test so the
+      // loading state is visible. Unmount immediately after asserting so
+      // the component's isMounted cleanup runs before afterEach.
+      const pending = new Promise<never>(() => {});
+      mockedAPI.getRuns.mockReturnValue(pending as any);
+      mockedAPI.getModelStatus.mockReturnValue(pending as any);
       const { unmount } = renderLab();
       expect(screen.getByText(/Loading evaluation artifacts/i)).toBeInTheDocument();
       unmount();
