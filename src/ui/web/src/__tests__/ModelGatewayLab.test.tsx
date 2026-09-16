@@ -157,8 +157,8 @@ function renderLab() {
 let _resolvePending: (() => void) | null = null;
 
 beforeEach(() => {
+  jest.useFakeTimers();
   jest.clearAllMocks();
-  jest.clearAllTimers();
   // Default all API methods to a controllable pending promise.
   const pending = new Promise<void>((resolve) => {
     _resolvePending = resolve;
@@ -171,10 +171,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  // Resolve (not reject) so load() exits via the isMounted guard, not a throw.
+  // Flush any pending fake timers, then resolve the pending promise so
+  // component effects can exit cleanly before real timers are restored.
+  jest.runOnlyPendingTimers();
   _resolvePending?.();
   _resolvePending = null;
-  jest.clearAllTimers();
   jest.useRealTimers();
 });
 
