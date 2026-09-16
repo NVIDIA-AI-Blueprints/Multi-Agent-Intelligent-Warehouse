@@ -172,8 +172,14 @@ describe('ModelGatewayLab', () => {
     });
 
     it('shows loading state initially', () => {
-      mockedAPI.getRuns.mockReturnValue(new Promise(() => {}));
-      mockedAPI.getModelStatus.mockReturnValue(new Promise(() => {}));
+      // Block ALL API calls — getRun/getRunCases default to undefined after
+      // clearAllMocks(), which causes Promise.all([undefined,undefined]) to
+      // resolve immediately and update state outside act().
+      const pending: Promise<never> = new Promise(() => {});
+      mockedAPI.getRuns.mockReturnValue(pending);
+      mockedAPI.getModelStatus.mockReturnValue(pending);
+      mockedAPI.getRun.mockReturnValue(pending);
+      mockedAPI.getRunCases.mockReturnValue(pending);
       renderLab();
       expect(screen.getByText(/Loading evaluation artifacts/i)).toBeInTheDocument();
     });
