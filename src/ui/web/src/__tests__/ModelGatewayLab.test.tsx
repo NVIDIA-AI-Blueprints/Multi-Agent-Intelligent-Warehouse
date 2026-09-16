@@ -150,10 +150,9 @@ function renderLab() {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
-  jest.useFakeTimers();
   jest.clearAllMocks();
-  // Default all mocks to resolved values so async effects complete within
-  // act() scope and no promise or coroutine is left pending at teardown.
+  // Default all mocks to resolved values. Real timers let Promise microtasks
+  // flush naturally so async state updates settle inside RTL's act() scope.
   mockedAPI.getRuns.mockResolvedValue(MOCK_RUNS as any);
   mockedAPI.getModelStatus.mockResolvedValue(MOCK_MODEL_STATUS as any);
   mockedAPI.getRun.mockResolvedValue(MOCK_18E_RUN as any);
@@ -162,8 +161,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  jest.runOnlyPendingTimers();
-  jest.useRealTimers();
+  jest.clearAllTimers();
 });
 
 describe('ModelGatewayLab', () => {
