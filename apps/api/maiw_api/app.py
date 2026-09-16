@@ -44,6 +44,7 @@ from maiw_api.routers.mcp_status import router as mcp_status_router
 from maiw_api.routers.runtime_status import router as runtime_status_router
 from maiw_api.routers.demo import router as demo_router
 from maiw_api.routers.copilot import router as copilot_router
+from maiw_api.routers.world import router as world_router
 
 from maiw_api.routers.model_lab import router as model_lab_router
 from maiw_api.routers.world import router as world_router
@@ -244,6 +245,7 @@ app.include_router(mcp_status_router)
 app.include_router(runtime_status_router)
 app.include_router(demo_router)
 app.include_router(copilot_router)
+app.include_router(world_router)
 
 app.include_router(model_lab_router)
 app.include_router(world_router)
