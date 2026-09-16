@@ -169,28 +169,29 @@ describe('ModelGatewayLab', () => {
     it('renders without crashing', async () => {
       setupDefaultMocks();
       renderLab();
-      await waitFor(() => {
-        expect(screen.getByText('MODEL GATEWAY LAB')).toBeInTheDocument();
-      });
+      expect(await screen.findByText('MODEL GATEWAY LAB')).toBeInTheDocument();
     });
 
     it('shows VIEW ONLY notice', async () => {
       setupDefaultMocks();
       renderLab();
-      await waitFor(() => {
-        expect(screen.getByText(/VIEW ONLY/i)).toBeInTheDocument();
-      });
+      expect(await screen.findByText(/VIEW ONLY/i)).toBeInTheDocument();
     });
 
     it('shows loading state initially', () => {
-      // Override with never-resolving promises just for this test so the
-      // loading state is visible. Unmount immediately after asserting so
-      // the component's isMounted cleanup runs before afterEach.
-      const pending = new Promise<never>(() => {});
-      mockedAPI.getRuns.mockReturnValue(pending as any);
-      mockedAPI.getModelStatus.mockReturnValue(pending as any);
+      // Use a controlled promise so we can resolve it before unmounting
+      // and avoid leaving a suspended coroutine (open handle) in the worker.
+      let resolveMocks!: () => void;
+      const controlled = new Promise<void>(r => { resolveMocks = r; });
+      mockedAPI.getRuns.mockReturnValue(controlled as any);
+      mockedAPI.getModelStatus.mockReturnValue(controlled as any);
+
       const { unmount } = renderLab();
       expect(screen.getByText(/Loading evaluation artifacts/i)).toBeInTheDocument();
+
+      // Settle the promise first so the coroutine exits via the isMounted
+      // guard after unmount, not via a hanging await.
+      resolveMocks();
       unmount();
     });
   });
@@ -199,17 +200,13 @@ describe('ModelGatewayLab', () => {
     it('shows run selector after data loads', async () => {
       setupDefaultMocks();
       renderLab();
-      await waitFor(() => {
-        expect(screen.getByTestId('run-selector')).toBeInTheDocument();
-      });
+      expect(await screen.findByTestId('run-selector')).toBeInTheDocument();
     });
 
     it('shows run selector with 18C in the runs list', async () => {
       setupDefaultMocks();
       renderLab();
-      await waitFor(() => {
-        expect(screen.getByTestId('run-selector')).toBeInTheDocument();
-      });
+      expect(await screen.findByTestId('run-selector')).toBeInTheDocument();
       // getRuns should have been called and returned all 3 run IDs
       expect(mockedAPI.getRuns).toHaveBeenCalled();
       const runIds = MOCK_RUNS.map((r) => r.run_id);
@@ -219,24 +216,19 @@ describe('ModelGatewayLab', () => {
     it('shows run selector with 18D in the runs list', async () => {
       setupDefaultMocks();
       renderLab();
-      await waitFor(() => {
-        expect(screen.getByTestId('run-selector')).toBeInTheDocument();
-      });
+      expect(await screen.findByTestId('run-selector')).toBeInTheDocument();
       expect(mockedAPI.getRuns).toHaveBeenCalled();
       const runIds = MOCK_RUNS.map((r) => r.run_id);
       expect(runIds).toContain('18d');
     });
 
-    it('loads 18E run data by default — getRun called with 18e', async () => {
+    it('loads 18F run data by default — getRun called with 18f', async () => {
       setupDefaultMocks();
       renderLab();
-      // 18E is the default selectedRunId; getRun('18e') must be called on mount
-      await waitFor(
-        () => {
-          expect(mockedAPI.getRun).toHaveBeenCalledWith('18e');
-        },
-        { timeout: 3000 }
-      );
+      // 18F is the default selectedRunId (set in useState)
+      await waitFor(() => {
+        expect(mockedAPI.getRun).toHaveBeenCalledWith('18f');
+      });
     });
   });
 
@@ -244,9 +236,7 @@ describe('ModelGatewayLab', () => {
     it('shows PROMPT ISOLATED badge', async () => {
       setupDefaultMocks();
       renderLab();
-      await waitFor(() => {
-        expect(screen.getByText('PROMPT ISOLATED')).toBeInTheDocument();
-      });
+      expect(await screen.findByText('PROMPT ISOLATED')).toBeInTheDocument();
     });
 
     it('shows PROMPT METADATA LEAKAGE warning when 18C is selected and methodology_valid is false', async () => {
@@ -257,9 +247,7 @@ describe('ModelGatewayLab', () => {
       mockedAPI.getRunCase.mockRejectedValue(new Error('not found'));
 
       renderLab();
-      await waitFor(() => {
-        expect(screen.getByText('PROMPT METADATA LEAKAGE')).toBeInTheDocument();
-      });
+      expect(await screen.findByText('PROMPT METADATA LEAKAGE')).toBeInTheDocument();
     });
   });
 
@@ -267,17 +255,13 @@ describe('ModelGatewayLab', () => {
     it('shows Nano as UNAVAILABLE', async () => {
       setupDefaultMocks();
       renderLab();
-      await waitFor(() => {
-        expect(screen.getByText('UNAVAILABLE')).toBeInTheDocument();
-      });
+      expect(await screen.findByText('UNAVAILABLE')).toBeInTheDocument();
     });
 
     it('shows NOT TESTED for Nano', async () => {
       setupDefaultMocks();
       renderLab();
-      await waitFor(() => {
-        expect(screen.getByText('NOT TESTED')).toBeInTheDocument();
-      });
+      expect(await screen.findByText('NOT TESTED')).toBeInTheDocument();
     });
 
     it('shows Super as AVAILABLE', async () => {
@@ -302,9 +286,7 @@ describe('ModelGatewayLab', () => {
     it('shows ROUTER ASSESSMENT section label', async () => {
       setupDefaultMocks();
       renderLab();
-      await waitFor(() => {
-        expect(screen.getByText('E. Router Assessment')).toBeInTheDocument();
-      });
+      expect(await screen.findByText('E. Router Assessment')).toBeInTheDocument();
     });
 
     it('shows INSUFFICIENT EVIDENCE for 18E', async () => {
@@ -343,9 +325,7 @@ describe('ModelGatewayLab', () => {
       mockedAPI.getRunCase.mockResolvedValue(MOCK_CASE_WITH_GRADER_FAIL as any);
 
       renderLab();
-      await waitFor(() => {
-        expect(screen.getByText('CRITICAL')).toBeInTheDocument();
-      });
+      expect(await screen.findByText('CRITICAL')).toBeInTheDocument();
     });
   });
 
