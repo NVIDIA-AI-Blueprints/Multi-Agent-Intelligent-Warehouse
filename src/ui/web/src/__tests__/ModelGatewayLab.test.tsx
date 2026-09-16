@@ -149,8 +149,17 @@ function renderLab() {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
+const _pending: Promise<never> = new Promise(() => {});
+
 beforeEach(() => {
   jest.clearAllMocks();
+  // Default all API methods to a never-resolving promise so state updates
+  // never fire outside act() in tests that don't call setupDefaultMocks().
+  mockedAPI.getRuns.mockReturnValue(_pending as any);
+  mockedAPI.getModelStatus.mockReturnValue(_pending as any);
+  mockedAPI.getRun.mockReturnValue(_pending as any);
+  mockedAPI.getRunCases.mockReturnValue(_pending as any);
+  mockedAPI.getRunCase.mockReturnValue(_pending as any);
 });
 
 describe('ModelGatewayLab', () => {

@@ -55,16 +55,16 @@ export const VersionFooter: React.FC<VersionFooterProps> = ({
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchVersionInfo = async () => {
       try {
         setLoading(true);
-        // getVersion() now returns fallback data instead of throwing
         const info = await versionAPI.getVersion();
+        if (cancelled) return;
         setVersionInfo(info);
         setError(null);
       } catch (err: any) {
-        // This catch block should rarely be hit since getVersion() returns fallback data
-        // But handle it gracefully just in case
+        if (cancelled) return;
         if (process.env.NODE_ENV === 'development') {
           console.debug('Version info fetch failed, using fallback:', err?.message);
         }
@@ -75,13 +75,14 @@ export const VersionFooter: React.FC<VersionFooterProps> = ({
           build_time: new Date().toISOString(),
           environment: 'development',
         });
-        setError(null); // Don't show error, just use fallback
+        setError(null);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchVersionInfo();
+    return () => { cancelled = true; };
   }, []);
 
   const handleDetailsClick = async () => {
