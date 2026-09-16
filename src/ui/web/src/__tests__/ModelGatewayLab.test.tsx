@@ -149,17 +149,23 @@ function renderLab() {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-const _pending: Promise<never> = new Promise(() => {});
-
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.clearAllTimers();
   // Default all API methods to a never-resolving promise so state updates
   // never fire outside act() in tests that don't call setupDefaultMocks().
-  mockedAPI.getRuns.mockReturnValue(_pending as any);
-  mockedAPI.getModelStatus.mockReturnValue(_pending as any);
-  mockedAPI.getRun.mockReturnValue(_pending as any);
-  mockedAPI.getRunCases.mockReturnValue(_pending as any);
-  mockedAPI.getRunCase.mockReturnValue(_pending as any);
+  // Fresh promise per test so no module-level handle survives the suite.
+  const pending: Promise<never> = new Promise(() => {});
+  mockedAPI.getRuns.mockReturnValue(pending as any);
+  mockedAPI.getModelStatus.mockReturnValue(pending as any);
+  mockedAPI.getRun.mockReturnValue(pending as any);
+  mockedAPI.getRunCases.mockReturnValue(pending as any);
+  mockedAPI.getRunCase.mockReturnValue(pending as any);
+});
+
+afterEach(() => {
+  jest.clearAllTimers();
+  jest.useRealTimers();
 });
 
 describe('ModelGatewayLab', () => {
@@ -181,14 +187,8 @@ describe('ModelGatewayLab', () => {
     });
 
     it('shows loading state initially', () => {
-      // Block ALL API calls — getRun/getRunCases default to undefined after
-      // clearAllMocks(), which causes Promise.all([undefined,undefined]) to
-      // resolve immediately and update state outside act().
-      const pending: Promise<never> = new Promise(() => {});
-      mockedAPI.getRuns.mockReturnValue(pending);
-      mockedAPI.getModelStatus.mockReturnValue(pending);
-      mockedAPI.getRun.mockReturnValue(pending);
-      mockedAPI.getRunCases.mockReturnValue(pending);
+      // beforeEach already sets all mocks to never-resolving promises,
+      // so no override needed here — just render and assert.
       renderLab();
       expect(screen.getByText(/Loading evaluation artifacts/i)).toBeInTheDocument();
     });
