@@ -177,7 +177,7 @@ def _extract_json(text: str) -> dict | None:
         parsed = json.loads(stripped)
         if isinstance(parsed, dict):
             return parsed
-    except json.JSONDecodeError:
+    except json.JSONDecodeError:  # noqa: BLE001 — malformed JSON is expected, fall through
         pass
 
     # Try to find JSON inside ```json ... ``` fence.
@@ -187,7 +187,7 @@ def _extract_json(text: str) -> dict | None:
             parsed = json.loads(fence_match.group(1))
             if isinstance(parsed, dict):
                 return parsed
-        except json.JSONDecodeError:
+        except json.JSONDecodeError:  # noqa: BLE001 — malformed JSON is expected, fall through
             pass
 
     # Try to find first {...} block.
@@ -197,7 +197,7 @@ def _extract_json(text: str) -> dict | None:
             parsed = json.loads(brace_match.group(0))
             if isinstance(parsed, dict):
                 return parsed
-        except json.JSONDecodeError:
+        except json.JSONDecodeError:  # noqa: BLE001 — malformed JSON is expected, fall through
             pass
 
     return None
