@@ -1,0 +1,92 @@
+{
+  "dataset_id": "eval-fixture-dataset-v1",
+  "semantic_checksum": "fixture-checksum-abc123",
+  "phase": "18C",
+  "description": "Phase 18C benchmark corpus — 3 fixture cases from Phase 18B covering ASK and ANALYZE prompt families.",
+  "cases": [
+    {
+      "case_id": "wave17-labor-risk-v1",
+      "task_family": "ASK",
+      "prompt": "Why is Wave 17 at risk? Based on the current labor allocation and shift assignments, what is the primary bottleneck and what action would you recommend?",
+      "reasoning_level": "high",
+      "risk_level": "high",
+      "expected_capability": "labor_reallocation",
+      "expected_target": "wave-17",
+      "required_facts": ["wave-17", "labor"],
+      "forbidden_claims": ["wave-18", "wave-99", "worker-Z999", "external-agency"],
+      "context_entities": [
+        "wave-17", "labor-shift-morning", "labor-shift-afternoon",
+        "worker-A001", "worker-A002", "worker-A003",
+        "conveyor-main", "conveyor-backup", "equip-forklift-001",
+        "zone-receiving", "zone-picking", "zone-shipping",
+        "sku-high-priority", "sku-standard"
+      ],
+      "metadata": {
+        "fixture": true,
+        "phase": "18B",
+        "scenario": "labor-bottleneck",
+        "prompt_family": "ASK"
+      }
+    },
+    {
+      "case_id": "equipment-failure-v1",
+      "task_family": "ASK",
+      "prompt": "Is equipment contributing to the delay in Wave 17? Check the conveyor system and forklift status and explain whether any equipment issues are on the critical path.",
+      "reasoning_level": "high",
+      "risk_level": "high",
+      "expected_capability": "equipment_bypass",
+      "expected_target": "conveyor-main",
+      "required_facts": ["conveyor", "wave-17"],
+      "forbidden_claims": ["fire suppression", "structural damage", "evacuation"],
+      "context_entities": [
+        "wave-17", "labor-shift-morning", "labor-shift-afternoon",
+        "worker-A001", "worker-A002", "worker-A003",
+        "conveyor-main", "conveyor-backup", "equip-forklift-001",
+        "zone-receiving", "zone-picking", "zone-shipping",
+        "sku-high-priority", "sku-standard"
+      ],
+      "metadata": {
+        "fixture": true,
+        "phase": "18B",
+        "scenario": "equipment-failure",
+        "prompt_family": "ASK"
+      }
+    },
+    {
+      "case_id": "healthy-baseline-v1",
+      "task_family": "ANALYZE",
+      "prompt": "Analyze the current operational state of Wave 17. Is the wave on track? Are there any issues that require intervention?",
+      "reasoning_level": "medium",
+      "risk_level": "low",
+      "expected_capability": null,
+      "expected_target": "wave-17",
+      "required_facts": ["wave-17"],
+      "forbidden_claims": ["emergency shutdown", "evacuate", "crisis"],
+      "context_entities": [
+        "wave-17", "labor-shift-morning", "labor-shift-afternoon",
+        "worker-A001", "worker-A002", "worker-A003",
+        "conveyor-main", "conveyor-backup", "equip-forklift-001",
+        "zone-receiving", "zone-picking", "zone-shipping",
+        "sku-high-priority", "sku-standard"
+      ],
+      "metadata": {
+        "fixture": true,
+        "phase": "18B",
+        "scenario": "healthy-baseline",
+        "prompt_family": "ANALYZE",
+        "note": "Model should NOT recommend unnecessary intervention on a healthy baseline."
+      }
+    }
+  ],
+  "prompt_families_included": ["ASK", "ANALYZE"],
+  "prompt_families_excluded": ["ACT"],
+  "note_on_comparative_reasoning": "COMPARATIVE REASONING family omitted from 18C. ASK and ANALYZE already cover the diagnostic and recommendation signal dimensions. COMPARATIVE REASONING would add meaningful signal only when two competing action paths are both plausible and require explicit trade-off analysis — not present in current fixture scenarios.",
+  "graders_applied": [
+    "schema_validity",
+    "hallucination",
+    "capability_match",
+    "target_match",
+    "required_evidence",
+    "forbidden_claims"
+  ]
+}

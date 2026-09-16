@@ -46,6 +46,9 @@ from maiw_api.routers.demo import router as demo_router
 from maiw_api.routers.copilot import router as copilot_router
 from maiw_api.routers.world import router as world_router
 
+from maiw_api.routers.model_lab import router as model_lab_router
+from maiw_api.routers.world import router as world_router
+
 # ── Legacy routers (keep temporarily) ────────────────────────────────────────
 from src.api.routers.auth import router as auth_router
 from src.api.routers.inventory import router as inventory_router
@@ -242,6 +245,9 @@ app.include_router(mcp_status_router)
 app.include_router(runtime_status_router)
 app.include_router(demo_router)
 app.include_router(copilot_router)
+app.include_router(world_router)
+
+app.include_router(model_lab_router)
 app.include_router(world_router)
 
 # Legacy (keep temporarily)

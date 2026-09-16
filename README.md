@@ -1427,7 +1427,7 @@ package-based, MCP v2 system.
 
 | Area | Status | Notes |
 |------|--------|-------|
-| **ModelGateway** (`maiw-models`) | ✅ Done | Nemotron 3 roles, routing policy, NIM provider, telemetry |
+| **ModelGateway** (`maiw-models`) | ✅ Done | Nemotron 3 roles, policy-constrained routing, NIM provider, telemetry. Phase 18B: `PolicyFilter` (hard eligibility gate by risk/reasoning/deployment) + `ModelRouter` (deterministic rule-based selection). Phase 18C–18E: reproducible offline evaluation with deterministic graders, fixed benchmark protocol (10 steps), and artifact storage. Phase 18F: **Model Gateway Lab** at `/models/lab` — read-only developer tool for inspecting 18C/18D/18E evaluation artifacts, model comparison, grader diagnostics, and router assessment. Workstream 3 verdict: INSUFFICIENT EVIDENCE — no routing defect found, deterministic router retained. See `docs/developer/MODEL_GATEWAY_EVALUATION.md`. |
 | **WarehouseState** (`maiw-state`) | ✅ Done | Snapshot sealing, freshness, provenance, all 4 domains |
 | **Skills** (`maiw-skills`) | ✅ Done | Read skills, write proposal factories, all 4 domains |
 | **DecisionEngine** (`maiw-decision`) | ✅ Done | All constraint rules, APPROVED/REJECTED/DEFERRED |

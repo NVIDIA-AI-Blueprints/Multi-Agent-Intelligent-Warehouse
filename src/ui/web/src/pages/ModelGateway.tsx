@@ -14,7 +14,10 @@ import {
   TableRow,
   Alert,
   Divider,
+  Button,
 } from '@mui/material';
+import ScienceIcon from '@mui/icons-material/Science';
+import { useNavigate } from 'react-router-dom';
 import {
   CheckCircle as OkIcon,
   Error as ErrorIcon,
@@ -62,16 +65,34 @@ function AvailabilityChip({ available }: { available: boolean | undefined }) {
 
 const ModelGateway: React.FC = () => {
   const { data: runtime, isLoading } = useRuntimeStatus();
+  const navigate = useNavigate();
 
   return (
     <Box sx={{ pb: 4 }}>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700, color: 'text.primary', letterSpacing: '-0.02em' }}>
-          Models
-        </Typography>
-        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-          ModelGateway routing · Nemotron role registry · Reasoning agents
-        </Typography>
+      <Box sx={{ mb: 3, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+        <Box>
+          <Typography variant="h4" sx={{ fontWeight: 700, color: 'text.primary', letterSpacing: '-0.02em' }}>
+            Models
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+            ModelGateway routing · Nemotron role registry · Reasoning agents
+          </Typography>
+        </Box>
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<ScienceIcon />}
+          onClick={() => navigate('/models/lab')}
+          sx={{
+            color: '#76B900',
+            borderColor: '#76B900',
+            '&:hover': { backgroundColor: '#1a3a00', borderColor: '#76B900' },
+            fontFamily: 'monospace',
+            fontWeight: 700,
+          }}
+        >
+          MODEL GATEWAY LAB
+        </Button>
       </Box>
 
       {/* Gateway availability */}

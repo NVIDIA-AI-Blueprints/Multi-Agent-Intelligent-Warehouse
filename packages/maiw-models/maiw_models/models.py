@@ -176,6 +176,10 @@ class ModelRequest(BaseModel):
     reasoning: ReasoningLevel = ReasoningLevel.MEDIUM
     risk_level: RiskLevel = RiskLevel.LOW
     modality: Modality = Modality.TEXT
+    # Phase 18B: DeploymentMode now wired into routing policy.
+    # Defaults to NVIDIA_HOSTED for backward compatibility.
+    # LOCAL_NIM constrains routing to locally-resolvable endpoints only.
+    deployment_mode: DeploymentMode = DeploymentMode.NVIDIA_HOSTED
     latency_budget_ms: int | None = None
     tools: list[str] = Field(default_factory=list)
     required_capabilities: set[str] = Field(default_factory=set)
@@ -209,6 +213,11 @@ class ModelRouteDecision(BaseModel):
         routing_reason   — human-readable summary of why requested_role was chosen
         fallback_from    — set when selected_role != requested_role (the skipped role)
         fallback_reason  — human-readable reason the preferred role was unavailable
+
+    Phase 18B additions:
+        routing_strategy   — name of the strategy used (e.g. "rules")
+        routing_latency_ms — time spent selecting the route (monotonic; excludes inference)
+        candidate_models   — model_ids eligible AFTER policy filtering (not all registry models)
     """
 
     selected_model_id: str
@@ -221,6 +230,10 @@ class ModelRouteDecision(BaseModel):
     task: str
     requested_reasoning: ReasoningLevel
     requested_risk_level: RiskLevel
+    # Phase 18B provenance fields.
+    routing_strategy: str = "rules"  # always "rules" until adaptive routing is introduced
+    routing_latency_ms: float = 0.0  # monotonic time for route selection only
+    candidate_models: list[str] = Field(default_factory=list)  # model_ids post-policy-filter
 
 
 # ── Response ──────────────────────────────────────────────────────────────────

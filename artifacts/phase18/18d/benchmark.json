@@ -1,0 +1,605 @@
+{
+  "metadata": {
+    "phase": "18D",
+    "calibration_run_timestamp": "2026-09-13T04:37:56.394676+00:00",
+    "source_baseline": "artifacts/phase18/baseline.json",
+    "source_baseline_phase": "18C",
+    "dataset_id": "eval-fixture-dataset-v1",
+    "semantic_checksum": "fixture-checksum-abc123",
+    "grader_version": "18D-calibrated",
+    "grader_changes": [
+      "HallucinationGrader: expanded allowlist via EntityResolver (canonical surface forms)",
+      "RequiredEvidenceGrader: canonical alias matching for entity-like facts",
+      "TargetMatchGrader: emits structured diagnostic (model_reference, resolved_entity_id, match)",
+      "CapabilityMatchGrader: extended equipment_bypass synonym list"
+    ],
+    "note": "All grading uses saved 18C response snippets (no model re-calls).",
+    "warning": "Response snippets are truncated (first 300 chars). Some grader results may differ from full-response grading. Calibration direction: reduces false negatives, confirmed by snippet analysis."
+  },
+  "nano_availability_audit": {
+    "model_id": "nvidia/nemotron-3-nano-30b-a3b",
+    "role": "nano",
+    "registry_enabled_default": true,
+    "operator_enabled": false,
+    "deployment_status": "deployed",
+    "endpoint_actually_available": "OPERATOR_DISABLED \u2014 cannot confirm live availability",
+    "source": "NEMOTRON_NANO_ENABLED=false in operator .env",
+    "routing_role": "EXCLUDED \u2014 disabled in operator .env (load_dotenv from nim_client.py)",
+    "reasoning_level_eligibility": "low/medium (when enabled)",
+    "risk_level_eligibility": "low/medium (when enabled; high/critical \u2192 super/ultra only)",
+    "policy_eligible_for_high_risk_high_reasoning": false,
+    "note": "Nano is deployment_status=DEPLOYED on integrate.api.nvidia.com (confirmed 2026-08-20). Operator has explicitly disabled it via NEMOTRON_NANO_ENABLED=false. Cannot confirm current endpoint availability without re-enabling and probing."
+  },
+  "corpus": [
+    {
+      "case_id": "wave17-labor-risk-v1",
+      "task_family": "ASK",
+      "risk_level": "high",
+      "reasoning_level": "high",
+      "phase": "18B",
+      "benchmark_case": "A/B/C",
+      "nano_policy_label": "RESEARCH ONLY \u2014 NOT PRODUCTION ELIGIBLE",
+      "description": "Why is Wave 17 at risk? Based on the current labor allocatio...",
+      "expected_capability": "labor_reallocation",
+      "expected_target": "wave-17"
+    },
+    {
+      "case_id": "equipment-failure-v1",
+      "task_family": "ASK",
+      "risk_level": "high",
+      "reasoning_level": "high",
+      "phase": "18B",
+      "benchmark_case": "A/B/C",
+      "nano_policy_label": "RESEARCH ONLY \u2014 NOT PRODUCTION ELIGIBLE",
+      "description": "Is equipment contributing to the delay in Wave 17? Check the...",
+      "expected_capability": "equipment_bypass",
+      "expected_target": "conveyor-main"
+    },
+    {
+      "case_id": "healthy-baseline-v1",
+      "task_family": "ANALYZE",
+      "risk_level": "low",
+      "reasoning_level": "medium",
+      "phase": "18B",
+      "benchmark_case": "A/B/C",
+      "nano_policy_label": "POLICY ELIGIBLE",
+      "description": "Analyze the current operational state of Wave 17. Is the wav...",
+      "expected_capability": null,
+      "expected_target": "wave-17"
+    },
+    {
+      "case_id": "evidence-ask-labor-v1",
+      "task_family": "ASK",
+      "risk_level": "low",
+      "reasoning_level": "medium",
+      "phase": "18D",
+      "benchmark_case": "B",
+      "nano_policy_label": "POLICY ELIGIBLE",
+      "description": "Evidence ASK \u2014 labor constraint evidence for Wave 17",
+      "expected_capability": "labor_reallocation",
+      "expected_target": "wave-17"
+    },
+    {
+      "case_id": "analyze-action-v1",
+      "task_family": "ANALYZE",
+      "risk_level": "medium",
+      "reasoning_level": "medium",
+      "phase": "18D",
+      "benchmark_case": "C",
+      "nano_policy_label": "POLICY ELIGIBLE",
+      "description": "ANALYZE \u2014 recommended action for Wave 17 labor constraint",
+      "expected_capability": "labor_reallocation",
+      "expected_target": "wave-17"
+    },
+    {
+      "case_id": "comparative-reasoning-v1",
+      "task_family": "ANALYZE",
+      "risk_level": "low",
+      "reasoning_level": "medium",
+      "phase": "18D",
+      "benchmark_case": "D",
+      "nano_policy_label": "POLICY ELIGIBLE",
+      "description": "Comparative reasoning \u2014 labor vs equipment intervention for Wave 17",
+      "expected_capability": null,
+      "expected_target": "wave-17"
+    }
+  ],
+  "regrade_18c_results": [
+    {
+      "case_id": "wave17-labor-risk-v1",
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "original_score": 0.4,
+      "calibrated_score": 0.6,
+      "delta": 0.2,
+      "original_pass": false,
+      "calibrated_pass": false,
+      "evaluation_verdict": "NOT ACCEPTABLE",
+      "policy_label": "RESEARCH ONLY \u2014 NOT PRODUCTION ELIGIBLE",
+      "per_grader": [
+        {
+          "case_id": "wave17-labor-risk-v1",
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "grader_name": "schema_validity",
+          "original_passed": true,
+          "calibrated_passed": true,
+          "delta": 0,
+          "original_reason": "No expected_schema defined \u2014 schema check skipped.",
+          "calibrated_reason": "No expected_schema defined \u2014 schema check skipped.",
+          "failure_class": "N/A",
+          "critical": true
+        },
+        {
+          "case_id": "wave17-labor-risk-v1",
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "grader_name": "hallucination",
+          "original_passed": false,
+          "calibrated_passed": false,
+          "delta": 0,
+          "original_reason": "Response references 3 entity ID(s) not in context.",
+          "calibrated_reason": "Response references 3 entity ID(s) not resolvable to any known context entity.",
+          "failure_class": "TRUE MODEL ERROR",
+          "critical": true
+        },
+        {
+          "case_id": "wave17-labor-risk-v1",
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "grader_name": "capability_match",
+          "original_passed": false,
+          "calibrated_passed": false,
+          "delta": 0,
+          "original_reason": "Response does not mention expected capability 'labor_reallocation' or its synonyms.",
+          "calibrated_reason": "Response does not mention expected capability 'labor_reallocation' or its synonyms.",
+          "failure_class": "TRUE MODEL ERROR",
+          "critical": true
+        },
+        {
+          "case_id": "wave17-labor-risk-v1",
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "grader_name": "target_match",
+          "original_passed": true,
+          "calibrated_passed": true,
+          "delta": 0,
+          "original_reason": "Response references expected target (variant 'wave 17'): wave-17",
+          "calibrated_reason": "Response references expected target (variant 'wave 17'): wave-17",
+          "failure_class": "N/A",
+          "critical": true
+        },
+        {
+          "case_id": "wave17-labor-risk-v1",
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "grader_name": "required_evidence",
+          "original_passed": false,
+          "calibrated_passed": true,
+          "delta": 1,
+          "original_reason": "1/2 required facts found. Missing: ['wave-17']",
+          "calibrated_reason": "All 2 required facts found.",
+          "failure_class": "FALSE GRADER FAILURE",
+          "critical": false
+        },
+        {
+          "case_id": "wave17-labor-risk-v1",
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "grader_name": "forbidden_claims",
+          "original_passed": true,
+          "calibrated_passed": true,
+          "delta": 0,
+          "original_reason": "No forbidden claims detected (4 checked).",
+          "calibrated_reason": "No forbidden claims detected (4 checked).",
+          "failure_class": "N/A",
+          "critical": false
+        }
+      ]
+    },
+    {
+      "case_id": "equipment-failure-v1",
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "original_score": 0.8,
+      "calibrated_score": 1.0,
+      "delta": 0.2,
+      "original_pass": false,
+      "calibrated_pass": true,
+      "evaluation_verdict": "ACCEPTABLE",
+      "policy_label": "RESEARCH ONLY \u2014 NOT PRODUCTION ELIGIBLE",
+      "per_grader": [
+        {
+          "case_id": "equipment-failure-v1",
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "grader_name": "schema_validity",
+          "original_passed": true,
+          "calibrated_passed": true,
+          "delta": 0,
+          "original_reason": "No expected_schema defined \u2014 schema check skipped.",
+          "calibrated_reason": "No expected_schema defined \u2014 schema check skipped.",
+          "failure_class": "N/A",
+          "critical": true
+        },
+        {
+          "case_id": "equipment-failure-v1",
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "grader_name": "hallucination",
+          "original_passed": true,
+          "calibrated_passed": true,
+          "delta": 0,
+          "original_reason": "No entity IDs outside context detected.",
+          "calibrated_reason": "No entity IDs outside context detected.",
+          "failure_class": "N/A",
+          "critical": true
+        },
+        {
+          "case_id": "equipment-failure-v1",
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "grader_name": "capability_match",
+          "original_passed": false,
+          "calibrated_passed": true,
+          "delta": 1,
+          "original_reason": "Response does not mention expected capability 'equipment_bypass' or its synonyms.",
+          "calibrated_reason": "Response mentions synonym for equipment_bypass: 'conveyor-backup'",
+          "failure_class": "FALSE GRADER FAILURE",
+          "critical": true
+        },
+        {
+          "case_id": "equipment-failure-v1",
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "grader_name": "target_match",
+          "original_passed": true,
+          "calibrated_passed": true,
+          "delta": 0,
+          "original_reason": "Response references expected target: conveyor-main",
+          "calibrated_reason": "Response references expected target exactly: conveyor-main",
+          "failure_class": "N/A",
+          "critical": true
+        },
+        {
+          "case_id": "equipment-failure-v1",
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "grader_name": "required_evidence",
+          "original_passed": true,
+          "calibrated_passed": true,
+          "delta": 0,
+          "original_reason": "All 2 required facts found.",
+          "calibrated_reason": "All 2 required facts found.",
+          "failure_class": "N/A",
+          "critical": false
+        },
+        {
+          "case_id": "equipment-failure-v1",
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "grader_name": "forbidden_claims",
+          "original_passed": true,
+          "calibrated_passed": true,
+          "delta": 0,
+          "original_reason": "No forbidden claims detected (3 checked).",
+          "calibrated_reason": "No forbidden claims detected (3 checked).",
+          "failure_class": "N/A",
+          "critical": false
+        }
+      ]
+    },
+    {
+      "case_id": "healthy-baseline-v1",
+      "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "original_score": 0.5,
+      "calibrated_score": 1.0,
+      "delta": 0.5,
+      "original_pass": false,
+      "calibrated_pass": true,
+      "evaluation_verdict": "ACCEPTABLE",
+      "policy_label": "POLICY ELIGIBLE",
+      "per_grader": [
+        {
+          "case_id": "healthy-baseline-v1",
+          "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "grader_name": "schema_validity",
+          "original_passed": true,
+          "calibrated_passed": true,
+          "delta": 0,
+          "original_reason": "No expected_schema defined \u2014 schema check skipped.",
+          "calibrated_reason": "No expected_schema defined \u2014 schema check skipped.",
+          "failure_class": "N/A",
+          "critical": true
+        },
+        {
+          "case_id": "healthy-baseline-v1",
+          "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "grader_name": "hallucination",
+          "original_passed": false,
+          "calibrated_passed": true,
+          "delta": 1,
+          "original_reason": "Response references 1 entity ID(s) not in context.",
+          "calibrated_reason": "No entity IDs outside context detected.",
+          "failure_class": "FALSE GRADER FAILURE",
+          "critical": true
+        },
+        {
+          "case_id": "healthy-baseline-v1",
+          "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "grader_name": "capability_match",
+          "original_passed": true,
+          "calibrated_passed": true,
+          "delta": 0,
+          "original_reason": "No expected_capability defined \u2014 capability check skipped.",
+          "calibrated_reason": "No expected_capability defined \u2014 capability check skipped.",
+          "failure_class": "N/A",
+          "critical": true
+        },
+        {
+          "case_id": "healthy-baseline-v1",
+          "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "grader_name": "target_match",
+          "original_passed": true,
+          "calibrated_passed": true,
+          "delta": 0,
+          "original_reason": "Response references expected target (variant 'wave 17'): wave-17",
+          "calibrated_reason": "Response references expected target (variant 'wave 17'): wave-17",
+          "failure_class": "N/A",
+          "critical": true
+        },
+        {
+          "case_id": "healthy-baseline-v1",
+          "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "grader_name": "required_evidence",
+          "original_passed": false,
+          "calibrated_passed": true,
+          "delta": 1,
+          "original_reason": "0/1 required facts found. Missing: ['wave-17']",
+          "calibrated_reason": "All 1 required facts found.",
+          "failure_class": "FALSE GRADER FAILURE",
+          "critical": false
+        },
+        {
+          "case_id": "healthy-baseline-v1",
+          "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+          "grader_name": "forbidden_claims",
+          "original_passed": true,
+          "calibrated_passed": true,
+          "delta": 0,
+          "original_reason": "No forbidden claims detected (3 checked).",
+          "calibrated_reason": "No forbidden claims detected (3 checked).",
+          "failure_class": "N/A",
+          "critical": false
+        }
+      ]
+    },
+    {
+      "case_id": "healthy-baseline-v1",
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "original_score": 0.5,
+      "calibrated_score": 0.75,
+      "delta": 0.25,
+      "original_pass": false,
+      "calibrated_pass": false,
+      "evaluation_verdict": "NOT ACCEPTABLE",
+      "policy_label": "POLICY ELIGIBLE",
+      "per_grader": [
+        {
+          "case_id": "healthy-baseline-v1",
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "grader_name": "schema_validity",
+          "original_passed": true,
+          "calibrated_passed": true,
+          "delta": 0,
+          "original_reason": "No expected_schema defined \u2014 schema check skipped.",
+          "calibrated_reason": "No expected_schema defined \u2014 schema check skipped.",
+          "failure_class": "N/A",
+          "critical": true
+        },
+        {
+          "case_id": "healthy-baseline-v1",
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "grader_name": "hallucination",
+          "original_passed": false,
+          "calibrated_passed": false,
+          "delta": 0,
+          "original_reason": "Response references 4 entity ID(s) not in context.",
+          "calibrated_reason": "Response references 2 entity ID(s) not resolvable to any known context entity.",
+          "failure_class": "TRUE MODEL ERROR",
+          "critical": true
+        },
+        {
+          "case_id": "healthy-baseline-v1",
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "grader_name": "capability_match",
+          "original_passed": true,
+          "calibrated_passed": true,
+          "delta": 0,
+          "original_reason": "No expected_capability defined \u2014 capability check skipped.",
+          "calibrated_reason": "No expected_capability defined \u2014 capability check skipped.",
+          "failure_class": "N/A",
+          "critical": true
+        },
+        {
+          "case_id": "healthy-baseline-v1",
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "grader_name": "target_match",
+          "original_passed": true,
+          "calibrated_passed": true,
+          "delta": 0,
+          "original_reason": "Response references expected target (variant 'wave 17'): wave-17",
+          "calibrated_reason": "Response references expected target (variant 'wave 17'): wave-17",
+          "failure_class": "N/A",
+          "critical": true
+        },
+        {
+          "case_id": "healthy-baseline-v1",
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "grader_name": "required_evidence",
+          "original_passed": false,
+          "calibrated_passed": true,
+          "delta": 1,
+          "original_reason": "0/1 required facts found. Missing: ['wave-17']",
+          "calibrated_reason": "All 1 required facts found.",
+          "failure_class": "FALSE GRADER FAILURE",
+          "critical": false
+        },
+        {
+          "case_id": "healthy-baseline-v1",
+          "model_id": "nvidia/nemotron-3-super-120b-a12b",
+          "grader_name": "forbidden_claims",
+          "original_passed": true,
+          "calibrated_passed": true,
+          "delta": 0,
+          "original_reason": "No forbidden claims detected (3 checked).",
+          "calibrated_reason": "No forbidden claims detected (3 checked).",
+          "failure_class": "N/A",
+          "critical": false
+        }
+      ]
+    }
+  ],
+  "latency_samples": [
+    {
+      "sample_id": "18c-001",
+      "phase": "18C",
+      "case_id": "wave17-labor-risk-v1",
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "requested_model": "nvidia/nemotron-3-super-120b-a12b",
+      "actual_model": "nvidia/nemotron-3-super-120b-a12b",
+      "deployment": "nvidia_hosted",
+      "provider": "nvidia-nim",
+      "routing_ms": 0.008,
+      "inference_ms": 2514.877,
+      "total_ms": 2514.885,
+      "input_tokens": null,
+      "output_tokens": null,
+      "fallback_used": false,
+      "retry_count": 0,
+      "error": null,
+      "warmup": false,
+      "run_index": 1,
+      "clean": true,
+      "notes": null
+    },
+    {
+      "sample_id": "18c-002",
+      "phase": "18C",
+      "case_id": "equipment-failure-v1",
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "requested_model": "nvidia/nemotron-3-super-120b-a12b",
+      "actual_model": "nvidia/nemotron-3-super-120b-a12b",
+      "deployment": "nvidia_hosted",
+      "provider": "nvidia-nim",
+      "routing_ms": 0.009,
+      "inference_ms": 2348.168,
+      "total_ms": 2348.177,
+      "input_tokens": null,
+      "output_tokens": null,
+      "fallback_used": false,
+      "retry_count": 0,
+      "error": null,
+      "warmup": false,
+      "run_index": 2,
+      "clean": true,
+      "notes": null
+    },
+    {
+      "sample_id": "18c-003",
+      "phase": "18C",
+      "case_id": "healthy-baseline-v1",
+      "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "requested_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "actual_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "deployment": "nvidia_hosted",
+      "provider": "nvidia-nim",
+      "routing_ms": 0.012,
+      "inference_ms": 48569.618,
+      "total_ms": 48569.63,
+      "input_tokens": null,
+      "output_tokens": null,
+      "fallback_used": false,
+      "retry_count": 0,
+      "error": null,
+      "warmup": false,
+      "run_index": 3,
+      "clean": true,
+      "notes": "LIGHTNING_ANOMALY: 48570ms on first call \u2014 likely cold container/model warmup at NIM endpoint"
+    },
+    {
+      "sample_id": "18c-004",
+      "phase": "18C",
+      "case_id": "healthy-baseline-v1",
+      "model_id": "nvidia/nemotron-3-super-120b-a12b",
+      "requested_model": "nvidia/nemotron-3-super-120b-a12b",
+      "actual_model": "nvidia/nemotron-3-super-120b-a12b",
+      "deployment": "nvidia_hosted",
+      "provider": "nvidia-nim",
+      "routing_ms": 0.021,
+      "inference_ms": 1446.726,
+      "total_ms": 1446.748,
+      "input_tokens": null,
+      "output_tokens": null,
+      "fallback_used": false,
+      "retry_count": 0,
+      "error": null,
+      "warmup": false,
+      "run_index": 4,
+      "clean": true,
+      "notes": null
+    }
+  ],
+  "lightning_latency_forensics": {
+    "anomaly": {
+      "case_id": "healthy-baseline-v1",
+      "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "observed_total_ms": 48569.63,
+      "routing_ms": 0.012,
+      "inference_ms": 48569.618,
+      "baseline_comparison": {
+        "super_same_case_ms": 1446.748,
+        "super_other_cases_ms": [
+          2514.885,
+          2348.177
+        ],
+        "lightning_speedup_expected": "Lightning (30B) should be faster than Super (120B)",
+        "actual_ratio": "Lightning was 33x SLOWER than Super on same case"
+      }
+    },
+    "client_side_analysis": {
+      "http_client": "httpx.AsyncClient (single instance, shared across all model calls)",
+      "connection_reuse": "YES \u2014 same base_url (integrate.api.nvidia.com), HTTP/1.1 keep-alive",
+      "http2": false,
+      "new_client_per_call": false,
+      "tls_overhead_expected": "MINIMAL \u2014 connection established on first Super call (cases 1-2)",
+      "dns_overhead_expected": "NONE \u2014 same base URL as Super"
+    },
+    "server_side_hypotheses": [
+      {
+        "hypothesis": "COLD_CONTAINER",
+        "description": "Lightning model was not loaded in NIM inference cluster; had to load weights into GPU",
+        "evidence_supporting": [
+          "Client-side connection reuse confirmed (no client reconnect)",
+          "All 48570ms is in inference_ms (not routing or connection)",
+          "Lightning was only called ONCE in 18C (no warm-up)",
+          "Super was pre-warmed by cases 1-2 (1447ms on case 3 vs 2400ms on case 1)"
+        ],
+        "evidence_against": [],
+        "confidence": "HIGH"
+      },
+      {
+        "hypothesis": "ENDPOINT_QUEUE",
+        "description": "NIM API had a large queue for Lightning requests",
+        "evidence_supporting": [
+          "Latency is entirely server-side"
+        ],
+        "evidence_against": [
+          "Would expect intermittent, not first-call-only"
+        ],
+        "confidence": "MEDIUM"
+      },
+      {
+        "hypothesis": "MODEL_COMPILATION",
+        "description": "MoE model graph needed JIT compilation on first call",
+        "evidence_supporting": [
+          "MoE models often have first-call overhead"
+        ],
+        "evidence_against": [
+          "48s is very long for compilation alone"
+        ],
+        "confidence": "LOW-MEDIUM"
+      }
+    ],
+    "root_cause_assessment": "MOST_LIKELY_COLD_CONTAINER_WARMUP",
+    "methodology_gap": "18C did not include an explicit warm-up call for Lightning. Per spec \u00a718, future runs must issue one warm-up request excluded from timing summary. The 48570ms observation should be treated as a warm-up artifact, not a clean latency sample.",
+    "recommendation": "Add explicit warm-up call before timed Lightning observations. Run N=5 measured repetitions after warm-up to establish steady-state latency. Separate cold-start vs steady-state in any Nano/Lightning comparison."
+  },
+  "decision_gate": "CURRENT ROUTER SUFFICIENT \u2014 unchanged from 18C"
+}

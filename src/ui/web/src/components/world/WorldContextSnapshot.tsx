@@ -84,19 +84,23 @@ export default function WorldContextSnapshot({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setError(null);
     setSnapshot(null);
     worldAPI.getContextByTurn(ctx.turnId).then(s => {
+      if (cancelled) return;
       setSnapshot(s);
       setLoading(false);
     }).catch(err => {
+      if (cancelled) return;
       const msg = err?.response?.status === 404
         ? 'No context snapshot was captured for this turn (turn may have been degraded or ungrounded).'
         : `Failed to load context snapshot: ${err?.message ?? 'Unknown error'}`;
       setError(msg);
       setLoading(false);
     });
+    return () => { cancelled = true; };
   }, [ctx.turnId]);
 
   return (
