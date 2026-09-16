@@ -23,25 +23,47 @@ without fresh graph traversal and without substituting LIVE current state.
 This is the evaluation reproducibility contract:
   historical OperationalContextSnapshot → deterministic ModelRequest context
 
-Design note on WS2 dependency:
-  OperationalContextSnapshot is defined in apps/api/maiw_api/copilot/models.py
-  (merged in Phase 17F / Workstream 2).  The import path is:
-      from maiw_api.copilot.models import OperationalContextSnapshot
-  This module uses TYPE_CHECKING guards so maiw-models stays importable even
-  when maiw_api is not installed (e.g. unit tests that mock the snapshot).
+The snapshot type is accepted via a structural Protocol so maiw-models
+has no import dependency on the API layer.  Any object whose attributes
+satisfy SnapshotLike will work — including the real OperationalContextSnapshot
+and the MockOperationalContextSnapshot defined below.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import Any, Protocol, runtime_checkable
 
-if TYPE_CHECKING:
-    # Import only for type hints — avoids hard dependency on maiw_api at runtime.
-    try:
-        from maiw_api.copilot.models import OperationalContextSnapshot
-    except ImportError:
-        OperationalContextSnapshot = Any  # type: ignore[assignment, misc]
+
+
+
+# ── Structural protocol (no API-layer import) ─────────────────────────────────
+
+
+@runtime_checkable
+class SnapshotLike(Protocol):
+    """
+    Structural interface for OperationalContextSnapshot.
+
+    Accepted by replay_context_from_snapshot so maiw-models never imports
+    the API layer.  The real OperationalContextSnapshot (WS2) and the
+    MockOperationalContextSnapshot below both satisfy this protocol.
+    """
+
+    context_snapshot_id: str
+    warehouse_id: str
+    dataset_id: str
+    datapack_checksum: str
+    warehouse_state_snapshot_id: str | None
+    focus_entity_id: str
+    focus_entity_type: str
+    focus_label: str
+    nodes: list[Any]
+    edges: list[Any]
+    entity_count: int
+    relationship_count: int
+    truncated: bool
+    captured_at: str
 
 
 # ── Reduced context ───────────────────────────────────────────────────────────
@@ -93,7 +115,7 @@ class ReplayContext:
 
 
 def replay_context_from_snapshot(
-    snapshot: "OperationalContextSnapshot",
+    snapshot: SnapshotLike,
     user_prompt: str,
     system_prompt: str | None = None,
 ) -> ReplayContext:
@@ -161,7 +183,7 @@ def replay_context_from_snapshot(
 
 
 def _build_system_prompt(
-    snapshot: "OperationalContextSnapshot",
+    snapshot: SnapshotLike,
     node_summaries: list[dict[str, Any]],
     edge_summaries: list[dict[str, Any]],
 ) -> str:
@@ -208,7 +230,7 @@ def _build_system_prompt(
 
 @dataclass
 class MockSnapshotNode:
-    """Minimal node stub for unit tests that do not have maiw_api installed."""
+    """Minimal node stub for unit tests that do not require the API layer."""
 
     entity_id: str
     entity_type: str
@@ -218,7 +240,7 @@ class MockSnapshotNode:
 
 @dataclass
 class MockSnapshotEdge:
-    """Minimal edge stub for unit tests that do not have maiw_api installed."""
+    """Minimal edge stub for unit tests that do not require the API layer."""
 
     source_id: str
     target_id: str
@@ -230,8 +252,8 @@ class MockOperationalContextSnapshot:
     """
     Self-contained mock snapshot for evaluation unit tests.
 
-    Use when maiw_api is not installed or when you need a deterministic
-    test fixture that does not depend on the WS2 runtime.
+    Use when you need a deterministic test fixture that does not depend
+    on the WS2/API-layer runtime.
     """
 
     context_snapshot_id: str
