@@ -20,8 +20,11 @@ import pytest
 from datetime import datetime, timezone
 
 
-def _make_delegation_request(target: str, bounded_context: dict) -> "AgentDelegationRequest":
+def _make_delegation_request(
+    target: str, bounded_context: dict
+) -> "AgentDelegationRequest":
     from maiw_agents.contracts import AgentDelegationRequest
+
     return AgentDelegationRequest(
         delegation_id="del-test-001",
         parent_task_id="parent-task-001",
@@ -37,20 +40,38 @@ def _make_delegation_request(target: str, bounded_context: dict) -> "AgentDelega
 
 # ── LaborAgent tests ──────────────────────────────────────────────────────────
 
+
 class TestLaborAgent:
     """LaborAgent.assess_labor_constraint() output contract."""
 
     @pytest.mark.asyncio
     async def test_idle_workers_with_tasks_produces_candidates(self):
         from maiw_agents.labor import LaborAgent
+
         agent = LaborAgent()
         bounded = {
             "workers": [
-                {"worker_id": "w1", "status": "active", "current_task_id": None, "zone": "A"},
-                {"worker_id": "w2", "status": "active", "current_task_id": "t99", "zone": "B"},
+                {
+                    "worker_id": "w1",
+                    "status": "active",
+                    "current_task_id": None,
+                    "zone": "A",
+                },
+                {
+                    "worker_id": "w2",
+                    "status": "active",
+                    "current_task_id": "t99",
+                    "zone": "B",
+                },
             ],
             "pending_tasks": [
-                {"task_id": "t1", "status": "pending", "assigned_to": None, "priority": "high", "zone": "A"},
+                {
+                    "task_id": "t1",
+                    "status": "pending",
+                    "assigned_to": None,
+                    "priority": "high",
+                    "zone": "A",
+                },
             ],
         }
         assessment = await agent.assess_labor_constraint(
@@ -70,6 +91,7 @@ class TestLaborAgent:
     @pytest.mark.asyncio
     async def test_no_idle_workers_constraint(self):
         from maiw_agents.labor import LaborAgent
+
         agent = LaborAgent()
         bounded = {
             "workers": [
@@ -88,6 +110,7 @@ class TestLaborAgent:
     @pytest.mark.asyncio
     async def test_no_unassigned_tasks_no_constraint(self):
         from maiw_agents.labor import LaborAgent
+
         agent = LaborAgent()
         bounded = {
             "workers": [
@@ -105,6 +128,7 @@ class TestLaborAgent:
     @pytest.mark.asyncio
     async def test_candidate_actions_never_write(self):
         from maiw_agents.labor import LaborAgent, CandidateLaborAction
+
         agent = LaborAgent()
         bounded = {
             "workers": [
@@ -126,6 +150,7 @@ class TestLaborAgent:
 
 # ── WaveAgent tests ───────────────────────────────────────────────────────────
 
+
 class TestWaveAgent:
     """WaveAgent.assess_wave_risk() output contract."""
 
@@ -133,12 +158,31 @@ class TestWaveAgent:
     async def test_at_risk_tasks_produce_candidates(self):
         from maiw_agents.wave import WaveAgent
         import datetime
-        soon = (datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(minutes=30)).isoformat()
+
+        soon = (
+            datetime.datetime.now(tz=datetime.timezone.utc)
+            + datetime.timedelta(minutes=30)
+        ).isoformat()
         bounded = {
             "wave_tasks": [
-                {"task_id": "wt1", "status": "pending", "priority": "high", "at_risk": True},
-                {"task_id": "wt2", "status": "pending", "priority": "low", "at_risk": False},
-                {"task_id": "wt3", "status": "in_progress", "priority": "medium", "at_risk": False},
+                {
+                    "task_id": "wt1",
+                    "status": "pending",
+                    "priority": "high",
+                    "at_risk": True,
+                },
+                {
+                    "task_id": "wt2",
+                    "status": "pending",
+                    "priority": "low",
+                    "at_risk": False,
+                },
+                {
+                    "task_id": "wt3",
+                    "status": "in_progress",
+                    "priority": "medium",
+                    "at_risk": False,
+                },
             ],
             "carrier_cutoff_iso": soon,
             "wave_id": "wave-001",
@@ -155,9 +199,15 @@ class TestWaveAgent:
     @pytest.mark.asyncio
     async def test_no_at_risk_tasks_no_constraint(self):
         from maiw_agents.wave import WaveAgent
+
         bounded = {
             "wave_tasks": [
-                {"task_id": "wt1", "status": "in_progress", "priority": "high", "at_risk": False},
+                {
+                    "task_id": "wt1",
+                    "status": "in_progress",
+                    "priority": "high",
+                    "at_risk": False,
+                },
                 {"task_id": "wt2", "status": "completed", "at_risk": False},
             ],
             "carrier_cutoff_iso": None,
@@ -173,11 +223,25 @@ class TestWaveAgent:
     async def test_candidate_wave_actions_not_write(self):
         from maiw_agents.wave import WaveAgent, CandidateWaveAction
         import datetime
-        soon = (datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(minutes=20)).isoformat()
+
+        soon = (
+            datetime.datetime.now(tz=datetime.timezone.utc)
+            + datetime.timedelta(minutes=20)
+        ).isoformat()
         bounded = {
             "wave_tasks": [
-                {"task_id": "wt1", "status": "pending", "priority": "high", "at_risk": True},
-                {"task_id": "wt2", "status": "pending", "priority": "low", "at_risk": False},
+                {
+                    "task_id": "wt1",
+                    "status": "pending",
+                    "priority": "high",
+                    "at_risk": True,
+                },
+                {
+                    "task_id": "wt2",
+                    "status": "pending",
+                    "priority": "low",
+                    "at_risk": False,
+                },
             ],
             "carrier_cutoff_iso": soon,
         }
@@ -189,11 +253,15 @@ class TestWaveAgent:
             assert isinstance(action, CandidateWaveAction)
             # intervention_type must not be a direct write
             assert action.intervention_type in (
-                "reprioritize", "resequence", "defer_low_priority", "escalate"
+                "reprioritize",
+                "resequence",
+                "defer_low_priority",
+                "escalate",
             )
 
 
 # ── handle_delegation() routing tests ────────────────────────────────────────
+
 
 class TestHandleDelegation:
     """handle_delegation() must route to the correct specialist."""
@@ -202,11 +270,19 @@ class TestHandleDelegation:
     async def test_routes_to_labor_agent(self):
         from maiw_agents.runtime.deterministic import handle_delegation
         from maiw_agents.labor import LaborAgent
+
         labor_agent = LaborAgent()
-        req = _make_delegation_request("labor", {
-            "workers": [{"worker_id": "w1", "status": "active", "current_task_id": None}],
-            "pending_tasks": [{"task_id": "t1", "status": "pending", "assigned_to": None}],
-        })
+        req = _make_delegation_request(
+            "labor",
+            {
+                "workers": [
+                    {"worker_id": "w1", "status": "active", "current_task_id": None}
+                ],
+                "pending_tasks": [
+                    {"task_id": "t1", "status": "pending", "assigned_to": None}
+                ],
+            },
+        )
         result = await handle_delegation(req, labor_agent=labor_agent)
         assert result.responding_agent == "labor"
         assert result.status == "completed"
@@ -216,11 +292,15 @@ class TestHandleDelegation:
     async def test_routes_to_wave_agent(self):
         from maiw_agents.runtime.deterministic import handle_delegation
         from maiw_agents.wave import WaveAgent
+
         wave_agent = WaveAgent()
-        req = _make_delegation_request("wave", {
-            "wave_tasks": [],
-            "carrier_cutoff_iso": None,
-        })
+        req = _make_delegation_request(
+            "wave",
+            {
+                "wave_tasks": [],
+                "carrier_cutoff_iso": None,
+            },
+        )
         result = await handle_delegation(req, wave_agent=wave_agent)
         assert result.responding_agent == "wave"
         assert result.status == "completed"
@@ -228,6 +308,7 @@ class TestHandleDelegation:
     @pytest.mark.asyncio
     async def test_no_specialist_returns_escalated(self):
         from maiw_agents.runtime.deterministic import handle_delegation
+
         req = _make_delegation_request("equipment", {"equipment": []})
         result = await handle_delegation(req)
         assert result.status == "escalated"
@@ -237,11 +318,15 @@ class TestHandleDelegation:
     async def test_delegation_result_has_required_fields(self):
         from maiw_agents.runtime.deterministic import handle_delegation
         from maiw_agents.labor import LaborAgent
+
         labor_agent = LaborAgent()
-        req = _make_delegation_request("labor", {
-            "workers": [],
-            "pending_tasks": [],
-        })
+        req = _make_delegation_request(
+            "labor",
+            {
+                "workers": [],
+                "pending_tasks": [],
+            },
+        )
         result = await handle_delegation(req, labor_agent=labor_agent)
         assert result.delegation_id == "del-test-001"
         assert result.requesting_agent == "operations_coordination"
@@ -252,12 +337,14 @@ class TestHandleDelegation:
 
 # ── GovernanceOutcome ─────────────────────────────────────────────────────────
 
+
 class TestGovernanceOutcome:
     """GovernanceOutcome Pydantic model must serialize correctly."""
 
     def test_governance_outcome_serializes(self):
         from maiw_agents.contracts import GovernanceOutcome
         from datetime import datetime, timezone
+
         outcome = GovernanceOutcome(
             proposal_id="prop-001",
             decision_outcome="approved",

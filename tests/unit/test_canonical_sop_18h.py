@@ -50,12 +50,34 @@ async def test_labor_sop_deterministic_run():
     labor_agent = LaborAgent()
     bounded_context = {
         "workers": [
-            {"worker_id": "w1", "status": "active", "current_task_id": None, "zone": "A"},
-            {"worker_id": "w2", "status": "active", "current_task_id": "t99", "zone": "B"},
+            {
+                "worker_id": "w1",
+                "status": "active",
+                "current_task_id": None,
+                "zone": "A",
+            },
+            {
+                "worker_id": "w2",
+                "status": "active",
+                "current_task_id": "t99",
+                "zone": "B",
+            },
         ],
         "pending_tasks": [
-            {"task_id": "t1", "status": "pending", "assigned_to": None, "priority": "high", "zone": "A"},
-            {"task_id": "t2", "status": "pending", "assigned_to": None, "priority": "medium", "zone": "A"},
+            {
+                "task_id": "t1",
+                "status": "pending",
+                "assigned_to": None,
+                "priority": "high",
+                "zone": "A",
+            },
+            {
+                "task_id": "t2",
+                "status": "pending",
+                "assigned_to": None,
+                "priority": "medium",
+                "zone": "A",
+            },
         ],
     }
 
@@ -128,8 +150,18 @@ async def test_wave_sop_deterministic_run():
     soon = (dt.datetime.now(tz=dt.timezone.utc) + dt.timedelta(minutes=25)).isoformat()
     bounded_context = {
         "wave_tasks": [
-            {"task_id": "wt1", "status": "pending", "priority": "high", "at_risk": True},
-            {"task_id": "wt2", "status": "pending", "priority": "low", "at_risk": False},
+            {
+                "task_id": "wt1",
+                "status": "pending",
+                "priority": "high",
+                "at_risk": True,
+            },
+            {
+                "task_id": "wt2",
+                "status": "pending",
+                "priority": "low",
+                "at_risk": False,
+            },
         ],
         "carrier_cutoff_iso": soon,
         "wave_id": "wave-001",
@@ -209,6 +241,7 @@ async def test_runtime_rejects_write_capability_in_sop(tmp_path):
     sop_file.write_text(yaml.dump(bad_sop_dict))
 
     from datetime import datetime, timezone
+
     state = AgentTaskState(
         task_id="test-bad-001",
         agent_id="labor",
@@ -225,6 +258,7 @@ async def test_runtime_rejects_write_capability_in_sop(tmp_path):
 
     # The SOP loader itself will reject WRITE capabilities in validate_sop
     from maiw_agents.contracts import SOPValidationError
+
     with pytest.raises((SOPValidationError, ValueError)):
         bad_sop = load_sop(sop_file)
         await runtime.run_task(

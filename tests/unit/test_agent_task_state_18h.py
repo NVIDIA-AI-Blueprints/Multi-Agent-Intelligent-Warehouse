@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 
 def _make_state(status="PENDING", iteration=0, max_iter=10):
     from maiw_agents.contracts import AgentTaskState, AgentTaskStatus
+
     return AgentTaskState(
         task_id="task-test-001",
         agent_id="labor",
@@ -37,36 +38,42 @@ class TestAgentTaskStatusTransitions:
 
     def test_pending_to_running(self):
         from maiw_agents.contracts import AgentTaskStatus
+
         state = _make_state("PENDING")
         new_state = state.transition(AgentTaskStatus.RUNNING)
         assert new_state.status == AgentTaskStatus.RUNNING
 
     def test_running_to_waiting_for_governance(self):
         from maiw_agents.contracts import AgentTaskStatus
+
         state = _make_state("RUNNING")
         new_state = state.transition(AgentTaskStatus.WAITING_FOR_GOVERNANCE)
         assert new_state.status == AgentTaskStatus.WAITING_FOR_GOVERNANCE
 
     def test_running_to_completed(self):
         from maiw_agents.contracts import AgentTaskStatus
+
         state = _make_state("RUNNING")
         new_state = state.transition(AgentTaskStatus.COMPLETED)
         assert new_state.status == AgentTaskStatus.COMPLETED
 
     def test_running_to_failed(self):
         from maiw_agents.contracts import AgentTaskStatus
+
         state = _make_state("RUNNING")
         new_state = state.transition(AgentTaskStatus.FAILED)
         assert new_state.status == AgentTaskStatus.FAILED
 
     def test_running_to_escalated(self):
         from maiw_agents.contracts import AgentTaskStatus
+
         state = _make_state("RUNNING")
         new_state = state.transition(AgentTaskStatus.ESCALATED)
         assert new_state.status == AgentTaskStatus.ESCALATED
 
     def test_invalid_pending_to_completed(self):
         from maiw_agents.contracts import AgentTaskStatus
+
         state = _make_state("PENDING")
         with pytest.raises(ValueError):
             state.transition(AgentTaskStatus.COMPLETED)
@@ -74,6 +81,7 @@ class TestAgentTaskStatusTransitions:
     def test_invalid_pending_to_failed(self):
         """PENDING → FAILED is allowed (fast-fail path). Test PENDING → ESCALATED instead."""
         from maiw_agents.contracts import AgentTaskStatus
+
         state = _make_state("PENDING")
         # PENDING → ESCALATED is invalid (must go through RUNNING first)
         with pytest.raises(ValueError):
@@ -81,18 +89,21 @@ class TestAgentTaskStatusTransitions:
 
     def test_completed_is_terminal(self):
         from maiw_agents.contracts import AgentTaskStatus
+
         state = _make_state("COMPLETED")
         with pytest.raises(ValueError):
             state.transition(AgentTaskStatus.RUNNING)
 
     def test_failed_is_terminal(self):
         from maiw_agents.contracts import AgentTaskStatus
+
         state = _make_state("FAILED")
         with pytest.raises(ValueError):
             state.transition(AgentTaskStatus.RUNNING)
 
     def test_escalated_is_terminal(self):
         from maiw_agents.contracts import AgentTaskStatus
+
         state = _make_state("ESCALATED")
         with pytest.raises(ValueError):
             state.transition(AgentTaskStatus.RUNNING)
@@ -103,6 +114,7 @@ class TestAgentTaskStateImmutability:
 
     def test_transition_returns_new_object(self):
         from maiw_agents.contracts import AgentTaskStatus
+
         state = _make_state("PENDING")
         new_state = state.transition(AgentTaskStatus.RUNNING)
         assert new_state is not state
@@ -137,9 +149,13 @@ class TestTerminalStatusHelper:
     @pytest.mark.parametrize("status", ["COMPLETED", "ESCALATED", "FAILED"])
     def test_terminal_statuses(self, status):
         from maiw_agents.contracts.task import is_terminal, AgentTaskStatus
+
         assert is_terminal(AgentTaskStatus(status)) is True
 
-    @pytest.mark.parametrize("status", ["PENDING", "RUNNING", "WAITING_FOR_GOVERNANCE", "WAITING_FOR_INPUT"])
+    @pytest.mark.parametrize(
+        "status", ["PENDING", "RUNNING", "WAITING_FOR_GOVERNANCE", "WAITING_FOR_INPUT"]
+    )
     def test_non_terminal_statuses(self, status):
         from maiw_agents.contracts.task import is_terminal, AgentTaskStatus
+
         assert is_terminal(AgentTaskStatus(status)) is False
