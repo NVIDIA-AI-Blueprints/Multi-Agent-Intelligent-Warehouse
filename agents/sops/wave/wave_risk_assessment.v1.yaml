@@ -1,0 +1,94 @@
+# MAIW SOP: Wave Agent — Wave Risk Assessment
+# Phase 18H: Agent/SOP Foundation
+
+id: wave.wave_risk_assessment
+version: "1.0"
+agent: wave
+objective: >
+  Protect wave completion before carrier cutoff by identifying task sequencing
+  or reprioritization opportunities and producing candidate wave interventions.
+
+description: >
+  The WaveAgent follows this SOP when delegated a wave risk assessment.
+  It reads wave status, outstanding orders/tasks, carrier cutoff, calculates
+  the critical path, identifies at-risk tasks, evaluates reprioritization options,
+  and returns a WaveAssessment with CandidateWaveAction[].
+  The WaveAgent does NOT execute any action — it only recommends.
+
+triggers:
+  - wave_risk_detected
+  - operator_requests_resolution
+
+required_context:
+  - wave
+  - carrier_cutoff
+
+allowed_capabilities:
+  - warehouse.wave.status
+  - warehouse.wave.inspect_tasks
+  - warehouse.wave.evaluate_critical_path
+  - warehouse.wave.evaluate_reprioritization
+
+allowed_subagents: []
+
+steps:
+  - id: read_wave_status
+    action: read_wave_status
+    description: >
+      Read current wave status: total_tasks, pending_count, in_progress_count,
+      at_risk_count, risk_level, risk_score.
+
+  - id: read_orders
+    action: read_outstanding_orders
+    description: Read outstanding orders and pending wave tasks with zone, priority, deadline.
+
+  - id: read_cutoff
+    action: read_cutoff
+    description: >
+      Identify the soonest carrier cutoff for at-risk tasks.
+      Record time-to-cutoff.
+
+  - id: critical_path
+    action: calculate_critical_path
+    description: >
+      Calculate which pending tasks are on the critical path (earliest deadline,
+      highest priority, blocking other tasks). Identify the top 3 at-risk tasks.
+
+  - id: identify_at_risk
+    action: identify_at_risk_tasks
+    description: >
+      List tasks that cannot complete before cutoff at current completion rate.
+      Quantify the risk gap.
+
+  - id: evaluate_reprioritization
+    action: generate_wave_options
+    description: >
+      Generate 1-3 wave reprioritization options. Each must:
+      - identify which zone or wave_id to reprioritize
+      - estimate impact on completion time
+      - NOT generate a write action directly
+
+  - id: return_assessment
+    action: return_wave_assessment
+    description: >
+      Package and return WaveAssessment:
+        - at_risk_task_count, pending_task_count
+        - time_to_cutoff (minutes)
+        - primary_constraint (sequencing | capacity | no_constraint)
+        - candidate_actions: list[CandidateWaveAction]
+      STOP.
+
+escalation:
+  - rule_id: insufficient_wave_data
+    trigger: Wave or carrier cutoff state is unavailable.
+    escalation_message: Wave state unavailable — cannot assess risk.
+
+  - rule_id: no_reprioritization_options
+    trigger: No wave reprioritization can improve the at-risk situation.
+    escalation_message: No feasible wave reprioritization found.
+
+stop_conditions:
+  - objective_met
+  - no_safe_action
+  - insufficient_context
+  - max_iterations_reached

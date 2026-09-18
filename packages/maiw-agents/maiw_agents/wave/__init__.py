@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+"""Wave domain agent — Phase 18H."""
+
+from .agent import (
+    WaveAgent,
+    WaveAssessment,
+    CandidateWaveAction,
+)
+
+__all__ = ["WaveAgent", "WaveAssessment", "CandidateWaveAction"]

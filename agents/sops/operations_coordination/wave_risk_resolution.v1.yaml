@@ -1,0 +1,140 @@
+# MAIW SOP: Operations Coordination — Wave Risk Resolution
+# Phase 18H: Agent/SOP Foundation
+#
+# This SOP defines the procedure the OperationsCoordinationAgent follows
+# when a wave is at risk of missing its carrier cutoff.
+#
+# The agent reasons and recommends; governance authorizes; ActionExecutor executes.
+# The agent NEVER directly mutates operational state.
+
+id: operations_coordination.wave_risk_resolution
+version: "1.0"
+agent: operations_coordination
+objective: >
+  Restore an at-risk wave to on-track completion before the carrier cutoff,
+  by identifying the primary constraint, consulting specialist agents, generating
+  candidate interventions, and emitting a single highest-priority recommendation
+  for governance evaluation.
+
+description: >
+  The canonical multi-step resolution SOP for wave-at-risk scenarios.
+  Used when a wave has at_risk_count > 0 or pending_count high with approaching cutoff.
+
+triggers:
+  - wave_risk_detected
+  - operator_requests_resolution
+
+required_context:
+  - wave
+  - task
+  - worker
+  - equipment
+  - carrier_cutoff
+
+allowed_capabilities:
+  - warehouse.inventory.lookup
+  - warehouse.equipment.status
+  - warehouse.equipment.telemetry
+  - warehouse.labor.capacity
+  - warehouse.labor.inspect_workers
+  - warehouse.labor.inspect_tasks
+  - warehouse.labor.evaluate_reallocation
+  - warehouse.wave.status
+  - warehouse.wave.inspect_tasks
+  - warehouse.wave.evaluate_critical_path
+  - warehouse.wave.evaluate_reprioritization
+
+allowed_subagents:
+  - labor
+  - wave
+  - equipment
+
+steps:
+  - id: establish_state
+    action: gather_operational_context
+    description: >
+      Assemble a fresh OperationalContextSnapshot from the sealed WarehouseStateSnapshot.
+      This is the ONLY source of truth for this task execution.
+
+  - id: diagnose
+    action: determine_primary_constraint
+    description: >
+      Determine whether the primary constraint is:
+      (a) labor: insufficient idle workers to cover pending tasks, or
+      (b) wave: task sequencing or prioritization issue, or
+      (c) equipment: offline/unavailable equipment blocking picks.
+      Record the determination as an observation.
+
+  - id: gather_specialist_evidence
+    action: consult_required_domains
+    description: >
+      Based on primary constraint, delegate bounded question to specialist agent(s).
+      If labor constraint: delegate to LaborAgent (labor_constraint_assessment SOP).
+      If wave constraint: delegate to WaveAgent (wave_risk_assessment SOP).
+      If equipment constraint: delegate to EquipmentAssetOperationsAgent.
+    condition:
+      predicate: domains_affected
+      operator: contains
+      value: labor
+
+  - id: generate_candidates
+    action: produce_candidate_interventions
+    description: >
+      Integrate specialist assessments. Generate 1-3 candidate interventions
+      from specialist candidate_actions. Each candidate must:
+      - map to an allowed capability (READ, ANALYTICAL, or PROPOSAL skill)
+      - have a rationale grounded in observed facts
+      - have a priority (critical | high | medium | low)
+
+  - id: compare
+    action: compare_candidates
+    description: >
+      Compare candidates by: urgency, operational impact, risk, reversibility.
+      Select the highest-impact, lowest-risk action as the primary recommendation.
+
+  - id: recommend
+    action: select_recommendation
+    description: >
+      Select the top recommendation. Emit a RecommendedAction with:
+      domain, capability, target, objective, rationale, priority, subtype.
+      The recommendation must NOT specify MCP parameters — only semantic intent.
+
+  - id: submit
+    action: emit_recommended_action
+    description: >
+      Transition to WAITING_FOR_GOVERNANCE.
+      The RecommendedAction flows to GovernedActionOrchestrator via CopilotService.
+
+  - id: observe
+    action: evaluate_post_execution_state
+    description: >
+      After governance result is returned (GovernanceOutcome injected):
+      Read the resulting WarehouseStateSnapshot. Compare wave state before and after.
+      Determine whether objective is met.
+      If met: COMPLETED.
+      If not met and safe next step exists: continue SOP from diagnose.
+      If no safe action: ESCALATED.
+
+escalation:
+  - rule_id: conflicting_evidence
+    trigger: Specialist assessments yield contradictory conclusions about the primary constraint.
+    escalation_message: Conflicting evidence from specialist agents — human review required.
+
+  - rule_id: insufficient_context
+    trigger: OperationalContextSnapshot is missing one or more required domains.
+    escalation_message: Insufficient operational context to proceed safely.
+
+  - rule_id: high_operational_risk
+    trigger: All candidate interventions carry HIGH or CRITICAL risk and no low-risk option exists.
+    escalation_message: All candidate actions carry unacceptable operational risk.
+
+  - rule_id: max_iterations_reached
+    trigger: SOP has completed the maximum allowed iterations without meeting the objective.
+    escalation_message: Maximum SOP iterations reached without resolution.
+
+stop_conditions:
+  - objective_met
+  - no_safe_action
+  - human_intervention_required
+  - max_iterations_reached
+  - insufficient_context
