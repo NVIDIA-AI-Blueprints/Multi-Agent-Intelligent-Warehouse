@@ -1,0 +1,103 @@
+# MAIW SOP: Labor Agent — Labor Constraint Assessment
+# Phase 18H: Agent/SOP Foundation
+
+id: labor.labor_constraint_assessment
+version: "1.0"
+agent: labor
+objective: >
+  Determine whether labor is constraining an operational objective
+  and produce feasible labor interventions for the parent agent to consider.
+
+description: >
+  The LaborAgent follows this SOP when delegated a labor constraint assessment.
+  It reads worker state, evaluates assignment imbalance and capacity deficit,
+  checks worker/zone/skill constraints, generates feasible reallocation interventions,
+  and returns a LaborAssessment with CandidateLaborAction[].
+  The LaborAgent does NOT execute any action — it only recommends.
+
+triggers:
+  - labor_constraint_detected
+  - operator_requests_resolution
+
+required_context:
+  - worker
+  - task
+
+allowed_capabilities:
+  - warehouse.labor.capacity
+  - warehouse.labor.inspect_workers
+  - warehouse.labor.inspect_tasks
+  - warehouse.labor.evaluate_reallocation
+
+allowed_subagents: []
+
+steps:
+  - id: read_workers
+    action: read_labor_state
+    description: Read current worker states, roles, zones, and active task assignments.
+
+  - id: read_tasks
+    action: read_task_assignments
+    description: Read relevant pending and in-progress wave tasks, including zone, priority, and deadline.
+
+  - id: evaluate_imbalance
+    action: evaluate_assignment_imbalance
+    description: >
+      Identify workers with no current task (idle). Compare idle count vs pending task count.
+      Flag zones with a deficit (more tasks than available workers).
+
+  - id: identify_deficit
+    action: identify_capacity_deficit
+    description: >
+      Quantify the capacity gap: how many pending tasks have no assigned worker?
+      Which zones are most under-staffed relative to task load?
+
+  - id: check_constraints
+    action: check_worker_constraints
+    description: >
+      Verify which idle workers can be assigned: skill match, zone compatibility,
+      shift availability. Filter out workers who cannot legally take the task.
+
+  - id: generate_interventions
+    action: generate_labor_interventions
+    description: >
+      Generate 1-3 feasible labor reallocation interventions. Each must:
+      - identify a specific (task_id, worker_id) pair
+      - confirm the worker is idle and zone-compatible
+      - provide a rationale
+      - NOT generate a write action directly
+
+  - id: rank
+    action: rank_labor_interventions
+    description: >
+      Rank interventions by: carrier cutoff proximity, task priority, zone alignment.
+      Select the highest-ranked intervention as the primary CandidateLaborAction.
+
+  - id: return_assessment
+    action: return_labor_assessment
+    description: >
+      Package and return LaborAssessment:
+        - total_workers, idle_workers, active_workers
+        - pending_task_count, unassigned_task_count
+        - primary_constraint (idle_workers_available | skill_gap | zone_mismatch | no_constraint)
+        - candidate_actions: list[CandidateLaborAction]
+      STOP.
+
+escalation:
+  - rule_id: insufficient_labor_data
+    trigger: Worker or task state is unavailable or incomplete.
+    escalation_message: Labor state unavailable — cannot assess constraint.
+
+  - rule_id: infeasible_reassignment
+    trigger: No idle workers are zone-compatible with any pending task.
+    escalation_message: No feasible labor reallocation found.
+
+  - rule_id: safety_policy_conflict
+    trigger: A reallocation violates a safety or labor policy constraint.
+    escalation_message: Labor reallocation blocked by safety or labor policy.
+
+stop_conditions:
+  - objective_met
+  - no_safe_action
+  - insufficient_context
+  - max_iterations_reached
