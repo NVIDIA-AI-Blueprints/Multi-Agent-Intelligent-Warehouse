@@ -527,7 +527,9 @@ class EquipmentAssetOperationsAgent:
                 )
 
             elif equipment_query.intent == "maintenance" and asset_id:
-                maintenance_result = await self.asset_tools.schedule_maintenance(
+                # Phase 18H: Route through state-aware governed path instead of direct write.
+                # propose_schedule_maintenance() → DecisionEngine → (optional) ActionExecutor
+                maintenance_result = await self.propose_schedule_maintenance(
                     asset_id=asset_id,
                     maintenance_type=equipment_query.entities.get(
                         "maintenance_type", "preventive"
@@ -536,8 +538,8 @@ class EquipmentAssetOperationsAgent:
                         "description", "Scheduled maintenance"
                     ),
                     scheduled_by=equipment_query.entities.get("scheduled_by", "system"),
-                    scheduled_for=equipment_query.entities.get(
-                        "scheduled_for", datetime.now()
+                    scheduled_for=str(
+                        equipment_query.entities.get("scheduled_for", datetime.now())
                     ),
                     estimated_duration_minutes=equipment_query.entities.get(
                         "duration_minutes", 60
@@ -546,7 +548,7 @@ class EquipmentAssetOperationsAgent:
                 )
                 actions_taken.append(
                     {
-                        "action": "schedule_maintenance",
+                        "action": "propose_schedule_maintenance",
                         "asset_id": asset_id,
                         "result": maintenance_result,
                         "timestamp": datetime.now().isoformat(),
@@ -554,14 +556,16 @@ class EquipmentAssetOperationsAgent:
                 )
 
             elif equipment_query.intent == "release" and asset_id:
-                release_result = await self.asset_tools.release_equipment(
+                # Phase 18H: Route through state-aware governed path instead of direct write.
+                # propose_equipment_release() → DecisionEngine → (optional) ActionExecutor
+                release_result = await self.propose_equipment_release(
                     asset_id=asset_id,
                     released_by=equipment_query.entities.get("released_by", "system"),
                     notes=equipment_query.entities.get("notes"),
                 )
                 actions_taken.append(
                     {
-                        "action": "release_equipment",
+                        "action": "propose_equipment_release",
                         "asset_id": asset_id,
                         "result": release_result,
                         "timestamp": datetime.now().isoformat(),

@@ -118,6 +118,23 @@ class OperationsCoordinationAgent:
         session_id: str = "default",
         context: Optional[Dict[str, Any]] = None,
     ) -> OperationsResponse:
+        """
+        DEPRECATED — Phase 18H governance closure.
+
+        This legacy method was the primary entry point before the governed Copilot
+        path was established. It should NOT be used for any operational write actions.
+
+        The canonical path is:
+            CopilotService.ask()  / CopilotService.analyze()
+                → OperationsCoordinationAgent.analyze_disruption()
+                    → OperationalAssessment (read-only output)
+                        → CopilotService.act()
+                            → GovernedActionOrchestrator.govern()
+
+        All _execute_action_tools() calls inside this method now return an empty list
+        (governance closure, Phase 18H). This method remains for backward compatibility
+        with any tests that call it for read/reasoning purposes only.
+        """
         try:
             if session_id not in self.conversation_context:
                 self.conversation_context[session_id] = {
@@ -439,192 +456,30 @@ class OperationsCoordinationAgent:
     async def _execute_action_tools(
         self, operations_query: OperationsQuery, context: Optional[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
-        actions_taken: List[Dict[str, Any]] = []
+        """
+        DEPRECATED — Phase 18H governance closure.
 
-        try:
-            if not self.action_tools:
-                return actions_taken
+        This method previously contained direct write bypasses for operational
+        capabilities (assign_tasks, generate_pick_wave, dispatch_equipment, etc.)
+        that circumvented the MAIW governance boundary.
 
-            task_type = operations_query.entities.get("task_type")
-            quantity = operations_query.entities.get("quantity", 0)
-            constraints = operations_query.entities.get("constraints", {})
-            assignees = operations_query.entities.get("assignees")
-            order_ids = operations_query.entities.get("order_ids", [])
-            wave_strategy = operations_query.entities.get("wave_strategy", "zone_based")
-            shift_id = operations_query.entities.get("shift_id")
-            action = operations_query.entities.get("action")
-            workers = operations_query.entities.get("workers")
-            equipment_id = operations_query.entities.get("equipment_id")
-            task_id = operations_query.entities.get("task_id")
+        All normal write actions must flow through:
+            RecommendedAction → ActionProposal → DecisionEngine → Approval
+            → ActionExecutor → MCP
 
-            if operations_query.intent == "task_assignment":
-                if not task_type:
-                    if "pick" in operations_query.user_query.lower():
-                        task_type = "pick"
-                    elif "pack" in operations_query.user_query.lower():
-                        task_type = "pack"
-                    elif "receive" in operations_query.user_query.lower():
-                        task_type = "receive"
-                    else:
-                        task_type = "general"
+        The canonical governed path is OperationsCoordinationAgent.analyze_disruption()
+        which returns a RecommendedAction. CopilotService forwards recommendations
+        to GovernedActionOrchestrator for governance evaluation and execution.
 
-                if not quantity:
-                    qty_matches = re.findall(r"\b(\d+)\b", operations_query.user_query)
-                    quantity = int(qty_matches[0]) if qty_matches else 1
-
-                if task_type and quantity:
-                    assignment = await self.action_tools.assign_tasks(
-                        task_type=task_type,
-                        quantity=quantity,
-                        constraints=constraints,
-                        assignees=assignees,
-                    )
-                    actions_taken.append(
-                        {
-                            "action": "assign_tasks",
-                            "task_type": task_type,
-                            "quantity": quantity,
-                            "result": asdict(assignment),
-                            "timestamp": datetime.now().isoformat(),
-                        }
-                    )
-
-            elif operations_query.intent == "workload_rebalance":
-                rebalance = await self.action_tools.rebalance_workload(
-                    sla_rules=operations_query.entities.get("sla_rules")
-                )
-                actions_taken.append(
-                    {
-                        "action": "rebalance_workload",
-                        "result": asdict(rebalance),
-                        "timestamp": datetime.now().isoformat(),
-                    }
-                )
-
-            elif operations_query.intent == "pick_wave":
-                if not order_ids:
-                    order_matches = re.findall(r"ORD\d+", operations_query.user_query)
-                    if order_matches:
-                        order_ids = order_matches
-                    else:
-                        line_count_match = re.search(
-                            r"(\d{1,5})-line order", operations_query.user_query
-                        )
-                        zone_match = re.search(
-                            r"Zone ([A-Z])", operations_query.user_query
-                        )
-                        if line_count_match and zone_match:
-                            order_id = f"ORD_{datetime.now().strftime('%Y%m%d%H%M%S')}"
-                            order_ids = [order_id]
-                        else:
-                            order_ids = [
-                                f"ORD_{datetime.now().strftime('%Y%m%d%H%M%S')}"
-                            ]
-
-                if order_ids:
-                    pick_wave = await self.action_tools.generate_pick_wave(
-                        order_ids=order_ids, wave_strategy=wave_strategy
-                    )
-                    actions_taken.append(
-                        {
-                            "action": "generate_pick_wave",
-                            "order_ids": order_ids,
-                            "result": asdict(pick_wave),
-                            "timestamp": datetime.now().isoformat(),
-                        }
-                    )
-
-            elif (
-                operations_query.intent == "optimize_paths"
-                and operations_query.entities.get("picker_id")
-            ):
-                optimization = await self.action_tools.optimize_pick_paths(
-                    picker_id=operations_query.entities.get("picker_id"),
-                    wave_id=operations_query.entities.get("wave_id"),
-                )
-                actions_taken.append(
-                    {
-                        "action": "optimize_pick_paths",
-                        "picker_id": operations_query.entities.get("picker_id"),
-                        "result": asdict(optimization),
-                        "timestamp": datetime.now().isoformat(),
-                    }
-                )
-
-            elif operations_query.intent == "shift_management" and shift_id and action:
-                shift_schedule = await self.action_tools.manage_shift_schedule(
-                    shift_id=shift_id,
-                    action=action,
-                    workers=workers,
-                    swaps=operations_query.entities.get("swaps"),
-                )
-                actions_taken.append(
-                    {
-                        "action": "manage_shift_schedule",
-                        "shift_id": shift_id,
-                        "result": asdict(shift_schedule),
-                        "timestamp": datetime.now().isoformat(),
-                    }
-                )
-
-            elif (
-                operations_query.intent == "dock_scheduling"
-                and operations_query.entities.get("appointments")
-            ):
-                appointments = await self.action_tools.dock_scheduling(
-                    appointments=operations_query.entities.get("appointments", []),
-                    capacity=operations_query.entities.get("capacity", {}),
-                )
-                actions_taken.append(
-                    {
-                        "action": "dock_scheduling",
-                        "appointments_count": len(appointments),
-                        "result": [asdict(apt) for apt in appointments],
-                        "timestamp": datetime.now().isoformat(),
-                    }
-                )
-
-            elif operations_query.intent == "equipment_dispatch" and equipment_id:
-                if not task_id:
-                    task_id = f"TASK_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-                dispatch = await self.action_tools.dispatch_equipment(
-                    equipment_id=equipment_id,
-                    task_id=task_id,
-                    operator=operations_query.entities.get("operator"),
-                )
-                actions_taken.append(
-                    {
-                        "action": "dispatch_equipment",
-                        "equipment_id": equipment_id,
-                        "task_id": task_id,
-                        "result": asdict(dispatch),
-                        "timestamp": datetime.now().isoformat(),
-                    }
-                )
-
-            elif operations_query.intent == "publish_kpis":
-                kpi_result = await self.action_tools.publish_kpis(
-                    metrics=operations_query.entities.get("metrics")
-                )
-                actions_taken.append(
-                    {
-                        "action": "publish_kpis",
-                        "result": kpi_result,
-                        "timestamp": datetime.now().isoformat(),
-                    }
-                )
-
-            return actions_taken
-
-        except Exception as e:
-            logger.error("Action tools execution failed: %s", e)
-            return [
-                {
-                    "action": "error",
-                    "error": str(e),
-                    "timestamp": datetime.now().isoformat(),
-                }
-            ]
+        This method now returns an empty list unconditionally.  The action_tools
+        attribute is retained for backward-compatibility but is never invoked.
+        """
+        logger.warning(
+            "OperationsCoordinationAgent._execute_action_tools() called — "
+            "this is a deprecated no-op. All writes must flow through the MAIW "
+            "governance boundary (analyze_disruption → GovernedActionOrchestrator)."
+        )
+        return []
 
     def _simulate_workforce_data(self) -> Dict[str, Any]:
         return {
@@ -1384,3 +1239,105 @@ class OperationsCoordinationAgent:
             fallback_reason=rd.fallback_reason,
             latency_ms=response.latency_ms,
         )
+
+    async def observe_governance_outcome(
+        self,
+        *,
+        outcome: Any,
+        prior_snapshot: Any,
+        trace_id: str,
+    ) -> dict[str, Any]:
+        """
+        18H.9 — Governance result / outcome continuation.
+
+        Called after GovernedActionOrchestrator returns a GovernanceOutcome.
+        Implements the "observe" step of the wave_risk_resolution SOP.
+
+        Reads the resulting warehouse state snapshot (if available), compares
+        wave state before and after execution, and determines whether the SOP
+        objective is met.
+
+        Returns a continuation decision dict:
+            {
+                "objective_met": bool,
+                "stop_reason": str,           # "OBJECTIVE_MET" | "NO_SAFE_ACTION" | "ESCALATED"
+                "wave_delta": dict,           # before/after comparison
+                "governance_outcome": dict,   # serialized GovernanceOutcome
+                "next_action": str,           # "COMPLETED" | "CONTINUE" | "ESCALATED"
+            }
+
+        This method is READ-ONLY — it produces an observation, not an action.
+        The decision to continue or terminate rests with the SOP runner / copilot.
+
+        Governance invariant: this method NEVER calls ActionExecutor or
+        DecisionEngine. It only reads state and returns an observation.
+        """
+        from ..contracts.delegation import GovernanceOutcome
+
+        # Serialize outcome
+        if hasattr(outcome, "model_dump"):
+            outcome_dict = outcome.model_dump()
+        else:
+            outcome_dict = {
+                "proposal_id": getattr(outcome, "proposal_id", None),
+                "decision_outcome": getattr(outcome, "decision_outcome", None),
+                "approval_status": getattr(outcome, "approval_status", None),
+                "execution_status": getattr(outcome, "execution_status", None),
+                "resulting_context_snapshot_id": getattr(outcome, "resulting_context_snapshot_id", None),
+                "trace_id": getattr(outcome, "trace_id", trace_id),
+            }
+
+        decision_outcome = outcome_dict.get("decision_outcome", "")
+        approval_status = outcome_dict.get("approval_status", "")
+        execution_status = outcome_dict.get("execution_status", "")
+
+        # Determine whether governance approved and execution succeeded
+        approved = approval_status in ("approved", "auto_approved")
+        executed = execution_status in ("succeeded", "completed")
+
+        # Compare wave state before/after
+        wave_delta: dict[str, Any] = {}
+        if prior_snapshot is not None:
+            try:
+                prior_wave = prior_snapshot.state.wave
+                at_risk_before = getattr(prior_wave, "at_risk_count", None)
+                wave_delta["at_risk_count_before"] = at_risk_before
+                wave_delta["trace_id"] = trace_id
+                if approved and executed:
+                    wave_delta["note"] = "Execution succeeded — new snapshot required to measure delta."
+                else:
+                    wave_delta["note"] = "Execution did not succeed — wave state unchanged."
+            except Exception as exc:
+                logger.warning(
+                    "observe_governance_outcome: could not extract prior wave state: %s", exc
+                )
+
+        # Determine continuation
+        if approved and executed:
+            objective_met = True
+            stop_reason = "OBJECTIVE_MET"
+            next_action = "COMPLETED"
+        elif not approved:
+            objective_met = False
+            stop_reason = "POLICY_BLOCKED"
+            next_action = "ESCALATED"
+        else:
+            # Approved but execution failed
+            objective_met = False
+            stop_reason = "NO_SAFE_ACTION"
+            next_action = "ESCALATED"
+
+        logger.info(
+            "observe_governance_outcome: trace=%s decision=%s approval=%s execution=%s "
+            "→ objective_met=%s next=%s",
+            trace_id, decision_outcome, approval_status, execution_status,
+            objective_met, next_action,
+        )
+
+        return {
+            "objective_met": objective_met,
+            "stop_reason": stop_reason,
+            "wave_delta": wave_delta,
+            "governance_outcome": outcome_dict,
+            "next_action": next_action,
+        }

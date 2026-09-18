@@ -62,6 +62,16 @@ from .registry import (
 from .runtime import (
     AgentExecutionContext,
     AgentRuntime,
+    AgentTaskResult,
+)
+from .definitions import (
+    AGENT_DEFINITIONS,
+    OPERATIONS_COORDINATION_DEFINITION,
+    LABOR_AGENT_DEFINITION,
+    WAVE_AGENT_DEFINITION,
+    EQUIPMENT_AGENT_DEFINITION,
+    SAFETY_COMPLIANCE_DEFINITION,
+    get_agent_definition,
 )
 
 __all__ = [
@@ -100,4 +110,13 @@ __all__ = [
     # Runtime
     "AgentExecutionContext",
     "AgentRuntime",
+    "AgentTaskResult",
+    # Canonical definitions
+    "AGENT_DEFINITIONS",
+    "OPERATIONS_COORDINATION_DEFINITION",
+    "LABOR_AGENT_DEFINITION",
+    "WAVE_AGENT_DEFINITION",
+    "EQUIPMENT_AGENT_DEFINITION",
+    "SAFETY_COMPLIANCE_DEFINITION",
+    "get_agent_definition",
 ]
