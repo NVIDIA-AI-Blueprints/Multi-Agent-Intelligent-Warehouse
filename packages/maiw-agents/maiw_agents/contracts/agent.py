@@ -30,7 +30,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # ── Trigger types ─────────────────────────────────────────────────────────────
@@ -39,7 +39,9 @@ TriggerType = Literal[
     "wave_risk_detected",
     "operator_requests_resolution",
     "equipment_failure_detected",
+    "equipment_constraint_detected",
     "labor_constraint_detected",
+    "safety_alert",
     "safety_incident_reported",
     "governance_result_returned",
     "manual",
@@ -177,7 +179,8 @@ class AgentDefinition(BaseModel):
         description="Agent IDs this agent may delegate to.",
     )
 
-    sop_id: str = Field(
+    sop_id: str | None = Field(
+        default=None,
         description="Reference to the SOP this agent follows (e.g. 'operations_coordination.wave_risk_resolution')."
     )
     output_contract: str = Field(
@@ -197,5 +200,4 @@ class AgentDefinition(BaseModel):
         description="When and how this agent stops.",
     )
 
-    class Config:
-        frozen = True
+    model_config = ConfigDict(frozen=True)

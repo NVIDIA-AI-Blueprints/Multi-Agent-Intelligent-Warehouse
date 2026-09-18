@@ -60,6 +60,7 @@ class AgentDelegationRequest(BaseModel):
         ),
     )
     requested_output: str = Field(
+        default="",
         description="What the parent expects back (e.g. 'LaborAssessment', 'WaveAssessment')."
     )
     trace_id: str | None = None
@@ -87,7 +88,7 @@ class AgentDelegationResult(BaseModel):
         default_factory=dict,
         description="Structured domain assessment (LaborAssessment, WaveAssessment, etc.).",
     )
-    evidence: list[dict[str, Any]] = Field(
+    evidence: list[str] = Field(
         default_factory=list,
         description="Supporting evidence observed by the specialist.",
     )

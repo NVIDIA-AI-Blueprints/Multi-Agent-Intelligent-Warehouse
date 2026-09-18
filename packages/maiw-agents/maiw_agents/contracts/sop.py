@@ -257,6 +257,10 @@ def validate_sop(
     if not sop.stop_conditions:
         errors.append("SOP must define at least one stop_condition.")
 
+    # Rule 2b: at least one step
+    if not sop.steps:
+        errors.append("SOP must define at least one step.")
+
     # Rule 3: unique step IDs
     step_ids = [s.id for s in sop.steps]
     seen: set[str] = set()
