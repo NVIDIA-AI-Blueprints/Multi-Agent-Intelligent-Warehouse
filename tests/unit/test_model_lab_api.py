@@ -391,13 +391,20 @@ class TestModelLabPathSecurity:
 
     def test_unknown_run_id_rejected(self):
         """Unknown run IDs are rejected with 404 — no filesystem path is constructed."""
-        for bad_id in ["../etc/passwd", "../../requirements.txt", "18c/../../../.env",
-                       "18c%2F..%2F.env", "18x"]:
+        for bad_id in [
+            "../etc/passwd",
+            "../../requirements.txt",
+            "18c/../../../.env",
+            "18c%2F..%2F.env",
+            "18x",
+        ]:
             resp = _client.get(f"/api/v1/models/lab/runs/{bad_id}")
             # Any unknown run_id must return 404 (not 200, 500, or path-relative content)
-            assert resp.status_code in (404, 307, 422), (
-                f"Expected 404/307/422 for run_id={bad_id!r}, got {resp.status_code}"
-            )
+            assert resp.status_code in (
+                404,
+                307,
+                422,
+            ), f"Expected 404/307/422 for run_id={bad_id!r}, got {resp.status_code}"
 
     def test_run_endpoint_only_accepts_whitelisted_ids(self):
         """Valid run IDs succeed; everything else is rejected."""
@@ -405,9 +412,10 @@ class TestModelLabPathSecurity:
         # These may 200 (artifact on disk) or 404 (artifact not on disk) — both safe
         for vid in valid_ids:
             resp = _client.get(f"/api/v1/models/lab/runs/{vid}")
-            assert resp.status_code in (200, 404), (
-                f"Unexpected status {resp.status_code} for valid run_id={vid}"
-            )
+            assert resp.status_code in (
+                200,
+                404,
+            ), f"Unexpected status {resp.status_code} for valid run_id={vid}"
 
     def test_run_list_does_not_expose_secrets(self):
         """Run list response must not contain secret fields."""
@@ -416,6 +424,6 @@ class TestModelLabPathSecurity:
             body = resp.json()
             text = str(body).lower()
             for secret_term in ["api_key", "authorization", "password"]:
-                assert secret_term not in text, (
-                    f"Run list response contains secret field: {secret_term!r}"
-                )
+                assert (
+                    secret_term not in text
+                ), f"Run list response contains secret field: {secret_term!r}"
