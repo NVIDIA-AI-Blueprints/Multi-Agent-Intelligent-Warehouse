@@ -163,11 +163,15 @@
 ## Copilot
 
 **CopilotService**
-: Handles ASK / ANALYZE / ACT intents. MUST NOT import `ActionExecutor`, `ApprovalStore`,
-  or `DecisionEngine`. Delegates ACT to `GovernedActionOrchestrator`.
+: Handles ASK / ANALYZE / ACT / OBSERVE_OUTCOME intents. MUST NOT import `ActionExecutor`,
+  `ApprovalStore`, or `DecisionEngine`. Delegates ACT to `GovernedActionOrchestrator`.
 
 **CopilotIntent**
-: ASK (question answering), ANALYZE (recommendation), ACT (governed action trigger).
+: Four intents over a single endpoint (`POST /api/v1/copilot/turn`):
+  - `ASK` — graph-grounded question answering; no proposal, no execution
+  - `ANALYZE` — deterministic severity assessment + ranked `RecommendedAction` list
+  - `ACT` — governed action trigger: `ActionProposal` → `DecisionEngine` → approval / execution
+  - `OBSERVE_OUTCOME` — post-execution outcome observation; compares pre/post state
 
 ---
 
@@ -201,4 +205,25 @@
 
 ---
 
-*Last updated: MAIW v2 pre-NemoClaw baseline*
+## Outcome Terminology
+
+**Closed-Loop Outcome Observation**
+: MAIW's mechanism for observing whether the intended operational outcome occurred after
+  execution. Post-execution state is read and compared to the pre-execution snapshot.
+  Result: `CONFIRMED_EXECUTED`, `CONFIRMED_NOT_EXECUTED`, or `INDETERMINATE`.
+  This does NOT imply autonomous learning or self-modification — MAIW does not update
+  its own SOPs, models, or policies based on outcomes.
+
+**CONFIRMED_EXECUTED**
+: Reconciliation outcome — the write succeeded and the operational state reflects the change.
+
+**CONFIRMED_NOT_EXECUTED**
+: Reconciliation outcome — the write did not take effect (state is unchanged).
+
+**INDETERMINATE**
+: Reconciliation outcome — authoritative state cannot confirm either outcome.
+  Requires operator review. Never triggers automatic retry.
+
+---
+
+*Last updated: MAIW v2*
