@@ -32,7 +32,11 @@ import pytest
 _REPO = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(_REPO / "packages" / "maiw-agents"))
 
-from maiw_agents.contracts.agent import AgentDefinition, TerminationPolicy, GovernanceBoundary
+from maiw_agents.contracts.agent import (
+    AgentDefinition,
+    TerminationPolicy,
+    GovernanceBoundary,
+)
 from maiw_agents.contracts.runtime import AgentExecutionContext, AgentTaskResult
 from maiw_agents.contracts.sop import load_sop, SOPDefinition
 from maiw_agents.contracts.task import AgentTaskState, AgentTaskStatus
@@ -46,7 +50,11 @@ from maiw_agents.runtime.model_adapter import MAIWModelGatewayChat
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 _SOP_PATH = (
-    _REPO / "agents" / "sops" / "operations_coordination" / "wave_risk_resolution.v1.yaml"
+    _REPO
+    / "agents"
+    / "sops"
+    / "operations_coordination"
+    / "wave_risk_resolution.v1.yaml"
 )
 
 _WAVE17_CONTEXT = {
@@ -131,6 +139,7 @@ def _make_context(
 
 # ── Test A: Basic SOP run ─────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_A_real_runtime_basic_sop_run():
     """
@@ -146,7 +155,9 @@ async def test_A_real_runtime_basic_sop_run():
 
     result = await runtime.run_task(definition, sop, state, context)
 
-    assert result.task_id == "task-A-basic", f"Expected task_id='task-A-basic', got {result.task_id!r}"
+    assert (
+        result.task_id == "task-A-basic"
+    ), f"Expected task_id='task-A-basic', got {result.task_id!r}"
     assert result.agent_id == definition.agent_id
     assert result.sop_id == sop.id
     assert result.sop_version == sop.version
@@ -160,6 +171,7 @@ async def test_A_real_runtime_basic_sop_run():
 
 
 # ── Test B: READ skill result injected via bounded_context ────────────────────
+
 
 @pytest.mark.asyncio
 async def test_B_read_skill_injected_via_bounded_context():
@@ -190,6 +202,7 @@ async def test_B_read_skill_injected_via_bounded_context():
 
 
 # ── Test C: SubAgent specs built from SOP allowed_subagents ──────────────────
+
 
 def test_C_subagent_specs_from_sop():
     """
@@ -230,6 +243,7 @@ def test_C_subagent_specs_from_sop():
 
 # ── Test D: WRITE skills absent from built tools ──────────────────────────────
 
+
 def test_D_write_skills_absent_from_tools():
     """
     Test D: _build_maiw_tools with WRITE-only capability IDs returns empty list.
@@ -250,6 +264,7 @@ def test_D_write_skills_absent_from_tools():
 
 
 # ── Test E: WAITING_FOR_GOVERNANCE status ─────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_E_waiting_for_governance_status():
@@ -279,6 +294,7 @@ async def test_E_waiting_for_governance_status():
 
 # ── Test F: resume_after_governance approved → COMPLETED ─────────────────────
 
+
 @pytest.mark.asyncio
 async def test_F_resume_after_governance_approved():
     """
@@ -302,18 +318,22 @@ async def test_F_resume_after_governance_approved():
     }
 
     result = await runtime.resume_after_governance(
-        definition, sop, waiting_state, context,
+        definition,
+        sop,
+        waiting_state,
+        context,
         governance_outcome=governance_outcome,
     )
 
-    assert result.final_status == AgentTaskStatus.COMPLETED, (
-        f"Expected COMPLETED after APPROVED governance, got {result.final_status.value}"
-    )
+    assert (
+        result.final_status == AgentTaskStatus.COMPLETED
+    ), f"Expected COMPLETED after APPROVED governance, got {result.final_status.value}"
     assert result.stop_reason == "OBJECTIVE_MET"
     assert result.task_id == "task-F-resume"
 
 
 # ── Test G: Large max_iterations — still terminates ───────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_G_large_max_iterations_terminates():
@@ -341,6 +361,7 @@ async def test_G_large_max_iterations_terminates():
 
 # ── Test H: Missing context → runtime terminates gracefully ──────────────────
 
+
 @pytest.mark.asyncio
 async def test_H_missing_context_terminates_gracefully():
     """
@@ -367,6 +388,7 @@ async def test_H_missing_context_terminates_gracefully():
 
 # ── Additional: MAIWModelGatewayChat test-mode verification ──────────────────
 
+
 def test_maiw_model_gateway_chat_test_mode_mock():
     """
     MAIWModelGatewayChat with model_gateway=None must return deterministic mock.
@@ -385,14 +407,15 @@ def test_maiw_model_gateway_chat_test_mode_mock():
     ]
     result = chat._generate(messages)
     content = result.generations[0].message.content
-    assert "WAITING_FOR_GOVERNANCE" in content or "GOVERNANCE" in content.upper(), (
-        f"Expected governance signal in mock response, got: {content!r}"
-    )
+    assert (
+        "WAITING_FOR_GOVERNANCE" in content or "GOVERNANCE" in content.upper()
+    ), f"Expected governance signal in mock response, got: {content!r}"
 
 
 def test_maiw_model_gateway_chat_is_langchain_base_chat_model():
     """MAIWModelGatewayChat must inherit from langchain_core BaseChatModel."""
     from langchain_core.language_models import BaseChatModel
+
     chat = MAIWModelGatewayChat(model_gateway=None)
     assert isinstance(chat, BaseChatModel), (
         "MAIWModelGatewayChat must be a LangChain BaseChatModel "
@@ -409,6 +432,6 @@ def test_maiw_model_gateway_chat_bind_tools_returns_self():
 
     chat = MAIWModelGatewayChat(model_gateway=None)
     result = chat.bind_tools([])
-    assert result is chat, (
-        "bind_tools() must return self (no-op) — MAIW mock model uses text output, not tool calls"
-    )
+    assert (
+        result is chat
+    ), "bind_tools() must return self (no-op) — MAIW mock model uses text output, not tool calls"

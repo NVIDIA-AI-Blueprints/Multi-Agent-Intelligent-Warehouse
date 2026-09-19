@@ -42,7 +42,9 @@ sys.path.insert(0, str(_REPO / "packages" / "maiw-agents"))
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
-_FORBIDDEN_FRAMEWORKS = frozenset({"deep_agents", "langchain", "langgraph", "nemoagent"})
+_FORBIDDEN_FRAMEWORKS = frozenset(
+    {"deep_agents", "langchain", "langgraph", "nemoagent"}
+)
 
 _RUNTIME_MODULE = _REPO / "packages" / "maiw-agents" / "maiw_agents" / "runtime"
 _CONTRACTS_MODULE = _REPO / "packages" / "maiw-agents" / "maiw_agents" / "contracts"
@@ -75,6 +77,7 @@ def _check_no_forbidden_imports(filepath: Path, label: str) -> None:
 
 # ── Invariant 1: DeepAgentsRuntime has no forbidden framework imports ──────────
 
+
 def test_deep_agents_runtime_has_no_framework_imports():
     """DeepAgentsRuntime must NOT import deep_agents, langchain, langgraph, nemoagent."""
     filepath = _RUNTIME_MODULE / "deep_agents_runtime.py"
@@ -98,9 +101,11 @@ def test_skill_adapter_has_no_framework_imports():
 
 # ── Invariant 2: MAIW contracts have ZERO framework imports ───────────────────
 
-@pytest.mark.parametrize("contract_file", [
-    "runtime.py", "agent.py", "task.py", "sop.py", "registry.py", "delegation.py"
-])
+
+@pytest.mark.parametrize(
+    "contract_file",
+    ["runtime.py", "agent.py", "task.py", "sop.py", "registry.py", "delegation.py"],
+)
 def test_contracts_have_no_framework_imports(contract_file: str):
     """MAIW contract files must have ZERO imports from any agent framework."""
     filepath = _CONTRACTS_MODULE / contract_file
@@ -110,6 +115,7 @@ def test_contracts_have_no_framework_imports(contract_file: str):
 
 # ── Invariant 3 & 4: WRITE/EMERGENCY_WRITE skills blocked ─────────────────────
 
+
 def test_skill_adapter_blocks_write_skills():
     """MAIWSkillAdapter.get_agent_callable_tools() must not return WRITE skills."""
     from maiw_agents.runtime.skill_adapter import MAIWSkillAdapter
@@ -118,13 +124,10 @@ def test_skill_adapter_blocks_write_skills():
     adapter = MAIWSkillAdapter()
     tools = adapter.get_agent_callable_tools()
 
-    write_tools = [
-        t for t in tools
-        if t.capability_class == CapabilityClass.WRITE
-    ]
-    assert len(write_tools) == 0, (
-        f"Expected no WRITE tools, found: {[t.skill_id for t in write_tools]}"
-    )
+    write_tools = [t for t in tools if t.capability_class == CapabilityClass.WRITE]
+    assert (
+        len(write_tools) == 0
+    ), f"Expected no WRITE tools, found: {[t.skill_id for t in write_tools]}"
 
 
 def test_skill_adapter_blocks_emergency_write_skills():
@@ -136,12 +139,11 @@ def test_skill_adapter_blocks_emergency_write_skills():
     tools = adapter.get_agent_callable_tools()
 
     emergency_write_tools = [
-        t for t in tools
-        if t.capability_class == CapabilityClass.EMERGENCY_WRITE
+        t for t in tools if t.capability_class == CapabilityClass.EMERGENCY_WRITE
     ]
-    assert len(emergency_write_tools) == 0, (
-        f"Expected no EMERGENCY_WRITE tools, found: {[t.skill_id for t in emergency_write_tools]}"
-    )
+    assert (
+        len(emergency_write_tools) == 0
+    ), f"Expected no EMERGENCY_WRITE tools, found: {[t.skill_id for t in emergency_write_tools]}"
 
 
 def test_skill_adapter_blocks_write_even_when_explicitly_requested():
@@ -155,13 +157,15 @@ def test_skill_adapter_blocks_write_even_when_explicitly_requested():
         allowed_capability_classes={
             CapabilityClass.READ,
             CapabilityClass.ANALYTICAL,
-            CapabilityClass.WRITE,           # should be silently removed
+            CapabilityClass.WRITE,  # should be silently removed
             CapabilityClass.EMERGENCY_WRITE,  # should be silently removed
         }
     )
     write_tools = [
-        t for t in tools
-        if t.capability_class in (CapabilityClass.WRITE, CapabilityClass.EMERGENCY_WRITE)
+        t
+        for t in tools
+        if t.capability_class
+        in (CapabilityClass.WRITE, CapabilityClass.EMERGENCY_WRITE)
     ]
     assert len(write_tools) == 0, (
         f"WRITE/EMERGENCY_WRITE blocked even when explicitly requested: "
@@ -175,18 +179,19 @@ def test_skill_adapter_is_blocked_method_identifies_write():
 
     adapter = MAIWSkillAdapter()
     # Known WRITE skill from SKILL_REGISTRY
-    assert adapter.is_blocked("warehouse.labor.assign_direct"), (
-        "warehouse.labor.assign_direct is WRITE — must be blocked"
-    )
-    assert adapter.is_blocked("warehouse.wave.reprioritize_direct"), (
-        "warehouse.wave.reprioritize_direct is WRITE — must be blocked"
-    )
-    assert adapter.is_blocked("warehouse.equipment.assign_direct"), (
-        "warehouse.equipment.assign_direct is WRITE — must be blocked"
-    )
+    assert adapter.is_blocked(
+        "warehouse.labor.assign_direct"
+    ), "warehouse.labor.assign_direct is WRITE — must be blocked"
+    assert adapter.is_blocked(
+        "warehouse.wave.reprioritize_direct"
+    ), "warehouse.wave.reprioritize_direct is WRITE — must be blocked"
+    assert adapter.is_blocked(
+        "warehouse.equipment.assign_direct"
+    ), "warehouse.equipment.assign_direct is WRITE — must be blocked"
 
 
 # ── Invariant 5: Uses ModelGateway adapter ────────────────────────────────────
+
 
 def test_deep_agents_runtime_uses_model_adapter():
     """DeepAgentsRuntime must use MAIWModelGatewayChat (LangChain BaseChatModel → ModelGateway)."""
@@ -221,6 +226,7 @@ def test_model_adapter_wraps_context_gateway():
 
 # ── Invariant 6: Uses MAIW AgentTaskState ────────────────────────────────────
 
+
 def test_deep_agents_runtime_accepts_agent_task_state():
     """DeepAgentsRuntime.run_task signature must accept AgentTaskState."""
     from maiw_agents.runtime.deep_agents_runtime import DeepAgentsRuntime
@@ -232,9 +238,9 @@ def test_deep_agents_runtime_accepts_agent_task_state():
 
     # Verify type annotation references AgentTaskState
     source = inspect.getsource(DeepAgentsRuntime.run_task)
-    assert "AgentTaskState" in source, (
-        "run_task must use MAIW AgentTaskState, not opaque framework state"
-    )
+    assert (
+        "AgentTaskState" in source
+    ), "run_task must use MAIW AgentTaskState, not opaque framework state"
 
 
 def test_agent_task_state_transition_is_validated():
@@ -277,6 +283,7 @@ def test_agent_task_state_terminal_states_have_no_transitions():
 
 # ── Invariant 7: Uses MAIW SOPDefinition ─────────────────────────────────────
 
+
 def test_deep_agents_runtime_accepts_sop_definition():
     """DeepAgentsRuntime.run_task signature must accept SOPDefinition."""
     from maiw_agents.runtime.deep_agents_runtime import DeepAgentsRuntime
@@ -286,12 +293,13 @@ def test_deep_agents_runtime_accepts_sop_definition():
     assert "sop" in params, "run_task must accept 'sop' (SOPDefinition) parameter"
 
     source = inspect.getsource(DeepAgentsRuntime.run_task)
-    assert "SOPDefinition" in source or "sop.steps" in source, (
-        "run_task must use MAIW SOPDefinition"
-    )
+    assert (
+        "SOPDefinition" in source or "sop.steps" in source
+    ), "run_task must use MAIW SOPDefinition"
 
 
 # ── Invariant 8 & 9: Skill adapter READ/ANALYTICAL allowed ───────────────────
+
 
 def test_skill_adapter_allows_read_skills():
     """MAIWSkillAdapter must expose READ-classified skills."""
@@ -302,9 +310,9 @@ def test_skill_adapter_allows_read_skills():
     tools = adapter.get_agent_callable_tools()
 
     read_tools = [t for t in tools if t.capability_class == CapabilityClass.READ]
-    assert len(read_tools) >= 1, (
-        f"Expected READ skills to be exposed, found zero. Total tools: {len(tools)}"
-    )
+    assert (
+        len(read_tools) >= 1
+    ), f"Expected READ skills to be exposed, found zero. Total tools: {len(tools)}"
 
 
 def test_skill_adapter_allows_analytical_skills():
@@ -315,13 +323,16 @@ def test_skill_adapter_allows_analytical_skills():
     adapter = MAIWSkillAdapter()
     tools = adapter.get_agent_callable_tools()
 
-    analytical_tools = [t for t in tools if t.capability_class == CapabilityClass.ANALYTICAL]
-    assert len(analytical_tools) >= 1, (
-        f"Expected ANALYTICAL skills to be exposed, found zero. Total tools: {len(tools)}"
-    )
+    analytical_tools = [
+        t for t in tools if t.capability_class == CapabilityClass.ANALYTICAL
+    ]
+    assert (
+        len(analytical_tools) >= 1
+    ), f"Expected ANALYTICAL skills to be exposed, found zero. Total tools: {len(tools)}"
 
 
 # ── Invariant 10: PROPOSAL skills allowed for recommendation ──────────────────
+
 
 def test_skill_adapter_allows_proposal_skills_when_opted_in():
     """PROPOSAL skills are allowed when explicitly included in capability classes."""
@@ -337,13 +348,17 @@ def test_skill_adapter_allows_proposal_skills_when_opted_in():
         }
     )
 
-    proposal_tools = [t for t in tools if t.capability_class == CapabilityClass.PROPOSAL]
-    assert len(proposal_tools) >= 1, (
-        "PROPOSAL skills should be accessible when explicitly included"
-    )
+    proposal_tools = [
+        t for t in tools if t.capability_class == CapabilityClass.PROPOSAL
+    ]
+    assert (
+        len(proposal_tools) >= 1
+    ), "PROPOSAL skills should be accessible when explicitly included"
     # Verify none are write
     for t in proposal_tools:
-        assert not t.is_write, f"PROPOSAL skill {t.skill_id} must not be marked as write"
+        assert (
+            not t.is_write
+        ), f"PROPOSAL skill {t.skill_id} must not be marked as write"
 
 
 def test_skill_adapter_excludes_proposal_by_default():
@@ -354,13 +369,16 @@ def test_skill_adapter_excludes_proposal_by_default():
     adapter = MAIWSkillAdapter()
     default_tools = adapter.get_agent_callable_tools()  # default: READ+ANALYTICAL
 
-    proposal_tools = [t for t in default_tools if t.capability_class == CapabilityClass.PROPOSAL]
-    assert len(proposal_tools) == 0, (
-        "PROPOSAL skills should not appear in default READ+ANALYTICAL tool set"
-    )
+    proposal_tools = [
+        t for t in default_tools if t.capability_class == CapabilityClass.PROPOSAL
+    ]
+    assert (
+        len(proposal_tools) == 0
+    ), "PROPOSAL skills should not appear in default READ+ANALYTICAL tool set"
 
 
 # ── Invariant 11: SOP conformance — governance handoff mandatory ──────────────
+
 
 @pytest.mark.asyncio
 async def test_governance_handoff_cannot_be_skipped():
@@ -375,7 +393,13 @@ async def test_governance_handoff_cannot_be_skipped():
     from maiw_agents.contracts.runtime import AgentExecutionContext
     from maiw_agents.runtime import DeepAgentsRuntime
 
-    sop_path = _REPO / "agents" / "sops" / "operations_coordination" / "wave_risk_resolution.v1.yaml"
+    sop_path = (
+        _REPO
+        / "agents"
+        / "sops"
+        / "operations_coordination"
+        / "wave_risk_resolution.v1.yaml"
+    )
     if not sop_path.exists():
         pytest.skip("SOP file not found")
 
@@ -434,6 +458,7 @@ async def test_governance_handoff_cannot_be_skipped():
 
 # ── Invariant 12: State transitions follow MAIW valid transition map ──────────
 
+
 def test_maiw_valid_transitions_are_enforced():
     """
     The MAIW _VALID_TRANSITIONS map must reject all invalid transitions.
@@ -443,19 +468,30 @@ def test_maiw_valid_transitions_are_enforced():
 
     # Valid transitions
     assert is_valid_transition(AgentTaskStatus.PENDING, AgentTaskStatus.RUNNING)
-    assert is_valid_transition(AgentTaskStatus.RUNNING, AgentTaskStatus.WAITING_FOR_GOVERNANCE)
-    assert is_valid_transition(AgentTaskStatus.WAITING_FOR_GOVERNANCE, AgentTaskStatus.OBSERVING_OUTCOME)
-    assert is_valid_transition(AgentTaskStatus.OBSERVING_OUTCOME, AgentTaskStatus.COMPLETED)
+    assert is_valid_transition(
+        AgentTaskStatus.RUNNING, AgentTaskStatus.WAITING_FOR_GOVERNANCE
+    )
+    assert is_valid_transition(
+        AgentTaskStatus.WAITING_FOR_GOVERNANCE, AgentTaskStatus.OBSERVING_OUTCOME
+    )
+    assert is_valid_transition(
+        AgentTaskStatus.OBSERVING_OUTCOME, AgentTaskStatus.COMPLETED
+    )
 
     # Invalid transitions
-    assert not is_valid_transition(AgentTaskStatus.PENDING, AgentTaskStatus.WAITING_FOR_GOVERNANCE)
+    assert not is_valid_transition(
+        AgentTaskStatus.PENDING, AgentTaskStatus.WAITING_FOR_GOVERNANCE
+    )
     assert not is_valid_transition(AgentTaskStatus.COMPLETED, AgentTaskStatus.RUNNING)
     assert not is_valid_transition(AgentTaskStatus.ESCALATED, AgentTaskStatus.RUNNING)
     assert not is_valid_transition(AgentTaskStatus.FAILED, AgentTaskStatus.COMPLETED)
-    assert not is_valid_transition(AgentTaskStatus.WAITING_FOR_GOVERNANCE, AgentTaskStatus.COMPLETED)
+    assert not is_valid_transition(
+        AgentTaskStatus.WAITING_FOR_GOVERNANCE, AgentTaskStatus.COMPLETED
+    )
 
 
 # ── Invariant 13: MAIW_AGENT_RUNTIME=deterministic → MAIWDeterministicRuntime ─
+
 
 def test_get_runtime_default_is_deterministic():
     """get_runtime() with no args returns MAIWDeterministicRuntime."""
@@ -465,9 +501,9 @@ def test_get_runtime_default_is_deterministic():
     # Unset env var to test default
     os.environ.pop("MAIW_AGENT_RUNTIME", None)
     rt = get_runtime()
-    assert isinstance(rt, MAIWDeterministicRuntime), (
-        f"Default runtime should be MAIWDeterministicRuntime, got {type(rt).__name__}"
-    )
+    assert isinstance(
+        rt, MAIWDeterministicRuntime
+    ), f"Default runtime should be MAIWDeterministicRuntime, got {type(rt).__name__}"
 
 
 def test_get_runtime_env_deterministic():
@@ -485,6 +521,7 @@ def test_get_runtime_env_deterministic():
 
 # ── Invariant 14: MAIW_AGENT_RUNTIME=deep_agents → DeepAgentsRuntime ──────────
 
+
 def test_get_runtime_env_deep_agents():
     """MAIW_AGENT_RUNTIME=deep_agents → DeepAgentsRuntime."""
     from maiw_agents.runtime.deep_agents_runtime import get_runtime, DeepAgentsRuntime
@@ -492,9 +529,9 @@ def test_get_runtime_env_deep_agents():
     os.environ["MAIW_AGENT_RUNTIME"] = "deep_agents"
     try:
         rt = get_runtime()
-        assert isinstance(rt, DeepAgentsRuntime), (
-            f"Expected DeepAgentsRuntime, got {type(rt).__name__}"
-        )
+        assert isinstance(
+            rt, DeepAgentsRuntime
+        ), f"Expected DeepAgentsRuntime, got {type(rt).__name__}"
     finally:
         os.environ.pop("MAIW_AGENT_RUNTIME", None)
 
@@ -520,15 +557,16 @@ def test_get_runtime_explicit_deterministic():
 
 # ── Additional: AgentRuntime Protocol compliance ──────────────────────────────
 
+
 def test_deep_agents_runtime_satisfies_agent_runtime_protocol():
     """DeepAgentsRuntime must satisfy the AgentRuntime Protocol (runtime_checkable)."""
     from maiw_agents.runtime.deep_agents_runtime import DeepAgentsRuntime
     from maiw_agents.contracts.runtime import AgentRuntime
 
     rt = DeepAgentsRuntime()
-    assert isinstance(rt, AgentRuntime), (
-        "DeepAgentsRuntime must satisfy the AgentRuntime Protocol"
-    )
+    assert isinstance(
+        rt, AgentRuntime
+    ), "DeepAgentsRuntime must satisfy the AgentRuntime Protocol"
 
 
 def test_deterministic_runtime_satisfies_agent_runtime_protocol():
@@ -537,16 +575,18 @@ def test_deterministic_runtime_satisfies_agent_runtime_protocol():
     from maiw_agents.contracts.runtime import AgentRuntime
 
     rt = MAIWDeterministicRuntime()
-    assert isinstance(rt, AgentRuntime), (
-        "MAIWDeterministicRuntime must satisfy the AgentRuntime Protocol"
-    )
+    assert isinstance(
+        rt, AgentRuntime
+    ), "MAIWDeterministicRuntime must satisfy the AgentRuntime Protocol"
 
 
 # ── Phase 19A Real Integration Invariants (19A.6–19A.9) ─────────────────────
 
+
 def test_deepagents_real_package_is_installed():
     """deepagents (real PyPI package) must be installed for Phase 19A real integration."""
     import importlib.util
+
     spec = importlib.util.find_spec("deepagents")
     assert spec is not None, (
         "deepagents package not found. Install: pip install 'maiw-agents[deep-agents]' "
@@ -582,10 +622,11 @@ def test_deep_agents_runtime_does_not_import_openai_or_anthropic_directly():
 def test_maiw_model_gateway_chat_llm_type():
     """MAIWModelGatewayChat._llm_type must be 'maiw-model-gateway'."""
     from maiw_agents.runtime.model_adapter import MAIWModelGatewayChat
+
     chat = MAIWModelGatewayChat(model_gateway=None)
-    assert chat._llm_type == "maiw-model-gateway", (
-        f"Expected _llm_type='maiw-model-gateway', got {chat._llm_type!r}"
-    )
+    assert (
+        chat._llm_type == "maiw-model-gateway"
+    ), f"Expected _llm_type='maiw-model-gateway', got {chat._llm_type!r}"
 
 
 def test_build_maiw_tools_blocks_write_capabilities():
@@ -622,6 +663,7 @@ def test_simulated_runtime_is_no_longer_importable():
     now owns that responsibility.
     """
     import importlib
+
     mod = importlib.import_module("maiw_agents.runtime.deep_agents_runtime")
     assert not hasattr(mod, "_SimulatedDeepAgentsRuntime"), (
         "_SimulatedDeepAgentsRuntime should not exist after Phase 19A.11b removal. "
@@ -631,9 +673,11 @@ def test_simulated_runtime_is_no_longer_importable():
 
 # ── Phase 19A.11 Invariants (runtime_profile, check_capability_alignment) ──────
 
+
 def test_check_capability_alignment_importable_from_contracts():
     """check_capability_alignment must be importable from contracts.runtime."""
     from maiw_agents.contracts.runtime import check_capability_alignment
+
     assert callable(check_capability_alignment)
 
 
@@ -654,9 +698,9 @@ def test_sop_definition_runtime_profile_defaults_to_strict():
         escalation=[],
         required_context=[],
     )
-    assert sop.runtime_profile == "strict", (
-        f"Expected runtime_profile='strict', got {sop.runtime_profile!r}"
-    )
+    assert (
+        sop.runtime_profile == "strict"
+    ), f"Expected runtime_profile='strict', got {sop.runtime_profile!r}"
 
 
 def test_get_runtime_with_adaptive_sop_returns_deep_agents():
@@ -680,9 +724,9 @@ def test_get_runtime_with_adaptive_sop_returns_deep_agents():
     )
     os.environ.pop("MAIW_AGENT_RUNTIME", None)
     rt = get_runtime(sop=sop)
-    assert isinstance(rt, DeepAgentsRuntime), (
-        f"Expected DeepAgentsRuntime for adaptive profile, got {type(rt).__name__}"
-    )
+    assert isinstance(
+        rt, DeepAgentsRuntime
+    ), f"Expected DeepAgentsRuntime for adaptive profile, got {type(rt).__name__}"
 
 
 def test_get_runtime_with_strict_sop_returns_deterministic():
@@ -707,9 +751,9 @@ def test_get_runtime_with_strict_sop_returns_deterministic():
     )
     os.environ.pop("MAIW_AGENT_RUNTIME", None)
     rt = get_runtime(sop=sop)
-    assert isinstance(rt, MAIWDeterministicRuntime), (
-        f"Expected MAIWDeterministicRuntime for strict profile, got {type(rt).__name__}"
-    )
+    assert isinstance(
+        rt, MAIWDeterministicRuntime
+    ), f"Expected MAIWDeterministicRuntime for strict profile, got {type(rt).__name__}"
 
 
 def test_get_runtime_config_overrides_sop_profile():
@@ -746,18 +790,25 @@ def test_wave_risk_resolution_sop_has_adaptive_profile():
     from pathlib import Path
     from maiw_agents.contracts.sop import load_sop
 
-    sop_path = _REPO / "agents" / "sops" / "operations_coordination" / "wave_risk_resolution.v1.yaml"
+    sop_path = (
+        _REPO
+        / "agents"
+        / "sops"
+        / "operations_coordination"
+        / "wave_risk_resolution.v1.yaml"
+    )
     if not sop_path.exists():
         pytest.skip("SOP file not found")
     sop = load_sop(sop_path)
-    assert sop.runtime_profile == "adaptive", (
-        f"wave_risk_resolution.v1 should have runtime_profile='adaptive', got {sop.runtime_profile!r}"
-    )
+    assert (
+        sop.runtime_profile == "adaptive"
+    ), f"wave_risk_resolution.v1 should have runtime_profile='adaptive', got {sop.runtime_profile!r}"
 
 
 def test_maiw_test_model_adapter_importable():
     """MAIWTestModelAdapter must be importable from runtime.model_adapter."""
     from maiw_agents.runtime.model_adapter import MAIWTestModelAdapter
+
     assert MAIWTestModelAdapter is not None
 
     adapter = MAIWTestModelAdapter(model_gateway=None)
@@ -767,6 +818,7 @@ def test_maiw_test_model_adapter_importable():
 def test_maiw_model_adapter_alias_still_works():
     """MAIWModelAdapter alias still works for backward compatibility."""
     from maiw_agents.runtime.model_adapter import MAIWModelAdapter, MAIWTestModelAdapter
+
     assert MAIWModelAdapter is MAIWTestModelAdapter
 
 
@@ -782,6 +834,6 @@ def test_model_adapter_has_no_framework_imports_updated():
     # deep_agents, langchain (base), langgraph, nemoagent are forbidden
     still_forbidden = frozenset({"deep_agents", "langchain", "langgraph", "nemoagent"})
     found = imports & still_forbidden
-    assert not found, (
-        f"model_adapter.py contains still-forbidden framework imports: {found}"
-    )
+    assert (
+        not found
+    ), f"model_adapter.py contains still-forbidden framework imports: {found}"

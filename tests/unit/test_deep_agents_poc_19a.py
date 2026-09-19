@@ -45,7 +45,11 @@ from maiw_agents.runtime import DeepAgentsRuntime
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 _SOP_PATH = (
-    _REPO / "agents" / "sops" / "operations_coordination" / "wave_risk_resolution.v1.yaml"
+    _REPO
+    / "agents"
+    / "sops"
+    / "operations_coordination"
+    / "wave_risk_resolution.v1.yaml"
 )
 
 # Wave 17 bounded context: labor constraint scenario
@@ -94,10 +98,18 @@ def _make_definition(max_iterations: int = 20) -> AgentDefinition:
             max_iterations=max_iterations,
             escalate_on_max_iterations=True,
             stop_conditions=[
-                TerminationCondition(condition_id="OBJECTIVE_MET", description="Wave back on track"),
-                TerminationCondition(condition_id="NO_SAFE_ACTION", description="No safe intervention"),
-                TerminationCondition(condition_id="HUMAN_REQUIRED", description="Human required"),
-                TerminationCondition(condition_id="MAX_ITERATIONS", description="Iteration limit"),
+                TerminationCondition(
+                    condition_id="OBJECTIVE_MET", description="Wave back on track"
+                ),
+                TerminationCondition(
+                    condition_id="NO_SAFE_ACTION", description="No safe intervention"
+                ),
+                TerminationCondition(
+                    condition_id="HUMAN_REQUIRED", description="Human required"
+                ),
+                TerminationCondition(
+                    condition_id="MAX_ITERATIONS", description="Iteration limit"
+                ),
             ],
         ),
     )
@@ -116,7 +128,9 @@ def _make_state(task_id: str = "task-poc-wave17") -> AgentTaskState:
     )
 
 
-def _make_context(bounded_context: dict[str, Any] | None = None) -> AgentExecutionContext:
+def _make_context(
+    bounded_context: dict[str, Any] | None = None,
+) -> AgentExecutionContext:
     return AgentExecutionContext(
         warehouse_id="wh-test",
         trace_id="trace-poc-wave17",
@@ -135,6 +149,7 @@ def _load_sop() -> SOPDefinition:
 
 # ── Test 1: Full flow → WAITING_FOR_GOVERNANCE ────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_full_flow_wave17_stops_at_governance():
     """
@@ -152,9 +167,9 @@ async def test_full_flow_wave17_stops_at_governance():
     result = await runtime.run_task(definition, sop, state, context)
 
     # Must stop at governance boundary
-    assert result.final_status == AgentTaskStatus.WAITING_FOR_GOVERNANCE, (
-        f"Expected WAITING_FOR_GOVERNANCE, got {result.final_status.value}"
-    )
+    assert (
+        result.final_status == AgentTaskStatus.WAITING_FOR_GOVERNANCE
+    ), f"Expected WAITING_FOR_GOVERNANCE, got {result.final_status.value}"
     assert result.stop_reason == "WAITING_FOR_GOVERNANCE"
     assert result.task_id == state.task_id
     assert result.agent_id == definition.agent_id
@@ -177,7 +192,9 @@ async def test_full_flow_produces_recommendation():
 
     assert result.final_status == AgentTaskStatus.WAITING_FOR_GOVERNANCE
     # Should have a recommendation
-    assert result.recommendation is not None, "Expected recommendation before governance handoff"
+    assert (
+        result.recommendation is not None
+    ), "Expected recommendation before governance handoff"
     assert "action" in result.recommendation or "domain" in result.recommendation
 
 
@@ -195,9 +212,7 @@ async def test_full_flow_produces_candidate_actions():
     result = await runtime.run_task(definition, sop, state, context)
 
     # Should have candidates from generate_candidates step
-    assert len(result.candidate_actions) >= 1, (
-        "Expected at least 1 candidate action"
-    )
+    assert len(result.candidate_actions) >= 1, "Expected at least 1 candidate action"
 
 
 @pytest.mark.asyncio
@@ -218,6 +233,7 @@ async def test_full_flow_records_observations():
 
 
 # ── Test 2: Governance continuation ───────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_resume_after_governance_approved():
@@ -246,7 +262,10 @@ async def test_resume_after_governance_approved():
     }
 
     final_result = await runtime.resume_after_governance(
-        definition, sop, waiting_state, context,
+        definition,
+        sop,
+        waiting_state,
+        context,
         governance_outcome=governance_outcome,
     )
 
@@ -275,7 +294,10 @@ async def test_resume_after_governance_rejected():
     }
 
     final_result = await runtime.resume_after_governance(
-        definition, sop, waiting_state, context,
+        definition,
+        sop,
+        waiting_state,
+        context,
         governance_outcome=governance_outcome,
     )
 
@@ -295,7 +317,10 @@ async def test_resume_requires_waiting_for_governance_state():
 
     # State is PENDING — not valid for resume
     result = await runtime.resume_after_governance(
-        definition, sop, state, context,
+        definition,
+        sop,
+        state,
+        context,
         governance_outcome={"decision_outcome": "APPROVED"},
     )
 
@@ -304,6 +329,7 @@ async def test_resume_requires_waiting_for_governance_state():
 
 
 # ── Test 3: Failure path (missing context) ────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_missing_labor_context_still_runs():
@@ -338,6 +364,7 @@ async def test_missing_labor_context_still_runs():
 
 
 # ── Test 4: Iteration limit enforcement ───────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_iteration_limit_1_escalates():
@@ -389,6 +416,7 @@ async def test_iteration_limit_normal_allows_completion():
 
 # ── Test 5: Governance handoff is mandatory ───────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_governance_handoff_is_mandatory():
     """
@@ -411,6 +439,7 @@ async def test_governance_handoff_is_mandatory():
 
 
 # ── Test 6: Delegation uses MAIW contracts ─────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_delegation_uses_maiw_contracts():
@@ -467,6 +496,7 @@ async def test_delegation_result_provides_candidates():
 
 
 # ── Test 7: SOP conformance ───────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_sop_id_and_version_preserved_in_result():
