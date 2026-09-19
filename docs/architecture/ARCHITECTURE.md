@@ -117,6 +117,16 @@ apps/api          (→ all canonical packages)
 
 ---
 
+## Known Modernization Boundary
+
+MAIW v2 uses the `packages/` layout as the target modular architecture, but portions of the live runtime still reside under `src/` and are actively imported by `apps/api/maiw_api/`. In particular, `apps/api/maiw_api/app.py` imports routers, middleware, and services directly from `src.api.*` (e.g., `src.api.routers`, `src.api.middleware.security_headers`, `src.api.services.monitoring`, `src.api.services.security`). Additionally, some ModelGateway-related runtime code has not yet been fully migrated from `src/api/services/model_gateway/` into `packages/maiw-models/` — both directories contain parallel implementations.
+
+These paths are **not dead legacy code** and must not be removed without an explicit migration that preserves all ModelGateway invariants (single inference boundary, PolicyFilter, ModelRouter, Deployment Resolver, routing provenance).
+
+The architectural source of truth remains the current MAIW v2 contracts, ownership boundaries, and runtime invariants documented in this directory. The remaining `src/` dependency is a known implementation migration boundary, not a bug or obsolete code. See [PACKAGE_OWNERSHIP.md](PACKAGE_OWNERSHIP.md) and [API_MIGRATION_PLAN.md](API_MIGRATION_PLAN.md) for the tracked migration status.
+
+---
+
 ## Key Invariants
 
 | Invariant | Enforcement |

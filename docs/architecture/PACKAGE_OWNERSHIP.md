@@ -5,6 +5,8 @@
 >
 > This file reflects an earlier MAIW implementation phase and may not describe the current MAIW v2 architecture. See [ARCHITECTURE.md](ARCHITECTURE.md) and the project [README](../../README.md) for the current authoritative design.
 
+> **Migration note:** Package ownership here reflects architectural responsibility. Some active runtime implementations still reside under `src/` and are actively imported by the API. See [Known Modernization Boundary](ARCHITECTURE.md#known-modernization-boundary) in `ARCHITECTURE.md` for details.
+
 **Phase:** 8  
 **Date:** 2026-08-20
 
