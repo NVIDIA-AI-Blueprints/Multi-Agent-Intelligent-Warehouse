@@ -63,7 +63,7 @@ jobs:
         pip install -e packages/maiw-models
         pip install -e packages/maiw-skills
         pip install -e packages/maiw-execution
-        pip install -e packages/maiw-agents
+        pip install -e "packages/maiw-agents[deep-agents]"
         pip install -e packages/maiw-contracts
         pip install -e packages/maiw-world
         pip install -e apps/api

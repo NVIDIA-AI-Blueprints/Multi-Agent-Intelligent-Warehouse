@@ -196,6 +196,15 @@ class SOPDefinition(BaseModel):
         ),
     )
 
+    runtime_profile: Literal["strict", "adaptive"] = Field(
+        default="strict",
+        description=(
+            "'strict' → MAIWDeterministicRuntime (default, production-safe). "
+            "'adaptive' → DeepAgentsRuntime (LLM-adaptive, specialist delegation). "
+            "Used by get_runtime() when no explicit override is provided."
+        ),
+    )
+
 
 # ── Validation ────────────────────────────────────────────────────────────────
 

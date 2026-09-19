@@ -10,6 +10,7 @@
 id: operations_coordination.wave_risk_resolution
 version: "1.0"
 agent: operations_coordination
+runtime_profile: adaptive
 objective: >
   Restore an at-risk wave to on-track completion before the carrier cutoff,
   by identifying the primary constraint, consulting specialist agents, generating
