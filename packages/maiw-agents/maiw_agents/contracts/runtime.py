@@ -26,6 +26,7 @@ from datetime import datetime, timezone
 from typing import Any, Protocol, runtime_checkable
 
 from .agent import AgentDefinition
+from .registry import CapabilityClass, SKILL_REGISTRY
 from .sop import SOPDefinition
 from .task import AgentTaskState, AgentTaskStatus
 
@@ -122,3 +123,38 @@ class AgentRuntime(Protocol):
         - Import LangGraph, LangChain, Deep Agents, NemoClaw
         """
         ...
+
+
+# ── Shared guard (extracted from runtimes) ────────────────────────────────────
+
+def check_capability_alignment(
+    definition: AgentDefinition,
+    sop: SOPDefinition,
+) -> None:
+    """
+    Verify that SOP capabilities are a subset of AgentDefinition capabilities,
+    and that no WRITE or EMERGENCY_WRITE capabilities are present.
+
+    Extracted from both DeepAgentsRuntime and MAIWDeterministicRuntime for
+    consolidation — this is a MAIW-owned guard, not a runtime-specific concern.
+
+    Raises ValueError if any invariant is violated.
+    """
+    definition_caps = set(definition.allowed_capabilities)
+    sop_caps = set(sop.allowed_capabilities)
+    extra = sop_caps - definition_caps
+    if extra:
+        raise ValueError(
+            f"SOP {sop.id!r} declares capabilities not in AgentDefinition "
+            f"{definition.agent_id!r}: {sorted(extra)}"
+        )
+    # Belt-and-suspenders: reject any write capabilities
+    for cap_id in sop_caps:
+        skill = SKILL_REGISTRY.get(cap_id)
+        if skill and skill.capability_class in (
+            CapabilityClass.WRITE, CapabilityClass.EMERGENCY_WRITE
+        ):
+            raise ValueError(
+                f"SOP {sop.id!r} contains WRITE capability {cap_id!r} — "
+                "agents may not invoke write capabilities directly."
+            )

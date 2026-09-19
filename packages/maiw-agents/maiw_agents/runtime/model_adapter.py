@@ -5,25 +5,22 @@ MAIW ModelGateway adapters for Deep Agents runtime — Phase 19A.
 
 Two adapters are provided:
 
-MAIWModelAdapter (original, Phase 19A POC)
-    Simple async wrapper around context.model_gateway. Used by the
-    _SimulatedDeepAgentsRuntime and direct-call tests. Not a LangChain
-    BaseChatModel — not usable by real deepagents create_deep_agent().
+MAIWTestModelAdapter (Phase 19A POC — TEST ONLY)
+    Simple async wrapper around context.model_gateway. Used by tests and
+    the deterministic reference executor. Not a LangChain BaseChatModel —
+    not usable by real deepagents create_deep_agent().
+    Previously named MAIWModelAdapter (renamed in 19A.11b for clarity).
 
-MAIWModelGatewayChat (new, Phase 19A real integration)
+MAIWModelGatewayChat (Phase 19A real integration — PRODUCTION)
     LangChain-compatible BaseChatModel backed by MAIW ModelGateway.
     Deep Agents uses this model — it CANNOT bypass ModelGateway.
     All model calls preserve: RiskLevel, ReasoningLevel, DeploymentMode,
     routing provenance, deadline, fallback, telemetry, trace_id.
     In test mode (model_gateway=None): returns deterministic mock responses.
 
-Simulates a Deep Agents-compatible model adapter backed by ModelGateway.
-Deep Agents MUST NOT instantiate its own provider clients — all model
-calls route through this adapter.
-
 Architecture:
     DeepAgentsRuntime
-        → MAIWModelAdapter.generate()
+        → MAIWModelGatewayChat._generate()
             → context.model_gateway (ModelGateway protocol)
                 → NIM / external provider
 
@@ -47,12 +44,14 @@ _DEFAULT_RISK_LEVEL = "standard"
 _DEFAULT_REASONING_LEVEL = "standard"
 
 
-class MAIWModelAdapter:
+class MAIWTestModelAdapter:
     """
-    MAIW ModelGateway adapter for the DeepAgentsRuntime.
+    MAIW test-only ModelGateway adapter (Phase 19A POC — TEST USE ONLY).
 
-    Wraps context.model_gateway and exposes a generate() interface that
-    the DeepAgentsRuntime calls for each planning/execution step.
+    Wraps context.model_gateway and exposes a generate() interface for
+    test scenarios and the deterministic reference executor. This is NOT
+    a LangChain BaseChatModel — it cannot be used with real deepagents
+    create_deep_agent(). For production use, see MAIWModelGatewayChat.
 
     The adapter preserves:
         - RiskLevel (governs which model tier to use)
@@ -62,6 +61,8 @@ class MAIWModelAdapter:
 
     In test mode (model_gateway is None), returns deterministic mock responses
     without making any network calls.
+
+    Renamed from MAIWModelAdapter in Phase 19A.11b.
     """
 
     def __init__(
@@ -106,7 +107,7 @@ class MAIWModelAdapter:
         self._call_count += 1
 
         logger.debug(
-            "MAIWModelAdapter.generate: step=%s trace=%s call=%d risk=%s",
+            "MAIWTestModelAdapter.generate: step=%s trace=%s call=%d risk=%s",
             step_id, trace_id, self._call_count, self._risk_level,
         )
 
@@ -146,7 +147,7 @@ class MAIWModelAdapter:
 
         except Exception as exc:
             logger.error(
-                "MAIWModelAdapter: ModelGateway call failed: %s trace=%s",
+                "MAIWTestModelAdapter: ModelGateway call failed: %s trace=%s",
                 exc, trace_id,
             )
             # Fall back to mock on failure to preserve test isolation
@@ -262,6 +263,10 @@ class MAIWModelAdapter:
             "step_id": step_label,
             "mock": True,
         }
+
+
+# Backward-compatible alias (deprecated — use MAIWTestModelAdapter)
+MAIWModelAdapter = MAIWTestModelAdapter
 
 
 # ── MAIWModelGatewayChat ──────────────────────────────────────────────────────
