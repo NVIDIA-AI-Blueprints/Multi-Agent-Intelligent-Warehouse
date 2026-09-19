@@ -42,8 +42,19 @@ from src.api.services.guardrails.guardrails_service import (
 @pytest.fixture
 def sdk_service():
     """Create SDK service instance for testing."""
+    import pathlib
     if not NEMO_SDK_AVAILABLE:
         pytest.skip("NeMo Guardrails SDK not available")
+    # Config dir is required; skip if not present (dev environment without guardrails config)
+    _default_config = (
+        pathlib.Path(__file__).parent.parent.parent
+        / "src" / "data" / "config" / "guardrails"
+    )
+    if not _default_config.exists():
+        pytest.skip(
+            "Guardrails config directory not found at src/data/config/guardrails — "
+            "populate it to run SDK tests"
+        )
     return NeMoGuardrailsSDKService()
 
 
@@ -131,12 +142,18 @@ async def test_sdk_check_output_safety(sdk_service):
 @pytest.mark.asyncio
 async def test_guardrails_service_sdk_enabled(guardrails_service_sdk):
     """Test guardrails service with SDK enabled."""
-    # Check that SDK is being used
-    if NEMO_SDK_AVAILABLE:
+    import pathlib
+    _config_dir = (
+        pathlib.Path(__file__).parent.parent.parent
+        / "src" / "data" / "config" / "guardrails"
+    )
+    config_present = _config_dir.exists()
+    # Check that SDK is being used (only if SDK package and config dir both available)
+    if NEMO_SDK_AVAILABLE and config_present:
         assert guardrails_service_sdk.use_sdk is True
         assert guardrails_service_sdk.sdk_service is not None
     else:
-        # Should fall back to pattern-based
+        # Falls back to pattern-based when SDK package or config dir is missing
         assert guardrails_service_sdk.use_sdk is False
 
 
