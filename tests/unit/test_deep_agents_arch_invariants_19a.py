@@ -189,14 +189,15 @@ def test_skill_adapter_is_blocked_method_identifies_write():
 # ── Invariant 5: Uses ModelGateway adapter ────────────────────────────────────
 
 def test_deep_agents_runtime_uses_model_adapter():
-    """DeepAgentsRuntime must use MAIWModelAdapter, not direct provider clients."""
+    """DeepAgentsRuntime must use MAIWModelGatewayChat (LangChain BaseChatModel → ModelGateway)."""
     from maiw_agents.runtime.deep_agents_runtime import DeepAgentsRuntime
-    from maiw_agents.runtime.model_adapter import MAIWModelAdapter
+    from maiw_agents.runtime.model_adapter import MAIWModelGatewayChat
 
-    # Source inspection: run_task must instantiate MAIWModelAdapter
+    # Source inspection: run_task must instantiate MAIWModelGatewayChat
     source = inspect.getsource(DeepAgentsRuntime.run_task)
-    assert "MAIWModelAdapter" in source, (
-        "DeepAgentsRuntime.run_task must use MAIWModelAdapter for model calls"
+    assert "MAIWModelGatewayChat" in source, (
+        "DeepAgentsRuntime.run_task must use MAIWModelGatewayChat — "
+        "a LangChain BaseChatModel that routes all calls through MAIW ModelGateway"
     )
 
 
@@ -538,4 +539,103 @@ def test_deterministic_runtime_satisfies_agent_runtime_protocol():
     rt = MAIWDeterministicRuntime()
     assert isinstance(rt, AgentRuntime), (
         "MAIWDeterministicRuntime must satisfy the AgentRuntime Protocol"
+    )
+
+
+# ── Phase 19A Real Integration Invariants (19A.6–19A.9) ─────────────────────
+
+def test_deepagents_real_package_is_installed():
+    """deepagents (real PyPI package) must be installed for Phase 19A real integration."""
+    import importlib.util
+    spec = importlib.util.find_spec("deepagents")
+    assert spec is not None, (
+        "deepagents package not found. Install: pip install 'maiw-agents[deep-agents]' "
+        "or pip install deepagents==0.7.15"
+    )
+
+
+def test_deep_agents_runtime_does_not_import_openai_or_anthropic_directly():
+    """
+    DeepAgentsRuntime must NOT directly import openai or anthropic.
+    All model calls go through MAIWModelGatewayChat → MAIW ModelGateway.
+    """
+    filepath = _RUNTIME_MODULE / "deep_agents_runtime.py"
+    assert filepath.exists()
+    source = filepath.read_text()
+    tree = ast.parse(source)
+    direct_imports = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                direct_imports.add(alias.name.split(".")[0])
+        elif isinstance(node, ast.ImportFrom):
+            if node.module:
+                direct_imports.add(node.module.split(".")[0])
+    forbidden_direct = frozenset({"openai", "anthropic"})
+    found = direct_imports & forbidden_direct
+    assert not found, (
+        f"DeepAgentsRuntime must NOT directly import {found}. "
+        "All model calls route through MAIWModelGatewayChat → MAIW ModelGateway."
+    )
+
+
+def test_maiw_model_gateway_chat_llm_type():
+    """MAIWModelGatewayChat._llm_type must be 'maiw-model-gateway'."""
+    from maiw_agents.runtime.model_adapter import MAIWModelGatewayChat
+    chat = MAIWModelGatewayChat(model_gateway=None)
+    assert chat._llm_type == "maiw-model-gateway", (
+        f"Expected _llm_type='maiw-model-gateway', got {chat._llm_type!r}"
+    )
+
+
+def test_build_maiw_tools_blocks_write_capabilities():
+    """
+    _build_maiw_tools() must return zero tools when called with only WRITE capability IDs.
+    WRITE skills are hard-blocked at the adapter layer, not prompt-only.
+    """
+    from maiw_agents.runtime.deep_agents_runtime import _build_maiw_tools
+    from maiw_agents.contracts.runtime import AgentExecutionContext
+
+    write_caps = [
+        "warehouse.labor.assign_direct",
+        "warehouse.wave.reprioritize_direct",
+        "warehouse.equipment.assign_direct",
+    ]
+
+    context = AgentExecutionContext(
+        warehouse_id="wh-test",
+        trace_id="trace-write-block-test",
+        bounded_context={},
+    )
+
+    tools = _build_maiw_tools(context, write_caps)
+    assert len(tools) == 0, (
+        f"Expected 0 tools from WRITE-only capability list, got {len(tools)}: "
+        f"{[getattr(t, 'name', str(t)) for t in tools]}"
+    )
+
+
+def test_simulated_runtime_is_preserved_as_private():
+    """_SimulatedDeepAgentsRuntime must still exist as private (backward compat / reference)."""
+    from maiw_agents.runtime.deep_agents_runtime import _SimulatedDeepAgentsRuntime
+    assert _SimulatedDeepAgentsRuntime is not None
+    rt = _SimulatedDeepAgentsRuntime()
+    assert hasattr(rt, "run_task")
+    assert hasattr(rt, "resume_after_governance")
+
+
+def test_model_adapter_has_no_framework_imports_updated():
+    """
+    model_adapter.py may import langchain_core (for MAIWModelGatewayChat)
+    but must NOT import deep_agents, langchain (base), langgraph, nemoagent.
+    """
+    filepath = _RUNTIME_MODULE / "model_adapter.py"
+    assert filepath.exists()
+    imports = _get_imports(filepath)
+    # langchain_core is allowed (BaseChatModel for real integration)
+    # deep_agents, langchain (base), langgraph, nemoagent are forbidden
+    still_forbidden = frozenset({"deep_agents", "langchain", "langgraph", "nemoagent"})
+    found = imports & still_forbidden
+    assert not found, (
+        f"model_adapter.py contains still-forbidden framework imports: {found}"
     )

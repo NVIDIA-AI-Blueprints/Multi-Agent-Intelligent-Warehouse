@@ -290,12 +290,20 @@ try:
         reasoning_level: str = "STANDARD"
         deployment_mode: str = "LOCAL"
 
-        class Config:
-            arbitrary_types_allowed = True
+        model_config = {"arbitrary_types_allowed": True}
 
         @property
         def _llm_type(self) -> str:
             return "maiw-model-gateway"
+
+        def bind_tools(self, tools: Any, **kwargs: Any) -> "MAIWModelGatewayChat":
+            """
+            No-op tool binding — MAIW mock model responds with text, not tool calls.
+            Returns self so deepagents can continue graph construction.
+            Real ModelGateway routing handles tool-equivalent capabilities via
+            MAIW skill adapters and SubAgent specs.
+            """
+            return self
 
         def _generate(
             self,
