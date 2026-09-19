@@ -1,5 +1,10 @@
 # Phase 14G — MAIW Demo UI Workflow
 
+
+> **Historical document**
+>
+> This file reflects an earlier MAIW implementation phase (Phase 14G) and may not describe the current MAIW v2 demo workflow. See [DEMO_RUNBOOK.md](DEMO_RUNBOOK.md) for the current demo guide.
+
 ## Overview
 
 Phase 14G hardens the MAIW v2 demo UI for reliable stakeholder demonstrations. It does not add new agents, capabilities, or model routes. It makes the existing end-to-end demo workflow robust, self-explanatory, and safe to operate.

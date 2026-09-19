@@ -1,5 +1,10 @@
 # NVIDIA RAPIDS Demand Forecasting Agent Implementation Plan
 
+
+> **Historical document**
+>
+> This file reflects an earlier MAIW implementation phase and may not describe the current MAIW v2 architecture. See [../architecture/ARCHITECTURE.md](../architecture/ARCHITECTURE.md) and the project [README](../../README.md) for the current authoritative design.
+
 ## Overview
 
 This document outlines the implementation plan for building a GPU-accelerated demand forecasting agent using NVIDIA RAPIDS cuML for the Frito-Lay warehouse operational assistant.

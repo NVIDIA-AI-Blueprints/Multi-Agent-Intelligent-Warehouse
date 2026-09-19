@@ -1,5 +1,10 @@
 # MCP API Reference
 
+
+> **Historical document**
+>
+> This file reflects an earlier MAIW implementation phase and may not describe the current MAIW v2 architecture. See [ARCHITECTURE.md](ARCHITECTURE.md) and the project [README](../../README.md) for the current authoritative design.
+
 ## Overview
 
 This document provides comprehensive API reference for the Model Context Protocol (MCP) implementation in the Multi-Agent-Intelligent-Warehouse. The MCP system provides standardized interfaces for tool discovery, execution, and communication between AI agents and external systems.

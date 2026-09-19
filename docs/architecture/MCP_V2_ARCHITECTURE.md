@@ -1,11 +1,14 @@
 # MCP v2 Architecture — MAIW Capability Bus (Inventory + Equipment)
+
+> **Update note (WS1):** `ActionProposal` and `RiskLevel` have moved from `maiw-mcp/contracts/` to `packages/maiw-decision/maiw_decision/proposal.py`. All other MCP SDK architecture described here remains current. Test counts shown are from Phase 6B; current totals are in [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ## Multi-Agent Intelligent Warehouse (MAIW)
 
 **Phase:** 6B (Architecture hardening — MCP boundary enforcement)  
 **Date:** 2026-08-20  
 **SDK:** `mcp` 2.0.0 (official Anthropic MCP Python SDK)  
 **Protocol version:** 2026-07-28  
-**Status:** Implemented — 311 tests passing across Phase 3-6B test files (contract + MCP protocol + unit + architecture invariants)
+**Status:** Implemented — 311 tests at Phase 6B baseline (see [ARCHITECTURE.md](ARCHITECTURE.md) for current test totals)
 
 ---
 

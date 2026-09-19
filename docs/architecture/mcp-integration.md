@@ -1,5 +1,10 @@
 # MCP (Model Context Protocol) Integration
 
+
+> **Historical document**
+>
+> This file reflects an earlier MAIW implementation phase and may not describe the current MAIW v2 architecture. See [ARCHITECTURE.md](ARCHITECTURE.md) and the project [README](../../README.md) for the current authoritative design.
+
 ## Overview
 
 The Warehouse Operational Assistant implements the Model Context Protocol (MCP) to enable seamless communication between AI agents and external systems. MCP provides a standardized way for AI systems to discover, access, and execute tools and resources from various adapters.

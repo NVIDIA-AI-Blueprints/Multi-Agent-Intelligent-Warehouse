@@ -1,5 +1,10 @@
 # Agent Reasoning Capability Overview
 
+
+> **Historical document**
+>
+> This file reflects an earlier MAIW implementation phase and may not describe the current MAIW v2 architecture. See [ARCHITECTURE.md](ARCHITECTURE.md) and the project [README](../../README.md) for the current authoritative design.
+
 ## Executive Summary
 
 The Warehouse Operational Assistant implements a comprehensive **Advanced Reasoning Engine** with 5 distinct reasoning types. **The reasoning engine is now fully integrated with ALL agents** (Equipment, Operations, Safety, Forecasting, Document) and the main chat router. Reasoning can be enabled/disabled via the chat API and UI, and reasoning chains are displayed in the chat interface.

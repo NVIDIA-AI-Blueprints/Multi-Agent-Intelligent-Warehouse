@@ -1,5 +1,10 @@
 # MCP Rollback Strategy and Fallback Mechanisms
 
+
+> **Historical document**
+>
+> This file reflects an earlier MAIW implementation phase and may not describe the current MAIW v2 architecture. See [ARCHITECTURE.md](ARCHITECTURE.md) and the project [README](../../README.md) for the current authoritative design.
+
 ## Overview
 
 This document outlines the comprehensive rollback strategy and fallback mechanisms for the Model Context Protocol (MCP) integration in the Warehouse Operational Assistant. The strategy ensures system reliability and provides safe rollback procedures in case of issues during MCP deployment or operation.

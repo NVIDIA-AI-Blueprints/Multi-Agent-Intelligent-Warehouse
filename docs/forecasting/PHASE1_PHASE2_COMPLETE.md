@@ -1,5 +1,10 @@
 #  Phase 1 & 2 Complete: RAPIDS Demand Forecasting Agent
 
+
+> **Historical document**
+>
+> This file reflects an earlier MAIW implementation phase and may not describe the current MAIW v2 architecture. See [../architecture/ARCHITECTURE.md](../architecture/ARCHITECTURE.md) and the project [README](../../README.md) for the current authoritative design.
+
 ## ** Successfully Implemented**
 
 ### **Phase 1: Environment Setup**

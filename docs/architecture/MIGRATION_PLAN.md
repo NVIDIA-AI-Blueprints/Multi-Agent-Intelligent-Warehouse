@@ -1,5 +1,10 @@
 # MAIW Modernization Migration Plan
 
+
+> **Historical document**
+>
+> This file reflects an earlier MAIW implementation phase and may not describe the current MAIW v2 architecture. See [ARCHITECTURE.md](ARCHITECTURE.md) and the project [README](../../README.md) for the current authoritative design.
+
 **Repository:** Multi-Agent-Intelligent-Warehouse  
 **Date:** 2026-08-20  
 **Author:** Architecture Review  

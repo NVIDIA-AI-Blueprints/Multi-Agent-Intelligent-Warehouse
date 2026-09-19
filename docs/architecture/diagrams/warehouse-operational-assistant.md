@@ -1,5 +1,10 @@
 # Warehouse Operational Assistant - Architecture Diagram
 
+
+> **Historical document**
+>
+> This file reflects an earlier MAIW implementation phase and may not describe the current MAIW v2 architecture. See [ARCHITECTURE.md](ARCHITECTURE.md) and the project [README](../../README.md) for the current authoritative design.
+
 ## System Architecture Overview
 
 The Warehouse Operational Assistant is a production-grade multi-agent AI system built on NVIDIA AI Blueprints, featuring:

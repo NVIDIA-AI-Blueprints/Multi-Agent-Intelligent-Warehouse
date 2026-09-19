@@ -1,5 +1,10 @@
 #  Phase 3, 4 & 5 Complete: Advanced RAPIDS Demand Forecasting System
 
+
+> **Historical document**
+>
+> This file reflects an earlier MAIW implementation phase and may not describe the current MAIW v2 architecture. See [../architecture/ARCHITECTURE.md](../architecture/ARCHITECTURE.md) and the project [README](../../README.md) for the current authoritative design.
+
 ## ** All Phases Successfully Implemented**
 
 ### **Phase 3: Model Implementation (Week 2-3)**

@@ -1,5 +1,10 @@
 # MCP — Current Implementation Audit
 
+
+> **Historical document**
+>
+> This file reflects an earlier MAIW implementation phase and may not describe the current MAIW v2 architecture. See [ARCHITECTURE.md](ARCHITECTURE.md) and the project [README](../../README.md) for the current authoritative design.
+
 **Audited:** 2026-08-20 | **Phase 2 pre-work**
 
 ---

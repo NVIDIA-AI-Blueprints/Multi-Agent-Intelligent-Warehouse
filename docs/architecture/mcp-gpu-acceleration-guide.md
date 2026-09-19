@@ -1,5 +1,10 @@
 # GPU Acceleration with Milvus + cuVS - Implementation Guide
 
+
+> **Historical document**
+>
+> This file reflects an earlier MAIW implementation phase and may not describe the current MAIW v2 architecture. See [ARCHITECTURE.md](ARCHITECTURE.md) and the project [README](../../README.md) for the current authoritative design.
+
 ##  **Overview**
 
 This guide covers the implementation of **GPU-accelerated vector search** using **Milvus with NVIDIA cuVS (CUDA Vector Search)** for our warehouse operational assistant system. This provides **dramatic performance improvements** for semantic search over warehouse documentation and operational procedures.

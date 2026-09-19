@@ -1,5 +1,10 @@
 # Phase 15 — Copilot Integration Boundary
 
+
+> **Historical document**
+>
+> This file reflects an earlier MAIW implementation phase and may not describe the current MAIW v2 architecture. See [../architecture/ARCHITECTURE.md](../architecture/ARCHITECTURE.md) and the project [README](../../README.md) for the current authoritative design.
+
 This document defines the architectural contract for the Phase 15 Copilot feature. It is written in Phase 14G so that Phase 15 work starts from a clear, agreed-upon boundary.
 
 The Copilot entry point is already reserved in the UI (`data-testid="phase15-copilot-button"`) but is disabled. No Copilot functionality is implemented in Phase 14.
