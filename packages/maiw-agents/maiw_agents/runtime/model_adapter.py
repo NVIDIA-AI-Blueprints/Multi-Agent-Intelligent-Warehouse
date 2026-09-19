@@ -327,30 +327,21 @@ try:
                 # Route through ModelGateway (real path)
                 try:
                     import asyncio
+                    import concurrent.futures
                     if hasattr(self.model_gateway, "generate"):
-                        loop = asyncio.get_event_loop()
-                        if loop.is_running():
-                            import concurrent.futures
-                            with concurrent.futures.ThreadPoolExecutor() as pool:
-                                future = pool.submit(
-                                    asyncio.run,
-                                    self.model_gateway.generate(
-                                        prompt=prompt,
-                                        trace_id=self.trace_id,
-                                        risk_level=self.risk_level,
-                                        reasoning_level=self.reasoning_level,
-                                    ),
-                                )
-                                raw = future.result()
-                        else:
-                            raw = loop.run_until_complete(
+                        # Always run in a thread pool to avoid blocking the calling
+                        # event loop and to avoid deprecated get_event_loop() patterns.
+                        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                            future = pool.submit(
+                                asyncio.run,
                                 self.model_gateway.generate(
                                     prompt=prompt,
                                     trace_id=self.trace_id,
                                     risk_level=self.risk_level,
                                     reasoning_level=self.reasoning_level,
-                                )
+                                ),
                             )
+                            raw = future.result()
                         if isinstance(raw, dict):
                             response_text = raw.get("text", str(raw))
                         else:

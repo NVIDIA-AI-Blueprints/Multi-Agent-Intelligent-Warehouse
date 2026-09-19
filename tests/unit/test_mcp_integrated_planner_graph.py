@@ -304,6 +304,17 @@ class TestHelperFunctions:
 # ============================================================================
 
 
+_ASYNCPG_AVAILABLE = True
+try:
+    import asyncpg  # noqa: F401
+except ImportError:
+    _ASYNCPG_AVAILABLE = False
+
+
+@pytest.mark.skipif(
+    not _ASYNCPG_AVAILABLE,
+    reason="PRE-V2 LEGACY: asyncpg not in MAIW v2 stack; classifier uses DB connection path",
+)
 class TestMCPIntentClassifier:
     """Test MCPIntentClassifier class."""
 
@@ -622,7 +633,7 @@ class TestMCPPlannerGraph:
         }
 
         with patch(
-            "src.api.graphs.mcp_integrated_planner_graph.get_semantic_router",
+            "src.api.services.routing.semantic_router.get_semantic_router",
             side_effect=ImportError(),
         ):
             result = await planner_graph._mcp_route_intent(state)
@@ -696,6 +707,7 @@ class TestMCPPlannerGraph:
         with patch(
             "src.api.graphs.mcp_integrated_planner_graph.get_enhanced_retriever",
             side_effect=ImportError(),
+            create=True,  # attribute is a local import inside the method
         ):
             result = await planner_graph._handle_ambiguous_query(state)
             assert result["final_response"] is not None
@@ -705,6 +717,10 @@ class TestMCPPlannerGraph:
             )
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        not _ASYNCPG_AVAILABLE,
+        reason="PRE-V2 LEGACY: mcp_equipment_agent import chain requires asyncpg",
+    )
     async def test_mcp_equipment_agent(self, planner_graph):
         """Test MCP equipment agent."""
         state: MCPWarehouseState = {
@@ -724,7 +740,7 @@ class TestMCPPlannerGraph:
         }
 
         with patch(
-            "src.api.graphs.mcp_integrated_planner_graph.get_mcp_equipment_agent"
+            "src.api.agents.inventory.mcp_equipment_agent.get_mcp_equipment_agent"
         ) as mock_get_agent:
             mock_agent = AsyncMock()
             mock_agent.process_query = AsyncMock(
@@ -744,6 +760,10 @@ class TestMCPPlannerGraph:
             )
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        not _ASYNCPG_AVAILABLE,
+        reason="PRE-V2 LEGACY: mcp_equipment_agent import chain requires asyncpg",
+    )
     async def test_mcp_equipment_agent_empty_message(self, planner_graph):
         """Test MCP equipment agent with empty message."""
         state: MCPWarehouseState = {
@@ -767,6 +787,10 @@ class TestMCPPlannerGraph:
         assert result["agent_responses"]["equipment"]["response_type"] == "error"
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        not _ASYNCPG_AVAILABLE,
+        reason="PRE-V2 LEGACY: mcp_equipment_agent import chain requires asyncpg",
+    )
     async def test_mcp_equipment_agent_timeout(self, planner_graph):
         """Test MCP equipment agent with timeout."""
         state: MCPWarehouseState = {
@@ -786,7 +810,7 @@ class TestMCPPlannerGraph:
         }
 
         with patch(
-            "src.api.graphs.mcp_integrated_planner_graph.get_mcp_equipment_agent"
+            "src.api.agents.inventory.mcp_equipment_agent.get_mcp_equipment_agent"
         ) as mock_get_agent:
             mock_agent = AsyncMock()
             mock_agent.process_query = AsyncMock(side_effect=asyncio.TimeoutError())
@@ -822,7 +846,7 @@ class TestMCPPlannerGraph:
             "reasoning_chain": None,
         }
 
-        result = await planner_graph._mcp_synthesize_response(state)
+        result = planner_graph._mcp_synthesize_response(state)
         assert result["final_response"] is not None
         assert "Forklift" in result["final_response"]
 
@@ -865,7 +889,7 @@ class TestMCPPlannerGraph:
             "reasoning_chain": None,
         }
 
-        result = await planner_graph._mcp_synthesize_response(state)
+        result = planner_graph._mcp_synthesize_response(state)
         assert result["final_response"] is not None
         assert (
             "reasoning_chain" in result["context"]
@@ -971,7 +995,7 @@ class TestMCPPlannerGraph:
         }
 
         with patch(
-            "src.api.graphs.mcp_integrated_planner_graph.get_semantic_router"
+            "src.api.services.routing.semantic_router.get_semantic_router"
         ) as mock_get_router:
             mock_router = AsyncMock()
             mock_router.classify_intent_semantic = AsyncMock(
@@ -1010,7 +1034,7 @@ class TestMCPPlannerGraph:
         }
 
         with patch(
-            "src.api.graphs.mcp_integrated_planner_graph.get_semantic_router",
+            "src.api.services.routing.semantic_router.get_semantic_router",
             side_effect=ImportError(),
         ):
             result = await planner_graph._mcp_route_intent(state)
@@ -1036,7 +1060,7 @@ class TestMCPPlannerGraph:
             "reasoning_chain": None,
         }
 
-        result = await planner_graph._mcp_synthesize_response(state)
+        result = planner_graph._mcp_synthesize_response(state)
         assert result["final_response"] is not None
         assert (
             "couldn't process" in result["final_response"].lower()
@@ -1062,7 +1086,7 @@ class TestMCPPlannerGraph:
             "reasoning_chain": None,
         }
 
-        result = await planner_graph._mcp_synthesize_response(state)
+        result = planner_graph._mcp_synthesize_response(state)
         assert result["final_response"] == "Simple string response"
 
 
