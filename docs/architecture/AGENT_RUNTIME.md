@@ -1,8 +1,8 @@
 # MAIW Agent Runtime Architecture
 
-**Phase:** 19A.11 (Runtime Simplification Audit)
+**Version:** MAIW v2 pre-NemoClaw baseline
 **Date:** 2026-09-19
-**Status:** AUTHORITATIVE — updated after _SimulatedDeepAgentsRuntime removal
+**Status:** AUTHORITATIVE
 
 ---
 

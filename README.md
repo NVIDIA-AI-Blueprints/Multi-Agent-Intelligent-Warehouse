@@ -155,7 +155,7 @@ The result is not simply a collection of warehouse agents.
 
 ---
 
-## Warehouse World Model (Phase 14E)
+## Warehouse World Model
 
 Demo Mode data flows through a layered, deterministic world model. The canonical path is:
 
@@ -232,7 +232,7 @@ See [docs/developer/WAREHOUSE_WORLD_MODEL.md](docs/developer/WAREHOUSE_WORLD_MOD
 
 ---
 
-## Warehouse World Explorer (Phase 17)
+## Warehouse World Explorer
 
 The **Warehouse World Explorer** is the operational observability UI for the running world. It is accessed from the WORLD tab in the demo shell and provides read-only inspection of the entire operational lifecycle — from the immutable DataPack through scenario overlays to the live runtime state.
 
@@ -391,6 +391,46 @@ connections, and can be instantiated in tests without database or network access
 
 ---
 
+## Agent Runtime
+
+MAIW provides two agent runtimes that share the same `AgentRuntime` protocol:
+
+### MAIWDeterministicRuntime
+
+The reference runtime. Follows SOP steps in exact order. No adaptive behavior, no tool selection,
+no subagent delegation. Used for:
+- CI / testing (reproducible outcomes)
+- Degraded mode (when Deep Agents is unavailable)
+- SOPs that require strict procedural compliance
+
+Activated by `MAIW_AGENT_RUNTIME=deterministic` (default) or `sop.runtime_profile=strict`.
+
+### DeepAgentsRuntime (deepagents==0.7.15)
+
+An adaptive runtime backed by the real `deepagents` SDK. Uses ReAct-style reasoning with:
+- MAIW-supplied system prompt (agent objective, SOP, allowed skills, governance boundary)
+- READ/ANALYTICAL tools only (WRITE/EMERGENCY_WRITE hard-blocked)
+- MAIW SubAgent specs (labor, wave, equipment — isolated mode)
+- All model calls through ModelGateway (no direct provider access)
+- `permissions=[]` — no filesystem, shell, or arbitrary network tools
+
+Activated by `MAIW_AGENT_RUNTIME=deep_agents` or `sop.runtime_profile=adaptive`.
+
+**Governance invariant:** Neither runtime may call `ActionExecutor`, write MCP capabilities,
+or the `DecisionEngine`. Both runtimes produce `RecommendedAction` and transition to
+`WAITING_FOR_GOVERNANCE`. The governance layer is always outside the agent runtime.
+
+**Runtime selection:**
+```
+MAIW_AGENT_RUNTIME=deterministic   → MAIWDeterministicRuntime (default)
+MAIW_AGENT_RUNTIME=deep_agents     → DeepAgentsRuntime (opt-in)
+```
+
+See [`docs/architecture/AGENT_RUNTIME.md`](docs/architecture/AGENT_RUNTIME.md) for the full
+runtime contract and ownership matrix.
+
+---
+
 ## Decision and Execution Architecture
 
 ### DecisionEngine
@@ -459,7 +499,7 @@ for full sequence diagrams of all implemented paths.
 
 ---
 
-### Reliable Execution (Phase 10E)
+### Reliable Execution
 
 **MAIW separates authorization from reliable execution.** Once an action is authorized,
 `ActionExecutor` assigns a stable execution identity and applies idempotency protection
@@ -546,12 +586,12 @@ protect against duplicate physical mutations. `trace_id` correlates the full lif
 `provider_reference` is the backend's own record of the transaction. `approval_id` scopes
 the authority grant — it is created at queue time, consumed after execution, and is never reused.
 
-> **Current limitation (Phase 10E Batch 1):** Idempotency protection is provided by an
+> **Current limitation:** Idempotency protection is provided by an
 > in-memory `ExecutionRegistry` within a single process. It does not yet provide distributed
 > or multi-replica exactly-once execution guarantees. This limitation is explicit and must
 > not be treated as a production distributed guarantee.
 
-**Execution Safety — Phase 10E Batch 1:**
+**Execution Safety:**
 
 ```
 ✓ Explicit six-value execution outcome (EXECUTED / NO_OP / DEFERRED / CONFLICT / UNKNOWN / FAILED)
@@ -563,7 +603,7 @@ the authority grant — it is created at queue time, consumed after execution, a
 ✗ Distributed/multi-replica exactly-once: not yet implemented
 ```
 
-#### Approval Governance (Phase 10E Batch 2)
+#### Approval Governance
 
 **Approval is an explicit, expirable, single-use authority grant** — not a boolean flag on a
 record. Before execution, a proposal must pass through an `ApprovalRecord` state machine that
@@ -612,13 +652,13 @@ preserved unchanged through `evaluate()`, `add_pending_approval()`, and
 from a serialized snapshot in the pending record rather than rebuilding it at approval time.
 This ensures `approval_id → proposal_id → decision_id` is a consistent audit chain.
 
-> **Current limitation (Phase 10E Batch 2):** Approval state is held in
+> **Current limitation:** Approval state is held in
 > `InMemoryApprovalStore` within a single process. PENDING → APPROVED → CONSUMED transitions
 > are atomic under asyncio cooperative multitasking but are **not distributed**. After a
 > process restart, all pending approvals are lost. Multi-replica approval state, durable
-> approval storage, and distributed exactly-once authority are out of scope for Phase 10E.
+> approval storage, and distributed exactly-once authority are deferred to future phases.
 
-**Authority Safety — Phase 10E Batch 2:**
+**Authority Safety:**
 
 ```
 ✓ Explicit ApprovalState machine: PENDING / APPROVED / REJECTED / EXPIRED / CONSUMED
@@ -634,7 +674,7 @@ This ensures `approval_id → proposal_id → decision_id` is a consistent audit
 ✗ Durable approval storage: not yet implemented (in-memory only)
 ```
 
-#### Reconciliation (Phase 10E Batch 3)
+#### Reconciliation
 
 When an MCP write times out after the provider has mutated state, MAIW records
 `ExecutionOutcome.UNKNOWN` and refuses to retry. Batch 3 adds the reconciliation
@@ -706,7 +746,7 @@ the `RECONCILE` category (amber) with operator-facing labels:
 ✗ Distributed reconciliation state: single-process only (same as registry)
 ```
 
-#### Request Deadline Hierarchy (Phase 10E Batch 4)
+#### Request Deadline Hierarchy
 
 Every request that enters the MAIW pipeline now carries an explicit, bounded time
 budget. Deadlines are monotonic-clock values set once at the API boundary and never
@@ -769,7 +809,7 @@ as a structured body (`status: "unknown"`) for operator reconciliation.
 
 ---
 
-#### Circuit Breakers and Graceful Degradation (Phase 10E Batch 5)
+#### Circuit Breakers and Graceful Degradation
 
 Each MCP domain (equipment, labor, wave, inventory) and the NIM provider have independent
 circuit breakers. An outage in one domain cannot cascade to others.
@@ -826,7 +866,7 @@ outage is operational degradation, not a readiness failure. **`GET /live`** is a
 
 ---
 
-#### Fault Injection and Safety Evidence (Phase 10E Batch 6)
+#### Fault Injection and Safety Evidence
 
 All five golden invariants are proven to hold under 13 deterministic fault profiles
 injected at the test/demo boundary — never inside production packages.
@@ -901,7 +941,7 @@ Artifacts: `artifacts/reliability/summary.{json,md}` — canonical safety eviden
 
 ---
 
-#### Operator Reliability UX (Phase 10E Batch 7)
+#### Operator Reliability UX
 
 The Command Center surfaces MAIW's proven reliability behavior without exposing
 infrastructure internals. An operator can always answer: what failed? what did MAIW do?
@@ -1023,7 +1063,7 @@ Multi-Agent-Intelligent-Warehouse/
 │   ├── agents/                    # Legacy agent layer (superseded by packages/maiw-agents)
 │   └── services/                  # Services: auth, DB, monitoring, legacy shims
 │
-├── apps/api/maiw_api/             # Canonical FastAPI entrypoint (Phase 9B)
+├── apps/api/maiw_api/             # Canonical FastAPI entrypoint (MAIWRuntime composition root)
 │   ├── app.py                     # ASGI entrypoint: uvicorn maiw_api.app:app
 │   ├── bootstrap.py               # MAIWRuntime composition root
 │   ├── config.py                  # Application settings
@@ -1323,19 +1363,19 @@ python -m pytest tests/unit/ tests/contract/ tests/mcp/ \
   --ignore=tests/unit/test_prompt_injection_simple.py
 ```
 
-**Baseline (Phase 9A): 528 passed, 1 skipped, 0 failed**
+**MAIW v2 test baseline (pre-NemoClaw): ~1600 Python unit tests passing (+ reliability suite)**
 
-**Phase 10E reliability tests in `tests/unit/reliability/` — 388 tests:**
+**Reliability tests in `tests/unit/reliability/` — 388 tests:**
 
-| Suite | Tests | Added in |
-|-------|-------|----------|
-| Ambiguous write, outcome model, idempotency, trace | 85 | Batch 1 |
-| Approval governance, single-use consume | 63 | Batch 2 |
-| Reconciliation, postcondition strategies | 51 | Batch 3 |
-| Request deadlines, timeout hierarchy | 18 | Batch 4 |
-| Circuit breakers, graceful degradation | 34 | Batch 5 |
-| Fault profiles F01–F13, baseline scenario | 30 | Batch 6 |
-| Reliability UI components | 35 | Batch 7 (frontend) |
+| Suite | Tests |
+|-------|-------|
+| Ambiguous write, outcome model, idempotency, trace | 85 |
+| Approval governance, single-use consume | 63 |
+| Reconciliation, postcondition strategies | 51 |
+| Request deadlines, timeout hierarchy | 18 |
+| Circuit breakers, graceful degradation | 34 |
+| Fault profiles F01–F13, baseline scenario | 30 |
+| Reliability UI components | 35 |
 
 **Frontend (React): 94 tests, 0 failures**
 
