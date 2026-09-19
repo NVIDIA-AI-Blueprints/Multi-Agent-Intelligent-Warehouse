@@ -206,13 +206,16 @@ def test_model_adapter_wraps_context_gateway():
 
     # In test mode (model_gateway=None), should return mock
     import asyncio
-    adapter = MAIWModelAdapter(model_gateway=None)
-    response = asyncio.get_event_loop().run_until_complete(
-        adapter.generate("test prompt", trace_id="trace-test")
-    )
-    assert response.get("mock") is True
-    assert response.get("trace_id") == "trace-test"
-    assert adapter.call_count == 1
+
+    async def _run() -> dict:
+        adapter = MAIWModelAdapter(model_gateway=None)
+        response = await adapter.generate("test prompt", trace_id="trace-test")
+        assert response.get("mock") is True
+        assert response.get("trace_id") == "trace-test"
+        assert adapter.call_count == 1
+        return response
+
+    asyncio.run(_run())
 
 
 # ── Invariant 6: Uses MAIW AgentTaskState ────────────────────────────────────
