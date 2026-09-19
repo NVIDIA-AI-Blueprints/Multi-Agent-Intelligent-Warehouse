@@ -1,0 +1,93 @@
+{
+  "task_identity": {
+    "task_id": "task-poc-wave17",
+    "agent_id": "operations_coordination",
+    "phase": "19A",
+    "generated_at": "2026-09-19T00:00:00Z"
+  },
+  "sop_id": "operations_coordination.wave_risk_resolution",
+  "sop_version": "1.0",
+  "scenario": "Wave 17 labor constraint / carrier cutoff risk",
+  "context_snapshot_id": "snap-wave17-test",
+  "scenario_details": {
+    "wave_id": "wave-17",
+    "at_risk_count": 3,
+    "pending_count": 12,
+    "carrier_cutoff_minutes": 47,
+    "primary_constraint": "labor",
+    "idle_workers": 5,
+    "zone_a_deficit": true
+  },
+  "deterministic_runtime": {
+    "runtime": "MAIWDeterministicRuntime",
+    "runtime_version": "18H",
+    "steps": [
+      {"step_id": "establish_state", "action": "gather_operational_context", "outcome": "completed"},
+      {"step_id": "diagnose", "action": "determine_primary_constraint", "outcome": "completed"},
+      {"step_id": "gather_specialist_evidence", "action": "consult_required_domains", "outcome": "completed"},
+      {"step_id": "generate_candidates", "action": "produce_candidate_interventions", "outcome": "completed"},
+      {"step_id": "compare", "action": "compare_candidates", "outcome": "completed"},
+      {"step_id": "recommend", "action": "select_recommendation", "outcome": "completed"},
+      {"step_id": "submit", "action": "emit_recommended_action", "outcome": "governance_wait"}
+    ],
+    "model_calls": 0,
+    "skill_calls": 3,
+    "subagent_calls": 1,
+    "latency_ms": "<1",
+    "recommendation": {
+      "domain": "labor",
+      "action": "reallocate_2_workers_zone_b_to_a",
+      "priority": "high",
+      "risk": "low",
+      "reversible": true,
+      "rationale": "Closes capacity deficit before carrier cutoff"
+    },
+    "stop_reason": "WAITING_FOR_GOVERNANCE",
+    "governance_compliance": true,
+    "sop_conformance": true
+  },
+  "deep_agents_runtime": {
+    "runtime": "DeepAgentsRuntime (POC simulation)",
+    "runtime_version": "19A.poc",
+    "steps": [
+      {"phase": "planning", "event": "plan", "plan_steps": ["establish_state", "diagnose", "gather_specialist_evidence", "generate_candidates", "compare", "recommend", "submit", "observe"]},
+      {"step_id": "establish_state", "action": "gather_operational_context", "outcome": "model_step"},
+      {"step_id": "diagnose", "action": "determine_primary_constraint", "outcome": "model_step"},
+      {"step_id": "gather_specialist_evidence", "action": "consult_required_domains", "outcome": "delegation"},
+      {"step_id": "generate_candidates", "action": "produce_candidate_interventions", "outcome": "model_step"},
+      {"step_id": "compare", "action": "compare_candidates", "outcome": "model_step"},
+      {"step_id": "recommend", "action": "select_recommendation", "outcome": "model_step"},
+      {"step_id": "submit", "action": "emit_recommended_action", "outcome": "governance_wait"}
+    ],
+    "model_calls": "8 (simulated via ModelGateway adapter)",
+    "skill_calls": 3,
+    "subagent_calls": 1,
+    "latency_ms": "<5",
+    "recommendation": {
+      "domain": "labor",
+      "action": "reallocate_2_workers_zone_b_to_a",
+      "priority": "high",
+      "risk": "low",
+      "reversible": true,
+      "rationale": "Closes capacity deficit before carrier cutoff"
+    },
+    "stop_reason": "WAITING_FOR_GOVERNANCE",
+    "governance_compliance": true,
+    "sop_conformance": true,
+    "runtime_events_count": 9,
+    "trace_id_propagated": true
+  },
+  "comparison": {
+    "sop_conformance": "Both compliant — same SOP, same governance boundary",
+    "governance_boundary": "Both respected — no writes, both stop at WAITING_FOR_GOVERNANCE",
+    "recommendation_parity": "Equivalent recommendations — same domain, action, priority",
+    "model_call_overhead": "Deep Agents uses 8 model calls vs 0 for deterministic",
+    "planning_benefit": "Deep Agents generates explicit step-by-step plan before execution; enables dynamic replanning",
+    "delegation_fidelity": "Both use MAIW AgentDelegationRequest/Result contracts",
+    "state_management": "Both use MAIW AgentTaskState as authoritative state",
+    "observability": "Deep Agents records richer runtime events (plan, step, skill, subagent, recommendation, governance_wait, termination)",
+    "determinism": "Deterministic runtime is fully deterministic; Deep Agents is non-deterministic (model-dependent)",
+    "testability": "Both support test mode with mocked ModelGateway"
+  },
+  "adoption_note": "deep-agents package NOT FOUND on PyPI as of 2026-09-19. This comparison uses simulated adapter only. Adoption decision: INSUFFICIENT EVIDENCE."
+}

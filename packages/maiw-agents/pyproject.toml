@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-deep-agents = []
+deep-agents = ["deepagents>=0.7.15,<0.8.0"]
 
 [tool.setuptools.packages.find]
 where = ["."]
