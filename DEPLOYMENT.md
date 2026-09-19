@@ -20,22 +20,22 @@ Complete deployment guide for the Warehouse Operational Assistant.
 
 **Option 1: Interactive Jupyter Notebook Setup (Recommended for First-Time Users)**
 
-📓 **[Complete Setup Guide (Jupyter Notebook)](notebooks/setup/complete_setup_guide.ipynb)**
+📓 **[MAIW v2 Getting Started (canonical)](notebooks/MAIW_v2_Getting_Started.ipynb)**
 
-The interactive notebook provides:
-- ✅ Automated environment validation and checks
-- ✅ Step-by-step guided setup with explanations
-- ✅ Interactive API key configuration (NVIDIA, Brev, etc.)
-- ✅ Database setup and migration automation
-- ✅ User creation and demo data generation
-- ✅ Backend and frontend startup from within the notebook
-- ✅ Comprehensive error handling and troubleshooting
-- ✅ Service health checks and verification
+The canonical developer notebook walks through the full end-to-end journey — environment
+validation, Warehouse World generation, scenario activation, Copilot interaction, SOP-driven
+agent execution, governance, outcome observation, and the Model Gateway Evaluation Lab.
 
-**To use the notebook:**
-1. Open `notebooks/setup/complete_setup_guide.ipynb` in Jupyter Lab/Notebook
+**Legacy setup notebook** (still valid for infrastructure-only setup):
+📓 [`notebooks/setup/complete_setup_guide.ipynb`](notebooks/setup/complete_setup_guide.ipynb)
+This infrastructure-focused notebook provides automated environment validation, API key
+configuration, database setup, user creation, and service health checks. Use it if you only
+need the infrastructure layer without the full MAIW v2 developer journey.
+
+**To use the canonical notebook:**
+1. Open `notebooks/MAIW_v2_Getting_Started.ipynb` in Jupyter Lab/Notebook
 2. Follow the interactive cells step by step
-3. The notebook will guide you through the entire setup process
+3. The notebook will guide you through the complete MAIW v2 developer journey
 
 **Option 2: Command-Line Setup (For Experienced Users)**
 
@@ -491,28 +491,19 @@ curl http://localhost:8001/api/v1/health
 
 ## Deployment Options
 
-### Complete Setup Guide (Jupyter Notebook)
+### Jupyter Notebook Options
 
-For a comprehensive, step-by-step setup guide with automated checks and interactive instructions, see:
+**Canonical MAIW v2 developer journey:**
+📓 **[MAIW v2 Getting Started](notebooks/MAIW_v2_Getting_Started.ipynb)**
 
-📓 **[Complete Setup Guide (Jupyter Notebook)](notebooks/setup/complete_setup_guide.ipynb)**
+Covers the full 17-step end-to-end journey — Warehouse World, Copilot, agents, governance,
+Model Gateway Evaluation Lab. Recommended starting point.
 
-This interactive notebook provides:
-- ✅ Automated environment validation and checks
-- ✅ Step-by-step guided setup with explanations
-- ✅ Interactive API key configuration (NVIDIA, Brev, etc.)
-- ✅ Database setup and migration automation
-- ✅ User creation and demo data generation
-- ✅ Backend and frontend startup from within the notebook
-- ✅ Comprehensive error handling and troubleshooting
-- ✅ Service health checks and verification
+**Infrastructure-focused setup:**
+📓 **[Complete Setup Guide](notebooks/setup/complete_setup_guide.ipynb)**
 
-**To use the notebook:**
-1. Open `notebooks/setup/complete_setup_guide.ipynb` in Jupyter Lab/Notebook
-2. Follow the interactive cells step by step
-3. The notebook will guide you through the entire setup process
-
-**Note:** This is the same notebook mentioned in the [Quick Start](#quick-start) section above. It's the recommended approach for first-time users.
+Automated environment validation, API key configuration, database setup, user creation,
+demo data generation, and service health checks. Use for infrastructure-only setup tasks.
 
 ## Post-Deployment Setup
 
