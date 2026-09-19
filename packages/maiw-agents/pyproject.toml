@@ -15,6 +15,9 @@ dependencies = [
     "maiw-state>=0.1.0",
 ]
 
+[project.optional-dependencies]
+deep-agents = []
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["maiw_agents*"]
