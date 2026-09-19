@@ -1,7 +1,12 @@
 # NeMo Guardrails Implementation Overview
 
-**Last Updated:** 2025-01-XX  
-**Status:** Phase 3 Complete - Ready for Production  
+> **Historical implementation record.**
+> This document reflects an earlier implementation phase (pre-MAIW v2) and may not describe
+> the current MAIW v2 governance architecture. See [`docs/architecture/GOVERNANCE.md`](GOVERNANCE.md)
+> for the current authoritative governance and authority-boundary design.
+
+**Last Updated:** 2025-01-XX (historical)
+**Status:** Historical — Phase 3 complete as of earlier implementation
 **Implementation:** Parallel SDK and Pattern-Based Support
 
 ---
@@ -10,9 +15,9 @@
 
 This document provides a comprehensive overview of the NeMo Guardrails implementation in the Warehouse Operational Assistant. The system supports both NVIDIA's NeMo Guardrails SDK (with Colang) and a pattern-based fallback implementation, allowing for runtime switching via feature flag.
 
-**Current State:** Dual implementation with feature flag control  
-**Target State:** Full NeMo Guardrails SDK integration with Colang-based programmable guardrails  
-**Migration Status:** Phase 3 Complete - Production Ready
+**Current State (historical):** Dual implementation with feature flag control  
+**Target State (historical):** Full NeMo Guardrails SDK integration with Colang-based programmable guardrails  
+**Migration Status (historical):** Phase 3 Complete
 
 ---
 
