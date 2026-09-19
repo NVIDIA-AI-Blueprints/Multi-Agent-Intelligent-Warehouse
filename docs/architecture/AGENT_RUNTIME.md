@@ -1,8 +1,8 @@
 # MAIW Agent Runtime Architecture
 
-**Version:** MAIW v2 pre-NemoClaw baseline
-**Date:** 2026-09-19
+**Version:** MAIW v2
 **Status:** AUTHORITATIVE
+**Diagram:** [docs/architecture/diagrams/maiw-runtime-pipeline.png](diagrams/maiw-runtime-pipeline.png)
 
 ---
 
