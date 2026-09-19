@@ -1,0 +1,93 @@
+{
+  "baseline_id": "maiw-v2-pre-nemoclaw",
+  "created": "2026-09-19T00:00:00Z",
+  "phase": "19B",
+  "commit_sha": "fd716e667a8fe026302048d89bd47c52579a3a7f",
+  "upstream_commit": "a367c78",
+  "branch": "feat/phase-19b-pre-nemoclaw-stabilization-wt",
+  "python_version": "3.12.3",
+  "node_version": "v24.1.0",
+  "deepagents_version": "0.7.15",
+  "langchain_version": "1.4.2",
+
+  "test_results": {
+    "python_unit_passed": 1603,
+    "python_unit_skipped": 23,
+    "python_unit_failed": 0,
+    "collection_errors": 5,
+    "collection_error_reason": "PRE-V2 LEGACY files with asyncpg dependency (test_mcp_system.py, test_chunking_demo.py, test_db_connection.py, test_enhanced_retrieval.py, test_evidence_scoring_demo.py)",
+    "reliability_tests": 388,
+    "note": "Reliability tests run separately via tests/unit/reliability/"
+  },
+
+  "codebase_metrics": {
+    "python_files_approx": 15604,
+    "typescript_files_approx": 768,
+    "packages": 9,
+    "sop_count": 3,
+    "mcp_servers": 4,
+    "api_routes_canonical_approx": 33,
+    "notebooks": 3,
+    "docs_files_approx": 40
+  },
+
+  "architecture": {
+    "runtimes": ["MAIWDeterministicRuntime", "DeepAgentsRuntime"],
+    "agents": ["OperationsCoordinationAgent", "LaborAgent", "WaveAgent", "EquipmentAgent", "SafetyAgent"],
+    "sops": [
+      "operations_coordination.wave_risk_resolution.v1",
+      "labor.labor_constraint_assessment.v1",
+      "wave.wave_risk_assessment.v1"
+    ],
+    "model_gateway_runs": ["18c", "18d", "18e", "18f"],
+    "default_runtime": "deterministic",
+    "deep_agents_opt_in_env": "MAIW_AGENT_RUNTIME=deep_agents"
+  },
+
+  "api_payload_bounds": {
+    "model_lab_raw_response_max_chars": 10000,
+    "artifact_paths_whitelist": ["18c", "18d", "18e", "18f"],
+    "copilot_turn_timeout_seconds": 30,
+    "world_summary_max_entities": "bounded by DataPack (~500 entities in dc47_demo preset)"
+  },
+
+  "performance_notes": {
+    "datapack_generation_seconds": "5-10 (one-time, dc47_demo preset, seed=42)",
+    "copilot_ask_overhead": "context assembly ~100ms + model call",
+    "deterministic_runtime_control_path": "synchronous, <1ms SOP step dispatch",
+    "deep_agents_overhead": "graph.ainvoke() overhead ~200-500ms setup + model call time",
+    "model_lab_run_list": "<5ms (in-memory metadata)",
+    "model_lab_artifact_load": "<100ms (JSON parse from disk, ~50KB artifacts)"
+  },
+
+  "memory_characteristics": {
+    "copilot_conversation_store": "in-memory, unbounded growth — P2 backlog item",
+    "agent_task_state_store": "in-memory, bounded by active tasks",
+    "context_snapshot_store": "in-memory, per-turn lifecycle",
+    "warehouse_world": "DataPack held in memory after first load (~5MB dc47_demo)",
+    "note": "No database introduced in 19B per spec. Persistence is NemoClaw-era concern."
+  },
+
+  "governance_invariants_verified": [
+    "CopilotService does not import ActionExecutor",
+    "CopilotService does not import ApprovalStore",
+    "CopilotService does not import DecisionEngine",
+    "No /copilot/approve route",
+    "No /copilot/execute route",
+    "No /copilot/force-action route",
+    "Deep Agents receives only READ/ANALYTICAL tools",
+    "WRITE/EMERGENCY_WRITE capabilities hard-blocked from Deep Agents",
+    "Model Lab router does not import DecisionEngine or ActionExecutor",
+    "WORLD router does not import ActionExecutor or DecisionEngine",
+    "No autonomous execution in any agent"
+  ],
+
+  "security_invariants_verified": [
+    "No secrets committed (.env not in git)",
+    "Model Lab artifact loader uses whitelist (no path traversal possible)",
+    "Path traversal tests pass (TestModelLabPathSecurity)",
+    "_strip_secrets applied to all Model Lab responses",
+    "No eval() in production code paths",
+    "MAIW_WORLD_AUTO_GENERATE defaults to false (not auto in production)"
+  ]
+}
