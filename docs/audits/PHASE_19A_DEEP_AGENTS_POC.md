@@ -1,8 +1,77 @@
-# MAIW Phase 19A — Deep Agents POC Evaluation Report (Corrected)
+# MAIW Phase 19A — Deep Agents POC Evaluation Report (Corrected + 19A.11 Amendment)
 
-**Phase:** 19A (Corrective Commits 19A.6–19A.10)
+**Phase:** 19A (Corrective Commits 19A.6–19A.10; Amendment 19A.11)
 **Date:** 2026-09-19
 **Branch:** feat/phase-19a-deep-agents-poc
+
+---
+
+## Phase 19A.11 Amendment (2026-09-19)
+
+Runtime simplification audit complete.
+
+### Simplifications implemented
+
+- `_SimulatedDeepAgentsRuntime` removed (~657 LOC of generic orchestration deleted)
+- `_infer_delegate_target`, `_build_step_prompt`, `_extract_step_results` removed (helpers only used by simulated runtime)
+- `_check_capability_alignment` extracted to `contracts/runtime.py` as `check_capability_alignment()` (consolidation — both runtimes now delegate to it)
+- `MAIWModelAdapter` renamed `MAIWTestModelAdapter` (test-only path made explicit; backward-compatible alias kept)
+- `runtime_profile: Literal["strict", "adaptive"]` field added to `SOPDefinition` (defaults to `"strict"`)
+- `get_runtime()` updated to accept `sop: SOPDefinition | None` parameter and honor `sop.runtime_profile`
+- `wave_risk_resolution.v1.yaml` updated to `runtime_profile: adaptive`
+- `docs/architecture/AGENT_RUNTIME.md` created (three-layer ownership model)
+- `docs/audits/PHASE_19A_11_OWNERSHIP_MATRIX.md` created (component classification table)
+
+### Code size after simplification
+
+| File | LOC before | LOC after | Delta |
+|---|---|---|---|
+| `deep_agents_runtime.py` | 1234 | ~577 | -657 |
+| `model_adapter.py` | 421 | ~425 | +4 |
+| `runtime/__init__.py` | 29 | ~39 | +10 |
+| `contracts/runtime.py` | 125 | ~160 | +35 |
+| `contracts/sop.py` | 338 | ~350 | +12 |
+| **Total runtime LOC** | **~2383** | **~1750** | **-633** |
+
+### Test counts
+
+| Suite | Before 19A.11 | After 19A.11 | Delta |
+|---|---|---|---|
+| test_deep_agents_poc_19a.py | 15 | 15 | 0 |
+| test_deep_agents_arch_invariants_19a.py | 38 | 46 | +8 |
+| test_deep_agents_real_integration_19a.py | 11 | 11 | 0 |
+| **Total Phase 19A** | **64** | **72** | **+8** |
+
+New invariant tests cover: `check_capability_alignment` import, `runtime_profile` default, `get_runtime(sop=...)` routing, config-overrides-SOP, wave SOP profile, `MAIWTestModelAdapter` rename, alias backward compat, `_SimulatedDeepAgentsRuntime` removal.
+
+### Adoption decision
+
+`DEEP AGENTS SHOULD BECOME PRIMARY ADAPTIVE RUNTIME`
+
+Rationale:
+1. `_SimulatedDeepAgentsRuntime` removal demonstrates Deep Agents owns ~657 LOC of generic orchestration that MAIW should not maintain
+2. Real SDK integration is clean — 72 Phase 19A tests pass
+3. ModelGateway hard invariant preserved (all model calls via `MAIWModelGatewayChat`)
+4. Governance boundary preserved (no runtime may cross it)
+5. SOP ownership preserved (MAIW owns procedures, Deep Agents owns adaptive execution within them)
+6. `MAIWDeterministicRuntime` remains as strict-mode reference and fallback — distinct, justified role
+7. `runtime_profile: strict/adaptive` provides explicit, auditable per-SOP selection
+
+This is an architectural direction recommendation, not an immediate default switch.
+The dual-runtime architecture (strict + adaptive) is intentional for the transition period.
+
+### Long-term recommendation
+
+Deep Agents as primary adaptive runtime for complex resolution SOPs.
+MAIWDeterministicRuntime as strict-mode/fallback for safety-critical procedural SOPs.
+The `runtime_profile` field in SOPDefinition provides the mechanism for explicit selection.
+
+### NemoClaw readiness
+
+READY FOR NEMOCLAW ARCHITECTURE AUDIT — governance boundary clean, MCP boundary clean,
+ModelGateway invariant clean, SOP ownership clean, runtime selection explicit.
+
+---
 **Status:** COMPLETE — Adoption Decision: KEEP DEEP AGENTS AS OPTIONAL RUNTIME
 **NemoClaw Readiness:** READY FOR NEMOCLAW ARCHITECTURE AUDIT
 

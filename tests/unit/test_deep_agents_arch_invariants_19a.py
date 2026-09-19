@@ -615,13 +615,159 @@ def test_build_maiw_tools_blocks_write_capabilities():
     )
 
 
-def test_simulated_runtime_is_preserved_as_private():
-    """_SimulatedDeepAgentsRuntime must still exist as private (backward compat / reference)."""
-    from maiw_agents.runtime.deep_agents_runtime import _SimulatedDeepAgentsRuntime
-    assert _SimulatedDeepAgentsRuntime is not None
-    rt = _SimulatedDeepAgentsRuntime()
-    assert hasattr(rt, "run_task")
-    assert hasattr(rt, "resume_after_governance")
+def test_simulated_runtime_is_no_longer_importable():
+    """
+    _SimulatedDeepAgentsRuntime must NOT exist after Phase 19A.11b cleanup.
+    ~600 LOC of generic orchestration was removed; the real deepagents SDK
+    now owns that responsibility.
+    """
+    import importlib
+    mod = importlib.import_module("maiw_agents.runtime.deep_agents_runtime")
+    assert not hasattr(mod, "_SimulatedDeepAgentsRuntime"), (
+        "_SimulatedDeepAgentsRuntime should not exist after Phase 19A.11b removal. "
+        "Use DeepAgentsRuntime (real SDK) or MAIWDeterministicRuntime (strict mode)."
+    )
+
+
+# ── Phase 19A.11 Invariants (runtime_profile, check_capability_alignment) ──────
+
+def test_check_capability_alignment_importable_from_contracts():
+    """check_capability_alignment must be importable from contracts.runtime."""
+    from maiw_agents.contracts.runtime import check_capability_alignment
+    assert callable(check_capability_alignment)
+
+
+def test_sop_definition_runtime_profile_defaults_to_strict():
+    """SOPDefinition.runtime_profile must default to 'strict'."""
+    from maiw_agents.contracts.sop import SOPDefinition, SOPStep
+
+    sop = SOPDefinition.model_construct(
+        id="test.default_profile",
+        version="1.0",
+        agent="test_agent",
+        objective="test",
+        steps=[SOPStep(id="step1", action="no_op")],
+        stop_conditions=["objective_met"],
+        allowed_capabilities=[],
+        allowed_subagents=[],
+        triggers=[],
+        escalation=[],
+        required_context=[],
+    )
+    assert sop.runtime_profile == "strict", (
+        f"Expected runtime_profile='strict', got {sop.runtime_profile!r}"
+    )
+
+
+def test_get_runtime_with_adaptive_sop_returns_deep_agents():
+    """get_runtime(sop=<adaptive profile>) returns DeepAgentsRuntime."""
+    from maiw_agents.runtime.deep_agents_runtime import get_runtime, DeepAgentsRuntime
+    from maiw_agents.contracts.sop import SOPDefinition, SOPStep
+
+    sop = SOPDefinition.model_construct(
+        id="test.adaptive",
+        version="1.0",
+        agent="test_agent",
+        objective="test",
+        runtime_profile="adaptive",
+        steps=[SOPStep(id="step1", action="no_op")],
+        stop_conditions=["objective_met"],
+        allowed_capabilities=[],
+        allowed_subagents=[],
+        triggers=[],
+        escalation=[],
+        required_context=[],
+    )
+    os.environ.pop("MAIW_AGENT_RUNTIME", None)
+    rt = get_runtime(sop=sop)
+    assert isinstance(rt, DeepAgentsRuntime), (
+        f"Expected DeepAgentsRuntime for adaptive profile, got {type(rt).__name__}"
+    )
+
+
+def test_get_runtime_with_strict_sop_returns_deterministic():
+    """get_runtime(sop=<strict profile>) returns MAIWDeterministicRuntime."""
+    from maiw_agents.runtime.deep_agents_runtime import get_runtime
+    from maiw_agents.runtime import MAIWDeterministicRuntime
+    from maiw_agents.contracts.sop import SOPDefinition, SOPStep
+
+    sop = SOPDefinition.model_construct(
+        id="test.strict",
+        version="1.0",
+        agent="test_agent",
+        objective="test",
+        runtime_profile="strict",
+        steps=[SOPStep(id="step1", action="no_op")],
+        stop_conditions=["objective_met"],
+        allowed_capabilities=[],
+        allowed_subagents=[],
+        triggers=[],
+        escalation=[],
+        required_context=[],
+    )
+    os.environ.pop("MAIW_AGENT_RUNTIME", None)
+    rt = get_runtime(sop=sop)
+    assert isinstance(rt, MAIWDeterministicRuntime), (
+        f"Expected MAIWDeterministicRuntime for strict profile, got {type(rt).__name__}"
+    )
+
+
+def test_get_runtime_config_overrides_sop_profile():
+    """get_runtime(config='deterministic', sop=<adaptive>) respects explicit config, not SOP."""
+    from maiw_agents.runtime.deep_agents_runtime import get_runtime
+    from maiw_agents.runtime import MAIWDeterministicRuntime
+    from maiw_agents.contracts.sop import SOPDefinition, SOPStep
+
+    sop = SOPDefinition.model_construct(
+        id="test.adaptive_override",
+        version="1.0",
+        agent="test_agent",
+        objective="test",
+        runtime_profile="adaptive",
+        steps=[SOPStep(id="step1", action="no_op")],
+        stop_conditions=["objective_met"],
+        allowed_capabilities=[],
+        allowed_subagents=[],
+        triggers=[],
+        escalation=[],
+        required_context=[],
+    )
+    os.environ.pop("MAIW_AGENT_RUNTIME", None)
+    # Explicit config='deterministic' should win over sop.runtime_profile='adaptive'
+    rt = get_runtime(config="deterministic", sop=sop)
+    assert isinstance(rt, MAIWDeterministicRuntime), (
+        f"Explicit config='deterministic' must override sop.runtime_profile='adaptive', "
+        f"got {type(rt).__name__}"
+    )
+
+
+def test_wave_risk_resolution_sop_has_adaptive_profile():
+    """wave_risk_resolution.v1 SOP must have runtime_profile='adaptive' after 19A.11b."""
+    from pathlib import Path
+    from maiw_agents.contracts.sop import load_sop
+
+    sop_path = _REPO / "agents" / "sops" / "operations_coordination" / "wave_risk_resolution.v1.yaml"
+    if not sop_path.exists():
+        pytest.skip("SOP file not found")
+    sop = load_sop(sop_path)
+    assert sop.runtime_profile == "adaptive", (
+        f"wave_risk_resolution.v1 should have runtime_profile='adaptive', got {sop.runtime_profile!r}"
+    )
+
+
+def test_maiw_test_model_adapter_importable():
+    """MAIWTestModelAdapter must be importable from runtime.model_adapter."""
+    from maiw_agents.runtime.model_adapter import MAIWTestModelAdapter
+    assert MAIWTestModelAdapter is not None
+
+    adapter = MAIWTestModelAdapter(model_gateway=None)
+    assert adapter.call_count == 0
+
+
+def test_maiw_model_adapter_alias_still_works():
+    """MAIWModelAdapter alias still works for backward compatibility."""
+    from maiw_agents.runtime.model_adapter import MAIWModelAdapter, MAIWTestModelAdapter
+    assert MAIWModelAdapter is MAIWTestModelAdapter
 
 
 def test_model_adapter_has_no_framework_imports_updated():
