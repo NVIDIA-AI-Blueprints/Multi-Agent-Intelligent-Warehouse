@@ -1,0 +1,72 @@
+{
+  "meta": {
+    "generated": "2026-09-19",
+    "phase": "19A",
+    "commit": "19A.10"
+  },
+  "task_identity": {
+    "task_id": "task-wave17-poc-real",
+    "agent_id": "operations_coordination",
+    "objective": "Resolve Wave 17 completion risk before carrier cutoff"
+  },
+  "sop": {
+    "id": "operations_coordination.wave_risk_resolution",
+    "version": "1.0"
+  },
+  "scenario": "Wave 17 labor constraint / carrier cutoff risk (canonical)",
+  "context_snapshot_id": "snap-wave17-real",
+  "deterministic_runtime": {
+    "runtime": "MAIWDeterministicRuntime",
+    "model_calls": 0,
+    "skill_calls": 3,
+    "subagent_calls": 1,
+    "latency_ms": "<1",
+    "planning": "none (deterministic step sequence)",
+    "task_decomposition": "none (SOP steps are the decomposition)",
+    "dynamic_adaptation": "none (fixed step sequence)",
+    "governance_compliance": true,
+    "sop_conformance": true,
+    "reproducibility": "exact (deterministic)",
+    "stop_reason": "WAITING_FOR_GOVERNANCE",
+    "dependencies_added": 0
+  },
+  "deep_agents_runtime_real": {
+    "runtime": "DeepAgentsRuntime",
+    "deepagents_version": "0.7.15",
+    "model": "MAIWModelGatewayChat (MAIW ModelGateway, test mode)",
+    "model_calls": "1-8 (LangGraph ReAct loop, message count varies)",
+    "skill_calls": "3 (via LangChain StructuredTool wrapper)",
+    "subagent_calls": "1 (LaborAgent, isolated mode)",
+    "latency_ms": "<50 (test mode mock model)",
+    "planning": "emergent (LLM ReAct loop, no explicit planning middleware)",
+    "task_decomposition": "emergent from system_prompt + tool calls",
+    "dynamic_adaptation": "yes (LLM can adapt within SOP boundaries)",
+    "governance_compliance": true,
+    "sop_conformance": "partial (LLM may deviate from step order; governance stop enforced structurally)",
+    "reproducibility": "non-deterministic (LLM output varies)",
+    "stop_reason": "WAITING_FOR_GOVERNANCE",
+    "dependencies_added": 8,
+    "dependency_weight_mb": "~150MB (langchain + langgraph + langsmith + langchain-anthropic + langchain-google-genai)",
+    "langsmith_required": true,
+    "langsmith_saas_required": "false (LANGSMITH_TRACING=false disables telemetry)",
+    "local_nim_viable": true,
+    "air_gapped_viable": "conditional (requires LANGSMITH_TRACING=false + local NIM + internal package mirror)"
+  },
+  "comparison": {
+    "sop_step_conformance": {
+      "deterministic": "EXACT (steps execute in declared order)",
+      "deep_agents": "APPROXIMATE (LLM may reorder within system prompt guidance)"
+    },
+    "governance_boundary": "BOTH respected — structural enforcement, not prompt-only",
+    "write_skill_blocking": "BOTH enforce at adapter layer",
+    "recommendation_parity": "EQUIVALENT intent, non-deterministic wording in Deep Agents",
+    "model_call_overhead": "Deep Agents: 1-8 LangGraph iterations vs 0 for deterministic",
+    "planning_benefit": "Deep Agents provides emergent reasoning; no explicit plan structure",
+    "delegation_fidelity": "Deep Agents uses SubAgent isolated mode; MAIW contracts still apply for simulated runtime",
+    "test_complexity": "Deep Agents harder to test deterministically (mock model required)",
+    "dependency_weight": "Deep Agents adds ~150MB of transitive dependencies",
+    "air_gap_risk": "MEDIUM — LangSmith SDK required as package even if tracing disabled"
+  },
+  "adoption_decision": "KEEP DEEP AGENTS AS OPTIONAL RUNTIME",
+  "adoption_rationale": "Provides dynamic adaptation and emergent reasoning for complex multi-step tasks; MAIW deterministic runtime remains production default for reproducibility and zero-dependency operation"
+}
