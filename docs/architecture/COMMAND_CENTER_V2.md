@@ -1,6 +1,6 @@
 # MAIW Command Center v2
 
-<!-- Phase 10 — UI design spec for the v2 operational UI -->
+<!-- UI design spec for the v2 operational UI (authored during Phase 10) -->
 
 ## Purpose
 
@@ -184,7 +184,7 @@ Render by logical role, not hardcoded model names:
 | Ultra | Nemotron Ultra (most capable) |
 
 Source: `GET /api/v1/runtime/status` → `model_gateway_available`.
-Full role details: ModelRegistry (not exposed via API yet — Phase 10 deferred).
+Full role details: ModelRegistry (not yet exposed via API; deferred to a future release).
 
 ### 9. Capability Plane View
 

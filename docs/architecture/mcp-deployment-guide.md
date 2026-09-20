@@ -1,5 +1,10 @@
 # MCP Deployment Guide
 
+
+> **Historical document**
+>
+> This file reflects an earlier MAIW implementation phase and may not describe the current MAIW v2 architecture. See [ARCHITECTURE.md](ARCHITECTURE.md) and the project [README](../../README.md) for the current authoritative design.
+
 ## Overview
 
 This guide provides comprehensive instructions for deploying the Model Context Protocol (MCP) system in various environments. The MCP system is designed to be scalable, reliable, and easy to deploy across different infrastructure configurations.

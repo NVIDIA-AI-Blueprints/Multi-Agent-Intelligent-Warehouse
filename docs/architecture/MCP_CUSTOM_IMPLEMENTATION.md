@@ -1,5 +1,10 @@
 # MCP Custom Implementation - Rationale and Benefits
 
+
+> **Historical document**
+>
+> This file reflects an earlier MAIW implementation phase and may not describe the current MAIW v2 architecture. See [ARCHITECTURE.md](ARCHITECTURE.md) and the project [README](../../README.md) for the current authoritative design.
+
 ## Overview
 
 **MCP (Model Context Protocol) is a custom implementation** in this codebase. The system does not use the official [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) but instead implements a custom MCP-compatible system tailored specifically for the Warehouse Operational Assistant.

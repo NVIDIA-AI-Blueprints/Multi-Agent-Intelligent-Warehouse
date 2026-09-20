@@ -1,5 +1,10 @@
 # MCP Migration Guide
 
+
+> **Historical document**
+>
+> This file reflects an earlier MAIW implementation phase and may not describe the current MAIW v2 architecture. See [ARCHITECTURE.md](ARCHITECTURE.md) and the project [README](../../README.md) for the current authoritative design.
+
 ## Overview
 
 This guide provides comprehensive instructions for migrating the Warehouse Operational Assistant to the Model Context Protocol (MCP) architecture. The migration is designed to be completed in three phases, with each phase building upon the previous one.

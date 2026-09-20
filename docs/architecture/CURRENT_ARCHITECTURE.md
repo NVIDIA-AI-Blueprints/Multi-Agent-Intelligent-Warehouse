@@ -1,5 +1,10 @@
 # Current Architecture — Multi-Agent Intelligent Warehouse (MAIW)
 
+
+> **Historical document**
+>
+> This file reflects an earlier MAIW implementation phase and may not describe the current MAIW v2 architecture. See [ARCHITECTURE.md](ARCHITECTURE.md) and the project [README](../../README.md) for the current authoritative design.
+
 > Generated: 2026-08-20. Based on static analysis of the repository at commit `e33ed69`.
 > All file paths are relative to the repository root unless otherwise noted.
 

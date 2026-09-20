@@ -1,5 +1,12 @@
 # MAIW Package Ownership Map
 
+
+> **Historical document**
+>
+> This file reflects an earlier MAIW implementation phase and may not describe the current MAIW v2 architecture. See [ARCHITECTURE.md](ARCHITECTURE.md) and the project [README](../../README.md) for the current authoritative design.
+
+> **Migration note:** Package ownership here reflects architectural responsibility. Some active runtime implementations still reside under `src/` and are actively imported by the API. See [Known Modernization Boundary](ARCHITECTURE.md#known-modernization-boundary) in `ARCHITECTURE.md` for details.
+
 **Phase:** 8  
 **Date:** 2026-08-20
 
@@ -26,7 +33,8 @@ These packages are in their canonical location and must not be moved.
 
 | Module | Current path | Target package | Status |
 |--------|-------------|----------------|--------|
-| `CapabilityMetadata`, `ActionProposal`, `RiskLevel` | `packages/maiw-mcp/maiw_mcp/contracts/` | `maiw-mcp` | ✅ CORRECT |
+| `CapabilityMetadata` | `packages/maiw-mcp/maiw_mcp/` | `maiw-mcp` | ✅ CORRECT (at time of writing) |
+| `ActionProposal`, `RiskLevel` | ~~`packages/maiw-mcp/maiw_mcp/contracts/`~~ → **moved to `packages/maiw-decision/maiw_decision/proposal.py`** (WS1) | `maiw-decision` | ⚠️ UPDATED — see current `ARCHITECTURE.md` |
 | `MAIWMCPClient` | `packages/maiw-mcp/maiw_mcp/client/` | `maiw-mcp` | ✅ CORRECT |
 | `CapabilityRegistry` | `packages/maiw-mcp/maiw_mcp/registry/` | `maiw-mcp` | ✅ CORRECT |
 | `CapabilityTelemetry` | `packages/maiw-mcp/maiw_mcp/telemetry/` | `maiw-mcp` | ✅ CORRECT |

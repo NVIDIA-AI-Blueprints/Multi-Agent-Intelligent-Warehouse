@@ -1,5 +1,10 @@
 # Phase 2: Performance Optimization Plan
 
+
+> **Historical document**
+>
+> This file reflects an earlier MAIW implementation phase and may not describe the current MAIW v2 architecture. See [ARCHITECTURE.md](ARCHITECTURE.md) and the project [README](../../README.md) for the current authoritative design.
+
 ## Overview
 This document outlines the performance optimizations for the document processing pipeline, focusing on parallel processing, caching, and frontend real-time updates.
 

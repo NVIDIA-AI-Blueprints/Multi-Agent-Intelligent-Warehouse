@@ -1,5 +1,10 @@
 # API Migration Plan — Phase 9B
 
+
+> **Historical document**
+>
+> This file reflects an earlier MAIW implementation phase and may not describe the current MAIW v2 architecture. See [ARCHITECTURE.md](ARCHITECTURE.md) and the project [README](../../README.md) for the current authoritative design.
+
 **Status:** IN PROGRESS (Phase 9B)  
 **Branch:** `feat/phase-9b-api-migration`  
 **Entering baseline:** 528 passed, 1 skipped, 0 failed (CORE CI)

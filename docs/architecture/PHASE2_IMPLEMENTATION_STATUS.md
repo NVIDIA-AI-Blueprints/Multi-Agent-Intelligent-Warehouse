@@ -1,5 +1,10 @@
 # Phase 2: Performance Optimization - Implementation Status
 
+
+> **Historical document**
+>
+> This file reflects an earlier MAIW implementation phase and may not describe the current MAIW v2 architecture. See [ARCHITECTURE.md](ARCHITECTURE.md) and the project [README](../../README.md) for the current authoritative design.
+
 ## Current Issues Found
 
 ### Issue 1: Missing Layout Detection in Router Flow
