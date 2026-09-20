@@ -157,7 +157,7 @@ See `docs/ux/MAIW_AUTHORITY_UX.md` for the full authority-state model.
 - OUTCOME stage narrative via OutcomeContinuation deterministic templates
 - DelegationCard status-aware subtitles for RUNNING/COMPLETED/FAILED/ESCALATED
 
-**UX-1C** (complete — feat/ux-1c-live-agent-continuity):
+**UX-1C** (complete — feat/ux-1b-agent-sop-progress):
 - CopilotAgentStatus component — live task state polling in CopilotDrawer
 - `agent_task_id` linkage: ACT turns → exact AgentTaskState entry
 - `subscribeToTask()` — bounded polling (3s), stops on terminal state or 404
@@ -171,4 +171,36 @@ See `docs/ux/MAIW_AUTHORITY_UX.md` for the full authority-state model.
 See `docs/ux/MAIW_LIVE_AGENT_CONTINUITY.md` for the full UX-1C specification and
 design invariants.
 
-## Deferred Consolidation (UX-2+)
+## Canonical Post-Execution Surfaces (UX-1D)
+
+UX-1D adds three semantic layers that must never be conflated. Each layer answers
+a distinct operator question with a distinct source of truth and surface.
+
+| Question | Source of Truth | Operator Surface | Developer Surface |
+|---|---|---|---|
+| Did it execute? | ExecutionRecord (ActionExecutor) | OutcomeSummary / ExecutionReliabilityPanel | DeveloperTrace |
+| Are we certain? | ReconciliationOutcome (ReconciliationEngine) | ExecutionReliabilityPanel | DeveloperTrace |
+| Did it help? | LIVE world state (OBSERVE_OUTCOME delta) | OutcomeSummary | World / DeveloperTrace |
+| Why did we act? | Decision provenance (trace_id) | Recommendation panel | DecisionGraph |
+| What happens next? | AgentTaskState | AgentActivity / CopilotAgentStatus | DeveloperTrace |
+
+### New Surfaces (UX-1D)
+
+- **ExecutionReliabilityPanel** (`components/outcome/`) — Execution certainty view with operator and
+  expert mode. UNKNOWN/RECONCILING shown in amber (not red). INDETERMINATE shows operator action badge.
+- **OutcomeSummary** (`components/outcome/`) — Four-layer summary: EXECUTION / RELIABILITY / OUTCOME /
+  AGENT STATUS. All deterministic templating, no LLM calls. Green outcome only when OBJECTIVE_ACHIEVED.
+- **StateDelta** (`components/outcome/`) — Entity before/after diff. Shows only changed fields.
+- **KPIDelta** (`components/outcome/`) — KPI before/after for metrics relevant to the intervention.
+
+### DecisionGraph vs DeveloperTrace Role Separation (UX-1D)
+
+| | DecisionGraph | DeveloperTrace |
+|---|---|---|
+| Purpose | Visual lifecycle | Forensic provenance |
+| Shows | Evidence → Outcome flow | IDs, timestamps, latencies, model routes |
+| Cross-links | VIEW DEVELOPER TRACE, CONTEXT, LIVE WORLD | VIEW DECISION GRAPH, CONTEXT, LIVE WORLD |
+
+See `docs/ux/MAIW_OUTCOME_RELIABILITY_UX.md` for full UX-1D specification.
+
+## Deferred

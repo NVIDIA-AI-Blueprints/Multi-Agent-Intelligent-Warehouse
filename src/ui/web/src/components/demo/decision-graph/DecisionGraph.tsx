@@ -113,11 +113,23 @@ interface DecisionGraphProps {
   pendingApprovals?: PendingApproval[];
   demoStatus?: DemoStatus | null;
   onOpenExplanation?: (focus: ExplanationFocus) => void;
+  /** UX-1D: Cross-link to DeveloperTrace (forensic detail view). */
+  onViewDeveloperTrace?: () => void;
+  /** UX-1D: Cross-link to context snapshot at decision time. */
+  onViewContextAtDecision?: () => void;
+  /** UX-1D: Cross-link to live world state. */
+  onViewLiveWorld?: () => void;
 }
 
 type GraphMode = 'story' | 'trace';
 
-export default function DecisionGraph({ graph, onOpenExplanation }: DecisionGraphProps) {
+export default function DecisionGraph({
+  graph,
+  onOpenExplanation,
+  onViewDeveloperTrace,
+  onViewContextAtDecision,
+  onViewLiveWorld,
+}: DecisionGraphProps) {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(ZOOM_DEFAULT);
   const [graphMode, setGraphMode] = useState<GraphMode>('story');
@@ -331,6 +343,39 @@ export default function DecisionGraph({ graph, onOpenExplanation }: DecisionGrap
           >
             FIT
           </Box>
+
+          {/* UX-1D: Cross-links — lifecycle role separation */}
+          {(onViewDeveloperTrace || onViewContextAtDecision || onViewLiveWorld) && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, ml: 1, borderLeft: '1px solid #21262D', pl: 1 }}>
+              {onViewDeveloperTrace && (
+                <Typography
+                  data-testid="decision-graph-view-developer-trace"
+                  onClick={onViewDeveloperTrace}
+                  sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#58A6FF', cursor: 'pointer', whiteSpace: 'nowrap', '&:hover': { textDecoration: 'underline' } }}
+                >
+                  VIEW DEVELOPER TRACE
+                </Typography>
+              )}
+              {onViewContextAtDecision && (
+                <Typography
+                  data-testid="decision-graph-view-context"
+                  onClick={onViewContextAtDecision}
+                  sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#58A6FF', cursor: 'pointer', whiteSpace: 'nowrap', '&:hover': { textDecoration: 'underline' } }}
+                >
+                  VIEW CONTEXT AT DECISION TIME
+                </Typography>
+              )}
+              {onViewLiveWorld && (
+                <Typography
+                  data-testid="decision-graph-view-live-world"
+                  onClick={onViewLiveWorld}
+                  sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#58A6FF', cursor: 'pointer', whiteSpace: 'nowrap', '&:hover': { textDecoration: 'underline' } }}
+                >
+                  VIEW LIVE WORLD
+                </Typography>
+              )}
+            </Box>
+          )}
         </Box>
 
         {/* Story Graph mode */}

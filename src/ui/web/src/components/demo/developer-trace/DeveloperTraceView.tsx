@@ -20,6 +20,12 @@ import { useTraceReplay } from './useTraceReplay';
 interface DeveloperTraceViewProps {
   trace: DeveloperTrace | null;
   onOpenExplanation?: (focus: ExplanationFocus) => void;
+  /** UX-1D: Cross-link to DecisionGraph (lifecycle visualization). */
+  onViewDecisionGraph?: () => void;
+  /** UX-1D: Cross-link to context snapshot at decision time. */
+  onViewContextAtDecision?: () => void;
+  /** UX-1D: Cross-link to live world state. */
+  onViewLiveWorld?: () => void;
 }
 
 // ── Status badge ───────────────────────────────────────────────────────────────
@@ -165,7 +171,13 @@ function ReplayControls({
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export default function DeveloperTraceView({ trace, onOpenExplanation }: DeveloperTraceViewProps) {
+export default function DeveloperTraceView({
+  trace,
+  onOpenExplanation,
+  onViewDecisionGraph,
+  onViewContextAtDecision,
+  onViewLiveWorld,
+}: DeveloperTraceViewProps) {
   // Hooks must be called unconditionally — before any early return
   const prefersReducedMotion = useMemo(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
@@ -273,6 +285,39 @@ export default function DeveloperTraceView({ trace, onOpenExplanation }: Develop
 
         <StatusBadge status={trace.status} />
       </Box>
+
+      {/* UX-1D: Cross-links — role separation */}
+      {(onViewDecisionGraph || onViewContextAtDecision || onViewLiveWorld) && (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 1 }}>
+          {onViewDecisionGraph && (
+            <Typography
+              data-testid="dev-trace-view-decision-graph"
+              onClick={onViewDecisionGraph}
+              sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#58A6FF', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+            >
+              VIEW DECISION GRAPH
+            </Typography>
+          )}
+          {onViewContextAtDecision && (
+            <Typography
+              data-testid="dev-trace-view-context"
+              onClick={onViewContextAtDecision}
+              sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#58A6FF', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+            >
+              VIEW CONTEXT AT DECISION TIME
+            </Typography>
+          )}
+          {onViewLiveWorld && (
+            <Typography
+              data-testid="dev-trace-view-live-world"
+              onClick={onViewLiveWorld}
+              sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#58A6FF', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+            >
+              VIEW LIVE WORLD
+            </Typography>
+          )}
+        </Box>
+      )}
 
       <SectionDivider />
 
