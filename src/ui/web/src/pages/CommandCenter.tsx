@@ -17,6 +17,11 @@ import SafetyScorecard from '../components/reliability/SafetyScorecard';
 import FaultInjectionPanel from '../components/reliability/FaultInjectionPanel';
 import { AnalysisResult, demoAPI } from '../services/demoAPI';
 import { format } from 'date-fns';
+import {
+  DECISION_STATUS_LABEL,
+  DECISION_STATUS_COLOR,
+  DECISION_STATUS_DOT,
+} from '../constants/authorityStates';
 
 const FAULT_INJECTION_ENABLED = process.env.REACT_APP_FAULT_INJECTION_ENABLED === 'true';
 
@@ -105,30 +110,11 @@ function getDecisionStatus(r: DecisionRecord) {
   return 'unknown';
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  approved: 'EXECUTED',
-  rejected: 'REJECTED',
-  requires_human_approval: 'APPROVAL',
-  requires_fresh_state: 'BLOCKED',
-  error: 'ERROR',
-  unknown: '—',
-};
-const STATUS_COLOR: Record<string, string> = {
-  approved: '#3FB950',
-  rejected: '#F85149',
-  requires_human_approval: '#D29922',
-  requires_fresh_state: '#58A6FF',
-  error: '#F85149',
-  unknown: '#484F58',
-};
-const STATUS_DOT: Record<string, string> = {
-  approved: '✓',
-  rejected: '✕',
-  requires_human_approval: '●',
-  requires_fresh_state: '◌',
-  error: '✕',
-  unknown: '—',
-};
+// Status label/color/dot maps are imported from authorityStates constants.
+// Use canonical names to avoid confusion at call sites.
+const STATUS_LABEL = DECISION_STATUS_LABEL;
+const STATUS_COLOR = DECISION_STATUS_COLOR;
+const STATUS_DOT = DECISION_STATUS_DOT;
 
 // ── activity log (session) ─────────────────────────────────────────────────
 
