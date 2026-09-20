@@ -24,6 +24,10 @@
 
 import React from 'react';
 import { render, screen, act, waitFor, fireEvent } from '@testing-library/react';
+import { agentTaskAPI } from '../services/agentTaskAPI';
+import CopilotAgentStatus from '../components/copilot/CopilotAgentStatus';
+import AgentActivity from '../components/demo/AgentActivity';
+import DelegationCard from '../components/demo/DelegationCard';
 
 // ── Mock agentTaskAPI ─────────────────────────────────────────────────────────
 jest.mock('../services/agentTaskAPI', () => ({
@@ -34,13 +38,35 @@ jest.mock('../services/agentTaskAPI', () => ({
   },
 }));
 
-import { agentTaskAPI } from '../services/agentTaskAPI';
 const mockGetTask = agentTaskAPI.getTask as jest.Mock;
 const mockSubscribeToTask = agentTaskAPI.subscribeToTask as jest.Mock;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function makeTask(overrides: Partial<any> = {}): any {
+type TaskOverrides = {
+  task_id?: string;
+  agent_id?: string;
+  sop_id?: string;
+  sop_version?: string;
+  objective?: string;
+  status?: string;
+  current_step_id?: string;
+  completed_steps?: string[];
+  iteration?: number;
+  conversation_id?: string;
+  copilot_turn_id?: string;
+  trace_id?: string;
+  context_snapshot_id?: string | null;
+  delegation_results?: unknown[];
+  stop_reason?: string | null;
+  recommendation_id?: string | null;
+  sop_steps?: unknown[];
+  created_at?: string;
+  updated_at?: string;
+  [key: string]: unknown;
+};
+
+function makeTask(overrides: TaskOverrides = {}): TaskOverrides {
   return {
     task_id: 'task-ux1c-001',
     agent_id: 'operations_coordination',
@@ -70,10 +96,6 @@ function makeTask(overrides: Partial<any> = {}): any {
     ...overrides,
   };
 }
-
-// ── Import component ──────────────────────────────────────────────────────────
-
-import CopilotAgentStatus from '../components/copilot/CopilotAgentStatus';
 
 // ── CopilotAgentStatus tests ──────────────────────────────────────────────────
 
@@ -154,7 +176,6 @@ describe('CopilotAgentStatus — task states', () => {
   });
 
   it('ESCALATED and FAILED have distinct testids', async () => {
-    // ESCALATED
     const escalatedTask = makeTask({ status: 'ESCALATED' });
     mockGetTask.mockResolvedValue(escalatedTask);
     const { unmount } = render(<CopilotAgentStatus agentTaskId="task-ux1c-001" />);
@@ -164,7 +185,6 @@ describe('CopilotAgentStatus — task states', () => {
     });
     unmount();
 
-    // FAILED
     const failedTask = makeTask({ status: 'FAILED' });
     mockGetTask.mockResolvedValue(failedTask);
     render(<CopilotAgentStatus agentTaskId="task-ux1c-001" />);
@@ -204,8 +224,8 @@ describe('CopilotAgentStatus — live update', () => {
     const task = makeTask({ status: 'RUNNING' });
     mockGetTask.mockResolvedValue(task);
 
-    let capturedCallback: ((state: any) => void) | null = null;
-    mockSubscribeToTask.mockImplementation((_taskId, onUpdate) => {
+    let capturedCallback: ((state: TaskOverrides) => void) | null = null;
+    mockSubscribeToTask.mockImplementation((_taskId: string, onUpdate: (state: TaskOverrides) => void) => {
       capturedCallback = onUpdate;
       return jest.fn();
     });
@@ -216,7 +236,6 @@ describe('CopilotAgentStatus — live update', () => {
       expect(screen.getByTestId('copilot-agent-status-label-RUNNING')).toBeInTheDocument();
     });
 
-    // Simulate live update: task transitions to WAITING_FOR_GOVERNANCE
     const updatedTask = makeTask({ status: 'WAITING_FOR_GOVERNANCE' });
     act(() => {
       capturedCallback!(updatedTask);
@@ -235,9 +254,7 @@ describe('CopilotAgentStatus — live update', () => {
     mockSubscribeToTask.mockReturnValue(mockCleanup);
 
     const { unmount } = render(<CopilotAgentStatus agentTaskId="task-ux1c-001" />);
-
     unmount();
-
     expect(mockCleanup).toHaveBeenCalled();
   });
 });
@@ -300,10 +317,9 @@ describe('Architecture invariants — no chain_of_thought', () => {
 
   it('CopilotAgentStatus does not render chain_of_thought or scratchpad', async () => {
     const task = makeTask({
-      // Attempt to inject prohibited fields via any
       chain_of_thought: 'secret reasoning',
       scratchpad: 'internal notes',
-    } as any);
+    });
     mockGetTask.mockResolvedValue(task);
 
     render(<CopilotAgentStatus agentTaskId="task-ux1c-001" expertMode={true} />);
@@ -338,46 +354,35 @@ describe('Architecture invariants — no chain_of_thought', () => {
 
 describe('REGRESSION: Execution confirmed ≠ Objective achieved', () => {
   it('observe_execution_confirmed=true does not imply observe_operational_improved=true', () => {
-    // These are separate fields in CopilotTurnResponse.
-    // Execution confirmed means the action was taken.
-    // Operational improved means the objective was achieved.
-    // They MUST be independently settable.
-
     const executionConfirmedNotAchieved = {
-      observe_execution_confirmed: true,  // action executed
-      observe_operational_improved: false, // but objective NOT achieved
+      observe_execution_confirmed: true,
+      observe_operational_improved: false,
       observe_operational_summary: 'Labor allocated but Wave 17 still at risk',
     };
 
     expect(executionConfirmedNotAchieved.observe_execution_confirmed).toBe(true);
     expect(executionConfirmedNotAchieved.observe_operational_improved).toBe(false);
-    // The two fields are independent
     expect(executionConfirmedNotAchieved.observe_execution_confirmed).not.toBe(
       executionConfirmedNotAchieved.observe_operational_improved
     );
   });
 
   it('observe_execution_confirmed field name is distinct from observe_operational_improved', () => {
-    // This test validates that the schema has separate fields
     const fields = [
       'observe_execution_confirmed',
       'observe_operational_improved',
     ];
-    // They must be different field names
     expect(new Set(fields).size).toBe(fields.length);
-    // Neither field implies the other
     expect(fields[0]).not.toBe(fields[1]);
   });
 
   it('execution confirmed=true with operational_improved=false is valid schema state', () => {
-    // Both states must be independently expressible in any object implementing the schema
     const cases = [
       { observe_execution_confirmed: true,  observe_operational_improved: true  },
       { observe_execution_confirmed: true,  observe_operational_improved: false },
       { observe_execution_confirmed: false, observe_operational_improved: false },
     ];
     cases.forEach(({ observe_execution_confirmed, observe_operational_improved }) => {
-      // Each case is a valid independent state
       expect(typeof observe_execution_confirmed).toBe('boolean');
       expect(typeof observe_operational_improved).toBe('boolean');
     });
@@ -385,8 +390,6 @@ describe('REGRESSION: Execution confirmed ≠ Objective achieved', () => {
 });
 
 // ── AgentActivity governance/outcome tests ────────────────────────────────────
-
-import AgentActivity from '../components/demo/AgentActivity';
 
 describe('AgentActivity — WAITING_FOR_GOVERNANCE', () => {
   it('shows governance transition panel', () => {
@@ -474,11 +477,6 @@ describe('AgentActivity — terminal states distinct', () => {
     render(<AgentActivity task={task} />);
     expect(screen.getByTestId('outcome-escalated')).toBeInTheDocument();
     expect(screen.queryByTestId('outcome-failed')).not.toBeInTheDocument();
-    // ESCALATED panel should NOT be red (not failed color)
-    const panel = screen.getByTestId('outcome-escalated');
-    const style = window.getComputedStyle(panel);
-    // The panel exists and doesn't have the failed testid
-    expect(panel).toBeInTheDocument();
   });
 
   it('FAILED shows red outcome-failed panel (not amber)', () => {
@@ -491,10 +489,8 @@ describe('AgentActivity — terminal states distinct', () => {
 
 // ── Delegation live states ─────────────────────────────────────────────────────
 
-import DelegationCard from '../components/demo/DelegationCard';
-
 describe('DelegationCard — live states', () => {
-  const makeTaskWithDelegation = (delegationStatus: string): any => ({
+  const makeTaskWithDelegation = (delegationStatus: string): TaskOverrides => ({
     ...makeTask(),
     delegation_results: [{
       delegation_id: 'del-001',
@@ -544,13 +540,8 @@ describe('AgentActivity — continue loop / iteration 2', () => {
   it('shows iteration 2 in expert mode', async () => {
     const task = makeTask({ iteration: 2, status: 'RUNNING' });
     render(<AgentActivity task={task} expertMode={true} />);
-    // Expert mode should show iteration count
-    // Expert mode shows "iteration" label and "2" value in separate elements
-    const expertSection = document.querySelector('[data-testid="agent-activity"]') || document.body;
-    // Look for both "iteration" label and "2" value presence
     const labels = screen.getAllByText(/^iteration$/i);
     expect(labels.length).toBeGreaterThan(0);
-    // Value "2" should appear somewhere in the expert section
     const values = screen.getAllByText((content) => content === '2');
     expect(values.length).toBeGreaterThan(0);
   });
@@ -561,13 +552,11 @@ describe('AgentActivity — continue loop / iteration 2', () => {
 describe('agentTaskAPI.subscribeToTask', () => {
   beforeEach(() => {
     jest.useFakeTimers();
-    // Restore the actual implementation for this test suite
     jest.unmock('../services/agentTaskAPI');
   });
 
   afterEach(() => {
     jest.useRealTimers();
-    // Re-mock after tests
     jest.mock('../services/agentTaskAPI', () => ({
       agentTaskAPI: {
         getTask: jest.fn(),
@@ -578,9 +567,7 @@ describe('agentTaskAPI.subscribeToTask', () => {
   });
 
   it('subscribeToTask returns a cleanup function', async () => {
-    // Basic contract test — subscribeToTask returns a function
     const { agentTaskAPI: realApi } = jest.requireActual('../services/agentTaskAPI');
     expect(typeof realApi.subscribeToTask).toBe('function');
-    // The function should return a cleanup function (tested via CopilotAgentStatus tests)
   });
 });
