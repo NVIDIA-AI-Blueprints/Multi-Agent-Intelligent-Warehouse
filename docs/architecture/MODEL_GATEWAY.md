@@ -69,7 +69,7 @@ architecture (active params at inference, not total params).
 
 | Legacy model ID                              | Prior role  | Status                        |
 |----------------------------------------------|-------------|-------------------------------|
-| `nvidia/llama-3.3-nemotron-super-49b-v1.5`  | super       | HTTP 200 but `content=null` (endpoint broken) |
+| `nvidia/nemotron-3-super-120b-a12b`  | super       | HTTP 200 but `content=null` (endpoint broken) |
 | `nvidia/llama-3.1-nemotron-nano-4b-v1.1`    | nano        | HTTP 404                      |
 | `nvidia/llama-3.1-nemotron-ultra-253b-v1`   | ultra       | HTTP 404                      |
 | `nvidia/llama-nemotron-nano-vl-8b-v1`       | nano-omni   | HTTP 404                      |

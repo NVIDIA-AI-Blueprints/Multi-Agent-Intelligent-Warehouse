@@ -35,7 +35,7 @@ class GPUMilvusConfig:
     host: str = "localhost"
     port: str = "19530"
     collection_name: str = "warehouse_docs_gpu"
-    dimension: int = 2048  # llama-nemotron-embed-vl-1b-v2
+    dimension: int = 2048  # nemotron-3-embed-1b
     
     # GPU Configuration
     use_gpu: bool = True

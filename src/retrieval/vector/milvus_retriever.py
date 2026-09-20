@@ -41,7 +41,7 @@ class MilvusConfig:
     host: str = os.getenv("MILVUS_HOST", "localhost")
     port: str = os.getenv("MILVUS_PORT", "19530")
     collection_name: str = "warehouse_docs"
-    dimension: int = int(os.getenv("EMBEDDING_DIMENSION", "2048"))  # llama-nemotron-embed-vl-1b-v2
+    dimension: int = int(os.getenv("EMBEDDING_DIMENSION", "2048"))  # nemotron-3-embed-1b
     index_type: str = "IVF_FLAT"
     metric_type: str = "L2"
 

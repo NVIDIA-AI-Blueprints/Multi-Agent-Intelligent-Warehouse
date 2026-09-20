@@ -1079,7 +1079,7 @@ class Settings(BaseSettings):
 
     nvidia_api_key: str = ""
     llm_nim_url: str = "https://integrate.api.nvidia.com/v1"
-    llm_model: str = "nvidia/llama-3.3-nemotron-super-49b-v1.5"
+    llm_model: str = "nvidia/nemotron-3-super-120b-a12b"
     llm_temperature: float = 0.1
     llm_max_tokens: int = 2000
     llm_client_timeout: int = 240
@@ -1089,7 +1089,7 @@ class Settings(BaseSettings):
     llm_reasoning_budget: int = 0
     embedding_api_key: str = ""
     embedding_nim_url: str = "https://integrate.api.nvidia.com/v1"
-    embedding_model: str = "nvidia/llama-nemotron-embed-vl-1b-v2"
+    embedding_model: str = "nvidia/nemotron-3-embed-1b"
     embedding_dimension: int = 2048
     model_gateway_enabled: bool = True
     environment: str = "development"
@@ -1324,7 +1324,7 @@ def test_model_requests_total_increments(gateway, respx_mock):
     # verify prometheus counter is accessible
     from src.api.gateway.telemetry import model_requests_total
     before = model_requests_total.labels(
-        model="nvidia/llama-3.3-nemotron-super-49b-v1.5",
+        model="nvidia/nemotron-3-super-120b-a12b",
         endpoint="chat/completions",
         status="ok"
     )._value.get()
@@ -1350,7 +1350,7 @@ from src.api.config.settings import Settings
 
 def test_settings_loads_defaults():
     s = Settings()
-    assert s.llm_model == "nvidia/llama-3.3-nemotron-super-49b-v1.5"
+    assert s.llm_model == "nvidia/nemotron-3-super-120b-a12b"
     assert s.embedding_dimension == 2048
     assert s.llm_enable_thinking is False
 
@@ -1366,7 +1366,7 @@ def test_settings_embedding_key_overrides_nvidia_key():
 ### Expected Behavior After This Slice
 
 - `POST /api/v1/chat` produces identical responses to before (same NIM calls, same prompts).
-- `GET /api/v1/metrics` includes `model_requests_total{model="nvidia/llama-3.3-nemotron-super-49b-v1.5",endpoint="chat/completions"}` counter.
+- `GET /api/v1/metrics` includes `model_requests_total{model="nvidia/nemotron-3-super-120b-a12b",endpoint="chat/completions"}` counter.
 - `MODEL_GATEWAY_ENABLED=false` produces exactly the same behavior as before this PR (legacy `NIMClient` httpx path).
 - `pydantic-settings` `Settings` replaces all scattered `os.getenv()` calls in `app.py` only (other files migrated one-by-one in subsequent PRs).
 - No change to the React frontend, nginx config, Docker Compose, or any database schema.

@@ -35,7 +35,7 @@ This analysis compares the current MAIW codebase state — derived from full str
 
 | # | Capability | Rating | Evidence Summary |
 |---|-----------|--------|-----------------|
-| 1 | Nemotron-native runtime | YELLOW | `nvidia/llama-3.3-nemotron-super-49b-v1.5` is the default model. Nemotron-specific parameters (`reasoning_budget`, `enable_thinking`, `/no_think` system prefix) are conditionally injected via a name-substring check in `nim_client.py`. However only one Nemotron model is wired; the Lightning/Nano/Ultra/Nano-Omni family variants are not reachable without env-var changes and the conditional logic is not extensible to multi-model dispatch. |
+| 1 | Nemotron-native runtime | YELLOW | `nvidia/nemotron-3-super-120b-a12b` is the default model. Nemotron-specific parameters (`reasoning_budget`, `enable_thinking`, `/no_think` system prefix) are conditionally injected via a name-substring check in `nim_client.py`. However only one Nemotron model is wired; the Lightning/Nano/Ultra/Nano-Omni family variants are not reachable without env-var changes and the conditional logic is not extensible to multi-model dispatch. |
 | 2 | ModelGateway | RED | No centralized gateway abstraction exists. LLM calls originate from at least six distinct call sites: `NIMClient` (shared agents), `SmallLLMProcessor` (document pipeline), `LargeLLMJudge` (document validation), `NemotronParseService` (OCR), `NeMoRetrieverPreprocessor` (preprocessing), and `GuardrailsService`. Each maintains its own `httpx.AsyncClient`, its own env-var credentials, and its own retry logic. There is no single choke point for model selection, telemetry, rate management, or cost attribution. |
 | 3 | Model registry | RED | No registry, catalog, or manifest of available models exists anywhere in the codebase. Model names are string literals or env-var defaults scattered across source files. There is no mechanism to enumerate available models, check capability flags, or perform capability negotiation. |
 | 4 | Dynamic model routing | RED | The only routing logic is a single string-contains check (`"nemotron" in model_name.lower()`) in `nim_client.py` lines 402-432. This gates Nemotron-specific payload fields but performs no capability-based selection, no cost/latency-based routing, and no fallback to alternative models. Routing between agents (equipment/operations/safety) is keyword + embedding similarity but this is agent routing, not model routing. |
@@ -94,7 +94,7 @@ This analysis compares the current MAIW codebase state — derived from full str
 
 **Current implementation:** No file. Model names exist as string defaults in `os.getenv()` calls: `nim_client.py:104`, `guardrails_service.py:62`, `large_llm_judge.py:65`, `nemo_retriever.py:354`, `small_llm_processor.py:38`, `embedding_service.py:45`.
 
-**Problem:** There is no machine-readable catalog of which models are available, what their capability flags are (vision, thinking, structured output, embedding dimension), what their API endpoints are, or what their cost profiles are. Changing from `nvidia/llama-3.3-nemotron-super-49b-v1.5` to a Nemotron Ultra variant requires grep-and-replace across six files with no automated verification.
+**Problem:** There is no machine-readable catalog of which models are available, what their capability flags are (vision, thinking, structured output, embedding dimension), what their API endpoints are, or what their cost profiles are. Changing from `nvidia/nemotron-3-super-120b-a12b` to a Nemotron Ultra variant requires grep-and-replace across six files with no automated verification.
 
 **Architectural risk:** When the Nemotron model family expands (Lightning, Nano, Ultra, Nano-Omni, domain-specialized variants), the codebase has no mechanism to declare which model serves which capability. Prompt engineering will diverge per model because there is no registry-enforced contract on what each model accepts.
 
@@ -281,7 +281,7 @@ This analysis compares the current MAIW codebase state — derived from full str
 
 ### 4.1 Nemotron-Native Runtime
 
-**Current implementation:** `src/api/services/llm/nim_client.py` lines 402-432 conditionally inject `reasoning_budget`, `enable_thinking`, and `/no_think` system prefix when `"nemotron" in self.config.llm_model.lower()`. The default model is `nvidia/llama-3.3-nemotron-super-49b-v1.5`.
+**Current implementation:** `src/api/services/llm/nim_client.py` lines 402-432 conditionally inject `reasoning_budget`, `enable_thinking`, and `/no_think` system prefix when `"nemotron" in self.config.llm_model.lower()`. The default model is `nvidia/nemotron-3-super-120b-a12b`.
 
 **What needs to change:**
 

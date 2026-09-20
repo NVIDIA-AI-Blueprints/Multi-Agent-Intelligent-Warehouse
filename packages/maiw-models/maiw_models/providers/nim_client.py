@@ -136,7 +136,7 @@ class NIMConfig:
         or os.getenv("LLM_MODEL", "nvidia/nemotron-3-super-120b-a12b")
     )
     embedding_model: str = os.getenv(
-        "EMBEDDING_MODEL", "nvidia/llama-nemotron-embed-vl-1b-v2"
+        "EMBEDDING_MODEL", "nvidia/nemotron-3-embed-1b"
     )
     timeout: int = _getenv_int(
         "LLM_CLIENT_TIMEOUT", 240

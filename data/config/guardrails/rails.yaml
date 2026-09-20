@@ -12,7 +12,7 @@ models:
 
   - type: embedding
     engine: nvidia_nim
-    model: nvidia/llama-nemotron-embed-vl-1b-v2
+    model: nvidia/nemotron-3-embed-1b
 
 instructions:
   - type: general

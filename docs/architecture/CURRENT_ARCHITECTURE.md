@@ -176,7 +176,7 @@ Multi-Agent-Intelligent-Warehouse/
 | Agent orchestration | `langgraph >= 1.0.5` + `langgraph-checkpoint >= 3.0.0` | StateGraph, no checkpointer (CVE-2025-8709) |
 | LLM client | Custom `httpx.AsyncClient` in `src/api/services/llm/nim_client.py` | No OpenAI SDK, no LangChain LLM wrappers |
 | LLM model | `nvidia/nemotron-3-super-120b-a12b` | Via NVIDIA NIM hosted at `integrate.api.nvidia.com/v1` |
-| Embedding model | `nvidia/llama-nemotron-embed-vl-1b-v2` | 2048-dim multimodal — current NVIDIA VL embedding model |
+| Embedding model | `nvidia/nemotron-3-embed-1b` | 2048-dim multimodal — current NVIDIA VL embedding model |
 | Guardrails | `nemoguardrails >= 0.19.0` | Pattern fallback when SDK disabled |
 | Vector DB | `pymilvus >= 2.3.0` | Collection `warehouse_docs`, IVF_FLAT index |
 | Relational DB | `asyncpg >= 0.29.0` + TimescaleDB | PostgreSQL 5435, hypertables for time-series |
@@ -453,7 +453,7 @@ Embedding calls:
   NIMClient.generate_embeddings(texts)
     await self.embedding_client.post(
         "/embeddings",
-        json={"model": "nvidia/llama-nemotron-embed-vl-1b-v2", "input": texts}  # multimodal embedding — current
+        json={"model": "nvidia/nemotron-3-embed-1b", "input": texts}  # multimodal embedding — current
     )
     → embeddings[0].embedding  # float[2048]
 ```
@@ -702,7 +702,7 @@ Stage 3: LLM_PROCESSING (entity extraction)
 
 Stage 4: EMBEDDING
   src/api/agents/document/processing/embedding_indexing.py
-  Model: nvidia/llama-nemotron-embed-vl-1b-v2 (2048-dim, multimodal — current)
+  Model: nvidia/nemotron-3-embed-1b (2048-dim, multimodal — current)
   Writes to: Milvus collection warehouse_docs
   Records vector_id in: Postgres document_search_metadata
 
