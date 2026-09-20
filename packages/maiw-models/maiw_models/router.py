@@ -106,7 +106,7 @@ class ModelRouter:
 
         preferred_role, routing_rule, routing_reason = self._select_role(request)
         capability, final_role, fallback_from, fallback_reason = (
-            self._resolve_with_fallback(preferred_role)
+            self._resolve_with_fallback(preferred_role, request)
         )
 
         # Candidate models = eligible set after policy filter.
@@ -208,35 +208,58 @@ class ModelRouter:
         )
 
     def _resolve_with_fallback(
-        self, preferred_role: str
+        self, preferred_role: str, request: ModelRequest
     ) -> tuple[ModelCapability, str, str | None, str | None]:
         """
-        Walk the fallback chain until an enabled model is found.
+        Walk the fallback chain until an enabled, policy-eligible model is found.
+
+        Every candidate (preferred and fallback) is validated against the original
+        request policy via PolicyFilter.is_request_eligible().  A fallback candidate
+        that is enabled but fails policy (wrong modality, missing required capability,
+        deployment mismatch, etc.) is skipped — the chain continues to the next role.
 
         Returns (capability, final_role, fallback_from, fallback_reason).
         fallback_from is set only when the final role differs from preferred_role.
-        Raises ModelUnavailable when the chain is exhausted.
+        Raises ModelUnavailable when the chain is exhausted without a policy-eligible
+        candidate.
         """
         chain = [preferred_role] + _FALLBACK_CHAIN.get(preferred_role, [])
 
         for role in chain:
             cap = self._registry.get_enabled_by_role(role)
-            if cap is not None:
-                if role != preferred_role:
-                    fallback_from = preferred_role
-                    fallback_reason = (
-                        f"role={preferred_role} is disabled; escalated to {role}"
-                    )
-                    logger.warning(
-                        "ModelRouter: fallback triggered preferred=%s selected=%s reason=%s",
-                        preferred_role,
-                        role,
-                        fallback_reason,
-                    )
-                    return cap, role, fallback_from, fallback_reason
-                return cap, role, None, None
+            if cap is None:
+                continue
+            if not self._policy_filter.is_request_eligible(cap, request):
+                logger.debug(
+                    "ModelRouter: fallback candidate role=%s rejected by PolicyFilter "
+                    "(request task=%s modality=%s risk=%s reasoning=%s caps=%s)",
+                    role,
+                    request.task,
+                    request.modality.value,
+                    request.risk_level.value,
+                    request.reasoning.value,
+                    request.required_capabilities,
+                )
+                continue
+            if role != preferred_role:
+                fallback_from = preferred_role
+                fallback_reason = (
+                    f"role={preferred_role} is disabled or policy-ineligible; "
+                    f"escalated to {role}"
+                )
+                logger.warning(
+                    "ModelRouter: fallback triggered preferred=%s selected=%s reason=%s",
+                    preferred_role,
+                    role,
+                    fallback_reason,
+                )
+                return cap, role, fallback_from, fallback_reason
+            return cap, role, None, None
 
         raise ModelUnavailable(
-            f"No enabled model available. Tried roles: {chain}. "
+            f"No enabled policy-eligible model available. Tried roles: {chain} "
+            f"for task={request.task!r} modality={request.modality.value} "
+            f"risk={request.risk_level.value} reasoning={request.reasoning.value} "
+            f"required_capabilities={request.required_capabilities}. "
             f"Enable at least one Nemotron model via environment variables.",
         )

@@ -834,21 +834,24 @@ class TestFallbackBehaviorUnchanged:
         assert decision.fallback_from == "ultra"
         assert decision.routing_rule == "judge_task"
 
-    def test_nano_omni_fallback_to_super(self):
+    def test_nano_omni_disabled_image_raises_model_unavailable(self):
+        # Policy fix: super is text-only (modalities={"text"}).
+        # An IMAGE request must NOT silently fall back to a text-only super.
+        from maiw_models.errors import ModelUnavailable
+
         router = ModelRouter(
             _make_registry(nano_omni_enabled=False, super_enabled=True)
         )
-        decision = router.route(
-            ModelRequest(
-                task="t",
-                messages=[],
-                reasoning=ReasoningLevel.LOW,
-                risk_level=RiskLevel.LOW,
-                modality=Modality.IMAGE,
+        with pytest.raises(ModelUnavailable):
+            router.route(
+                ModelRequest(
+                    task="t",
+                    messages=[],
+                    reasoning=ReasoningLevel.LOW,
+                    risk_level=RiskLevel.LOW,
+                    modality=Modality.IMAGE,
+                )
             )
-        )
-        assert decision.selected_role == "super"
-        assert decision.fallback_from == "nano-omni"
 
     def test_fallback_decision_has_18b_fields(self):
         """Fallback decisions must also populate 18B provenance fields."""
