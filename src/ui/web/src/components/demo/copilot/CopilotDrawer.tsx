@@ -18,6 +18,7 @@ import { Box, Typography } from '@mui/material';
 import { demoAPI, CopilotTurnResponse, CopilotRecommendation } from '../../../services/demoAPI';
 import TerminalTypewriter from './TerminalTypewriter';
 import { TurnEntry, CopilotSystemCard } from '../../../hooks/useCopilotConversation';
+import CopilotAgentStatus from '../../copilot/CopilotAgentStatus';
 
 // ── Color constants (MAIW dark terminal aesthetic) ─────────────────────────────
 
@@ -121,6 +122,10 @@ interface CopilotDrawerProps {
   setTurns: Dispatch<SetStateAction<TurnEntry[]>>;
   conversationError: string | null;
   setConversationError: (e: string | null) => void;
+  /** Expert mode — shows technical IDs and developer-visible fields. */
+  expertMode?: boolean;
+  /** Called when user clicks "View activity" in CopilotAgentStatus. */
+  onViewAgentActivity?: (taskId: string) => void;
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
@@ -1033,6 +1038,8 @@ export default function CopilotDrawer({
   setTurns,
   conversationError,
   setConversationError,
+  expertMode = false,
+  onViewAgentActivity,
 }: CopilotDrawerProps) {
   const [inputMessage, setInputMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -1296,11 +1303,23 @@ export default function CopilotDrawer({
             {/* Response */}
             <Box sx={{ maxWidth: '100%' }}>
               {turn.response ? (
-                turn.response.intent === 'act'
-                  ? <CopilotActAnswer turn={turn.response} isLatest={isLatest} onReviewApproval={onReviewApproval} />
-                  : turn.response.intent === 'observe_outcome'
-                  ? <CopilotObserveAnswer turn={turn.response} isLatest={isLatest} />
-                  : <CopilotAnswer turn={turn.response} isLatest={isLatest} onViewOperationalContext={onViewOperationalContext} onViewContextAtDecisionTime={onViewContextAtDecisionTime} />
+                <>
+                  {turn.response.intent === 'act'
+                    ? <CopilotActAnswer turn={turn.response} isLatest={isLatest} onReviewApproval={onReviewApproval} />
+                    : turn.response.intent === 'observe_outcome'
+                    ? <CopilotObserveAnswer turn={turn.response} isLatest={isLatest} />
+                    : <CopilotAnswer turn={turn.response} isLatest={isLatest} onViewOperationalContext={onViewOperationalContext} onViewContextAtDecisionTime={onViewContextAtDecisionTime} />
+                  }
+                  {/* UX-1C.3: Compact agent status — shown on ACT/OBSERVE_OUTCOME turns with agent_task_id */}
+                  {(turn.response.intent === 'act' || turn.response.intent === 'observe_outcome') &&
+                    turn.response.agent_task_id && (
+                    <CopilotAgentStatus
+                      agentTaskId={turn.response.agent_task_id}
+                      expertMode={expertMode}
+                      onViewActivity={onViewAgentActivity}
+                    />
+                  )}
+                </>
               ) : turn.error ? (
                 <Typography sx={{
                   fontFamily: 'monospace', fontSize: '0.72rem', color: '#F85149',
