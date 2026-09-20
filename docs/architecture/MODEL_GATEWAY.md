@@ -140,16 +140,66 @@ eligible candidates using a deterministic rule-based strategy (`routing_strategy
 
 When the preferred role is disabled, the router walks a fallback chain:
 
-| Primary role | Fallback order |
-|-------------|----------------|
-| `lightning` | `nano` → `super` |
-| `nano` | `super` |
-| `super` | *(none — raises `ModelUnavailable`)* |
-| `ultra` | `super` |
-| `nano-omni` | `super` *(degrades to text-only)* |
+| Primary role | Fallback order                              |
+|-------------|---------------------------------------------|
+| `lightning` | `nano` → `super`                            |
+| `nano` | `super`                                          |
+| `super` | *(none — raises `ModelUnavailable`)*         |
+| `ultra` | `super`                                      |
+| `nano-omni` | `super` *(TEXT requests only — see below)*  |
 
 When a fallback is used, `fallback_from` and `fallback_reason` are populated
 in `ModelRouteDecision` and surfaced in telemetry.
+
+### Fallback policy invariant
+
+**Fallback never relaxes policy.** Every fallback candidate is evaluated against
+the original `ModelRequest` constraints before it can be selected. Policy determines
+eligibility; fallback is part of routing and remains subject to the same constraints.
+
+Constraints enforced on every fallback candidate (primary and fallback):
+
+- `enabled` state in the registry
+- Provider/deployment compatibility (`DeploymentMode`)
+- Modality support (`modalities` field on `ModelCapability`)
+- `RiskLevel` constraint — `CRITICAL` → only high-capability roles (`super`, `ultra`)
+- `ReasoningLevel` constraint — `HIGH` → only high-capability roles (`super`, `ultra`)
+- Required capabilities (`tool_use`, `structured_output`, `teacher_judge`)
+
+Routing sequence including fallback:
+
+```text
+ModelRequest
+    ↓
+PolicyFilter          — determines eligible candidate set
+    ↓
+ModelRouter           — selects preferred role from routing rules
+    ↓
+Preferred Candidate   — checked against PolicyFilter
+    ↓
+Fallback Ordering     — next roles in fallback chain, if preferred unavailable
+    ↓
+Policy Revalidation   — each fallback candidate re-evaluated against ModelRequest
+    ↓
+Selected Candidate (or ModelUnavailable)
+```
+
+**No policy relaxation on failure.** Model unavailability does not permit MAIW to
+weaken the original request contract. If no fallback candidate satisfies the policy
+constraints, `ModelGateway` raises `ModelUnavailable` rather than selecting an
+ineligible model.
+
+Concrete examples:
+
+- An IMAGE request cannot fall back from `nano-omni` to `super`: `super` has
+  `modalities={"text"}` only. With `nano-omni` disabled the request raises
+  `ModelUnavailable`.
+- A request requiring `tool_use` cannot fall back to `nano` or `super`: both have
+  `tool_use=False` in the current registry.
+
+This invariant is enforced by regression tests in
+`tests/unit/test_model_gateway_fallback_policy.py` covering modality, required
+capabilities, risk level, reasoning level, and deployment constraints.
 
 ### Routing signals
 
@@ -493,10 +543,16 @@ NEMOTRON_ULTRA_ENABLED=true python scripts/model_routing_report.py
 ## Testing
 
 ```bash
-python -m pytest tests/unit/test_model_gateway.py -v
+python -m pytest tests/unit/test_model_gateway.py \
+                 tests/unit/test_model_gateway_18b.py \
+                 tests/unit/test_model_gateway_18c.py \
+                 tests/unit/test_model_gateway_18d.py \
+                 tests/unit/test_model_gateway_18e.py \
+                 tests/unit/test_model_lab_api.py \
+                 tests/unit/test_model_gateway_fallback_policy.py -v
 ```
 
-117 tests covering:
+514 tests covering:
 
 - `TestModelRegistry` — roles, enabled/disabled, env-driven IDs, reload
 - `TestModelCapabilityFields` — generation labels, `DeploymentStatus`, `tool_use` validation,
@@ -505,13 +561,14 @@ python -m pytest tests/unit/test_model_gateway.py -v
 - `TestModelRouter` — all routing rules, fallback chains, `ModelUnavailable`
 - `TestRouteDecisionFields` — `requested_role`, `routing_rule`, telemetry accuracy
 - `TestRoutingMatrix` — 11 representative warehouse workloads × 3 assertions
-- `TestRoutingMatrixFallbacks` — all fallback scenarios validated
+- `TestRoutingMatrixFallbacks` — fallback scenarios, policy-constrained candidates
 - `TestModelGateway` — end-to-end with mocked provider
-- `TestNIMClientModelOverride` — model override plumbing
-- `TestOperationsAgentGatewaySlice` — gateway attribute + feature flag
-- `TestEquipmentAgentGatewaySlice` — gateway attribute + feature flag
-- `TestSafetyAgentGatewaySlice` — gateway attribute + feature flag
-- `TestFeatureFlag` + `TestGatewaySingleton`
+- `TestFallbackPolicyInvariant` (`test_model_gateway_fallback_policy.py`) — 17 regression tests:
+  modality, required capabilities, risk level, reasoning level, deployment mode,
+  fallback provenance, `PolicyFilter.is_request_eligible` contract
+- Phase 18B provenance, evaluation, replay, calibration suites
+- `TestModelLabAPI` — evaluation endpoint coverage
+- `TestNIMClientModelOverride`, `TestFeatureFlag`, `TestGatewaySingleton`
 
 All tests are synchronous (`asyncio.run` where needed) — no pytest-asyncio dependency.
 
