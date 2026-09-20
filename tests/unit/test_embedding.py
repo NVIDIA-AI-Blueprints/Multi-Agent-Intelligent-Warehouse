@@ -85,9 +85,7 @@ async def test_embedding():
         assert (
             len(response.embeddings[0]) == 2048
         ), f"Expected embedding dimension 2048, got {len(response.embeddings[0])}"
-        print(
-            f"\n✅ Embedding dimension correct (2048 for nemotron-3-embed-1b)"
-        )
+        print(f"\n✅ Embedding dimension correct (2048 for nemotron-3-embed-1b)")
 
         # Test health check
         print(f"\n🏥 Running health check...")
