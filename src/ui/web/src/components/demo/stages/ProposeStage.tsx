@@ -111,7 +111,7 @@ function ProposalCard({ index, action, capability, target, riskLevel, proposalId
 
 // ── ProposeStage ──────────────────────────────────────────────────────────────
 
-export default function ProposeStage({ sseEvents, analysisResult, onOpenExplanation }: StageContentPaneProps) {
+export default function ProposeStage({ sseEvents, analysisResult, onOpenExplanation, agentTask }: StageContentPaneProps) {
   const proposeEvents = runWindowEvents(sseEvents, ['PROPOSE']);
 
   // Prefer structured lifecycle records when available
@@ -146,6 +146,32 @@ export default function ProposeStage({ sseEvents, analysisResult, onOpenExplanat
 
   return (
     <Box data-testid="propose-stage">
+      {/* UX-1B: Agent procedure completion notice (above proposal) */}
+      {agentTask && (
+        <StageSection>
+          <Box
+            data-testid="agent-procedure-complete"
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              background: '#0D1117',
+              border: '1px solid #21262D',
+              borderRadius: '4px',
+              px: 1.5,
+              py: 0.75,
+            }}
+          >
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: '#3FB950' }}>
+              ✓
+            </Typography>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: '#8B949E' }}>
+              Agent procedure complete — Recommendation generated
+            </Typography>
+          </Box>
+        </StageSection>
+      )}
+
       {/* Stage header */}
       <StageSection>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
