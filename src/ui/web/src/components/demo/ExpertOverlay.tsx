@@ -14,13 +14,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Typography } from '@mui/material';
 import { RuntimeStatus } from '../../services/api';
 import { SSEEvent } from '../../hooks/useDemoSSE';
-import { AnalysisResult, PendingApproval, DemoStatus } from '../../services/demoAPI';
-import { DecisionGraph } from './decision-graph/graphTypes';
-import { ExplanationFocus } from './decision-explanation/explanationTypes';
-import { buildDeveloperTrace } from './developer-trace/buildDeveloperTrace';
-import DeveloperTraceView from './developer-trace/DeveloperTraceView';
-import DeveloperJourneyRail, { JourneyStageInfo } from '../developer-journey/DeveloperJourneyRail';
-import DeveloperJourneyPanel from '../developer-journey/DeveloperJourneyPanel';
+import { AnalysisResult, CopilotTurnResponse, PendingApproval, DemoStatus } from '../../services/demoAPI';
 import { AgentTaskView } from '../../types/agentTask';
 import {
   JOURNEY_STAGES,
@@ -29,6 +23,12 @@ import {
   ArtifactIdentity,
   INTENT_JOURNEY_STAGES,
 } from '../../constants/journeyIdentity';
+import DeveloperJourneyRail, { JourneyStageInfo } from '../developer-journey/DeveloperJourneyRail';
+import DeveloperJourneyPanel from '../developer-journey/DeveloperJourneyPanel';
+import { DecisionGraph } from './decision-graph/graphTypes';
+import { ExplanationFocus } from './decision-explanation/explanationTypes';
+import { buildDeveloperTrace } from './developer-trace/buildDeveloperTrace';
+import DeveloperTraceView from './developer-trace/DeveloperTraceView';
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
@@ -323,7 +323,7 @@ interface Props {
   onOpenExplanation?: (focus: ExplanationFocus) => void;
   // UX-1E: Unified Developer Journey
   agentTask?: AgentTaskView | null;
-  copilotTurn?: import('../../services/demoAPI').CopilotTurnResponse | null;
+  copilotTurn?: CopilotTurnResponse | null;
   /** UX-1D cross-link: open DecisionGraph pane */
   onViewDecisionGraph?: () => void;
   /** UX-1D cross-link: open context snapshot at decision time */
@@ -373,7 +373,7 @@ export default function ExpertOverlay({
       turn_id:             turn?.turn_id,
       trace_id:            turn?.trace_id ?? ar?.trace_id,
       context_snapshot_id: turn?.context_snapshot_id ?? turn?.act_source_snapshot_id ?? ar?.assessment?.snapshot_id,
-      warehouse_id:        ar?.assessment?.warehouse_id ?? (demoStatus?.world as any)?.warehouse_id,
+      warehouse_id:        ar?.assessment?.warehouse_id ?? demoStatus?.world?.warehouse_id,
       agent_task_id:       turn?.agent_task_id ?? agentTask?.task_id,
       agent_id:            agentTask?.agent_id ?? (turn?.agent ?? undefined),
       sop_id:              agentTask?.sop_id,
@@ -399,11 +399,11 @@ export default function ExpertOverlay({
         return { stage, status: 'unavailable' as JourneyStageStatus };
       }
       let hint: string | undefined;
-      if (stage === 'CONTEXT') hint = identity.context_snapshot_id?.slice(0, 8);
-      else if (stage === 'AGENT') hint = identity.agent_task_id?.slice(0, 8);
-      else if (stage === 'MODEL') hint = identity.model_id?.slice(0, 12);
-      else if (stage === 'DECISION') hint = identity.proposal_id?.slice(0, 8);
-      else if (stage === 'EXECUTION') hint = identity.execution_id?.slice(0, 8);
+      if (stage === 'CONTEXT') { hint = identity.context_snapshot_id?.slice(0, 8); }
+      else if (stage === 'AGENT') { hint = identity.agent_task_id?.slice(0, 8); }
+      else if (stage === 'MODEL') { hint = identity.model_id?.slice(0, 12); }
+      else if (stage === 'DECISION') { hint = identity.proposal_id?.slice(0, 8); }
+      else if (stage === 'EXECUTION') { hint = identity.execution_id?.slice(0, 8); }
       return {
         stage,
         status: (stage === journeyStage ? 'current' : (hint ? 'available' : 'pending')) as JourneyStageStatus,

@@ -160,7 +160,7 @@ export default function DeveloperJourneyRail({
 }: DeveloperJourneyRailProps) {
   // Build a lookup for fast status access
   const stageMap = new Map<JourneyStage, JourneyStageInfo>();
-  for (const s of stages) stageMap.set(s.stage, s);
+  for (const s of stages) { stageMap.set(s.stage, s); }
 
   const orderedStages = JOURNEY_STAGES.map(s => stageMap.get(s) ?? {
     stage: s,

@@ -22,7 +22,8 @@ import {
   CHAIN_OF_THOUGHT_EXCLUDED_FIELDS,
   INTENT_JOURNEY_STAGES,
 } from '../constants/journeyIdentity';
-import DeveloperJourneyRail from '../components/developer-journey/DeveloperJourneyRail';
+import DeveloperJourneyRail, { JourneyStageInfo } from '../components/developer-journey/DeveloperJourneyRail';
+import { JourneyStageStatus } from '../constants/journeyIdentity';
 import DeveloperJourneyPanel from '../components/developer-journey/DeveloperJourneyPanel';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -207,10 +208,10 @@ describe('TC-1: journeyIdentity constants', () => {
 
 // ── TC-2: DeveloperJourneyRail ────────────────────────────────────────────────
 
-function makeAllAvailableStages() {
+function makeAllAvailableStages(): JourneyStageInfo[] {
   return JOURNEY_STAGES.map(stage => ({
     stage,
-    status: 'available',
+    status: 'available' as JourneyStageStatus,
     artifactIdHint: `${stage.slice(0, 4)}-id`,
   }));
 }
@@ -246,9 +247,9 @@ describe('TC-2: DeveloperJourneyRail', () => {
 
   it('TC-2.3: unavailable stage does not fire onStageSelect', () => {
     const onSelect = jest.fn();
-    const stages = JOURNEY_STAGES.map(s => ({
+    const stages: JourneyStageInfo[] = JOURNEY_STAGES.map(s => ({
       stage: s,
-      status: (s === 'EXECUTION' ? 'unavailable' : 'available') as any,
+      status: (s === 'EXECUTION' ? 'unavailable' : 'available') as JourneyStageStatus,
     }));
     render(
       <DeveloperJourneyRail
@@ -262,9 +263,9 @@ describe('TC-2: DeveloperJourneyRail', () => {
   });
 
   it('TC-2.4: active stage is marked current', () => {
-    const stages = JOURNEY_STAGES.map(s => ({
+    const stages: JourneyStageInfo[] = JOURNEY_STAGES.map(s => ({
       stage: s,
-      status: 'available',
+      status: 'available' as JourneyStageStatus,
     }));
     render(
       <DeveloperJourneyRail

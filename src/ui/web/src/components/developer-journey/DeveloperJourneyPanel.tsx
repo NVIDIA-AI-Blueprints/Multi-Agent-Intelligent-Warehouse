@@ -50,7 +50,7 @@ function PanelSection({ title, children }: { title: string; children: React.Reac
 }
 
 function FieldRow({ label, value, mono = true }: { label: string; value: string | null | undefined; mono?: boolean }) {
-  if (!value) return null;
+  if (!value) { return null; }
   return (
     <Box sx={{ display: 'flex', gap: 1, mb: '4px', alignItems: 'flex-start' }}>
       <Typography sx={{
@@ -117,7 +117,7 @@ function ContextPanel({ identity, copilotTurn, demoStatus, onNavigate }: {
     ?? copilotTurn?.act_source_snapshot_id
     ?? null;
 
-  if (!snapshotId && !identity.warehouse_id) return <EmptyPanel stage="CONTEXT" />;
+  if (!snapshotId && !identity.warehouse_id) { return <EmptyPanel stage="CONTEXT" />; }
 
   const world = demoStatus?.world;
   return (
@@ -157,7 +157,7 @@ function AgentPanel({ identity, agentTask, copilotTurn, onNavigate }: {
   const taskId = identity.agent_task_id ?? copilotTurn?.agent_task_id ?? agentTask?.task_id ?? null;
   const sopId = identity.sop_id ?? agentTask?.sop_id ?? null;
 
-  if (!taskId && !sopId) return <EmptyPanel stage="AGENT" />;
+  if (!taskId && !sopId) { return <EmptyPanel stage="AGENT" />; }
 
   return (
     <Box>
@@ -194,7 +194,7 @@ function ModelPanel({ identity, analysisResult, copilotTurn, onNavigate }: {
     ?? analysisResult?.assessment?.model_id
     ?? null;
 
-  if (!modelId) return <EmptyPanel stage="MODEL" />;
+  if (!modelId) { return <EmptyPanel stage="MODEL" />; }
 
   const routingRule = identity.routing_rule
     ?? copilotTurn?.routing_rule
@@ -247,7 +247,7 @@ function SkillsPanel({ copilotTurn, onNavigate }: {
   const skillsUsed = copilotTurn?.skills_used ?? [];
   const skillsAvail = copilotTurn?.skills_available ?? [];
 
-  if (!skillsUsed.length && !skillsAvail.length) return <EmptyPanel stage="SKILLS" />;
+  if (!skillsUsed.length && !skillsAvail.length) { return <EmptyPanel stage="SKILLS" />; }
 
   return (
     <Box>
@@ -300,7 +300,7 @@ function DecisionPanel({ identity, copilotTurn, analysisResult, onNavigate }: {
 
   const recs = copilotTurn?.recommendations ?? analysisResult?.assessment?.recommendations ?? [];
 
-  if (!proposalId && !decisionId && !recs.length) return <EmptyPanel stage="DECISION" />;
+  if (!proposalId && !decisionId && !recs.length) { return <EmptyPanel stage="DECISION" />; }
 
   return (
     <Box>
@@ -351,7 +351,7 @@ function ExecutionPanel({ identity, copilotTurn, onNavigate }: {
 }) {
   const executionId = identity.execution_id ?? copilotTurn?.act_execution_id ?? null;
 
-  if (!executionId) return <EmptyPanel stage="EXECUTION" />;
+  if (!executionId) { return <EmptyPanel stage="EXECUTION" />; }
 
   return (
     <Box>
@@ -389,7 +389,7 @@ function OutcomePanel({ copilotTurn, analysisResult, onNavigate }: {
   const summary = copilotTurn?.observe_operational_summary;
   const delta = analysisResult?.kpi_delta ?? null;
 
-  if (confirmed === undefined && !summary && !delta) return <EmptyPanel stage="OUTCOME" />;
+  if (confirmed === undefined && !summary && !delta) { return <EmptyPanel stage="OUTCOME" />; }
 
   return (
     <Box>
