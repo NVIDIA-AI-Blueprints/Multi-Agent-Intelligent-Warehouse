@@ -1,198 +1,314 @@
-# ModelGateway — Architecture & Developer Guide
+# ModelGateway — MAIW v2 Architecture
 
 **Version:** MAIW v2
-**Status:** AUTHORITATIVE — current single model-access boundary for all MAIW agents
-Feature flag: `MODEL_GATEWAY_ENABLED` (default `true`)
+**Status:** AUTHORITATIVE — canonical model-access boundary for all MAIW agents and runtimes
 
 ---
 
-## Overview
+## Purpose
 
-The ModelGateway is the single model-access boundary in MAIW v2. All agents and runtimes
-route model requests through the gateway. Agents and runtimes do **not** instantiate provider
-clients directly.
+The ModelGateway is the single model-access boundary in MAIW v2. All agents and
+runtimes route model requests through the gateway. No agent or runtime instantiates
+a provider client directly.
 
-Agents describe *what* they need (task, reasoning depth, risk level, modality) and the
-gateway resolves *which* model to use. The routing decision and selection provenance are
-observable through structured telemetry.
+The gateway separates three distinct concerns:
+
+1. **Policy** — `PolicyFilter` determines which models are eligible for a request
+   given deployment mode, risk level, reasoning level, modality, and required capabilities.
+2. **Routing** — `ModelRouter` selects among eligible candidates using a deterministic
+   rule-based strategy.
+3. **Deployment resolution** — the registry and provider layer map the selected logical
+   role to a physical endpoint.
+
+Agents express *what they need* (task, reasoning depth, risk level, modality).
+The gateway decides *which model to use*. Routing provenance is fully observable
+through structured telemetry.
+
+---
+
+## Architectural Principles
+
+- **Single inference boundary.** Every model call in MAIW flows through `ModelGateway.generate()`.
+  No agent or runtime holds a raw `NIMClient` reference outside the provider layer.
+- **Logical role, not physical model ID.** Agents submit `ModelRequest` objects
+  describing task intent. They never name a specific model ID.
+- **Policy before routing.** `PolicyFilter` runs before `ModelRouter`. The router
+  selects only from the eligible set returned by the filter.
+- **Deterministic and auditable.** Routing rules are explicit and ordered.
+  Every selection is recorded in `ModelRouteDecision` and emitted as telemetry.
+- **No write operations below the gateway.** `ModelGateway` calls the provider and
+  returns a normalized `ModelResponse`. It does not create `ActionProposal` objects,
+  invoke `DecisionEngine`, or touch `ApprovalStore` or `ActionExecutor`.
+
+---
+
+## Request Flow
 
 ```
 AgentRuntime
-  │  ModelRequest(task, messages, reasoning, risk_level, modality, …)
+  │  ModelRequest(task, messages, reasoning, risk_level, modality, deployment_mode, …)
   ▼
-ModelGateway
-  ├─ PolicyFilter          — model eligibility per deployment environment
-  ├─ ModelRouter           — routing policy: chooses logical role
-  ├─ Deployment Resolver   — selects physical endpoint for the role
-  ├─ NIMProvider           — calls NVIDIA NIM inference endpoint
-  ├─ GatewayTelemetry      — structured JSON provenance log
-  └─ ModelResponse         (content, latency_ms, usage, route_decision, …)
+ModelGateway.generate()
+  │
+  ├─ 1. Deadline guard (RequestDeadline.expired → reject before any provider call)
+  │
+  ├─ 2. ModelRouter.route(request)
+  │       │
+  │       ├─ PolicyFilter.filter(request, deployment_mode)
+  │       │       → list[ModelCandidate]   (enabled + eligible after all policy constraints)
+  │       │
+  │       └─ _select_role(request)
+  │               → (preferred_role, routing_rule, routing_reason)
+  │               → _resolve_with_fallback(preferred_role)
+  │                       → ModelRouteDecision
+  │
+  ├─ 3. ModelRegistry.get_by_id(decision.selected_model_id)
+  │       → ModelCapability (physical endpoint, provider, capability flags)
+  │
+  ├─ 4. NIMProvider.call(model_id, request, capability)
+  │       [wrapped in CircuitBreaker if nim_circuit is configured]
+  │       → LLMResponse
+  │
+  ├─ 5. GatewayTelemetry.record_success(…)
+  │
+  └─ 6. ModelResponse(content, model_id, latency_ms, route_decision, …)
+              returned to AgentRuntime
 ```
 
-Routing provenance is fully observable via `ModelRouteDecision` (see Routing telemetry).
+Failure at any step is translated to a `ModelGatewayError` subclass.
+The telemetry records both success and failure paths.
 
 ---
 
-## Package layout
+## Responsibilities
 
-```
-src/api/services/model_gateway/
-├── __init__.py         Public API + singleton (get_model_gateway, is_model_gateway_enabled)
-├── models.py           Pydantic v2 request/response/capability types, enums
-├── registry.py         ModelRegistry — Nemotron role catalogue, env-driven config
-├── router.py           ModelRouter   — deterministic routing policy + routing_rule
-├── gateway.py          ModelGateway  — orchestrator
-├── telemetry.py        GatewayTelemetry — structured JSON logging
-├── errors.py           Typed error hierarchy
-└── providers/
-    ├── __init__.py
-    └── nim.py          NIMProvider — wraps NIMClient, translates errors
-```
+**ModelGateway owns:**
+- Deadline enforcement before provider calls
+- Routing (via `ModelRouter` + `PolicyFilter`)
+- Provider dispatch (via `NIMProvider`)
+- Error normalization — provider exceptions become `ModelGatewayError` subclasses
+- Structured telemetry
 
----
-
-## Model inventory (endpoint-validated 2026-08-20)
-
-All four Nemotron 3 / 3.5 MoE models were confirmed live on `integrate.api.nvidia.com/v1`.
-The suffix `a3b / a12b / a55b` denotes active parameter count in the Mixture-of-Experts
-architecture (active params at inference, not total params).
-
-| Role        | Default model ID                             | Generation   | Enabled? | Endpoint status                             | tool_use |
-|-------------|----------------------------------------------|--------------|----------|---------------------------------------------|----------|
-| `lightning` | `nvidia/nemotron-3.5-lightning-30b-a3b`      | Nemotron 3.5 | **yes**  | ✓ DEPLOYED — 279 ms p50                     | **yes**  |
-| `nano`      | `nvidia/nemotron-3-nano-30b-a3b`             | Nemotron 3   | **yes**  | ✓ DEPLOYED — 364 ms p50                     | no       |
-| `super`     | `nvidia/nemotron-3-super-120b-a12b`          | Nemotron 3   | **yes**  | ✓ DEPLOYED — 275 ms p50                     | no       |
-| `ultra`     | `nvidia/nemotron-3-ultra-550b-a55b`          | Nemotron 3   | no       | ✓ DEPLOYED — ~31 s (cost; operator opt-in)  | no (assumed) |
-| `nano-omni` | *(operator must configure)*                  | unknown      | no       | ✗ NOT CURRENTLY DEPLOYED — no verified VL model ID in NIM catalog | no |
-
-**Superseded model IDs** (removed from `integrate.api.nvidia.com/v1` as of 2026-08-20):
-
-| Legacy model ID                              | Prior role  | Status                        |
-|----------------------------------------------|-------------|-------------------------------|
-| `nvidia/nemotron-3-super-120b-a12b`  | super       | HTTP 200 but `content=null` (endpoint broken) |
-| `nvidia/llama-3.1-nemotron-nano-4b-v1.1`    | nano        | HTTP 404                      |
-| `nvidia/llama-3.1-nemotron-ultra-253b-v1`   | ultra       | HTTP 404                      |
-| `nvidia/llama-nemotron-nano-vl-8b-v1`       | nano-omni   | HTTP 404                      |
-
-These IDs are preserved as `LEGACY_*` constants in `registry.py` for audit and tooling purposes.
-They must **not** be used as defaults for any role.
-
-**Structured output** (JSON mode): not confirmed for any model — all return extended thinking
-traces rather than pure JSON.  `structured_output=False` for all roles until further notice.
+**ModelGateway does NOT own:**
+- SOP logic or warehouse operational semantics
+- ActionProposal creation or approval
+- DecisionEngine or governance
+- MCP write capabilities
+- Agent conversation state
 
 ---
 
-## Logical role → Physical model separation
+## PolicyFilter
 
-Agents depend only on capabilities and task requirements, never on physical model IDs.
+`PolicyFilter` (`packages/maiw-models/maiw_models/routing.py`) is the hard policy
+layer. It determines which models are **eligible** for a request before routing runs.
 
-```
-Logical role  →  ModelCapability  →  deployment_endpoint  →  physical model_id
-              (generation, provider,                         (resolved from env var,
-               modalities, tool_use,                         never hardcoded in agent)
-               context_window, …)
-```
+Six eligibility constraints are applied. A model must pass all six:
 
-`ModelCapability` fields:
+| # | Constraint | Rule |
+|---|------------|------|
+| 1 | **Enabled** | `ModelCapability.enabled` must be `True` |
+| 2 | **Provider / deployment mode** | Model's `provider` must match the allowed set for the request's `deployment_mode` |
+| 3 | **Modality** | Non-TEXT requests require the model to explicitly support that modality; TEXT requests require `"text"` in `modalities` |
+| 4 | **Risk level** | `risk_level=CRITICAL` → only high-capability roles (`super`, `ultra`) are eligible |
+| 5 | **Reasoning level** | `reasoning=HIGH` → only high-capability roles (`super`, `ultra`) are eligible |
+| 6 | **Required capabilities** | Any `required_capabilities` tag (`tool_use`, `structured_output`, `teacher_judge`) must be satisfied by the model's capability flags |
 
-| Field               | Type         | Purpose                                               |
-|---------------------|--------------|-------------------------------------------------------|
-| `model_id`          | str          | Physical NIM model identifier                         |
-| `role`              | str          | Logical role (lightning/nano/super/ultra/nano-omni)   |
-| `family`            | str          | `"nemotron"`                                          |
-| `generation`        | str          | e.g. `"nemotron-3"`, `"nemotron-3.5"`, `"nemotron-vl"` |
-| `provider`          | str          | `"nvidia-nim"`                                        |
-| `modalities`        | set[str]     | What input types this model handles                   |
-| `tool_use`          | bool         | Supports tool/function calling                        |
-| `structured_output` | bool         | Supports structured output / JSON mode                |
-| `reasoning_level`   | ReasoningLevel | Intrinsic reasoning capability                      |
-| `latency_class`     | LatencyClass | Expected latency tier                                 |
-| `cost_class`        | CostClass    | Relative cost tier                                    |
-| `teacher_judge`     | bool         | Suitable for teacher/judge evaluation workloads       |
-| `context_window`    | int\|None    | Context window in tokens (None = not confirmed)       |
-| `deployment_endpoint` | str\|None | Overrides global NIM URL                            |
-| `enabled`           | bool         | Whether this role is active in the current environment|
+`PolicyFilter` does not rank candidates — that is the routing strategy's job.
+The eligible candidate list is recorded as `ModelRouteDecision.candidate_models`
+and surfaced in all telemetry and evaluation results.
 
 ---
 
-## Nemotron model roles
+## ModelRouter
 
-| Role        | Generation      | Routing priority                                           |
-|-------------|-----------------|------------------------------------------------------------|
-| `lightning` | nemotron-3.5    | LOW reasoning, LOW risk — quick classification             |
-| `nano`      | nemotron-3      | MEDIUM reasoning — moderate analysis                       |
-| `super`     | nemotron-3      | HIGH reasoning, CRITICAL risk, wave recovery — complex planning |
-| `ultra`     | nemotron-3      | Teacher/judge tasks — trajectory evaluation                |
-| `nano-omni` | *unverified*    | Multimodal (IMAGE/VIDEO/AUDIO) requests (not yet deployed) |
+`ModelRouter` (`packages/maiw-models/maiw_models/router.py`) selects among
+eligible candidates using a deterministic rule-based strategy (`routing_strategy="rules"`).
 
----
+### Routing rules (priority order)
 
-## Configuration
+| Priority | Routing rule | Condition | Preferred role |
+|----------|-------------|-----------|----------------|
+| 1 | `multimodal_input` | `modality` ≠ TEXT | `nano-omni` |
+| 2 | `judge_task` | task name contains `judge`, `teacher`, `eval`, `offline`, `score`, or `grade` | `ultra` |
+| 3 | `critical_risk` | `risk_level=CRITICAL` | `super` |
+| 4 | `high_reasoning` | `reasoning=HIGH` | `super` |
+| 5 | `medium_reasoning` | `reasoning=MEDIUM` | `nano` |
+| 6 | `low_reasoning` | `reasoning=LOW` | `lightning` |
 
-```bash
-# ── Enable/disable roles ──────────────────────────────────────────────────────
-NEMOTRON_LIGHTNING_ENABLED=true       # default true — DEPLOYED, 279ms p50
-NEMOTRON_NANO_ENABLED=true            # default true — DEPLOYED, 364ms p50
-NEMOTRON_SUPER_ENABLED=true           # default true — DEPLOYED, 275ms p50
-NEMOTRON_ULTRA_ENABLED=false          # default false — ~31s latency; operator opt-in
-NEMOTRON_NANO_OMNI_ENABLED=false      # default false — NOT_CURRENTLY_DEPLOYED
+### Fallback chains
 
-# ── Override physical model IDs ────────────────────────────────────────────────
-# Defaults (validated Nemotron 3 / 3.5 on integrate.api.nvidia.com/v1 2026-08-20):
-NEMOTRON_LIGHTNING_MODEL=nvidia/nemotron-3.5-lightning-30b-a3b
-NEMOTRON_NANO_MODEL=nvidia/nemotron-3-nano-30b-a3b
-NEMOTRON_SUPER_MODEL=nvidia/nemotron-3-super-120b-a12b
-NEMOTRON_ULTRA_MODEL=nvidia/nemotron-3-ultra-550b-a55b
-# Nano Omni: no verified ID in NIM catalog as of 2026-08-20.
-# Operator MUST set this to a confirmed VL/multimodal model ID before enabling.
-# NEMOTRON_NANO_OMNI_MODEL=<verified-vl-model-id>
-
-# ── Feature flag ──────────────────────────────────────────────────────────────
-MODEL_GATEWAY_ENABLED=true            # default true; set false only for operator rollback
-
-# ── Environment presets ────────────────────────────────────────────────────────
-# Standard (uses defaults — Lightning + Nano + Super):
-# (no overrides needed — all three enabled by default)
-#
-# With Ultra for evaluation workloads:
-# NEMOTRON_ULTRA_ENABLED=true
-#
-# With Nano Omni (requires operator-supplied VL model):
-# NEMOTRON_NANO_OMNI_ENABLED=true NEMOTRON_NANO_OMNI_MODEL=<verified-vl-model-id>
-```
-
----
-
-## Routing policy
-
-Rules applied in priority order:
-
-| Priority | Routing rule          | Condition                           | Preferred role  |
-|----------|-----------------------|-------------------------------------|-----------------|
-| 1        | `multimodal_input`    | modality ≠ TEXT                     | nano-omni       |
-| 2        | `judge_task`          | task name contains judge/eval/…     | ultra           |
-| 3        | `critical_risk`       | risk_level = CRITICAL               | super           |
-| 4        | `high_reasoning`      | reasoning = HIGH                    | super           |
-| 5        | `medium_reasoning`    | reasoning = MEDIUM                  | nano            |
-| 6        | `low_reasoning`       | reasoning = LOW                     | lightning       |
-
-Fallback chains:
+When the preferred role is disabled, the router walks a fallback chain:
 
 | Primary role | Fallback order |
-|--------------|----------------|
-| `lightning`  | nano → super   |
-| `nano`       | super          |
-| `super`      | (none → raises ModelUnavailable) |
-| `ultra`      | super          |
-| `nano-omni`  | super          |
+|-------------|----------------|
+| `lightning` | `nano` → `super` |
+| `nano` | `super` |
+| `super` | *(none — raises `ModelUnavailable`)* |
+| `ultra` | `super` |
+| `nano-omni` | `super` *(degrades to text-only)* |
+
+When a fallback is used, `fallback_from` and `fallback_reason` are populated
+in `ModelRouteDecision` and surfaced in telemetry.
+
+### Routing signals
+
+`ModelRouter` uses only the fields on `ModelRequest`:
+
+- `reasoning` (`ReasoningLevel`) — primary routing signal
+- `risk_level` (`RiskLevel`) — elevates to high-capability roles at CRITICAL
+- `modality` (`Modality`) — triggers multimodal routing
+- `task` (str) — inspected for judge/teacher/eval keywords
+- `deployment_mode` (`DeploymentMode`) — passed to `PolicyFilter` for provider eligibility
 
 ---
 
-## Routing telemetry
+## Deployment Resolution
 
-`ModelRouteDecision` carries separate fields for requested vs actual routing, making
-provenance fully observable. `routing_reason` always describes WHY `requested_role` was
-chosen; fallback fields explain any deviation.
+The registry maps logical roles to physical deployments. Agents never see physical
+model IDs.
+
+```
+Logical role (lightning / nano / super / ultra / nano-omni)
+    ↓
+ModelRegistry.get_enabled_by_role(role)
+    → ModelCapability
+        model_id:            physical NIM model identifier (from env var or default)
+        deployment_endpoint: per-model URL override (or None → global NIM URL)
+        provider:            "nvidia-nim"
+        enabled:             True/False (env-driven)
+```
+
+Physical model IDs are configured via environment variables
+(`NEMOTRON_LIGHTNING_MODEL`, `NEMOTRON_NANO_MODEL`, etc.) and resolved at
+startup by `ModelRegistry`. Defaults point to the current Nemotron 3 / 3.5 MoE
+model IDs. Operators override via env var for self-hosted or alternate deployments.
+
+### Nemotron model roles
+
+| Role | Generation | Routing use |
+|------|------------|-------------|
+| `lightning` | Nemotron 3.5 | LOW reasoning, LOW risk — quick classification |
+| `nano` | Nemotron 3 | MEDIUM reasoning — moderate analysis |
+| `super` | Nemotron 3 | HIGH reasoning, CRITICAL risk, wave recovery |
+| `ultra` | Nemotron 3 | Teacher/judge evaluation workloads |
+| `nano-omni` | *unverified* | Multimodal (IMAGE/VIDEO/AUDIO) — operator must configure |
+
+---
+
+## Deployment Modes
+
+`DeploymentMode` (`packages/maiw-models/maiw_models/models.py`) controls which
+provider endpoints are eligible during policy filtering.
+
+| Value | Description |
+|-------|-------------|
+| `nvidia_hosted` | NVIDIA NIM public cloud (`integrate.api.nvidia.com`). Requires `NVIDIA_API_KEY`. |
+| `local_nim` | Self-hosted NIM container (on-prem). Set `MAIW_NIM_BASE_URL` and `MAIW_NIM_MODEL`. |
+| `openai_compatible` | Any OpenAI-compatible endpoint (vLLM, Ollama, etc.). Set `MAIW_NIM_BASE_URL` and `MAIW_NIM_MODEL`. |
+| `enterprise` | Enterprise-managed NIM (NGC private registry). Set `MAIW_NIM_BASE_URL`, `MAIW_NIM_MODEL`, and `NVIDIA_API_KEY`. |
+
+Default for `ModelRequest` is `NVIDIA_HOSTED`. All four modes currently route to
+`provider="nvidia-nim"` in the registry.
+
+---
+
+## Provider Layer
+
+`NIMProvider` (`packages/maiw-models/maiw_models/providers/nim.py`) is the only
+supported provider. It wraps `NIMClient` and:
+
+- Translates provider-specific exceptions to `ModelGatewayError` subclasses
+- Does not expose raw provider structures to the rest of the gateway
+- Supports an optional `CircuitBreaker` (`nim_circuit`) — when the circuit is OPEN,
+  `NIMProvider` raises `ModelUnavailable` with the remaining cooldown duration
+
+All credentials (`NVIDIA_API_KEY`) are held at or below the provider layer.
+Agents and runtimes never receive raw provider credentials.
+
+---
+
+## Agent Runtime Integration
+
+Both production runtimes route through `ModelGateway`. Neither instantiates
+provider clients directly.
+
+### MAIWDeterministicRuntime
+
+`MAIWDeterministicRuntime` (`packages/maiw-agents/maiw_agents/runtime/deterministic.py`)
+is the default production runtime. It executes SOP phases in strict sequence.
+Model calls are made by passing a `ModelRequest` to the gateway instance held
+in the agent's operational context.
+
+### DeepAgentsRuntime
+
+`DeepAgentsRuntime` (`packages/maiw-agents/maiw_agents/runtime/deep_agents_runtime.py`)
+is the adaptive runtime that delegates step scheduling to the Deep Agents framework.
+It uses `MAIWModelGatewayChat` as its model — a LangChain `BaseChatModel` backed
+by `ModelGateway`. Deep Agents cannot bypass `ModelGateway`.
+
+`MAIWModelGatewayChat` (`packages/maiw-agents/maiw_agents/runtime/model_adapter.py`):
+
+- Implements `BaseChatModel._generate()` and `_agenerate()`
+- All model calls route through `context.model_gateway` — `RiskLevel`,
+  `ReasoningLevel`, `DeploymentMode`, routing provenance, deadlines, fallback,
+  telemetry, and `trace_id` are all preserved
+- In test mode (`model_gateway=None`): returns deterministic mock responses
+  without any network calls
+
+`MAIWTestModelAdapter` in the same module is a test-only wrapper; it is not
+used in production routing.
+
+### Emergency rollback
+
+`is_model_gateway_enabled()` reads the `MODEL_GATEWAY_ENABLED` environment
+variable (default `true`). When set to `false`, several legacy agents
+(ForecastingAgent, EquipmentAgent, OperationsAgent, SafetyAgent) fall back to
+a direct `NIMClient` path. This is an emergency operator rollback only — the
+direct path bypasses `PolicyFilter`, `ModelRouter`, and routing telemetry.
+The `MODEL_GATEWAY_ENABLED` flag is expected to be removed once the legacy
+fallback paths are retired.
+
+---
+
+## Fallback and Failure Handling
+
+| Scenario | Behavior |
+|----------|----------|
+| Preferred role disabled | Router walks fallback chain; `fallback_from` + `fallback_reason` set in `ModelRouteDecision` |
+| Entire fallback chain exhausted | `ModelUnavailable` raised |
+| NIM circuit breaker OPEN | `ModelUnavailable` with cooldown duration; telemetry records failure |
+| `RequestDeadline` expired before provider call | `RequestDeadlineExceeded` raised; 0 provider calls made |
+| Provider exception | Translated to `ModelGatewayError` subclass; telemetry records failure |
+| Evaluation forced-model failure | `EvaluationCallResult.error` set; fallback NOT attempted |
+
+---
+
+## Routing Provenance and Observability
+
+Every `ModelResponse` carries a `ModelRouteDecision` with full routing provenance:
+
+| Field | Description |
+|-------|-------------|
+| `requested_role` | Ideal role chosen by routing policy before any fallback |
+| `selected_role` | Role that actually served the request (may differ from `requested_role`) |
+| `selected_model_id` | Physical model ID used |
+| `routing_rule` | Machine-readable rule name (e.g., `medium_reasoning`) |
+| `routing_reason` | Human-readable explanation of why `requested_role` was chosen |
+| `fallback_from` | Set when `selected_role` ≠ `requested_role` |
+| `fallback_reason` | Why the preferred role was unavailable |
+| `routing_strategy` | Always `"rules"` in the current deterministic implementation |
+| `routing_latency_ms` | Monotonic time for route selection only (excludes inference) |
+| `candidate_models` | Model IDs eligible after `PolicyFilter` (source of truth for evaluation reproducibility) |
+| `task` | Task name from the original `ModelRequest` |
+| `requested_reasoning` | Reasoning level from the request |
+| `requested_risk_level` | Risk level from the request |
+
+Telemetry is emitted by `GatewayTelemetry` (`packages/maiw-models/maiw_models/telemetry.py`)
+as structured JSON on both success and failure paths. The Developer Trace panel
+and Model Gateway Evaluation Lab consume this data.
+
+Example provenance record:
 
 ```json
 {
@@ -202,7 +318,10 @@ chosen; fallback fields explain any deviation.
   "routing_reason": "reasoning=MEDIUM prefers Nano",
   "fallback_from": "nano",
   "fallback_reason": "role=nano is disabled; escalated to super",
-  "selected_model": "nvidia/nemotron-3-super-120b-a12b",
+  "selected_model_id": "nvidia/nemotron-3-super-120b-a12b",
+  "routing_strategy": "rules",
+  "routing_latency_ms": 0.412,
+  "candidate_models": ["nvidia/nemotron-3-super-120b-a12b"],
   "task": "warehouse.operations.summarize_state",
   "requested_reasoning": "medium",
   "requested_risk_level": "low"
@@ -211,56 +330,162 @@ chosen; fallback fields explain any deviation.
 
 ---
 
-## Task routing reference
+## Model Gateway Evaluation Lab
 
-| Task                                       | Reasoning | Risk     | Role target |
-|--------------------------------------------|-----------|----------|-------------|
-| `warehouse.*.understand_query`             | LOW       | LOW      | lightning   |
-| `warehouse.forecasting.generate_response`  | MEDIUM    | LOW      | nano        |
-| `warehouse.operations.generate_response`   | MEDIUM    | LOW/HIGH | nano/super  |
-| `warehouse.operations.recover_wave`        | MEDIUM    | HIGH     | super       |
-| `warehouse.equipment.<maintenance/assign>` | HIGH      | HIGH     | super       |
-| `warehouse.equipment.summarize_health`     | MEDIUM    | LOW      | nano        |
-| `warehouse.safety.broadcast_alert`         | HIGH      | CRITICAL | super       |
-| `warehouse.safety.lockout_tagout`          | HIGH      | CRITICAL | super       |
-| `warehouse.safety.incident_report`         | HIGH      | HIGH     | super       |
-| `warehouse.safety.summarize_event`         | MEDIUM    | MEDIUM   | nano        |
+`ModelGateway.evaluate_with_model()` is a forced-model evaluation entry point
+used exclusively by the offline Model Gateway Evaluation Lab (WS3).
+
+**What it does:**
+- Accepts a `model_id` and calls that exact model, bypassing the normal routing strategy
+- Still runs `PolicyFilter` — the result records `policy_compliant` to indicate
+  whether the forced model would have been eligible under the current policy
+- When `allow_out_of_policy=False` (default), refuses the call if the model
+  is not eligible and returns an error in `EvaluationCallResult`
+- Emits full routing and provider telemetry for every call
+- Returns `EvaluationCallResult` — never raises provider exceptions
+
+**What it does NOT do:**
+- Never falls back to another model — if the forced model fails, `error` is set
+  and `response_content=None`
+- Never creates `ActionProposal`, approval, or MCP write operations
+- Never modifies Copilot conversation or approval queues
+
+**Reproducibility identity:** `dataset_id + prompt_hash + model_id + deployment_id + context_snapshot_id`
+uniquely identifies an evaluation run. Timestamps are not part of the identity.
+
+The Evaluation Lab is **not** the production routing authority. Evaluation results
+inform model selection decisions; they do not change live routing.
 
 ---
 
-## DocumentAgent compatibility exception
+## Configuration
 
-DocumentAgent implements a multi-stage NeMo OCR/extraction pipeline with distinct model
-requirements per stage. The document pipeline stages that use direct NIMClient calls (OCR,
-embedding, extraction) are an explicit compatibility exception pending multimodal NIM endpoint
-availability for the nano-omni role.
+```bash
+# ── Enable/disable roles ──────────────────────────────────────────────────────
+NEMOTRON_LIGHTNING_ENABLED=true       # default true
+NEMOTRON_NANO_ENABLED=true            # default true
+NEMOTRON_SUPER_ENABLED=true           # default true
+NEMOTRON_ULTRA_ENABLED=false          # default false — high latency; operator opt-in
+NEMOTRON_NANO_OMNI_ENABLED=false      # default false — no verified VL model ID
+
+# ── Override physical model IDs ────────────────────────────────────────────────
+NEMOTRON_LIGHTNING_MODEL=nvidia/nemotron-3.5-lightning-30b-a3b
+NEMOTRON_NANO_MODEL=nvidia/nemotron-3-nano-30b-a3b
+NEMOTRON_SUPER_MODEL=nvidia/nemotron-3-super-120b-a12b
+NEMOTRON_ULTRA_MODEL=nvidia/nemotron-3-ultra-550b-a55b
+# Nano Omni: operator MUST set to a confirmed VL model ID before enabling.
+# NEMOTRON_NANO_OMNI_MODEL=<verified-vl-model-id>
+
+# ── Emergency rollback ─────────────────────────────────────────────────────────
+MODEL_GATEWAY_ENABLED=true            # default true; set false only for emergency rollback
+                                      # (bypasses PolicyFilter, ModelRouter, telemetry)
+```
+
+---
+
+## Task Routing Reference
+
+| Task | Reasoning | Risk | Role target |
+|------|-----------|------|-------------|
+| `warehouse.*.understand_query` | LOW | LOW | lightning |
+| `warehouse.forecasting.generate_response` | MEDIUM | LOW | nano |
+| `warehouse.operations.generate_response` | MEDIUM | LOW/HIGH | nano/super |
+| `warehouse.operations.recover_wave` | MEDIUM | HIGH | super |
+| `warehouse.equipment.<maintenance/assign>` | HIGH | HIGH | super |
+| `warehouse.equipment.summarize_health` | MEDIUM | LOW | nano |
+| `warehouse.safety.broadcast_alert` | HIGH | CRITICAL | super |
+| `warehouse.safety.lockout_tagout` | HIGH | CRITICAL | super |
+| `warehouse.safety.incident_report` | HIGH | HIGH | super |
+| `warehouse.safety.summarize_event` | MEDIUM | MEDIUM | nano |
+
+---
+
+## DocumentAgent Compatibility Exception
+
+DocumentAgent implements a multi-stage NeMo OCR/extraction pipeline with distinct
+model requirements per stage. The document pipeline stages that use direct `NIMClient`
+calls (OCR, embedding, extraction) are an explicit compatibility exception pending
+multimodal NIM endpoint availability for the `nano-omni` role.
 
 Evidence: `document/action_tools.py`, `document/document_extraction_agent.py`,
 `document/processing/embedding_indexing.py`, `document/validation/large_llm_judge.py`.
 
-These are not routing decisions — they label pipeline stages. Full gateway integration
-requires multimodal NIM endpoint provisioning for the nano-omni role.
+These are pipeline-stage labels, not routing decisions. Full gateway integration
+requires multimodal NIM endpoint provisioning for the `nano-omni` role.
 
 ---
 
-## Diagnostic report
+## Known Modernization Boundary
+
+The ModelGateway implementation is currently split across two paths:
+
+- `src/api/services/model_gateway/` — DEPRECATED compatibility shims. Each file
+  re-exports from `maiw_models.*`. These shims exist to allow existing import
+  paths to continue working without modification during the migration period.
+  They are marked `DEPRECATED — Remove by Phase 9`.
+- `packages/maiw-models/maiw_models/` — canonical package. All substantive logic
+  lives here: `gateway.py`, `models.py`, `router.py`, `routing.py`, `registry.py`,
+  `telemetry.py`, `providers/`, `evaluation/`.
+
+The canonical import path is:
+
+```python
+from maiw_models import ModelGateway, ModelRequest, get_model_gateway
+```
+
+The `src/` shims are **not dead legacy code**. Physical removal requires an
+explicit migration that preserves all ModelGateway invariants (single inference
+boundary, `PolicyFilter`, `ModelRouter`, deployment resolver, routing provenance).
+See [ARCHITECTURE.md](ARCHITECTURE.md#known-modernization-boundary) for full context.
+
+`LEGACY_*` constants in `packages/maiw-models/maiw_models/registry.py` record
+prior model IDs that are no longer available on the configured NIM endpoint.
+They are retained for audit and migration tooling only and must not be used as
+defaults for any role.
+
+---
+
+## Security
+
+- All provider credentials (`NVIDIA_API_KEY`) are held at or below the `NIMProvider`
+  layer. Agents and runtimes never receive raw credentials.
+- The Evaluation Lab (`evaluate_with_model`) is a read-only evaluation path.
+  It cannot create approvals, write MCP resources, or modify operational state.
+- `MODEL_GATEWAY_ENABLED=false` bypasses the gateway's policy and telemetry.
+  This mode is an emergency operator rollback; it must not be used in normal operations.
+
+---
+
+## Developer Guidance
+
+**Agent developers:**
+Use the runtime adapter provided by your runtime. Submit `ModelRequest` with intent
+fields populated (`reasoning`, `risk_level`, `modality`, `task`). Never name a
+`model_id` in a `ModelRequest`.
+
+**Model / platform developers:**
+Changes to eligibility logic go in `PolicyFilter` (`maiw_models/routing.py`).
+Changes to routing rules go in `ModelRouter` (`maiw_models/router.py`).
+Changes to the model catalogue go in `ModelRegistry` (`maiw_models/registry.py`).
+
+**Deployment engineers:**
+Configure deployment mode and model IDs via environment variables.
+To enable `ultra` for evaluation workloads: `NEMOTRON_ULTRA_ENABLED=true`.
+To enable multimodal routing: set `NEMOTRON_NANO_OMNI_ENABLED=true` and
+`NEMOTRON_NANO_OMNI_MODEL=<verified-vl-model-id>`.
+
+**Evaluators / researchers:**
+Use `ModelGateway.evaluate_with_model()` via the Model Gateway Evaluation Lab
+harness. Do not call the method directly in production agent code.
+
+---
+
+## Diagnostics
 
 ```bash
 python scripts/model_routing_report.py
 # With additional roles enabled:
-NEMOTRON_NANO_ENABLED=true python scripts/model_routing_report.py
-```
-
-Sample output (default deployment — Lightning + Nano + Super enabled):
-
-```
-ROLE        EN   GENERATION      PHYSICAL MODEL                                 PROVIDER    DEPLOYMENT STATUS
-────────────────────────────────────────────────────────────────────────────────────────────────────────────
-lightning   yes  nemotron-3.5    nvidia/nemotron-3.5-lightning-30b-a3b          nvidia-nim  ✓ deployed
-nano        yes  nemotron-3      nvidia/nemotron-3-nano-30b-a3b                 nvidia-nim  ✓ deployed
-super       yes  nemotron-3      nvidia/nemotron-3-super-120b-a12b              nvidia-nim  ✓ deployed
-ultra       no   nemotron-3      nvidia/nemotron-3-ultra-550b-a55b              nvidia-nim  ✓ deployed
-nano-omni   no   unknown         (operator must configure)                      nvidia-nim  ✗ not-deployed
+NEMOTRON_ULTRA_ENABLED=true python scripts/model_routing_report.py
 ```
 
 ---
@@ -272,19 +497,31 @@ python -m pytest tests/unit/test_model_gateway.py -v
 ```
 
 117 tests covering:
+
 - `TestModelRegistry` — roles, enabled/disabled, env-driven IDs, reload
-- `TestModelCapabilityFields` — generation labels, DeploymentStatus, tool_use validation,
-  structured_output conservative defaults, enabled-by-default assertions, Nano Omni sentinel guard
-- `TestDefaultModelIds` — default model IDs are Nemotron 3/3.5, no legacy llama-nemotron
-- `TestModelRouter` — all routing rules, fallback chains, ModelUnavailable
-- `TestRouteDecisionFields` — requested_role, routing_rule, telemetry accuracy
+- `TestModelCapabilityFields` — generation labels, `DeploymentStatus`, `tool_use` validation,
+  `structured_output` conservative defaults, enabled-by-default assertions, Nano Omni sentinel guard
+- `TestDefaultModelIds` — default model IDs are Nemotron 3/3.5, no legacy IDs
+- `TestModelRouter` — all routing rules, fallback chains, `ModelUnavailable`
+- `TestRouteDecisionFields` — `requested_role`, `routing_rule`, telemetry accuracy
 - `TestRoutingMatrix` — 11 representative warehouse workloads × 3 assertions
 - `TestRoutingMatrixFallbacks` — all fallback scenarios validated
 - `TestModelGateway` — end-to-end with mocked provider
-- `TestNIMClientModelOverride` — model_override plumbing
+- `TestNIMClientModelOverride` — model override plumbing
 - `TestOperationsAgentGatewaySlice` — gateway attribute + feature flag
 - `TestEquipmentAgentGatewaySlice` — gateway attribute + feature flag
 - `TestSafetyAgentGatewaySlice` — gateway attribute + feature flag
 - `TestFeatureFlag` + `TestGatewaySingleton`
 
-All tests are synchronous (asyncio.run where needed) — no pytest-asyncio dependency.
+All tests are synchronous (`asyncio.run` where needed) — no pytest-asyncio dependency.
+
+---
+
+## Related Documentation
+
+- [ARCHITECTURE.md](ARCHITECTURE.md) — top-level system architecture;
+  [Known Modernization Boundary](ARCHITECTURE.md#known-modernization-boundary)
+- [AGENT_RUNTIME.md](AGENT_RUNTIME.md) — runtime adapter contracts,
+  `MAIWDeterministicRuntime` and `DeepAgentsRuntime` architecture
+- [GLOSSARY.md](../GLOSSARY.md) — canonical definitions for `ModelGateway`,
+  `PolicyFilter`, `ModelRouter`, `DeploymentMode`, and related terms
