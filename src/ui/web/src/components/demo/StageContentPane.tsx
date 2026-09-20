@@ -197,6 +197,8 @@ export interface StageContentPaneProps {
   selectedApprovalId?: string | null;
   /** Return to Copilot after approval resolution — passed from DemoShell. */
   onReturnToCopilot?: (card: { decision: string; execution: string; action: string }) => void;
+  /** Expert/developer mode — when true, shows model IDs, trace IDs, routing rules, etc. */
+  expertMode?: boolean;
 }
 
 // ── Stages that support STORY/GRAPH toggle ────────────────────────────────────

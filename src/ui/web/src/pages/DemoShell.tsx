@@ -511,7 +511,7 @@ export default function DemoShell() {
           color: '#C9D1D9', letterSpacing: '0.08em', textTransform: 'uppercase',
           flexShrink: 0,
         }}>
-          MAIW Command Center
+          MAIW Operations
         </Typography>
         <Box sx={{ width: '1px', height: 14, background: '#21262D', flexShrink: 0 }} />
         <Box sx={{
@@ -604,6 +604,7 @@ export default function DemoShell() {
               onViewFullTrace={handleViewFullTrace}
               selectedApprovalId={selectedApprovalId}
               onReturnToCopilot={handleReturnToCopilot}
+              expertMode={expertMode}
             />
           </>
         )}
@@ -683,12 +684,8 @@ export default function DemoShell() {
           </>
         )}
         <Box sx={{ flexGrow: 1 }} />
-        <Typography sx={{
-          fontFamily: 'monospace', fontSize: '0.62rem', color: '#484F58',
-          cursor: 'pointer', '&:hover': { color: '#8B949E' },
-        }}>
-          Details ›
-        </Typography>
+        {/* Details › removed — was a dead affordance with no onClick handler. 
+            Expert mode toggle (upper right) provides developer detail access. */}
       </Box>
 
       {/* ── Phase 15B: Copilot ASK drawer ───────────────────────────────────── */}

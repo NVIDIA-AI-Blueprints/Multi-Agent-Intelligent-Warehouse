@@ -21,6 +21,8 @@ import {
   runWindowEvents,
   StageContentPaneProps,
 } from '../StageContentPane';
+import AuthorityBoundary from '../../AuthorityBoundary';
+import { PRE_EXECUTION_NOTICE } from '../../../constants/authorityStates';
 
 // ── Proposal card ─────────────────────────────────────────────────────────────
 
@@ -157,9 +159,27 @@ export default function ProposeStage({ sseEvents, analysisResult, onOpenExplanat
             MAIW Action Proposal
           </Typography>
         </Box>
-        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D', mt: 0.5 }}>
-          No projected impact numbers — actuals captured post-execution in Outcome
-        </Typography>
+        {/* Pre-execution clarity notice */}
+        <Box
+          data-testid="pre-execution-notice"
+          sx={{
+            mt: 1,
+            display: 'flex', alignItems: 'center', gap: 1,
+            background: '#0D1117',
+            border: '1px solid #1C2128',
+            borderRadius: '4px',
+            px: 1.5, py: 0.75,
+          }}
+        >
+          <Typography sx={{
+            fontFamily: 'monospace', fontSize: '0.62rem',
+            color: '#484F58', letterSpacing: '0.03em',
+          }}>
+            {PRE_EXECUTION_NOTICE}
+          </Typography>
+        </Box>
+        {/* Authority boundary — AI recommendation ends here */}
+        <AuthorityBoundary />
       </StageSection>
 
       {/* Proposal cards */}

@@ -173,6 +173,7 @@ export default function ObserveStage({
   analysisResult,
   analyzing,
   onAnalyze,
+  expertMode,
 }: StageContentPaneProps) {
   const { world, current_kpis, scenario } = demoStatus;
   const observeEvents = runWindowEvents(sseEvents, ['OBSERVE']);
@@ -254,7 +255,7 @@ export default function ObserveStage({
         <StageSection>
           <SectionHeader>Snapshot</SectionHeader>
           <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-            <IdText label="ID" value={observeLifecycle.snapshot_id ?? '—'} />
+            {expertMode && <IdText label="ID" value={observeLifecycle.snapshot_id ?? '—'} />}
             <IdText label="Warehouse" value={observeLifecycle.warehouse_id ?? '—'} />
             <Box>
               <MonoText color="#484F58" size="0.58rem">Domains</MonoText>

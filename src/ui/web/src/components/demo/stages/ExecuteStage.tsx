@@ -188,7 +188,8 @@ function SSEExecRow({ message, detail }: { message: string; detail: string | nul
 
 // ── ExecuteStage ──────────────────────────────────────────────────────────────
 
-export default function ExecuteStage({ sseEvents, analysisResult }: StageContentPaneProps) {
+export default function ExecuteStage({ sseEvents, analysisResult ,
+  expertMode}: StageContentPaneProps) {
   // Primary: lifecycle EXECUTE records
   const lifecycleExecutions: LifecycleRecord[] =
     (analysisResult?.lifecycle ?? []).filter(r => r.phase === 'EXECUTE');
@@ -266,7 +267,7 @@ export default function ExecuteStage({ sseEvents, analysisResult }: StageContent
               <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                 <MonoText color="#8B949E" size="0.68rem">{pr.capability}</MonoText>
                 <OutcomeBadge outcome={canonicalize(pr.status)} />
-                {pr.execution_id && (
+                {expertMode && pr.execution_id && (
                   <IdText label="exec_id" value={pr.execution_id} />
                 )}
               </Box>

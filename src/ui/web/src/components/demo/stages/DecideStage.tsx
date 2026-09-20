@@ -22,6 +22,7 @@ import {
   runWindowEvents,
   StageContentPaneProps,
 } from '../StageContentPane';
+import { POLICY_APPROVED_NOTICE } from '../../../constants/authorityStates';
 
 // ── Authority chain ────────────────────────────────────────────────────────────
 
@@ -128,6 +129,27 @@ function DecisionCard({ index, outcome, proposalId, decisionId, violations, requ
                 {v.rule ?? v.message ?? JSON.stringify(v)}
               </MonoText>
             ))}
+          </Box>
+        )}
+
+        {/* Policy auto-approved notice — shown when DecisionEngine approved without human gate */}
+        {!requiresApproval && outcome === 'APPROVED' && (
+          <Box
+            data-testid="policy-approved-notice"
+            sx={{
+              mt: 0.5,
+              p: 1,
+              background: '#0d1f0d',
+              border: '1px solid #3FB95033',
+              borderRadius: '4px',
+            }}
+          >
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#3FB950', fontWeight: 700, mb: '2px' }}>
+              Approved by Policy
+            </Typography>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>
+              {POLICY_APPROVED_NOTICE}
+            </Typography>
           </Box>
         )}
 

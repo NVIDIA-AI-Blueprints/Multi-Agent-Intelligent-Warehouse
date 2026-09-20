@@ -12,7 +12,7 @@ import { Box, Typography } from '@mui/material';
 import { StageSection, MonoText, StageContentPaneProps } from '../StageContentPane';
 import AgenticReasoningCanvas from '../AgenticReasoningCanvas';
 
-export default function ReasonStage({ analysisResult }: StageContentPaneProps) {
+export default function ReasonStage({ analysisResult, expertMode }: StageContentPaneProps) {
   return (
     <Box data-testid="reason-stage">
       {/* Stage header */}
@@ -30,7 +30,7 @@ export default function ReasonStage({ analysisResult }: StageContentPaneProps) {
         </Box>
       </StageSection>
 
-      <AgenticReasoningCanvas analysisResult={analysisResult} />
+      <AgenticReasoningCanvas analysisResult={analysisResult} expertMode={expertMode} />
     </Box>
   );
 }

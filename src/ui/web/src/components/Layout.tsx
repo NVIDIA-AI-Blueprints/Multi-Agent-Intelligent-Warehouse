@@ -4,6 +4,7 @@ import { Menu as MenuIcon } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { healthAPI } from '../services/api';
+import { useDemoStatus } from '../hooks/useDemoStatus';
 import StatusBar from './StatusBar';
 
 interface LayoutProps {
@@ -11,11 +12,10 @@ interface LayoutProps {
 }
 
 const NAV = [
-  { label: 'COMMAND', path: '/command' },
-  { label: 'STATE', path: '/state' },
-  { label: 'DECISIONS', path: '/decisions' },
-  { label: 'MODELS', path: '/models' },
+  { label: 'OPERATIONS', path: '/demo' },   // Primary operator surface
   { label: 'WORLD', path: '/world' },
+  { label: 'RELIABILITY', path: '/command' }, // Governance & system overview
+  { label: 'MODELS', path: '/models' },
   { label: 'CAPABILITIES', path: '/capabilities' },
   { label: 'ACTIVITY', path: '/activity' },
 ];
@@ -35,6 +35,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     staleTime: 10000,
   });
   const isLive = live?.status === 'alive';
+
+  // Demo mode detection — threaded from backend status so all pages show the indicator
+  const { isDemoMode } = useDemoStatus();
 
   const NavItems = () => (
     <>
@@ -103,7 +106,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             onError={(e: any) => { e.target.style.display = 'none'; }}
           />
           <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.75rem', color: '#E6EDF3', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
-            MAIW COMMAND CENTER
+            MAIW OPERATIONS
           </Typography>
         </Box>
 
@@ -127,6 +130,33 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             WAREHOUSE: <Box component="span" sx={{ color: '#C9D1D9', fontWeight: 700 }}>{WAREHOUSE_ID}</Box>
           </Typography>
         </Box>
+
+        {/* Demo mode indicator — visible across all pages during synthetic warehouse sessions */}
+        {isDemoMode && (
+          <Box
+            data-testid="demo-mode-indicator"
+            sx={{
+              display: { xs: 'none', sm: 'flex' },
+              alignItems: 'center',
+              px: 1.25, py: 0,
+              mr: 2,
+              borderRight: '1px solid #1C2128',
+            }}
+          >
+            <Box sx={{
+              background: '#0d2146',
+              border: '1px solid #1F3458',
+              borderRadius: '3px',
+              px: '6px', py: '2px',
+              fontFamily: 'monospace', fontSize: '0.6rem',
+              color: '#58A6FF', letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              whiteSpace: 'nowrap',
+            }}>
+              SIMULATED WAREHOUSE
+            </Box>
+          </Box>
+        )}
 
         {/* Desktop nav */}
         <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'stretch', gap: 0 }}>

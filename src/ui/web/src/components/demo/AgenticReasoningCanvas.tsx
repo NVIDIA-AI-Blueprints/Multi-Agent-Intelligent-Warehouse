@@ -246,10 +246,11 @@ function RecommendationRow({ rec, index }: { rec: RecommendedAction; index: numb
 // ── AgenticReasoningCanvas ────────────────────────────────────────────────────
 
 interface AgenticReasoningCanvasProps {
+  expertMode?: boolean;
   analysisResult: AnalysisResult | null;
 }
 
-export default function AgenticReasoningCanvas({ analysisResult }: AgenticReasoningCanvasProps) {
+export default function AgenticReasoningCanvas({ analysisResult, expertMode }: AgenticReasoningCanvasProps) {
   const assessment = analysisResult?.assessment ?? null;
   const lifecycle  = analysisResult?.lifecycle  ?? [];
   const skillRecords  = lifecycle.filter(r => r.phase === 'SKILL');
@@ -289,7 +290,7 @@ export default function AgenticReasoningCanvas({ analysisResult }: AgenticReason
         <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>
           OperationsCoordinationAgent
         </Typography>
-        {assessment?.model_id && (
+        {expertMode && assessment?.model_id && (
           <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
             <MonoText color="#484F58" size="0.58rem">{assessment.model_id}</MonoText>
             {assessment.latency_ms != null && (
@@ -358,15 +359,17 @@ export default function AgenticReasoningCanvas({ analysisResult }: AgenticReason
               </Box>
             )}
 
-            {/* Routing rule + reason (model + latency shown in canvas header) */}
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-              {assessment!.routing_rule && (
-                <IdText label="rule" value={assessment!.routing_rule} />
-              )}
-              {assessment!.routing_reason && (
-                <MonoText color="#484F58" size="0.62rem">{assessment!.routing_reason}</MonoText>
-              )}
-            </Box>
+            {/* Routing rule + reason — developer detail, gated behind Expert mode */}
+            {expertMode && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                {assessment!.routing_rule && (
+                  <IdText label="rule" value={assessment!.routing_rule} />
+                )}
+                {assessment!.routing_reason && (
+                  <MonoText color="#484F58" size="0.62rem">{assessment!.routing_reason}</MonoText>
+                )}
+              </Box>
+            )}
           </Box>
         ) : (
           <MonoText color="#30363D" size="0.65rem">
