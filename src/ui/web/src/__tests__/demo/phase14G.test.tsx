@@ -332,7 +332,8 @@ describe('DemoShell identity', () => {
 
   it('shows MAIW product identity text', () => {
     renderShell(inactiveDemoStatus);
-    expect(screen.getByText(/MAIW Command Center/i)).toBeInTheDocument();
+    // DemoShell title renamed from "MAIW Command Center" to "MAIW Operations" in UX-1A
+    expect(screen.getByText(/MAIW Operations/i)).toBeInTheDocument();
   });
 
   it('shows DEMO MODE indicator badge', () => {

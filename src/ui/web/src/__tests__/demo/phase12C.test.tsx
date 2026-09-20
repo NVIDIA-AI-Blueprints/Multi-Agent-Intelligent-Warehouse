@@ -348,9 +348,16 @@ describe('ObserveStage', () => {
     expect(screen.getByText('7 pending pick tasks with approaching deadlines')).toBeInTheDocument();
   });
 
-  it('shows snapshot_id post-analysis', () => {
-    wrap(<ObserveStage {...makeProps({ analysisResult: baseAnalysis })} />);
+  it('shows snapshot_id post-analysis when expertMode is on', () => {
+    // snapshot_id is a developer detail — only visible with expertMode=true
+    wrap(<ObserveStage {...makeProps({ analysisResult: baseAnalysis, expertMode: true })} />);
     expect(screen.getByText('snap-abc12345')).toBeInTheDocument();
+  });
+
+  it('hides snapshot_id by default (expertMode off)', () => {
+    // Developer detail must not appear in default operator view
+    wrap(<ObserveStage {...makeProps({ analysisResult: baseAnalysis })} />);
+    expect(screen.queryByText('snap-abc12345')).not.toBeInTheDocument();
   });
 
   it('shows re-run button (not primary CTA) after analysis', () => {
@@ -368,19 +375,25 @@ describe('ObserveStage', () => {
 // ── ReasonStage ───────────────────────────────────────────────────────────────
 
 describe('ReasonStage', () => {
-  it('shows model ID from analysisResult', () => {
-    // AgenticReasoningCanvas renders model_id once in the canvas header
-    wrap(<ReasonStage {...makeProps({ currentStage: 'REASON', analysisResult: baseAnalysis })} />);
+  it('shows model ID from analysisResult when expertMode is on', () => {
+    // model_id is a developer detail — only visible with expertMode=true
+    wrap(<ReasonStage {...makeProps({ currentStage: 'REASON', analysisResult: baseAnalysis, expertMode: true })} />);
     expect(screen.getAllByText('nvidia/llama-3.1-nemotron-70b-instruct').length).toBeGreaterThan(0);
   });
 
-  it('shows routing rule from analysisResult', () => {
+  it('hides model ID by default (expertMode off)', () => {
+    // Developer detail must not appear in default operator view (UX-1A P2)
     wrap(<ReasonStage {...makeProps({ currentStage: 'REASON', analysisResult: baseAnalysis })} />);
+    expect(screen.queryByText('nvidia/llama-3.1-nemotron-70b-instruct')).not.toBeInTheDocument();
+  });
+
+  it('shows routing rule from analysisResult when expertMode is on', () => {
+    wrap(<ReasonStage {...makeProps({ currentStage: 'REASON', analysisResult: baseAnalysis, expertMode: true })} />);
     expect(screen.getByText('labor_wave_risk')).toBeInTheDocument();
   });
 
-  it('shows routing reason from analysisResult', () => {
-    wrap(<ReasonStage {...makeProps({ currentStage: 'REASON', analysisResult: baseAnalysis })} />);
+  it('shows routing reason from analysisResult when expertMode is on', () => {
+    wrap(<ReasonStage {...makeProps({ currentStage: 'REASON', analysisResult: baseAnalysis, expertMode: true })} />);
     expect(screen.getByText(/Labor \+ wave domain/)).toBeInTheDocument();
   });
 
@@ -390,9 +403,9 @@ describe('ReasonStage', () => {
     expect(screen.getByText(/3 workers on unplanned absence causing/)).toBeInTheDocument();
   });
 
-  it('shows latency', () => {
-    // Canvas renders latency in the header; getAllByText handles multiple occurrences
-    wrap(<ReasonStage {...makeProps({ currentStage: 'REASON', analysisResult: baseAnalysis })} />);
+  it('shows latency when expertMode is on', () => {
+    // Canvas renders latency in the header — developer detail, gated behind expertMode
+    wrap(<ReasonStage {...makeProps({ currentStage: 'REASON', analysisResult: baseAnalysis, expertMode: true })} />);
     expect(screen.getAllByText('1240ms').length).toBeGreaterThan(0);
   });
 
