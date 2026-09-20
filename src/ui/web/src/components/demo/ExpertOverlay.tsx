@@ -324,6 +324,8 @@ interface Props {
   // UX-1E: Unified Developer Journey
   agentTask?: AgentTaskView | null;
   copilotTurn?: CopilotTurnResponse | null;
+  /** Increment to force-switch ExpertOverlay to the TRACE tab (works even when defaultTab is already 'trace'). */
+  forceTraceTab?: number;
   /** UX-1D cross-link: open DecisionGraph pane */
   onViewDecisionGraph?: () => void;
   /** UX-1D cross-link: open context snapshot at decision time */
@@ -343,6 +345,7 @@ export default function ExpertOverlay({
   onOpenExplanation,
   agentTask,
   copilotTurn,
+  forceTraceTab,
   onViewDecisionGraph,
   onViewContextAtDecision,
   onViewLiveWorld,
@@ -351,8 +354,13 @@ export default function ExpertOverlay({
 
   // Reset to defaultTab when it changes externally (for VIEW FULL TRACE click)
   useEffect(() => {
-    if (defaultTab) setActiveTab(defaultTab);
+    if (defaultTab) { setActiveTab(defaultTab); }
   }, [defaultTab]);
+
+  // Force-switch to TRACE tab even when defaultTab was already 'trace'
+  useEffect(() => {
+    if (forceTraceTab !== undefined) { setActiveTab('trace'); }
+  }, [forceTraceTab]);
 
   const trace = useMemo(() => buildDeveloperTrace({
     analysisResult: analysisResult ?? null,

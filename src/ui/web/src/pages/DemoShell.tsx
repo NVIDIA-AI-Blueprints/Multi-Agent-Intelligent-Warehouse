@@ -350,6 +350,7 @@ export default function DemoShell() {
   const [mode, setMode] = useState<DemoMode>('operations');
   const [expertMode, setExpertMode] = useState(false);
   const [expertDefaultTab, setExpertDefaultTab] = useState<'trace' | 'runtime' | 'raw'>('trace');
+  const [forceTraceTabSeq, setForceTraceTabSeq] = useState(0);
   // showSelector overrides demoStatus.active — set true on reset so ScenarioSelector
   // appears immediately without waiting for the status poll to confirm active:false.
   const [showSelector, setShowSelector] = useState(false);
@@ -435,6 +436,7 @@ export default function DemoShell() {
   const handleViewDecisionGraph = useCallback(() => {
     setMode('operations');
     setExpertDefaultTab('trace');
+    setForceTraceTabSeq(s => s + 1);
     setCopilotOpen(false);
   }, []);
 
