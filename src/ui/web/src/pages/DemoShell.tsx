@@ -350,6 +350,7 @@ export default function DemoShell() {
   const [mode, setMode] = useState<DemoMode>('operations');
   const [expertMode, setExpertMode] = useState(false);
   const [expertDefaultTab, setExpertDefaultTab] = useState<'trace' | 'runtime' | 'raw'>('trace');
+  const [forceTraceTabSeq, setForceTraceTabSeq] = useState(0);
   // showSelector overrides demoStatus.active — set true on reset so ScenarioSelector
   // appears immediately without waiting for the status poll to confirm active:false.
   const [showSelector, setShowSelector] = useState(false);
@@ -392,6 +393,9 @@ export default function DemoShell() {
     ? buildDemoAgentTask(analysisResult, effectiveStage)
     : null;
 
+  // UX-1E: last completed Copilot turn (for developer journey identity chain)
+  const lastCopilotTurn = [...conversation.turns].reverse().find(t => t.response !== null)?.response ?? null;
+
   const handleReviewApproval = useCallback((pendingApprovalId: string) => {
     setCopilotOpen(false);
     setSelectedStage('APPROVE');
@@ -426,6 +430,19 @@ export default function DemoShell() {
   const handleReturnFromGraph = useCallback(() => {
     setMode('operations');
     setCopilotOpen(true);
+  }, []);
+
+  // UX-1D cross-links wired through ExpertOverlay → DeveloperTraceView
+  const handleViewDecisionGraph = useCallback(() => {
+    setMode('operations');
+    setExpertDefaultTab('trace');
+    setForceTraceTabSeq(s => s + 1);
+    setCopilotOpen(false);
+  }, []);
+
+  const handleViewLiveWorld = useCallback(() => {
+    setMode('world');
+    setCopilotOpen(false);
   }, []);
 
   const handleReturnToCopilot = useCallback((card: CopilotSystemCard) => {
@@ -648,6 +665,20 @@ export default function DemoShell() {
             defaultTab={expertDefaultTab}
             analysisResult={analysisResult}
             pendingApprovals={pendingApprovals}
+            agentTask={agentTask}
+            copilotTurn={lastCopilotTurn}
+            onViewDecisionGraph={handleViewDecisionGraph}
+            onViewContextAtDecision={() => {
+              if (lastCopilotTurn) {
+                handleViewContextAtDecisionTime({
+                  turnId: lastCopilotTurn.turn_id,
+                  traceId: lastCopilotTurn.trace_id,
+                  entityLabel: lastCopilotTurn.focus_entity_label ?? null,
+                  contextSnapshotId: lastCopilotTurn.context_snapshot_id ?? lastCopilotTurn.act_source_snapshot_id ?? '',
+                });
+              }
+            }}
+            onViewLiveWorld={handleViewLiveWorld}
           />
         )}
       </Box>

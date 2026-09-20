@@ -14,7 +14,17 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Typography } from '@mui/material';
 import { RuntimeStatus } from '../../services/api';
 import { SSEEvent } from '../../hooks/useDemoSSE';
-import { AnalysisResult, PendingApproval, DemoStatus } from '../../services/demoAPI';
+import { AnalysisResult, CopilotTurnResponse, PendingApproval, DemoStatus } from '../../services/demoAPI';
+import { AgentTaskView } from '../../types/agentTask';
+import {
+  JOURNEY_STAGES,
+  JourneyStage,
+  JourneyStageStatus,
+  ArtifactIdentity,
+  INTENT_JOURNEY_STAGES,
+} from '../../constants/journeyIdentity';
+import DeveloperJourneyRail, { JourneyStageInfo } from '../developer-journey/DeveloperJourneyRail';
+import DeveloperJourneyPanel from '../developer-journey/DeveloperJourneyPanel';
 import { DecisionGraph } from './decision-graph/graphTypes';
 import { ExplanationFocus } from './decision-explanation/explanationTypes';
 import { buildDeveloperTrace } from './developer-trace/buildDeveloperTrace';
@@ -262,7 +272,7 @@ function SseSection({ events }: { events: SSEEvent[] }) {
 
 // ── Tab pill ───────────────────────────────────────────────────────────────────
 
-type ExpertTab = 'trace' | 'runtime' | 'raw';
+type ExpertTab = 'trace' | 'runtime' | 'raw' | 'journey';
 
 function TabPill({
   label,
@@ -311,6 +321,17 @@ interface Props {
   pendingApprovals?: PendingApproval[];
   graph?: DecisionGraph | null;
   onOpenExplanation?: (focus: ExplanationFocus) => void;
+  // UX-1E: Unified Developer Journey
+  agentTask?: AgentTaskView | null;
+  copilotTurn?: CopilotTurnResponse | null;
+  /** Increment to force-switch ExpertOverlay to the TRACE tab (works even when defaultTab is already 'trace'). */
+  forceTraceTab?: number;
+  /** UX-1D cross-link: open DecisionGraph pane */
+  onViewDecisionGraph?: () => void;
+  /** UX-1D cross-link: open context snapshot at decision time */
+  onViewContextAtDecision?: () => void;
+  /** UX-1D cross-link: open live world state */
+  onViewLiveWorld?: () => void;
 }
 
 export default function ExpertOverlay({
@@ -322,13 +343,24 @@ export default function ExpertOverlay({
   pendingApprovals,
   graph,
   onOpenExplanation,
+  agentTask,
+  copilotTurn,
+  forceTraceTab,
+  onViewDecisionGraph,
+  onViewContextAtDecision,
+  onViewLiveWorld,
 }: Props) {
   const [activeTab, setActiveTab] = useState<ExpertTab>(defaultTab ?? 'trace');
 
   // Reset to defaultTab when it changes externally (for VIEW FULL TRACE click)
   useEffect(() => {
-    if (defaultTab) setActiveTab(defaultTab);
+    if (defaultTab) { setActiveTab(defaultTab); }
   }, [defaultTab]);
+
+  // Force-switch to TRACE tab even when defaultTab was already 'trace'
+  useEffect(() => {
+    if (forceTraceTab !== undefined) { setActiveTab('trace'); }
+  }, [forceTraceTab]);
 
   const trace = useMemo(() => buildDeveloperTrace({
     analysisResult: analysisResult ?? null,
@@ -337,6 +369,56 @@ export default function ExpertOverlay({
     sseEvents,
     graph: graph ?? null,
   }), [analysisResult, pendingApprovals, demoStatus, sseEvents, graph]);
+
+  // ── UX-1E: journey state ───────────────────────────────────────────────────
+  const [journeyStage, setJourneyStage] = useState<JourneyStage>('CONTEXT');
+
+  const identity = useMemo((): ArtifactIdentity => {
+    const turn = copilotTurn ?? null;
+    const ar = analysisResult ?? null;
+    return {
+      conversation_id:     turn?.conversation_id,
+      turn_id:             turn?.turn_id,
+      trace_id:            turn?.trace_id ?? ar?.trace_id,
+      context_snapshot_id: turn?.context_snapshot_id ?? turn?.act_source_snapshot_id ?? ar?.assessment?.snapshot_id,
+      warehouse_id:        ar?.assessment?.warehouse_id ?? demoStatus?.world?.warehouse_id,
+      agent_task_id:       turn?.agent_task_id ?? agentTask?.task_id,
+      agent_id:            agentTask?.agent_id ?? (turn?.agent ?? undefined),
+      sop_id:              agentTask?.sop_id,
+      sop_version:         agentTask?.sop_version,
+      runtime:             undefined,
+      model_id:            turn?.model_id ?? ar?.assessment?.model_id,
+      routing_rule:        turn?.routing_rule ?? ar?.assessment?.routing_rule,
+      proposal_id:         turn?.act_proposal_id ?? undefined,
+      decision_id:         turn?.act_decision_id ?? undefined,
+      execution_id:        turn?.act_execution_id ?? undefined,
+    };
+  }, [copilotTurn, analysisResult, demoStatus, agentTask]);
+
+  const journeyStageInfos = useMemo((): JourneyStageInfo[] => {
+    const intent = copilotTurn?.intent?.toUpperCase() ?? null;
+    const activeStages = new Set<JourneyStage>(
+      intent && INTENT_JOURNEY_STAGES[intent]
+        ? INTENT_JOURNEY_STAGES[intent]
+        : JOURNEY_STAGES.slice()
+    );
+    return JOURNEY_STAGES.map(stage => {
+      if (!activeStages.has(stage)) {
+        return { stage, status: 'unavailable' as JourneyStageStatus };
+      }
+      let hint: string | undefined;
+      if (stage === 'CONTEXT') { hint = identity.context_snapshot_id?.slice(0, 8); }
+      else if (stage === 'AGENT') { hint = identity.agent_task_id?.slice(0, 8); }
+      else if (stage === 'MODEL') { hint = identity.model_id?.slice(0, 12); }
+      else if (stage === 'DECISION') { hint = identity.proposal_id?.slice(0, 8); }
+      else if (stage === 'EXECUTION') { hint = identity.execution_id?.slice(0, 8); }
+      return {
+        stage,
+        status: (stage === journeyStage ? 'current' : (hint ? 'available' : 'pending')) as JourneyStageStatus,
+        artifactIdHint: hint,
+      };
+    });
+  }, [identity, journeyStage, copilotTurn]);
 
   return (
     <Box
@@ -373,6 +455,7 @@ export default function ExpertOverlay({
           <TabPill label="Trace" active={activeTab === 'trace'} onClick={() => setActiveTab('trace')} />
           <TabPill label="Runtime" active={activeTab === 'runtime'} onClick={() => setActiveTab('runtime')} />
           <TabPill label="Raw Events" active={activeTab === 'raw'} onClick={() => setActiveTab('raw')} />
+          <TabPill label="Journey" active={activeTab === 'journey'} onClick={() => setActiveTab('journey')} />
         </Box>
       </Box>
 
@@ -382,6 +465,9 @@ export default function ExpertOverlay({
           <DeveloperTraceView
             trace={trace}
             onOpenExplanation={onOpenExplanation}
+            onViewDecisionGraph={onViewDecisionGraph}
+            onViewContextAtDecision={onViewContextAtDecision}
+            onViewLiveWorld={onViewLiveWorld}
           />
         )}
 
@@ -395,6 +481,25 @@ export default function ExpertOverlay({
 
         {activeTab === 'raw' && (
           <SseSection events={sseEvents} />
+        )}
+
+        {activeTab === 'journey' && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <DeveloperJourneyRail
+              stages={journeyStageInfos}
+              activeStage={journeyStage}
+              onStageSelect={setJourneyStage}
+            />
+            <DeveloperJourneyPanel
+              activeStage={journeyStage}
+              identity={identity}
+              analysisResult={analysisResult ?? null}
+              copilotTurn={copilotTurn ?? null}
+              demoStatus={demoStatus ?? null}
+              agentTask={agentTask ?? null}
+              onNavigateToStage={setJourneyStage}
+            />
+          </Box>
         )}
       </Box>
     </Box>

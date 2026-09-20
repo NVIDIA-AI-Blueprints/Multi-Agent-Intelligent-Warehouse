@@ -82,11 +82,16 @@ At every stage, the operator can open the **Copilot** (ASK) for evidence-grounde
 
 1. Navigate to **OPERATIONS** → enable **Expert Mode** (toggle, top-right)
 2. Observe technical detail: model_id, routing_rule, snapshot_id, trace_id, execution_id
-3. Open **ExpertOverlay → TRACE** for full developer trace timeline and artifacts
-4. Open **ExpertOverlay → RUNTIME** for runtime health, MCP domain status, agent availability
-5. Navigate to **WORLD → CONTEXT** to view OperationalContextSnapshot at decision time
-6. Navigate to **MODELS / LAB** to inspect model evaluation runs (VIEW ONLY)
-7. Navigate to **ACTIVITY** for full SSE event log
+3. Open **ExpertOverlay → JOURNEY** for end-to-end provenance navigation across all 7 stages
+   (Context → Agent/SOP → Model → Skills → Decision → Execution → Outcome)
+4. Open **ExpertOverlay → TRACE** for full developer trace timeline and forensic artifacts
+5. Open **ExpertOverlay → RUNTIME** for runtime health, MCP domain status, agent availability
+6. Navigate to **WORLD → CONTEXT** to view OperationalContextSnapshot at decision time
+7. Navigate to **MODELS / LAB** to inspect model evaluation runs (VIEW ONLY)
+8. Navigate to **ACTIVITY** for full SSE event log
+
+See [MAIW_DEVELOPER_JOURNEY.md](MAIW_DEVELOPER_JOURNEY.md) for stage definitions,
+partial journey maps, exact artifact IDs, and chain-of-thought exclusion invariants.
 
 ---
 
