@@ -23,6 +23,7 @@ import DecideStage   from './stages/DecideStage';
 import ApproveStage  from './stages/ApproveStage';
 import ExecuteStage  from './stages/ExecuteStage';
 import OutcomeStage  from './stages/OutcomeStage';
+import { AgentTaskView } from '../../types/agentTask';
 
 // ── Shared utilities exported for stage components ─────────────────────────────
 
@@ -199,6 +200,8 @@ export interface StageContentPaneProps {
   onReturnToCopilot?: (card: { decision: string; execution: string; action: string }) => void;
   /** Expert/developer mode — when true, shows model IDs, trace IDs, routing rules, etc. */
   expertMode?: boolean;
+  /** Agent task view for UX-1B agent/SOP progress display. */
+  agentTask?: AgentTaskView | null;
 }
 
 // ── Stages that support STORY/GRAPH toggle ────────────────────────────────────

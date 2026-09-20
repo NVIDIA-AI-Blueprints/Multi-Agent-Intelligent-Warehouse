@@ -6,6 +6,8 @@ import { useRuntimeStatus } from '../hooks/useRuntimeStatus';
 import { useDemoSSE } from '../hooks/useDemoSSE';
 import { useDemoLifecycle, RailStage } from '../hooks/useDemoLifecycle';
 import { demoAPI, AnalysisResult } from '../services/demoAPI';
+import { buildDemoAgentTask } from '../services/agentTaskAPI';
+import { AgentTaskView } from '../types/agentTask';
 import ScenarioSelector from '../components/demo/ScenarioSelector';
 import LifecycleRail from '../components/demo/LifecycleRail';
 import OperationalContextStrip from '../components/demo/OperationalContextStrip';
@@ -385,6 +387,11 @@ export default function DemoShell() {
 
   const effectiveStage: RailStage = selectedStage ?? currentStage;
 
+  // UX-1B: Build synthetic demo agent task from analysis result for operator visibility
+  const agentTask: AgentTaskView | null = analysisResult
+    ? buildDemoAgentTask(analysisResult, effectiveStage)
+    : null;
+
   const handleReviewApproval = useCallback((pendingApprovalId: string) => {
     setCopilotOpen(false);
     setSelectedStage('APPROVE');
@@ -605,6 +612,7 @@ export default function DemoShell() {
               selectedApprovalId={selectedApprovalId}
               onReturnToCopilot={handleReturnToCopilot}
               expertMode={expertMode}
+              agentTask={agentTask}
             />
           </>
         )}

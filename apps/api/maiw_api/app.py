@@ -48,6 +48,7 @@ from maiw_api.routers.world import router as world_router
 
 from maiw_api.routers.model_lab import router as model_lab_router
 from maiw_api.routers.world import router as world_router
+from maiw_api.routers.agent_tasks import router as agent_tasks_router
 
 # ── Legacy routers (keep temporarily) ────────────────────────────────────────
 from src.api.routers.auth import router as auth_router
@@ -249,6 +250,7 @@ app.include_router(world_router)
 
 app.include_router(model_lab_router)
 app.include_router(world_router)
+app.include_router(agent_tasks_router)
 
 # Legacy (keep temporarily)
 app.include_router(auth_router)
