@@ -237,6 +237,8 @@ export interface CopilotTurnResponse {
   observe_act_pending_approval_id?: string | null;
   // Phase 17E: operational context snapshot ID — present on grounded turns
   context_snapshot_id?: string | null;
+  // UX-1C.1: agent task ID — present on ACT turns where an AgentTaskState was registered
+  agent_task_id?: string | null;
 }
 
 export interface CopilotTurnRequest {
