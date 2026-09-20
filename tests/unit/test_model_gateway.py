@@ -1406,21 +1406,23 @@ class TestRoutingMatrixFallbacks:
         assert decision.routing_rule == "judge_task"
         assert decision.fallback_from == "ultra"
 
-    def test_nano_omni_falls_back_to_super(self):
+    def test_nano_omni_disabled_image_request_raises(self):
+        # Policy fix: super is text-only (modalities={"text"}).
+        # An IMAGE request with nano-omni disabled must raise ModelUnavailable
+        # rather than silently falling back to a text-only model.
+        from maiw_models.errors import ModelUnavailable
+
         router = self._router_super_only()
-        decision = router.route(
-            ModelRequest(
-                task="warehouse.documents.inspect_image",
-                messages=[],
-                reasoning=ReasoningLevel.MEDIUM,
-                risk_level=RiskLevel.LOW,
-                modality=Modality.IMAGE,
+        with pytest.raises(ModelUnavailable):
+            router.route(
+                ModelRequest(
+                    task="warehouse.documents.inspect_image",
+                    messages=[],
+                    reasoning=ReasoningLevel.MEDIUM,
+                    risk_level=RiskLevel.LOW,
+                    modality=Modality.IMAGE,
+                )
             )
-        )
-        assert decision.requested_role == "nano-omni"
-        assert decision.selected_role == "super"
-        assert decision.routing_rule == "multimodal_input"
-        assert decision.fallback_from == "nano-omni"
 
 
 # ── Phase 1B: OperationsAgent gateway migration ───────────────────────────────

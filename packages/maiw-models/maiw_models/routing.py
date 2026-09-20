@@ -57,7 +57,6 @@ from .models import (
 )
 from .registry import ModelRegistry
 
-
 # ── Candidate ────────────────────────────────────────────────────────────────
 
 
@@ -161,8 +160,10 @@ class PolicyFilter:
     # Deployment mode → allowed provider tags.
     _DEPLOYMENT_ALLOWED_PROVIDERS: dict[DeploymentMode, set[str]] = {
         DeploymentMode.NVIDIA_HOSTED: {"nvidia-nim"},
-        DeploymentMode.LOCAL_NIM: {"nvidia-nim"},       # operator sets MAIW_NIM_BASE_URL
-        DeploymentMode.OPENAI_COMPATIBLE: {"nvidia-nim"},  # operator sets compatible URL
+        DeploymentMode.LOCAL_NIM: {"nvidia-nim"},  # operator sets MAIW_NIM_BASE_URL
+        DeploymentMode.OPENAI_COMPATIBLE: {
+            "nvidia-nim"
+        },  # operator sets compatible URL
         DeploymentMode.ENTERPRISE: {"nvidia-nim"},
     }
 
@@ -246,10 +247,28 @@ class PolicyFilter:
                 and not cap.structured_output
             ):
                 return False
-            if "teacher_judge" in request.required_capabilities and not cap.teacher_judge:
+            if (
+                "teacher_judge" in request.required_capabilities
+                and not cap.teacher_judge
+            ):
                 return False
 
         return True
+
+    def is_request_eligible(
+        self,
+        cap: ModelCapability,
+        request: ModelRequest,
+    ) -> bool:
+        """Check whether a single capability satisfies all policy constraints for request.
+
+        Used by ModelRouter to validate fallback candidates without duplicating
+        policy logic.  deployment_mode is taken from request.deployment_mode.
+        """
+        allowed_providers = self._DEPLOYMENT_ALLOWED_PROVIDERS.get(
+            request.deployment_mode, {"nvidia-nim"}
+        )
+        return self._is_eligible(cap, request, allowed_providers)
 
     def candidate_model_ids(
         self,
