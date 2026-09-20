@@ -198,7 +198,7 @@ function GovernanceTransition() {
 
 // ── Outcome continuation ──────────────────────────────────────────────────────
 
-function OutcomeContinuation({ task }: { task: AgentTaskView }) {
+function OutcomeContinuation({ task, onViewLiveWorld }: { task: AgentTaskView; onViewLiveWorld?: () => void }) {
   const isCompleted = task.status === 'COMPLETED';
   const isEscalated = task.status === 'ESCALATED';
   const isFailed = task.status === 'FAILED';
@@ -314,9 +314,6 @@ function OutcomeContinuation({ task }: { task: AgentTaskView }) {
         <Box
           data-testid="outcome-observing"
           sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
             background: '#0d1117',
             border: '1px solid #21262D',
             borderRadius: '4px',
@@ -324,12 +321,36 @@ function OutcomeContinuation({ task }: { task: AgentTaskView }) {
             py: 0.75,
           }}
         >
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#3FB950' }}>
-            ◎
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#3FB950' }}>
+              ◎
+            </Typography>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#3FB950', fontWeight: 600 }}>
+              Verifying outcome
+            </Typography>
+          </Box>
+          <Typography
+            data-testid="outcome-observing-semantics"
+            sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#8B949E', lineHeight: 1.4, mb: 0.75 }}
+          >
+            MAIW is re-reading the warehouse state to determine whether the objective was achieved.
           </Typography>
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#3FB950' }}>
-            Verifying outcome
-          </Typography>
+          {onViewLiveWorld && (
+            <Box
+              component="button"
+              data-testid="outcome-view-live-world"
+              onClick={onViewLiveWorld}
+              sx={{
+                background: 'transparent', border: '1px solid #21262D',
+                borderRadius: '3px', px: 1, py: 0.375,
+                fontFamily: 'monospace', fontSize: '0.62rem',
+                color: '#8B949E', cursor: 'pointer',
+                '&:hover': { color: '#58A6FF', borderColor: '#58A6FF44' },
+              }}
+            >
+              [VIEW LIVE WORLD]
+            </Box>
+          )}
         </Box>
       )}
     </Box>
@@ -345,12 +366,25 @@ export interface AgentActivityProps {
   expertMode?: boolean;
   /** Compact display for REASON stage integration */
   compact?: boolean;
+  // UX-1C.4: Governance and world navigation callbacks
+  /** Called when operator clicks [REVIEW GOVERNANCE] — receives exact proposal_id */
+  onReviewGovernance?: (pendingApprovalId: string) => void;
+  /** Called when operator clicks [VIEW LIVE WORLD] */
+  onViewLiveWorld?: () => void;
+  /** Pending approval ID linked to this task — used for REVIEW GOVERNANCE link */
+  pendingApprovalId?: string | null;
+  /** Execution status from ActionExecutor — for INDETERMINATE/RECONCILING */
+  executionStatus?: string | null;
 }
 
 const AgentActivity: React.FC<AgentActivityProps> = ({
   task,
   expertMode = false,
   compact = false,
+  onReviewGovernance,
+  onViewLiveWorld,
+  pendingApprovalId,
+  executionStatus,
 }) => {
   const [expanded, setExpanded] = useState(!compact);
 
@@ -575,10 +609,73 @@ const AgentActivity: React.FC<AgentActivityProps> = ({
           )}
 
           {/* Governance handoff — WAITING_FOR_GOVERNANCE */}
-          {isGovernanceWait && <GovernanceTransition />}
+          {isGovernanceWait && (
+            <>
+              <GovernanceTransition />
+              {/* UX-1C.4: REVIEW GOVERNANCE link to exact proposal */}
+              {pendingApprovalId && onReviewGovernance && (
+                <Box sx={{ mt: 0.75 }}>
+                  <Box
+                    component="button"
+                    data-testid="agent-activity-review-governance"
+                    onClick={() => onReviewGovernance(pendingApprovalId)}
+                    sx={{
+                      background: 'rgba(210, 153, 34, 0.08)',
+                      border: '1px solid rgba(210, 153, 34, 0.3)',
+                      borderRadius: '4px',
+                      px: 1.5, py: 0.75,
+                      fontFamily: 'monospace', fontSize: '0.65rem',
+                      color: '#D29922', cursor: 'pointer',
+                      '&:hover': { background: 'rgba(210, 153, 34, 0.15)' },
+                    }}
+                  >
+                    [REVIEW GOVERNANCE]
+                  </Box>
+                </Box>
+              )}
+              {/* INDETERMINATE / RECONCILING execution status */}
+              {executionStatus === 'INDETERMINATE' && (
+                <Box
+                  data-testid="agent-activity-indeterminate"
+                  sx={{
+                    mt: 0.75, p: 1.25,
+                    background: 'rgba(248, 81, 73, 0.06)',
+                    border: '1px solid rgba(248, 81, 73, 0.2)',
+                    borderRadius: '4px',
+                  }}
+                >
+                  <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#F85149', fontWeight: 600, mb: 0.5 }}>
+                    INDETERMINATE
+                  </Typography>
+                  <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#8B949E', lineHeight: 1.4 }}>
+                    MAIW could not determine with confidence whether the action occurred.
+                    No automatic retry will be issued. Operator review is required.
+                  </Typography>
+                </Box>
+              )}
+              {executionStatus === 'UNKNOWN' && (
+                <Box
+                  data-testid="agent-activity-reconciling"
+                  sx={{
+                    mt: 0.75, p: 1.25,
+                    background: 'rgba(210, 153, 34, 0.06)',
+                    border: '1px solid rgba(210, 153, 34, 0.2)',
+                    borderRadius: '4px',
+                  }}
+                >
+                  <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#D29922', mb: 0.5 }}>
+                    Execution status is uncertain.
+                  </Typography>
+                  <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#8B949E', lineHeight: 1.4 }}>
+                    MAIW is reconciling before evaluating the outcome.
+                  </Typography>
+                </Box>
+              )}
+            </>
+          )}
 
           {/* Outcome continuation */}
-          {isOutcomeState && !isGovernanceWait && <OutcomeContinuation task={task} />}
+          {isOutcomeState && !isGovernanceWait && <OutcomeContinuation task={task} onViewLiveWorld={onViewLiveWorld} />}
 
           {/* SOP Progress */}
           {task.sop_steps.length > 0 && !isGovernanceWait && !isOutcomeState && (

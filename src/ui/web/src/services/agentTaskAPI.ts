@@ -40,6 +40,67 @@ export const agentTaskAPI = {
     const r = await http.get('/agent-tasks');
     return r.data as AgentTaskView[];
   },
+
+  /**
+   * Subscribe to live updates for a specific agent task.
+   * Uses bounded polling (3-5s interval) since no task-specific SSE stream exists.
+   * Polling stops automatically when task reaches a terminal state.
+   *
+   * UX-1C.2: Live AgentTaskState updates.
+   *
+   * @returns cleanup function — call to stop polling
+   */
+  subscribeToTask(
+    taskId: string,
+    onUpdate: (state: AgentTaskView) => void,
+    intervalMs: number = 3000,
+  ): () => void {
+    const TERMINAL_STATUSES = new Set([
+      'COMPLETED', 'ESCALATED', 'FAILED',
+    ]);
+
+    let active = true;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const poll = async () => {
+      if (!active) return;
+      try {
+        const r = await http.get(`/agent-tasks/${taskId}`);
+        const state = r.data as AgentTaskView;
+        if (active) {
+          onUpdate(state);
+          // Stop polling on terminal states
+          if (TERMINAL_STATUSES.has(state.status)) {
+            active = false;
+            return;
+          }
+        }
+      } catch (e: any) {
+        // 404 = task no longer available (e.g., server restart)
+        if (e?.response?.status === 404) {
+          active = false;
+          return;
+        }
+        // Other errors: log and continue polling
+        console.warn('[agentTaskAPI] subscribeToTask poll error:', e?.message);
+      }
+      if (active) {
+        timeoutId = setTimeout(poll, intervalMs);
+      }
+    };
+
+    // Start polling
+    poll();
+
+    // Return cleanup function
+    return () => {
+      active = false;
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+    };
+  },
 };
 
 // ── Demo-mode synthetic task construction ─────────────────────────────────────

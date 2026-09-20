@@ -124,7 +124,14 @@ function SingleDelegationCard({ result, parentTaskId, expertMode }: SingleDelega
         {/* Status icon — not color-only */}
         <Typography
           aria-hidden="true"
-          sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: statusColor, flexShrink: 0 }}
+          sx={{
+            fontFamily: 'monospace', fontSize: '0.65rem', color: statusColor, flexShrink: 0,
+            // UX-1C.2: pulse animation for RUNNING live state
+            ...(result.status === 'RUNNING' && {
+              animation: 'pulse 1s ease-in-out infinite',
+              '@keyframes pulse': { '0%, 100%': { opacity: 0.4 }, '50%': { opacity: 1 } },
+            }),
+          }}
         >
           {statusIcon}
         </Typography>
@@ -141,13 +148,23 @@ function SingleDelegationCard({ result, parentTaskId, expertMode }: SingleDelega
             {agentName}
           </Typography>
           <Typography
+            data-testid={`delegation-status-${result.status.toLowerCase()}`}
             sx={{
               fontFamily: 'monospace',
               fontSize: '0.55rem',
-              color: '#8B949E',
+              color: result.status === 'RUNNING' ? '#58A6FF' : '#8B949E',
             }}
           >
-            Specialist consultation · Consulted {consultReason}
+            {result.status === 'RUNNING'
+              ? `Consulting specialist... · ${consultReason}`
+              : result.status === 'COMPLETED'
+              ? `Consultation complete · ${consultReason}`
+              : result.status === 'FAILED'
+              ? `Specialist could not complete · ${consultReason}`
+              : result.status === 'ESCALATED'
+              ? `Specialist requires attention · ${consultReason}`
+              : `Specialist consultation · Consulted ${consultReason}`
+            }
           </Typography>
         </Box>
 

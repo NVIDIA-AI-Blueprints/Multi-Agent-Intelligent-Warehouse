@@ -88,7 +88,9 @@ class CopilotService:
         event_bus: Any | None = None,
         graph: Any | None = None,
         store: InMemoryCopilotStore | None = None,
-        datapack_manifest: dict | None = None,  # Phase 17E: DataPack metadata for snapshot provenance
+        datapack_manifest: (
+            dict | None
+        ) = None,  # Phase 17E: DataPack metadata for snapshot provenance
     ) -> None:
         self._agent = operations_agent
         self._state_provider = state_provider
@@ -134,12 +136,14 @@ class CopilotService:
         trace_id = str(uuid.uuid4())
         turn_id = str(uuid.uuid4())
 
-        conv = self._store.get_or_create(
-            conversation_id, warehouse_id, scenario_name
-        )
+        conv = self._store.get_or_create(conversation_id, warehouse_id, scenario_name)
         parent_turn_id = conv.last_turn.turn_id if conv.last_turn else None
 
-        await self._publish("COPILOT_TURN_STARTED", f"Copilot ASK — turn {turn_id[:8]}", trace_id=trace_id)
+        await self._publish(
+            "COPILOT_TURN_STARTED",
+            f"Copilot ASK — turn {turn_id[:8]}",
+            trace_id=trace_id,
+        )
         await self._publish("COPILOT_INTENT_RESOLVED", "intent=ASK", trace_id=trace_id)
 
         # ── Assemble WarehouseState ───────────────────────────────────────────
@@ -156,6 +160,7 @@ class CopilotService:
 
         if state is None or missing:
             from maiw_api.copilot.models import ContextNeighborhood as _CN
+
             neighborhood = _CN(
                 focus_entity_id=None,
                 focus_entity_label=None,
@@ -165,7 +170,9 @@ class CopilotService:
                 graph_available=False,
                 entity_resolution=None,
             )
-            degradation = _build_degradation(state_degradation_reason, missing, neighborhood)
+            degradation = _build_degradation(
+                state_degradation_reason, missing, neighborhood
+            )
             if state is None:
                 answer = (
                     f"I cannot determine the answer because warehouse state is unavailable"
@@ -208,12 +215,20 @@ class CopilotService:
                 },
             )
             turn = self._make_turn(
-                turn_id=turn_id, conv_id=conv.conversation_id, message=message,
-                intent=CopilotIntent.ASK, trace_id=trace_id, summary=result.answer,
+                turn_id=turn_id,
+                conv_id=conv.conversation_id,
+                message=message,
+                intent=CopilotIntent.ASK,
+                trace_id=trace_id,
+                summary=result.answer,
                 parent_turn_id=parent_turn_id,
             )
             self._store.add_turn(turn)
-            await self._publish("COPILOT_TURN_COMPLETE", "degraded=true insufficient_evidence", trace_id=trace_id)
+            await self._publish(
+                "COPILOT_TURN_COMPLETE",
+                "degraded=true insufficient_evidence",
+                trace_id=trace_id,
+            )
             return result, turn
 
         # ── Resolve Operational Graph neighborhood ────────────────────────────
@@ -257,7 +272,9 @@ class CopilotService:
 
             # Enrich context when the operator is asking a comparative question
             # about why a prior recommendation is the best option.
-            enriched_context = _enrich_with_recommendations(message, conv.last_recommendations)
+            enriched_context = _enrich_with_recommendations(
+                message, conv.last_recommendations
+            )
 
             assessment = await self._agent.analyze_disruption(
                 snapshot=snapshot,
@@ -291,19 +308,27 @@ class CopilotService:
                 missing_context=[],
             )
             turn = self._make_turn(
-                turn_id=turn_id, conv_id=conv.conversation_id, message=message,
-                intent=CopilotIntent.ASK, trace_id=trace_id, summary=err_answer,
+                turn_id=turn_id,
+                conv_id=conv.conversation_id,
+                message=message,
+                intent=CopilotIntent.ASK,
+                trace_id=trace_id,
+                summary=err_answer,
                 parent_turn_id=parent_turn_id,
             )
             self._store.add_turn(turn)
-            await self._publish("COPILOT_TURN_COMPLETE", "degraded=true error", trace_id=trace_id)
+            await self._publish(
+                "COPILOT_TURN_COMPLETE", "degraded=true error", trace_id=trace_id
+            )
             return result, turn
 
         # ── Build result ──────────────────────────────────────────────────────
         _total_ms = (time.monotonic() - _t0) * 1000
         evidence = _facts_to_evidence(assessment.facts_observed, assessment.severity)
 
-        full_degradation = _build_degradation(state_degradation_reason, [], neighborhood)
+        full_degradation = _build_degradation(
+            state_degradation_reason, [], neighborhood
+        )
         partial_missing = [m for m in _missing_context(state, scenario_name)]
         # Graph unavailability is captured in full_degradation; it must not
         # demote answerability — the answer is still grounded in state facts.
@@ -348,16 +373,24 @@ class CopilotService:
             conv.last_focus_entity_type = er.entity_type if er else None
 
         turn = self._make_turn(
-            turn_id=turn_id, conv_id=conv.conversation_id, message=message,
-            intent=CopilotIntent.ASK, trace_id=trace_id, summary=result.answer,
+            turn_id=turn_id,
+            conv_id=conv.conversation_id,
+            message=message,
+            intent=CopilotIntent.ASK,
+            trace_id=trace_id,
+            summary=result.answer,
             parent_turn_id=parent_turn_id,
             focus_entity_id=neighborhood.focus_entity_id,
             focus_entity_type=conv.last_focus_entity_type,
             focus_entity_label=neighborhood.focus_entity_label,
-            context_snapshot_id=_ctx_snapshot.context_snapshot_id if _ctx_snapshot is not None else None,
+            context_snapshot_id=(
+                _ctx_snapshot.context_snapshot_id if _ctx_snapshot is not None else None
+            ),
         )
         self._store.add_turn(turn)
-        await self._publish("COPILOT_TURN_COMPLETE", f"model={result.model_id}", trace_id=trace_id)
+        await self._publish(
+            "COPILOT_TURN_COMPLETE", f"model={result.model_id}", trace_id=trace_id
+        )
         return result, turn
 
     async def analyze(
@@ -378,16 +411,22 @@ class CopilotService:
         trace_id = str(uuid.uuid4())
         turn_id = str(uuid.uuid4())
 
-        conv = self._store.get_or_create(
-            conversation_id, warehouse_id, scenario_name
-        )
+        conv = self._store.get_or_create(conversation_id, warehouse_id, scenario_name)
         parent_turn_id = conv.last_turn.turn_id if conv.last_turn else None
 
-        await self._publish("COPILOT_TURN_STARTED", f"Copilot ANALYZE — turn {turn_id[:8]}", trace_id=trace_id)
-        await self._publish("COPILOT_INTENT_RESOLVED", "intent=ANALYZE", trace_id=trace_id)
+        await self._publish(
+            "COPILOT_TURN_STARTED",
+            f"Copilot ANALYZE — turn {turn_id[:8]}",
+            trace_id=trace_id,
+        )
+        await self._publish(
+            "COPILOT_INTENT_RESOLVED", "intent=ANALYZE", trace_id=trace_id
+        )
 
         # ── Fresh WarehouseState read (do not reuse prior ASK snapshot) ───────
-        await self._publish("COPILOT_READING_STATE", "Reading warehouse state", trace_id=trace_id)
+        await self._publish(
+            "COPILOT_READING_STATE", "Reading warehouse state", trace_id=trace_id
+        )
         _t_state = time.monotonic()
         state, state_degraded, state_degradation_reason = await self._get_state(
             warehouse_id=warehouse_id,
@@ -400,43 +439,72 @@ class CopilotService:
 
         if state is None or missing:
             from maiw_api.copilot.models import ContextNeighborhood as _CN
+
             neighborhood = _CN(
-                focus_entity_id=None, focus_entity_label=None, entity_ids=[],
-                relationship_summary={}, max_depth=2, graph_available=False,
+                focus_entity_id=None,
+                focus_entity_label=None,
+                entity_ids=[],
+                relationship_summary={},
+                max_depth=2,
+                graph_available=False,
                 entity_resolution=None,
             )
-            degradation = _build_degradation(state_degradation_reason, missing, neighborhood)
+            degradation = _build_degradation(
+                state_degradation_reason, missing, neighborhood
+            )
             summary = (
                 "I cannot produce recommendations because warehouse state is unavailable. "
                 + (state_degradation_reason or "")
             ).strip()
             result = CopilotAnalyzeResult(
-                summary=summary, severity="UNKNOWN", evidence=[], recommendations=[],
-                neighborhood=neighborhood, agent="OperationsCoordinationAgent",
-                skills_used=[], skills_available=[], model_id="none",
-                reasoning_level="HIGH", routing_rule="none",
+                summary=summary,
+                severity="UNKNOWN",
+                evidence=[],
+                recommendations=[],
+                neighborhood=neighborhood,
+                agent="OperationsCoordinationAgent",
+                skills_used=[],
+                skills_available=[],
+                model_id="none",
+                reasoning_level="HIGH",
+                routing_rule="none",
                 routing_reason="State unavailable — skipped",
-                trace_id=trace_id, snapshot_id="none", warehouse_id=warehouse_id,
+                trace_id=trace_id,
+                snapshot_id="none",
+                warehouse_id=warehouse_id,
                 latency_ms=(time.monotonic() - _t0) * 1000,
-                degraded=True, degradation_reason=degradation,
-                answerability="insufficient_evidence", missing_context=missing,
+                degraded=True,
+                degradation_reason=degradation,
+                answerability="insufficient_evidence",
+                missing_context=missing,
                 timing={
                     "state_assembly_ms": round(_state_ms, 1),
-                    "graph_lookup_ms": 0.0, "model_inference_ms": 0.0,
+                    "graph_lookup_ms": 0.0,
+                    "model_inference_ms": 0.0,
                     "total_ms": round((time.monotonic() - _t0) * 1000, 1),
                 },
             )
             turn = self._make_turn(
-                turn_id=turn_id, conv_id=conv.conversation_id, message=message,
-                intent=CopilotIntent.ANALYZE, trace_id=trace_id, summary=result.summary,
+                turn_id=turn_id,
+                conv_id=conv.conversation_id,
+                message=message,
+                intent=CopilotIntent.ANALYZE,
+                trace_id=trace_id,
+                summary=result.summary,
                 parent_turn_id=parent_turn_id,
             )
             self._store.add_turn(turn)
-            await self._publish("COPILOT_TURN_COMPLETE", "degraded=true insufficient_evidence", trace_id=trace_id)
+            await self._publish(
+                "COPILOT_TURN_COMPLETE",
+                "degraded=true insufficient_evidence",
+                trace_id=trace_id,
+            )
             return result, turn
 
         # ── Resolve Operational Graph neighborhood with focus continuity ──────
-        await self._publish("COPILOT_RESOLVING_CONTEXT", "Resolving graph context", trace_id=trace_id)
+        await self._publish(
+            "COPILOT_RESOLVING_CONTEXT", "Resolving graph context", trace_id=trace_id
+        )
         _t_graph = time.monotonic()
         neighborhood = context_resolver.resolve(
             question=message,
@@ -456,7 +524,9 @@ class CopilotService:
         )
 
         # ── Seal snapshot and call agent with HIGH reasoning ──────────────────
-        await self._publish("COPILOT_ANALYZING", "Generating recommendations", trace_id=trace_id)
+        await self._publish(
+            "COPILOT_ANALYZING", "Generating recommendations", trace_id=trace_id
+        )
         _ctx_snapshot_analyze: OperationalContextSnapshot | None = None  # Phase 17E
         try:
             from maiw_models import ReasoningLevel, RiskLevel
@@ -490,14 +560,24 @@ class CopilotService:
             logger.error("CopilotService.analyze: agent call failed — %s", exc)
             err_summary = "I encountered an error while generating recommendations."
             result = CopilotAnalyzeResult(
-                summary=err_summary, severity="UNKNOWN", evidence=[], recommendations=[],
-                neighborhood=neighborhood, agent="OperationsCoordinationAgent",
-                skills_used=[], skills_available=[], model_id="none",
-                reasoning_level="HIGH", routing_rule="none",
+                summary=err_summary,
+                severity="UNKNOWN",
+                evidence=[],
+                recommendations=[],
+                neighborhood=neighborhood,
+                agent="OperationsCoordinationAgent",
+                skills_used=[],
+                skills_available=[],
+                model_id="none",
+                reasoning_level="HIGH",
+                routing_rule="none",
                 routing_reason=f"Agent error: {exc}",
-                trace_id=trace_id, snapshot_id="none", warehouse_id=warehouse_id,
+                trace_id=trace_id,
+                snapshot_id="none",
+                warehouse_id=warehouse_id,
                 latency_ms=(time.monotonic() - _t0) * 1000,
-                degraded=True, degradation_reason=str(exc),
+                degraded=True,
+                degradation_reason=str(exc),
                 answerability="insufficient_evidence",
                 timing={
                     "state_assembly_ms": round(_state_ms, 1),
@@ -507,48 +587,72 @@ class CopilotService:
                 },
             )
             turn = self._make_turn(
-                turn_id=turn_id, conv_id=conv.conversation_id, message=message,
-                intent=CopilotIntent.ANALYZE, trace_id=trace_id, summary=err_summary,
+                turn_id=turn_id,
+                conv_id=conv.conversation_id,
+                message=message,
+                intent=CopilotIntent.ANALYZE,
+                trace_id=trace_id,
+                summary=err_summary,
                 parent_turn_id=parent_turn_id,
             )
             self._store.add_turn(turn)
-            await self._publish("COPILOT_TURN_COMPLETE", "degraded=true error", trace_id=trace_id)
+            await self._publish(
+                "COPILOT_TURN_COMPLETE", "degraded=true error", trace_id=trace_id
+            )
             return result, turn
 
         # ── Build RecommendedActionResult list with provenance ────────────────
         _total_ms = (time.monotonic() - _t0) * 1000
         evidence = _facts_to_evidence(assessment.facts_observed, assessment.severity)
-        full_degradation = _build_degradation(state_degradation_reason, [], neighborhood)
+        full_degradation = _build_degradation(
+            state_degradation_reason, [], neighborhood
+        )
         answerability = "partial" if state_degradation_reason else "answerable"
 
-        effective_focus_id = (
-            neighborhood.focus_entity_id or conv.last_focus_entity_id
-        )
+        effective_focus_id = neighborhood.focus_entity_id or conv.last_focus_entity_id
         effective_focus_label = (
             neighborhood.focus_entity_label or conv.last_focus_entity_label
         )
 
         recs: list[RecommendedActionResult] = []
         for i, ra in enumerate(assessment.recommendations):
-            recs.append(RecommendedActionResult(
-                recommendation_id=f"{turn_id[:8]}-rec-{i:02d}",
-                domain=ra.domain.value if hasattr(ra.domain, "value") else str(ra.domain),
-                capability=ra.capability.value if hasattr(ra.capability, "value") else str(ra.capability),
-                target=ra.target,
-                objective=ra.objective,
-                rationale=ra.rationale,
-                priority=ra.priority.value if hasattr(ra.priority, "value") else str(ra.priority),
-                subtype=ra.subtype,
-                conversation_id=conv.conversation_id,
-                turn_id=turn_id,
-                trace_id=trace_id,
-                snapshot_id=assessment.snapshot_id,
-                focus_entity_id=effective_focus_id,
-            ))
+            recs.append(
+                RecommendedActionResult(
+                    recommendation_id=f"{turn_id[:8]}-rec-{i:02d}",
+                    domain=(
+                        ra.domain.value
+                        if hasattr(ra.domain, "value")
+                        else str(ra.domain)
+                    ),
+                    capability=(
+                        ra.capability.value
+                        if hasattr(ra.capability, "value")
+                        else str(ra.capability)
+                    ),
+                    target=ra.target,
+                    objective=ra.objective,
+                    rationale=ra.rationale,
+                    priority=(
+                        ra.priority.value
+                        if hasattr(ra.priority, "value")
+                        else str(ra.priority)
+                    ),
+                    subtype=ra.subtype,
+                    conversation_id=conv.conversation_id,
+                    turn_id=turn_id,
+                    trace_id=trace_id,
+                    snapshot_id=assessment.snapshot_id,
+                    focus_entity_id=effective_focus_id,
+                )
+            )
 
         result = CopilotAnalyzeResult(
             summary=assessment.summary,
-            severity=assessment.severity.value if hasattr(assessment.severity, "value") else str(assessment.severity),
+            severity=(
+                assessment.severity.value
+                if hasattr(assessment.severity, "value")
+                else str(assessment.severity)
+            ),
             evidence=evidence,
             recommendations=recs,
             neighborhood=neighborhood,
@@ -589,16 +693,28 @@ class CopilotService:
         conv.last_recommendations = list(recs)
 
         turn = self._make_turn(
-            turn_id=turn_id, conv_id=conv.conversation_id, message=message,
-            intent=CopilotIntent.ANALYZE, trace_id=trace_id, summary=result.summary,
+            turn_id=turn_id,
+            conv_id=conv.conversation_id,
+            message=message,
+            intent=CopilotIntent.ANALYZE,
+            trace_id=trace_id,
+            summary=result.summary,
             parent_turn_id=parent_turn_id,
             focus_entity_id=effective_focus_id,
             focus_entity_type=conv.last_focus_entity_type,
             focus_entity_label=effective_focus_label,
-            context_snapshot_id=_ctx_snapshot_analyze.context_snapshot_id if _ctx_snapshot_analyze is not None else None,
+            context_snapshot_id=(
+                _ctx_snapshot_analyze.context_snapshot_id
+                if _ctx_snapshot_analyze is not None
+                else None
+            ),
         )
         self._store.add_turn(turn)
-        await self._publish("COPILOT_TURN_COMPLETE", f"recommendations={len(recs)} model={result.model_id}", trace_id=trace_id)
+        await self._publish(
+            "COPILOT_TURN_COMPLETE",
+            f"recommendations={len(recs)} model={result.model_id}",
+            trace_id=trace_id,
+        )
         return result, turn
 
     async def act(
@@ -625,7 +741,11 @@ class CopilotService:
         conv = self._store.get_or_create(conversation_id, warehouse_id, scenario_name)
         parent_turn_id = conv.last_turn.turn_id if conv.last_turn else None
 
-        await self._publish("COPILOT_TURN_STARTED", f"Copilot ACT — turn {turn_id[:8]}", trace_id=trace_id)
+        await self._publish(
+            "COPILOT_TURN_STARTED",
+            f"Copilot ACT — turn {turn_id[:8]}",
+            trace_id=trace_id,
+        )
         await self._publish("COPILOT_INTENT_RESOLVED", "intent=ACT", trace_id=trace_id)
 
         def _make_act_error(
@@ -679,16 +799,26 @@ class CopilotService:
                 degraded=True,
             )
             turn = self._make_turn(
-                turn_id=turn_id, conv_id=conv.conversation_id, message=message,
-                intent=CopilotIntent.ACT, trace_id=trace_id, summary=result.message,
+                turn_id=turn_id,
+                conv_id=conv.conversation_id,
+                message=message,
+                intent=CopilotIntent.ACT,
+                trace_id=trace_id,
+                summary=result.message,
                 parent_turn_id=parent_turn_id,
             )
             self._store.add_turn(turn)
-            await self._publish("COPILOT_TURN_COMPLETE", "not_implemented", trace_id=trace_id)
+            await self._publish(
+                "COPILOT_TURN_COMPLETE", "not_implemented", trace_id=trace_id
+            )
             return result, turn
 
         # ── Recommendation resolution ─────────────────────────────────────────
-        await self._publish("COPILOT_RESOLVING_RECOMMENDATION", "Resolving recommendation", trace_id=trace_id)
+        await self._publish(
+            "COPILOT_RESOLVING_RECOMMENDATION",
+            "Resolving recommendation",
+            trace_id=trace_id,
+        )
         recs: list[RecommendedActionResult] = list(conv.last_recommendations)
 
         if not recs:
@@ -701,20 +831,25 @@ class CopilotService:
                 degraded=False,
             )
             turn = self._make_turn(
-                turn_id=turn_id, conv_id=conv.conversation_id, message=message,
-                intent=CopilotIntent.ACT, trace_id=trace_id, summary=result.message,
+                turn_id=turn_id,
+                conv_id=conv.conversation_id,
+                message=message,
+                intent=CopilotIntent.ACT,
+                trace_id=trace_id,
+                summary=result.message,
                 parent_turn_id=parent_turn_id,
             )
             self._store.add_turn(turn)
-            await self._publish("COPILOT_TURN_COMPLETE", "no_recommendations", trace_id=trace_id)
+            await self._publish(
+                "COPILOT_TURN_COMPLETE", "no_recommendations", trace_id=trace_id
+            )
             return result, turn
 
         selected_rec, resolution_reason = _select_recommendation(message, recs)
 
         if selected_rec is None and resolution_reason == "ambiguous":
             rec_list = "\n".join(
-                f"{i + 1}. {r.objective} ({r.capability})"
-                for i, r in enumerate(recs)
+                f"{i + 1}. {r.objective} ({r.capability})" for i, r in enumerate(recs)
             )
             result = _make_act_error(
                 "CLARIFICATION_REQUIRED",
@@ -727,12 +862,18 @@ class CopilotService:
                 degraded=False,
             )
             turn = self._make_turn(
-                turn_id=turn_id, conv_id=conv.conversation_id, message=message,
-                intent=CopilotIntent.ACT, trace_id=trace_id, summary=result.message,
+                turn_id=turn_id,
+                conv_id=conv.conversation_id,
+                message=message,
+                intent=CopilotIntent.ACT,
+                trace_id=trace_id,
+                summary=result.message,
                 parent_turn_id=parent_turn_id,
             )
             self._store.add_turn(turn)
-            await self._publish("COPILOT_TURN_COMPLETE", "clarification_required", trace_id=trace_id)
+            await self._publish(
+                "COPILOT_TURN_COMPLETE", "clarification_required", trace_id=trace_id
+            )
             return result, turn
 
         if selected_rec is None:
@@ -742,8 +883,12 @@ class CopilotService:
                 degraded=True,
             )
             turn = self._make_turn(
-                turn_id=turn_id, conv_id=conv.conversation_id, message=message,
-                intent=CopilotIntent.ACT, trace_id=trace_id, summary=result.message,
+                turn_id=turn_id,
+                conv_id=conv.conversation_id,
+                message=message,
+                intent=CopilotIntent.ACT,
+                trace_id=trace_id,
+                summary=result.message,
                 parent_turn_id=parent_turn_id,
             )
             self._store.add_turn(turn)
@@ -756,7 +901,11 @@ class CopilotService:
         )
 
         # ── Re-read WarehouseState (S2) ───────────────────────────────────────
-        await self._publish("COPILOT_READING_STATE", "Reading current warehouse state", trace_id=trace_id)
+        await self._publish(
+            "COPILOT_READING_STATE",
+            "Reading current warehouse state",
+            trace_id=trace_id,
+        )
         state, state_degraded, state_degradation_reason = await self._get_state(
             warehouse_id=warehouse_id,
             scenario_name=scenario_name,
@@ -778,12 +927,18 @@ class CopilotService:
                 degradation_reason=state_degradation_reason,
             )
             turn = self._make_turn(
-                turn_id=turn_id, conv_id=conv.conversation_id, message=message,
-                intent=CopilotIntent.ACT, trace_id=trace_id, summary=result.message,
+                turn_id=turn_id,
+                conv_id=conv.conversation_id,
+                message=message,
+                intent=CopilotIntent.ACT,
+                trace_id=trace_id,
+                summary=result.message,
                 parent_turn_id=parent_turn_id,
             )
             self._store.add_turn(turn)
-            await self._publish("COPILOT_TURN_COMPLETE", "state_unavailable", trace_id=trace_id)
+            await self._publish(
+                "COPILOT_TURN_COMPLETE", "state_unavailable", trace_id=trace_id
+            )
             return result, turn
 
         # ── Seal S2 snapshot ──────────────────────────────────────────────────
@@ -791,7 +946,11 @@ class CopilotService:
         current_snapshot_id = getattr(snapshot, "snapshot_id", "unknown")
 
         # ── Validate state drift (S1 vs S2) ──────────────────────────────────
-        await self._publish("COPILOT_VALIDATING_STATE", "Validating against current state", trace_id=trace_id)
+        await self._publish(
+            "COPILOT_VALIDATING_STATE",
+            "Validating against current state",
+            trace_id=trace_id,
+        )
         drift_reason = _check_state_drift(selected_rec, state)
 
         if drift_reason:
@@ -810,12 +969,18 @@ class CopilotService:
                 degraded=False,
             )
             turn = self._make_turn(
-                turn_id=turn_id, conv_id=conv.conversation_id, message=message,
-                intent=CopilotIntent.ACT, trace_id=trace_id, summary=result.message,
+                turn_id=turn_id,
+                conv_id=conv.conversation_id,
+                message=message,
+                intent=CopilotIntent.ACT,
+                trace_id=trace_id,
+                summary=result.message,
                 parent_turn_id=parent_turn_id,
             )
             self._store.add_turn(turn)
-            await self._publish("COPILOT_TURN_COMPLETE", "stale_state", trace_id=trace_id)
+            await self._publish(
+                "COPILOT_TURN_COMPLETE", "stale_state", trace_id=trace_id
+            )
             return result, turn
 
         # ── Build GovernedActionRequest ───────────────────────────────────────
@@ -842,7 +1007,9 @@ class CopilotService:
         pre_metrics = _extract_state_metrics(state)
 
         # ── Delegate to GovernedActionOrchestrator ────────────────────────────
-        await self._publish("COPILOT_PREPARING_ACTION", "Preparing governed action", trace_id=trace_id)
+        await self._publish(
+            "COPILOT_PREPARING_ACTION", "Preparing governed action", trace_id=trace_id
+        )
         try:
             result = await self._orchestrator.govern(
                 request=gov_request,
@@ -867,6 +1034,20 @@ class CopilotService:
         conv.last_act_result = result
         conv.last_act_pre_state_metrics = pre_metrics
 
+        # ── UX-1C.1: Create and register AgentTaskState for this ACT turn ─────
+        agent_task_id = _register_copilot_act_task(
+            result=result,
+            conversation_id=conv.conversation_id,
+            turn_id=turn_id,
+            trace_id=trace_id,
+            objective=selected_rec.objective,
+            sop_id="operations_coordination.wave_risk_resolution",
+            context_snapshot_id=current_snapshot_id,
+        )
+        result.agent_task_id = agent_task_id
+        if agent_task_id:
+            conv.last_agent_task_id = agent_task_id
+
         # ── Persist turn with artifact refs ───────────────────────────────────
         artifact_refs: dict[str, str | None] = {}
         if result.proposal_id:
@@ -879,8 +1060,11 @@ class CopilotService:
             artifact_refs["execution_id"] = result.execution_id
 
         turn = self._make_turn(
-            turn_id=turn_id, conv_id=conv.conversation_id, message=message,
-            intent=CopilotIntent.ACT, trace_id=trace_id,
+            turn_id=turn_id,
+            conv_id=conv.conversation_id,
+            message=message,
+            intent=CopilotIntent.ACT,
+            trace_id=trace_id,
             summary=result.message[:200],
             parent_turn_id=parent_turn_id,
             focus_entity_id=selected_rec.focus_entity_id,
@@ -888,6 +1072,7 @@ class CopilotService:
             focus_entity_label=conv.last_focus_entity_label,
         )
         turn.artifact_refs.update(artifact_refs)
+        turn.agent_task_id = agent_task_id
         self._store.add_turn(turn)
         await self._publish(
             "COPILOT_TURN_COMPLETE",
@@ -928,8 +1113,14 @@ class CopilotService:
         parent_turn_id = conv.last_turn.turn_id if conv.last_turn else None
         from maiw_api.copilot.models import ContextNeighborhood as _CN
 
-        await self._publish("COPILOT_TURN_STARTED", f"Copilot OBSERVE — turn {turn_id[:8]}", trace_id=trace_id)
-        await self._publish("COPILOT_INTENT_RESOLVED", "intent=OBSERVE_OUTCOME", trace_id=trace_id)
+        await self._publish(
+            "COPILOT_TURN_STARTED",
+            f"Copilot OBSERVE — turn {turn_id[:8]}",
+            trace_id=trace_id,
+        )
+        await self._publish(
+            "COPILOT_INTENT_RESOLVED", "intent=OBSERVE_OUTCOME", trace_id=trace_id
+        )
 
         # ── No prior ACT on this conversation ─────────────────────────────────
         last_act = conv.last_act_result
@@ -941,8 +1132,12 @@ class CopilotService:
                 "Ask 'What should we do?' to get recommendations, then 'Do it.' to request a governed action."
             )
             neighborhood = _CN(
-                focus_entity_id=None, focus_entity_label=None, entity_ids=[],
-                relationship_summary={}, max_depth=2, graph_available=False,
+                focus_entity_id=None,
+                focus_entity_label=None,
+                entity_ids=[],
+                relationship_summary={},
+                max_depth=2,
+                graph_available=False,
                 entity_resolution=None,
             )
             result = CopilotObserveResult(
@@ -970,16 +1165,26 @@ class CopilotService:
                 answerability="answerable",
             )
             turn = self._make_turn(
-                turn_id=turn_id, conv_id=conv.conversation_id, message=message,
-                intent=CopilotIntent.OBSERVE_OUTCOME, trace_id=trace_id, summary=answer,
+                turn_id=turn_id,
+                conv_id=conv.conversation_id,
+                message=message,
+                intent=CopilotIntent.OBSERVE_OUTCOME,
+                trace_id=trace_id,
+                summary=answer,
                 parent_turn_id=parent_turn_id,
             )
             self._store.add_turn(turn)
-            await self._publish("COPILOT_TURN_COMPLETE", "no_prior_act", trace_id=trace_id)
+            await self._publish(
+                "COPILOT_TURN_COMPLETE", "no_prior_act", trace_id=trace_id
+            )
             return result, turn
 
         # ── Read current state ────────────────────────────────────────────────
-        await self._publish("COPILOT_READING_STATE", "Reading current warehouse state for outcome", trace_id=trace_id)
+        await self._publish(
+            "COPILOT_READING_STATE",
+            "Reading current warehouse state for outcome",
+            trace_id=trace_id,
+        )
         _t_state = time.monotonic()
         state, state_degraded, state_degradation_reason = await self._get_state(
             warehouse_id=warehouse_id,
@@ -1027,12 +1232,18 @@ class CopilotService:
                 answerability="insufficient_evidence",
             )
             turn = self._make_turn(
-                turn_id=turn_id, conv_id=conv.conversation_id, message=message,
-                intent=CopilotIntent.OBSERVE_OUTCOME, trace_id=trace_id, summary=answer,
+                turn_id=turn_id,
+                conv_id=conv.conversation_id,
+                message=message,
+                intent=CopilotIntent.OBSERVE_OUTCOME,
+                trace_id=trace_id,
+                summary=answer,
                 parent_turn_id=parent_turn_id,
             )
             self._store.add_turn(turn)
-            await self._publish("COPILOT_TURN_COMPLETE", "state_unavailable", trace_id=trace_id)
+            await self._publish(
+                "COPILOT_TURN_COMPLETE", "state_unavailable", trace_id=trace_id
+            )
             return result, turn
 
         # ── Compute post-metrics and delta ────────────────────────────────────
@@ -1042,8 +1253,8 @@ class CopilotService:
         decision_outcome = getattr(last_act, "decision_outcome", None)
         mutation_state = getattr(last_act, "mutation_state", None)
         execution_confirmed = (
-            mutation_state is not None and
-            getattr(mutation_state, "value", str(mutation_state)) == "CONFIRMED"
+            mutation_state is not None
+            and getattr(mutation_state, "value", str(mutation_state)) == "CONFIRMED"
         )
         # The last_act_result is written at ACT time (mutation_state=NOT_ATTEMPTED).
         # After the human approves and execution runs, last_act_result is never updated.
@@ -1103,13 +1314,19 @@ class CopilotService:
         )
 
         turn = self._make_turn(
-            turn_id=turn_id, conv_id=conv.conversation_id, message=message,
-            intent=CopilotIntent.OBSERVE_OUTCOME, trace_id=trace_id, summary=summary,
+            turn_id=turn_id,
+            conv_id=conv.conversation_id,
+            message=message,
+            intent=CopilotIntent.OBSERVE_OUTCOME,
+            trace_id=trace_id,
+            summary=summary,
             parent_turn_id=parent_turn_id,
             focus_entity_id=conv.last_focus_entity_id,
             focus_entity_type=conv.last_focus_entity_type,
             focus_entity_label=conv.last_focus_entity_label,
         )
+        # UX-1C.1: carry forward agent_task_id from conversation so OBSERVE turn links to same task
+        turn.agent_task_id = getattr(conv, "last_agent_task_id", None)
         self._store.add_turn(turn)
         await self._publish(
             "COPILOT_TURN_COMPLETE",
@@ -1169,15 +1386,21 @@ class CopilotService:
             ent = graph.get_entity(eid)
             if ent is None:
                 continue
-            et = ent.entity_type.value if hasattr(ent.entity_type, "value") else str(ent.entity_type)
+            et = (
+                ent.entity_type.value
+                if hasattr(ent.entity_type, "value")
+                else str(ent.entity_type)
+            )
             label = _snapshot_entity_label(ent)
             attrs = _snapshot_entity_attributes(ent)
-            nodes.append(ContextSnapshotNode(
-                entity_id=eid,
-                entity_type=et,
-                label=label,
-                attributes=attrs,
-            ))
+            nodes.append(
+                ContextSnapshotNode(
+                    entity_id=eid,
+                    entity_type=et,
+                    label=label,
+                    attributes=attrs,
+                )
+            )
 
         # ── Capture edges between nodes in the bounded set ────────────────────
         capped_ids = {focus_id} | set(all_ids)
@@ -1193,16 +1416,22 @@ class CopilotService:
                         continue
                     if len(edges) >= 100:
                         break
-                    rel = edge.relationship_type.value if hasattr(edge.relationship_type, "value") else str(edge.relationship_type)
+                    rel = (
+                        edge.relationship_type.value
+                        if hasattr(edge.relationship_type, "value")
+                        else str(edge.relationship_type)
+                    )
                     vf = edge.valid_from
                     vt = edge.valid_to
-                    edges.append(ContextSnapshotEdge(
-                        source_id=edge.source_id,
-                        target_id=edge.target_id,
-                        relationship_type=rel,
-                        valid_from=vf.isoformat() if vf else None,
-                        valid_to=vt.isoformat() if vt else None,
-                    ))
+                    edges.append(
+                        ContextSnapshotEdge(
+                            source_id=edge.source_id,
+                            target_id=edge.target_id,
+                            relationship_type=rel,
+                            valid_from=vf.isoformat() if vf else None,
+                            valid_to=vt.isoformat() if vt else None,
+                        )
+                    )
                     seen_edges.add(edge.id)
             except Exception:
                 pass
@@ -1210,8 +1439,14 @@ class CopilotService:
                 break
 
         # ── Focus entity identity ─────────────────────────────────────────────
-        focus_et = focus_entity.entity_type.value if hasattr(focus_entity.entity_type, "value") else str(focus_entity.entity_type)
-        focus_label = getattr(neighborhood, "focus_entity_label", None) or _snapshot_entity_label(focus_entity)
+        focus_et = (
+            focus_entity.entity_type.value
+            if hasattr(focus_entity.entity_type, "value")
+            else str(focus_entity.entity_type)
+        )
+        focus_label = getattr(
+            neighborhood, "focus_entity_label", None
+        ) or _snapshot_entity_label(focus_entity)
 
         # ── DataPack identity ─────────────────────────────────────────────────
         dataset_id = manifest.get("dataset_id", "unknown")
@@ -1241,7 +1476,9 @@ class CopilotService:
             edges=edges,
             entity_count=len(nodes),
             relationship_count=len(edges),
-            relationship_summary=dict(getattr(neighborhood, "relationship_summary", {})),
+            relationship_summary=dict(
+                getattr(neighborhood, "relationship_summary", {})
+            ),
             captured_at=_dt.now(_tz.utc).isoformat(),
         )
         return snapshot
@@ -1259,7 +1496,11 @@ class CopilotService:
         call fails, returns (None, True, reason).
         """
         if self._state_provider is None:
-            return None, True, "WarehouseStateProvider is unavailable in this environment."
+            return (
+                None,
+                True,
+                "WarehouseStateProvider is unavailable in this environment.",
+            )
 
         try:
             requirements_cls = _StateRequirements
@@ -1343,6 +1584,111 @@ class CopilotService:
 
 # ── ACT helpers ──────────────────────────────────────────────────────────────
 
+
+# UX-1C.1: AgentTask registration for copilot-initiated ACT turns
+
+
+def _register_copilot_act_task(
+    *,
+    result: "CopilotActResult",
+    conversation_id: str,
+    turn_id: str,
+    trace_id: str,
+    objective: str,
+    sop_id: str = "operations_coordination.wave_risk_resolution",
+    context_snapshot_id: str | None = None,
+) -> str | None:
+    """Create and register AgentTaskState for copilot ACT turn. UX-1C.1."""
+    try:
+        import uuid as _uuid_mod
+        from datetime import datetime as _dt, timezone as _tz
+        from maiw_agents.contracts.task import AgentTaskState, AgentTaskStatus
+        from maiw_api.routers.agent_tasks import register_agent_task
+
+        task_id = f"copilot-act-{turn_id[:8]}-{_uuid_mod.uuid4().hex[:8]}"
+
+        outcome = result.decision_outcome
+        mutation = getattr(result.mutation_state, "value", str(result.mutation_state))
+
+        if outcome == "REQUIRES_HUMAN_APPROVAL":
+            status = AgentTaskStatus.WAITING_FOR_GOVERNANCE
+            current_step_id = "submit"
+            completed = [
+                "establish_state",
+                "diagnose",
+                "gather_specialist_evidence",
+                "generate_candidates",
+                "compare",
+                "recommend",
+                "submit",
+            ]
+        elif outcome == "APPROVED" and mutation == "CONFIRMED":
+            status = AgentTaskStatus.OBSERVING_OUTCOME
+            current_step_id = "observe"
+            completed = [
+                "establish_state",
+                "diagnose",
+                "gather_specialist_evidence",
+                "generate_candidates",
+                "compare",
+                "recommend",
+                "submit",
+            ]
+        elif outcome in ("REJECTED", "ERROR", "NOT_IMPLEMENTED"):
+            status = AgentTaskStatus.FAILED
+            current_step_id = None
+            completed = ["establish_state", "diagnose"]
+        elif outcome in (
+            "STALE_STATE",
+            "REQUIRES_FRESH_STATE",
+            "CLARIFICATION_REQUIRED",
+        ):
+            status = AgentTaskStatus.ESCALATED
+            current_step_id = None
+            completed = ["establish_state", "diagnose"]
+        else:
+            status = AgentTaskStatus.WAITING_FOR_GOVERNANCE
+            current_step_id = "submit"
+            completed = [
+                "establish_state",
+                "diagnose",
+                "gather_specialist_evidence",
+                "generate_candidates",
+                "compare",
+                "recommend",
+                "submit",
+            ]
+
+        now = _dt.now(tz=_tz.utc)
+        state = AgentTaskState(
+            task_id=task_id,
+            agent_id="operations_coordination",
+            sop_id=sop_id,
+            sop_version="1.0",
+            objective=objective,
+            status=status,
+            current_step_id=current_step_id,
+            completed_steps=completed,
+            iteration=1,
+            conversation_id=conversation_id,
+            copilot_turn_id=turn_id,
+            trace_id=trace_id,
+            context_snapshot_id=context_snapshot_id,
+            stop_reason=None,
+            recommendation_id=result.recommendation_id,
+            created_at=now,
+            updated_at=now,
+        )
+        register_agent_task(task_id, state)
+        logger.debug(
+            "UX-1C.1: registered copilot agent task %s status=%s", task_id, status.value
+        )
+        return task_id
+    except Exception as exc:
+        logger.warning("UX-1C.1: could not register copilot agent task: %s", exc)
+        return None
+
+
 import re as _re
 
 _FIRST_PATTERNS = [
@@ -1355,15 +1701,15 @@ _SECOND_PATTERNS = [
 ]
 
 _CAPABILITY_KEYWORDS: dict[str, str] = {
-    "labor":        "warehouse.labor.allocate",
-    "allocat":      "warehouse.labor.allocate",
-    "worker":       "warehouse.labor.allocate",
-    "wave":         "warehouse.wave.reprioritize",
-    "reprioritiz":  "warehouse.wave.reprioritize",
-    "equipment":    "warehouse.equipment.assign",
-    "assign":       "warehouse.equipment.assign",
-    "maintenance":  "warehouse.equipment.schedule_maintenance",
-    "release":      "warehouse.equipment.release",
+    "labor": "warehouse.labor.allocate",
+    "allocat": "warehouse.labor.allocate",
+    "worker": "warehouse.labor.allocate",
+    "wave": "warehouse.wave.reprioritize",
+    "reprioritiz": "warehouse.wave.reprioritize",
+    "equipment": "warehouse.equipment.assign",
+    "assign": "warehouse.equipment.assign",
+    "maintenance": "warehouse.equipment.schedule_maintenance",
+    "release": "warehouse.equipment.release",
 }
 
 
@@ -1424,8 +1770,11 @@ def _check_state_drift(rec: RecommendedActionResult, state: Any) -> str | None:
         if labor is not None:
             _sentinel = object()
             idle = next(
-                (getattr(labor, attr, _sentinel) for attr in ("idle_workers", "workers_idle", "available_workers")
-                 if getattr(labor, attr, _sentinel) is not _sentinel),
+                (
+                    getattr(labor, attr, _sentinel)
+                    for attr in ("idle_workers", "workers_idle", "available_workers")
+                    if getattr(labor, attr, _sentinel) is not _sentinel
+                ),
                 None,
             )
             if idle is not None and idle == 0:
@@ -1477,9 +1826,15 @@ def _enrich_with_recommendations(message: str, recs: list) -> str:
         obj = getattr(r, "objective", "")
         rat = getattr(r, "rationale", "") or ""
         rat_clause = f" Rationale: {rat}" if rat else ""
-        rec_lines.append(f"  #{i + 1}: {cap} → {tgt} ({pri} priority) — {obj}.{rat_clause}")
+        rec_lines.append(
+            f"  #{i + 1}: {cap} → {tgt} ({pri} priority) — {obj}.{rat_clause}"
+        )
     rec_summary = "\n".join(rec_lines)
-    is_comparison = _re.search(r"\b(why not|compare|instead|versus|vs\.?|differ|makes.*better)\b", message, _re.IGNORECASE)
+    is_comparison = _re.search(
+        r"\b(why not|compare|instead|versus|vs\.?|differ|makes.*better)\b",
+        message,
+        _re.IGNORECASE,
+    )
     if is_comparison:
         directive = (
             "Compare recommendation #1 against the alternatives. Explain which specific "
@@ -1500,6 +1855,7 @@ def _enrich_with_recommendations(message: str, recs: list) -> str:
 
 
 # ── Answerability helpers ─────────────────────────────────────────────────────
+
 
 def _missing_context(state: Any | None, scenario_name: str) -> list[str]:
     """
@@ -1540,9 +1896,19 @@ def _missing_context(state: Any | None, scenario_name: str) -> list[str]:
     labor = state.labor
     equipment = state.equipment
 
-    wave_total = getattr(waves, "total_waves", None) or getattr(waves, "total_tasks", None) or 0
-    labor_total = getattr(labor, "total_workers", None) or getattr(labor, "total_labor", None) or 0
-    equip_total = getattr(equipment, "total_equipment", None) or getattr(equipment, "total", None) or 0
+    wave_total = (
+        getattr(waves, "total_waves", None) or getattr(waves, "total_tasks", None) or 0
+    )
+    labor_total = (
+        getattr(labor, "total_workers", None)
+        or getattr(labor, "total_labor", None)
+        or 0
+    )
+    equip_total = (
+        getattr(equipment, "total_equipment", None)
+        or getattr(equipment, "total", None)
+        or 0
+    )
 
     if wave_total == 0 and labor_total == 0 and equip_total == 0:
         # All zeros across all three domains = scenario not loaded
@@ -1609,9 +1975,11 @@ def _extract_state_metrics(state: Any) -> dict:
 
     if labor:
         idle = next(
-            (getattr(labor, attr, None) for attr in
-             ("idle_workers", "workers_idle", "available_workers")
-             if getattr(labor, attr, None) is not None),
+            (
+                getattr(labor, attr, None)
+                for attr in ("idle_workers", "workers_idle", "available_workers")
+                if getattr(labor, attr, None) is not None
+            ),
             None,
         )
         metrics["idle_workers"] = idle if idle is not None else 0
@@ -1629,7 +1997,11 @@ def _compute_kpi_delta(pre: dict, post: dict) -> dict:
     """Compute post - pre for numeric KPIs shared between both snapshots."""
     delta: dict = {}
     for key in pre:
-        if key in post and isinstance(pre[key], (int, float)) and isinstance(post[key], (int, float)):
+        if (
+            key in post
+            and isinstance(pre[key], (int, float))
+            and isinstance(post[key], (int, float))
+        ):
             delta[key] = post[key] - pre[key]
     # Include string fields with change markers
     for key in ("wave_risk_level",):
@@ -1671,16 +2043,24 @@ def _compose_observe_narrative(
     improvement_signals = []
     if backlog_delta is not None and backlog_delta < 0:
         operational_improved = True
-        improvement_signals.append(f"pending backlog fell from {pre_backlog} to {post_backlog}")
+        improvement_signals.append(
+            f"pending backlog fell from {pre_backlog} to {post_backlog}"
+        )
     if idle_delta is not None and idle_delta < 0:
         operational_improved = True
-        improvement_signals.append(f"idle workers reduced from {pre_idle} to {post_idle}")
+        improvement_signals.append(
+            f"idle workers reduced from {pre_idle} to {post_idle}"
+        )
     if risk_level_change:
         improvement_signals.append(f"wave risk classification: {risk_level_change}")
         # Treat risk reduction as improvement
         risk_order = ["critical", "high", "medium", "low", "none", "unknown"]
-        pre_idx = next((i for i, r in enumerate(risk_order) if r in str(pre_risk).lower()), 999)
-        post_idx = next((i for i, r in enumerate(risk_order) if r in str(post_risk).lower()), 999)
+        pre_idx = next(
+            (i for i, r in enumerate(risk_order) if r in str(pre_risk).lower()), 999
+        )
+        post_idx = next(
+            (i for i, r in enumerate(risk_order) if r in str(post_risk).lower()), 999
+        )
         if post_idx > pre_idx:
             operational_improved = True
 
@@ -1697,10 +2077,14 @@ def _compose_observe_narrative(
         if operational_improved and improvement_signals:
             signals_str = "; ".join(improvement_signals)
             _one_task = (
-                "\n\nWhy only one task resolved? A single governed action unblocks the "
-                "highest-priority allocation bottleneck. Broader backlog reduction requires "
-                "additional reallocation cycles authorized through the governance pipeline."
-            ) if backlog_delta is not None and backlog_delta == -1 else ""
+                (
+                    "\n\nWhy only one task resolved? A single governed action unblocks the "
+                    "highest-priority allocation bottleneck. Broader backlog reduction requires "
+                    "additional reallocation cycles authorized through the governance pipeline."
+                )
+                if backlog_delta is not None and backlog_delta == -1
+                else ""
+            )
             answer = (
                 f"Yes — the warehouse state improved after the governed action was executed. "
                 f"{signals_str.capitalize()}.{_one_task}\n\n"
@@ -1708,7 +2092,7 @@ def _compose_observe_narrative(
                 f"The operational bottleneck has been partially resolved."
             )
             summary = f"Improvement confirmed: {improvement_signals[0]}"
-        elif (not kpi_delta or pre_metrics == post_metrics):
+        elif not kpi_delta or pre_metrics == post_metrics:
             # State unchanged — distinguish still-pending, rejected, or unknown
             if is_still_pending is True:
                 answer = (
@@ -1764,16 +2148,22 @@ def _compose_observe_narrative(
         if operational_improved and improvement_signals:
             signals_str = "; ".join(improvement_signals)
             _one_task = (
-                "\n\nWhy only one task resolved? A single governed action unblocks the "
-                "highest-priority allocation bottleneck. Broader backlog reduction requires "
-                "additional reallocation cycles authorized through the governance pipeline."
-            ) if backlog_delta is not None and backlog_delta == -1 else ""
+                (
+                    "\n\nWhy only one task resolved? A single governed action unblocks the "
+                    "highest-priority allocation bottleneck. Broader backlog reduction requires "
+                    "additional reallocation cycles authorized through the governance pipeline."
+                )
+                if backlog_delta is not None and backlog_delta == -1
+                else ""
+            )
             answer = (
                 f"Yes. The action executed and the operational state improved. "
                 f"{signals_str.capitalize()}.{_one_task}\n\n"
                 f"The labor allocation was executed through the MAIW governance pipeline."
             )
-            summary = f"Execution confirmed; improvement observed: {improvement_signals[0]}"
+            summary = (
+                f"Execution confirmed; improvement observed: {improvement_signals[0]}"
+            )
         else:
             answer = (
                 "The action executed successfully (CONFIRMED), "
@@ -1824,11 +2214,15 @@ def _observe_facts(pre: dict, post: dict, delta: dict) -> list[str]:
     if "wave_risk_level" in pre and "wave_risk_level" in post:
         facts.append(f"Wave risk: {pre['wave_risk_level']} → {post['wave_risk_level']}")
     if "wave_risk_score" in pre and "wave_risk_score" in post:
-        facts.append(f"Wave risk score: {pre['wave_risk_score']} → {post['wave_risk_score']}")
+        facts.append(
+            f"Wave risk score: {pre['wave_risk_score']} → {post['wave_risk_score']}"
+        )
     return facts
 
 
-def _facts_to_evidence(facts: list[str], assessment_severity: str) -> list[EvidenceFact]:
+def _facts_to_evidence(
+    facts: list[str], assessment_severity: str
+) -> list[EvidenceFact]:
     """
     Convert OperationalAssessment.facts_observed into structured EvidenceFacts.
 
@@ -1847,32 +2241,44 @@ def _facts_to_evidence(facts: list[str], assessment_severity: str) -> list[Evide
 
         # UNASSIGNED PENDING TASKS is always HIGH — check before partition
         if fact.startswith("UNASSIGNED"):
-            evidence.append(EvidenceFact(
-                label="Unassigned pending tasks",
-                value=fact.partition(": ")[2] or fact,
-                severity="HIGH",
-            ))
+            evidence.append(
+                EvidenceFact(
+                    label="Unassigned pending tasks",
+                    value=fact.partition(": ")[2] or fact,
+                    severity="HIGH",
+                )
+            )
         elif ": " in fact:
             label, _, value = fact.partition(": ")
-            evidence.append(EvidenceFact(
-                label=label.strip(),
-                value=value.strip(),
-                severity=severity,
-            ))
+            evidence.append(
+                EvidenceFact(
+                    label=label.strip(),
+                    value=value.strip(),
+                    severity=severity,
+                )
+            )
         else:
-            evidence.append(EvidenceFact(
-                label="Observation",
-                value=fact,
-                severity=severity,
-            ))
+            evidence.append(
+                EvidenceFact(
+                    label="Observation",
+                    value=fact,
+                    severity=severity,
+                )
+            )
 
     return evidence
 
+
 # ── Phase 17E: snapshot entity helpers ───────────────────────────────────────
+
 
 def _snapshot_entity_label(entity: Any) -> str:
     """Human-readable label for a graph entity — used in context snapshot nodes."""
-    et = entity.entity_type.value if hasattr(entity.entity_type, "value") else str(entity.entity_type)
+    et = (
+        entity.entity_type.value
+        if hasattr(entity.entity_type, "value")
+        else str(entity.entity_type)
+    )
     if et == "worker":
         return getattr(entity, "full_name", None) or entity.id
     if et == "wave":
@@ -1880,11 +2286,19 @@ def _snapshot_entity_label(entity: Any) -> str:
         return f"Wave {num}" if num is not None else entity.id
     if et == "equipment":
         eq_type = getattr(entity, "equipment_type", None)
-        type_str = eq_type.value.upper() if hasattr(eq_type, "value") else str(eq_type).upper() if eq_type else ""
+        type_str = (
+            eq_type.value.upper()
+            if hasattr(eq_type, "value")
+            else str(eq_type).upper() if eq_type else ""
+        )
         return f"{type_str} {entity.id}" if type_str else entity.id
     if et == "task":
         task_type = getattr(entity, "task_type", None)
-        type_str = task_type.value if hasattr(task_type, "value") else str(task_type) if task_type else ""
+        type_str = (
+            task_type.value
+            if hasattr(task_type, "value")
+            else str(task_type) if task_type else ""
+        )
         return f"{type_str} {entity.id}" if type_str else entity.id
     if et == "zone":
         code = getattr(entity, "zone_code", "") or ""
@@ -1899,6 +2313,7 @@ def _snapshot_entity_attributes(entity: Any) -> dict:
     Only captures attributes actually used for reasoning — NOT the full canonical
     entity payload.  Bounded to 5 attributes per entity.
     """
+
     def _v(attr: str) -> Any:
         val = getattr(entity, attr, None)
         if val is None:
@@ -1911,16 +2326,28 @@ def _snapshot_entity_attributes(entity: Any) -> dict:
             return val
         return str(val)
 
-    et = entity.entity_type.value if hasattr(entity.entity_type, "value") else str(entity.entity_type)
+    et = (
+        entity.entity_type.value
+        if hasattr(entity.entity_type, "value")
+        else str(entity.entity_type)
+    )
 
     if et == "worker":
         return {k: _v(k) for k in ("role", "skills", "shift_id") if _v(k) is not None}
     if et == "wave":
-        return {k: _v(k) for k in ("wave_number", "status", "strategy", "priority") if _v(k) is not None}
+        return {
+            k: _v(k)
+            for k in ("wave_number", "status", "strategy", "priority")
+            if _v(k) is not None
+        }
     if et == "equipment":
-        return {k: _v(k) for k in ("equipment_type", "model", "status") if _v(k) is not None}
+        return {
+            k: _v(k) for k in ("equipment_type", "model", "status") if _v(k) is not None
+        }
     if et == "task":
-        return {k: _v(k) for k in ("task_type", "status", "priority") if _v(k) is not None}
+        return {
+            k: _v(k) for k in ("task_type", "status", "priority") if _v(k) is not None
+        }
     if et == "zone":
         return {k: _v(k) for k in ("zone_code", "zone_type") if _v(k) is not None}
     if et == "carrier_cutoff":

@@ -1,6 +1,6 @@
 # MAIW Information Architecture
 
-> Version: UX-1A  
+> Version: UX-1C  
 > Date: 2026-09-20  
 > Status: Implemented
 
@@ -136,7 +136,7 @@ See `docs/ux/MAIW_AUTHORITY_UX.md` for the full authority-state model.
 
 ---
 
-## Deferred Consolidation
+## Deferred Consolidation (UX-2+)
 
 | Issue | Priority | Rationale for Deferral |
 |-------|----------|----------------------|
@@ -148,12 +148,27 @@ See `docs/ux/MAIW_AUTHORITY_UX.md` for the full authority-state model.
 
 ---
 
-## UX-1B Recommendation
+## UX-1B / UX-1C Implementation Status
 
-**UX-1B scope** (not started):
+**UX-1B** (complete — feat/ux-1b-agent-sop-progress):
 - SOP step visibility in REASON stage (which SOP ran, step sequence, iteration count)
-- Subagent delegation chain in developer trace
-- INDETERMINATE outcome operator guidance
-- OUTCOME stage narrative (plain-language KPI delta)
-- Consolidate two ReliabilityPanel implementations
-- WorldShell CONTEXT tab accessible without Copilot (trace_id URL param)
+- Subagent delegation chain with DelegationCard
+- INDETERMINATE / UNKNOWN outcome operator guidance in AgentActivity
+- OUTCOME stage narrative via OutcomeContinuation deterministic templates
+- DelegationCard status-aware subtitles for RUNNING/COMPLETED/FAILED/ESCALATED
+
+**UX-1C** (complete — feat/ux-1c-live-agent-continuity):
+- CopilotAgentStatus component — live task state polling in CopilotDrawer
+- `agent_task_id` linkage: ACT turns → exact AgentTaskState entry
+- `subscribeToTask()` — bounded polling (3s), stops on terminal state or 404
+- WAITING_FOR_GOVERNANCE: governance pause semantics surfaced in CopilotDrawer
+- OBSERVING_OUTCOME: outcome semantics text in CopilotDrawer
+- Expert mode: task_id, agent_id, sop_id, sop_version, iteration, trace_id
+- AgentActivity: REVIEW GOVERNANCE button, INDETERMINATE/UNKNOWN panels
+- AgentActivity OutcomeContinuation: VIEW LIVE WORLD button + semantics text
+- DelegationCard: live delegation state with pulsing animation for RUNNING
+
+See `docs/ux/MAIW_LIVE_AGENT_CONTINUITY.md` for the full UX-1C specification and
+design invariants.
+
+## Deferred Consolidation (UX-2+)
