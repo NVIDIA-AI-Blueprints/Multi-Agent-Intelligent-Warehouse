@@ -33,8 +33,8 @@ if str(_WORKTREE_API) not in sys.path:
 
 from maiw_agents.contracts.task import AgentTaskState, AgentTaskStatus, AgentResultRef
 
-
 # ── Fixtures ───────────────────────────────────────────────────────────────────
+
 
 def make_task(**kwargs) -> AgentTaskState:
     defaults = dict(
@@ -55,9 +55,15 @@ def make_task(**kwargs) -> AgentTaskState:
 
 # ── Registry tests ────────────────────────────────────────────────────────────
 
+
 class TestAgentTaskRegistry:
     def test_register_and_retrieve(self):
-        from maiw_api.routers.agent_tasks import register_agent_task, get_registered_task, clear_task_registry
+        from maiw_api.routers.agent_tasks import (
+            register_agent_task,
+            get_registered_task,
+            clear_task_registry,
+        )
+
         clear_task_registry()
         task = make_task()
         register_agent_task(task.task_id, task)
@@ -65,12 +71,21 @@ class TestAgentTaskRegistry:
         assert retrieved is task
 
     def test_missing_task_returns_none(self):
-        from maiw_api.routers.agent_tasks import get_registered_task, clear_task_registry
+        from maiw_api.routers.agent_tasks import (
+            get_registered_task,
+            clear_task_registry,
+        )
+
         clear_task_registry()
         assert get_registered_task("nonexistent-task") is None
 
     def test_list_tasks(self):
-        from maiw_api.routers.agent_tasks import register_agent_task, list_registered_tasks, clear_task_registry
+        from maiw_api.routers.agent_tasks import (
+            register_agent_task,
+            list_registered_tasks,
+            clear_task_registry,
+        )
+
         clear_task_registry()
         t1 = make_task(task_id="t1")
         t2 = make_task(task_id="t2")
@@ -80,7 +95,12 @@ class TestAgentTaskRegistry:
         assert len(tasks) == 2
 
     def test_clear_registry(self):
-        from maiw_api.routers.agent_tasks import register_agent_task, list_registered_tasks, clear_task_registry
+        from maiw_api.routers.agent_tasks import (
+            register_agent_task,
+            list_registered_tasks,
+            clear_task_registry,
+        )
+
         register_agent_task("x", make_task())
         clear_task_registry()
         assert list_registered_tasks() == []
@@ -88,9 +108,11 @@ class TestAgentTaskRegistry:
 
 # ── Task view serialization ───────────────────────────────────────────────────
 
+
 class TestAgentTaskViewSerialization:
     def test_status_serialized_as_string(self):
         from maiw_api.routers.agent_tasks import _build_task_view
+
         task = make_task()
         view = _build_task_view(task)
         assert isinstance(view.status, str)
@@ -98,6 +120,7 @@ class TestAgentTaskViewSerialization:
 
     def test_core_fields_serialized(self):
         from maiw_api.routers.agent_tasks import _build_task_view
+
         task = make_task()
         view = _build_task_view(task)
         assert view.task_id == "test-task-001"
@@ -112,6 +135,7 @@ class TestAgentTaskViewSerialization:
 
     def test_timestamps_serialized_as_iso_strings(self):
         from maiw_api.routers.agent_tasks import _build_task_view
+
         task = make_task()
         view = _build_task_view(task)
         assert view.created_at is not None
@@ -122,6 +146,7 @@ class TestAgentTaskViewSerialization:
 
     def test_delegation_results_serialized(self):
         from maiw_api.routers.agent_tasks import _build_task_view
+
         task = make_task()
         ref = AgentResultRef(
             child_task_id="child-labor-001",
@@ -142,22 +167,36 @@ class TestAgentTaskViewSerialization:
     def test_no_chain_of_thought_field(self):
         """AgentTaskView must not expose chain_of_thought or scratchpad."""
         from maiw_api.routers.agent_tasks import AgentTaskView
+
         view_fields = set(AgentTaskView.model_fields.keys())
-        forbidden = {"chain_of_thought", "scratchpad", "hidden_reasoning", "raw_prompt", "system_prompt"}
+        forbidden = {
+            "chain_of_thought",
+            "scratchpad",
+            "hidden_reasoning",
+            "raw_prompt",
+            "system_prompt",
+        }
         violations = view_fields & forbidden
         assert violations == set(), f"Forbidden fields found: {violations}"
 
     def test_no_framework_internals(self):
         """AgentTaskView must not expose LangGraph or deepagents internal fields."""
         from maiw_api.routers.agent_tasks import AgentTaskView
+
         view_fields = set(AgentTaskView.model_fields.keys())
-        forbidden = {"langgraph_state", "deepagents_checkpoint", "node_state", "graph_state"}
+        forbidden = {
+            "langgraph_state",
+            "deepagents_checkpoint",
+            "node_state",
+            "graph_state",
+        }
         violations = view_fields & forbidden
         assert violations == set(), f"Framework internal fields found: {violations}"
 
     def test_response_bounded_no_full_conversation(self):
         """AgentTaskView must not expose full conversation history."""
         from maiw_api.routers.agent_tasks import AgentTaskView
+
         view_fields = set(AgentTaskView.model_fields.keys())
         # Should have a reference to conversation_id, not a full conversation object
         assert "conversation_id" in view_fields
@@ -168,10 +207,12 @@ class TestAgentTaskViewSerialization:
 
 # ── Read-only API invariant ───────────────────────────────────────────────────
 
+
 class TestReadOnlyInvariant:
     def test_router_has_no_post_routes(self):
         """The agent-tasks router must have no POST, PUT, or DELETE routes."""
         from maiw_api.routers.agent_tasks import router
+
         non_get_methods = set()
         for route in router.routes:
             methods = getattr(route, "methods", set()) or set()
@@ -183,9 +224,11 @@ class TestReadOnlyInvariant:
 
 # ── SOP metadata loading ──────────────────────────────────────────────────────
 
+
 class TestSOPMetadataLoading:
     def test_loads_wave_risk_resolution_sop(self):
         from maiw_api.routers.agent_tasks import _load_sop_metadata
+
         meta = _load_sop_metadata("operations_coordination.wave_risk_resolution")
         assert meta is not None
         assert meta["id"] == "operations_coordination.wave_risk_resolution"
@@ -198,12 +241,14 @@ class TestSOPMetadataLoading:
 
     def test_loads_labor_constraint_assessment_sop(self):
         from maiw_api.routers.agent_tasks import _load_sop_metadata
+
         meta = _load_sop_metadata("labor.labor_constraint_assessment")
         assert meta is not None
         assert meta["agent"] == "labor"
 
     def test_steps_have_descriptions(self):
         from maiw_api.routers.agent_tasks import _load_sop_metadata
+
         meta = _load_sop_metadata("operations_coordination.wave_risk_resolution")
         assert meta is not None
         for step in meta["steps"]:
@@ -213,11 +258,17 @@ class TestSOPMetadataLoading:
 
     def test_unknown_sop_returns_none(self):
         from maiw_api.routers.agent_tasks import _load_sop_metadata
+
         meta = _load_sop_metadata("nonexistent.sop_name")
         assert meta is None
 
     def test_sop_steps_included_in_task_view(self):
-        from maiw_api.routers.agent_tasks import _build_task_view, register_agent_task, clear_task_registry
+        from maiw_api.routers.agent_tasks import (
+            _build_task_view,
+            register_agent_task,
+            clear_task_registry,
+        )
+
         clear_task_registry()
         task = make_task(sop_id="operations_coordination.wave_risk_resolution")
         register_agent_task(task.task_id, task)
@@ -228,26 +279,48 @@ class TestSOPMetadataLoading:
 
 # ── AgentTaskView field invariants ────────────────────────────────────────────
 
+
 class TestAgentTaskViewFields:
     def test_view_exposes_all_required_operator_fields(self):
         from maiw_api.routers.agent_tasks import AgentTaskView
+
         fields = set(AgentTaskView.model_fields.keys())
-        required_operator = {"task_id", "agent_id", "sop_id", "sop_version", "objective", "status"}
-        assert required_operator <= fields, f"Missing operator fields: {required_operator - fields}"
+        required_operator = {
+            "task_id",
+            "agent_id",
+            "sop_id",
+            "sop_version",
+            "objective",
+            "status",
+        }
+        assert (
+            required_operator <= fields
+        ), f"Missing operator fields: {required_operator - fields}"
 
     def test_view_exposes_all_required_developer_fields(self):
         from maiw_api.routers.agent_tasks import AgentTaskView
+
         fields = set(AgentTaskView.model_fields.keys())
         required_dev = {
-            "trace_id", "context_snapshot_id", "conversation_id", "copilot_turn_id",
-            "stop_reason", "recommendation_id", "completed_steps", "iteration",
+            "trace_id",
+            "context_snapshot_id",
+            "conversation_id",
+            "copilot_turn_id",
+            "stop_reason",
+            "recommendation_id",
+            "completed_steps",
+            "iteration",
         }
-        assert required_dev <= fields, f"Missing developer fields: {required_dev - fields}"
+        assert (
+            required_dev <= fields
+        ), f"Missing developer fields: {required_dev - fields}"
 
     def test_view_includes_sop_steps_for_ui(self):
         from maiw_api.routers.agent_tasks import AgentTaskView
+
         assert "sop_steps" in AgentTaskView.model_fields
 
     def test_view_includes_delegation_results(self):
         from maiw_api.routers.agent_tasks import AgentTaskView
+
         assert "delegation_results" in AgentTaskView.model_fields
