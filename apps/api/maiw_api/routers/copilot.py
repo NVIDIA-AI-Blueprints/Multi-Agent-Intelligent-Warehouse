@@ -76,6 +76,7 @@ async def copilot_turn(body: CopilotTurnRequest, request: Request):
             pending_outcome: str | None = None
             try:
                 from maiw_api.demo.controller import get_demo_controller
+
                 ctrl = get_demo_controller()
                 last_conv = svc.store.get_or_create(
                     body.conversation_id,
@@ -91,10 +92,16 @@ async def copilot_turn(body: CopilotTurnRequest, request: Request):
                             is_still_pending = True
                         else:
                             # Not in live queue — check the terminal outcome cache.
-                            pending_outcome = ctrl._pending_approval_outcomes.get(pending_id)
+                            pending_outcome = ctrl._pending_approval_outcomes.get(
+                                pending_id
+                            )
                             # is_still_pending=False only for rejected/expired (not executed).
                             # For 'executed', let operational_improved guide the narrative.
-                            is_still_pending = False if pending_outcome in ("rejected", "expired") else None
+                            is_still_pending = (
+                                False
+                                if pending_outcome in ("rejected", "expired")
+                                else None
+                            )
             except Exception:
                 pass  # controller unavailable — fall back to heuristic
 
@@ -185,6 +192,7 @@ def _observe_response(result, turn) -> CopilotTurnResponse:
         observe_act_decision_outcome=result.act_decision_outcome,
         observe_act_pending_approval_id=result.act_pending_approval_id,
         related_artifacts={},
+        agent_task_id=getattr(turn, "agent_task_id", None),  # UX-1C.1
     )
 
 
@@ -224,6 +232,7 @@ def _act_response(result, turn) -> CopilotTurnResponse:
         degraded=result.degraded,
         degradation_reason=result.degradation_reason,
         related_artifacts=related_artifacts,
+        agent_task_id=result.agent_task_id,  # UX-1C.1
     )
 
 
