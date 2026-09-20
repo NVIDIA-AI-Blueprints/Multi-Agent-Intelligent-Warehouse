@@ -26,6 +26,7 @@ import {
   IdText,
   StageContentPaneProps,
 } from '../StageContentPane';
+import { PRE_EXECUTION_NOTICE } from '../../../constants/authorityStates';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -225,6 +226,27 @@ function ApprovalCard({
           </Box>
         </StageSection>
 
+        {/* Pre-execution authority notice — visible until actioned */}
+        {!actioned && (
+          <Box
+            data-testid="pre-execution-notice"
+            sx={{
+              display: 'flex', alignItems: 'center', gap: 1,
+              background: '#0D1117',
+              border: '1px solid #1C2128',
+              borderRadius: '4px',
+              px: 1.5, py: 0.75,
+            }}
+          >
+            <Typography sx={{
+              fontFamily: 'monospace', fontSize: '0.62rem',
+              color: '#484F58', letterSpacing: '0.03em',
+            }}>
+              {PRE_EXECUTION_NOTICE}
+            </Typography>
+          </Box>
+        )}
+
         {/* Action buttons or result */}
         {actioned ? (
           <Box data-testid="approval-result">
@@ -288,28 +310,36 @@ function ApprovalCard({
               REJECT
             </Box>
 
-            {/* APPROVE & EXECUTE */}
-            <Box
-              component="button"
-              onClick={() => !disableActions && onApprove(pending_id)}
-              disabled={disableActions}
-              data-testid="approve-execute-button"
-              sx={{
-                display: 'flex', alignItems: 'center', gap: 0.75,
-                background: '#162032',
-                border: `1px solid ${disableActions ? '#21262D' : '#1F6FEB'}`,
-                borderRadius: '4px',
-                px: '16px', py: '7px',
-                fontFamily: 'monospace', fontSize: '0.68rem', fontWeight: 700,
-                color: disableActions ? '#30363D' : '#58A6FF',
-                cursor: disableActions ? 'not-allowed' : 'pointer',
-                letterSpacing: '0.04em',
-                transition: 'all 0.12s ease',
-                '&:hover:not(:disabled)': { background: '#1a2d48', borderColor: '#388BFD' },
-              }}
-            >
-              {actionStatus === 'approving' && <CircularProgress size={10} sx={{ color: '#58A6FF66' }} />}
-              APPROVE &amp; EXECUTE
+            {/* APPROVE ACTION — execution follows automatically via ActionExecutor */}
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.25 }}>
+              <Box
+                component="button"
+                onClick={() => !disableActions && onApprove(pending_id)}
+                disabled={disableActions}
+                data-testid="approve-execute-button"
+                sx={{
+                  display: 'flex', alignItems: 'center', gap: 0.75,
+                  background: '#162032',
+                  border: `1px solid ${disableActions ? '#21262D' : '#1F6FEB'}`,
+                  borderRadius: '4px',
+                  px: '16px', py: '7px',
+                  fontFamily: 'monospace', fontSize: '0.68rem', fontWeight: 700,
+                  color: disableActions ? '#30363D' : '#58A6FF',
+                  cursor: disableActions ? 'not-allowed' : 'pointer',
+                  letterSpacing: '0.04em',
+                  transition: 'all 0.12s ease',
+                  '&:hover:not(:disabled)': { background: '#1a2d48', borderColor: '#388BFD' },
+                }}
+              >
+                {actionStatus === 'approving' && <CircularProgress size={10} sx={{ color: '#58A6FF66' }} />}
+                APPROVE ACTION
+              </Box>
+              <Typography sx={{
+                fontFamily: 'monospace', fontSize: '0.57rem', color: '#484F58',
+                letterSpacing: '0.02em',
+              }}>
+                Governance approval — execution follows automatically
+              </Typography>
             </Box>
 
           </Box>
