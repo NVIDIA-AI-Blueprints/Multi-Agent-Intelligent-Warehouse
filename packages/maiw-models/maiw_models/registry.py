@@ -51,6 +51,7 @@ LEGACY — no longer available on integrate.api.nvidia.com as of 2026-08-20:
   nvidia/llama-3.1-nemotron-nano-4b-v1.1    — HTTP 404
   nvidia/llama-3.1-nemotron-ultra-253b-v1   — HTTP 404
   nvidia/llama-nemotron-nano-vl-8b-v1       — HTTP 404
+  nvidia/nemotron-3-embed-1b                  — successor to embed-vl-1b-v2 (deprecated per NVBug 2026-09; see LEGACY_EMBED_VL_1B_V2)
 
   These models must NOT be used as defaults for Nemotron 3 roles.
   They are retained as LEGACY_* constants below for documentation and
@@ -115,6 +116,7 @@ LEGACY_SUPER_LLAMA33 = "nvidia/llama-3.3-nemotron-super-49b-v1.5"
 LEGACY_NANO_LLAMA31 = "nvidia/llama-3.1-nemotron-nano-4b-v1.1"
 LEGACY_ULTRA_LLAMA31 = "nvidia/llama-3.1-nemotron-ultra-253b-v1"
 LEGACY_NANO_VL = "nvidia/llama-nemotron-nano-vl-8b-v1"
+LEGACY_EMBED_VL_1B_V2 = "nvidia/llama-nemotron-embed-vl-1b-v2"
 
 # ── Enabled defaults ───────────────────────────────────────────────────────────
 

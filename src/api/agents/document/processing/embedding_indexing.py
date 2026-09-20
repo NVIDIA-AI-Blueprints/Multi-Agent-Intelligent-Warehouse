@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """
-Stage 4: Embedding & Indexing with llama-nemotron-embed-vl-1b-v2 (2048-dim)
+Stage 4: Embedding & Indexing with nemotron-3-embed-1b (2048-dim)
 Generates semantic embeddings and stores them in Milvus vector database.
 """
 
@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 class EmbeddingIndexingService:
     """
-    Stage 4: Embedding & Indexing using llama-nemotron-embed-vl-1b-v2 (2048-dim).
+    Stage 4: Embedding & Indexing using nemotron-3-embed-1b (2048-dim).
 
     Responsibilities:
     - Generate semantic embeddings for document content
@@ -181,7 +181,7 @@ class EmbeddingIndexingService:
             return []
 
     async def _generate_embeddings(self, text_content: List[str]) -> List[List[float]]:
-        """Generate embeddings using llama-nemotron-embed-vl-1b-v2."""
+        """Generate embeddings using nemotron-3-embed-1b."""
         try:
             if not self.nim_client:
                 logger.warning("NIM client not available, using mock embeddings")

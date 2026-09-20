@@ -238,7 +238,7 @@ The system uses the following NVIDIA NIMs:
 | NIM Service | Model | Purpose | Environment Variable | Default Endpoint |
 |-------------|-------|---------|---------------------|------------------|
 | **LLM Service** | Nemotron 3 Super 120B (`nvidia/nemotron-3-super-120b-a12b`) | Primary language model for chat, reasoning, and generation | `LLM_NIM_URL` | `https://integrate.api.nvidia.com/v1` |
-| **Embedding Service** | `nvidia/llama-nemotron-embed-vl-1b-v2` (2048-dim multimodal) | Semantic search embeddings for RAG | `EMBEDDING_NIM_URL` | `https://integrate.api.nvidia.com/v1` |
+| **Embedding Service** | `nvidia/nemotron-3-embed-1b` (2048-dim multimodal) | Semantic search embeddings for RAG | `EMBEDDING_NIM_URL` | `https://integrate.api.nvidia.com/v1` |
 | **NeMo Retriever** | NeMo Retriever | Document preprocessing and structure analysis | `NEMO_RETRIEVER_URL` | `https://integrate.api.nvidia.com/v1` |
 | **NeMo OCR** | NeMoRetriever-OCR-v1 | Intelligent OCR with layout understanding | `NEMO_OCR_URL` | `https://integrate.api.nvidia.com/v1` |
 | **Nemotron Parse** | Nemotron Parse | Advanced document parsing and extraction | `NEMO_PARSE_URL` | `https://integrate.api.nvidia.com/v1` |
@@ -308,7 +308,7 @@ Deploy NIMs on your own infrastructure for data privacy, cost control, and custo
    
    # Example: Deploy Embedding NIM on port 8001
    docker run --gpus all -p 8001:8001 \
-     nvcr.io/nvidia/nim/llama-nemotron-embed-vl-1b-v2:latest
+     nvcr.io/nvidia/nim/nemotron-3-embed-1b:latest
    ```
 
 2. **Configure environment variables** to point to your self-hosted endpoints:
@@ -348,7 +348,7 @@ Deploy NIMs on your own infrastructure for data privacy, cost control, and custo
    curl -X POST https://your-nim-host:8001/v1/embeddings \
      -H "Authorization: Bearer $NVIDIA_API_KEY" \
      -H "Content-Type: application/json" \
-     -d '{"model":"nvidia/llama-nemotron-embed-vl-1b-v2","input":"test"}'  # multimodal embedding — current
+     -d '{"model":"nvidia/nemotron-3-embed-1b","input":"test"}'  # multimodal embedding — current
    ```
 
 **Important Notes:**
@@ -454,7 +454,7 @@ curl -X POST $LLM_NIM_URL/chat/completions \
 curl -X POST $EMBEDDING_NIM_URL/embeddings \
   -H "Authorization: Bearer $NVIDIA_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"model":"nvidia/llama-nemotron-embed-vl-1b-v2","input":"test"}'
+  -d '{"model":"nvidia/nemotron-3-embed-1b","input":"test"}'
 
 # Check application health (includes NIM connectivity)
 curl http://localhost:8001/api/v1/health

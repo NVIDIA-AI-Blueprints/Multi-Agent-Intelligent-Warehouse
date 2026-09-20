@@ -77,7 +77,7 @@ class DocumentExtractionAgent:
     1. Document Preprocessing (NeMo Retriever)
     2. Intelligent OCR (NeMoRetriever-OCR-v1 + Nemotron Parse)
     3. Small LLM Processing (Nemotron Nano VL, runtime-configured via NEMOTRON_OMNI_API_KEY)
-    4. Embedding & Indexing (llama-nemotron-embed-vl-1b-v2, multimodal — current)
+    4. Embedding & Indexing (nemotron-3-embed-1b, multimodal — current)
     5. Large LLM Judge (Nemotron 3 Super 120B)
     6. Intelligent Routing (Quality-based routing)
     """

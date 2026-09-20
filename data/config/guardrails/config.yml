@@ -20,7 +20,7 @@ models:
 
   - type: embedding
     engine: openai
-    model: nvidia/llama-nemotron-embed-vl-1b-v2
+    model: nvidia/nemotron-3-embed-1b
     parameters:
       api_key: ${NVIDIA_API_KEY}
       api_base: ${RAIL_API_URL:https://integrate.api.nvidia.com/v1}

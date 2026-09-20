@@ -30,18 +30,18 @@
 
 | Role | Model ID | Invocation path | Config source |
 |------|----------|-----------------|---------------|
-| Primary LLM (all agents) | `nvidia/llama-3.3-nemotron-super-49b-v1.5` | `NIMClient.generate_response()` → `POST /chat/completions` | `LLM_MODEL` env var |
-| Guardrails judge | `nvidia/llama-3.3-nemotron-super-49b-v1.5` | `GuardrailsService` → own `httpx` call | `GUARDRAILS_MODEL` env var |
-| Document judge (Stage 5) | `nvidia/llama-3.3-nemotron-super-49b-v1.5` | `LargeLLMJudge` → own `httpx.AsyncClient` per request | `LLM_MODEL` env var (runtime), `LLAMA_70B_TIMEOUT` for deadline |
-| Document preprocessor fallback | `nvidia/llama-3.3-nemotron-super-49b-v1.5` | `NeMoRetrieverPreprocessor` → own `httpx` call (line 354) | Hardcoded string |
-| Embeddings | `nvidia/llama-nemotron-embed-vl-1b-v2` | `NIMClient.generate_embeddings()` → `POST /embeddings` | `EMBEDDING_MODEL` env var |
-| Document embeddings (Stage 4) | `llama-nemotron-embed-vl-1b-v2` | `EmbeddingIndexingService` → own `httpx` call | Hardcoded in service (line 45) |
+| Primary LLM (all agents) | `nvidia/nemotron-3-super-120b-a12b` | `NIMClient.generate_response()` → `POST /chat/completions` | `LLM_MODEL` env var |
+| Guardrails judge | `nvidia/nemotron-3-super-120b-a12b` | `GuardrailsService` → own `httpx` call | `GUARDRAILS_MODEL` env var |
+| Document judge (Stage 5) | `nvidia/nemotron-3-super-120b-a12b` | `LargeLLMJudge` → own `httpx.AsyncClient` per request | `LLM_MODEL` env var (runtime), `LLAMA_70B_TIMEOUT` for deadline |
+| Document preprocessor fallback | `nvidia/nemotron-3-super-120b-a12b` | `NeMoRetrieverPreprocessor` → own `httpx` call (line 354) | Hardcoded string |
+| Embeddings | `nvidia/nemotron-3-embed-1b` | `NIMClient.generate_embeddings()` → `POST /embeddings` | `EMBEDDING_MODEL` env var |
+| Document embeddings (Stage 4) | `nemotron-3-embed-1b` | `EmbeddingIndexingService` → own `httpx` call | Hardcoded in service (line 45) |
 | Document small LLM (Stage 3) | `Llama-Nemotron-Nano-VL-8B` (display name) | `SmallLLMProcessor` → own `httpx.AsyncClient` | `LLAMA_NANO_VL_URL` env var |
 | OCR vision fallback | `meta/llama-3.2-11b-vision-instruct` | `NeMoOCRService` → own `httpx` call (line 145) | Hardcoded string |
 | Small LLM vision fallback | `meta/llama-3.2-11b-vision-instruct` | `SmallLLMProcessor._call_vision_api()` (line 315) | Hardcoded string |
 | Small LLM text fallback | `meta/llama-3.1-8b-instruct` | `SmallLLMProcessor._call_text_api()` (line 248) | Hardcoded string |
 | NeMo Parse (OCR) | `nemotron-parse` | `NemotronParseService` → `POST .../models/nemotron-parse/infer` | `NEMO_PARSE_URL` env var |
-| NeMo Guardrails config (rails.yaml) | `nvidia/llama-3.3-nemotron-super-49b-v1.5` + `nvidia/llama-nemotron-embed-vl-1b-v2` | NeMo Guardrails SDK (opt-in via `USE_NEMO_GUARDRAILS_SDK=true`) | `data/config/guardrails/rails.yaml` |
+| NeMo Guardrails config (rails.yaml) | `nvidia/nemotron-3-super-120b-a12b` + `nvidia/nemotron-3-embed-1b` | NeMo Guardrails SDK (opt-in via `USE_NEMO_GUARDRAILS_SDK=true`) | `data/config/guardrails/rails.yaml` |
 
 ### 1.2 Invocation Architecture
 
@@ -87,9 +87,9 @@ This string-match on the model name is the exact coupling point that ModelGatewa
 
 | Variable | Default value | Scope |
 |----------|--------------|-------|
-| `LLM_MODEL` | `nvidia/llama-3.3-nemotron-super-49b-v1.5` | NIMClient, LargeLLMJudge |
-| `EMBEDDING_MODEL` | `nvidia/llama-nemotron-embed-vl-1b-v2` | NIMClient, EmbeddingService |
-| `GUARDRAILS_MODEL` | `nvidia/llama-3.3-nemotron-super-49b-v1.5` | GuardrailsConfig |
+| `LLM_MODEL` | `nvidia/nemotron-3-super-120b-a12b` | NIMClient, LargeLLMJudge |
+| `EMBEDDING_MODEL` | `nvidia/nemotron-3-embed-1b` | NIMClient, EmbeddingService |
+| `GUARDRAILS_MODEL` | `nvidia/nemotron-3-super-120b-a12b` | GuardrailsConfig |
 | `LLAMA_NANO_VL_URL` | `https://integrate.api.nvidia.com/v1` | SmallLLMProcessor endpoint |
 | `LLAMA_NANO_VL_API_KEY` | `""` | SmallLLMProcessor auth |
 | `LLM_NIM_URL` | `https://integrate.api.nvidia.com/v1` | NIMClient LLM endpoint |
@@ -133,15 +133,15 @@ Every reference to a Llama model string, env var, or naming artifact in the repo
 
 | File | Line(s) | Reference | Category | Runtime impact |
 |------|---------|-----------|----------|----------------|
-| `src/api/services/llm/nim_client.py` | 104 | `nvidia/llama-3.3-nemotron-super-49b-v1.5` (default for `LLM_MODEL`) | **runtime** | Determines every agent LLM call when env var is unset |
-| `src/api/services/llm/nim_client.py` | 105 | `nvidia/llama-nemotron-embed-vl-1b-v2` (default for `EMBEDDING_MODEL`) | **runtime** | Determines every embedding call when env var is unset |
+| `src/api/services/llm/nim_client.py` | 104 | `nvidia/nemotron-3-super-120b-a12b` (default for `LLM_MODEL`) | **runtime** | Determines every agent LLM call when env var is unset |
+| `src/api/services/llm/nim_client.py` | 105 | `nvidia/nemotron-3-embed-1b` (default for `EMBEDDING_MODEL`) | **runtime** | Determines every embedding call when env var is unset |
 | `src/api/services/llm/nim_client.py` | 402, 422 | `"nemotron" in model.lower()` branch | **runtime** | Controls `/no_think` injection and `reasoning_budget`; model-name coupling |
-| `src/api/services/guardrails/guardrails_service.py` | 62 | `nvidia/llama-3.3-nemotron-super-49b-v1.5` (default for `GUARDRAILS_MODEL`) | **runtime** | Guardrails judge model when env var is unset |
-| `src/api/services/guardrails/guardrails_service.py` | 217 | Comment: `Model: nvidia/llama-3.3-nemotron-super-49b-v1.5` | documentation | None |
-| `src/api/agents/document/validation/large_llm_judge.py` | 65 | `nvidia/llama-3.3-nemotron-super-49b-v1.5` (default for `LLM_MODEL`) | **runtime** | Document Stage 5 judge model |
+| `src/api/services/guardrails/guardrails_service.py` | 62 | `nvidia/nemotron-3-super-120b-a12b` (default for `GUARDRAILS_MODEL`) | **runtime** | Guardrails judge model when env var is unset |
+| `src/api/services/guardrails/guardrails_service.py` | 217 | Comment: `Model: nvidia/nemotron-3-super-120b-a12b` | documentation | None |
+| `src/api/agents/document/validation/large_llm_judge.py` | 65 | `nvidia/nemotron-3-super-120b-a12b` (default for `LLM_MODEL`) | **runtime** | Document Stage 5 judge model |
 | `src/api/agents/document/validation/large_llm_judge.py` | 67–69 | `LLAMA_70B_TIMEOUT` env var (legacy name) | **runtime** | Timeout for the judge call; confusingly named |
 | `src/api/agents/document/validation/large_llm_judge.py` | 260 | `LLAMA_70B_TIMEOUT` in error message | **runtime** | Surface error text seen by operators |
-| `src/api/agents/document/preprocessing/nemo_retriever.py` | 354 | `nvidia/llama-3.3-nemotron-super-49b-v1.5` (hardcoded fallback) | **runtime** | Page element detection fallback; not env-configurable |
+| `src/api/agents/document/preprocessing/nemo_retriever.py` | 354 | `nvidia/nemotron-3-super-120b-a12b` (hardcoded fallback) | **runtime** | Page element detection fallback; not env-configurable |
 | `src/api/agents/document/processing/small_llm_processor.py` | 49 | `LLAMA_NANO_VL_API_KEY` env var | **runtime** | Auth for Nano VL endpoint |
 | `src/api/agents/document/processing/small_llm_processor.py` | 51 | `LLAMA_NANO_VL_URL` env var | **runtime** | Endpoint URL for Nano VL |
 | `src/api/agents/document/processing/small_llm_processor.py` | 65 | `LLAMA_NANO_VL_API_KEY not found` warning | **runtime** | Log message at startup |
@@ -149,21 +149,21 @@ Every reference to a Llama model string, env var, or naming artifact in the repo
 | `src/api/agents/document/processing/small_llm_processor.py` | 248 | `meta/llama-3.1-8b-instruct` (hardcoded text-only fallback) | **runtime** | Called when vision model fails; not env-configurable |
 | `src/api/agents/document/processing/small_llm_processor.py` | 315 | `meta/llama-3.2-11b-vision-instruct` (hardcoded vision fallback) | **runtime** | Called on multimodal failure; not env-configurable |
 | `src/api/agents/document/processing/small_llm_processor.py` | 17, 38, 87, 98 | `Llama Nemotron Nano VL 8B` in docstrings / logs | documentation | None |
-| `src/api/agents/document/processing/embedding_indexing.py` | 17, 45, 184 | `llama-nemotron-embed-vl-1b-v2` in docstrings | documentation | None |
+| `src/api/agents/document/processing/embedding_indexing.py` | 17, 45, 184 | `nemotron-3-embed-1b` in docstrings | documentation | None |
 | `src/api/agents/document/ocr/nemo_ocr.py` | 145 | `meta/llama-3.2-11b-vision-instruct` (hardcoded OCR vision fallback) | **runtime** | Called when NeMo OCR service is unavailable |
 | `src/api/agents/document/action_tools.py` | 48 | `MODEL_SMALL_LLM = "Llama Nemotron Nano VL 8B"` | **runtime** | Class constant — written to responses and logs; tested in unit tests |
 | `src/api/agents/document/action_tools.py` | 49 | `MODEL_LARGE_JUDGE = "Llama 3.3 Nemotron Super 49B"` | **runtime** | Class constant — same as above |
 | `src/api/agents/document/action_tools.py` | 560–562, 1162, 1547 | Pipeline stage label strings | documentation | Appear in `ChatResponse` `quick_actions` strings |
 | `src/api/agents/document/document_extraction_agent.py` | 79–81, 207, 237 | Docstring and comment references | documentation | None |
 | `src/api/agents/document/mcp_document_agent.py` | 338–340 | Pipeline stage label strings | documentation | Appear in MCP tool results |
-| `src/retrieval/vector/embedding_service.py` | 37, 45 | `nvidia/llama-nemotron-embed-vl-1b-v2` (default value and docstring) | **runtime** | Controls embedding calls when `EMBEDDING_MODEL` unset |
-| `src/retrieval/vector/milvus_retriever.py` | 44 | Comment: `# llama-nemotron-embed-vl-1b-v2` (dimension comment) | legacy-artifact | None — comment only |
+| `src/retrieval/vector/embedding_service.py` | 37, 45 | `nvidia/nemotron-3-embed-1b` (default value and docstring) | **runtime** | Controls embedding calls when `EMBEDDING_MODEL` unset |
+| `src/retrieval/vector/milvus_retriever.py` | 44 | Comment: `# nemotron-3-embed-1b` (dimension comment) | legacy-artifact | None — comment only |
 | `src/retrieval/vector/gpu_milvus_retriever.py` | 44 | Same dimension comment | legacy-artifact | None — comment only |
-| `data/config/guardrails/rails.yaml` | 7, 15 | `nvidia/llama-3.3-nemotron-super-49b-v1.5` and `nvidia/llama-nemotron-embed-vl-1b-v2` | configuration | Active when `USE_NEMO_GUARDRAILS_SDK=true` |
+| `data/config/guardrails/rails.yaml` | 7, 15 | `nvidia/nemotron-3-super-120b-a12b` and `nvidia/nemotron-3-embed-1b` | configuration | Active when `USE_NEMO_GUARDRAILS_SDK=true` |
 | `data/config/guardrails/config.yml` | 13, 23 | Same two models | configuration | Active when NeMo SDK is enabled |
 | `tests/unit/test_document_action_tools.py` | 69–70 | Asserts `MODEL_SMALL_LLM == "Llama Nemotron Nano VL 8B"` and `MODEL_LARGE_JUDGE == "Llama 3.3 Nemotron Super 49B"` | test | Tests will fail if constants change without update |
 | `tests/unit/test_nvidia_llm.py` | 92, 98, 103 | `LLAMA_NANO_VL_API_KEY` env check, display strings | test | Env var rename will break this check |
-| `tests/unit/test_embedding.py` | 34, 83, 89 | `nvidia/llama-nemotron-embed-vl-1b-v2` in print strings | test | No assertion; display-only |
+| `tests/unit/test_embedding.py` | 34, 83, 89 | `nvidia/nemotron-3-embed-1b` in print strings | test | No assertion; display-only |
 | `tests/unit/test_document_pipeline.py` | 340 | `LLAMA_NANO_VL_API_KEY` in `os.environ` mock | test | Will fail silently if env var is renamed |
 | `docs/configuration/LLM_PARAMETERS.md` | 42, 144, 278 | Model names in docs | documentation | None |
 | `docs/architecture/adr/002-nvidia-nims-integration.md` | 32–182 | Model names throughout ADR | documentation | None |
@@ -189,7 +189,7 @@ Every reference to a Llama model string, env var, or naming artifact in the repo
 
 | Workload | Current model | Recommended Nemotron | Reasoning |
 |----------|--------------|---------------------|-----------|
-| Intent classification (`MCPIntentClassifier` keyword + semantic blend) | `nvidia/llama-3.3-nemotron-super-49b-v1.5` via NIMClient | **Nemotron Lightning** | Pure classification; no deep reasoning needed; latency directly impacts P50 chat response. Super is overprovisioned here. |
+| Intent classification (`MCPIntentClassifier` keyword + semantic blend) | `nvidia/nemotron-3-super-120b-a12b` via NIMClient | **Nemotron Lightning** | Pure classification; no deep reasoning needed; latency directly impacts P50 chat response. Super is overprovisioned here. |
 | Equipment query parsing (`_parse_equipment_query` complex branch) | Super 49B | **Nemotron Nano** | Structured extraction from a constrained domain vocabulary. Nano is SFT target once trajectory store is active. |
 | Equipment response generation (`_generate_response_with_tools`, temp 0.0, 2000 tokens) | Super 49B | **Nemotron Super** | Multi-tool result synthesis with citation; needs depth. Keep Super for now; migrate to fine-tuned Nano in Phase 3. |
 | Equipment recommendations (temp 0.3, 500 tokens) | Super 49B | **Nemotron Nano** | Short, formulaic recommendation text from structured data. Nano is appropriate. |
@@ -204,7 +204,7 @@ Every reference to a Llama model string, env var, or naming artifact in the repo
 | OCR vision fallback (NeMoOCRService) | `meta/llama-3.2-11b-vision-instruct` | **Nemotron Nano Omni** | Eliminates the one remaining Meta model in the runtime path. |
 | Vision fallback in SmallLLMProcessor | `meta/llama-3.2-11b-vision-instruct` | **Nemotron Nano Omni** | Same rationale; unified into Nano Omni endpoint. |
 | Text-only fallback in SmallLLMProcessor | `meta/llama-3.1-8b-instruct` | **Nemotron Nano** | Consolidate all text fallbacks to Nano; eliminates second Meta runtime dependency. |
-| Semantic routing embedding | `nvidia/llama-nemotron-embed-vl-1b-v2` (2048-dim) | **Nemotron Nano Omni embedding** (or current model retained) | Current model is already Nemotron-family; retain unless a higher-accuracy embedding model ships. No action in Phase 1. |
+| Semantic routing embedding | `nvidia/nemotron-3-embed-1b` (2048-dim) | **Nemotron Nano Omni embedding** (or current model retained) | Current model is already Nemotron-family; retain unless a higher-accuracy embedding model ships. No action in Phase 1. |
 | Guardrails input/output safety | Super 49B (opt-in via NeMo SDK) | **Nemotron Lightning** (input) + **Nemotron Nano** (output) | Input safety is high-volume and latency-critical (3s budget). Lightning fits. Output check has more room (5s); Nano provides better semantic understanding than pattern matching. |
 | Multi-domain ambiguous intent synthesis (`_mcp_synthesize_response`) | Super 49B | **Nemotron Super** | Final synthesis of multi-agent results; quality matters. Keep Super. |
 | Trajectory evaluation (future, post Phase 3) | None today | **Nemotron Ultra** | Offline judge for SFT data quality and regression evaluation. |
@@ -453,7 +453,7 @@ Each agent migration follows the same pattern: the agent calls `model_gateway.co
 **Step 3.1 — Delete `LLM_MODEL` as the sole model selection variable**
 - After all agents use ModelGateway, `LLM_MODEL` no longer controls agent routing.
 - Retain `LLM_MODEL` as a `ROUTING_TABLE` override mechanism: if `LLM_MODEL` is set, it overrides the `NEMOTRON_SUPER_MODEL` env var only (for operators who prefer explicit control).
-- Remove all `os.getenv("LLM_MODEL", "nvidia/llama-3.3-nemotron-super-49b-v1.5")` calls from `nim_client.py` line 104, `large_llm_judge.py` line 65.
+- Remove all `os.getenv("LLM_MODEL", "nvidia/nemotron-3-super-120b-a12b")` calls from `nim_client.py` line 104, `large_llm_judge.py` line 65.
 
 **Step 3.2 — Remove per-service httpx clients**
 - `LargeLLMJudge`: remove the per-request `httpx.AsyncClient` instantiation. The judge calls `model_gateway.complete(ModelRequest(workload=DOCUMENT_JUDGE))`.
@@ -490,9 +490,9 @@ Each agent migration follows the same pattern: the agent calls `model_gateway.co
 | Nemotron Lightning | `nvidia/nemotron-x-lightning` | `NEMOTRON_LIGHTNING_URL` + `NEMOTRON_LIGHTNING_API_KEY` | None (new) | `/chat/completions` |
 | Nemotron Nano | `nvidia/nemotron-x-nano` | `NEMOTRON_NANO_URL` + `NEMOTRON_NANO_API_KEY` | None (new) | `/chat/completions` |
 | Nemotron Nano Omni | `nvidia/nemotron-x-nano-omni` | `NEMOTRON_NANO_OMNI_URL` + `NEMOTRON_NANO_OMNI_API_KEY` | `LLAMA_NANO_VL_URL`, `LLAMA_NANO_VL_API_KEY` | `/chat/completions` (multimodal) |
-| Nemotron Super | `nvidia/llama-3.3-nemotron-super-49b-v1.5` | `NEMOTRON_SUPER_URL` + `NEMOTRON_SUPER_API_KEY` | `LLM_NIM_URL`, `NVIDIA_API_KEY` | `/chat/completions` |
+| Nemotron Super | `nvidia/nemotron-3-super-120b-a12b` | `NEMOTRON_SUPER_URL` + `NEMOTRON_SUPER_API_KEY` | `LLM_NIM_URL`, `NVIDIA_API_KEY` | `/chat/completions` |
 | Nemotron Ultra | `nvidia/llama-3.1-nemotron-ultra-253b-v1` | `NEMOTRON_ULTRA_URL` + `NEMOTRON_ULTRA_API_KEY` | None (new) | `/chat/completions` |
-| Nemotron Embed | `nvidia/llama-nemotron-embed-vl-1b-v2` (retain or upgrade) | `NEMOTRON_EMBED_URL` + `NEMOTRON_EMBED_API_KEY` | `EMBEDDING_NIM_URL`, `EMBEDDING_API_KEY` | `/embeddings` |
+| Nemotron Embed | `nvidia/nemotron-3-embed-1b` (retain or upgrade) | `NEMOTRON_EMBED_URL` + `NEMOTRON_EMBED_API_KEY` | `EMBEDDING_NIM_URL`, `EMBEDDING_API_KEY` | `/embeddings` |
 | Nemotron Parse (OCR) | `nemotron-parse` | `NEMO_PARSE_URL` + `NEMO_PARSE_API_KEY` | Same (no rename needed) | `/models/nemotron-parse/infer` |
 
 **Note on model IDs:** Exact model IDs for Lightning, Nano, and Nano Omni should be confirmed against `https://integrate.api.nvidia.com/v1/models` at the time of Phase 1 implementation. The names used above (`nvidia/nemotron-x-*`) are placeholders. The Super model ID is already deployed and confirmed.

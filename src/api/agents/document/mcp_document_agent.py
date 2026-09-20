@@ -336,7 +336,7 @@ class MCPDocumentExtractionAgent:
                         "Document Preprocessing (NeMo Retriever)",
                         "Intelligent OCR (NeMoRetriever-OCR-v1)",
                         "Small LLM Processing (Nemotron Nano VL, runtime-configured)",
-                        "Embedding & Indexing (llama-nemotron-embed-vl-1b-v2)",
+                        "Embedding & Indexing (nemotron-3-embed-1b)",
                         "Large LLM Judge (Nemotron 3 Super 120B)",
                         "Intelligent Routing",
                     ],

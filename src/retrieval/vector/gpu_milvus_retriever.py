@@ -41,7 +41,7 @@ class GPUMilvusConfig:
     host: str = os.getenv("MILVUS_HOST", "localhost")
     port: str = os.getenv("MILVUS_PORT", "19530")
     collection_name: str = "warehouse_docs_gpu"
-    dimension: int = int(os.getenv("EMBEDDING_DIMENSION", "2048"))  # llama-nemotron-embed-vl-1b-v2
+    dimension: int = int(os.getenv("EMBEDDING_DIMENSION", "2048"))  # nemotron-3-embed-1b
     
     # GPU Configuration
     use_gpu: bool = os.getenv("MILVUS_USE_GPU", "true").lower() == "true"

@@ -70,7 +70,7 @@ graph TB
 
     subgraph AI_LAYER["AI Services - NVIDIA NIMs"]
         NIM_LLM["NVIDIA NIM LLM<br/>Nemotron 3 Super 120B<br/>Fully Integrated"]
-        NIM_EMB["NVIDIA NIM Embeddings<br/>llama-nemotron-embed-vl-1b-v2 (multimodal)<br/>GPU Accelerated"]
+        NIM_EMB["NVIDIA NIM Embeddings<br/>nemotron-3-embed-1b (multimodal)<br/>GPU Accelerated"]
         GUARDRAILS_NIM["NeMo Guardrails<br/>Content Safety & Compliance"]
     end
 
@@ -78,7 +78,7 @@ graph TB
         NEMO_RETRIEVER["NeMo Retriever<br/>Document Preprocessing<br/>Stage 1"]
         NEMO_OCR["NeMoRetriever-OCR-v1<br/>Intelligent OCR<br/>Stage 2"]
         NANO_VL["Nemotron Nano VL (runtime-configured)<br/>Small LLM Processing<br/>Stage 3"]
-        E5_EMBEDDINGS["llama-nemotron-embed-vl-1b-v2 (multimodal)<br/>Embedding Indexing<br/>Stage 4"]
+        E5_EMBEDDINGS["nemotron-3-embed-1b (multimodal)<br/>Embedding Indexing<br/>Stage 4"]
         NEMOTRON_70B["Nemotron 3 Super 120B<br/>Large LLM Judge<br/>Stage 5"]
         INTELLIGENT_ROUTER["Intelligent Router<br/>Quality-based Routing<br/>Stage 6"]
     end
@@ -458,7 +458,7 @@ sequenceDiagram
 | **Forecasting Agent** | Complete | Python, async + MCP | - | Demand forecasting, reorder recommendations (MCP version is primary) |
 | **Document Extraction Agent** | Complete | Python, async + NVIDIA NeMo | - | 6-stage document processing pipeline |
 | **Memory Manager** | Complete | PostgreSQL, Redis | - | Session context, conversation history |
-| **NVIDIA NIMs** | Complete | Nemotron 3 Super 120B, llama-nemotron-embed-vl-1b-v2 | - | AI-powered responses |
+| **NVIDIA NIMs** | Complete | Nemotron 3 Super 120B, nemotron-3-embed-1b | - | AI-powered responses |
 | **Document Processing Pipeline** | Complete | NVIDIA NeMo Models | - | 6-stage intelligent document processing |
 | **Forecasting Service** | Complete | Python, scikit-learn, XGBoost | - | Multi-model ensemble forecasting |
 | **Forecasting Training** | Complete | Python, RAPIDS cuML (GPU) | - | Phase 1-3 training pipeline |
@@ -569,7 +569,7 @@ The Warehouse Operational Assistant uses multiple NVIDIA NIMs (NVIDIA Inference 
 | NIM Service | Model | Purpose | Endpoint Type | Environment Variable | Default Endpoint |
 |-------------|-------|---------|---------------|---------------------|------------------|
 | **LLM Service** | Nemotron 3 Super 120B | Primary language model for chat, reasoning, and generation | Cloud or Self-hosted | `LLM_NIM_URL` | `https://integrate.api.nvidia.com/v1` |
-| **Embedding Service** | llama-nemotron-embed-vl-1b-v2 | Semantic search embeddings for RAG | Cloud (integrate.api.nvidia.com) or Self-hosted | `EMBEDDING_NIM_URL` | `https://integrate.api.nvidia.com/v1` |
+| **Embedding Service** | nemotron-3-embed-1b | Semantic search embeddings for RAG | Cloud (integrate.api.nvidia.com) or Self-hosted | `EMBEDDING_NIM_URL` | `https://integrate.api.nvidia.com/v1` |
 | **NeMo Retriever** | NeMo Retriever | Document preprocessing and structure analysis | Cloud or Self-hosted | `NEMO_RETRIEVER_URL` | `https://integrate.api.nvidia.com/v1` |
 | **NeMo OCR** | NeMoRetriever-OCR-v1 | Intelligent OCR with layout understanding | Cloud or Self-hosted | `NEMO_OCR_URL` | `https://integrate.api.nvidia.com/v1` |
 | **Nemotron Parse** | Nemotron Parse | Advanced document parsing and extraction | Cloud or Self-hosted | `NEMO_PARSE_URL` | `https://integrate.api.nvidia.com/v1` |
@@ -589,7 +589,7 @@ The Warehouse Operational Assistant uses multiple NVIDIA NIMs (NVIDIA Inference 
 | Component | Installation Type | Required For | Notes |
 |-----------|------------------|--------------|-------|
 | **Nemotron 3 Super 120B** | Endpoint (Cloud or Self-hosted) | Core LLM functionality, chat, reasoning | Required - Use https://integrate.api.nvidia.com/v1 or deploy locally |
-| **llama-nemotron-embed-vl-1b-v2** | Endpoint (Cloud or Self-hosted) | Semantic search, RAG, vector embeddings | Required - Can use cloud endpoint or deploy locally |
+| **nemotron-3-embed-1b** | Endpoint (Cloud or Self-hosted) | Semantic search, RAG, vector embeddings | Required - Can use cloud endpoint or deploy locally |
 | **NeMo Retriever** | Endpoint (Cloud or Self-hosted) | Document preprocessing (Stage 1) | Required for document processing pipeline |
 | **NeMoRetriever-OCR-v1** | Endpoint (Cloud or Self-hosted) | OCR processing (Stage 2) | Required for document processing pipeline |
 | **Nemotron Parse** | Endpoint (Cloud or Self-hosted) | Document parsing (Stage 2) | Required for document processing pipeline |
@@ -643,7 +643,7 @@ The Document Extraction Agent implements a comprehensive **6-stage pipeline** us
 - **Capabilities**: Entity extraction, data structuring, content analysis, metadata generation
 
 ### Stage 4: Embedding & Indexing
-- **Model**: llama-nemotron-embed-vl-1b-v2
+- **Model**: nemotron-3-embed-1b
 - **Purpose**: Vector embedding generation and semantic indexing
 - **Capabilities**: Semantic search preparation, content indexing, similarity matching
 

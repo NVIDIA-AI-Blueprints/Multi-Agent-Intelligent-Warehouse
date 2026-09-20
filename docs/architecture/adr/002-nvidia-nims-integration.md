@@ -149,7 +149,7 @@ LLM_CONFIG = {
     "timeout": 30,
     "max_retries": 3,
     "retry_delay": 1.0,
-    "model": "nvidia/llama-3.3-nemotron-super-49b-v1.5"
+    "model": "nvidia/nemotron-3-super-120b-a12b"
 }
 
 # Embeddings Service Configuration
@@ -159,7 +159,7 @@ EMBEDDINGS_CONFIG = {
     "timeout": 10,
     "max_retries": 3,
     "retry_delay": 0.5,
-    "model": "nvidia/llama-nemotron-embed-vl-1b-v2"
+    "model": "nvidia/nemotron-3-embed-1b"
 }
 ```
 
@@ -179,6 +179,6 @@ EMBEDDINGS_CONFIG = {
 
 - [NVIDIA NIMs Documentation](https://docs.nvidia.com/nim/)
 - [Llama 3.3 Nemotron Super 49B Model Card](https://huggingface.co/nvidia/Llama-3.3-Nemotron-Super-49B)
-- [Llama Nemotron Embed VL 1B v2 Model Card](https://build.nvidia.com/nvidia/llama-nemotron-embed-vl-1b-v2/modelcard)
+- [Llama Nemotron Embed VL 1B v2 Model Card](https://build.nvidia.com/nvidia/nemotron-3-embed-1b/modelcard)
 - [NVIDIA AI Enterprise](https://www.nvidia.com/en-us/data-center/products/ai-enterprise/)
 - [Production AI Best Practices](https://docs.nvidia.com/nim/guides/production-deployment/)
