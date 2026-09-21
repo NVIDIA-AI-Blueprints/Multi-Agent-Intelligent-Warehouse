@@ -127,14 +127,16 @@ and actor identity. The audit chain is preserved even after consumption.
 
 ---
 
-## ActionExecutor — Four Guards
+## ActionExecutor — Six Guards
 
-`BaseActionExecutor.execute()` checks four guards **in order** before any MCP write:
+`BaseActionExecutor.execute()` checks six guards **in order** before any MCP write:
 
 1. **Decision outcome is `APPROVED`** — rejects anything else
 2. **Decision binds to the exact `proposal_id`** — prevents stale-decision replay
 3. **Action name is in the executor's static `_ALLOWED_ACTIONS` frozenset** — allowlist check
-4. **Decision is not stale** — snapshot-drift check against current warehouse state
+4. **Decision is not stale** — `evaluated_at` age exceeds `max_decision_age_seconds`
+5. **Domain-specific additional guards** — subclass `_check_additional_guards()` hook (e.g. state-drift for equipment)
+6. **Request deadline not expired** — checked immediately before write; no mutation on expiry
 
 If any guard fails, no MCP write is attempted. The outcome is `REJECTED` or `CONFLICT`.
 
