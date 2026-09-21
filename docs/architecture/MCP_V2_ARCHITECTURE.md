@@ -1,696 +1,529 @@
-# MCP v2 Architecture — MAIW Capability Bus (Inventory + Equipment)
+# MAIW v2 MCP Architecture
 
-> **Update note (WS1):** `ActionProposal` and `RiskLevel` have moved from `maiw-mcp/contracts/` to `packages/maiw-decision/maiw_decision/proposal.py`. All other MCP SDK architecture described here remains current. Test counts shown are from Phase 6B; current totals are in [ARCHITECTURE.md](ARCHITECTURE.md).
-
-## Multi-Agent Intelligent Warehouse (MAIW)
-
-**Phase:** 6B (Architecture hardening — MCP boundary enforcement)  
-**Date:** 2026-08-20  
-**SDK:** `mcp` 2.0.0 (official Anthropic MCP Python SDK)  
-**Protocol version:** 2026-07-28  
-**Status:** Implemented — 311 tests at Phase 6B baseline (see [ARCHITECTURE.md](ARCHITECTURE.md) for current test totals)
+> **Status:** Current — authoritative reference for MAIW v2.  
+> **SDK:** `mcp>=2.0.0,<3` · Protocol version `2026-07-28`  
+> **Last updated:** 2026-09-20
 
 ---
 
-## 1. Overview
+## Central Principle
 
-Phase 2 proves one complete end-to-end path from an agent method call through the
-official MCP protocol to the existing MAIW backend — without modifying the backend,
-without breaking existing agents, and without touching the Phase 1 ModelGateway.
+**MCP is the interoperability layer, not the authority layer.**
 
-```
-OperationsCoordinationAgent._lookup_inventory_sku("SKU-001")
-  ↓
-InventoryLookupSkill.execute(InventoryLookupRequest(sku="SKU-001"))
-  ↓  [semantic capability name only]
-MAIWMCPClient.invoke("warehouse.inventory.get", payload)
-  ↓  [official MCP Python SDK]
-streamablehttp_client(server_url) → ClientSession → session.call_tool(...)
-  ↓  [MCP JSON-RPC 2.0 over Streamable HTTP — or in-memory for tests]
-FastMCP server: mcp_servers/inventory/server.py
-  ↓  [warehouse_inventory_get tool]
-MAIWInventoryAdapter.get_inventory()
-  ↓  [wraps existing code — zero new inventory logic]
-InventoryQueries.get_item_by_sku() → SQLRetriever → PostgreSQL
-```
+MCP defines how MAIW capabilities are discovered, invoked, and monitored across
+process boundaries. It says nothing about *whether* a capability may be invoked.
+That authority belongs to the governed write path:
+`DecisionEngine → Human Approval → ActionExecutor`.
+Every write tool call that crosses the MCP boundary has already passed six
+sequential guards in `BaseActionExecutor` before the wire is ever touched.
 
 ---
 
-## 2. Package Layout
+## 1. System Overview
+
+MAIW v2 exposes warehouse capabilities as MCP tools hosted by four dedicated
+servers (equipment, labor, wave, inventory). Agents and skills call those tools
+exclusively through `MAIWMCPClient`. The LLM layer reasons and recommends; it
+never touches the write path.
 
 ```
-packages/
-└── maiw-mcp/                       ← editable install: pip install -e packages/maiw-mcp/
-    └── maiw_mcp/
-        ├── __init__.py
-        ├── errors.py               ← typed error hierarchy
-        ├── auth/
-        │   └── auth.py             ← MCPAuthConfig (bearer token)
-        ├── client/
-        │   └── client.py           ← MAIWMCPClient (official SDK)
-        ├── contracts/
-        │   ├── actions.py          ← ActionProposal, RiskLevel (write boundary)
-        │   ├── common.py           ← CapabilityMetadata
-        │   ├── equipment.py        ← EquipmentStatusRequest/Result, TelemetryRequest/Result + metadata
-        │   └── inventory.py        ← InventoryLookupRequest/Result/Location + metadata
-        ├── registry/
-        │   └── registry.py         ← CapabilityRegistry
-        ├── telemetry/
-        │   └── telemetry.py        ← CapabilityTelemetry (structured JSON log)
-        └── testing/
-            ├── conformance.py      ← run_inventory_conformance()
-            ├── fixtures.py         ← make_inventory_result()
-            └── mock_server.py      ← MockInventoryServer (in-memory transport)
-
-mcp_servers/
-├── inventory/                      ← deployable MCP server package
-│   ├── __init__.py
-│   ├── server.py                   ← MCPServer entry point (2 tools)
-│   ├── provider.py                 ← InventoryProvider Protocol + MockInventoryProvider
-│   └── adapters/
-│       └── maiw_backend.py         ← MAIWInventoryAdapter
-└── equipment/                      ← Phase 3: second MCP domain
-    ├── __init__.py
-    ├── server.py                   ← MCPServer entry point (3 tools)
-    ├── provider.py                 ← EquipmentProvider Protocol + MockEquipmentProvider
-    └── adapters/
-        └── maiw_backend.py         ← MAIWEquipmentAdapter → EquipmentAssetTools
-
-src/api/
-└── skills/
-    ├── inventory.py                ← InventoryLookupSkill + get_inventory_skill()
-    └── equipment.py                ← EquipmentStatusSkill, EquipmentTelemetrySkill,
-                                       EquipmentAssignmentSkill + factories
-
-tests/
-├── contract/
-│   ├── test_inventory_capability.py   ← 78 contract tests (inventory)
-│   └── test_equipment_capability.py   ← 44 contract tests (equipment + ActionProposal)
-└── mcp/
-    ├── test_inventory_mcp_server.py   ← 31 MCP protocol tests (inventory)
-    └── test_equipment_mcp_server.py   ← 28 MCP protocol tests (equipment)
+┌─────────────────── MAIW Authority Boundary ────────────────────────┐
+│                                                                      │
+│  Agent / SOP Runtime                                                 │
+│      │                                                               │
+│      ▼                                                               │
+│  RecommendedAction           (AI reasoning output — read-only)       │
+│      │                                                               │
+│      ▼                                                               │
+│  ActionProposal              (maiw-decision — struct, not request)   │
+│      │                                                               │
+│      ▼                                                               │
+│  DecisionEngine              (policy evaluation)                     │
+│      │                                                               │
+│      ▼                                                               │
+│  Human Approval Gate         (if requires_approval == True)          │
+│      │                                                               │
+│  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │
+│  (write path only crosses this line after APPROVED decision)         │
+│      │                                                               │
+│      ▼                                                               │
+│  BaseActionExecutor          (6 guards, maiw-execution)              │
+│      │                                                               │
+└──────┼───────────────────────────────────────────────────────────────┘
+       │
+       ▼  (MCP boundary — interoperability layer)
+   MAIWMCPClient
+       │
+       ▼
+   mcp.client.Client           (official MCP SDK 2.0, protocol 2026-07-28)
+       │
+       ▼
+   MCPServer                   (one per domain — equipment / labor / wave / inventory)
+       │
+       ▼
+   Provider / MAIW Backend Adapter
+       │
+       ▼
+   Operational System          (warehouse equipment, labor, wave, inventory)
 ```
 
-### Phase 3 Capability Bus
+Read tools (inventory lookup, equipment status, labor capacity, wave risk) follow
+the same path from the top but bypass the authority chain — skills call
+`MAIWMCPClient.invoke()` directly after the reasoning phase.
 
-```
-OperationsCoordinationAgent
-  ├── _lookup_inventory_sku()       via InventoryLookupSkill
-  ├── _get_equipment_status()       via EquipmentStatusSkill
-  └── _get_equipment_telemetry()    via EquipmentTelemetrySkill
+---
 
-Skill layer (src/api/skills/)
-  ↓ MAIWMCPClient.invoke(capability_name, payload)
-  ↓ [MCP v2 Streamable HTTP or in-memory]
-MCP Server layer (mcp_servers/)
-  ├── InventoryMCPServer  (warehouse.inventory.get, warehouse.inventory.locate)
-  └── EquipmentMCPServer  (warehouse.equipment.get_status,
-                           warehouse.equipment.get_telemetry,
-                           warehouse.equipment.assign → ActionProposal)
-  ↓ Provider / Adapter layer
-  ├── MAIWInventoryAdapter → InventoryQueries → PostgreSQL
-  └── MAIWEquipmentAdapter → EquipmentAssetTools → PostgreSQL
+## 2. Package Ownership
 
-Write seam (Phase 3 only — future DecisionEngine not yet implemented):
-  warehouse.equipment.assign  →  ActionProposal (not executed)
-  [future DecisionEngine]     →  EquipmentAssetTools.assign_equipment()
-```
+| Package | Owns | Does NOT own |
+|---------|------|-------------|
+| `maiw-contracts` | `CapabilityMetadata`, domain request/result models, tool name constants | ActionProposal, decision logic |
+| `maiw-mcp` | `MAIWMCPClient`, `CapabilityRegistry`, auth, telemetry, circuit breaker, deadline, testing utilities | Warehouse domain contracts, ActionProposal |
+| `maiw-decision` | `ActionProposal`, `DecisionEngine`, `DecisionResult`, `ApprovalStore`, `RiskLevel` | MCP transport |
+| `maiw-execution` | `BaseActionExecutor`, domain executors (equipment, labor, wave), `ExecutionOutcome`, reconciliation | Decision policy |
+| `mcp_servers/*` | Per-domain MCP servers (MCPServer instances with tool registrations and provider injection) | Domain business logic |
 
-### ActionProposal — Write Boundary
+`maiw-mcp` has **zero imports** from `maiw-decision`. The two packages are
+independent; `ActionProposal` is passed into `BaseActionExecutor` from the
+orchestrator layer, not from within the MCP client.
 
-Write capabilities do NOT execute directly. They return an `ActionProposal`:
+There is **no `contracts/` subdirectory** inside `packages/maiw-mcp/maiw_mcp/`.
+All domain contracts live in `packages/maiw-contracts/maiw_contracts/`.
+
+---
+
+## 3. Capability Taxonomy
+
+All capability names follow the pattern `warehouse.<domain>.<action>` (enforced
+by `CapabilityMetadata` field validation).
+
+### Read capabilities
+
+| Capability | Domain | Defined in |
+|-----------|--------|-----------|
+| `warehouse.inventory.get` | inventory | `maiw_contracts/inventory.py` |
+| `warehouse.inventory.locate` | inventory | `maiw_contracts/inventory.py` |
+| `warehouse.equipment.get_status` | equipment | `maiw_contracts/equipment.py` |
+| `warehouse.equipment.get_telemetry` | equipment | `maiw_contracts/equipment.py` |
+| `warehouse.labor.get_capacity` | labor | `maiw_contracts/labor.py` |
+| `warehouse.labor.get_allocation` | labor | `maiw_contracts/labor.py` |
+| `warehouse.wave.get` | wave | `maiw_contracts/wave.py` |
+| `warehouse.wave.get_risk` | wave | `maiw_contracts/wave.py` |
+
+### Write capabilities (require APPROVED DecisionResult)
+
+| Capability | Domain | Risk level | Requires approval |
+|-----------|--------|-----------|-------------------|
+| `warehouse.equipment.assign` | equipment | MEDIUM | Yes |
+| `warehouse.equipment.release` | equipment | LOW | No |
+| `warehouse.equipment.schedule_maintenance` | equipment | MEDIUM | Yes |
+| `warehouse.labor.allocate` | labor | MEDIUM | Yes |
+| `warehouse.wave.reprioritize` | wave | MEDIUM | Yes |
+
+Write tool functions require `proposal_id` and `decision_id` as mandatory
+parameters. `BaseActionExecutor` verifies these match the approved
+`DecisionResult` before the MCP call is made.
+
+`CapabilityMetadata` carries `side_effect` (`"read"` | `"write"` | `"action"`),
+`risk` (`"low"` | `"medium"` | `"high"`), `idempotent`, and `timeout_seconds`.
+These fields are informational at this time; `required_permission` is defined
+but not yet enforced at runtime.
+
+---
+
+## 4. Write Path Authority Chain
+
+`BaseActionExecutor.execute()` enforces six guards in order before any write
+reaches the MCP layer:
+
+1. **APPROVED gate** — `decision.outcome == DecisionOutcome.APPROVED`; raises `ActionNotApproved`
+2. **Proposal/decision bind** — `decision.proposal_id == proposal.proposal_id`; raises `ActionDecisionMismatch`
+3. **Action allowlist** — `proposal.action in self._ALLOWED_ACTIONS`; raises `ActionUnsupported`
+4. **Staleness check** — decision age ≤ `max_decision_age_seconds` (default 300 s); raises `ActionExpired`
+5. **Additional guards** — `await self._check_additional_guards(proposal)` (subclass hook); raises `ActionConflict`
+6. **Deadline check** — `deadline.expired` immediately before write; raises `RequestDeadlineExceeded` (no mutation occurs)
+
+Only after all six guards pass does `_do_execute()` call `MAIWMCPClient.invoke()`
+with the write capability.
+
+`ActionProposal` factory classmethods (`ActionProposal.for_equipment_assign()`,
+`for_labor_allocate()`, etc.) are defined in `maiw-decision/maiw_decision/proposal.py`.
+
+---
+
+## 5. MAIWMCPClient
+
+File: `packages/maiw-mcp/maiw_mcp/client/client.py`
+
+### MCP SDK imports
 
 ```python
-ActionProposal(
-    proposal_id="uuid",
-    action="warehouse.equipment.assign",
-    parameters={"asset_id": "FL-001", "assignee": "op-1", ...},
-    domain="equipment",
-    risk_level=RiskLevel.MEDIUM,
-    requires_approval=True,
-    reason="Unload dock 3",
-    requested_by="operations-agent",
-)
+from mcp import types
+from mcp.client import Client
 ```
 
-This seam is the insertion point for the future DecisionEngine. Until then,
-callers receive the proposal and may inspect or log it.
+`ClientSession`, `streamablehttp_client`, `create_connected_server_and_client_session`,
+and manual `session.initialize()` calls are **not used**. The v2 SDK's `Client`
+context manager handles the full lifecycle.
 
----
-
-## 2B. MCP SDK v1 → v2 Migration Summary
-
-| Aspect | v1 (mcp 1.27.0) | v2 (mcp 2.0.0) |
-|--------|-----------------|-----------------|
-| Protocol version | 2024-11-05 | 2026-07-28 |
-| High-level server | `FastMCP` (`mcp.server.fastmcp`) | `MCPServer` (`mcp.server`) |
-| High-level client | `ClientSession` + `streamablehttp_client` | `Client` (`mcp.client`) |
-| In-memory test | `create_connected_server_and_client_session(server)` | `Client(server)` |
-| HTTP client | `streamablehttp_client(url)` + `ClientSession` | `Client("http://url")` |
-| Error flag | `result.isError` | `result.is_error` |
-| Tool schema key | `tool.inputSchema` | `tool.input_schema` |
-| Structured content | `result.structuredContent` | `result.structured_content` |
-| Stateless HTTP | Not default | `stateless_http=True` on `run()` |
-| Session init | Manual `session.initialize()` | Handled internally by `Client` |
-
-**Breaking changes in MAIW code:**
-1. `mcp.server.fastmcp` module removed entirely — no `FastMCP` anywhere
-2. `mcp.shared.memory.create_connected_server_and_client_session` removed
-3. `mcp.client.streamable_http.streamablehttp_client` renamed to `streamable_http_client` (superseded by `Client`)
-4. All `isError` / `inputSchema` / `structuredContent` field names snake_cased
-
-**Stateless HTTP for horizontal scaling:**
-
-```python
-# Production entry point — stateless_http=True means no Mcp-Session-Id required.
-# Any request can be served by any pod behind a load balancer.
-mcp_server.run("streamable-http", host=host, port=port, stateless_http=True)
-```
-
----
-
-## 3. Capability Naming Convention
-
-All MAIW capabilities follow the `warehouse.<domain>.<action>` namespace:
-
-| Capability Name               | Domain    | Action   | Side Effect | Risk |
-|-------------------------------|-----------|----------|-------------|------|
-| `warehouse.inventory.get`     | inventory | get      | read        | low  |
-| `warehouse.inventory.locate`  | inventory | locate   | read        | low  |
-
-Rules:
-- All lowercase, dot-separated, no hyphens in the capability name itself.
-- `warehouse` is the fixed top-level namespace for all MAIW MCP capabilities.
-- `<domain>` maps to a single MAIW MCP server (one server per domain boundary).
-- `<action>` is a verb: `get`, `locate`, `reserve`, `release`, `transfer`, etc.
-- Side effects must be declared: `"read"` | `"write"` | `"reserve"`.
-- Risk must be declared: `"low"` | `"medium"` | `"high"`.
-
----
-
-## 4. Contract Structure
-
-### 4.1 CapabilityMetadata (`maiw_mcp/contracts/common.py`)
-
-Declarative per-capability metadata attached to every capability definition.
-
-```python
-class CapabilityMetadata(BaseModel):
-    name: str                   # warehouse.<domain>.<action>
-    version: int = 1            # integer — increment on breaking change
-    domain: str                 # "inventory", "fulfillment", …
-    side_effect: str = "read"   # "read" | "write" | "reserve"
-    risk: str = "low"           # "low" | "medium" | "high"
-    idempotent: bool = True
-    timeout_seconds: int = 30
-    required_permission: str | None = None
-    description: str = ""
-```
-
-### 4.2 Inventory Contracts (`maiw_mcp/contracts/inventory.py`)
-
-```
-InventoryLookupRequest
-  warehouse_id: str = "default"
-  sku: str (min_length=1)
-  location: str | None
-
-InventoryLocation
-  location_id: str
-  quantity_available: int (≥0)
-  quantity_reserved: int = 0 (≥0)
-  reorder_point: int (≥0)
-  → quantity_on_hand: int  [property = available + reserved]
-
-InventoryLookupResult
-  warehouse_id: str
-  sku: str
-  name: str
-  locations: list[InventoryLocation]
-  total_available: int (≥0)
-  is_low_stock: bool
-  observed_at: datetime
-  source: str  ["maiw-backend" | "sap-ewm" | "manhattan" | "mock" | …]
-```
-
-**Vendor neutrality guarantee:** No field references any WMS vendor. The `source`
-field identifies the backend for provenance — it does not change the contract shape.
-
----
-
-## 5. MCP Server Architecture (`mcp_servers/inventory/server.py`)
-
-### 5.1 Server Construction
-
-```python
-mcp_server = FastMCP("MAIW Inventory Server")
-
-@mcp_server.tool(name="warehouse.inventory.get", description=INVENTORY_GET_METADATA.description)
-async def warehouse_inventory_get(sku: str, warehouse_id: str = "default", location: str | None = None) -> str:
-    result = await _get_provider().get_inventory(InventoryLookupRequest(sku=sku, ...))
-    return json.dumps(result.model_dump(mode="json"), default=str)
-```
-
-### 5.2 Transport Selection
-
-The server selects transport from the `MAIW_MCP_TRANSPORT` environment variable:
-
-| `MAIW_MCP_TRANSPORT` | Transport          | Use case                       |
-|----------------------|--------------------|--------------------------------|
-| `stdio` (default)    | Standard I/O       | Local / subprocess             |
-| `sse`                | Server-Sent Events | Legacy MCP clients             |
-| `streamable-http`    | Streamable HTTP    | Production deployment (default)|
-
-Production runs with `MAIW_MCP_TRANSPORT=streamable-http`.
-
-### 5.3 Provider Injection
-
-The module-level `_provider` is set via `configure_server(provider)`. This is
-the primary injection point for both testing and production:
-
-```python
-# Production (wired in app startup or Kubernetes init container)
-from mcp_servers.inventory.adapters.maiw_backend import MAIWInventoryAdapter
-configure_server(MAIWInventoryAdapter(inventory_queries))
-
-# Tests (no database)
-configure_server(MockInventoryProvider())
-```
-
----
-
-## 6. Connector Boundary: InventoryProvider Protocol
-
-```python
-@runtime_checkable
-class InventoryProvider(Protocol):
-    async def get_inventory(self, request: InventoryLookupRequest) -> InventoryLookupResult: ...
-```
-
-Any object implementing `get_inventory` satisfies the Protocol — no base class
-required. New WMS vendors add an adapter class; no MCP server changes needed.
-
-| Adapter                  | Backend                     | Status           |
-|--------------------------|-----------------------------|------------------|
-| `MockInventoryProvider`  | In-memory fixture           | Implemented      |
-| `MAIWInventoryAdapter`   | Existing MAIW PostgreSQL    | Implemented      |
-| `SAPEWMAdapter`          | SAP Extended Warehouse Mgmt | Future Phase 3   |
-| `ManhattanAdapter`       | Manhattan Associates WMS    | Future Phase 3   |
-
----
-
-## 7. Client Architecture (`maiw_mcp/client/client.py`)
+### Constructor
 
 ```python
 class MAIWMCPClient:
-    def __init__(self, registry: CapabilityRegistry, *, telemetry: CapabilityTelemetry | None = None)
-
-    async def invoke(
+    def __init__(
         self,
-        capability: str,            # "warehouse.inventory.get"
-        payload: dict,              # request.model_dump(exclude_none=True)
+        registry: CapabilityRegistry,
         *,
-        trace_id: str | None = None,
-        timeout_seconds: float = 30.0,
-    ) -> dict
+        telemetry: CapabilityTelemetry | None = None,
+        circuit_registry: DomainCircuitRegistry | None = None,
+    ) -> None:
 ```
 
-**Runtime path (MCP v2):**
-1. `CapabilityRegistry.resolve(capability)` → server URL (raises `CapabilityNotFound` if not registered)
-2. `async with Client(server_url, read_timeout_seconds=timeout_seconds) as client:` — `Client` handles the full MCP 2026-07-28 lifecycle (connect, initialize handshake, session teardown)
-3. `await client.call_tool(capability, payload)` → MCP `tools/call` request
-4. Check `result.is_error` → raise `MCPToolError` if true
-5. Parse `TextContent[0].text` as JSON → return dict
-6. `CapabilityTelemetry.record_success/failure()` → structured JSON log (includes `mcp_sdk_version` and `mcp_protocol_version`)
-
-**v1 → v2 client changes:**
-- `streamablehttp_client + ClientSession + session.initialize()` replaced by `Client(url)`
-- `result.isError` → `result.is_error`
-- `result.structuredContent` → `result.structured_content`
-- No persistent session state; every `invoke()` is independently routable
-
-**Error hierarchy** (`maiw_mcp/errors.py`):
-
-```
-MAIWMCPError
-├── MCPUnavailable       — transport or protocol error
-├── MCPTimeout           — client-side timeout exceeded
-├── MCPToolError         — server returned isError=True
-├── MCPContractError     — result not valid JSON or wrong shape
-├── CapabilityNotFound   — no server URL registered for this capability
-├── CapabilityPermissionDenied — auth check failed
-└── BackendUnavailable   — adapter could not reach the WMS backend
-```
-
----
-
-## 8. Capability Registry (`maiw_mcp/registry/registry.py`)
-
-Maps semantic capability names to MCP server URLs. In production, populated from
-environment variables at startup.
+### Public API
 
 ```python
-registry = CapabilityRegistry.from_env()
-# Reads MAIW_MCP_SERVER_INVENTORY_URL=http://inventory-mcp:8080
-# Registers: warehouse.inventory.get → http://inventory-mcp:8080
-#            warehouse.inventory.locate → http://inventory-mcp:8080
-```
-
-Environment variable convention: `MAIW_MCP_SERVER_<DOMAIN>_URL`
-
-| Domain     | Env Var                              | Capabilities Registered          |
-|------------|--------------------------------------|----------------------------------|
-| inventory  | `MAIW_MCP_SERVER_INVENTORY_URL`      | `warehouse.inventory.get`        |
-|            |                                      | `warehouse.inventory.locate`     |
-| fulfillment| `MAIW_MCP_SERVER_FULFILLMENT_URL`    | (future)                         |
-| receiving  | `MAIW_MCP_SERVER_RECEIVING_URL`      | (future)                         |
-
----
-
-## 9. Telemetry (`maiw_mcp/telemetry/telemetry.py`)
-
-Every `invoke()` call emits one structured JSON record to the application logger:
-
-```json
-{
-  "event": "mcp_capability_call",
-  "trace_id": "trace-abc123",
-  "capability_name": "warehouse.inventory.get",
-  "capability_version": 1,
-  "mcp_server": "http://inventory-mcp:8080",
-  "transport": "streamable-http",
-  "latency_ms": 12.4,
-  "success": true,
-  "backend": null,
-  "error_class": null,
-  "error_message": null
-}
-```
-
-`trace_id` propagates from the ModelGateway request span, enabling correlation of
-agent reasoning calls (`/api/v1/chat`) through the MCP capability invocations.
-
----
-
-## 10. Security Model (Phase 2)
-
-Phase 2 implements bearer-token auth only. OAuth 2.0 is deferred to Phase 4.
-
-| Control               | Implementation                                                |
-|-----------------------|---------------------------------------------------------------|
-| Transport encryption  | TLS required for all non-localhost Streamable HTTP URLs       |
-| Authentication        | `Authorization: Bearer <token>` from `MAIW_MCP_API_KEY`      |
-| Authorization         | `required_permission` field on `CapabilityMetadata`          |
-| Server-side enforcement | Phase 3 (FastMCP middleware layer)                          |
-| OAuth 2.0             | Phase 4                                                       |
-
----
-
-## 11. Skill Integration (`src/api/skills/inventory.py`)
-
-```python
-class InventoryLookupSkill:
-    """Bridge between agent semantic needs and MCP capability invocation."""
-
-    def __init__(self, client: MAIWMCPClient): ...
-
-    async def execute(
-        self,
-        request: InventoryLookupRequest,
-        *,
-        trace_id: str | None = None,
-    ) -> InventoryLookupResult:
-        payload = request.model_dump(exclude_none=True)
-        raw = await self._client.invoke(
-            INVENTORY_GET_METADATA.name, payload, trace_id=trace_id
-        )
-        try:
-            return InventoryLookupResult.model_validate(raw)
-        except ValidationError as exc:
-            raise MCPContractError(str(exc)) from exc
-```
-
-**Factory** for singleton use in agents:
-
-```python
-async def get_inventory_skill() -> InventoryLookupSkill:
-    registry = CapabilityRegistry.from_env()
-    client = MAIWMCPClient(registry, telemetry=CapabilityTelemetry())
-    return InventoryLookupSkill(client)
-```
-
----
-
-## 12. Agent Integration (`src/api/agents/operations/operations_agent.py`)
-
-### 12.1 Graceful Degradation
-
-The skill is wired only when `MAIW_MCP_SERVER_INVENTORY_URL` is set:
-
-```python
-async def initialize(self) -> None:
-    ...
-    if os.getenv("MAIW_MCP_SERVER_INVENTORY_URL"):
-        self.inventory_skill = await get_inventory_skill()
-    # if not set: self.inventory_skill stays None — no crash, no warning needed
-```
-
-### 12.2 Lookup Method
-
-```python
-async def _lookup_inventory_sku(
+async def invoke(
     self,
-    sku: str,
-    warehouse_id: str = "default",
-    trace_id: Optional[str] = None,
-) -> Optional[Dict[str, Any]]:
-    if self.inventory_skill is None:
-        return None  # MCP not configured — silent degradation
-    try:
-        result = await self.inventory_skill.execute(
-            InventoryLookupRequest(sku=sku, warehouse_id=warehouse_id),
-            trace_id=trace_id,
-        )
-        return {
-            "sku": result.sku,
-            "name": result.name,
-            "total_available": result.total_available,
-            "is_low_stock": result.is_low_stock,
-            "locations": [loc.model_dump() for loc in result.locations],
-        }
-    except MAIWMCPError as exc:
-        logger.warning("MCP inventory lookup failed for %s: %s", sku, exc)
-        return None  # degrade gracefully
+    capability: str,
+    payload: dict[str, Any],
+    *,
+    trace_id: str | None = None,
+    timeout_seconds: float = 30.0,
+    deadline: RequestDeadline | None = None,
+) -> dict[str, Any]:
 ```
+
+`invoke()` is the sole public method.
+
+### Internal call chain
+
+```
+MAIWMCPClient.invoke(capability, payload)
+  → CapabilityRegistry.resolve(capability)          → server_url
+  → DomainCircuitRegistry.get(domain).call(...)     → circuit guard
+  → _call_tool(capability, payload, server_url, effective_timeout)
+      → async with Client(server_url, read_timeout_seconds=timeout) as client:
+          result: types.CallToolResult = await client.call_tool(capability, payload)
+      → check result.is_error
+      → _parse_result(result)
+          → check result.structured_content
+          → fallback: parse JSON from TextContent
+```
+
+`Client` accepts either a string URL (Streamable HTTP) or an `MCPServer` instance
+(in-memory transport for tests). No transport-specific code in the client.
+
+### Error taxonomy
+
+| Condition | Exception |
+|-----------|-----------|
+| Deadline already expired at call entry | `RequestDeadlineExceeded` |
+| Circuit breaker OPEN | `MCPUnavailable` |
+| `call_result.is_error == True` | `MCPToolError` |
+| Non-JSON or non-dict result | `MCPContractError` |
+| `TimeoutError` from SDK | `MCPTimeout` |
+| All other `Exception` | `MCPUnavailable` |
+| `CapabilityNotFound`, `BackendUnavailable` | re-raised as-is |
 
 ---
 
-## 13. Deployment Model
+## 6. Capability Registry
 
-### Development / CI
+File: `packages/maiw-mcp/maiw_mcp/registry/registry.py`
 
-```
-[pytest] → MockInventoryProvider → mcp_server (in-memory transport)
-                                        ↑
-                              create_connected_server_and_client_session()
-```
-
-No network, no database, no environment variables required.
-
-### Staging / Production
-
-```
-[OperationsCoordinationAgent]
-    ↓ MAIW_MCP_SERVER_INVENTORY_URL=http://inventory-mcp:8080
-[MAIWMCPClient] → Client("http://inventory-mcp:8080") → [Load Balancer]
-                                                              ↓
-                                                    ┌─────────────────┐
-                                                    │ inventory-mcp-1 │ MCPServer (stateless_http=True)
-                                                    ├─────────────────┤
-                                                    │ inventory-mcp-2 │
-                                                    ├─────────────────┤
-                                                    │ inventory-mcp-N │
-                                                    └─────────────────┘
-                                                              ↓
-                                                     MAIWInventoryAdapter
-                                                              ↓
-                                                     InventoryQueries (existing)
-                                                              ↓
-                                                          PostgreSQL
+```python
+class CapabilityRegistry:
+    def register(self, capability: str, server_url: object) -> None
+    def register_domain(self, capabilities: list[str], server_url: object) -> None
+    def resolve(self, capability: str) -> object      # raises CapabilityNotFound
+    def all_capabilities(self) -> list[str]
+    def is_registered(self, capability: str) -> bool
+    @classmethod def from_env(cls) -> "CapabilityRegistry"
 ```
 
-Kubernetes: inventory MCP server runs as a Deployment with N replicas.
-`stateless_http=True` means no `Mcp-Session-Id` is required — any replica can
-serve any request.  No sticky sessions, no session affinity rules needed on the
-Service or Ingress.  Agents discover the Service via `MAIW_MCP_SERVER_INVENTORY_URL`.
+`from_env()` reads `MAIW_MCP_SERVER_INVENTORY_URL` and registers the two
+inventory capabilities. Equipment, labor, and wave capabilities are registered
+programmatically via `register_domain()` in application bootstrap code. The env
+vars `MAIW_MCP_SERVER_EQUIPMENT_URL`, `MAIW_MCP_SERVER_LABOR_URL`, and
+`MAIW_MCP_SERVER_WAVE_URL` are planned but not yet read by `from_env()`.
+
+`server_url` accepts a string URL or an `MCPServer` instance. `mcp.client.Client`
+handles both transports transparently.
 
 ---
 
-## 14. Testing Strategy
+## 7. MCP Servers
 
-### 14.1 Contract Tests (`tests/contract/test_inventory_capability.py` — 37 tests)
+All four domain servers follow the same pattern.
 
-Validate the Pydantic v2 contracts independent of any MCP protocol:
-- `CapabilityMetadata` name pattern, version, risk, side-effect
-- `InventoryLookupRequest` field validation (required sku, empty rejection)
-- `InventoryLookupResult` low-stock logic, JSON round-trip
-- `InventoryLookupSkill` correct capability name, trace_id propagation
-- `MockInventoryProvider` Protocol conformance
-- `MAIWInventoryAdapter` quantity mapping, error surfacing
+### Server primitive
 
-### 14.2 MCP Protocol Tests (`tests/mcp/test_inventory_mcp_server.py` — 31 tests)
-
-Exercise the real MCP 2026-07-28 protocol using `Client(server)` in-memory transport:
-- `TestMCPV2Protocol` (6): SDK v2 import path, protocol version, FastMCP removed, telemetry fields
-- `TestMCPServerInitialization` (3): server creates, name, Client connects
-- `TestMCPToolDiscovery` (4): tool names, `input_schema` (snake_case v2), description
-- `TestMCPInventoryGetTool` (7): valid request, JSON result, required fields, source, locate tool
-- `TestMCPErrorHandling` (2): `BackendUnavailable` → `is_error=True`, empty SKU handled
-- `TestMCPStatelessBehavior` (3): two independent clients, per-request Client pattern, state isolation
-- `TestMCPConformanceSuite` (1): full 8-check conformance suite passes
-- `TestMockInventoryServer` (5): respond, configured data, both tools, telemetry, session alias
-
-### 14.3 ModelGateway Regression (`tests/unit/test_model_gateway.py` — 117 tests)
-
-Unchanged. Phase 2B did not touch the ModelGateway.
-
-**Total: 185 tests | 185 passed | 0 failed | 0 skipped**
-
----
-
-## 15. What Was NOT Changed (Phase 2 Scope Boundary)
-
-| Component                         | Status in Phase 2 |
-|-----------------------------------|-------------------|
-| ModelGateway                      | Untouched         |
-| Existing MCP custom implementation| Untouched (operational) |
-| NIM client / LLM routing          | Untouched         |
-| InventoryQueries SQL layer        | Untouched (wrapped) |
-| FastAPI routers                   | Untouched         |
-| React frontend                    | Untouched         |
-| Existing agent tool calls         | Untouched         |
-| Existing test suite (117 tests)   | All passing       |
-
-The only modifications to existing source files:
-- `src/api/agents/operations/operations_agent.py` — added `inventory_skill` wiring +
-  `_lookup_inventory_sku()`. No existing methods changed.
-
----
-
-## Phase 4 — Central Runtime Architecture
-
-### Runtime Flow
-
-```
-Agent request
-    │
-    ▼
-StateRequirements  (agent declares what it needs)
-    │
-    ▼
-WarehouseStateProvider.get_state()
-    │  calls only the domains declared in requirements
-    │  ┌───────────────────────────────┐
-    ├──► EquipmentStatusSkill.execute() │  → EquipmentState
-    │  └───────────────────────────────┘
-    │  ┌───────────────────────────────┐
-    └──► InventoryLookupSkill.execute() │  → InventoryState
-       └───────────────────────────────┘
-    │
-    ▼
-WarehouseState  (assembled, with StateFreshness + StateProvenance per domain)
-    │
-    ▼
-WarehouseStateSnapshot.seal()  ← immutable, UUID-identified
-    │
-    ▼
-Agent reasoning → ActionProposal (NEVER executed directly)
-    │
-    ▼
-DecisionEngine.evaluate(DecisionRequest)
-    │
-    ├─ READ_ONLY → APPROVED
-    ├─ stale state → REQUIRES_FRESH_STATE
-    ├─ asset not in snapshot → REJECTED
-    ├─ MEDIUM/HIGH/CRITICAL or requires_approval=True → REQUIRES_HUMAN_APPROVAL
-    └─ LOW, no approval → APPROVED
-    │
-    ▼
-DecisionResult + DecisionAuditRecord
+```python
+from mcp.server import MCPServer   # all four servers — equipment, labor, wave, inventory
 ```
 
-### New Packages
+`FastMCP` is not used anywhere in the codebase.
 
-| Package | Location | Depends on |
-|---------|----------|-----------|
-| `maiw-state` | `packages/maiw-state/` | `maiw-mcp` |
-| `maiw-decision` | `packages/maiw-decision/` | `maiw-mcp`, `maiw-state` |
+### Tool registration
 
-### Key Invariants
+```python
+@mcp_server.tool(
+    name=SOME_CAPABILITY_METADATA.name,
+    description=SOME_CAPABILITY_METADATA.description,
+)
+async def warehouse_<domain>_<action>(...) -> str:
+    ...
+```
 
-1. **No MCP write during decision**: `DecisionEngine.evaluate()` is synchronous and pure — no capability calls, no I/O.
-2. **ActionProposal never executes itself**: write operations are proposed, evaluated, and returned; execution is a separate (future) step.
-3. **Snapshot immutability**: `WarehouseStateSnapshot` carries the `snapshot_id` referenced in every audit record — decisions are always traceable to an exact state version.
-4. **Circular dependency prevention**: `maiw-state` uses `typing.Protocol` for skill injection; it never imports `src/api/`.
+Tool names and descriptions come from `CapabilityMetadata` constants in
+`maiw-contracts`. Tool functions return JSON strings.
 
-### New Test Files (Phase 4)
+### Provider injection
 
-| File | Tests | Coverage |
-|------|-------|---------|
-| `tests/unit/test_warehouse_state.py` | 37 | State composition, freshness, provenance, snapshot, provider, errors |
-| `tests/unit/test_decision_engine.py` | 18 | All outcome paths, audit fields, constraint violations |
-| `tests/mcp/test_decision_integration.py` | 7 | End-to-end: skill → snapshot → engine → REQUIRES_HUMAN_APPROVAL |
+Each server module exposes a `configure_server(provider)` function that sets a
+module-level `_provider` global. Production startup calls this once with the real
+backend adapter. Tests call it with a mock. No imports of the backend adapter
+occur at module load time (deferred import in `_build_default_provider()`).
 
-**Phase 4 total: 319 tests passing** (37 inventory contract + 44 equipment contract + 31 inventory MCP + 28 equipment MCP + 117 model gateway + 37 warehouse state + 18 decision engine + 7 decision integration)
+### Transport
 
-### Documentation
+```python
+if transport == "streamable-http":
+    mcp_server.run("streamable-http", host=host, port=port, stateless_http=True)
+elif transport == "sse":
+    mcp_server.run("sse", host=host, port=port)
+else:
+    mcp_server.run("stdio")
+```
 
-- [`WAREHOUSE_STATE.md`](WAREHOUSE_STATE.md) — state assembly, freshness, provenance, snapshot semantics, adding domains
-- [`DECISION_ENGINE.md`](DECISION_ENGINE.md) — outcomes, rule evaluation order, audit records, extending the rule set
+`stateless_http=True` enables Kubernetes horizontal scaling with no session
+affinity. Controlled by `MAIW_MCP_TRANSPORT` env var (default: `stdio`).
 
 ---
 
-## Phase 6 — Equipment Action Lifecycle (PROPOSE → DECIDE → EXECUTE → RESULT)
+## 8. Domain Contracts (`maiw-contracts`)
 
-### New Capabilities
+File layout:
 
-Five new MCP tools added to `mcp_servers/equipment/server.py`:
+```
+packages/maiw-contracts/maiw_contracts/
+    common.py      — CapabilityMetadata (base dataclass for all tool metadata)
+    equipment.py   — request/result models + EQUIPMENT_* metadata constants
+    inventory.py   — request/result models + INVENTORY_* metadata constants
+    labor.py       — request/result models + LABOR_* metadata constants
+    wave.py        — request/result models + WAVE_* metadata constants
+```
 
-| Tool | Purpose |
-|------|---------|
-| `warehouse.equipment.propose_release` | Build `ActionProposal.for_equipment_release()` |
-| `warehouse.equipment.propose_maintenance` | Build `ActionProposal.for_schedule_maintenance()` |
-| `warehouse.equipment.execute_assign` | Execute an APPROVED assignment write |
-| `warehouse.equipment.execute_release` | Execute an APPROVED release write |
-| `warehouse.equipment.execute_maintenance` | Execute an APPROVED maintenance schedule write |
+`CapabilityMetadata` is the single source of truth for each capability's name,
+description, `side_effect`, `risk`, `idempotent`, and `timeout_seconds`. Both
+the MCP server tool registration and the capability registry use it.
 
-### New Contracts (`packages/maiw-mcp/maiw_mcp/contracts/`)
+---
 
-**`actions.py`** — two new factory classmethods on `ActionProposal`:
-- `for_equipment_release(asset_id, released_by, ...)` — `risk_level=LOW`, `requires_approval=False`
-- `for_schedule_maintenance(asset_id, maintenance_type, ...)` — `risk_level=MEDIUM`, `requires_approval=True`
+## 9. Authentication
 
-**`equipment.py`** — new request/result types:
-- `EquipmentReleaseRequest / EquipmentReleaseProposalResult`
-- `EquipmentMaintenanceScheduleRequest / EquipmentMaintenanceProposalResult`
-- `EquipmentExecuteAssignRequest / EquipmentExecuteAssignResult`
-- `EquipmentExecuteReleaseRequest / EquipmentExecuteReleaseResult`
-- `EquipmentExecuteMaintenanceRequest / EquipmentExecuteMaintenanceResult`
+File: `packages/maiw-mcp/maiw_mcp/auth/auth.py`
 
-### New Source Files
+Bearer token auth via `MAIW_MCP_API_KEY` environment variable:
 
-| File | Purpose |
-|------|---------|
-| `src/api/agents/inventory/action_executor.py` (rewrite) | `EquipmentActionExecutor`, `NoOpActionExecutor`, typed error hierarchy |
-| `src/api/agents/inventory/state_aware_ops.py` (extended) | `propose_equipment_release`, `propose_schedule_maintenance`, `_execute_action` |
-| `src/api/skills/equipment.py` (extended) | `ExecuteEquipmentAssignmentSkill`, `ExecuteEquipmentReleaseSkill`, `ExecuteEquipmentMaintenanceSkill` + factories |
+```python
+class MCPAuthConfig:
+    @property
+    def headers(self) -> dict[str, str]:
+        if self._api_key:
+            return {"Authorization": f"Bearer {self._api_key}"}
+        return {}
+```
 
-### Test Files Added (Phase 6)
+OAuth 2.0 (via `mcp.client.auth.oauth2`) is the planned next step but is not
+yet implemented.
 
-| File | Tests | Coverage |
-|------|-------|---------|
-| `tests/unit/test_action_executor.py` | 14 | Executor guards (5), skill routing, backend errors, NoOp backward compat |
-| `tests/unit/test_state_aware_ops_phase6.py` | 10 | Execution paths, release/maintenance proposals, warehouse_id, trace_id |
+---
 
-**Phase 6 total: 361 tests passing** (319 Phase 4 baseline + 18 Phase 5 + 14 action executor + 10 state_aware_ops Phase 6)
+## 10. Circuit Breaker
 
+File: `packages/maiw-mcp/maiw_mcp/circuit_registry.py`
+
+`DomainCircuitRegistry` maintains one `CircuitBreaker` per MCP domain:
+`equipment`, `labor`, `wave`, `inventory`.
+
+State machine: `CLOSED → OPEN → HALF_OPEN → CLOSED`
+
+| Parameter | Default |
+|-----------|---------|
+| `consecutive_failures` threshold | 5 |
+| `cooldown_seconds` | 30.0 |
+| `success_threshold` (HALF_OPEN probe) | 1 |
+
+Domain is extracted from the middle segment of `warehouse.<domain>.<action>`.
+`CircuitOpen` is translated to `MCPUnavailable` at the `invoke()` boundary.
+State transitions are protected by `asyncio.Lock`. A HALF_OPEN probe allows
+exactly one in-flight call; additional callers receive `CircuitOpen` immediately.
+
+---
+
+## 11. Deadline and Timeout
+
+File: `packages/maiw-mcp/maiw_mcp/deadline.py`
+
+```python
+@dataclass(frozen=True)
+class RequestDeadline:
+    @classmethod def from_timeout(cls, seconds: float) -> "RequestDeadline": ...
+    @classmethod def unlimited(cls) -> "RequestDeadline": ...
+    def effective_timeout(self, cap: float) -> float: ...  # min(cap, remaining)
+    @property def expired(self) -> bool: ...
+```
+
+Two independent mechanisms:
+- **`timeout_seconds`** (default 30.0): passed as `read_timeout_seconds` to `Client()`
+- **`RequestDeadline`** (optional): monotonic-clock budget from request ingress; `effective_timeout()` returns `min(timeout_seconds, deadline.remaining_seconds)`. Deadline expired at call entry raises `RequestDeadlineExceeded` before any network I/O.
+
+---
+
+## 12. Telemetry
+
+File: `packages/maiw-mcp/maiw_mcp/telemetry/telemetry.py`
+
+`CapabilityTelemetry` emits structured `CapabilityCallRecord` JSON lines via
+`logging.getLogger("maiw_mcp.telemetry")`.
+
+Fields: `trace_id`, `capability_name`, `capability_version`, `mcp_server`,
+`transport`, `latency_ms`, `success`, `error_class`, `error_message`,
+`mcp_sdk_version`, `mcp_protocol_version` (hardcoded `"2026-07-28"`).
+
+`record_success()` logs at INFO; `record_failure()` logs at ERROR. Telemetry is
+recorded on `TimeoutError` and unclassified `Exception` only — domain exceptions
+(`MCPToolError`, `MCPContractError`, `CapabilityNotFound`, etc.) re-raise without
+a telemetry record.
+
+---
+
+## 13. Testing Architecture
+
+`packages/maiw-mcp/maiw_mcp/testing/` provides:
+
+| Module | Contents |
+|--------|----------|
+| `conformance.py` | `MCPConformanceSuite` — protocol-level tests runnable against any server |
+| `fixtures.py` | Pytest fixtures: `mcp_client`, `capability_registry`, `mock_telemetry` |
+| `mock_server.py` | `MockMCPServer` — in-memory test double with configurable tool responses |
+
+In-memory transport (`async with Client(mcp_server) as client:`) is the default
+test pattern — no network, no Docker. Production transport tests use
+`MAIW_MCP_TRANSPORT=streamable-http` with a real server process.
+
+---
+
+## 14. Security Constraints
+
+These constraints are enforced at the code boundary, not just at policy:
+
+| Constraint | Rationale |
+|-----------|-----------|
+| `CopilotService` must not import `ActionExecutor`, `ApprovalStore`, or `DecisionEngine` | Copilot is a read/reasoning surface only |
+| Router must not expose `/copilot/approve`, `/copilot/execute`, `/copilot/force-action` | No write path through the copilot HTTP API |
+| `chain_of_thought`, `scratchpad`, `hidden_reasoning`, `reasoning_tokens` never in API responses | CoT is internal reasoning state, not operator-visible data |
+| WORLD router (`/world`, `/world/*`) must not import `ActionExecutor`, `DecisionEngine`, `ApprovalStore`, `GovernedActionOrchestrator` | World is read-only; GET endpoints only |
+| Model Lab backend must have zero imports of `DecisionEngine`, `ApprovalStore`, `ActionExecutor`, write MCP modules | Lab is evaluation-only; VIEW ONLY |
+| Deep Agents runtime must use `ModelGateway` — no direct provider clients | Routing and cost governance must apply |
+| `MAIWDeterministicRuntime` must not be removed | Deterministic runtime required for regression tests |
+| Deep Agents must not be the default runtime | Production default is deterministic SOP runtime |
+| No autonomous event triggering | All actions require an explicit decision chain |
+
+---
+
+## 15. Skill Layer
+
+Canonical skill implementations live in the `maiw_skills.*` package tree.
+
+`src/api/skills/` contains only deprecated compatibility shims marked for removal
+by Phase 9. They re-export from `maiw_skills.*` without adding logic:
+
+```python
+# DEPRECATED compatibility shim — use maiw_skills.inventory directly. Remove by Phase 9.
+from maiw_skills.inventory.lookup import InventoryLookupSkill, ...
+```
+
+Skills invoke `MAIWMCPClient.invoke()` for read capabilities. Write capabilities
+are not invoked by skills directly — they are invoked by domain executors inside
+`BaseActionExecutor._do_execute()` after all authority guards pass.
+
+---
+
+## 16. Known Gaps and Next Steps
+
+| Area | Current state | Next step |
+|------|--------------|-----------|
+| `from_env()` domain wiring | Only inventory wired; equipment/labor/wave require programmatic `register_domain()` | Add `MAIW_MCP_SERVER_{EQUIPMENT,LABOR,WAVE}_URL` to `from_env()` |
+| Auth wiring | `MCPAuthConfig.headers` defined but not injected into `Client()` | Wire auth headers at `Client` construction |
+| OAuth 2.0 | Not implemented; bearer token only | Implement via `mcp.client.auth.oauth2` |
+| `required_permission` enforcement | Field defined on `CapabilityMetadata` but not enforced | Enforce at `CapabilityRegistry.resolve()` |
+| Labor/wave `__main__` block | Not defined in current server files | Add for consistency with inventory/equipment |
+
+---
+
+## 17. Migration History
+
+This section preserves the v1 → v2 SDK migration record for reference. All v2
+code in the current codebase uses the v2 APIs exclusively.
+
+### SDK v1 → v2 breaking changes
+
+| v1 (removed) | v2 (current) | Notes |
+|-------------|-------------|-------|
+| `streamablehttp_client` | `Client(url)` | `mcp.client` |
+| `ClientSession` | `Client` context manager | `mcp.client` |
+| `session.initialize()` | implicit in `async with Client()` | automatic |
+| `create_connected_server_and_client_session()` | `async with Client(MCPServer)` | in-memory transport |
+| `result.isError` (camelCase) | `result.is_error` | `mcp.types.CallToolResult` |
+| `tool.inputSchema` (camelCase) | `tool.input_schema` | `mcp.types.Tool` |
+| `FastMCP` | `MCPServer` | `mcp.server` |
+
+Protocol version promoted from `2024-11-05` (v1) to `2026-07-28` (v2).
+
+In-memory transport was available in v1 via `create_connected_server_and_client_session()`;
+in v2 it is `async with Client(mcp_server)` — same semantics, simpler API.
+
+---
+
+## Appendix: File Index
+
+```
+packages/maiw-mcp/maiw_mcp/
+    client/client.py          — MAIWMCPClient
+    registry/registry.py      — CapabilityRegistry
+    auth/auth.py              — MCPAuthConfig
+    circuit_breaker.py        — CircuitBreaker (state machine)
+    circuit_registry.py       — DomainCircuitRegistry
+    deadline.py               — RequestDeadline
+    errors.py                 — MCPToolError, MCPContractError, MCPTimeout, MCPUnavailable, ...
+    telemetry/telemetry.py    — CapabilityTelemetry, CapabilityCallRecord
+    testing/conformance.py    — MCPConformanceSuite
+    testing/fixtures.py       — pytest fixtures
+    testing/mock_server.py    — MockMCPServer
+
+packages/maiw-contracts/maiw_contracts/
+    common.py                 — CapabilityMetadata
+    equipment.py / inventory.py / labor.py / wave.py
+
+packages/maiw-decision/maiw_decision/
+    proposal.py               — ActionProposal (with factory classmethods)
+    engine.py                 — DecisionEngine
+    approval.py               — ApprovalStore
+    models.py                 — DecisionResult, DecisionOutcome, RiskLevel
+    audit.py                  — AuditLog
+
+packages/maiw-execution/maiw_execution/
+    base.py                   — ActionExecutor (Protocol), BaseActionExecutor (6 guards)
+    equipment.py / labor.py / wave.py
+    outcome.py                — ExecutionOutcome
+    reconciliation.py         — ReconciliationEngine
+    registry.py               — ExecutorRegistry
+
+mcp_servers/
+    equipment/server.py       — MCPServer, tool registrations, configure_server()
+    inventory/server.py       — MCPServer, tool registrations, configure_server()
+    labor/server.py           — MCPServer, tool registrations, configure_server()
+    wave/server.py            — MCPServer, tool registrations, configure_server()
+```
