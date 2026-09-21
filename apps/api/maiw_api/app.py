@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 """
-Canonical MAIW FastAPI entrypoint — Phase 9B.
+Canonical MAIW FastAPI entrypoint.
 
 Entrypoint:
     uvicorn maiw_api.app:app --host 0.0.0.0 --port 8001
@@ -47,7 +47,6 @@ from maiw_api.routers.copilot import router as copilot_router
 from maiw_api.routers.world import router as world_router
 
 from maiw_api.routers.model_lab import router as model_lab_router
-from maiw_api.routers.world import router as world_router
 from maiw_api.routers.agent_tasks import router as agent_tasks_router
 
 # ── Legacy routers (keep temporarily) ────────────────────────────────────────
@@ -237,7 +236,7 @@ async def metrics_middleware(request: Request, call_next):
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 
-# Canonical (Phase 9B)
+# Canonical routers
 app.include_router(health_router)
 app.include_router(equipment_router)
 app.include_router(operations_router)
@@ -249,7 +248,6 @@ app.include_router(copilot_router)
 app.include_router(world_router)
 
 app.include_router(model_lab_router)
-app.include_router(world_router)
 app.include_router(agent_tasks_router)
 
 # Legacy (keep temporarily)
