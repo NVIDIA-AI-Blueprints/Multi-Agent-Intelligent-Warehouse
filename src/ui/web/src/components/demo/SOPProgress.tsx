@@ -44,7 +44,7 @@ const STEP_STATE_LABEL: Record<string, string> = {
   current:         'In progress',
   pending:         'Pending',
   escalated:       'Escalated',
-  governance_wait: 'Waiting for governance',
+  governance_wait: 'Awaiting approval',
   skipped:         'Skipped',
 };
 
@@ -174,7 +174,7 @@ const SOPProgress: React.FC<SOPProgressProps> = ({
       <Typography
         sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}
       >
-        No SOP steps available
+        No procedure steps recorded for this operation.
       </Typography>
     );
   }

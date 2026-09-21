@@ -260,7 +260,7 @@ describe('SOPProgress component', () => {
       completed_steps: ['establish_state', 'diagnose', 'gather_specialist_evidence', 'generate_candidates'],
     });
     render(<SOPProgress task={task} />);
-    expect(screen.getByText(/Waiting for governance/i)).toBeInTheDocument();
+    expect(screen.getByText(/Awaiting approval/i)).toBeInTheDocument();
   });
 
   it('escalated step renders with ! marker and Escalated label', () => {
@@ -302,7 +302,7 @@ describe('SOPProgress component', () => {
   it('shows empty message when no steps', () => {
     const task = makeTask({ sop_steps: [] });
     render(<SOPProgress task={task} />);
-    expect(screen.getByText(/No SOP steps available/i)).toBeInTheDocument();
+    expect(screen.getByText(/No procedure steps recorded/i)).toBeInTheDocument();
   });
 });
 
