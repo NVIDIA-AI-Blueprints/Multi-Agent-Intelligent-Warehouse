@@ -286,6 +286,8 @@ function TabPill({
   return (
     <Box
       component="button"
+      role="tab"
+      aria-selected={active}
       onClick={onClick}
       sx={{
         fontFamily: 'monospace',
@@ -451,7 +453,7 @@ export default function ExpertOverlay({
         </Typography>
         <Box sx={{ flexGrow: 1 }} />
         {/* Tab pills */}
-        <Box sx={{ display: 'flex', gap: '2px', background: '#161B22', borderRadius: '5px', p: '3px', border: '1px solid #21262D' }}>
+        <Box role="tablist" aria-label="Expert view panels" sx={{ display: 'flex', gap: '2px', background: '#161B22', borderRadius: '5px', p: '3px', border: '1px solid #21262D' }}>
           <TabPill label="Trace" active={activeTab === 'trace'} onClick={() => setActiveTab('trace')} />
           <TabPill label="Runtime" active={activeTab === 'runtime'} onClick={() => setActiveTab('runtime')} />
           <TabPill label="Raw Events" active={activeTab === 'raw'} onClick={() => setActiveTab('raw')} />

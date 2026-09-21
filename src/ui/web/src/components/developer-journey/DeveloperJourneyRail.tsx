@@ -230,10 +230,16 @@ export default function DeveloperJourneyRail({
         flexDirection: 'row',
         alignItems: 'flex-start',
         width: '100%',
+        minWidth: 0,
+        overflowX: 'auto',
         py: 1.5,
         px: 0.5,
         background: '#0D1117',
         borderBottom: '1px solid #21262D',
+        scrollbarWidth: 'thin',
+        scrollbarColor: '#21262D transparent',
+        '&::-webkit-scrollbar': { height: 3 },
+        '&::-webkit-scrollbar-thumb': { background: '#21262D', borderRadius: 2 },
       }}
     >
       {orderedStages.map((info, idx) => (
