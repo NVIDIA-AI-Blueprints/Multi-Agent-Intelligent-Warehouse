@@ -2,27 +2,27 @@
 
 ## Purpose
 
-The `DecisionEngine` evaluates `ActionProposal` objects against a `WarehouseStateSnapshot` using deterministic rules.  It **never executes actions** — it classifies them.
+The `DecisionEngine` evaluates `ActionProposal` objects against a `WarehouseStateSnapshot` using deterministic rules. It **never executes actions** — it classifies them.
 
-This establishes the approval boundary between agent reasoning and system mutation.  No MCP write tool, database write, or external API call is triggered by the engine.
+This establishes the approval boundary between agent reasoning and system mutation. No MCP write tool, database write, or external API call is triggered by the engine.
 
 ```
 Agent reasoning
-    │
-    ▼
-ActionProposal  ──────────────────────────┐
-                                          │
-WarehouseStateSnapshot  ──────────────────┤
-                                          ▼
-                              DecisionEngine.evaluate()
-                                          │
-                                ┌─────────┴────────────┐
-                                ▼                      ▼
-                          DecisionResult         DecisionAuditRecord
-                         (APPROVED /              (structured log)
-                          REJECTED /
-                          REQUIRES_HUMAN_APPROVAL /
-                          REQUIRES_FRESH_STATE)
+ │
+ ▼
+ActionProposal ──────────────────────────┐
+ │
+WarehouseStateSnapshot ──────────────────┤
+ ▼
+ DecisionEngine.evaluate()
+ │
+ ┌─────────┴────────────┐
+ ▼ ▼
+ DecisionResult DecisionAuditRecord
+ (APPROVED / (structured log)
+ REJECTED /
+ REQUIRES_HUMAN_APPROVAL /
+ REQUIRES_FRESH_STATE)
 ```
 
 ## Package
@@ -61,9 +61,9 @@ from maiw_state import WarehouseStateSnapshot
 engine = DecisionEngine()
 
 request = DecisionRequest(
-    proposal=action_proposal,
-    state=warehouse_snapshot,
-    trace_id="trace-001",
+ proposal=action_proposal,
+ state=warehouse_snapshot,
+ trace_id="trace-001",
 )
 
 result, audit = engine.evaluate(request)
@@ -91,15 +91,15 @@ The engine reads the following fields from `ActionProposal`:
 Every evaluation emits one `DecisionAuditRecord`:
 
 ```python
-audit.result_id        # cross-references DecisionResult.result_id
-audit.proposal_id      # cross-references ActionProposal.proposal_id
-audit.snapshot_id      # the exact state version evaluated
-audit.outcome          # DecisionOutcome value
-audit.violation_rules  # ["equipment.asset_not_found"]
-audit.engine_version   # "1.0.0"
-audit.trace_id         # propagated from DecisionRequest
+audit.result_id # cross-references DecisionResult.result_id
+audit.proposal_id # cross-references ActionProposal.proposal_id
+audit.snapshot_id # the exact state version evaluated
+audit.outcome # DecisionOutcome value
+audit.violation_rules # ["equipment.asset_not_found"]
+audit.engine_version # "1.0.0"
+audit.trace_id # propagated from DecisionRequest
 
-log.info(audit.to_log_dict())  # flat dict with event="decision_engine.evaluation"
+log.info(audit.to_log_dict()) # flat dict with event="decision_engine.evaluation"
 ```
 
 ## Constraint Violations
@@ -108,12 +108,12 @@ Each rule that fires adds a `ConstraintViolation`:
 
 ```python
 class ConstraintViolation(BaseModel):
-    rule: str     # machine-readable: "equipment.asset_not_found"
-    message: str  # human-readable explanation
-    details: dict # structured context (asset_id, snapshot_id, age_ms, …)
+ rule: str # machine-readable: "equipment.asset_not_found"
+ message: str # human-readable explanation
+ details: dict # structured context (asset_id, snapshot_id, age_ms, …)
 ```
 
-`APPROVED` outcomes have zero violations.  `REQUIRES_HUMAN_APPROVAL` has exactly one (`approval.required`).  `REJECTED` has one or more.
+`APPROVED` outcomes have zero violations. `REQUIRES_HUMAN_APPROVAL` has exactly one (`approval.required`). `REJECTED` has one or more.
 
 ## Deliberate Constraints
 
@@ -145,7 +145,7 @@ To add a rule:
 
 **Why LIMITED**: The drift check requires a live state fetch (`WarehouseStateProvider.get_state`). If the provider is absent, the check is skipped (no error). If the provider is present, only a single asset status field is validated. A full re-evaluation would require re-running DecisionEngine against a new snapshot, which is the caller's responsibility if the decision token expires.
 
-**`warehouse_id` propagation (Phase 6B):** `_check_state_drift()` reads `warehouse_id` from `proposal.parameters["warehouse_id"]` — never uses a hardcoded default. All three `ActionProposal` factories include `warehouse_id` in their parameters dict.
+**`warehouse_id` propagation ():** `_check_state_drift()` reads `warehouse_id` from `proposal.parameters["warehouse_id"]` — never uses a hardcoded default. All three `ActionProposal` factories include `warehouse_id` in their parameters dict.
 
 ## NIM Fallback
 
@@ -155,9 +155,9 @@ The `_llm_generate()` path in `MCPEquipmentAssetOperationsAgent` can fall back t
 Classification: COMPATIBILITY_ONLY
 ```
 
-**When active**: `MAIW_MODEL_GATEWAY_ENABLED` is unset or `false`.  
-**What it does**: Routes to `nim_client.generate_response()` directly, bypassing `ModelGateway`.  
-**Why kept**: Some deployments do not have `ModelGateway` configured; the fallback ensures the agent remains functional. It is not the production path.  
+**When active**: `MAIW_MODEL_GATEWAY_ENABLED` is unset or `false`. 
+**What it does**: Routes to `nim_client.generate_response()` directly, bypassing `ModelGateway`. 
+**Why kept**: Some deployments do not have `ModelGateway` configured; the fallback ensures the agent remains functional. It is not the production path. 
 **Invariant**: The NIM fallback path is not a new capability. No new code should use it. All new agent work should use `ModelGateway`.
 
 ## Version History
@@ -165,4 +165,4 @@ Classification: COMPATIBILITY_ONLY
 | Version | Changes |
 |---------|---------|
 | `1.0.0` | Initial: READ_ONLY bypass, freshness check, asset-not-found, approval threshold |
-| `1.0.0` (Phase 6B) | State drift documentation: `STATE_DRIFT_PROTECTION = LIMITED`; `warehouse_id` propagation fix |
+| `1.0.0` () | State drift documentation: `STATE_DRIFT_PROTECTION = LIMITED`; `warehouse_id` propagation fix |

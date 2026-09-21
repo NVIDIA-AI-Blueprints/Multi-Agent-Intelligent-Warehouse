@@ -552,7 +552,7 @@ python -m pytest tests/unit/test_model_gateway.py \
                  tests/unit/test_model_gateway_fallback_policy.py -v
 ```
 
-514 tests covering:
+Tests covering:
 
 - `TestModelRegistry` — roles, enabled/disabled, env-driven IDs, reload
 - `TestModelCapabilityFields` — generation labels, `DeploymentStatus`, `tool_use` validation,
@@ -566,7 +566,7 @@ python -m pytest tests/unit/test_model_gateway.py \
 - `TestFallbackPolicyInvariant` (`test_model_gateway_fallback_policy.py`) — 17 regression tests:
   modality, required capabilities, risk level, reasoning level, deployment mode,
   fallback provenance, `PolicyFilter.is_request_eligible` contract
-- Phase 18B provenance, evaluation, replay, calibration suites
+- Provenance, evaluation, replay, calibration suites
 - `TestModelLabAPI` — evaluation endpoint coverage
 - `TestNIMClientModelOverride`, `TestFeatureFlag`, `TestGatewaySingleton`
 

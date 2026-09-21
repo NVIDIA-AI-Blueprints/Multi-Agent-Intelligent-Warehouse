@@ -1,12 +1,5 @@
 # MAIW Capability Matrix
 
-**Phase:** 8  
-**Date:** 2026-08-20  
-**Baseline:** 483 passed, 1 skipped (CORE CI)  
-**Domains:** 4 (Inventory, Equipment, Labor, Wave)  
-**Capabilities:** 12 total (7 read-only, 5 write)
-
----
 
 ## Overview
 
@@ -21,8 +14,8 @@ STATE → REASON → PROPOSE → DECIDE → EXECUTE → MCP → BACKEND
 ```
 
 No capability bypasses this boundary.  Proposal skills are local (no MCP call).
-Only `*ActionExecutor` classes reach write capabilities, and only after the 4-guard check:
-APPROVED → binding → allowlist → staleness.
+Only `*ActionExecutor` classes reach write capabilities, and only after the 6-guard check:
+APPROVED → binding → allowlist → staleness → additional_guards → deadline.
 
 ---
 
@@ -63,6 +56,7 @@ APPROVED → binding → allowlist → staleness.
 | Capability | Risk | Side-effect | Req. approval | Idempotent | Proposal skill | Exec skill | Executor | MCP server | State component |
 |---|---|---|---|---|---|---|---|---|---|
 | `warehouse.equipment.get_status` | read_only | read | No | Yes | — | `EquipmentStatusSkill` | — | `mcp_servers/equipment` | `EquipmentState` |
+| `warehouse.equipment.get_telemetry` | read_only | read | No | Yes | — | `EquipmentTelemetrySkill` | — | `mcp_servers/equipment` | `EquipmentState` |
 | `warehouse.equipment.assign` | medium | write | Yes | No | `EquipmentAssignmentSkill` | `ExecuteEquipmentAssignSkill` | `EquipmentActionExecutor` | `mcp_servers/equipment` | `EquipmentState` |
 | `warehouse.equipment.release` | low | write | No | Yes | *(factory)* | `ExecuteEquipmentReleaseSkill` | `EquipmentActionExecutor` | `mcp_servers/equipment` | `EquipmentState` |
 | `warehouse.equipment.schedule_maintenance` | medium | write | Yes | No | *(factory)* | `ExecuteMaintenanceSkill` | `EquipmentActionExecutor` | `mcp_servers/equipment` | `EquipmentState` |
@@ -112,10 +106,10 @@ APPROVED → binding → allowlist → staleness.
 | Domain | Read capabilities | Write capabilities | Total |
 |--------|------------------|--------------------|-------|
 | Inventory | 2 | 0 | **2** |
-| Equipment | 1 | 3 | **4** |
+| Equipment | 2 | 3 | **5** |
 | Labor | 2 | 1 | **3** |
 | Wave | 2 | 1 | **3** |
-| **Total** | **7** | **5** | **12** |
+| **Total** | **8** | **5** | **13** |
 
 ---
 

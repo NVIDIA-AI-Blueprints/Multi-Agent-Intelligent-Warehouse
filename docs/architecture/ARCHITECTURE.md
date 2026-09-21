@@ -45,7 +45,7 @@ MAIW Agent Runtime
   (explicit, expirable, single-use)
     ↓
   ActionExecutor
-  (4-guard pattern)
+  (6-guard pattern)
     ↓
   MCP Interoperability Layer
   (mcp.client.Client → mcp.server.MCPServer)
@@ -91,7 +91,7 @@ Observe → Reason → Recommend → Govern → Approve → Execute → Observe 
 | Recommend | Agent → `RecommendedAction` | Semantic intent — not MCP parameters, not write commands |
 | Govern | `DecisionEngine` | Deterministic policy evaluation → `APPROVED / REJECTED / DEFERRED` |
 | Approve | `ApprovalStore` | Human approval — explicit, expirable, single-use, proposal-bound |
-| Execute | `ActionExecutor` | 4-guard write path → MCP write capability |
+| Execute | `ActionExecutor` | 6-guard write path → MCP write capability |
 | Observe Outcome | Reconciliation + `OBSERVE_OUTCOME` | `CONFIRMED_EXECUTED / CONFIRMED_NOT_EXECUTED / INDETERMINATE` |
 
 ---
@@ -123,7 +123,7 @@ MAIW v2 uses the `packages/` layout as the target modular architecture, but port
 
 These paths are **not dead legacy code** and must not be removed without an explicit migration that preserves all ModelGateway invariants (single inference boundary, PolicyFilter, ModelRouter, Deployment Resolver, routing provenance).
 
-The architectural source of truth remains the current MAIW v2 contracts, ownership boundaries, and runtime invariants documented in this directory. The remaining `src/` dependency is a known implementation migration boundary, not a bug or obsolete code. See [PACKAGE_OWNERSHIP.md](PACKAGE_OWNERSHIP.md) and [API_MIGRATION_PLAN.md](API_MIGRATION_PLAN.md) for the tracked migration status.
+The architectural source of truth remains the current MAIW v2 contracts, ownership boundaries, and runtime invariants documented in this directory. The remaining `src/` dependency is a known implementation migration boundary, not a bug or obsolete code. See [PACKAGE_OWNERSHIP.md](PACKAGE_OWNERSHIP.md) for current ownership boundaries.
 
 ---
 
@@ -147,10 +147,10 @@ The architectural source of truth remains the current MAIW v2 contracts, ownersh
 | [AGENT_RUNTIME.md](AGENT_RUNTIME.md) | Deterministic vs. adaptive runtimes, SOP envelope, authority boundary |
 | [GOVERNANCE.md](GOVERNANCE.md) | DecisionEngine, approval lifecycle, ActionExecutor guards |
 | [MODEL_GATEWAY.md](MODEL_GATEWAY.md) | PolicyFilter, ModelRouter, Deployment Resolver, Nemotron roles |
-| [MCP_V2_ARCHITECTURE.md](MCP_V2_ARCHITECTURE.md) | Official MCP SDK, Streamable HTTP, capability registry |
+| [MCP.md](MCP.md) | Official MCP SDK, Streamable HTTP, capability registry |
 | [WAREHOUSE_WORLD.md](WAREHOUSE_WORLD.md) | BASE/SCENARIO/LIVE, OperationalContextSnapshot |
 | [DECISION_ENGINE.md](DECISION_ENGINE.md) | Constraint rules, APPROVED/REJECTED/DEFERRED |
-| [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md) | All 12 capabilities, read/write classification |
+| [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md) | All 13 capabilities, read/write classification |
 | [RUNTIME_EXECUTION_FLOW.md](RUNTIME_EXECUTION_FLOW.md) | Full pipeline sequence diagrams |
 | [DEPENDENCY_BOUNDARIES.md](DEPENDENCY_BOUNDARIES.md) | Package boundary enforcement |
 | [TEST_STRATEGY.md](TEST_STRATEGY.md) | CORE CI structure, exclusion rationale |

@@ -1,12 +1,12 @@
 # MAIW v2 Deployment Architecture
 
-<!-- Phase 10 — documents current behavior, not target assumptions -->
+
 
 ## Service Boundaries
 
 ```
                         ┌─────────────────────────┐
-                        │   Users / Command Center │
+                        │   Users / MAIW Frontend │
                         │   (React, port 3001)     │
                         └───────────┬─────────────┘
                                     │ HTTP (all /api/v1/*)
@@ -73,7 +73,7 @@ Transport values: `streamable-http` (default for network deployments),
 session affinity is required** — MCP domain servers are horizontally
 scalable. See [Stateless MCP Invariant](#stateless-mcp-invariant).
 
-### Command Center / Frontend (`wosa-frontend`)
+### MAIW Frontend (`wosa-frontend`)
 
 | Field | Value |
 |---|---|
