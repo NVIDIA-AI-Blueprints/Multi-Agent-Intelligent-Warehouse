@@ -26,7 +26,6 @@ import pytest
 from maiw_agents.equipment.agent import EquipmentAssetOperationsAgent
 from maiw_execution import NoOpActionExecutor
 
-
 # ---------------------------------------------------------------------------
 # Invariant A — assignment with no decision_engine returns error, no write
 # ---------------------------------------------------------------------------
@@ -53,9 +52,13 @@ class TestAssignmentWithoutGovernance:
     def test_propose_assignment_no_decision_engine_never_calls_asset_tools(self):
         mock_asset_tools = MagicMock()
         mock_asset_tools.assign_equipment = AsyncMock()
-        agent = EquipmentAssetOperationsAgent(asset_tools=mock_asset_tools)  # no decision_engine
+        agent = EquipmentAssetOperationsAgent(
+            asset_tools=mock_asset_tools
+        )  # no decision_engine
 
-        asyncio.run(agent.propose_equipment_assignment(asset_id="FL-001", assignee="op-1"))
+        asyncio.run(
+            agent.propose_equipment_assignment(asset_id="FL-001", assignee="op-1")
+        )
 
         mock_asset_tools.assign_equipment.assert_not_called()
 
@@ -93,7 +96,9 @@ class TestReleaseWithoutGovernance:
         mock_asset_tools.release_equipment = AsyncMock()
         agent = EquipmentAssetOperationsAgent(asset_tools=mock_asset_tools)
 
-        asyncio.run(agent.propose_equipment_release(asset_id="FL-001", released_by="op-1"))
+        asyncio.run(
+            agent.propose_equipment_release(asset_id="FL-001", released_by="op-1")
+        )
 
         mock_asset_tools.release_equipment.assert_not_called()
 
@@ -223,12 +228,11 @@ class TestNoLegacyAssign:
         """No method names may suggest an ungoverned direct write."""
         agent = EquipmentAssetOperationsAgent()
         bad_names = [
-            name for name in dir(agent)
+            name
+            for name in dir(agent)
             if "legacy" in name.lower() or "direct_write" in name.lower()
         ]
-        assert bad_names == [], (
-            f"Unexpected direct-write methods found: {bad_names}"
-        )
+        assert bad_names == [], f"Unexpected direct-write methods found: {bad_names}"
 
 
 # ---------------------------------------------------------------------------
