@@ -573,3 +573,15 @@ GET /api/v1/model-lab/model-status                  — current model availabili
 ```
 
 All endpoints are GET-only. No write operations exist. `raw_response` fields are bounded at 10,000 characters. Secret fields (`api_key`, `authorization`, `password`) are stripped before response.
+
+### Regenerating Phase 18F Benchmark Artifacts
+
+The committed `artifacts/phase18/18f/benchmark.json` is evaluation evidence, not live runtime state. It records what the benchmark protocol produced at Phase 18F and is preserved for reference and reproducibility. To regenerate it:
+
+```bash
+python -m maiw_models.eval benchmark \
+  --cases artifacts/phase18/cases.json \
+  --output artifacts/phase18/18f/benchmark.json
+```
+
+Requires `NVIDIA_API_KEY`. Without it, the CLI validates infrastructure and records `endpoint_status = "NOT RUN — ENDPOINT UNAVAILABLE"`. The fixed 10-step benchmark protocol (see above) applies. Regenerating overwrites the committed artifact — commit only when the regeneration is intentional (e.g., after a provider or grader change under governance review).
