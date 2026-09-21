@@ -241,7 +241,7 @@ DecisionEngine  (synchronous, no I/O, deterministic)
     ↓
 Human Approval  (where required — explicit, expirable, single-use)
     ↓
-ActionExecutor  (4-guard pattern before any MCP write)
+ActionExecutor  (6-guard pattern before any MCP write)
     ↓
 MCP Interoperability Layer
     ↓
@@ -258,7 +258,7 @@ The invariant is non-negotiable:
 
 AI recommends and proposes. The `DecisionEngine` governs. Human authority approves where required. `ActionExecutor` executes.
 
-`DecisionEngine` is synchronous, performs no I/O, and cannot be overridden by a model-generated argument. `ActionExecutor` checks four guards in order: (1) decision outcome is `APPROVED`, (2) decision binds to the exact proposal ID, (3) action name is in the static allowlist, (4) the decision is not stale.
+`DecisionEngine` is synchronous, performs no I/O, and cannot be overridden by a model-generated argument. `ActionExecutor` checks six guards in order: (1) decision outcome is `APPROVED`, (2) decision binds to the exact proposal ID, (3) action name is in the static allowlist, (4) the decision is not stale, (5) domain-specific additional guards (e.g. state-drift check), (6) request deadline not expired immediately before write.
 
 See [docs/architecture/GOVERNANCE.md](docs/architecture/GOVERNANCE.md) and [docs/architecture/DECISION_ENGINE.md](docs/architecture/DECISION_ENGINE.md).
 
@@ -290,7 +290,7 @@ Warehouse Backend
 
 `MAIWMCPClient` wraps `mcp.client.Client`. Servers use `mcp.server.MCPServer`. Transport: Streamable HTTP (stateless, no session affinity required). Test transport: in-memory via `CapabilityRegistry`.
 
-See [docs/architecture/MCP_V2_ARCHITECTURE.md](docs/architecture/MCP_V2_ARCHITECTURE.md).
+See [docs/architecture/MCP.md](docs/architecture/MCP.md).
 
 ---
 
@@ -586,7 +586,7 @@ python scripts/trace_capture.py          # generates artifacts/demo/labor_constr
 │  ├─ maiw-decision/       # DecisionEngine — APPROVED/REJECTED/DEFERRED
 │  ├─ maiw-models/         # ModelGateway, NIM provider, PolicyFilter, ModelRouter
 │  ├─ maiw-skills/         # Inventory, Equipment, Labor, Wave skills
-│  ├─ maiw-execution/      # BaseActionExecutor (4-guard pattern), domain executors
+│  ├─ maiw-execution/      # BaseActionExecutor (6-guard pattern), domain executors
 │  ├─ maiw-agents/         # Equipment, Labor, Wave, Operations, Safety agents
 │  └─ maiw-world/          # Warehouse World — DataPack, ScenarioOverlay, Explorer
 ├─ apps/api/               # FastAPI application (bootstrap.py, MAIWRuntime)
@@ -614,10 +614,10 @@ python scripts/trace_capture.py          # generates artifacts/demo/labor_constr
 | [docs/architecture/AGENT_RUNTIME.md](docs/architecture/AGENT_RUNTIME.md) | Agent runtime (deterministic vs. adaptive) |
 | [docs/architecture/GOVERNANCE.md](docs/architecture/GOVERNANCE.md) | Authority boundary, DecisionEngine, approval lifecycle |
 | [docs/architecture/MODEL_GATEWAY.md](docs/architecture/MODEL_GATEWAY.md) | ModelGateway chain, Nemotron roles, routing policy |
-| [docs/architecture/MCP_V2_ARCHITECTURE.md](docs/architecture/MCP_V2_ARCHITECTURE.md) | MCP SDK, protocol version, deployment |
+| [docs/architecture/MCP.md](docs/architecture/MCP.md) | MCP SDK, protocol version, deployment |
 | [docs/architecture/WAREHOUSE_WORLD.md](docs/architecture/WAREHOUSE_WORLD.md) | Warehouse World layers, OperationalContextSnapshot |
 | [docs/architecture/DECISION_ENGINE.md](docs/architecture/DECISION_ENGINE.md) | Constraint rules, outcome model |
-| [docs/architecture/CAPABILITY_MATRIX.md](docs/architecture/CAPABILITY_MATRIX.md) | All 12 capabilities, read/write classification |
+| [docs/architecture/CAPABILITY_MATRIX.md](docs/architecture/CAPABILITY_MATRIX.md) | All 13 capabilities, read/write classification |
 | [docs/architecture/DEPENDENCY_BOUNDARIES.md](docs/architecture/DEPENDENCY_BOUNDARIES.md) | Package boundary rules |
 | [docs/architecture/RUNTIME_EXECUTION_FLOW.md](docs/architecture/RUNTIME_EXECUTION_FLOW.md) | Full pipeline sequence diagrams |
 | [docs/architecture/TEST_STRATEGY.md](docs/architecture/TEST_STRATEGY.md) | CORE CI command, exclusion rationale |
