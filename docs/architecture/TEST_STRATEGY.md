@@ -27,32 +27,11 @@ python -m pytest tests/unit/ tests/contract/ tests/mcp/ tests/api/ \
   --ignore=tests/unit/test_prompt_injection_simple.py
 ```
 
-**Phase 6B baseline:** 386 passed, 1 skipped, 0 failed  
-**Phase 7 baseline:** 483 passed, 1 skipped, 0 failed (+97 new tests: Labor/Wave MCP, contract, state, executor, invariant)  
-**Phase 8 baseline:** 512 passed, 1 skipped, 0 failed (+29 new tests: package import smoke, forbidden-dependency guards, compatibility shim verification)  
-**Phase 9A baseline:** 528 passed, 1 skipped, 0 failed (+16 net: 20 new Phase 9A package import and invariant tests; −4 from deletion of dead MCP files whose callers were integration tests only)  
-**Phase 9B baseline:** 551 passed, 1 skipped, 0 failed (+23 new tests/api/ tests: app startup, router registration, equipment pipeline, architecture invariants)  
-**Phase 10 baseline:** 556 passed, 1 skipped, 0 failed (+5 new tests/api/test_architecture.py assertions: canonical entrypoint, load_dotenv side-effect, diagnostic stub removed, runtime_status router, MCP compose containers)  
-All final phase reports MUST use this command. Any regression against the baseline is a blocker.
-
 > **Note:** `ci-cd.yml` previously ran only `tests/unit/` (327 tests). As of Phase 9A it was corrected to run `tests/unit/ tests/contract/ tests/mcp/` (528 tests). Phase 9B adds `tests/api/` to the canonical command.
 
 All final phase reports MUST use this command. Any regression against the baseline is a blocker.
 
 ---
-
-## Why the Count Varies Across Reports
-
-Previous reports showed different passing counts (337, 361, 311, 386) because each ran a different subset:
-
-| Count | What was run |
-|-------|-------------|
-| 337 | Phase 5 subset: 8 specific files |
-| 361 | Phase 6 subset: 9 specific files |
-| 311 | Phase 6B subset: 9 Phase 3-6B files including new invariant tests |
-| **386** | **Canonical CORE CI (all unit + contract + mcp, minus excluded categories below)** |
-
-The 386 count is the canonical baseline from Phase 7 onward.
 
 ---
 
@@ -63,13 +42,13 @@ The 386 count is the canonical baseline from Phase 7 onward.
 ```
 tests/unit/          ← pure Python, no DB/API/GPU required
 tests/contract/      ← MCP capability contract tests (in-memory MockProvider)
-tests/mcp/           ← MCP protocol tests (in-memory FastMCP server)
+tests/mcp/           ← MCP SDK protocol tests (FastMCP not importable — tests verify SDK v2 boundary)
 tests/api/           ← infrastructure-free API app/router tests (httpx ASGI transport)
 ```
 
 These tests run in < 10 seconds total. They require only the Python packages installed in the venv and no environment variables.
 
-**Phase 3-6B domain-specific files:**
+**CORE CI domain test files:**
 
 | File | Domain | Tests |
 |------|--------|-------|
@@ -160,7 +139,7 @@ tests/unit/test_document_action_tools.py           ← document pipeline schema 
 tests/unit/test_document_pipeline.py               ← document pipeline infrastructure
 ```
 
-**Excluded from CORE CI due to:** pre-existing failures not caused by Phase 6/7 changes.
+**Excluded from CORE CI due to:** pre-existing failures unrelated to current changes.
 
 ---
 
