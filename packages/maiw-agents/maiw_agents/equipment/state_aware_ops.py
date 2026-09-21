@@ -10,14 +10,13 @@ needing asyncpg, redis, pymilvus, or other infrastructure dependencies.
 
 The ``EquipmentAssetOperationsAgent`` delegates its state-aware methods here.
 
-Phase 6 additions
------------------
-- ``propose_equipment_assignment()`` now accepts an optional ``action_executor``
-  and calls it when the decision is APPROVED.
+Functions
+---------
+- ``propose_equipment_assignment()`` — full state/decide/execute path for assignment.
 - ``propose_equipment_release()`` — full state/decide/execute path for release.
 - ``propose_schedule_maintenance()`` — state/decide path for maintenance (MEDIUM
   risk, so always REQUIRES_HUMAN_APPROVAL — no executor call).
-- ``get_equipment_state_snapshot()`` — unchanged read path.
+- ``get_equipment_state_snapshot()`` — read-only state snapshot for agent reasoning.
 """
 
 from __future__ import annotations
