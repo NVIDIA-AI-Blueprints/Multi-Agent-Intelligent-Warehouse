@@ -204,7 +204,9 @@ describe('CopilotDrawer context snapshot button — WT8, WT9', () => {
 
   test('WT8: VIEW CONTEXT AT DECISION TIME button present when context_snapshot_id set', async () => {
     // Import CopilotDrawer lazily to avoid complex module graph
-    const { default: CopilotDrawer } = await import('../components/demo/copilot/CopilotDrawer');
+    // Cast to ComponentType<any> so tests remain valid when prop interface evolves
+    const { default: CopilotDrawerRaw } = await import('../components/demo/copilot/CopilotDrawer');
+    const CopilotDrawer = CopilotDrawerRaw as React.ComponentType<any>;
     const mockTurns = [
       {
         question: 'Why is Wave 17 at risk?',
@@ -265,7 +267,8 @@ describe('CopilotDrawer context snapshot button — WT8, WT9', () => {
   });
 
   test('WT9: VIEW CONTEXT AT DECISION TIME button absent when context_snapshot_id null', async () => {
-    const { default: CopilotDrawer } = await import('../components/demo/copilot/CopilotDrawer');
+    const { default: CopilotDrawerRaw } = await import('../components/demo/copilot/CopilotDrawer');
+    const CopilotDrawer = CopilotDrawerRaw as React.ComponentType<any>;
     const mockTurns = [
       {
         question: 'Why is Wave 17 at risk?',

@@ -370,7 +370,7 @@ describe('TC-3: DeveloperJourneyPanel stage panels', () => {
         onNavigateToStage={onNavigate}
       />
     );
-    fireEvent.click(screen.getByText(/SKILLS →/));
+    fireEvent.click(screen.getByRole('button', { name: /Navigate to SKILLS/i }));
     expect(onNavigate).toHaveBeenCalledWith('SKILLS');
   });
 });

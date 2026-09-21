@@ -256,7 +256,7 @@ const CopilotAgentStatus: React.FC<CopilotAgentStatusProps> = ({
         </Typography>
       )}
 
-      {/* OBSERVING_OUTCOME: closed-loop semantics */}
+      {/* OBSERVING_OUTCOME: outcome observation phase */}
       {task.status === 'OBSERVING_OUTCOME' && (
         <Typography
           data-testid="copilot-agent-status-observing-outcome"
@@ -272,7 +272,7 @@ const CopilotAgentStatus: React.FC<CopilotAgentStatusProps> = ({
           data-testid="copilot-agent-status-escalated"
           sx={{ fontSize: '0.65rem', color: '#D29922', mt: 0.5 }}
         >
-          Human attention required. MAIW could not autonomously resolve this situation.
+          Human attention required. MAIW has escalated this situation for review.
         </Typography>
       )}
 

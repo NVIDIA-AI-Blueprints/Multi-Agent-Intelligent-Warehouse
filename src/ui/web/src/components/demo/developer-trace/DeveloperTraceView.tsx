@@ -37,7 +37,7 @@ const STATUS_COLORS: Record<DeveloperTraceStatus, string> = {
   RECONCILIATION_REQUIRED: '#F85149',
   COMPLETE:                '#3FB950',
   FAILED:                  '#F85149',
-  UNKNOWN:                 '#484F58',
+  UNKNOWN:                 '#D29922',
 };
 
 function StatusBadge({ status }: { status: DeveloperTraceStatus }) {

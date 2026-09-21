@@ -2,11 +2,11 @@
  * DeveloperJourneyRail.tsx — 7-stage orientation nav for the ExpertOverlay JOURNEY tab.
  *
  * Renders stage pills (CONTEXT → OUTCOME) with availability status.
- * Clicking an available stage fires onStageSelect.
+ * Clicking or pressing Enter/Space on an available stage fires onStageSelect.
  * Never shows chain-of-thought or hidden reasoning state.
  */
 
-import React from 'react';
+import React, { KeyboardEvent } from 'react';
 import { Box, Typography } from '@mui/material';
 import {
   JOURNEY_STAGES,
@@ -35,8 +35,8 @@ interface DeveloperJourneyRailProps {
 const STATUS_COLORS: Record<JourneyStageStatus, { pill: string; text: string; border: string }> = {
   available:   { pill: 'transparent', text: '#58A6FF', border: '#1F6FEB44' },
   current:     { pill: '#1F6FEB22',   text: '#79C0FF', border: '#1F6FEB' },
-  pending:     { pill: 'transparent', text: '#484F58',  border: '#21262D' },
-  unavailable: { pill: 'transparent', text: '#30363D',  border: '#21262D' },
+  pending:     { pill: 'transparent', text: '#6E7681',  border: '#21262D' },
+  unavailable: { pill: 'transparent', text: '#484F58',  border: '#21262D' },
 };
 
 // ── Single stage pill ─────────────────────────────────────────────────────────
@@ -55,39 +55,76 @@ function StagePill({
   onSelect: () => void;
 }) {
   const clickable = info.status === 'available' || info.status === 'current';
-  const colors = isActive
-    ? STATUS_COLORS.current
-    : STATUS_COLORS[info.status];
+  const disabled = info.status === 'unavailable' || info.status === 'pending';
+  const colors = isActive ? STATUS_COLORS.current : STATUS_COLORS[info.status];
+
+  const stageLabel = JOURNEY_STAGE_LABEL[info.stage];
+  const statusDescription = isActive
+    ? 'current'
+    : info.status === 'available'
+    ? 'available'
+    : info.status === 'pending'
+    ? 'pending'
+    : 'unavailable';
+  const ariaLabel = `${stageLabel} stage — ${statusDescription}${info.artifactIdHint ? `, artifact ${info.artifactIdHint}` : ''}`;
+
+  function handleKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    if (!clickable) { return; }
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onSelect();
+    }
+  }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, position: 'relative' }}>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        flex: 1,
+        position: 'relative',
+      }}
+    >
       {/* Connector line — left half */}
       {!isFirst && (
-        <Box sx={{
-          position: 'absolute',
-          top: '12px',
-          left: 0,
-          width: '50%',
-          height: '1px',
-          background: info.status === 'pending' || info.status === 'unavailable' ? '#21262D' : '#1F6FEB44',
-        }} />
+        <Box
+          aria-hidden="true"
+          sx={{
+            position: 'absolute',
+            top: '12px',
+            left: 0,
+            width: '50%',
+            height: '1px',
+            background: disabled ? '#21262D' : '#1F6FEB44',
+          }}
+        />
       )}
       {/* Connector line — right half */}
       {!isLast && (
-        <Box sx={{
-          position: 'absolute',
-          top: '12px',
-          right: 0,
-          width: '50%',
-          height: '1px',
-          background: info.status === 'pending' || info.status === 'unavailable' ? '#21262D' : '#1F6FEB44',
-        }} />
+        <Box
+          aria-hidden="true"
+          sx={{
+            position: 'absolute',
+            top: '12px',
+            right: 0,
+            width: '50%',
+            height: '1px',
+            background: disabled ? '#21262D' : '#1F6FEB44',
+          }}
+        />
       )}
 
-      {/* Dot */}
+      {/* Dot — keyboard accessible button */}
       <Box
         data-testid={`journey-stage-${info.stage}`}
+        role="button"
+        tabIndex={clickable ? 0 : -1}
+        aria-label={ariaLabel}
+        aria-current={isActive ? 'step' : undefined}
+        aria-disabled={disabled ? true : undefined}
         onClick={clickable ? onSelect : undefined}
+        onKeyDown={handleKeyDown}
         sx={{
           width: 24,
           height: 24,
@@ -100,6 +137,11 @@ function StagePill({
           alignItems: 'center',
           justifyContent: 'center',
           transition: 'background 0.15s, border-color 0.15s',
+          outline: 'none',
+          '&:focus-visible': clickable ? {
+            outline: '2px solid #58A6FF',
+            outlineOffset: '3px',
+          } : {},
           '&:hover': clickable ? {
             background: '#1F6FEB33',
             borderColor: '#58A6FF',
@@ -107,43 +149,55 @@ function StagePill({
         }}
       >
         {info.status === 'available' && !isActive && (
-          <Box sx={{ width: 6, height: 6, borderRadius: '50%', background: '#58A6FF' }} />
+          <Box
+            aria-hidden="true"
+            sx={{ width: 6, height: 6, borderRadius: '50%', background: '#58A6FF' }}
+          />
         )}
         {(info.status === 'current' || isActive) && (
-          <Box sx={{ width: 8, height: 8, borderRadius: '50%', background: '#79C0FF' }} />
+          <Box
+            aria-hidden="true"
+            sx={{ width: 8, height: 8, borderRadius: '50%', background: '#79C0FF' }}
+          />
         )}
       </Box>
 
-      {/* Label */}
-      <Typography sx={{
-        fontFamily: 'monospace',
-        fontSize: '0.52rem',
-        fontWeight: isActive ? 700 : 400,
-        color: isActive ? '#C9D1D9' : colors.text,
-        letterSpacing: '0.06em',
-        textTransform: 'uppercase',
-        mt: '4px',
-        textAlign: 'center',
-        lineHeight: 1.2,
-        whiteSpace: 'nowrap',
-      }}>
-        {JOURNEY_STAGE_LABEL[info.stage]}
+      {/* Label — hidden from a11y tree (stage info is on the button aria-label) */}
+      <Typography
+        aria-hidden="true"
+        sx={{
+          fontFamily: 'monospace',
+          fontSize: '0.6rem',
+          fontWeight: isActive ? 700 : 400,
+          color: isActive ? '#C9D1D9' : colors.text,
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          mt: '4px',
+          textAlign: 'center',
+          lineHeight: 1.2,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {stageLabel}
       </Typography>
 
-      {/* Artifact ID hint */}
+      {/* Artifact ID hint — visible when active */}
       {info.artifactIdHint && (isActive || info.status === 'current') && (
-        <Typography sx={{
-          fontFamily: 'monospace',
-          fontSize: '0.44rem',
-          color: '#484F58',
-          mt: '1px',
-          textAlign: 'center',
-          letterSpacing: '0.04em',
-          maxWidth: 64,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}>
+        <Typography
+          aria-hidden="true"
+          sx={{
+            fontFamily: 'monospace',
+            fontSize: '0.5rem',
+            color: '#6E7681',
+            mt: '1px',
+            textAlign: 'center',
+            letterSpacing: '0.04em',
+            maxWidth: 64,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
           {info.artifactIdHint}
         </Typography>
       )}
@@ -158,7 +212,6 @@ export default function DeveloperJourneyRail({
   activeStage,
   onStageSelect,
 }: DeveloperJourneyRailProps) {
-  // Build a lookup for fast status access
   const stageMap = new Map<JourneyStage, JourneyStageInfo>();
   for (const s of stages) { stageMap.set(s.stage, s); }
 
@@ -170,6 +223,8 @@ export default function DeveloperJourneyRail({
   return (
     <Box
       data-testid="developer-journey-rail"
+      role="group"
+      aria-label="Developer journey stages"
       sx={{
         display: 'flex',
         flexDirection: 'row',
