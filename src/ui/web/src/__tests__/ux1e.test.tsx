@@ -277,6 +277,103 @@ describe('TC-2: DeveloperJourneyRail', () => {
     // MODEL dot should exist and be clickable (status available)
     expect(screen.getByTestId('journey-stage-MODEL')).toBeInTheDocument();
   });
+
+  it('TC-2.5: available stage has role=button and tabIndex=0', () => {
+    render(
+      <DeveloperJourneyRail
+        stages={makeAllAvailableStages()}
+        activeStage="CONTEXT"
+        onStageSelect={jest.fn()}
+      />
+    );
+    const modelDot = screen.getByTestId('journey-stage-MODEL');
+    expect(modelDot).toHaveAttribute('role', 'button');
+    expect(modelDot).toHaveAttribute('tabindex', '0');
+  });
+
+  it('TC-2.6: unavailable stage has aria-disabled and tabIndex=-1', () => {
+    const stages: JourneyStageInfo[] = JOURNEY_STAGES.map(s => ({
+      stage: s,
+      status: (s === 'EXECUTION' ? 'unavailable' : 'available') as JourneyStageStatus,
+    }));
+    render(
+      <DeveloperJourneyRail
+        stages={stages}
+        activeStage="CONTEXT"
+        onStageSelect={jest.fn()}
+      />
+    );
+    const execDot = screen.getByTestId('journey-stage-EXECUTION');
+    expect(execDot).toHaveAttribute('aria-disabled', 'true');
+    expect(execDot).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('TC-2.7: active stage has aria-current=step', () => {
+    render(
+      <DeveloperJourneyRail
+        stages={makeAllAvailableStages()}
+        activeStage="DECISION"
+        onStageSelect={jest.fn()}
+      />
+    );
+    expect(screen.getByTestId('journey-stage-DECISION')).toHaveAttribute('aria-current', 'step');
+  });
+
+  it('TC-2.8: Enter key on available stage fires onStageSelect', () => {
+    const onSelect = jest.fn();
+    render(
+      <DeveloperJourneyRail
+        stages={makeAllAvailableStages()}
+        activeStage="CONTEXT"
+        onStageSelect={onSelect}
+      />
+    );
+    fireEvent.keyDown(screen.getByTestId('journey-stage-SKILLS'), { key: 'Enter' });
+    expect(onSelect).toHaveBeenCalledWith('SKILLS');
+  });
+
+  it('TC-2.9: Space key on available stage fires onStageSelect', () => {
+    const onSelect = jest.fn();
+    render(
+      <DeveloperJourneyRail
+        stages={makeAllAvailableStages()}
+        activeStage="CONTEXT"
+        onStageSelect={onSelect}
+      />
+    );
+    fireEvent.keyDown(screen.getByTestId('journey-stage-MODEL'), { key: ' ' });
+    expect(onSelect).toHaveBeenCalledWith('MODEL');
+  });
+
+  it('TC-2.10: Enter key on unavailable stage does not fire onStageSelect', () => {
+    const onSelect = jest.fn();
+    const stages: JourneyStageInfo[] = JOURNEY_STAGES.map(s => ({
+      stage: s,
+      status: (s === 'OUTCOME' ? 'unavailable' : 'available') as JourneyStageStatus,
+    }));
+    render(
+      <DeveloperJourneyRail
+        stages={stages}
+        activeStage="CONTEXT"
+        onStageSelect={onSelect}
+      />
+    );
+    fireEvent.keyDown(screen.getByTestId('journey-stage-OUTCOME'), { key: 'Enter' });
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('TC-2.11: rail has role=group with accessible label', () => {
+    render(
+      <DeveloperJourneyRail
+        stages={makeAllAvailableStages()}
+        activeStage="CONTEXT"
+        onStageSelect={jest.fn()}
+      />
+    );
+    const rail = screen.getByTestId('developer-journey-rail');
+    expect(rail).toHaveAttribute('role', 'group');
+    expect(rail).toHaveAttribute('aria-label', 'Developer journey stages');
+  });
 });
 
 // ── TC-3: DeveloperJourneyPanel stage panels ──────────────────────────────────
@@ -370,7 +467,7 @@ describe('TC-3: DeveloperJourneyPanel stage panels', () => {
         onNavigateToStage={onNavigate}
       />
     );
-    fireEvent.click(screen.getByText(/SKILLS →/));
+    fireEvent.click(screen.getByRole('button', { name: /Navigate to SKILLS/i }));
     expect(onNavigate).toHaveBeenCalledWith('SKILLS');
   });
 });

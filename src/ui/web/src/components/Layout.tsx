@@ -105,7 +105,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             sx={{ height: 16, width: 'auto' }}
             onError={(e: any) => { e.target.style.display = 'none'; }}
           />
-          <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.75rem', color: '#E6EDF3', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
+          <Typography component="h1" sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.75rem', color: '#E6EDF3', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
             MAIW OPERATIONS
           </Typography>
         </Box>

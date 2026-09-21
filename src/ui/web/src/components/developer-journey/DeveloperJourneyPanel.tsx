@@ -75,9 +75,19 @@ function FieldRow({ label, value, mono = true }: { label: string; value: string 
 }
 
 function CrossLink({ label, onClick }: { label: string; onClick: () => void }) {
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onClick();
+    }
+  }
   return (
     <Typography
+      role="button"
+      tabIndex={0}
+      aria-label={`Navigate to ${label} stage`}
       onClick={onClick}
+      onKeyDown={handleKeyDown}
       sx={{
         fontFamily: 'monospace',
         fontSize: '0.55rem',
@@ -86,10 +96,16 @@ function CrossLink({ label, onClick }: { label: string; onClick: () => void }) {
         letterSpacing: '0.04em',
         display: 'inline-block',
         mr: 1.5,
+        outline: 'none',
         '&:hover': { textDecoration: 'underline' },
+        '&:focus-visible': {
+          outline: '2px solid #58A6FF',
+          outlineOffset: '2px',
+          borderRadius: '2px',
+        },
       }}
     >
-      {label} →
+      {label} <span aria-hidden="true">→</span>
     </Typography>
   );
 }

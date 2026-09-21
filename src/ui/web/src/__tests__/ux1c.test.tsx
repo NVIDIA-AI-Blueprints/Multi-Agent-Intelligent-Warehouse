@@ -28,6 +28,7 @@ import { agentTaskAPI } from '../services/agentTaskAPI';
 import CopilotAgentStatus from '../components/copilot/CopilotAgentStatus';
 import AgentActivity from '../components/demo/AgentActivity';
 import DelegationCard from '../components/demo/DelegationCard';
+import { AgentTaskView } from '../types/agentTask';
 
 // ── Mock agentTaskAPI ─────────────────────────────────────────────────────────
 jest.mock('../services/agentTaskAPI', () => ({
@@ -66,7 +67,7 @@ type TaskOverrides = {
   [key: string]: unknown;
 };
 
-function makeTask(overrides: TaskOverrides = {}): TaskOverrides {
+function makeTask(overrides: TaskOverrides = {}): AgentTaskView {
   return {
     task_id: 'task-ux1c-001',
     agent_id: 'operations_coordination',
@@ -94,7 +95,7 @@ function makeTask(overrides: TaskOverrides = {}): TaskOverrides {
     created_at: '2026-09-20T10:00:00Z',
     updated_at: '2026-09-20T10:00:05Z',
     ...overrides,
-  };
+  } as AgentTaskView;
 }
 
 // ── CopilotAgentStatus tests ──────────────────────────────────────────────────
@@ -224,8 +225,8 @@ describe('CopilotAgentStatus — live update', () => {
     const task = makeTask({ status: 'RUNNING' });
     mockGetTask.mockResolvedValue(task);
 
-    let capturedCallback: ((state: TaskOverrides) => void) | null = null;
-    mockSubscribeToTask.mockImplementation((_taskId: string, onUpdate: (state: TaskOverrides) => void) => {
+    let capturedCallback: ((state: AgentTaskView) => void) | null = null;
+    mockSubscribeToTask.mockImplementation((_taskId: string, onUpdate: (state: AgentTaskView) => void) => {
       capturedCallback = onUpdate;
       return jest.fn();
     });
@@ -490,7 +491,7 @@ describe('AgentActivity — terminal states distinct', () => {
 // ── Delegation live states ─────────────────────────────────────────────────────
 
 describe('DelegationCard — live states', () => {
-  const makeTaskWithDelegation = (delegationStatus: string): TaskOverrides => ({
+  const makeTaskWithDelegation = (delegationStatus: string): AgentTaskView => ({
     ...makeTask(),
     delegation_results: [{
       delegation_id: 'del-001',
@@ -504,7 +505,7 @@ describe('DelegationCard — live states', () => {
       trace_id: 'trace-001',
       context_snapshot_id: null,
     }],
-  });
+  } as AgentTaskView);
 
   it('RUNNING delegation shows "Consulting specialist..."', () => {
     const task = makeTaskWithDelegation('RUNNING');
