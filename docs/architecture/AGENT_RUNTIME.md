@@ -131,6 +131,8 @@ As confidence in Deep Agents integration grows:
 **The dual-runtime architecture is an intentional design, not technical debt.**
 It provides a clean separation between deterministic compliance and adaptive reasoning.
 
+The decision to retain Deep Agents as an optional adaptive runtime was validated through the Phase 19A runtime comparison. See [`artifacts/phase19a/runtime_comparison_real_deepagents.json`](../../artifacts/phase19a/runtime_comparison_real_deepagents.json) for the preserved evaluation artifact (`adoption_decision`: "KEEP DEEP AGENTS AS OPTIONAL RUNTIME"). The architecture document above remains normative — the artifact is evidence, not specification.
+
 ---
 
 ## File Map

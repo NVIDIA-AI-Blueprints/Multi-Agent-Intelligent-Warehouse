@@ -573,6 +573,8 @@ python scripts/counterfactual_eval.py   # generates artifacts/demo/labor_wave_co
 python scripts/trace_capture.py          # generates artifacts/demo/labor_constraint_wave_risk_trace.*
 ```
 
+A frozen pre-NemoClaw performance baseline is preserved under `artifacts/baselines/` for future regression comparison.
+
 ---
 
 ## Repository Structure
