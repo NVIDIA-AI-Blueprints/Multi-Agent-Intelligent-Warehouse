@@ -16,6 +16,16 @@ import { TraceArtifactLineage } from './developerTraceTypes';
 
 const BRANCH_LABELS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
+const EXECUTION_STATUS_COLOR: Record<string, string> = {
+  CONFIRMED_EXECUTED:     '#3FB950',
+  COMPLETE:               '#3FB950',
+  UNKNOWN:                '#D29922',
+  RECONCILING:            '#D29922',
+  INDETERMINATE:          '#F0883E',
+  CONFIRMED_NOT_EXECUTED: '#F85149',
+  FAILED:                 '#F85149',
+};
+
 function truncId(id: string): string {
   return id.length > 8 ? `${id.slice(0, 8)}…` : id;
 }
@@ -246,7 +256,7 @@ export default function DeveloperTraceArtifacts({ artifacts, onViewContextSnapsh
             branchLabel={multiProposal ? BRANCH_LABELS[i] : undefined}
             id={e.executionId}
             suffix={e.status ?? undefined}
-            color={e.status === 'UNKNOWN' ? '#D29922' : '#3FB950'}
+            color={e.status ? (EXECUTION_STATUS_COLOR[e.status] ?? '#8B949E') : '#8B949E'}
           />
         ))
       )}
