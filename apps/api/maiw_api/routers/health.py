@@ -127,18 +127,44 @@ async def readiness_check(request: Request):
     """
     Capability-aware readiness probe.
 
-    Returns 200 if at least one MAIW operational path is available.
-    A single domain being CIRCUIT OPEN does NOT fail readiness — only that
+    Returns 200 if the MAIW canonical write path is fully operational.
+    A single MCP domain being CIRCUIT OPEN does NOT fail readiness — only that
     domain's workflows are affected; others remain available.
 
-    Returns 503 only when:
-        - MAIW runtime is not initialized, OR
+    Returns 503 when ANY of the following are true:
+        - MAIW runtime is not initialized
+        - decision_engine is not available (governed write path is broken)
+        - mcp_client is not available (no MCP connectivity)
+        - equipment_agent is not available (canonical agent not wired)
         - ALL MCP domains are CIRCUIT OPEN (total loss of MCP capability)
+
+    Optional (degrade gracefully without failing readiness):
+        - ModelGateway (used for NL reasoning only)
+        - Warehouse World / World Explorer
+        - Copilot (separate from core write path)
     """
     rt = getattr(request.app.state, "runtime", None)
 
     if rt is None:
         raise HTTPException(status_code=503, detail="MAIW runtime not initialized")
+
+    # Check critical MAIW components required for the canonical write path
+    missing: list[str] = []
+    if rt.decision_engine is None:
+        missing.append("decision_engine")
+    if rt.mcp_client is None:
+        missing.append("mcp_client")
+    if rt.equipment_agent is None:
+        missing.append("equipment_agent")
+
+    if missing:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "Critical MAIW components unavailable",
+                "missing": missing,
+            },
+        )
 
     # Check per-domain circuit states
     domain_status: dict = {}
@@ -164,6 +190,13 @@ async def readiness_check(request: Request):
         "status": "ready",
         "timestamp": datetime.utcnow().isoformat(),
         "version": _version_display(),
+        "components": {
+            "decision_engine": rt.decision_engine is not None,
+            "mcp_client": rt.mcp_client is not None,
+            "equipment_agent": rt.equipment_agent is not None,
+            "model_gateway": rt.model_gateway is not None,
+            "copilot_service": rt.copilot_service is not None,
+        },
         "domain_health": domain_status,
         "healthy_domains": healthy_domains,
         "degraded_domains": degraded_domains,

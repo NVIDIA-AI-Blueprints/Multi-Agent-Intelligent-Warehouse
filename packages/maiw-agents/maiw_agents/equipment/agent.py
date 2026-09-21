@@ -3,18 +3,22 @@
 """
 Equipment & Asset Operations Agent (EAO) — maiw-agents package.
 
-Migration notes (Phase 9A)
---------------------------
-- All src.* imports removed; dependencies are injected at construction time.
-- NIM fallback branches removed; only the ModelGateway path is retained.
-- SearchContext sourced from maiw_agents.common.types (no retrieval.* import).
-- ActionExecutor / ActionExecutionResult / NoOpActionExecutor sourced from maiw_execution.
-- Bootstrap (apps/api/maiw_api/bootstrap.py) creates concrete instances and injects them.
+All dependencies are injected at construction time by the composition root
+(apps/api/maiw_api/bootstrap.py).  No src.* imports; no inline LLM/DB access.
 
 Mission: Ensure equipment is available, safe, and optimally used for warehouse workflows.
 Owns: availability, assignments, telemetry, maintenance requests, compliance links.
 Collaborates: with Operations Coordination Agent for task/route planning and equipment
 allocation, with Safety & Compliance Agent for pre-op checks, incidents, LOTO.
+
+Write-path invariant
+--------------------
+All state-mutating operations MUST flow through:
+    RecommendedAction → Governance → ActionProposal → DecisionEngine → ActionExecutor → MCP
+
+No method in this class may write to warehouse state without an APPROVED DecisionResult.
+When the state-aware path is not configured, methods return an error dict — they do NOT
+fall back to direct writes.
 """
 
 from __future__ import annotations
@@ -137,18 +141,20 @@ class EquipmentAssetOperationsAgent:
         if not (
             self._state_provider and self._decision_engine and self._assignment_skill
         ):
-            logger.warning(
-                "State-aware path not available for assignment of %s; using legacy path",
+            logger.error(
+                "State-aware path not configured for assignment of %s; "
+                "refusing direct write — DecisionEngine governance is required",
                 asset_id,
             )
-            return await self._legacy_assign(
-                asset_id=asset_id,
-                assignee=assignee,
-                assignment_type=assignment_type,
-                task_id=task_id,
-                duration_hours=duration_hours,
-                notes=notes,
-            )
+            return {
+                "status": "error",
+                "action": "warehouse.equipment.assign",
+                "reason": (
+                    "state_provider, decision_engine, and assignment_skill must all be "
+                    "configured before equipment assignment is permitted"
+                ),
+                "executed": False,
+            }
 
         return await state_aware_ops.propose_equipment_assignment(
             asset_id=asset_id,
@@ -178,29 +184,22 @@ class EquipmentAssetOperationsAgent:
         State-aware equipment release — state → ActionProposal → DecisionEngine → (optional) execute.
 
         LOW risk: auto-approved by DecisionEngine unless state is absent/stale or
-        asset not found. Falls back to direct asset_tools.release_equipment() when
-        the state-aware path is not configured.
+        asset not found. Returns error dict (status='error') when state_provider
+        or decision_engine is not configured — no direct write fallback.
         """
         if not (self._state_provider and self._decision_engine):
-            logger.warning(
-                "State-aware path not available for release of %s; using legacy path",
+            logger.error(
+                "State-aware path not configured for release of %s; "
+                "refusing direct write — DecisionEngine governance is required",
                 asset_id,
             )
-            if self.asset_tools:
-                result = await self.asset_tools.release_equipment(
-                    asset_id=asset_id, released_by=released_by, notes=notes
-                )
-                return {
-                    "status": "executed" if result.get("success") else "error",
-                    "action": "warehouse.equipment.release",
-                    "reason": result.get("error", "legacy direct write"),
-                    "executed": result.get("success", False),
-                    "legacy_result": result,
-                }
             return {
                 "status": "error",
                 "action": "warehouse.equipment.release",
-                "reason": "no state_provider or asset_tools configured",
+                "reason": (
+                    "state_provider and decision_engine must be configured "
+                    "before equipment release is permitted"
+                ),
                 "executed": False,
             }
 
@@ -231,42 +230,25 @@ class EquipmentAssetOperationsAgent:
         """
         State-aware maintenance scheduling — state → ActionProposal → DecisionEngine.
 
-        MEDIUM risk: always returns requires_human_approval. Falls back to
-        direct asset_tools.schedule_maintenance() when state-aware path is not configured.
+        MEDIUM risk: always returns requires_human_approval. Returns error dict
+        (status='error') when state_provider or decision_engine is not configured —
+        no direct write fallback.
         """
         if not (self._state_provider and self._decision_engine):
-            logger.warning(
-                "State-aware path not available for maintenance of %s; using legacy path",
+            logger.error(
+                "State-aware path not configured for maintenance of %s; "
+                "refusing direct write — DecisionEngine governance is required",
                 asset_id,
             )
-            if self.asset_tools:
-                try:
-                    sf_dt = datetime.fromisoformat(scheduled_for.replace("Z", "+00:00"))
-                except (ValueError, AttributeError):
-                    sf_dt = datetime.now()
-                result = await self.asset_tools.schedule_maintenance(
-                    asset_id=asset_id,
-                    maintenance_type=maintenance_type,
-                    description=description,
-                    scheduled_by=scheduled_by,
-                    scheduled_for=sf_dt,
-                    estimated_duration_minutes=estimated_duration_minutes,
-                    priority=priority,
-                )
-                return {
-                    "status": "executed" if result.get("success") else "error",
-                    "action": "warehouse.equipment.schedule_maintenance",
-                    "reason": result.get("error", "legacy direct write"),
-                    "executed": result.get("success", False),
-                    "legacy_result": result,
-                }
             return {
                 "status": "error",
                 "action": "warehouse.equipment.schedule_maintenance",
-                "reason": "no state_provider or asset_tools configured",
+                "reason": (
+                    "state_provider and decision_engine must be configured "
+                    "before maintenance scheduling is permitted"
+                ),
                 "executed": False,
             }
-
         return await state_aware_ops.propose_schedule_maintenance(
             asset_id=asset_id,
             maintenance_type=maintenance_type,
@@ -303,39 +285,6 @@ class EquipmentAssetOperationsAgent:
             state_provider=self._state_provider,
         )
 
-    async def _legacy_assign(
-        self,
-        *,
-        asset_id: str,
-        assignee: str,
-        assignment_type: str,
-        task_id: Optional[str],
-        duration_hours: Optional[float],
-        notes: Optional[str],
-    ) -> Dict[str, Any]:
-        """Legacy direct-write assignment — preserved for environments without MCP server."""
-        if not self.asset_tools:
-            return {
-                "status": "error",
-                "action": "warehouse.equipment.assign",
-                "reason": "no asset_tools configured",
-                "executed": False,
-            }
-        result = await self.asset_tools.assign_equipment(
-            asset_id=asset_id,
-            assignee=assignee,
-            assignment_type=assignment_type,
-            task_id=task_id,
-            duration_hours=duration_hours,
-            notes=notes,
-        )
-        return {
-            "status": "approved" if result.get("success") else "error",
-            "action": "warehouse.equipment.assign",
-            "reason": result.get("error", "legacy direct write"),
-            "executed": result.get("success", False),
-            "legacy_result": result,
-        }
 
     # ------------------------------------------------------------------
     # Reasoning loop (process_query)
@@ -527,8 +476,7 @@ class EquipmentAssetOperationsAgent:
                 )
 
             elif equipment_query.intent == "maintenance" and asset_id:
-                # Phase 18H: Route through state-aware governed path instead of direct write.
-                # propose_schedule_maintenance() → DecisionEngine → (optional) ActionExecutor
+                # Governed path: state → ActionProposal → DecisionEngine → (optional) ActionExecutor
                 maintenance_result = await self.propose_schedule_maintenance(
                     asset_id=asset_id,
                     maintenance_type=equipment_query.entities.get(
@@ -556,8 +504,7 @@ class EquipmentAssetOperationsAgent:
                 )
 
             elif equipment_query.intent == "release" and asset_id:
-                # Phase 18H: Route through state-aware governed path instead of direct write.
-                # propose_equipment_release() → DecisionEngine → (optional) ActionExecutor
+                # Governed path: state → ActionProposal → DecisionEngine → (optional) ActionExecutor
                 release_result = await self.propose_equipment_release(
                     asset_id=asset_id,
                     released_by=equipment_query.entities.get("released_by", "system"),

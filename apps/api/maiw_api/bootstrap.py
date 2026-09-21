@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 """
-MAIW API Composition Root — Phase 9B.
+MAIW API Composition Root.
 
 MAIWRuntime is the single place where the runtime object graph is assembled:
 
@@ -101,7 +101,7 @@ class MAIWRuntime:
     labor_executor: Any = None  # maiw_execution.LaborActionExecutor
     wave_executor: Any = None  # maiw_execution.WaveActionExecutor
 
-    # Circuit breakers (Phase 10E Batch 5)
+    # Circuit breakers — per-domain isolation and NIM/ModelGateway isolation
     circuit_registry: Any = None  # maiw_mcp.DomainCircuitRegistry (per-MCP-domain)
     nim_circuit: Any = None  # maiw_mcp.CircuitBreaker (NIM/ModelGateway)
 
@@ -115,10 +115,10 @@ class MAIWRuntime:
     operations_agent: Any = None  # maiw_agents.operations.OperationsCoordinationAgent
     safety_agent: Any = None  # maiw_agents.safety.SafetyComplianceAgent
 
-    # Copilot service (Phase 15)
+    # Copilot service — coordinates ASK/ANALYZE/ACT/OBSERVE_OUTCOME workflows
     copilot_service: Any = None  # maiw_api.copilot.CopilotService
 
-    # World graph + DataPack metadata (Phase 17A — read-only world inspection)
+    # World graph + DataPack metadata — read-only world inspection for World Explorer
     world_graph: Any = None  # maiw_world.graph.CanonicalWarehouseGraph
     world_datapack_manifest: dict = field(default_factory=dict)
 
@@ -464,13 +464,13 @@ async def get_runtime() -> MAIWRuntime:
             event_bus=event_bus,
             graph=graph,
             store=InMemoryCopilotStore(),
-            datapack_manifest=runtime.world_datapack_manifest,  # Phase 17E: provenance
+            datapack_manifest=runtime.world_datapack_manifest,  # DataPack provenance for ASK-turn context
         )
         logger.info("MAIW bootstrap: CopilotService ready (graph=%s)", graph is not None)
     except Exception as exc:
         logger.warning("MAIW bootstrap: CopilotService unavailable — %s", exc)
 
-    # ── 12b. GovernedActionOrchestrator (Phase 15D) ───────────────────────────
+    # ── 12b. GovernedActionOrchestrator ──────────────────────────────────────
     if runtime.copilot_service is not None:
         try:
             from maiw_api.copilot.orchestrator import GovernedActionOrchestrator
