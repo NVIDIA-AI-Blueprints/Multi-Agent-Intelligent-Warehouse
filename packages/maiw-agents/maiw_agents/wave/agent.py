@@ -36,68 +36,9 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
-from ..contracts.agent import (
-    AgentDefinition,
-    AgentTrigger,
-    GovernanceBoundary,
-    TerminationPolicy,
-    TerminationCondition,
-)
+from ..contracts.definitions import WAVE_AGENT_DEFINITION
 
 logger = logging.getLogger(__name__)
-
-# ── WaveAgent definition ──────────────────────────────────────────────────────
-
-WAVE_AGENT_DEFINITION = AgentDefinition(
-    agent_id="wave",
-    version="1.0",
-    objective=(
-        "Protect wave completion before carrier cutoff by identifying task sequencing "
-        "or reprioritization opportunities and producing candidate wave interventions."
-    ),
-    domain="wave",
-    triggers=[
-        AgentTrigger(
-            trigger_id="wave_risk_detected",
-            trigger_type="wave_risk_detected",
-            description="Wave has at_risk_count > 0 or pending_count high with approaching cutoff.",
-        ),
-        AgentTrigger(
-            trigger_id="delegated_by_oca",
-            trigger_type="operator_requests_resolution",
-            description="OperationsCoordinationAgent delegated a wave risk assessment.",
-        ),
-    ],
-    required_context=["wave", "carrier_cutoff"],
-    allowed_capabilities=[
-        "warehouse.wave.status",
-        "warehouse.wave.inspect_tasks",
-        "warehouse.wave.evaluate_critical_path",
-        "warehouse.wave.evaluate_reprioritization",
-    ],
-    allowed_subagents=[],
-    sop_id="wave.wave_risk_assessment",
-    output_contract=(
-        "WaveAssessment containing at_risk_task_count, pending_task_count, "
-        "time_to_cutoff (minutes), primary_constraint classification, and "
-        "CandidateWaveAction[] ordered by urgency. "
-        "Never a write action."
-    ),
-    governance_boundary=GovernanceBoundary(
-        allowed_capability_classes=["READ", "ANALYTICAL"],
-        may_invoke_action_executor=False,
-        may_invoke_decision_engine=False,
-    ),
-    termination_policy=TerminationPolicy(
-        max_iterations=5,
-        stop_conditions=[
-            TerminationCondition(condition_id="OBJECTIVE_MET", description="WaveAssessment produced."),
-            TerminationCondition(condition_id="NO_SAFE_ACTION", description="No feasible reprioritization found."),
-            TerminationCondition(condition_id="INSUFFICIENT_CONTEXT", description="Wave state unavailable."),
-            TerminationCondition(condition_id="MAX_ITERATIONS", description="Iteration limit reached."),
-        ],
-    ),
-)
 
 
 # ── Output models ─────────────────────────────────────────────────────────────

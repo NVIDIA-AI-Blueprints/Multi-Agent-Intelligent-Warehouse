@@ -209,7 +209,6 @@ class SOPDefinition(BaseModel):
 # ── Validation ────────────────────────────────────────────────────────────────
 
 # Write capabilities are never allowed inside a SOP.
-_PROHIBITED_CAPABILITY_PREFIXES = ("warehouse.write.", "exec.", "action_executor.")
 _WRITE_CAPABILITY_PATTERNS = re.compile(
     r"^(warehouse\.(labor\.assign|wave\.assign|equipment\.(assign|release_direct|deploy))|"
     r"action_executor\.|exec\.)",

@@ -410,6 +410,10 @@ async def assign_equipment(request: AssignmentRequest, runtime=Depends(get_runti
     """
     Propose an equipment assignment through the canonical pipeline.
 
+    The agent stops at the DecisionEngine result.  If the decision is APPROVED
+    and an EquipmentActionExecutor is available, execution is performed here
+    (apps/api service layer) — not inside the agent package.
+
     Response shape::
 
         {
@@ -435,11 +439,37 @@ async def assign_equipment(request: AssignmentRequest, runtime=Depends(get_runti
             notes=request.notes,
             warehouse_id=request.warehouse_id or "default",
         )
+        # Extract private execution objects (not JSON-serialisable — must be popped)
+        _proposal = result.pop("_proposal", None)
+        _decision = result.pop("_decision", None)
+
         if result.get("status") == "error":
             raise HTTPException(
                 status_code=400,
                 detail=result.get("reason", "Assignment proposal failed"),
             )
+
+        # Execute in apps/api service layer (MAIW authority boundary)
+        if (
+            result.get("status") == "approved"
+            and runtime.equipment_executor is not None
+            and _proposal is not None
+            and _decision is not None
+        ):
+            try:
+                exec_result = await runtime.equipment_executor.execute(
+                    _proposal, _decision, trace_id=result.get("trace_id")
+                )
+                result["executed"] = exec_result.executed
+                result["execution_id"] = exec_result.execution_id
+                result["status"] = exec_result.outcome.value
+            except Exception as exc:
+                logger.warning(
+                    "Execution failed after APPROVED assignment %s: %s",
+                    result.get("proposal_id"), exc,
+                )
+                result["execution_error"] = str(exc)
+
         return result
     except HTTPException:
         raise
@@ -456,6 +486,10 @@ async def release_equipment(request: ReleaseRequest, runtime=Depends(get_runtime
     Propose and (if approved) execute releasing equipment from its current assignment.
 
     LOW risk: DecisionEngine auto-approves unless equipment state is stale/absent.
+
+    The agent stops at the DecisionEngine result.  If APPROVED and an
+    EquipmentActionExecutor is available, execution is performed here
+    (apps/api service layer) — not inside the agent package.
     """
     agent = _require_agent(runtime)
     try:
@@ -465,11 +499,37 @@ async def release_equipment(request: ReleaseRequest, runtime=Depends(get_runtime
             notes=request.notes,
             warehouse_id=request.warehouse_id or "default",
         )
+        # Extract private execution objects (not JSON-serialisable — must be popped)
+        _proposal = result.pop("_proposal", None)
+        _decision = result.pop("_decision", None)
+
         if result.get("status") == "error":
             raise HTTPException(
                 status_code=400,
                 detail=result.get("reason", "Release failed"),
             )
+
+        # Execute in apps/api service layer (MAIW authority boundary)
+        if (
+            result.get("status") == "approved"
+            and runtime.equipment_executor is not None
+            and _proposal is not None
+            and _decision is not None
+        ):
+            try:
+                exec_result = await runtime.equipment_executor.execute(
+                    _proposal, _decision, trace_id=result.get("trace_id")
+                )
+                result["executed"] = exec_result.executed
+                result["execution_id"] = exec_result.execution_id
+                result["status"] = exec_result.outcome.value
+            except Exception as exc:
+                logger.warning(
+                    "Execution failed after APPROVED release %s: %s",
+                    result.get("proposal_id"), exc,
+                )
+                result["execution_error"] = str(exc)
+
         return result
     except HTTPException:
         raise
@@ -499,6 +559,9 @@ async def schedule_maintenance(
             priority=request.priority,
             warehouse_id=request.warehouse_id or "default",
         )
+        # Strip private keys if present (maintenance never auto-executes)
+        result.pop("_proposal", None)
+        result.pop("_decision", None)
         if result.get("status") == "error":
             raise HTTPException(
                 status_code=400,

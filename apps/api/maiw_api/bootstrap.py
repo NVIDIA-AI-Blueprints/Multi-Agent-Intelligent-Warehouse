@@ -398,7 +398,6 @@ async def get_runtime() -> MAIWRuntime:
             state_provider=runtime.state_provider,
             decision_engine=runtime.decision_engine,
             assignment_skill=assignment_skill,
-            action_executor=runtime.equipment_executor,
         )
         logger.info("MAIW bootstrap: EquipmentAssetOperationsAgent ready")
     except Exception as exc:

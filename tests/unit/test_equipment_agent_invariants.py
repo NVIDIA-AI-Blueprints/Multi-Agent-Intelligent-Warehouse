@@ -11,7 +11,8 @@ Invariants verified:
     B.  Agent with no decision_engine returns error (no direct write) on release
     C.  Agent with no decision_engine returns error (no direct write) on maintenance
     D.  Agent with decision_engine routes to governed path, never to asset_tools
-    E.  NoOpActionExecutor is wired by default (agent cannot execute without executor)
+    E.  EquipmentAssetOperationsAgent has NO _action_executor attribute — authority boundary
+        enforcement: execution belongs to apps/api, not the agent package
     F.  No _legacy_assign method exists on EquipmentAssetOperationsAgent
     G.  agent.asset_tools read-only methods (get_status, get_telemetry) are not blocked
 """
@@ -24,7 +25,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from maiw_agents.equipment.agent import EquipmentAssetOperationsAgent
-from maiw_execution import NoOpActionExecutor
 
 # ---------------------------------------------------------------------------
 # Invariant A — assignment with no decision_engine returns error, no write
@@ -192,21 +192,31 @@ class TestAssignmentWithGovernanceRoutes:
 
 
 # ---------------------------------------------------------------------------
-# Invariant E — NoOpActionExecutor is default
+# Invariant E — agent has no _action_executor (authority boundary hardening)
 # ---------------------------------------------------------------------------
 
 
-class TestNoOpExecutorDefault:
-    """EquipmentAssetOperationsAgent defaults to NoOpActionExecutor."""
+class TestNoActionExecutorOnAgent:
+    """
+    EquipmentAssetOperationsAgent must NOT hold an ActionExecutor.
 
-    def test_default_executor_is_noop(self):
+    Authority boundary: agents may only READ, ANALYZE, PROPOSE.
+    ActionExecutor belongs to apps/api (the execution service layer),
+    not to the maiw-agents package.
+    """
+
+    def test_agent_has_no_action_executor_attribute(self):
         agent = EquipmentAssetOperationsAgent()
-        assert isinstance(agent._action_executor, NoOpActionExecutor)
+        assert not hasattr(agent, "_action_executor"), (
+            "EquipmentAssetOperationsAgent must not hold _action_executor; "
+            "execution belongs to the apps/api service layer (authority boundary)."
+        )
 
-    def test_custom_executor_is_stored(self):
-        custom = NoOpActionExecutor()
-        agent = EquipmentAssetOperationsAgent(action_executor=custom)
-        assert agent._action_executor is custom
+    def test_agent_constructor_does_not_accept_action_executor(self):
+        """Passing action_executor to the constructor must raise TypeError."""
+        import pytest
+        with pytest.raises(TypeError):
+            EquipmentAssetOperationsAgent(action_executor=object())
 
 
 # ---------------------------------------------------------------------------

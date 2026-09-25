@@ -10,13 +10,26 @@ needing asyncpg, redis, pymilvus, or other infrastructure dependencies.
 
 The ``EquipmentAssetOperationsAgent`` delegates its state-aware methods here.
 
+Authority boundary
+------------------
+All functions in this module stop at the DecisionEngine result.  They do NOT
+call ActionExecutor.  Execution (calling ActionExecutor after an APPROVED
+decision) is the responsibility of the apps/api service layer.
+
+The returned dict for APPROVED decisions includes private keys ``_proposal``
+and ``_decision`` so the apps/api caller can invoke
+``action_executor.execute(_proposal, _decision)`` without rebuilding state.
+These keys are NEVER serialised to JSON — callers must pop them before
+returning an HTTP response.
+
 Functions
 ---------
-- ``propose_equipment_assignment()`` — full state/decide/execute path for assignment.
-- ``propose_equipment_release()`` — full state/decide/execute path for release.
-- ``propose_schedule_maintenance()`` — state/decide path for maintenance (MEDIUM
-  risk, so always REQUIRES_HUMAN_APPROVAL — no executor call).
-- ``get_equipment_state_snapshot()`` — read-only state snapshot for agent reasoning.
+- ``propose_equipment_assignment()`` — state → decide path for assignment.
+- ``propose_equipment_release()`` — state → decide path for release.
+- ``propose_schedule_maintenance()`` — state → decide path for maintenance
+  (MEDIUM risk, always REQUIRES_HUMAN_APPROVAL).
+- ``get_equipment_state_snapshot()`` — read-only state snapshot for agent
+  reasoning context.
 """
 
 from __future__ import annotations
@@ -25,7 +38,7 @@ import logging
 from typing import Any, Optional
 
 from maiw_decision import DecisionEngine
-from maiw_decision.models import DecisionOutcome, DecisionRequest
+from maiw_decision.models import DecisionRequest
 from maiw_decision.proposal import ActionProposal
 from maiw_contracts.equipment import EquipmentAssignmentRequest
 from maiw_state import StateRequirements, WarehouseStateSnapshot
@@ -46,7 +59,6 @@ async def propose_equipment_assignment(
     state_provider: Any,
     decision_engine: DecisionEngine,
     assignment_skill: Any,
-    action_executor: Optional[Any] = None,
 ) -> dict[str, Any]:
     """
     State-aware equipment assignment.
@@ -56,8 +68,12 @@ async def propose_equipment_assignment(
     2. Seal into WarehouseStateSnapshot.
     3. Build ActionProposal via assignment_skill (never writes DB).
     4. Evaluate with DecisionEngine.
-    5. If APPROVED and action_executor is provided, execute immediately.
-    6. Return structured decision/execution dict.
+    5. Return structured decision dict (execution is the caller's responsibility).
+
+    Authority boundary: this function NEVER calls ActionExecutor.  The returned
+    dict includes private keys ``_proposal`` and ``_decision`` so that the
+    apps/api layer can call ``executor.execute(_proposal, _decision)`` when the
+    outcome is APPROVED.
 
     Raises nothing intentionally — errors are captured in the returned dict
     with status="error".
@@ -130,16 +146,8 @@ async def propose_equipment_assignment(
 
     reason = result.violations[0].message if result.violations else "all checks passed"
 
-    # Step 4: Execute if APPROVED and executor provided
-    if result.outcome == DecisionOutcome.APPROVED and action_executor is not None:
-        return await _execute_action(
-            proposal=proposal,
-            decision=result,
-            action_executor=action_executor,
-            snapshot_id=snapshot.snapshot_id,
-            trace_id=trace_id,
-        )
-
+    # Return decision result. Execution is the responsibility of the apps/api caller.
+    # Private keys _proposal and _decision let the caller invoke execute() if APPROVED.
     return {
         "status": result.outcome.value,
         "action": "warehouse.equipment.assign",
@@ -150,6 +158,9 @@ async def propose_equipment_assignment(
         "snapshot_id": snapshot.snapshot_id,
         "trace_id": trace_id,
         "violations": [v.model_dump() for v in result.violations],
+        # Private: for apps/api execution layer only — must not be JSON-serialised
+        "_proposal": proposal,
+        "_decision": result,
     }
 
 
@@ -162,7 +173,6 @@ async def propose_equipment_release(
     trace_id: Optional[str] = None,
     state_provider: Any,
     decision_engine: DecisionEngine,
-    action_executor: Optional[Any] = None,
 ) -> dict[str, Any]:
     """
     State-aware equipment release.
@@ -170,8 +180,10 @@ async def propose_equipment_release(
     LOW risk (requires_approval=False) so the DecisionEngine auto-approves
     unless equipment state is absent/stale or the asset is not in the snapshot.
 
-    When an executor is provided and the decision is APPROVED, execution
-    happens immediately and ``executed: true`` is returned.
+    Authority boundary: this function NEVER calls ActionExecutor.  The returned
+    dict includes private keys ``_proposal`` and ``_decision`` so that the
+    apps/api layer can call ``executor.execute(_proposal, _decision)`` when the
+    outcome is APPROVED.
     """
     requirements = StateRequirements(
         equipment=True,
@@ -218,16 +230,8 @@ async def propose_equipment_release(
         asset_id,
     )
 
-    if result.outcome == DecisionOutcome.APPROVED and action_executor is not None:
-        return await _execute_action(
-            proposal=proposal,
-            decision=result,
-            action_executor=action_executor,
-            snapshot_id=snapshot.snapshot_id,
-            trace_id=trace_id,
-        )
-
     reason = result.violations[0].message if result.violations else "all checks passed"
+    # Private: for apps/api execution layer only — must not be JSON-serialised
     return {
         "status": result.outcome.value,
         "action": "warehouse.equipment.release",
@@ -238,6 +242,9 @@ async def propose_equipment_release(
         "snapshot_id": snapshot.snapshot_id,
         "trace_id": trace_id,
         "violations": [v.model_dump() for v in result.violations],
+        # Private: for apps/api execution layer only — must not be JSON-serialised
+        "_proposal": proposal,
+        "_decision": result,
     }
 
 
@@ -254,15 +261,15 @@ async def propose_schedule_maintenance(
     trace_id: Optional[str] = None,
     state_provider: Any,
     decision_engine: DecisionEngine,
-    action_executor: Optional[Any] = None,
 ) -> dict[str, Any]:
     """
     State-aware maintenance scheduling.
 
     MEDIUM risk (requires_approval=True) so the DecisionEngine always returns
-    REQUIRES_HUMAN_APPROVAL unless state guards fire first.  The action_executor
-    parameter is accepted for interface symmetry but is never called because
-    maintenance proposals don't auto-execute.
+    REQUIRES_HUMAN_APPROVAL unless state guards fire first.
+
+    Authority boundary: this function NEVER calls ActionExecutor.
+    Maintenance proposals never auto-execute — human approval is always required.
     """
     requirements = StateRequirements(
         equipment=True,
@@ -325,57 +332,6 @@ async def propose_schedule_maintenance(
         "trace_id": trace_id,
         "violations": [v.model_dump() for v in result.violations],
     }
-
-
-async def _execute_action(
-    *,
-    proposal: ActionProposal,
-    decision: Any,
-    action_executor: Any,
-    snapshot_id: str,
-    trace_id: Optional[str],
-) -> dict[str, Any]:
-    """
-    Call action_executor.execute() and return a structured execution result dict.
-
-    Captures all errors and maps them to status="error".
-    """
-    try:
-        exec_result = await action_executor.execute(
-            proposal, decision, trace_id=trace_id
-        )
-        return {
-            "status": exec_result.outcome.value,
-            "action": proposal.action,
-            "proposal_id": proposal.proposal_id,
-            "decision_id": decision.result_id,
-            "execution_id": exec_result.execution_id,
-            "success": exec_result.success,
-            "reason": "approved and executed",
-            "executed": exec_result.executed,
-            "snapshot_id": snapshot_id,
-            "trace_id": trace_id,
-            "violations": [],
-            "provider_reference": exec_result.provider_reference,
-            "backend_response": exec_result.backend_response,
-        }
-    except Exception as exc:
-        logger.error(
-            "Execution failed after APPROVED decision: proposal_id=%s error=%s",
-            proposal.proposal_id,
-            exc,
-        )
-        return {
-            "status": "error",
-            "action": proposal.action,
-            "proposal_id": proposal.proposal_id,
-            "decision_id": decision.result_id,
-            "reason": f"Execution failed: {exc}",
-            "executed": False,
-            "snapshot_id": snapshot_id,
-            "trace_id": trace_id,
-            "violations": [],
-        }
 
 
 async def get_equipment_state_snapshot(
