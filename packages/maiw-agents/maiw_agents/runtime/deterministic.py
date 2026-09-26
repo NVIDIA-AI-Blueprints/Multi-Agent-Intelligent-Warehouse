@@ -30,6 +30,7 @@ from typing import Any
 
 from ..contracts.agent import AgentDefinition
 from ..contracts.delegation import AgentDelegationRequest, AgentDelegationResult
+from ..contracts.procedure_state import ProcedureExecutionState, ProcedureStatus
 from ..contracts.registry import CapabilityClass, SKILL_REGISTRY
 from ..contracts.runtime import (
     AgentExecutionContext,
@@ -37,10 +38,24 @@ from ..contracts.runtime import (
     AgentTaskResult,
     check_capability_alignment,
 )
-from ..contracts.sop import SOPDefinition
+from ..contracts.sop import SOPDefinition, SOPStep
+from ..contracts.sop_v2 import EscalationReasonCode
+from ..contracts.step_result import EvidenceRef, StepResult, StepStatus
 from ..contracts.task import AgentTaskState, AgentTaskStatus, is_valid_transition
+from ..sop_engine import SOPEngine, ValidatorRegistry
 
 logger = logging.getLogger(__name__)
+
+# Step action types that must never appear in an SOP. validate_sop() rejects
+# write capabilities, but the runtime keeps its own belt-and-suspenders check.
+_FORBIDDEN_WRITE_ACTIONS = ("write", "execute", "mutate")
+
+# Terminal actions whose job is to surface the specialist's assessment.
+_RETURN_ACTIONS = (
+    "return_labor_assessment",
+    "return_wave_assessment",
+    "return_assessment",
+)
 
 
 class MAIWDeterministicRuntime:
@@ -72,8 +87,126 @@ class MAIWDeterministicRuntime:
         specialist registered in the context skill_registry.
     """
 
-    def __init__(self) -> None:
-        pass
+    RUNTIME_NAME = "deterministic"
+
+    def __init__(self, validator_registry: ValidatorRegistry | None = None) -> None:
+        self._validator_registry = validator_registry
+
+    # ── SOPStepExecutor implementation ────────────────────────────────────────
+
+    async def execute_step(
+        self,
+        *,
+        definition: AgentDefinition,
+        step: SOPStep,
+        procedure_state: ProcedureExecutionState,
+        context: AgentExecutionContext,
+        attempt: int,
+    ) -> StepResult:
+        """
+        Implement SOPStepExecutor for the deterministic runtime.
+
+        Fulfils exactly one step and reports what it produced. It does NOT
+        decide whether the step is complete and does NOT choose the next step —
+        the SOP Engine owns both. The ``status`` returned here is a claim that
+        the engine's validator then confirms or rejects.
+        """
+        started_at = datetime.now(timezone.utc)
+        action = step.action
+
+        # Belt-and-suspenders write guard. validate_sop() should already have
+        # rejected this, so reaching it means a hand-built SOPDefinition.
+        if action in _FORBIDDEN_WRITE_ACTIONS:
+            return StepResult(
+                step_id=step.id,
+                status=StepStatus.FAILED,
+                output={},
+                runtime=self.RUNTIME_NAME,
+                attempt=attempt,
+                started_at=started_at,
+                completed_at=datetime.now(timezone.utc),
+                error=(
+                    f"Deterministic runtime rejects action {action!r} — "
+                    "write actions not permitted"
+                ),
+                escalation_reason=EscalationReasonCode.POLICY_CONFLICT,
+                escalation_message=(
+                    f"Step {step.id!r} has forbidden write action {action!r}."
+                ),
+            )
+
+        logger.debug(
+            "MAIWDeterministicRuntime.execute_step: sop=%s step=%s action=%s attempt=%d",
+            procedure_state.sop_id, step.id, action, attempt,
+        )
+
+        bounded = context.bounded_context or {}
+        output: dict[str, Any] = {}
+
+        # The deterministic runtime's execution model: specialist agents
+        # pre-load their results into bounded_context before run_task().
+        # A step's declared completion criteria are satisfied from that context.
+        if step.completion is not None and step.completion.schema_fields:
+            for field_name in step.completion.schema_fields:
+                if field_name in bounded:
+                    output[field_name] = bounded[field_name]
+
+        if step.completion is not None and step.completion.required_capability_result:
+            cap_id = step.completion.required_capability_result
+            for key in (cap_id, f"skill_result_{cap_id}"):
+                if key in bounded:
+                    output[cap_id] = bounded[key]
+                    break
+
+        # Terminal "return the assessment" steps surface the specialist result.
+        if action in _RETURN_ACTIONS:
+            agent_result = bounded.get("_agent_result")
+            if agent_result is not None:
+                if hasattr(agent_result, "model_dump"):
+                    result_dict = agent_result.model_dump()
+                else:
+                    result_dict = dict(agent_result)
+                output["result"] = result_dict
+                raw_candidates = result_dict.get("candidate_actions", [])
+                output["candidate_actions"] = (
+                    raw_candidates if isinstance(raw_candidates, list) else []
+                )
+
+        evidence = [
+            EvidenceRef(
+                type="step_execution",
+                source=self.RUNTIME_NAME,
+                reference_id=context.trace_id or None,
+                timestamp=datetime.now(timezone.utc),
+                summary=f"deterministic execution of step {step.id!r} (action={action})",
+                metadata={
+                    "step_id": step.id,
+                    "action": action,
+                    "sop_id": procedure_state.sop_id,
+                    "agent_id": definition.agent_id,
+                    "attempt": attempt,
+                },
+            )
+        ]
+
+        return StepResult(
+            step_id=step.id,
+            status=StepStatus.COMPLETED,
+            output=output,
+            evidence=evidence,
+            runtime=self.RUNTIME_NAME,
+            attempt=attempt,
+            started_at=started_at,
+            completed_at=datetime.now(timezone.utc),
+            metadata={
+                "action": action,
+                "sop_id": procedure_state.sop_id,
+                "agent_id": definition.agent_id,
+                "trace_id": context.trace_id,
+            },
+        )
+
+    # ── AgentRuntime implementation ───────────────────────────────────────────
 
     async def run_task(
         self,
@@ -85,7 +218,9 @@ class MAIWDeterministicRuntime:
         """
         Execute an agent task following the given SOP.
 
-        See AgentRuntime Protocol docstring for invariants.
+        Procedure control is delegated to the SOP Engine, with this runtime
+        acting as the SOPStepExecutor. See AgentRuntime Protocol docstring for
+        invariants.
         """
         logger.info(
             "MAIWDeterministicRuntime.run_task: agent=%s sop=%s task=%s trace=%s",
@@ -98,146 +233,129 @@ class MAIWDeterministicRuntime:
         # Validate capability alignment (delegated to shared contracts.runtime guard)
         check_capability_alignment(definition, sop)
 
-        # Build step index
-        steps = {s.id: s for s in sop.steps}
-        if not steps:
+        if not sop.steps:
             return self._terminal(state, AgentTaskStatus.FAILED, "SOP has no steps.")
 
-        current_step_id = sop.steps[0].id
+        max_iterations = definition.termination_policy.max_iterations
+        remaining_budget = max(max_iterations - state.iteration, 0)
+        if remaining_budget == 0:
+            reason = f"Max iterations ({max_iterations}) reached."
+            logger.warning(
+                "MAIWDeterministicRuntime: %s — escalating. task=%s", reason, state.task_id
+            )
+            status = (
+                AgentTaskStatus.ESCALATED
+                if definition.termination_policy.escalate_on_max_iterations
+                else AgentTaskStatus.FAILED
+            )
+            return self._terminal(state, status, reason)
+
+        engine = SOPEngine(
+            executor=self,
+            validator_registry=self._validator_registry,
+            trace_id=context.trace_id,
+            max_transitions=remaining_budget,
+        )
+
+        proc_state = await engine.run_procedure(
+            definition=definition,
+            sop=sop,
+            agent_task_id=state.task_id,
+            context=context,
+            warehouse_state_snapshot=(context.bounded_context or {}).get(
+                "_warehouse_state_snapshot"
+            ),
+        )
+
+        return self._to_task_result(state, definition, sop, context, proc_state)
+
+    # ── ProcedureExecutionState → AgentTaskResult bridge ──────────────────────
+
+    def _to_task_result(
+        self,
+        state: AgentTaskState,
+        definition: AgentDefinition,
+        sop: SOPDefinition,
+        context: AgentExecutionContext,
+        proc_state: ProcedureExecutionState,
+    ) -> AgentTaskResult:
+        """Project the SOP Engine's procedure state back onto the task contract."""
         observations: list[dict[str, Any]] = []
         candidate_actions: list[dict[str, Any]] = []
         assessment: dict[str, Any] = {}
-        iteration = state.iteration
 
-        while current_step_id is not None:
-            # Iteration guard
-            if iteration >= definition.termination_policy.max_iterations:
-                reason = f"Max iterations ({definition.termination_policy.max_iterations}) reached."
-                logger.warning(
-                    "MAIWDeterministicRuntime: %s — escalating. task=%s",
-                    reason,
-                    state.task_id,
+        for step_id in proc_state.branch_history:
+            result = proc_state.step_results.get(step_id)
+            meta = result.metadata if result else {}
+            observations.append({
+                "step_id": step_id,
+                "action": meta.get("action"),
+                "sop_id": sop.id,
+                "agent_id": definition.agent_id,
+                "trace_id": context.trace_id,
+                "status": result.status.value if result else "skipped",
+                "attempt": result.attempt if result else 0,
+                "validator": (
+                    result.validation_result.validator_type.value
+                    if result and result.validation_result
+                    else None
+                ),
+                "timestamp": (
+                    result.completed_at or result.started_at
+                ).isoformat() if result else datetime.now(timezone.utc).isoformat(),
+            })
+            if result is None:
+                continue
+            if "result" in result.output:
+                assessment["result"] = result.output["result"]
+            raw_candidates = result.output.get("candidate_actions")
+            if isinstance(raw_candidates, list):
+                candidate_actions.extend(raw_candidates)
+
+        iterations = state.iteration + len(proc_state.branch_history)
+
+        # Surface the first typed escalation reason we recorded, if any.
+        escalation_message: str | None = None
+        for result in proc_state.step_results.values():
+            if result.escalation_reason is not None:
+                escalation_message = (
+                    result.escalation_message
+                    or f"{result.escalation_reason.value} at step {result.step_id}"
                 )
-                if definition.termination_policy.escalate_on_max_iterations:
-                    return self._terminal(state, AgentTaskStatus.ESCALATED, reason, observations=observations)
-                return self._terminal(state, AgentTaskStatus.FAILED, reason, observations=observations)
+                break
 
-            step = steps.get(current_step_id)
-            if step is None:
-                return self._terminal(
-                    state, AgentTaskStatus.FAILED,
-                    f"Unknown step_id: {current_step_id!r}",
-                    observations=observations,
-                )
+        if proc_state.status == ProcedureStatus.COMPLETED:
+            final_status = AgentTaskStatus.COMPLETED
+            stop_reason: str | None = "OBJECTIVE_MET"
+        elif proc_state.status == ProcedureStatus.WAITING_FOR_GOVERNANCE:
+            final_status = AgentTaskStatus.WAITING_FOR_GOVERNANCE
+            stop_reason = "WAITING_FOR_GOVERNANCE"
+        elif proc_state.status == ProcedureStatus.ESCALATED:
+            final_status = AgentTaskStatus.ESCALATED
+            stop_reason = None
+        else:
+            final_status = AgentTaskStatus.FAILED
+            stop_reason = None
 
-            # Reject WRITE step actions (must never appear in SOP — belt-and-suspenders)
-            if step.action in ("write", "execute", "mutate"):
-                return self._terminal(
-                    state, AgentTaskStatus.FAILED,
-                    f"Step {step.id!r} has forbidden write action {step.action!r}.",
-                    observations=observations,
-                )
-
-            logger.debug(
-                "MAIWDeterministicRuntime: executing step %s.%s action=%s task=%s",
-                sop.id, step.id, step.action, state.task_id,
-            )
-
-            # Evaluate step condition (skip if condition not met)
-            if step.condition is not None:
-                condition_facts = {
-                    **context.bounded_context,
-                    **assessment,
-                }
-                condition_met = step.condition.evaluate(condition_facts)
-                if not condition_met:
-                    logger.debug(
-                        "MAIWDeterministicRuntime: step %s condition not met, skipping. task=%s",
-                        step.id, state.task_id,
-                    )
-                    current_step_id = step.next_step_id
-                    iteration += 1
-                    continue
-
-            # Run the step — dispatch to action handlers
-            step_obs, step_candidates, step_assessment = await self._run_step(
-                step_id=step.id,
-                action=step.action,
-                definition=definition,
-                sop=sop,
-                context=context,
-                accumulated_assessment=assessment,
-            )
-            observations.extend(step_obs)
-            candidate_actions.extend(step_candidates)
-            assessment.update(step_assessment)
-            iteration += 1
-
-            # Terminal step check — if no next_step_id, we're done
-            next_step = step.next_step_id
-            current_step_id = next_step
-
-        # All steps complete — objective met
         return AgentTaskResult(
             task_id=state.task_id,
             agent_id=definition.agent_id,
             sop_id=sop.id,
             sop_version=sop.version,
-            final_status=AgentTaskStatus.COMPLETED,
+            final_status=final_status,
             assessment=assessment or None,
             candidate_actions=candidate_actions,
             observations=observations,
-            iterations=iteration,
-            stop_reason="OBJECTIVE_MET",
+            iterations=iterations,
+            stop_reason=stop_reason,
+            escalation_reason=(
+                escalation_message
+                if final_status in (AgentTaskStatus.ESCALATED, AgentTaskStatus.FAILED)
+                else None
+            ),
             completed_at=datetime.now(timezone.utc),
         )
 
-    async def _run_step(
-        self,
-        *,
-        step_id: str,
-        action: str,
-        definition: AgentDefinition,
-        sop: SOPDefinition,
-        context: AgentExecutionContext,
-        accumulated_assessment: dict[str, Any],
-    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
-        """
-        Dispatch a single SOP step to the appropriate executor.
-
-        Returns: (observations, candidate_actions, assessment_update)
-
-        For the deterministic runtime, most steps are handled by the
-        specialist agent pre-loading results into bounded_context.
-        This method records the step execution and extracts results.
-        """
-        obs: list[dict[str, Any]] = [
-            {
-                "step_id": step_id,
-                "action": action,
-                "sop_id": sop.id,
-                "agent_id": definition.agent_id,
-                "trace_id": context.trace_id,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            }
-        ]
-        candidates: list[dict[str, Any]] = []
-        assessment_update: dict[str, Any] = {}
-
-        # For return/terminal steps, extract candidate_actions from context
-        if action in ("return_labor_assessment", "return_wave_assessment", "return_assessment"):
-            result = context.bounded_context.get("_agent_result")
-            if result is not None:
-                # Pydantic model → dict
-                if hasattr(result, "model_dump"):
-                    result_dict = result.model_dump()
-                else:
-                    result_dict = dict(result)
-                assessment_update["result"] = result_dict
-                raw_candidates = result_dict.get("candidate_actions", [])
-                candidates = raw_candidates if isinstance(raw_candidates, list) else []
-
-        return obs, candidates, assessment_update
 
     @staticmethod
     def _terminal(
