@@ -57,18 +57,26 @@ def get_runtime(config: str | None = None, sop: SOPDefinition | None = None) -> 
         "deterministic" (default) — MAIWDeterministicRuntime
         "deep_agents" — DeepAgentsRuntime (real deepagents==0.7.15)
 
-    If config is None and sop is provided, sop.runtime_profile is used:
-        "strict"   → MAIWDeterministicRuntime
-        "adaptive" → DeepAgentsRuntime
+    Precedence (highest to lowest):
+        1. Explicit ``config`` parameter — always wins.
+        2. ``sop.runtime_profile`` — when no explicit config, the SOP governs.
+        3. ``MAIW_AGENT_RUNTIME`` env var — last-resort fallback when neither
+           explicit config nor SOP is provided.
+        4. Default: "deterministic".
 
-    Environment variable: MAIW_AGENT_RUNTIME (overrides sop.runtime_profile)
+    The env var can no longer override an explicit SOP runtime_profile.
     """
     from .deterministic import MAIWDeterministicRuntime
 
-    selected = config or os.environ.get("MAIW_AGENT_RUNTIME")
-    if selected is None and sop is not None:
+    # 1. Explicit config takes precedence over everything
+    if config is not None:
+        selected = config
+    # 2. SOP runtime_profile takes precedence over env var
+    elif sop is not None:
         selected = "deep_agents" if sop.runtime_profile == "adaptive" else "deterministic"
-    selected = selected or "deterministic"
+    # 3. Env var only as last-resort fallback when neither config nor SOP is given
+    else:
+        selected = os.environ.get("MAIW_AGENT_RUNTIME", "deterministic")
 
     if selected == "deep_agents":
         return DeepAgentsRuntime()

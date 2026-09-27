@@ -30,8 +30,6 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from maiw_execution import ActionExecutor, NoOpActionExecutor
-
 from ..common.types import SearchContext
 from . import state_aware_ops
 
@@ -90,7 +88,6 @@ class EquipmentAssetOperationsAgent:
         state_provider: Optional[Any] = None,
         decision_engine: Optional[Any] = None,
         assignment_skill: Optional[Any] = None,
-        action_executor: Optional[ActionExecutor] = None,
     ) -> None:
         self.model_gateway = model_gateway
         self.hybrid_retriever = hybrid_retriever
@@ -101,7 +98,6 @@ class EquipmentAssetOperationsAgent:
         self._state_provider = state_provider
         self._decision_engine = decision_engine
         self._assignment_skill = assignment_skill
-        self._action_executor: ActionExecutor = action_executor or NoOpActionExecutor()
 
     async def initialize(self) -> None:
         """
@@ -168,7 +164,6 @@ class EquipmentAssetOperationsAgent:
             state_provider=self._state_provider,
             decision_engine=self._decision_engine,
             assignment_skill=self._assignment_skill,
-            action_executor=self._action_executor,
         )
 
     async def propose_equipment_release(
@@ -211,7 +206,6 @@ class EquipmentAssetOperationsAgent:
             trace_id=trace_id,
             state_provider=self._state_provider,
             decision_engine=self._decision_engine,
-            action_executor=self._action_executor,
         )
 
     async def propose_schedule_maintenance(
@@ -476,7 +470,7 @@ class EquipmentAssetOperationsAgent:
                 )
 
             elif equipment_query.intent == "maintenance" and asset_id:
-                # Governed path: state → ActionProposal → DecisionEngine → (optional) ActionExecutor
+                # Governed path: state → ActionProposal → DecisionEngine (MEDIUM risk: always requires approval)
                 maintenance_result = await self.propose_schedule_maintenance(
                     asset_id=asset_id,
                     maintenance_type=equipment_query.entities.get(
@@ -504,7 +498,7 @@ class EquipmentAssetOperationsAgent:
                 )
 
             elif equipment_query.intent == "release" and asset_id:
-                # Governed path: state → ActionProposal → DecisionEngine → (optional) ActionExecutor
+                # Governed path: state → ActionProposal → DecisionEngine (LOW risk: decision returned to caller)
                 release_result = await self.propose_equipment_release(
                     asset_id=asset_id,
                     released_by=equipment_query.entities.get("released_by", "system"),

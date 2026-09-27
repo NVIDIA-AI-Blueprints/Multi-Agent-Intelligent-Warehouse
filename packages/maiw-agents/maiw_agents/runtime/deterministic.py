@@ -31,7 +31,12 @@ from typing import Any
 from ..contracts.agent import AgentDefinition
 from ..contracts.delegation import AgentDelegationRequest, AgentDelegationResult
 from ..contracts.registry import CapabilityClass, SKILL_REGISTRY
-from ..contracts.runtime import AgentExecutionContext, AgentRuntime, AgentTaskResult
+from ..contracts.runtime import (
+    AgentExecutionContext,
+    AgentRuntime,
+    AgentTaskResult,
+    check_capability_alignment,
+)
 from ..contracts.sop import SOPDefinition
 from ..contracts.task import AgentTaskState, AgentTaskStatus, is_valid_transition
 
@@ -90,8 +95,8 @@ class MAIWDeterministicRuntime:
             context.trace_id,
         )
 
-        # Validate capability alignment
-        self._check_capability_alignment(definition, sop)
+        # Validate capability alignment (delegated to shared contracts.runtime guard)
+        check_capability_alignment(definition, sop)
 
         # Build step index
         steps = {s.id: s for s in sop.steps}
@@ -233,32 +238,6 @@ class MAIWDeterministicRuntime:
                 candidates = raw_candidates if isinstance(raw_candidates, list) else []
 
         return obs, candidates, assessment_update
-
-    def _check_capability_alignment(
-        self,
-        definition: AgentDefinition,
-        sop: SOPDefinition,
-    ) -> None:
-        """
-        Verify the SOP's allowed_capabilities are a subset of the definition's.
-        Raise ValueError if they diverge (should have been caught by validate_sop).
-        """
-        definition_caps = set(definition.allowed_capabilities)
-        sop_caps = set(sop.allowed_capabilities)
-        extra = sop_caps - definition_caps
-        if extra:
-            raise ValueError(
-                f"SOP {sop.id!r} declares capabilities not in AgentDefinition {definition.agent_id!r}: "
-                f"{sorted(extra)}"
-            )
-        # Reject WRITE capabilities (belt-and-suspenders)
-        for cap_id in sop_caps:
-            skill = SKILL_REGISTRY.get(cap_id)
-            if skill and skill.capability_class in (CapabilityClass.WRITE, CapabilityClass.EMERGENCY_WRITE):
-                raise ValueError(
-                    f"SOP {sop.id!r} contains WRITE capability {cap_id!r} — "
-                    "agents may not invoke write capabilities directly."
-                )
 
     @staticmethod
     def _terminal(

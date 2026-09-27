@@ -36,67 +36,9 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
-from ..contracts.agent import (
-    AgentDefinition,
-    AgentTrigger,
-    GovernanceBoundary,
-    TerminationPolicy,
-    TerminationCondition,
-)
+from ..contracts.definitions import LABOR_AGENT_DEFINITION
 
 logger = logging.getLogger(__name__)
-
-# ── LaborAgent definition ─────────────────────────────────────────────────────
-
-LABOR_AGENT_DEFINITION = AgentDefinition(
-    agent_id="labor",
-    version="1.0",
-    objective=(
-        "Determine whether labor is constraining an operational objective "
-        "and produce feasible labor interventions."
-    ),
-    domain="labor",
-    triggers=[
-        AgentTrigger(
-            trigger_id="labor_constraint_detected",
-            trigger_type="labor_constraint_detected",
-            description="Labor utilization or idle-worker state indicates a constraint.",
-        ),
-        AgentTrigger(
-            trigger_id="delegated_by_oca",
-            trigger_type="operator_requests_resolution",
-            description="OperationsCoordinationAgent delegated a labor assessment.",
-        ),
-    ],
-    required_context=["worker", "task"],
-    allowed_capabilities=[
-        "warehouse.labor.capacity",
-        "warehouse.labor.inspect_workers",
-        "warehouse.labor.inspect_tasks",
-        "warehouse.labor.evaluate_reallocation",
-    ],
-    allowed_subagents=[],
-    sop_id="labor.labor_constraint_assessment",
-    output_contract=(
-        "LaborAssessment containing idle/active worker counts, unassigned task count, "
-        "primary constraint classification, and CandidateLaborAction[] ordered by priority. "
-        "Never a write action."
-    ),
-    governance_boundary=GovernanceBoundary(
-        allowed_capability_classes=["READ", "ANALYTICAL"],
-        may_invoke_action_executor=False,
-        may_invoke_decision_engine=False,
-    ),
-    termination_policy=TerminationPolicy(
-        max_iterations=5,
-        stop_conditions=[
-            TerminationCondition(condition_id="OBJECTIVE_MET", description="LaborAssessment produced."),
-            TerminationCondition(condition_id="NO_SAFE_ACTION", description="No feasible reallocation found."),
-            TerminationCondition(condition_id="INSUFFICIENT_CONTEXT", description="Labor state unavailable."),
-            TerminationCondition(condition_id="MAX_ITERATIONS", description="Iteration limit reached."),
-        ],
-    ),
-)
 
 
 # ── Output models ─────────────────────────────────────────────────────────────
