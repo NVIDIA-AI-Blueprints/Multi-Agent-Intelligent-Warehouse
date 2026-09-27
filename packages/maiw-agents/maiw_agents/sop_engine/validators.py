@@ -429,12 +429,16 @@ class ValidatorRegistry:
     """
 
     def __init__(self, validators: dict[ValidatorType, StepValidator] | None = None) -> None:
-        self._validators: dict[ValidatorType, StepValidator] = validators or {
-            ValidatorType.SCHEMA: SchemaValidator(),
-            ValidatorType.STATE_PREDICATE: StatePredicateValidator(),
-            ValidatorType.CAPABILITY_RESULT: CapabilityResultValidator(),
-            ValidatorType.LEGACY_SUCCESS: LegacySuccessValidator(),
-        }
+        # `is None`, not truthiness: an explicitly empty registry must stay empty
+        # so that every lookup raises rather than silently falling back.
+        if validators is None:
+            validators = {
+                ValidatorType.SCHEMA: SchemaValidator(),
+                ValidatorType.STATE_PREDICATE: StatePredicateValidator(),
+                ValidatorType.CAPABILITY_RESULT: CapabilityResultValidator(),
+                ValidatorType.LEGACY_SUCCESS: LegacySuccessValidator(),
+            }
+        self._validators: dict[ValidatorType, StepValidator] = validators
 
     def get(self, validator_type: ValidatorType) -> StepValidator:
         validator = self._validators.get(validator_type)
@@ -448,7 +452,7 @@ class ValidatorRegistry:
     def get_for_step(self, step: SOPStep) -> StepValidator:
         """A step with no completion spec gets LEGACY_SUCCESS (V1 behaviour)."""
         if step.completion is None:
-            return self._validators[ValidatorType.LEGACY_SUCCESS]
+            return self.get(ValidatorType.LEGACY_SUCCESS)
         return self.get(step.completion.validator_type)
 
     def supported_types(self) -> set[ValidatorType]:

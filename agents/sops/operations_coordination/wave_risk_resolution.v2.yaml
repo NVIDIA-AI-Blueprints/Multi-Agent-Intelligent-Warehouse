@@ -1,0 +1,226 @@
+# MAIW SOP: Operations Coordination — Wave Risk Resolution (v2)
+# SOP Engine V2 Foundation — Proof SOP A
+#
+# Same procedure as wave_risk_resolution.v1.yaml, re-authored with V2 step
+# semantics. v1 is left untouched and still loads and runs: the V2 fields are
+# additive and default to None.
+#
+# What this SOP proves:
+#   1. A step can declare what "done" means (completion.validator_type).
+#   2. A step can carry a retry budget that never retries an ambiguous write.
+#   3. The post-execution step completes only when authoritative warehouse state
+#      proves the change landed (STATE_PREDICATE), not because governance said
+#      APPROVED — see docs/architecture/SOP_ENGINE_V2_DESIGN.md Section 34.
+#
+# Steps are explicitly chained with next_step_id so the engine traverses the full
+# procedure. (v1 declares no next_step_id, which terminates after the first step.)
+#
+# The agent reasons and recommends; governance authorizes; ActionExecutor executes.
+# The agent NEVER directly mutates operational state.
+
+id: operations_coordination.wave_risk_resolution_v2
+version: "2.0"
+agent: operations_coordination
+runtime_profile: adaptive
+objective: >
+  Restore an at-risk wave to on-track completion before the carrier cutoff,
+  by identifying the primary constraint, consulting specialist agents, generating
+  candidate interventions, and emitting a single highest-priority recommendation
+  for governance evaluation.
+
+description: >
+  V2 re-authoring of the canonical wave-at-risk resolution SOP. Demonstrates
+  declared step completion criteria, per-step retry budgets, evidence
+  requirements, and authoritative post-write state validation.
+
+triggers:
+  - wave_risk_detected
+  - operator_requests_resolution
+
+required_context:
+  - wave
+  - task
+  - worker
+  - equipment
+  - carrier_cutoff
+
+allowed_capabilities:
+  - warehouse.inventory.lookup
+  - warehouse.equipment.status
+  - warehouse.equipment.telemetry
+  - warehouse.labor.capacity
+  - warehouse.labor.inspect_workers
+  - warehouse.labor.inspect_tasks
+  - warehouse.labor.evaluate_reallocation
+  - warehouse.wave.status
+  - warehouse.wave.inspect_tasks
+  - warehouse.wave.evaluate_critical_path
+  - warehouse.wave.evaluate_reprioritization
+
+allowed_subagents:
+  - labor
+  - wave
+  - equipment
+
+steps:
+  # ── V2 step: SCHEMA completion + retry budget ──────────────────────────────
+  - id: establish_state
+    action: gather_operational_context
+    next_step_id: diagnose
+    objective: >
+      Obtain a fresh, sealed operational snapshot that will be the only source
+      of truth for this task execution.
+    description: >
+      Assemble a fresh OperationalContextSnapshot from the sealed WarehouseStateSnapshot.
+      This is the ONLY source of truth for this task execution.
+    required_inputs:
+      - wave_id
+    expected_output:
+      wave_id: string
+      at_risk_count: integer
+      carrier_cutoff_minutes: integer
+    completion:
+      validator_type: schema
+      schema_fields:
+        - wave_id
+        - at_risk_count
+        - carrier_cutoff_minutes
+    retry_policy:
+      max_attempts: 3
+      retry_on:
+        - VALIDATION_FAILED
+        - CAPABILITY_UNAVAILABLE
+      backoff_seconds: 0.0
+      escalate_on_exhaustion: true
+    evidence_requirements:
+      - state_snapshot
+    timeout_seconds: 30.0
+    escalation_reason: >
+      Could not assemble a complete operational snapshot — refusing to reason
+      about an at-risk wave from partial state.
+
+  # ── V2 step: SCHEMA completion on the diagnosis ────────────────────────────
+  - id: diagnose
+    action: determine_primary_constraint
+    next_step_id: gather_specialist_evidence
+    objective: Name the single primary constraint driving the wave risk.
+    description: >
+      Determine whether the primary constraint is:
+      (a) labor: insufficient idle workers to cover pending tasks, or
+      (b) wave: task sequencing or prioritization issue, or
+      (c) equipment: offline/unavailable equipment blocking picks.
+      Record the determination as an observation.
+    expected_output:
+      primary_constraint: "one of: labor | wave | equipment"
+    completion:
+      validator_type: schema
+      schema_fields:
+        - primary_constraint
+    retry_policy:
+      max_attempts: 2
+      backoff_seconds: 0.0
+    evidence_requirements:
+      - state_snapshot
+
+  - id: gather_specialist_evidence
+    action: consult_required_domains
+    next_step_id: generate_candidates
+    objective: Collect bounded specialist assessments for the affected domains.
+    description: >
+      Based on primary constraint, delegate bounded question to specialist agent(s).
+      If labor constraint: delegate to LaborAgent (labor_constraint_assessment SOP).
+      If wave constraint: delegate to WaveAgent (wave_risk_assessment SOP).
+      If equipment constraint: delegate to EquipmentAssetOperationsAgent.
+    condition:
+      predicate: domains_affected
+      operator: contains
+      value: labor
+    evidence_requirements:
+      - subagent_assessment
+
+  - id: generate_candidates
+    action: produce_candidate_interventions
+    next_step_id: compare
+    description: >
+      Integrate specialist assessments. Generate 1-3 candidate interventions
+      from specialist candidate_actions. Each candidate must:
+      - map to an allowed capability (READ, ANALYTICAL, or PROPOSAL skill)
+      - have a rationale grounded in observed facts
+      - have a priority (critical | high | medium | low)
+
+  - id: compare
+    action: compare_candidates
+    next_step_id: recommend
+    description: >
+      Compare candidates by: urgency, operational impact, risk, reversibility.
+      Select the highest-impact, lowest-risk action as the primary recommendation.
+
+  - id: recommend
+    action: select_recommendation
+    next_step_id: submit
+    description: >
+      Select the top recommendation. Emit a RecommendedAction with:
+      domain, capability, target, objective, rationale, priority, subtype.
+      The recommendation must NOT specify MCP parameters — only semantic intent.
+
+  - id: submit
+    action: emit_recommended_action
+    next_step_id: observe
+    description: >
+      Transition to WAITING_FOR_GOVERNANCE.
+      The RecommendedAction flows to GovernedActionOrchestrator via CopilotService.
+
+  # ── V2 step: the post-write invariant ──────────────────────────────────────
+  # This step is the reason SOP Engine V2 exists. It does NOT complete because
+  # governance returned APPROVED or because a call returned 2xx. It completes
+  # only if a re-read of authoritative warehouse state satisfies the registered
+  # predicate. An indeterminate execution escalates as EXECUTION_INDETERMINATE
+  # and is never resolved by retrying the write.
+  - id: observe
+    action: evaluate_post_execution_state
+    objective: >
+      Prove, from authoritative warehouse state, that the approved intervention
+      actually changed the world in the intended direction.
+    description: >
+      After governance result is returned (GovernanceOutcome injected):
+      Read the resulting WarehouseStateSnapshot. Compare wave state before and after.
+      Determine whether objective is met.
+    completion:
+      validator_type: state_predicate
+      predicate_name: wave_risk_reduced
+      predicate_args:
+        min_reduction: 1
+    evidence_requirements:
+      - state_snapshot
+      - state_comparison
+    escalation_reason: >
+      Authoritative warehouse state does not confirm the approved intervention
+      took effect — human review required before any further action.
+
+escalation:
+  - rule_id: conflicting_evidence
+    trigger: Specialist assessments yield contradictory conclusions about the primary constraint.
+    escalation_message: Conflicting evidence from specialist agents — human review required.
+
+  - rule_id: insufficient_context
+    trigger: OperationalContextSnapshot is missing one or more required domains.
+    escalation_message: Insufficient operational context to proceed safely.
+
+  - rule_id: high_operational_risk
+    trigger: All candidate interventions carry HIGH or CRITICAL risk and no low-risk option exists.
+    escalation_message: All candidate actions carry unacceptable operational risk.
+
+  - rule_id: post_write_unconfirmed
+    trigger: Authoritative state does not confirm the executed intervention.
+    escalation_message: Post-execution state does not confirm the write — escalating without retry.
+
+  - rule_id: max_iterations_reached
+    trigger: SOP has completed the maximum allowed iterations without meeting the objective.
+    escalation_message: Maximum SOP iterations reached without resolution.
+
+stop_conditions:
+  - objective_met
+  - no_safe_action
+  - human_intervention_required
+  - max_iterations_reached
+  - insufficient_context
