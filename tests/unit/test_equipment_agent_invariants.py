@@ -215,6 +215,7 @@ class TestNoActionExecutorOnAgent:
     def test_agent_constructor_does_not_accept_action_executor(self):
         """Passing action_executor to the constructor must raise TypeError."""
         import pytest
+
         with pytest.raises(TypeError):
             EquipmentAssetOperationsAgent(action_executor=object())
 

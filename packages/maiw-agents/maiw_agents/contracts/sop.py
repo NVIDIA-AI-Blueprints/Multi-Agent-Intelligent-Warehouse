@@ -29,6 +29,8 @@ from typing import Any, Literal
 import yaml
 from pydantic import BaseModel, Field, model_validator
 
+from .sop_v2 import RetryPolicy, StepCompletionSpec
+
 
 # ── Condition (declarative) ───────────────────────────────────────────────────
 
@@ -152,6 +154,48 @@ class SOPStep(BaseModel):
     on_failure_step_id: str | None = Field(
         default=None,
         description="Go to this step on failure (instead of escalating).",
+    )
+
+    # ── V2 extension fields ───────────────────────────────────────────────────
+    # Every field below is Optional with a None default. A v1 SOP that sets none
+    # of them loads and executes exactly as it did before SOP Engine V2:
+    # completion=None selects the LEGACY_SUCCESS validator, retry_policy=None
+    # means a single attempt, timeout_seconds=None means no step-level timeout.
+
+    objective: str | None = Field(
+        default=None,
+        description="What this individual step is trying to achieve (distinct from the SOP objective).",
+    )
+    required_inputs: list[str] | None = Field(
+        default=None,
+        description="Context keys that must be present before this step may run.",
+    )
+    expected_output: dict[str, Any] | None = Field(
+        default=None,
+        description="JSON-schema-like hint describing the shape of this step's output.",
+    )
+    completion: StepCompletionSpec | None = Field(
+        default=None,
+        description=(
+            "Declares what 'done' means for this step. "
+            "None = legacy/compatibility behaviour (LEGACY_SUCCESS validator)."
+        ),
+    )
+    retry_policy: RetryPolicy | None = Field(
+        default=None,
+        description="Per-step retry budget. None = no retry (single attempt).",
+    )
+    timeout_seconds: float | None = Field(
+        default=None,
+        description="Step-level wall-clock budget. None = no step-level timeout.",
+    )
+    escalation_reason: str | None = Field(
+        default=None,
+        description="Overrides the default escalation message for this step.",
+    )
+    evidence_requirements: list[str] | None = Field(
+        default=None,
+        description="Evidence type names that must be collected for this step.",
     )
 
 

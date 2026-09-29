@@ -47,6 +47,25 @@ from .sop import (
     load_sop,
     validate_sop,
 )
+from .sop_v2 import (
+    ValidatorType,
+    EscalationReasonCode,
+    StepCompletionSpec,
+    RetryPolicy,
+)
+# SOP Engine V2 step result. Exported under explicit V2 names here because
+# contracts/task.py already owns the Phase 18H `StepResult`/`StepStatus` names.
+# The package root (`maiw_agents`) exports these as StepResult/StepStatus.
+from .step_result import (
+    StepResult as StepResultV2,
+    StepStatus as StepStatusV2,
+    EvidenceRef,
+    ValidationResult,
+)
+from .procedure_state import (
+    ProcedureExecutionState,
+    ProcedureStatus,
+)
 from .delegation import (
     AgentDelegationRequest,
     AgentDelegationResult,
@@ -97,6 +116,17 @@ __all__ = [
     "SOPValidationError",
     "load_sop",
     "validate_sop",
+    # SOP v2 step semantics
+    "ValidatorType",
+    "EscalationReasonCode",
+    "StepCompletionSpec",
+    "RetryPolicy",
+    "StepResultV2",
+    "StepStatusV2",
+    "EvidenceRef",
+    "ValidationResult",
+    "ProcedureExecutionState",
+    "ProcedureStatus",
     # Delegation
     "AgentDelegationRequest",
     "AgentDelegationResult",
