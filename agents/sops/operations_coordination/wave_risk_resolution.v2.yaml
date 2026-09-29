@@ -13,7 +13,8 @@
 #      APPROVED — see docs/architecture/SOP_ENGINE_V2_DESIGN.md Section 34.
 #
 # Steps are explicitly chained with next_step_id so the engine traverses the full
-# procedure. (v1 declares no next_step_id, which terminates after the first step.)
+# procedure. (v1 now declares the same chain explicitly — see the V1 Procedure
+# Migration section of docs/architecture/SOP_ENGINE_V2_DESIGN.md.)
 #
 # The agent reasons and recommends; governance authorizes; ActionExecutor executes.
 # The agent NEVER directly mutates operational state.

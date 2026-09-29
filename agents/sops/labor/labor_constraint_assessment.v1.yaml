@@ -2,7 +2,7 @@
 # Phase 18H: Agent/SOP Foundation
 
 id: labor.labor_constraint_assessment
-version: "1.0"
+version: "1.1"
 agent: labor
 objective: >
   Determine whether labor is constraining an operational objective
@@ -31,35 +31,44 @@ allowed_capabilities:
 
 allowed_subagents: []
 
+# Steps are explicitly chained with next_step_id so the engine traverses the full
+# procedure. A step whose next_step_id is None terminates the procedure, so every
+# non-terminal step below names its successor and only return_assessment omits it.
 steps:
   - id: read_workers
     action: read_labor_state
+    next_step_id: read_tasks
     description: Read current worker states, roles, zones, and active task assignments.
 
   - id: read_tasks
     action: read_task_assignments
+    next_step_id: evaluate_imbalance
     description: Read relevant pending and in-progress wave tasks, including zone, priority, and deadline.
 
   - id: evaluate_imbalance
     action: evaluate_assignment_imbalance
+    next_step_id: identify_deficit
     description: >
       Identify workers with no current task (idle). Compare idle count vs pending task count.
       Flag zones with a deficit (more tasks than available workers).
 
   - id: identify_deficit
     action: identify_capacity_deficit
+    next_step_id: check_constraints
     description: >
       Quantify the capacity gap: how many pending tasks have no assigned worker?
       Which zones are most under-staffed relative to task load?
 
   - id: check_constraints
     action: check_worker_constraints
+    next_step_id: generate_interventions
     description: >
       Verify which idle workers can be assigned: skill match, zone compatibility,
       shift availability. Filter out workers who cannot legally take the task.
 
   - id: generate_interventions
     action: generate_labor_interventions
+    next_step_id: rank
     description: >
       Generate 1-3 feasible labor reallocation interventions. Each must:
       - identify a specific (task_id, worker_id) pair
@@ -69,12 +78,15 @@ steps:
 
   - id: rank
     action: rank_labor_interventions
+    next_step_id: return_assessment
     description: >
       Rank interventions by: carrier cutoff proximity, task priority, zone alignment.
       Select the highest-ranked intervention as the primary CandidateLaborAction.
 
+  # TERMINAL STEP — no next_step_id, so the procedure completes here.
   - id: return_assessment
     action: return_labor_assessment
+    next_step_id: null
     description: >
       Package and return LaborAssessment:
         - total_workers, idle_workers, active_workers

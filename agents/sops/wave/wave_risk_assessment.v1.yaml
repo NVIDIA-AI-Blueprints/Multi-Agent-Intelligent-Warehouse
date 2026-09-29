@@ -2,7 +2,7 @@
 # Phase 18H: Agent/SOP Foundation
 
 id: wave.wave_risk_assessment
-version: "1.0"
+version: "1.1"
 agent: wave
 objective: >
   Protect wave completion before carrier cutoff by identifying task sequencing
@@ -31,45 +31,56 @@ allowed_capabilities:
 
 allowed_subagents: []
 
+# Steps are explicitly chained with next_step_id so the engine traverses the full
+# procedure. A step whose next_step_id is None terminates the procedure, so every
+# non-terminal step below names its successor and only return_assessment omits it.
 steps:
   - id: read_wave_status
     action: read_wave_status
+    next_step_id: read_orders
     description: >
       Read current wave status: total_tasks, pending_count, in_progress_count,
       at_risk_count, risk_level, risk_score.
 
   - id: read_orders
     action: read_outstanding_orders
+    next_step_id: read_cutoff
     description: Read outstanding orders and pending wave tasks with zone, priority, deadline.
 
   - id: read_cutoff
     action: read_cutoff
+    next_step_id: critical_path
     description: >
       Identify the soonest carrier cutoff for at-risk tasks.
       Record time-to-cutoff.
 
   - id: critical_path
     action: calculate_critical_path
+    next_step_id: identify_at_risk
     description: >
       Calculate which pending tasks are on the critical path (earliest deadline,
       highest priority, blocking other tasks). Identify the top 3 at-risk tasks.
 
   - id: identify_at_risk
     action: identify_at_risk_tasks
+    next_step_id: evaluate_reprioritization
     description: >
       List tasks that cannot complete before cutoff at current completion rate.
       Quantify the risk gap.
 
   - id: evaluate_reprioritization
     action: generate_wave_options
+    next_step_id: return_assessment
     description: >
       Generate 1-3 wave reprioritization options. Each must:
       - identify which zone or wave_id to reprioritize
       - estimate impact on completion time
       - NOT generate a write action directly
 
+  # TERMINAL STEP — no next_step_id, so the procedure completes here.
   - id: return_assessment
     action: return_wave_assessment
+    next_step_id: null
     description: >
       Package and return WaveAssessment:
         - at_risk_task_count, pending_task_count

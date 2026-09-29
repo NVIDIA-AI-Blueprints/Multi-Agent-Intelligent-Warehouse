@@ -147,8 +147,10 @@ class SOPStep(BaseModel):
     next_step_id: str | None = Field(
         default=None,
         description=(
-            "Override: go to this step ID after this one. "
-            "If None, proceed to the next step in the sequence."
+            "The step ID to execute after this one. "
+            "None means this step is TERMINAL and the procedure completes here — "
+            "it does NOT fall through to the next step in the YAML list. "
+            "Every non-terminal step must name its successor explicitly."
         ),
     )
     on_failure_step_id: str | None = Field(
