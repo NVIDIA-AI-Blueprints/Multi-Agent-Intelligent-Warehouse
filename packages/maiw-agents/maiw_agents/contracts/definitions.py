@@ -142,7 +142,12 @@ LABOR_AGENT_DEFINITION = AgentDefinition(
         may_invoke_decision_engine=False,
     ),
     termination_policy=TerminationPolicy(
-        max_iterations=5,
+        # max_iterations is the SOP *step transition* budget: the deterministic
+        # runtime passes (max_iterations - state.iteration) to SOPEngine as
+        # max_transitions. labor.labor_constraint_assessment has 8 steps, so a
+        # budget of 5 would escalate the procedure at step 6 before it could
+        # return its assessment. 10 = 8 steps + headroom for on-failure branching.
+        max_iterations=10,
         stop_conditions=[
             TerminationCondition(condition_id="OBJECTIVE_MET", description="LaborAssessment produced."),
             TerminationCondition(condition_id="NO_SAFE_ACTION", description="No feasible reallocation found."),
@@ -196,7 +201,10 @@ WAVE_AGENT_DEFINITION = AgentDefinition(
         may_invoke_decision_engine=False,
     ),
     termination_policy=TerminationPolicy(
-        max_iterations=5,
+        # max_iterations is the SOP *step transition* budget — see LaborAgent above.
+        # wave.wave_risk_assessment has 7 steps, so a budget of 5 would escalate the
+        # procedure at step 6. 10 = 7 steps + headroom for on-failure branching.
+        max_iterations=10,
         stop_conditions=[
             TerminationCondition(condition_id="OBJECTIVE_MET", description="WaveAssessment produced."),
             TerminationCondition(condition_id="NO_SAFE_ACTION", description="No feasible reprioritization found."),
