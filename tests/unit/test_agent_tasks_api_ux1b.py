@@ -232,7 +232,9 @@ class TestSOPMetadataLoading:
         meta = _load_sop_metadata("operations_coordination.wave_risk_resolution")
         assert meta is not None
         assert meta["id"] == "operations_coordination.wave_risk_resolution"
-        assert meta["version"] == "1.0"
+        # The router surfaces whatever version the YAML declares; assert the 1.x
+        # line rather than a literal so SOP revisions do not break the router test.
+        assert meta["version"].startswith("1.")
         assert len(meta["steps"]) > 0
         # Verify step IDs match SOP YAML
         step_ids = [s["id"] for s in meta["steps"]]

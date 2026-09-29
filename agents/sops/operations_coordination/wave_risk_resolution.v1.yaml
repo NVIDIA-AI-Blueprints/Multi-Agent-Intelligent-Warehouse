@@ -8,7 +8,7 @@
 # The agent NEVER directly mutates operational state.
 
 id: operations_coordination.wave_risk_resolution
-version: "1.0"
+version: "1.1"
 agent: operations_coordination
 runtime_profile: adaptive
 objective: >
@@ -50,15 +50,20 @@ allowed_subagents:
   - wave
   - equipment
 
+# Steps are explicitly chained with next_step_id so the engine traverses the full
+# procedure. A step whose next_step_id is None terminates the procedure, so every
+# non-terminal step below names its successor and only `observe` omits it.
 steps:
   - id: establish_state
     action: gather_operational_context
+    next_step_id: diagnose
     description: >
       Assemble a fresh OperationalContextSnapshot from the sealed WarehouseStateSnapshot.
       This is the ONLY source of truth for this task execution.
 
   - id: diagnose
     action: determine_primary_constraint
+    next_step_id: gather_specialist_evidence
     description: >
       Determine whether the primary constraint is:
       (a) labor: insufficient idle workers to cover pending tasks, or
@@ -68,6 +73,7 @@ steps:
 
   - id: gather_specialist_evidence
     action: consult_required_domains
+    next_step_id: generate_candidates
     description: >
       Based on primary constraint, delegate bounded question to specialist agent(s).
       If labor constraint: delegate to LaborAgent (labor_constraint_assessment SOP).
@@ -80,6 +86,7 @@ steps:
 
   - id: generate_candidates
     action: produce_candidate_interventions
+    next_step_id: compare
     description: >
       Integrate specialist assessments. Generate 1-3 candidate interventions
       from specialist candidate_actions. Each candidate must:
@@ -89,12 +96,14 @@ steps:
 
   - id: compare
     action: compare_candidates
+    next_step_id: recommend
     description: >
       Compare candidates by: urgency, operational impact, risk, reversibility.
       Select the highest-impact, lowest-risk action as the primary recommendation.
 
   - id: recommend
     action: select_recommendation
+    next_step_id: submit
     description: >
       Select the top recommendation. Emit a RecommendedAction with:
       domain, capability, target, objective, rationale, priority, subtype.
@@ -102,12 +111,20 @@ steps:
 
   - id: submit
     action: emit_recommended_action
+    next_step_id: observe
     description: >
       Transition to WAITING_FOR_GOVERNANCE.
       The RecommendedAction flows to GovernedActionOrchestrator via CopilotService.
 
+  # TERMINAL STEP — no next_step_id, so the procedure completes here.
+  # The description below says "continue SOP from diagnose" when the objective is
+  # not yet met. That re-entry is caller-driven: the caller starts a new procedure
+  # run. It is deliberately NOT modelled as `next_step_id: diagnose`, because
+  # validate_sop() Rule 8 rejects next_step_id cycles. This matches the terminal
+  # semantics already established by wave_risk_resolution.v2.yaml.
   - id: observe
     action: evaluate_post_execution_state
+    next_step_id: null
     description: >
       After governance result is returned (GovernanceOutcome injected):
       Read the resulting WarehouseStateSnapshot. Compare wave state before and after.
