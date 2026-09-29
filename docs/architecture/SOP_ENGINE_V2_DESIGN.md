@@ -1617,6 +1617,147 @@ M. Proof SOP C (inventory_exception_resolution — new, with SCHEMA validator + 
 
 ---
 
+## V1 Procedure Migration
+
+**IMPLEMENTED** — branch `feat/sop-v1-procedure-migration`, based on `380ccf2` (PR #123).
+
+### Problem
+
+`SOPEngine._advance()` treats `next_step_id is None` as **terminal**:
+
+```python
+return proc_state.model_copy(update={
+    "current_step_id": step.next_step_id,   # None → loop exits → COMPLETED
+    ...
+})
+```
+
+It does *not* fall through to the next step in the YAML list. The three V1 YAML
+SOPs declared no `next_step_id` on any step, so each one executed **exactly one
+step** and then reported `COMPLETED`. The procedure graphs existed only in the
+step descriptions, never in the data the engine reads.
+
+This was silent: the runs did not fail, they returned a successful-looking
+single-step result. `SOPStep.next_step_id`'s own field description compounded
+the problem by claiming "If None, proceed to the next step in the sequence" —
+the opposite of the engine's actual rule. That description has been corrected.
+
+### Migration table
+
+| SOP | Old effective traversal | New traversal | Version |
+|---|---|---|---|
+| `labor.labor_constraint_assessment` | 1 of 8 (`read_workers`) | 8 of 8 | 1.0 → 1.1 |
+| `wave.wave_risk_assessment` | 1 of 7 (`read_wave_status`) | 7 of 7 | 1.0 → 1.1 |
+| `operations_coordination.wave_risk_resolution` | 1 of 8 (`establish_state`) | 8 of 8 | 1.0 → 1.1 |
+| `operations_coordination.wave_risk_resolution_v2` | 8 of 8 (already chained) | unchanged | 2.0 |
+
+Resulting chains:
+
+```
+labor.labor_constraint_assessment
+  read_workers → read_tasks → evaluate_imbalance → identify_deficit
+  → check_constraints → generate_interventions → rank → return_assessment (TERMINAL)
+
+wave.wave_risk_assessment
+  read_wave_status → read_orders → read_cutoff → critical_path
+  → identify_at_risk → evaluate_reprioritization → return_assessment (TERMINAL)
+
+operations_coordination.wave_risk_resolution
+  establish_state → diagnose → gather_specialist_evidence → generate_candidates
+  → compare → recommend → submit → observe (TERMINAL)
+```
+
+Each chain is the YAML list order, confirmed step-by-step against data
+dependencies (each step's declared output is the next step's declared input) and
+against the SOP objective — not assumed from list order. The
+`wave_risk_resolution` chain is identical to the already-proven
+`wave_risk_resolution.v2.yaml` chain.
+
+### Rules applied
+
+1. **Explicit sequencing** — every non-terminal step names its successor via
+   `next_step_id`. No step relies on list position.
+2. **Terminal semantics** — exactly one terminal step per SOP, written as an
+   explicit `next_step_id: null` plus a `# TERMINAL STEP` comment, so the
+   terminal is a stated intent rather than an omission.
+3. **Version increment** — traversal semantics changed, so each migrated SOP
+   moved 1.0 → 1.1. Per Section 42 this is a *minor* bump: the step set,
+   objective, and completion criteria are unchanged; only the declared
+   navigation between existing steps became explicit.
+4. **Nothing else changed** — action, description, delegate_to, skill_id,
+   condition, stop_conditions, allowed_capabilities, allowed_subagents,
+   escalation, runtime_profile, triggers, and required_context are untouched.
+
+`next_step_id` is a **V1** navigation field, so the migrated SOPs remain pure V1
+artifacts: they still declare none of the V2 step fields (`completion`,
+`retry_policy`, `timeout_seconds`, `required_inputs`, `evidence_requirements`).
+
+### No re-entry cycles
+
+`wave_risk_resolution`'s `observe` step is described as "continue SOP from
+diagnose" when the objective is not met. That re-entry is **caller-driven** — the
+caller starts a new procedure run. It is deliberately *not* modelled as
+`next_step_id: diagnose`, because `validate_sop()` Rule 8 statically rejects
+`next_step_id` cycles. This follows the terminal semantics already established by
+`wave_risk_resolution.v2.yaml`.
+
+### Iteration-policy resolution
+
+`TerminationPolicy.max_iterations` is the SOP **step-transition budget**, not a
+separate reasoning-loop budget. Both runtimes compute it identically:
+
+```python
+remaining_budget = max(max_iterations - state.iteration, 0)
+engine = SOPEngine(..., max_transitions=remaining_budget)
+```
+
+`SOPEngine.run_procedure()` increments one transition per step (including
+condition-skipped steps) and escalates with `POLICY_CONFLICT` once the budget is
+exceeded. A budget below a SOP's step count therefore escalates a perfectly valid
+procedure before it can finish.
+
+Once the chains became explicit, two budgets were too small:
+
+| Agent | SOP steps | Old `max_iterations` | New | Status |
+|---|---|---|---|---|
+| `labor` | 8 | 5 | **10** | was blocked at step 6 |
+| `wave` | 7 | 5 | **10** | was blocked at step 6 |
+| `operations_coordination` | 8 | 10 | 10 | already sufficient |
+
+The limit was raised rather than decoupled: `max_iterations` is documented and
+used as a step bound, and it remains the only guard against `on_failure_step_id`
+ping-pong loops, which `validate_sop()`'s static cycle check cannot see. `10`
+gives each SOP its step count plus headroom for on-failure branching. The
+runaway-loop guard is covered by a dedicated regression test.
+
+This budget is runtime-neutral: `MAIWDeterministicRuntime` and `DeepAgentsRuntime`
+derive `max_transitions` from the same expression, so both were affected and both
+are fixed by the same change.
+
+### Cross-runtime equivalence
+
+Step progression is owned solely by `SOPEngine`. `SOPStepExecutor` implementations
+"never decide the next step" (see `sop_engine/executor.py`), so the deterministic
+and Deep Agents runtimes traverse the identical chain and neither can skip,
+reorder, or shorten a procedure. Making the chains explicit strengthens this: the
+graph is now in the SOP data both runtimes read, not in either runtime.
+
+### Tests
+
+`tests/unit/test_sop_v1_procedure_migration.py` — 51 tests. Per migrated SOP:
+loads, validates, every non-terminal step has an explicit successor, all
+successors resolve, exactly one terminal, traversal matches the intended chain,
+traversal reaches every defined step, no cycles, no orphans, engine completes
+every step. Plus: budget-covers-step-count for all three agents, explicit 8-step
+labor and 7-step wave completion runs, runaway-loop escalation, no write
+capabilities added, still-pure-V1, and versions incremented.
+
+One test guards the premise itself: stripping `next_step_id` reproduces the old
+single-step behaviour, so if the engine's terminal rule ever changes, the
+migration's rationale is re-examined rather than silently invalidated.
+
+---
+
 ## Appendix: Current Package Structure Snapshot
 
 ```
@@ -1642,7 +1783,11 @@ packages/maiw-agents/
     └── assessment.py        Assessment base types
 
 agents/sops/
-├── operations_coordination/wave_risk_resolution.v1.yaml  (runtime_profile: adaptive, 8 steps)
-├── labor/labor_constraint_assessment.v1.yaml              (runtime_profile: strict, 8 steps)
-└── wave/wave_risk_assessment.v1.yaml                      (runtime_profile: strict, 7 steps)
+├── operations_coordination/wave_risk_resolution.v1.yaml  (runtime_profile: adaptive, 8 steps, v1.1)
+├── operations_coordination/wave_risk_resolution.v2.yaml  (runtime_profile: adaptive, 8 steps, v2.0 — Proof SOP A)
+├── labor/labor_constraint_assessment.v1.yaml              (runtime_profile: strict, 8 steps, v1.1)
+└── wave/wave_risk_assessment.v1.yaml                      (runtime_profile: strict, 7 steps, v1.1)
+
+All four declare explicit next_step_id chains and a single terminal step.
+See "V1 Procedure Migration" above.
 ```
