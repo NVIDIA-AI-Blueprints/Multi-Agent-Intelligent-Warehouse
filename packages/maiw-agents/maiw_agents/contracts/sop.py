@@ -114,6 +114,16 @@ StepActionType = Literal[
     "identify_at_risk_tasks",
     "generate_wave_options",
     "return_wave_assessment",
+    # Equipment domain (Proof SOP B — equipment failure / recovery). Additive,
+    # mirroring the labor and wave domain blocks above. None of these are write
+    # actions: they read equipment state, assess impact, and select a strategy.
+    # The mutation itself is never an SOP action — it is performed by
+    # ActionExecutor outside the agent package after governance approves.
+    "read_equipment_state",
+    "assess_equipment_impact",
+    "inspect_alternate_equipment",
+    "determine_recovery_strategy",
+    "verify_equipment_recovery",
     "no_op",
 ]
 

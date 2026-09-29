@@ -1,0 +1,369 @@
+# MAIW SOP: Equipment — Failure / Recovery (v1)
+# SOP Engine V2 — Proof SOP B
+#
+# The one thing this procedure exists to prove:
+#
+#   Equipment recovery is complete only when the physical/operational state
+#   proves the recovery — not when the agent, MCP server, or executor says
+#   it succeeded.
+#
+# Three consequences of that, visible in the step list below:
+#
+#   1. The three decisive steps (wait_for_governance, verify_execution,
+#      verify_recovery) all complete via STATE_PREDICATE. None of them can be
+#      satisfied by an HTTP 200, an executor return string, a governance
+#      APPROVED, or a model's opinion.
+#   2. The predicates get *stronger* as the procedure advances:
+#        equipment_write_landed         — did the mutation reach the warehouse?
+#        equipment_replacement_assigned — was it the transition we intended?
+#        equipment_recovery_complete    — is the warehouse objective restored?
+#      Passing the first two and failing the third is a real outcome: execution
+#      succeeded, recovery did not, and the procedure does NOT complete.
+#   3. Ambiguity is resolved by re-reading, never by re-writing. No step in this
+#      SOP retries a write; the retry budgets below cover only safe re-reads.
+#
+# Authority boundary, restated because it is the point:
+#   The agent assesses and recommends. Governance authorizes. ActionExecutor —
+#   which lives outside this package, in apps/api/maiw_api/routers/equipment.py —
+#   performs the mutation. This SOP cannot even *name* the write capability:
+#   validate_sop() rejects `warehouse.equipment.assign` in allowed_capabilities,
+#   so the list below contains only READ and non-assign PROPOSAL capabilities.
+#
+# Human-readable companion: docs/sops/EQUIPMENT_FAILURE_RECOVERY.md
+# (same id, same version).
+
+id: equipment.equipment_failure_recovery
+version: "1.0"
+agent: equipment
+runtime_profile: adaptive
+objective: >
+  Restore the operational capability lost when a critical equipment asset
+  becomes unavailable, by the least disruptive means available, and confirm
+  from authoritative warehouse state that the capability is genuinely restored
+  before declaring the procedure complete.
+
+description: >
+  Governed equipment failure/recovery procedure. Detects an asset that has left
+  service, assesses what that costs the operation, looks for a usable
+  alternative, selects a recovery strategy, and emits a single RecommendedAction
+  for governance. After governance and execution, completion is decided
+  exclusively by re-reading authoritative equipment state.
+
+triggers:
+  - equipment_constraint_detected
+  - delegated_by_oca
+
+required_context:
+  - equipment
+
+# Only READ and non-assign PROPOSAL capabilities. `warehouse.equipment.assign`
+# is deliberately absent: it is a PROPOSAL capability whose id matches
+# validate_sop()'s write-capability pattern, so an SOP is structurally incapable
+# of declaring it. The assignment reaches the warehouse only via
+# RecommendedAction -> ActionProposal -> DecisionEngine -> ActionExecutor.
+allowed_capabilities:
+  - warehouse.equipment.status
+  - warehouse.equipment.telemetry
+  - warehouse.equipment.release
+  - warehouse.equipment.schedule_maintenance
+
+allowed_subagents: []
+
+steps:
+  # ── 1. What failed? ─────────────────────────────────────────────────────────
+  - id: detect_failure
+    action: read_equipment_state
+    next_step_id: assess_operational_impact
+    objective: >
+      Establish from authoritative equipment state that a specific asset is no
+      longer in service, and name it.
+    description: >
+      Read equipment status via warehouse.equipment.status. The step completes
+      only if the capability actually returned a result naming the failed asset
+      and its current status — an empty or partial read is not a detection.
+    required_inputs:
+      - failed_asset_id
+    expected_output:
+      warehouse.equipment.status: object
+    completion:
+      validator_type: capability_result
+      required_capability_result: warehouse.equipment.status
+      required_result_fields:
+        - failed_asset_id
+        - failed_asset_status
+        - zone
+    retry_policy:
+      max_attempts: 3
+      retry_on:
+        - CAPABILITY_UNAVAILABLE
+        - VALIDATION_FAILED
+      backoff_seconds: 0.0
+      escalate_on_exhaustion: true
+    timeout_seconds: 30.0
+    evidence_requirements:
+      - equipment_state_snapshot
+    escalation_reason: >
+      Could not read authoritative equipment state — refusing to reason about a
+      failure we cannot observe.
+
+  # ── 2. What does it cost us? ────────────────────────────────────────────────
+  - id: assess_operational_impact
+    action: assess_equipment_impact
+    next_step_id: inspect_alternatives
+    objective: Quantify the operational consequence of losing this asset.
+    description: >
+      Determine which operation the failed asset was serving, how severe the
+      loss is, and on what evidence. Severity drives whether a recovery is worth
+      the disruption it causes.
+    expected_output:
+      affected_asset: string
+      affected_operation: string
+      severity: "one of: critical | high | medium | low"
+      evidence: array
+    completion:
+      validator_type: schema
+      schema_fields:
+        - affected_asset
+        - affected_operation
+        - severity
+        - evidence
+    retry_policy:
+      max_attempts: 2
+      backoff_seconds: 0.0
+    timeout_seconds: 30.0
+    evidence_requirements:
+      - impact_assessment
+    escalation_reason: >
+      Operational impact could not be characterised — escalating rather than
+      recommending a change whose value is unknown.
+
+  # ── 3. Is there anything else we can use? ───────────────────────────────────
+  - id: inspect_alternatives
+    action: inspect_alternate_equipment
+    next_step_id: determine_recovery_strategy
+    objective: Find a usable replacement asset, or establish that none exists.
+    description: >
+      Query equipment status for candidate assets of the same type that are
+      available and in a usable zone. "No alternative exists" is a legitimate
+      and important result: it is reported as CAPABILITY_UNAVAILABLE and ends
+      the procedure in escalation rather than inventing a recovery.
+    completion:
+      validator_type: capability_result
+      required_capability_result: warehouse.equipment.status
+      required_result_fields:
+        - candidate_count
+        - alternate_asset_id
+    retry_policy:
+      max_attempts: 3
+      retry_on:
+        - CAPABILITY_UNAVAILABLE
+        - VALIDATION_FAILED
+      backoff_seconds: 0.0
+      escalate_on_exhaustion: true
+    timeout_seconds: 30.0
+    evidence_requirements:
+      - alternate_equipment_result
+    escalation_reason: >
+      No alternate equipment is available to recover this capability — human
+      dispatch required.
+
+  # ── 4. What is the least disruptive thing to do? ────────────────────────────
+  - id: determine_recovery_strategy
+    action: determine_recovery_strategy
+    next_step_id: produce_recommendation
+    objective: Select one recovery strategy and justify it.
+    description: >
+      Choose among the strategies the current code actually supports:
+      reassign_alternate (propose assigning the replacement asset),
+      release_failed_asset, schedule_maintenance, defer, or escalate_to_human.
+      The choice is structured output, not a hardcoded method per strategy.
+    expected_output:
+      strategy: "one of: reassign_alternate | release_failed_asset | schedule_maintenance | defer | escalate_to_human"
+      replacement_asset_id: string
+      rationale: string
+    completion:
+      validator_type: schema
+      schema_fields:
+        - strategy
+        - replacement_asset_id
+        - rationale
+    retry_policy:
+      max_attempts: 2
+      backoff_seconds: 0.0
+    timeout_seconds: 30.0
+    evidence_requirements:
+      - strategy_selection
+    escalation_reason: >
+      No recovery strategy could be selected from the available options.
+
+  # ── 5. Say exactly what should happen — and nothing more. ───────────────────
+  - id: produce_recommendation
+    action: select_recommendation
+    next_step_id: wait_for_governance
+    objective: Emit a single, well-formed RecommendedAction.
+    description: >
+      Produce a RecommendedAction carrying domain, capability, target, objective,
+      rationale and priority. It states semantic intent only — it does not carry
+      MCP parameters, and producing it changes nothing in the warehouse.
+    expected_output:
+      recommendation_id: string
+      domain: string
+      capability: string
+      target: string
+      rationale: string
+      priority: "one of: critical | high | medium | low"
+    completion:
+      validator_type: schema
+      schema_fields:
+        - recommendation_id
+        - domain
+        - capability
+        - target
+        - rationale
+        - priority
+    retry_policy:
+      max_attempts: 2
+      backoff_seconds: 0.0
+    timeout_seconds: 30.0
+    evidence_requirements:
+      - recommended_action
+    escalation_reason: >
+      Could not produce a well-formed RecommendedAction for governance.
+
+  # ── 6. Stop. Hand over. ─────────────────────────────────────────────────────
+  # The SOP Engine HALTS here with ProcedureStatus.WAITING_FOR_GOVERNANCE and
+  # executes nothing further until resume_after_governance() is called. The
+  # RecommendedAction flows to ActionProposal -> DecisionEngine -> human approval
+  # (ActionProposal.for_equipment_assign sets requires_approval=True) ->
+  # ActionExecutor. None of that happens inside this package.
+  #
+  # This step's completion criterion is evaluated ONLY on resume, because the
+  # governance-resume seam is the first moment post-write authoritative state
+  # exists. It asks the weakest honest question — did the write land at all? —
+  # since that is exactly the question that separates "the write was lost" from
+  # "the write landed but the response was unreadable". An ambiguous executor
+  # outcome is settled here by reading, and the engine escalates
+  # EXECUTION_INDETERMINATE rather than ever re-issuing the write.
+  #
+  # Deliberately no retry_policy: resume must not re-execute this step.
+  - id: wait_for_governance
+    action: emit_recommended_action
+    next_step_id: verify_execution
+    objective: >
+      Hand the recommendation to governance and resume only once authoritative
+      state shows the approved mutation reached the warehouse.
+    description: >
+      Transition to WAITING_FOR_GOVERNANCE. On resume, re-read authoritative
+      equipment state and confirm the replacement asset has left the available
+      pool. Governance returning APPROVED is not sufficient; an executor
+      reporting success is not sufficient.
+    completion:
+      validator_type: state_predicate
+      predicate_name: equipment_write_landed
+      predicate_args:
+        replacement_asset_id: FL-204
+    evidence_requirements:
+      - governance_outcome_ref
+      - post_write_equipment_state
+    escalation_reason: >
+      Authoritative equipment state does not show the approved assignment
+      reaching the warehouse — escalating without retrying the write.
+
+  # ── 7. Was it the transition we asked for? ──────────────────────────────────
+  - id: verify_execution
+    action: evaluate_post_execution_state
+    next_step_id: verify_recovery
+    objective: >
+      Confirm the replacement asset is in the exact state the recommendation
+      intended, not merely in some changed state.
+    description: >
+      Re-read authoritative equipment state and require the replacement asset to
+      be 'assigned'. An asset that moved to 'maintenance' or 'offline' also left
+      the available pool, and that is not the transition we asked for.
+      The retry budget here re-reads state; it never re-issues a write.
+    completion:
+      validator_type: state_predicate
+      predicate_name: equipment_replacement_assigned
+      predicate_args:
+        replacement_asset_id: FL-204
+        expected_status: assigned
+    retry_policy:
+      max_attempts: 3
+      retry_on:
+        - VALIDATION_FAILED
+      backoff_seconds: 0.0
+      escalate_on_exhaustion: true
+    timeout_seconds: 30.0
+    evidence_requirements:
+      - post_write_equipment_state
+    escalation_reason: >
+      The replacement asset is not in the intended 'assigned' state — the
+      execution did not produce the transition the recommendation specified.
+
+  # ── 8. Is the warehouse actually recovered? (TERMINAL) ──────────────────────
+  # The distinction this step exists to draw: execution succeeding is not
+  # recovery succeeding. verify_execution can pass and this step still fail —
+  # and when it does, the procedure does NOT complete.
+  - id: verify_recovery
+    action: verify_equipment_recovery
+    next_step_id: null
+    objective: Prove the lost operational capability is genuinely restored.
+    description: >
+      The operational post-condition, all parts of which must hold together:
+      the replacement asset is assigned, it is in the zone that lost capacity,
+      and the failed asset has not silently returned to service. Only then is
+      the procedure complete.
+    completion:
+      validator_type: state_predicate
+      predicate_name: equipment_recovery_complete
+      predicate_args:
+        replacement_asset_id: FL-204
+        failed_asset_id: FL-101
+        expected_status: assigned
+        expected_zone: ZONE-A
+    retry_policy:
+      max_attempts: 3
+      retry_on:
+        - VALIDATION_FAILED
+      backoff_seconds: 0.0
+      escalate_on_exhaustion: true
+    timeout_seconds: 30.0
+    evidence_requirements:
+      - recovery_validation_result
+    escalation_reason: >
+      Execution was confirmed but the operational objective is not restored —
+      human review required before any further automated action.
+
+escalation:
+  - rule_id: no_alternate_equipment
+    trigger: No alternate asset of the required type is available to recover the capability.
+    escalation_message: No alternate equipment available — human dispatch required.
+
+  - rule_id: governance_rejected
+    trigger: Governance rejected or did not approve the recommended assignment.
+    escalation_message: >
+      Recommended recovery was not approved — no write was attempted and the
+      capability remains degraded.
+
+  - rule_id: execution_indeterminate
+    trigger: The executor outcome is ambiguous and authoritative state does not settle it.
+    escalation_message: >
+      Cannot determine whether the assignment took effect — escalating without
+      retrying the write.
+
+  - rule_id: recovery_not_confirmed
+    trigger: Execution confirmed but the operational post-condition does not hold.
+    escalation_message: >
+      Equipment was assigned but the operational objective is not restored —
+      human review required.
+
+  - rule_id: equipment_state_unreadable
+    trigger: Authoritative equipment state could not be read within the retry budget.
+    escalation_message: Equipment state unavailable — cannot verify recovery.
+
+stop_conditions:
+  - objective_met
+  - no_safe_action
+  - human_intervention_required
+  - max_iterations_reached
+  - insufficient_context
