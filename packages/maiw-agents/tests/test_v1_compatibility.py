@@ -95,8 +95,9 @@ async def test_v1_steps_complete_via_legacy_success(v1_sop, definition, context)
 async def test_v1_traversal_matches_pre_v2_next_step_semantics(v1_sop, definition, context):
     """
     Pre-V2, MAIWDeterministicRuntime advanced via `current_step_id = step.next_step_id`
-    and terminated on None. The engine must reproduce that traversal exactly for
-    v1 SOPs (none of which declare next_step_id).
+    and terminated on None. The engine must reproduce that traversal exactly — the
+    expected chain is derived from the SOP itself, so this holds both before and
+    after the V1 procedure migration made the next_step_id chains explicit.
     """
     expected: list[str] = []
     by_id = {s.id: s for s in v1_sop.steps}
@@ -145,7 +146,13 @@ def test_v2_proof_sop_loads(sop_dir):
 
 
 def test_v1_and_v2_are_distinct_artifacts(sop_dir):
-    """The v1 file must remain untouched alongside the v2 re-authoring."""
+    """
+    The v1 file remains a separate, pure-V1 artifact alongside the v2 re-authoring.
+
+    v1 is on the 1.x line and declares none of the V2 step fields; v2 is 2.0 and
+    does. The V1 procedure migration moved v1 from 1.0 to 1.1 (explicit
+    next_step_id chain, a V1 navigation field) — that does not make it a V2 SOP.
+    """
     v1 = load_sop(sop_dir / "operations_coordination" / "wave_risk_resolution.v1.yaml")
     v2_path = sop_dir / "operations_coordination" / "wave_risk_resolution.v2.yaml"
     if not v2_path.exists():
@@ -153,6 +160,7 @@ def test_v1_and_v2_are_distinct_artifacts(sop_dir):
     v2 = load_sop(v2_path)
 
     assert v1.id != v2.id
-    assert v1.version == "1.0"
+    assert v1.version.startswith("1.")
+    assert v2.version.startswith("2.")
     assert all(s.completion is None for s in v1.steps)
     assert any(s.completion is not None for s in v2.steps)

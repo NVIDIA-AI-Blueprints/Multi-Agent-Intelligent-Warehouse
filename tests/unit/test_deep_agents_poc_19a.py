@@ -512,7 +512,9 @@ async def test_sop_id_and_version_preserved_in_result():
     result = await runtime.run_task(definition, sop, state, context)
 
     assert result.sop_id == "operations_coordination.wave_risk_resolution"
-    assert result.sop_version == "1.0"
+    # Identity is *preserved*, so compare against the loaded SOP rather than a
+    # literal — the version moves whenever the SOP is revised.
+    assert result.sop_version == sop.version
 
 
 @pytest.mark.asyncio
