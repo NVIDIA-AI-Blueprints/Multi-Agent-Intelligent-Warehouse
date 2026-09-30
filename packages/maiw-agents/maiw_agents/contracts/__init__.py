@@ -52,6 +52,7 @@ from .sop_v2 import (
     EscalationReasonCode,
     StepCompletionSpec,
     RetryPolicy,
+    LoopPolicy,
 )
 # SOP Engine V2 step result. Exported under explicit V2 names here because
 # contracts/task.py already owns the Phase 18H `StepResult`/`StepStatus` names.
@@ -89,6 +90,7 @@ from .definitions import (
     LABOR_AGENT_DEFINITION,
     WAVE_AGENT_DEFINITION,
     EQUIPMENT_AGENT_DEFINITION,
+    INVENTORY_AGENT_DEFINITION,
     SAFETY_COMPLIANCE_DEFINITION,
     get_agent_definition,
 )
@@ -121,6 +123,7 @@ __all__ = [
     "EscalationReasonCode",
     "StepCompletionSpec",
     "RetryPolicy",
+    "LoopPolicy",
     "StepResultV2",
     "StepStatusV2",
     "EvidenceRef",
@@ -147,6 +150,7 @@ __all__ = [
     "LABOR_AGENT_DEFINITION",
     "WAVE_AGENT_DEFINITION",
     "EQUIPMENT_AGENT_DEFINITION",
+    "INVENTORY_AGENT_DEFINITION",
     "SAFETY_COMPLIANCE_DEFINITION",
     "get_agent_definition",
 ]

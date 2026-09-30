@@ -75,6 +75,14 @@ class EscalationReasonCode(str, Enum):
     EXECUTION_INDETERMINATE = "execution_indeterminate"
     RETRY_BUDGET_EXHAUSTED = "retry_budget_exhausted"
     UNSUPPORTED_VALIDATOR = "unsupported_validator"
+    UNSUPPORTED_STRATEGY = "unsupported_strategy"
+    """No configured operational strategy can address the situation."""
+
+    LOOP_BUDGET_EXHAUSTED = "loop_budget_exhausted"
+    """A bounded reassessment loop ran its full budget without the declared
+    completion criterion ever holding. Distinct from RETRY_BUDGET_EXHAUSTED,
+    which means a *single* step attempt kept failing: here every attempt ran
+    cleanly and the world simply never reached the required state."""
 
 
 # ── Step completion specification ─────────────────────────────────────────────
@@ -174,9 +182,90 @@ class RetryPolicy(BaseModel):
         return self
 
 
+# ── Loop policy ───────────────────────────────────────────────────────────────
+
+class LoopPolicy(BaseModel):
+    """
+    Bounded, validator-driven repetition of ONE SOP step.
+
+    This is deliberately the smallest loop construct that is still useful. It is
+    not a control-flow DSL: there is no expression language, no ``while``, no
+    ``foreach``, no counter arithmetic and no way for a SOP author (or a model)
+    to write a condition. The only question asked at the end of each iteration
+    is the one the step already declares in its ``completion`` spec, answered by
+    a registered validator against authoritative state.
+
+    The invariant this exists to enforce:
+
+        The SOP Engine controls the loop. The model may provide evidence, but
+        it cannot decide that the loop is finished.
+
+    A model returning ``status=COMPLETED`` does not exit the loop — the
+    validator's verdict does. A model returning ``status=FAILED`` does not
+    extend the loop — if the validator says the criterion holds, the loop exits
+    anyway. Neither runtime is ever asked "should we go round again?".
+
+    Loop body
+        The loop body is the step itself. There is no multi-step loop: a
+        back-edge spanning several steps would make it possible to re-enter a
+        governed write, which is exactly the failure mode the no-blind-retry
+        rule exists to prevent. See ``SOPStep`` for the validators that refuse
+        a loop on a write/governance step.
+
+    Bounds
+        Every loop is bounded twice over — by ``max_iterations`` (a count) and
+        optionally by ``max_total_seconds`` (wall clock across all iterations).
+        Neither bound is model-supplied.
+
+    Counter
+        The authoritative iteration counter is
+        ``ProcedureExecutionState.attempt_by_step[step_id]``, which the engine
+        already maintains per step attempt. A loop step may not also declare a
+        ``retry_policy`` precisely so that "attempts" and "iterations" stay the
+        same number — two repetition budgets on one step is the conflation this
+        contract exists to avoid.
+    """
+
+    max_iterations: int = Field(
+        ge=1,
+        le=20,
+        default=3,
+        description=(
+            "Maximum number of times this step may run. The engine stops at this "
+            "bound regardless of what any runtime or model reports."
+        ),
+    )
+    exit_step_id: str | None = Field(
+        default=None,
+        description=(
+            "Step to proceed to when the completion criterion holds. "
+            "None means fall through to the step's own next_step_id."
+        ),
+    )
+    exhaustion_step_id: str | None = Field(
+        default=None,
+        description=(
+            "Step to proceed to when the budget is exhausted — typically a "
+            "structured human-escalation step. None means escalate the procedure "
+            "immediately. Either way the procedure terminates as ESCALATED: "
+            "reaching this branch is never a success."
+        ),
+    )
+    max_total_seconds: float | None = Field(
+        default=None,
+        gt=0.0,
+        le=3600.0,
+        description=(
+            "Wall-clock budget measured from the first entry into the loop step, "
+            "across all iterations. None means only max_iterations bounds the loop."
+        ),
+    )
+
+
 __all__ = [
     "ValidatorType",
     "EscalationReasonCode",
     "StepCompletionSpec",
     "RetryPolicy",
+    "LoopPolicy",
 ]

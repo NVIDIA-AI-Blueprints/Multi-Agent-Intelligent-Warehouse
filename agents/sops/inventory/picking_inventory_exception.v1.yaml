@@ -1,0 +1,479 @@
+# MAIW SOP: Inventory — Picking / Inventory Exception (v1)
+# SOP Engine V2 — Proof SOP C
+#
+# The one thing this procedure exists to prove:
+#
+#   The SOP Engine controls the loop. The model may provide evidence, but it
+#   cannot decide that the loop is finished.
+#
+# Four consequences of that, visible in the step list below:
+#
+#   1. Exactly one step loops — reassess_inventory_state — and it loops on
+#      itself, bounded twice over (max_iterations AND max_total_seconds). The
+#      loop body is a re-read of authoritative state and nothing else.
+#   2. The loop's exit criterion is a registered STATE_PREDICATE
+#      (inventory_exception_resolved). A runtime reporting COMPLETED does not
+#      exit the loop; a runtime reporting FAILED does not extend it. The
+#      validator's verdict decides, and no runtime is ever asked to choose.
+#   3. Loop exhaustion is not a failure to be retried harder — it is a handoff.
+#      The budget running out routes to escalate_to_human, and the procedure
+#      terminates ESCALATED even though that step itself runs cleanly. An
+#      unresolved exception can never end as COMPLETED.
+#   4. The write happens ONCE, outside the loop, before it. propose_resolution
+#      has no retry_policy and structurally cannot have a loop — the SOPStep
+#      contract rejects a loop on a governed write action. The loop that follows
+#      re-reads; it can never re-write, however many times it runs.
+#
+# Facility strategy variation:
+#   The same procedure behaves differently in a zone-picking facility and a
+#   discrete-picking facility, without a separate agent method per strategy.
+#   inspect_alternate_locations carries a declarative StepCondition on
+#   `facility_picking_strategy`, a deterministic operational configuration value
+#   supplied in bounded context. Under `zone` the cross-location search runs;
+#   under `discrete` the engine skips it. The model never selects the strategy
+#   and never sees a choice — it is told which facility it is in.
+#
+# Authority boundary, restated because it is the point:
+#   The agent assesses and recommends. Governance authorizes. ActionExecutor —
+#   which lives outside this package — performs the mutation. This SOP cannot
+#   even *name* the write capability: validate_sop() rejects
+#   `warehouse.inventory.adjust` in allowed_capabilities, so the list below
+#   contains only READ, ANALYTICAL and non-adjust PROPOSAL capabilities.
+#
+# Human-readable companion: docs/sops/PICKING_INVENTORY_EXCEPTION.md
+# (same id, same version).
+
+id: inventory.picking_inventory_exception
+version: "1.0"
+agent: inventory
+runtime_profile: strict
+objective: >
+  Resolve a picking exception — a SKU that cannot satisfy the quantity a pick
+  requires — by the least disruptive means the facility's configured picking
+  strategy allows, and confirm from authoritative inventory state that the pick
+  can genuinely resume before declaring the procedure complete. Where the
+  exception does not clear within a bounded reassessment budget, hand control to
+  a human rather than continuing to look.
+
+description: >
+  Governed picking/inventory exception procedure. Detects a SKU whose available
+  quantity cannot satisfy a pick, classifies the exception, selects the
+  replenishment approach permitted by the facility's picking strategy, and emits
+  a single RecommendedAction for governance. After governance and execution,
+  resolution is decided exclusively by re-reading authoritative inventory state,
+  a bounded number of times, under the SOP Engine's control.
+
+triggers:
+  - inventory_exception_detected
+  - delegated_by_oca
+
+required_context:
+  - inventory
+
+allowed_capabilities:
+  - warehouse.inventory.lookup
+  - warehouse.inventory.locate
+  - warehouse.inventory.evaluate_replenishment
+  - warehouse.inventory.replenish
+
+allowed_subagents: []
+
+steps:
+  # ── 1. What is short? ───────────────────────────────────────────────────────
+  - id: detect_exception
+    action: read_inventory_state
+    next_step_id: classify_exception
+    objective: >
+      Establish from authoritative inventory state that a specific SKU cannot
+      satisfy the quantity this pick requires, and name both numbers.
+    description: >
+      Read inventory via warehouse.inventory.lookup. The step completes only if
+      the capability actually returned a result naming the SKU, what is
+      available, and what was required — an empty or partial read is not a
+      detection, and we will not reason about a shortage we cannot observe.
+    required_inputs:
+      - sku
+      - required_quantity
+    expected_output:
+      warehouse.inventory.lookup: object
+    completion:
+      validator_type: capability_result
+      required_capability_result: warehouse.inventory.lookup
+      required_result_fields:
+        - sku
+        - total_available
+        - required_quantity
+    retry_policy:
+      max_attempts: 3
+      retry_on:
+        - CAPABILITY_UNAVAILABLE
+        - VALIDATION_FAILED
+      backoff_seconds: 0.0
+      escalate_on_exhaustion: true
+    timeout_seconds: 30.0
+    evidence_requirements:
+      - inventory_state_snapshot
+    escalation_reason: >
+      Could not read authoritative inventory state — refusing to reason about a
+      shortage we cannot observe.
+
+  # ── 2. What kind of exception is it? ────────────────────────────────────────
+  - id: classify_exception
+    action: classify_inventory_exception
+    next_step_id: select_picking_strategy
+    objective: Name the exception type and how much it costs the operation.
+    description: >
+      Distinguish the cases that need different handling: short_pick (less on
+      hand than required), stockout (nothing on hand), and count_discrepancy
+      (the record and the location disagree). The classification is structured
+      output; it does not authorize anything.
+    expected_output:
+      sku: string
+      exception_type: "one of: short_pick | stockout | count_discrepancy"
+      severity: "one of: critical | high | medium | low"
+      required_quantity: integer
+      observed_available: integer
+      evidence: array
+    completion:
+      validator_type: schema
+      schema_fields:
+        - sku
+        - exception_type
+        - severity
+        - required_quantity
+        - observed_available
+        - evidence
+    retry_policy:
+      max_attempts: 2
+      backoff_seconds: 0.0
+    timeout_seconds: 30.0
+    evidence_requirements:
+      - exception_classification
+    escalation_reason: >
+      The exception could not be characterised — escalating rather than
+      recommending a change whose nature is unknown.
+
+  # ── 3. What is this facility allowed to do about it? ────────────────────────
+  # The strategy is READ from deterministic operational configuration
+  # (facility_picking_strategy in bounded context). It is not selected here, and
+  # it is emphatically not selected by a model — this step records which
+  # strategy applies and what it permits.
+  - id: select_picking_strategy
+    action: determine_picking_strategy
+    next_step_id: inspect_alternate_locations
+    objective: >
+      Record the facility's configured picking strategy and the replenishment
+      approach it permits.
+    description: >
+      Read facility_picking_strategy from bounded context. `zone` facilities may
+      search other stocking locations across zones; `discrete` facilities pick
+      one order from one location and may not. strategy_source must record where
+      the value came from, so an audit can tell configuration from invention.
+    required_inputs:
+      - facility_picking_strategy
+    expected_output:
+      picking_strategy: "one of: discrete | zone"
+      strategy_source: "must be: facility_configuration"
+      rationale: string
+    completion:
+      validator_type: schema
+      schema_fields:
+        - picking_strategy
+        - strategy_source
+        - rationale
+    retry_policy:
+      max_attempts: 2
+      backoff_seconds: 0.0
+    timeout_seconds: 30.0
+    evidence_requirements:
+      - strategy_selection
+    escalation_reason: >
+      No configured picking strategy applies to this facility — escalating
+      rather than assuming one.
+
+  # ── 4. Zone facilities only: is it held anywhere else? ──────────────────────
+  # This is the strategy variation. Same SOP, same engine, same agent — the
+  # engine skips this step entirely in a discrete-picking facility because the
+  # declarative condition does not hold. No per-strategy branch exists in Python.
+  - id: inspect_alternate_locations
+    action: inspect_alternate_inventory_locations
+    condition:
+      predicate: facility_picking_strategy
+      operator: eq
+      value: zone
+    next_step_id: evaluate_resolution_options
+    objective: >
+      In a zone-picking facility, find other stocking locations holding this SKU,
+      or establish that none exist.
+    description: >
+      Query warehouse.inventory.locate for every location holding the SKU.
+      "No alternate location exists" is a legitimate and important result: it
+      narrows the options rather than inventing one.
+    completion:
+      validator_type: capability_result
+      required_capability_result: warehouse.inventory.locate
+      required_result_fields:
+        - candidate_location_count
+        - alternate_location_id
+    retry_policy:
+      max_attempts: 3
+      retry_on:
+        - CAPABILITY_UNAVAILABLE
+        - VALIDATION_FAILED
+      backoff_seconds: 0.0
+      escalate_on_exhaustion: true
+    timeout_seconds: 30.0
+    evidence_requirements:
+      - alternate_location_result
+    escalation_reason: >
+      Alternate stocking locations could not be read — cannot evaluate a
+      zone-picking resolution.
+
+  # ── 5. What are the options, and which one? ─────────────────────────────────
+  - id: evaluate_resolution_options
+    action: evaluate_replenishment_options
+    next_step_id: propose_resolution
+    objective: Produce ranked options and select one, with a reason.
+    description: >
+      ANALYTICAL only. Rank the replenishment or substitution options the
+      facility's strategy permits and select the least disruptive feasible one.
+      Producing this changes nothing in the warehouse.
+    expected_output:
+      options: array
+      selected_option: string
+      replenishment_source_location: string
+      expected_available_after: integer
+      rationale: string
+    completion:
+      validator_type: schema
+      schema_fields:
+        - options
+        - selected_option
+        - replenishment_source_location
+        - expected_available_after
+        - rationale
+    retry_policy:
+      max_attempts: 2
+      backoff_seconds: 0.0
+    timeout_seconds: 30.0
+    evidence_requirements:
+      - resolution_options
+    escalation_reason: >
+      No feasible resolution option exists under this facility's picking
+      strategy — human intervention required.
+
+  # ── 6. Stop. Hand over. (the ONE write, and it is outside the loop) ─────────
+  # The SOP Engine HALTS here with ProcedureStatus.WAITING_FOR_GOVERNANCE and
+  # executes nothing further until resume_after_governance() is called. The
+  # RecommendedAction flows to ActionProposal -> DecisionEngine -> human
+  # approval -> ActionExecutor. None of that happens inside this package.
+  #
+  # This step's completion criterion is evaluated ONLY on resume, because the
+  # governance-resume seam is the first moment post-write authoritative state
+  # exists. It asks the weakest honest question — did availability move off the
+  # number we recorded before the write? — since that is exactly the question
+  # that separates "the adjustment was lost" from "the adjustment landed but the
+  # response was unreadable". An ambiguous executor outcome is settled here by
+  # reading, and the engine escalates EXECUTION_INDETERMINATE rather than ever
+  # re-issuing the write.
+  #
+  # Deliberately no retry_policy: resume must not re-execute this step. A `loop`
+  # here is not merely discouraged — SOPStep rejects a loop on a governed write
+  # action at construction time, so this SOP could not declare one.
+  - id: propose_resolution
+    action: emit_recommended_action
+    next_step_id: reassess_inventory_state
+    objective: >
+      Hand one recommendation to governance and resume only once authoritative
+      state shows the approved adjustment reached the warehouse.
+    description: >
+      Transition to WAITING_FOR_GOVERNANCE. On resume, re-read authoritative
+      inventory state and confirm availability for this SKU has moved off its
+      pre-write baseline. Governance returning APPROVED is not sufficient; an
+      executor reporting success is not sufficient.
+    completion:
+      validator_type: state_predicate
+      predicate_name: inventory_write_landed
+      predicate_args:
+        sku: SKU-88231
+        baseline_available: 4
+    evidence_requirements:
+      - governance_outcome_ref
+      - post_write_inventory_state
+    escalation_reason: >
+      Authoritative inventory state does not show the approved adjustment
+      reaching the warehouse — escalating without retrying the write.
+
+  # ── 7. THE BOUNDED LOOP. Re-read until resolved, or until the budget ends. ──
+  # This is the only looping step in any MAIW SOP, and everything about it is
+  # engine-owned:
+  #
+  #   iterations   bounded by loop.max_iterations — the engine counts, using
+  #                ProcedureExecutionState.attempt_by_step
+  #   wall clock   bounded by loop.max_total_seconds across ALL iterations
+  #   exit         decided by inventory_exception_resolved against authoritative
+  #                state; a runtime's own status claim cannot exit or extend it
+  #   exhaustion   routes to escalate_to_human and terminates ESCALATED
+  #
+  # It has no retry_policy: SOPStep forbids carrying both budgets, so iterations
+  # and attempts are guaranteed to be the same number.
+  #
+  # Every iteration appends its validator verdict to evidence_refs stamped with
+  # the attempt number, so the audit trail distinguishes "still short on
+  # iteration 1" from "...and on iteration 3".
+  - id: reassess_inventory_state
+    action: verify_inventory_reconciled
+    next_step_id: resume_picking
+    objective: >
+      Prove from authoritative state that the pick can genuinely resume — enough
+      on hand, and actually held somewhere pickable.
+    description: >
+      Re-read authoritative inventory state. The exception is resolved only when
+      availability meets the required quantity AND the SKU is held in at least
+      one location: a record claiming stock with nowhere to pick it from is an
+      inconsistent state, which is a human's problem, not a model's. Each pass
+      is a fresh read and nothing else — this step never writes.
+    completion:
+      validator_type: state_predicate
+      predicate_name: inventory_exception_resolved
+      predicate_args:
+        sku: SKU-88231
+        required_quantity: 12
+        min_locations: 1
+    loop:
+      max_iterations: 3
+      exit_step_id: resume_picking
+      exhaustion_step_id: escalate_to_human
+      max_total_seconds: 120.0
+    timeout_seconds: 30.0
+    evidence_requirements:
+      - post_write_inventory_state
+      - reassessment_validation_result
+    escalation_reason: >
+      Inventory did not reconcile within the bounded reassessment budget — the
+      pick cannot be confirmed and a human must count the location.
+
+  # ── 8a. Resolved. (TERMINAL) ────────────────────────────────────────────────
+  - id: resume_picking
+    action: return_inventory_assessment
+    next_step_id: null
+    objective: Report that the exception cleared and the pick may resume.
+    description: >
+      Terminal success path. Reached only via the loop's EXIT edge, which is
+      reached only when inventory_exception_resolved held against authoritative
+      state.
+    expected_output:
+      sku: string
+      resolution: string
+      available_after: integer
+      pick_can_resume: boolean
+    completion:
+      validator_type: schema
+      schema_fields:
+        - sku
+        - resolution
+        - available_after
+        - pick_can_resume
+    timeout_seconds: 30.0
+    evidence_requirements:
+      - inventory_assessment
+    escalation_reason: >
+      The exception cleared but the assessment could not be reported.
+
+  # ── 8b. Not resolved. Hand to a human. (TERMINAL) ───────────────────────────
+  # Escalation, not a HUMAN validator. The distinction is deliberate and is
+  # argued in docs/sops/PICKING_INVENTORY_EXCEPTION.md: the engine is
+  # transferring control, not waiting on a human response as this step's
+  # completion criterion. Nothing here resumes when a human replies; the
+  # procedure is over.
+  #
+  # This step completes normally — it is well-formed escalation, not a failure
+  # to produce one — yet the PROCEDURE still terminates ESCALATED, because the
+  # engine records the exhausted loop in loop_exhausted_step_ids and that cannot
+  # be overwritten by a downstream step running cleanly.
+  - id: escalate_to_human
+    action: escalate_inventory_exception
+    next_step_id: null
+    objective: >
+      Produce a structured handoff carrying everything the human needs and
+      nothing they do not.
+    description: >
+      Terminal escalation path. Reached only via the loop's EXHAUSTION edge.
+      Carries the typed reason, the numbers, how many times we looked, and a
+      plain-language summary — never model reasoning.
+    expected_output:
+      escalation_reason: string
+      sku: string
+      required_quantity: integer
+      observed_available: integer
+      attempts: integer
+      handoff_summary: string
+    completion:
+      validator_type: schema
+      schema_fields:
+        - escalation_reason
+        - sku
+        - required_quantity
+        - observed_available
+        - attempts
+        - handoff_summary
+    timeout_seconds: 30.0
+    evidence_requirements:
+      - escalation_record
+    escalation_reason: >
+      Inventory exception unresolved after bounded reassessment — human count
+      and decision required.
+
+escalation:
+  - rule_id: inventory_state_unreadable
+    trigger: Authoritative inventory state could not be read within the retry budget.
+    escalation_message: Inventory state unavailable — cannot assess the exception.
+
+  - rule_id: no_feasible_resolution
+    trigger: >
+      No replenishment or substitution option exists that this facility's
+      picking strategy permits.
+    escalation_message: >
+      No feasible resolution under the configured picking strategy — human
+      intervention required.
+
+  - rule_id: unsupported_strategy
+    trigger: The configured facility picking strategy is not one this SOP supports.
+    escalation_message: >
+      Facility picking strategy is not supported by this procedure — escalating
+      rather than falling back to an assumed strategy.
+
+  - rule_id: governance_rejected
+    trigger: Governance rejected or did not approve the recommended adjustment.
+    escalation_message: >
+      Recommended replenishment was not approved — no write was attempted and
+      the pick remains blocked.
+
+  - rule_id: execution_indeterminate
+    trigger: The executor outcome is ambiguous and authoritative state does not settle it.
+    escalation_message: >
+      Cannot determine whether the adjustment took effect — escalating without
+      retrying the write.
+
+  - rule_id: reassessment_budget_exhausted
+    trigger: >
+      The bounded reassessment loop ran its full budget without inventory
+      reconciling.
+    escalation_message: >
+      Inventory did not reconcile after the permitted number of re-reads — a
+      human must physically count the location.
+
+  - rule_id: inconsistent_inventory_state
+    trigger: >
+      Availability satisfies the requirement but the SKU is held in no location,
+      or the record and the location otherwise disagree.
+    escalation_message: >
+      Inventory record is internally inconsistent — human reconciliation
+      required. No automated resolution will be attempted.
+
+stop_conditions:
+  - objective_met
+  - no_safe_action
+  - human_intervention_required
+  - max_iterations_reached
+  - insufficient_context

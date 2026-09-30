@@ -7,6 +7,7 @@ Owns procedure lifecycle, step progression, completion validation, retry,
 escalation, and evidence collection — independently of any runtime.
 
     SOPEngine           procedure lifecycle owner
+    LoopDecision        the bounded-loop state machine (EXIT / RETRY / EXHAUSTED)
     SOPStepExecutor     the per-step runtime seam
     ValidatorRegistry   selects the validator that proves a step is complete
 
@@ -16,7 +17,7 @@ Authority boundary — enforced by test_security_boundary.py:
     No validator can authorize an operational write.
 """
 
-from .engine import SOPEngine
+from .engine import LoopDecision, SOPEngine
 from .executor import SOPStepExecutor
 from .validators import (
     DEFAULT_VALIDATOR_REGISTRY,
@@ -34,6 +35,7 @@ from .validators import (
 
 __all__ = [
     "SOPEngine",
+    "LoopDecision",
     "SOPStepExecutor",
     "StepValidator",
     "StepValidationContext",

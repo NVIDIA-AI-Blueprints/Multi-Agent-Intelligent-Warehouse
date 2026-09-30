@@ -79,6 +79,29 @@ class ProcedureExecutionState(BaseModel):
         description="Evidence accumulated across every step, in observation order.",
     )
 
+    # ── Bounded loop bookkeeping ──────────────────────────────────────────────
+    # The iteration counter for a looping step is ``attempt_by_step`` — a loop
+    # step may not declare a retry_policy, so its attempt count and its
+    # iteration count are the same number by construction. The two fields below
+    # carry only what ``attempt_by_step`` cannot express.
+
+    loop_started_at: dict[str, datetime] = Field(
+        default_factory=dict,
+        description=(
+            "step_id → when the engine first entered that looping step. The "
+            "origin for LoopPolicy.max_total_seconds, which spans iterations."
+        ),
+    )
+    loop_exhausted_step_ids: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Looping steps whose budget ran out without the completion criterion "
+            "holding. Non-empty means the procedure terminates as ESCALATED even "
+            "if a downstream escalation-handling step ran cleanly — reaching the "
+            "exhaustion branch is never a success."
+        ),
+    )
+
     status: ProcedureStatus
     branch_history: list[str] = Field(
         default_factory=list,
@@ -91,6 +114,15 @@ class ProcedureExecutionState(BaseModel):
     def next_attempt(self, step_id: str) -> int:
         """Return the attempt number the next execution of ``step_id`` would be."""
         return self.attempt_by_step.get(step_id, 0) + 1
+
+    def loop_iterations(self, step_id: str) -> int:
+        """
+        Iterations of ``step_id`` completed so far.
+
+        Identical to the attempt count: a looping step is forbidden from also
+        declaring a retry_policy precisely so these two numbers cannot diverge.
+        """
+        return self.attempt_by_step.get(step_id, 0)
 
 
 __all__ = [

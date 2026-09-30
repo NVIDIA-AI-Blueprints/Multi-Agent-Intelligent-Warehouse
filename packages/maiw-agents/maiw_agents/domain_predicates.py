@@ -43,6 +43,7 @@ PredicateFn = Callable[[dict[str, Any], dict[str, Any]], bool]
 # the package runs its ``register_*_predicates()`` call.
 PREDICATE_DOMAIN_MODULES = (
     "maiw_agents.equipment.predicates",
+    "maiw_agents.inventory.predicates",
     "maiw_agents.wave.predicates",
 )
 

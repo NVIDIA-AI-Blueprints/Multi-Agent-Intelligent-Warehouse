@@ -328,6 +328,102 @@ SAFETY_COMPLIANCE_DEFINITION = AgentDefinition(
 )
 
 
+# ── InventoryExceptionAgent ───────────────────────────────────────────────────
+#
+# Proof SOP C. Note what this definition does NOT have: a per-strategy method
+# surface. Picking strategy (discrete vs zone) is deterministic facility
+# configuration supplied through bounded context and branched on by the SOP's
+# declarative StepCondition — never chosen by a model, and never a different
+# code path in an agent class.
+
+INVENTORY_AGENT_DEFINITION = AgentDefinition(
+    agent_id="inventory",
+    version="1.0",
+    objective=(
+        "Resolve a picking exception — a SKU that cannot satisfy the quantity a "
+        "pick requires — by reading authoritative inventory state, classifying the "
+        "exception, evaluating replenishment options under the facility's "
+        "configured picking strategy, and proposing at most one corrective action."
+    ),
+    domain="inventory",
+    triggers=[
+        AgentTrigger(
+            trigger_id="inventory_exception_detected",
+            trigger_type="operator_requests_resolution",
+            description=(
+                "A picker reached a location and the SKU could not satisfy the "
+                "required quantity, or the count is inconsistent with the record."
+            ),
+        ),
+        AgentTrigger(
+            trigger_id="delegated_by_oca",
+            trigger_type="operator_requests_resolution",
+            description="OperationsCoordinationAgent delegated an inventory exception.",
+        ),
+    ],
+    required_context=["inventory"],
+    allowed_capabilities=[
+        # READ
+        "warehouse.inventory.lookup",
+        "warehouse.inventory.locate",
+        # ANALYTICAL
+        "warehouse.inventory.evaluate_replenishment",
+        # PROPOSAL — routes through RecommendedAction -> governance. The write
+        # capability (warehouse.inventory.adjust) is deliberately absent and is
+        # in fact undeclarable: validate_sop()'s write-capability pattern
+        # rejects it.
+        "warehouse.inventory.replenish",
+    ],
+    allowed_subagents=[],
+    sop_id="inventory.picking_inventory_exception",
+    output_contract=(
+        "Inventory exception assessment with sku, exception_type, severity, "
+        "required_quantity, observed_available, picking_strategy, and either a "
+        "resolution or a structured human escalation. Write proposals flow "
+        "through RecommendedAction -> ActionProposal -> DecisionEngine -> "
+        "governance -> ActionExecutor, none of which lives in this package."
+    ),
+    governance_boundary=GovernanceBoundary(
+        allowed_capability_classes=["READ", "ANALYTICAL", "PROPOSAL"],
+        may_invoke_action_executor=False,
+        may_invoke_decision_engine=False,
+    ),
+    termination_policy=TerminationPolicy(
+        # Sized as SOP step count (9) plus headroom for the bounded reassessment
+        # loop, whose own budget is LoopPolicy.max_iterations on the
+        # reassess_inventory_state step. These are separate budgets on purpose:
+        # this one bounds procedure step transitions, that one bounds how many
+        # times the world is re-read before a human is called.
+        max_iterations=20,
+        stop_conditions=[
+            TerminationCondition(
+                condition_id="OBJECTIVE_MET",
+                description="Inventory exception resolved and the pick can resume.",
+            ),
+            TerminationCondition(
+                condition_id="NO_SAFE_ACTION",
+                description="No feasible replenishment or substitution option exists.",
+            ),
+            TerminationCondition(
+                condition_id="HUMAN_REQUIRED",
+                description=(
+                    "Bounded reassessment finished without the exception clearing, "
+                    "or state is internally inconsistent."
+                ),
+            ),
+            TerminationCondition(
+                condition_id="INSUFFICIENT_CONTEXT",
+                description="Authoritative inventory state unavailable.",
+            ),
+            TerminationCondition(
+                condition_id="MAX_ITERATIONS",
+                description="Iteration limit reached.",
+            ),
+        ],
+    ),
+)
+
+
 # ── Registry of all canonical definitions ────────────────────────────────────
 
 AGENT_DEFINITIONS: dict[str, AgentDefinition] = {
@@ -335,6 +431,7 @@ AGENT_DEFINITIONS: dict[str, AgentDefinition] = {
     "labor": LABOR_AGENT_DEFINITION,
     "wave": WAVE_AGENT_DEFINITION,
     "equipment": EQUIPMENT_AGENT_DEFINITION,
+    "inventory": INVENTORY_AGENT_DEFINITION,
     "safety_compliance": SAFETY_COMPLIANCE_DEFINITION,
 }
 

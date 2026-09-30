@@ -147,6 +147,40 @@ SKILL_REGISTRY: dict[str, SkillRegistryEntry] = dict([
         output_schema="maiw_contracts.inventory.InventoryLookupResult",
         implementation="maiw_skills.inventory.lookup.InventoryLookupSkill",
     ),
+    # `warehouse.inventory.locate` is already exposed by the inventory MCP
+    # server (INVENTORY_LOCATE_METADATA in maiw_contracts.inventory) but was
+    # never registered as a skill. Proof SOP C needs it to answer "is this SKU
+    # held anywhere else?", so it is registered here as the READ capability it
+    # has always been.
+    _reg(
+        "warehouse.inventory.locate",
+        "inventory",
+        CapabilityClass.READ,
+        "Locate every stocking location holding a SKU, with per-location quantities.",
+        input_schema="maiw_contracts.inventory.InventoryLocateRequest",
+        output_schema="maiw_contracts.inventory.InventoryLookupResult",
+        uses_mcp=True,
+    ),
+    _reg(
+        "warehouse.inventory.evaluate_replenishment",
+        "inventory",
+        CapabilityClass.ANALYTICAL,
+        (
+            "Evaluate replenishment and substitution options for a short-picked SKU. "
+            "Produces ranked options only — selecting or performing one is not this "
+            "capability's authority."
+        ),
+    ),
+    _reg(
+        "warehouse.inventory.replenish",
+        "inventory",
+        CapabilityClass.PROPOSAL,
+        (
+            "Propose a replenishment move for a short SKU. PROPOSAL, not WRITE: it "
+            "produces a RecommendedAction that must clear DecisionEngine and human "
+            "approval before any ActionExecutor touches stock."
+        ),
+    ),
 
     # ── Equipment — read ───────────────────────────────────────────────────────
     _reg(
