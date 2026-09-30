@@ -1901,6 +1901,171 @@ traverse identically.
 
 ---
 
+## Proof SOP C — Picking / Inventory Exception
+
+**IMPLEMENTED** — branch `feat/sop-proof-c-picking-inventory-exception`, based on
+`aac1ca4` (PR #127).
+
+- Executable SOP: `agents/sops/inventory/picking_inventory_exception.v1.yaml`
+  (`inventory.picking_inventory_exception` v1.0, 9 steps)
+- Predicates: `packages/maiw-agents/maiw_agents/inventory/predicates.py`
+- Tests: `packages/maiw-agents/tests/test_sop_loop_semantics.py` (58),
+  `packages/maiw-agents/tests/test_sop_picking_inventory_exception.py` (93)
+- Human doc: `docs/sops/PICKING_INVENTORY_EXCEPTION.md`
+
+### What this proof adds over Proof SOP B
+
+Proof SOP B proved that a *step* completes only on evidence. Proof SOP C proves
+the same thing about *repetition*:
+
+> **The SOP Engine controls the loop. The model may provide evidence, but it
+> cannot decide that the loop is finished.**
+
+Four things are new.
+
+**1. Bounded loops, as the smallest safe construct.** `LoopPolicy`
+(`contracts/sop_v2.py`) has exactly four fields — `max_iterations`,
+`exit_step_id`, `exhaustion_step_id`, `max_total_seconds` — and no way to
+express a condition. This is deliberately *not* a workflow DSL: there is no
+`while`, no `foreach`, no expression language, and no counter arithmetic. The
+only question asked at the end of an iteration is the one the step already
+declares in its `completion` spec.
+
+The loop body is the step itself. A multi-step back-edge is not expressible and
+was rejected on purpose: a loop spanning several steps could re-enter the
+governed write, which is exactly the failure mode the no-blind-retry rule exists
+to prevent.
+
+**2. The loop is safe by construction, not by convention.** Four rules are
+enforced in `SOPStep`'s model validator, so a violating SOP cannot be built:
+
+| Rule | Why |
+|---|---|
+| A loop requires an explicit `completion` spec | Something must decide the exit besides the runtime |
+| `LEGACY_SUCCESS` may not govern a loop | "The runtime returned" exits on iteration 1 every time |
+| `loop` and `retry_policy` are mutually exclusive | Two repetition budgets make the iteration counter ambiguous |
+| No loop on a `GOVERNED_WRITE_ACTIONS` step | Repeating a write duplicates a physical side effect |
+
+Two further rules are enforced in `validate_sop()`: loop targets must name real
+steps, and the loop step must not be reachable from its own exit or exhaustion
+branch — an outer cycle would reset the counter and void the bound.
+
+**3. The counter is the existing attempt counter.** Because a looping step may
+not also carry a `retry_policy`, `attempt_by_step[step_id]` *is* the iteration
+count, with no second bookkeeping field and no possibility of divergence.
+`_run_step_with_retry` now numbers attempts cumulatively across re-entries; for
+a step entered once — every step in every pre-loop SOP — the base offset is zero
+and the numbering is exactly what it was before.
+
+Note what this does **not** reuse: `TerminationPolicy.max_iterations` on the
+agent definition, which bounds procedure *step transitions*. That budget and the
+loop budget answer different questions and are kept apart.
+
+**4. Loop exhaustion cannot be laundered into success.** The engine records the
+exhausted step in `ProcedureExecutionState.loop_exhausted_step_ids`. Even when
+the SOP routes to a tidy escalation-handling step that runs and validates
+cleanly, `_terminal_status()` returns `ESCALATED`. An unresolved exception that
+reports itself well is still an unresolved exception.
+
+### Loop state machine
+
+```
+LOOP_RUNNING ─ validator says the criterion holds ──────────→ EXIT
+             ├ criterion does not hold, budget remains ─────→ RETRY
+             └ criterion does not hold, budget spent ───────→ EXHAUSTED
+```
+
+`LoopDecision` in `sop_engine/engine.py` is the whole machine. Nothing in
+`_loop_decision()` consults the executor, the runtime, the model, or
+`StepResult.output`.
+
+### Why the model cannot win
+
+| Model attempt | Outcome |
+|---|---|
+| `status=COMPLETED` every iteration | Validator decides; full budget runs, then escalation |
+| `status=FAILED` when state is fine | Validator decides; loop exits on iteration 1 |
+| `exit_loop: true` in output | Ignored — the engine reads no loop field from output |
+| `iterations_remaining: 99` in output | Ignored, same reason |
+| Selecting a successor | The `SOPStepExecutor` seam has no such parameter |
+
+### Facility strategy variation
+
+The same procedure behaves differently by facility without a per-strategy code
+path. `inspect_alternate_locations` carries a declarative `StepCondition` on
+`facility_picking_strategy`, a deterministic configuration value in bounded
+context. Under `zone` the step runs; under `discrete` the engine skips it.
+
+There is no `InventoryAgent` class, so there is nowhere for a per-strategy
+method to live. Adding a strategy means adding configuration and a condition.
+
+**Section 35's audit still stands.** Of six picking strategies, only `discrete`
+and `zone` are representable in this codebase; `batch`, `cluster` and `hybrid`
+have no contract, configuration or code, and `Wave.strategy` (`fifo` / `priority`
+/ `deadline`) is release sequencing, not a picking method. The
+`PickingStrategy` model sketched in Section 37 remains design-only. This SOP
+supports the two real strategies and documents the limitation rather than
+inventing configuration the warehouse cannot honour.
+
+### Write ambiguity, with a loop in the picture
+
+Exactly one write occurs, at `propose_resolution`, **outside the loop and before
+it**. The loop that follows can only read. A test asserts write count `== 1` even
+when the loop runs all three iterations — the sharpest edge of the design,
+because looping over a write step is precisely how an automated system
+duplicates a physical side effect.
+
+### HUMAN validator: considered and declined
+
+`ValidatorType.HUMAN` remains deferred. The distinction that settled it:
+
+- **Escalation** — the engine transfers control and the procedure ends.
+- **HUMAN validator** — a human response is a step's completion criterion; the
+  procedure pauses and continues on the answer.
+
+`escalate_to_human` is the first. It produces a structured handoff and stops;
+nothing resumes when the human replies. Adding a HUMAN validator would have
+meant inventing a pause the procedure does not have, plus a request/response
+contract, an expiry and a no-answer timeout — to model a handoff that structured
+escalation already models correctly.
+
+When `HUMAN` is eventually added it must stay separate from governance approval:
+approving an `ActionProposal` authorizes a *write*; answering a HUMAN validator
+supplies *evidence*. Collapsing them would let a validator response grant
+operational authority.
+
+### Defect found and fixed in passing
+
+A step skipped by a false `StepCondition` was being recorded in
+`completed_step_ids`. A step that never reached the executor and never faced a
+validator has completed nothing, and an audit trail saying otherwise is wrong.
+Skipped steps now appear only in `branch_history`, which is what that field
+documents. `SOPEngine._skip()` replaces the `_advance()` call on the skip path.
+
+### Engine domain neutrality
+
+`test_sop_loop_semantics.py` imports no domain package at all — it is a
+meta-assertion in that file. Two further tests walk the engine AST and assert
+that no import and no executable identifier carries domain vocabulary. The loop
+is engine machinery that a non-warehouse deployment inherits unchanged.
+
+### Remaining gaps
+
+1. **`is_low_stock` threshold disagreement.** `demo/world.py` uses `<=`,
+   `maiw_world/projections.py` uses `<`. `inventory_exception_resolved` consults
+   the flag only when a SOP opts in via `require_not_low_stock`.
+2. **`InventoryState.from_lookup_result` projects one SKU.** A multi-SKU
+   exception is not representable; this SOP is single-SKU by construction.
+3. **No `PickingStrategy` contract.** Strategy is a bounded-context string.
+4. **No inventory `ActionExecutor`.** `warehouse.inventory.adjust` is guarded by
+   `_WRITE_CAPABILITY_PATTERNS` but has no `SKILL_REGISTRY` entry — the guard is
+   deliberately ahead of the implementation.
+5. **`max_total_seconds` is checked between iterations, not during one.** A
+   single very slow iteration is bounded by `timeout_seconds`, not by the loop
+   budget.
+
+---
+
 ## Domain-Owned State Predicates
 
 **IMPLEMENTED** — branch `fix/sop-wave-predicate-registration`, based on
