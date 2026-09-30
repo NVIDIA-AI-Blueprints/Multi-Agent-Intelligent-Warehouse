@@ -29,6 +29,12 @@ from datetime import datetime, timezone
 from typing import Any
 
 from ..contracts.agent import AgentDefinition
+from ..contracts.capability_policy import (
+    CapabilityDeniedError,
+    RuntimeCapabilityPolicy,
+    authorize_step,
+    build_capability_policy,
+)
 from ..contracts.delegation import AgentDelegationRequest, AgentDelegationResult
 from ..contracts.procedure_state import ProcedureExecutionState, ProcedureStatus
 from ..contracts.registry import CapabilityClass, SKILL_REGISTRY
@@ -89,8 +95,17 @@ class MAIWDeterministicRuntime:
 
     RUNTIME_NAME = "deterministic"
 
-    def __init__(self, validator_registry: ValidatorRegistry | None = None) -> None:
+    def __init__(
+        self,
+        validator_registry: ValidatorRegistry | None = None,
+        *,
+        store: Any | None = None,
+    ) -> None:
         self._validator_registry = validator_registry
+        self._store = store
+        # Set per run_task(). The step executor reads it to authorize each step,
+        # so it is never supplied by a caller and never widened mid-procedure.
+        self._policy: RuntimeCapabilityPolicy | None = None
 
     # ── SOPStepExecutor implementation ────────────────────────────────────────
 
@@ -134,6 +149,31 @@ class MAIWDeterministicRuntime:
                     f"Step {step.id!r} has forbidden write action {action!r}."
                 ),
             )
+
+        # Deny-by-default capability gate, immediately before the step does
+        # anything. This runs per step, not once at load time: a load-time check
+        # says the SOP was well-formed when it was read, which is a different
+        # claim from "this invocation is permitted right now".
+        if self._policy is not None:
+            try:
+                await authorize_step(self._policy, step)
+            except CapabilityDeniedError as denied:
+                logger.warning(
+                    "MAIWDeterministicRuntime: step %s denied by policy %s — %s",
+                    step.id, self._policy.policy_id, denied.reason,
+                )
+                return StepResult(
+                    step_id=step.id,
+                    status=StepStatus.ESCALATED,
+                    output={},
+                    runtime=self.RUNTIME_NAME,
+                    attempt=attempt,
+                    started_at=started_at,
+                    completed_at=datetime.now(timezone.utc),
+                    error=str(denied),
+                    escalation_reason=EscalationReasonCode.CAPABILITY_DENIED,
+                    escalation_message=str(denied),
+                )
 
         logger.debug(
             "MAIWDeterministicRuntime.execute_step: sop=%s step=%s action=%s attempt=%d",
@@ -233,6 +273,16 @@ class MAIWDeterministicRuntime:
         # Validate capability alignment (delegated to shared contracts.runtime guard)
         check_capability_alignment(definition, sop)
 
+        # Issue the runtime's capability policy for this task. Built from the
+        # AgentDefinition, the SOP and the capability registry — never from
+        # model output, a prompt, or the environment. Immutable once issued.
+        self._policy = build_capability_policy(
+            definition=definition,
+            sop=sop,
+            agent_task_id=state.task_id,
+            runtime=self.RUNTIME_NAME,
+        )
+
         if not sop.steps:
             return self._terminal(state, AgentTaskStatus.FAILED, "SOP has no steps.")
 
@@ -255,6 +305,7 @@ class MAIWDeterministicRuntime:
             validator_registry=self._validator_registry,
             trace_id=context.trace_id,
             max_transitions=remaining_budget,
+            store=self._store,
         )
 
         proc_state = await engine.run_procedure(

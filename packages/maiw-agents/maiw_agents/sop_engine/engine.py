@@ -41,6 +41,17 @@ Authority boundary (docs/architecture/SOP_ENGINE_V2_DESIGN.md Section 31):
     pause at WAITING_FOR_GOVERNANCE and are resumed by the caller only after
     governance has run — and even then, only complete if authoritative state
     proves the change landed. See ``resume_after_governance``.
+
+Persistence (production hardening):
+    Supplying a ``ProcedureStateStore`` makes the procedure recoverable. The
+    engine checkpoints after each lifecycle transition, so a restart can restore
+    exactly which SOP version was running, which step and attempt were active,
+    what evidence had been proven, and whether a write may already have
+    occurred. Persistence changes nothing about authority: a restored procedure
+    that was waiting on governance is still waiting on governance, and a
+    restored post-write step still proves its outcome by re-reading
+    authoritative state rather than by repeating the write. The engine runs
+    unchanged with ``store=None``.
 """
 
 from __future__ import annotations
@@ -59,7 +70,9 @@ from ..contracts.sop import SOPDefinition, SOPStep
 from ..contracts.sop_v2 import EscalationReasonCode, ValidatorType
 from ..contracts.step_result import EvidenceRef, StepResult, StepStatus
 from .executor import SOPStepExecutor
+from .state_store import ProcedureStateStore
 from .validators import (
+    DEFAULT_EVIDENCE_VALIDATOR,
     DEFAULT_VALIDATOR_REGISTRY,
     StepValidationContext,
     ValidatorRegistry,
@@ -110,11 +123,47 @@ class SOPEngine:
         validator_registry: ValidatorRegistry | None = None,
         trace_id: str = "",
         max_transitions: int = _DEFAULT_MAX_TRANSITIONS,
+        store: ProcedureStateStore | None = None,
     ) -> None:
         self._executor = executor
         self._validators = validator_registry or DEFAULT_VALIDATOR_REGISTRY
         self._trace_id = trace_id
         self._max_transitions = max_transitions
+        # None = run without persistence. This is the pre-hardening behaviour and
+        # remains the default so every existing caller is unaffected.
+        self._store = store
+
+    # ── Checkpointing ─────────────────────────────────────────────────────────
+
+    async def _checkpoint(
+        self,
+        proc_state: ProcedureExecutionState,
+        *,
+        final: bool = False,
+    ) -> ProcedureExecutionState:
+        """
+        Persist a lifecycle transition and adopt the store's new revision.
+
+        Checkpointed: procedure created, step started, StepResult accepted,
+        validation recorded, retry/loop count changed, branch taken, governance
+        wait entered, governance resumed, escalation, terminal.
+
+        Not checkpointed: token-level model activity, partial runtime output, or
+        anything else that is not a procedure-level transition. A checkpoint is
+        a point the procedure can be resumed from, not a trace.
+
+        Terminal states are written exactly once, by the ``final=True`` call at
+        the end of ``run_procedure``. Intermediate checkpoints skip them so the
+        store's terminal-immutability rule is never tripped by the engine's own
+        bookkeeping.
+        """
+        if self._store is None:
+            return proc_state
+        if not final and proc_state.is_terminal():
+            return proc_state
+        return await self._store.save(
+            proc_state, expected_revision=proc_state.revision
+        )
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -134,14 +183,84 @@ class SOPEngine:
         Returns the final ``ProcedureExecutionState``. The caller is responsible for:
           - creating a RecommendedAction from a WAITING_FOR_GOVERNANCE pause
           - calling ``resume_after_governance()`` once governance has completed
+
+        Resuming after a restart: pass the state loaded from the store as
+        ``initial_state``. Everything that governs progression — current step,
+        completed steps, attempt counts, loop budgets, evidence, governance
+        status — is carried on that state, so the resumed run picks up exactly
+        where the crashed one stopped. Completed steps are not re-executed and
+        loop budgets are not reset.
         """
+        # Resuming a procedure that already finished is a no-op, and a no-op
+        # must not write. Re-saving a terminal record would both trip the
+        # store's immutability rule and add a revision that represents nothing.
+        if initial_state is not None and initial_state.is_terminal():
+            logger.info(
+                "SOPEngine: procedure %s is already terminal (%s) — nothing to resume",
+                initial_state.procedure_execution_id, initial_state.status.value,
+            )
+            return initial_state
+
+        proc_state = await self._run_procedure_inner(
+            definition=definition,
+            sop=sop,
+            agent_task_id=agent_task_id,
+            context=context,
+            initial_state=initial_state,
+            warehouse_state_snapshot=warehouse_state_snapshot,
+        )
+        # Exactly one terminal/paused write, at the single exit point.
+        return await self._checkpoint(proc_state, final=True)
+
+    async def _run_procedure_inner(
+        self,
+        *,
+        definition: AgentDefinition,
+        sop: SOPDefinition,
+        agent_task_id: str,
+        context: AgentExecutionContext,
+        initial_state: ProcedureExecutionState | None = None,
+        warehouse_state_snapshot: Any | None = None,
+    ) -> ProcedureExecutionState:
+        """Procedure loop. Checkpoints non-terminal transitions only."""
+        resuming = initial_state is not None
         proc_state = initial_state or self._init_state(sop, agent_task_id, context)
+
+        # A restored procedure must never be re-advanced past its own ending.
+        if proc_state.is_terminal():
+            logger.info(
+                "SOPEngine: refusing to resume terminal procedure %s (status=%s)",
+                proc_state.procedure_execution_id, proc_state.status.value,
+            )
+            return proc_state
+
+        # SOP version pinning: a restored procedure runs the version it started
+        # under, or it does not run. Silently continuing under a newer SOP would
+        # mean the steps already completed and the steps still to come came from
+        # different procedures.
+        if resuming:
+            mismatch = self._version_mismatch(proc_state, sop)
+            if mismatch is not None:
+                return self._escalate(
+                    proc_state, EscalationReasonCode.POLICY_CONFLICT, mismatch
+                )
+
         step_index: dict[str, SOPStep] = {s.id: s for s in sop.steps}
 
         if proc_state.current_step_id is None and sop.steps:
+            if proc_state.completed_step_ids or proc_state.branch_history:
+                # Resumed at a procedure that had already run off the end of its
+                # step chain. Restarting from step 0 would re-execute everything.
+                return proc_state.model_copy(update={
+                    "status": self._terminal_status(proc_state),
+                    "last_updated_at": _now(),
+                })
             proc_state = proc_state.model_copy(
                 update={"current_step_id": sop.steps[0].id}
             )
+
+        # Checkpoint: procedure created (or resumed and validated).
+        proc_state = await self._checkpoint(proc_state)
 
         transitions = 0
 
@@ -171,6 +290,7 @@ class SOPEngine:
                         step.id, sop.id,
                     )
                     proc_state = self._skip(proc_state, step)
+                    proc_state = await self._checkpoint(proc_state)  # branch taken
                     continue
 
             # Required inputs (V2): a step cannot run without the context it declares.
@@ -190,6 +310,11 @@ class SOPEngine:
                 proc_state = proc_state.model_copy(update={
                     "loop_started_at": {**proc_state.loop_started_at, step.id: _now()},
                 })
+
+            # Checkpoint: step started. A crash after this point is recoverable
+            # as "this step was in flight", which is what lets Scenario A
+            # distinguish a step that never ran from one that may have.
+            proc_state = await self._checkpoint(proc_state)
 
             proc_state, step_result = await self._run_step_with_retry(
                 definition=definition,
@@ -212,6 +337,7 @@ class SOPEngine:
                 # declared criterion proven — that is the loop's EXIT edge.
                 override = step.loop.exit_step_id if step.loop is not None else None
                 proc_state = self._advance(proc_state, step, override_next=override)
+                proc_state = await self._checkpoint(proc_state)  # advance recorded
                 continue
 
             # ── Bounded loop: the criterion did not hold (yet) ────────────────
@@ -226,6 +352,9 @@ class SOPEngine:
                         step.loop.max_iterations,
                         sop.id,
                     )
+                    # Checkpoint: loop iteration count changed. This is what
+                    # makes "attempt 2 of 3" survive a crash as 2 of 3.
+                    proc_state = await self._checkpoint(proc_state)
                     # current_step_id is unchanged: the loop body is the step.
                     continue
                 proc_state = self._record_loop_exhaustion(proc_state, step, step_result, reason)
@@ -239,6 +368,7 @@ class SOPEngine:
                     "branch_history": proc_state.branch_history + [step.id],
                     "last_updated_at": _now(),
                 })
+                proc_state = await self._checkpoint(proc_state)  # exhaustion branch
                 continue
 
             # Step did not complete. Honour the declared failure branch if present.
@@ -252,6 +382,7 @@ class SOPEngine:
                     "branch_history": proc_state.branch_history + [step.id],
                     "last_updated_at": _now(),
                 })
+                proc_state = await self._checkpoint(proc_state)  # failure branch
                 continue
 
             terminal = (
@@ -288,10 +419,30 @@ class SOPEngine:
         are evaluated against authoritative post-execution state. An
         indeterminate execution escalates as EXECUTION_INDETERMINATE rather
         than retrying the write.
+
+        Restart safety: this method re-runs *validation only*. It never invokes
+        the executor and never issues a write. A procedure that crashed after
+        its write landed but before the authoritative re-read resumes here,
+        re-reads, and completes — with the write still having happened exactly
+        once.
         """
         step_id = proc_state.current_step_id
         if step_id is None:
             raise ValueError("resume_after_governance called but no current step")
+
+        if proc_state.is_terminal():
+            logger.info(
+                "SOPEngine: refusing governance resume on terminal procedure %s (%s)",
+                proc_state.procedure_execution_id, proc_state.status.value,
+            )
+            return proc_state
+
+        version_mismatch = self._version_mismatch(proc_state, sop)
+        if version_mismatch is not None:
+            escalated = self._escalate(
+                proc_state, EscalationReasonCode.POLICY_CONFLICT, version_mismatch
+            )
+            return await self._checkpoint(escalated, final=True)
 
         step = next((s for s in sop.steps if s.id == step_id), None)
         if step is None:
@@ -323,6 +474,30 @@ class SOPEngine:
             warehouse_state_snapshot=warehouse_state_snapshot,
         )
         validator = self._validators.get_for_step(step)
+
+        # Evidence requirements bind here too — this is the post-write reread,
+        # the step where "we believe it worked" is least acceptable.
+        evidence_check = await DEFAULT_EVIDENCE_VALIDATOR.validate(
+            step, step_result, val_ctx
+        )
+        if not evidence_check.valid:
+            failed = step_result.model_copy(update={
+                "status": StepStatus.ESCALATED,
+                "validation_result": evidence_check,
+                "evidence": step_result.evidence + evidence_check.evidence,
+                "escalation_reason": EscalationReasonCode.EVIDENCE_MISSING,
+                "escalation_message": (
+                    f"Post-governance evidence missing: {evidence_check.reason}"
+                ),
+            })
+            escalated = proc_state.model_copy(update={
+                "step_results": {**proc_state.step_results, step_id: failed},
+                "evidence_refs": proc_state.evidence_refs + evidence_check.evidence,
+                "status": ProcedureStatus.ESCALATED,
+                "last_updated_at": _now(),
+            })
+            return await self._checkpoint(escalated, final=True)
+
         validation = await validator.validate(step, step_result, val_ctx)
 
         # An indeterminate execution is only resolvable by positive proof.
@@ -357,11 +532,14 @@ class SOPEngine:
             })
             advanced = self._advance(updated, step)
             if advanced.current_step_id is None:
-                return advanced.model_copy(update={
-                    "status": self._terminal_status(advanced),
-                    "last_updated_at": _now(),
-                })
-            return advanced
+                return await self._checkpoint(
+                    advanced.model_copy(update={
+                        "status": self._terminal_status(advanced),
+                        "last_updated_at": _now(),
+                    }),
+                    final=True,
+                )
+            return await self._checkpoint(advanced)
 
         # Validation failed after governance. Distinguish "the write definitely
         # did not land" from "we cannot tell whether it landed" — the latter is
@@ -380,12 +558,15 @@ class SOPEngine:
                 f"Post-governance validation failed: {validation.reason}"
             ),
         })
-        return proc_state.model_copy(update={
-            "step_results": {**proc_state.step_results, step_id: failed_result},
-            "evidence_refs": proc_state.evidence_refs + validation.evidence,
-            "status": ProcedureStatus.ESCALATED,
-            "last_updated_at": _now(),
-        })
+        return await self._checkpoint(
+            proc_state.model_copy(update={
+                "step_results": {**proc_state.step_results, step_id: failed_result},
+                "evidence_refs": proc_state.evidence_refs + validation.evidence,
+                "status": ProcedureStatus.ESCALATED,
+                "last_updated_at": _now(),
+            }),
+            final=True,
+        )
 
     # ── Step execution ────────────────────────────────────────────────────────
 
@@ -430,6 +611,11 @@ class SOPEngine:
                 ),
                 "last_updated_at": _now(),
             })
+
+            # Checkpoint: StepResult accepted, validation recorded, attempt
+            # count advanced. A crash after this point must not re-execute the
+            # step — the stored result is reused and only validation replays.
+            proc_state = await self._checkpoint(proc_state)
 
             if step_result.status in (
                 StepStatus.COMPLETED,
@@ -551,6 +737,26 @@ class SOPEngine:
             execution_context=context,
             warehouse_state_snapshot=warehouse_state_snapshot,
         )
+
+        # 4a. Evidence requirements run FIRST. A step that cannot show its work
+        #     has not completed, whatever its completion criterion would have
+        #     said — and it is reported as EVIDENCE_MISSING rather than
+        #     VALIDATION_FAILED, because the two call for different responses.
+        evidence_check = await DEFAULT_EVIDENCE_VALIDATOR.validate(step, result, val_ctx)
+        if not evidence_check.valid:
+            logger.warning(
+                "SOPEngine: step %s failed evidence requirements on attempt %d — %s",
+                step.id, attempt, evidence_check.reason,
+            )
+            return result.model_copy(update={
+                "status": StepStatus.FAILED,
+                "completed_at": result.completed_at or _now(),
+                "validation_result": evidence_check,
+                "evidence": result.evidence + evidence_check.evidence,
+                "escalation_reason": EscalationReasonCode.EVIDENCE_MISSING,
+                "escalation_message": step.escalation_reason or evidence_check.reason,
+            })
+
         validation = await validator.validate(step, result, val_ctx)
 
         if validation.valid:
@@ -808,6 +1014,39 @@ class SOPEngine:
             return []
         bounded = context.bounded_context or {}
         return [key for key in step.required_inputs if key not in bounded]
+
+    @staticmethod
+    def _version_mismatch(
+        proc_state: ProcedureExecutionState,
+        sop: SOPDefinition,
+    ) -> str | None:
+        """
+        Refuse to run a restored procedure against a different SOP version.
+
+        ``sop_version`` on the procedure record is a pin, not a label. A
+        procedure that completed steps 1–4 under v1.0 and would run steps 5–9
+        under v1.1 has executed a procedure that never existed — the completed
+        work and the remaining work came from different documents, and no audit
+        of either one describes what actually happened.
+
+        There is no auto-upgrade path and there is deliberately no override. If
+        the pinned version cannot be supplied, the procedure fails safely with a
+        structured reason and a human decides what to do, which is the correct
+        outcome for a procedure that may already have written to the warehouse.
+        """
+        if proc_state.sop_id != sop.id:
+            return (
+                f"Restored procedure pins SOP {proc_state.sop_id!r} but was resumed "
+                f"with SOP {sop.id!r}. Refusing to continue under a different procedure."
+            )
+        if proc_state.sop_version != sop.version:
+            return (
+                f"Restored procedure pins SOP {proc_state.sop_id!r} version "
+                f"{proc_state.sop_version!r} but was resumed with version "
+                f"{sop.version!r}. Procedures never auto-upgrade: supply the pinned "
+                "version or escalate to a human."
+            )
+        return None
 
     @staticmethod
     def _is_indeterminate(execution_status: str) -> bool:

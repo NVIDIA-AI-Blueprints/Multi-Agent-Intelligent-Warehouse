@@ -216,8 +216,24 @@ def test_engine_constructor_takes_no_executor_of_actions():
 
     params = set(inspect.signature(SOPEngine.__init__).parameters)
     assert params == {
-        "self", "executor", "validator_registry", "trace_id", "max_transitions"
+        "self", "executor", "validator_registry", "trace_id", "max_transitions",
+        "store",
     }
     # 'executor' here is a SOPStepExecutor (a step runner), not an ActionExecutor.
     annotation = inspect.signature(SOPEngine.__init__).parameters["executor"].annotation
     assert "SOPStepExecutor" in str(annotation)
+
+    # 'store' is a ProcedureStateStore — a record keeper, not an actor. It can
+    # save, load and delete procedure state and nothing else, so handing the
+    # engine persistence grants it no operational authority.
+    store_annotation = str(
+        inspect.signature(SOPEngine.__init__).parameters["store"].annotation
+    )
+    assert "ProcedureStateStore" in store_annotation
+
+    from maiw_agents.sop_engine import ProcedureStateStore
+
+    store_api = {n for n in dir(ProcedureStateStore) if not n.startswith("_")}
+    assert store_api == {"save", "load", "delete"}, (
+        f"ProcedureStateStore exposes unexpected API: {sorted(store_api)}"
+    )
