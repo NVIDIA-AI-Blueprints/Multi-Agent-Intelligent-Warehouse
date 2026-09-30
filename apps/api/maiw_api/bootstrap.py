@@ -137,6 +137,18 @@ async def get_runtime() -> MAIWRuntime:
     logger.info("MAIW bootstrap: assembling runtime...")
     runtime = MAIWRuntime()
 
+    # ── 0z. SOP state predicates ──────────────────────────────────────────────
+    # Every domain's SOP STATE_PREDICATE validators must be resolvable before a
+    # procedure runs, independently of which agents this process goes on to
+    # construct. Pure imports: no network, no DB, no model provider.
+    try:
+        from maiw_agents.domain_predicates import register_all_domain_predicates
+
+        register_all_domain_predicates()
+        logger.info("MAIW bootstrap: SOP domain predicates registered")
+    except Exception as exc:  # pragma: no cover - defensive, mirrors block style
+        logger.warning("MAIW bootstrap: SOP domain predicates unavailable — %s", exc)
+
     # ── 0a. Circuit breakers — created before all network-touching components ──
     # Domain isolation: each MCP domain has its own independent circuit breaker.
     # NIM has a separate circuit breaker on the ModelGateway path.
