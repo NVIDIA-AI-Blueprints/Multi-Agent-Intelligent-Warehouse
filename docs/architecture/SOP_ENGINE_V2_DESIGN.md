@@ -1780,9 +1780,10 @@ Three things are new:
 
 1. **A registered production predicate.** Before this change, no equipment or
    wave predicate was registered anywhere outside a test fixture — the
-   `wave_risk_reduced` name referenced by `wave_risk_resolution.v2.yaml` resolves
-   to nothing at runtime and would validate as "unknown predicate". Proof SOP B
-   establishes the registration pattern: `maiw_agents/equipment/predicates.py`
+   `wave_risk_reduced` name referenced by `wave_risk_resolution.v2.yaml` resolved
+   to nothing at runtime and validated as "unknown predicate". (That name is now
+   owned by the wave domain — see *Domain-Owned State Predicates* below.) Proof
+   SOP B establishes the registration pattern: `maiw_agents/equipment/predicates.py`
    calls `register_predicate()` at import, and `maiw_agents/equipment/__init__.py`
    imports it, so *loading the equipment domain* is what makes equipment
    semantics available. The generic validator engine still knows nothing about
@@ -1878,9 +1879,11 @@ traverse identically.
    substitution the engine does not have. Proof SOP C should decide whether to
    add scoped substitution or accept per-incident SOP instantiation — *not* an
    expression language.
-2. **`wave_risk_reduced` is still unregistered.** Proof SOP A's YAML names a
-   predicate that resolves to nothing in production. The wave domain should adopt
-   the `equipment/predicates.py` pattern.
+2. ~~**`wave_risk_reduced` is still unregistered.**~~ **CLOSED** by
+   `fix/sop-wave-predicate-registration`. The wave domain adopted the
+   `equipment/predicates.py` pattern, and a generic registry-drift test now
+   fails CI for any SOP naming an unregistered predicate. See *Domain-Owned
+   State Predicates*.
 3. **Equipment status has no enum.** `status` is a bare `str` and the DB comment
    (`out_of_service`) disagrees with the contract vocabulary (`offline`). A
    shared status enum is a prerequisite for predicates that are safe across
@@ -1895,6 +1898,133 @@ traverse identically.
    never enforced by the engine; it only reaches the Deep Agents prompt. Tests
    assert evidence *presence* and predicate naming, but nothing checks the
    declared list against what was actually collected.
+
+---
+
+## Domain-Owned State Predicates
+
+**IMPLEMENTED** — branch `fix/sop-wave-predicate-registration`, based on
+`5e31c19` (PR #125). Closes gap 2 of the Proof SOP B remaining-gaps list.
+
+### The rule
+
+A STATE_PREDICATE is named in YAML and implemented in the domain package that
+owns the semantics. The generic engine never learns what the name means.
+
+```
+SOP YAML                    completion.validator_type: state_predicate
+   │                        completion.predicate_name: wave_risk_reduced
+   ▼
+named predicate             a name only — never an expression, never eval()
+   │
+   ▼
+domain-owned implementation maiw_agents/<domain>/predicates.py
+   │                        pure, read-only, fn(state_dict, args) -> bool
+   ▼
+production ValidatorRegistry  sop_engine/validators.py::_PREDICATES
+```
+
+| Domain | Module | Predicates |
+|---|---|---|
+| equipment | `maiw_agents/equipment/predicates.py` | `equipment_write_landed`, `equipment_replacement_assigned`, `equipment_recovery_complete` |
+| wave | `maiw_agents/wave/predicates.py` | `wave_risk_reduced` |
+
+Each `predicates.py` calls `register_predicate()` at import and each domain
+`__init__.py` imports it, so *loading a domain* is what makes its semantics
+available. Registration is idempotent and order-independent: re-registering a
+name rebinds it to the same function, and the two domains share no names.
+
+**Hard rule: the generic engine does not embed domain semantics.** A test
+asserts that neither `sop_engine/engine.py` nor `sop_engine/validators.py`
+contains `wave_risk_reduced`, `at_risk_count`, `carrier_cutoff` or `forklift` in
+executable code. Adding a domain means adding a `predicates.py` and one import —
+never a change to the engine.
+
+> **STATE_PREDICATE validates operational state. It does not authorize or
+> execute the action.** A predicate receives an already-captured view of
+> authoritative state and returns a bool. It holds no ActionExecutor, no MCP
+> client, no ModelGateway and no credentials; it cannot fetch state, re-issue a
+> write, or approve anything. Governance authorizes; ActionExecutor executes;
+> the predicate only ever *observes* the result.
+
+### The composition root
+
+Domain ownership alone makes predicate availability a function of *which agents
+a process happened to construct*. `maiw_agents/domain_predicates.py` closes
+that: `register_all_domain_predicates()` imports every predicate-owning domain,
+and `apps/api/maiw_api/bootstrap.py` calls it during runtime assembly, before
+any procedure can run. It is not a second registry — there is exactly one — and
+it is not a test bootstrap. `production_predicates()` is the read-side of the
+same call, and it is what conformance tests must use.
+
+### Registry drift is now a CI failure
+
+`test_all_sop_state_predicates_registered_in_production` walks every executable
+SOP YAML under `agents/sops/`, extracts every named STATE_PREDICATE, and asserts
+each resolves through the production registry.
+
+> **Invariant:** an executable SOP YAML may only reference named
+> STATE_PREDICATE validators that are registered in the production validator
+> registry.
+
+This is the guard that would have caught `wave_risk_reduced`. Proof SOP A's
+YAML named a predicate no production module owned, so its terminal step resolved
+to a non-retryable `unknown predicate` escalation at runtime — while every test
+passed, because the tests registered their own predicates under different names
+(`t_wave_risk_reduced`, `t_engine_risk_reduced`). The check is accompanied by two
+guards of its own: one asserting the corpus is non-empty and contains at least
+one STATE_PREDICATE (so it can never pass vacuously), and one proving it rejects
+a SOP naming an unimplemented predicate.
+
+The correct response to this test failing is to implement and register the
+predicate in the owning domain package. Never to relax the assertion.
+
+### No generic fallback
+
+An unregistered name fails explicitly and non-retryably — re-running a step
+cannot register a predicate. `valid=False`, `retryable=False`, reason
+`unknown predicate: <name>`. An unsupported completion criterion must never be
+mistaken for a satisfied one.
+
+### `wave_risk_reduced`
+
+Reads exactly one authoritative field, `waves.at_risk_count` from
+`maiw_state.models.wave.WaveState`, and operates in one of two modes:
+
+- **Absolute (default).** `at_risk_count <= max_at_risk_count` (default `0`) —
+  the wave is no longer in breach, which is the SOP's stated objective. A
+  partial improvement is not a resolution.
+- **Relative.** When the SOP declares `baseline_at_risk_count`, requires
+  `baseline - current >= min_reduction`.
+
+The baseline is a **declared literal in the YAML**, not a prior snapshot read.
+The predicate never consults a pre-action snapshot, cached model output,
+recommendation text, or executor return value — all four are claims about the
+world rather than the world. Current state reaches it as
+`context.warehouse_state_snapshot`, re-read at validation time; a retry is a
+genuine fresh read.
+
+Missing or malformed data returns `False`, never `True`: absent wave component,
+absent/non-integer/boolean/negative `at_risk_count`, `min_reduction < 1`, a
+malformed threshold or baseline, or a `warehouse_id` mismatch. "No wave data"
+and "wave data showing zero at-risk tasks" are deliberately distinguishable.
+
+### Remaining predicate debt
+
+1. **Predicate args are still literal in YAML** (unchanged from Proof SOP B).
+   `wave_risk_reduced` needs no asset IDs, so Proof SOP A does not feel this,
+   but relative mode would need `baseline_at_risk_count` bound from bounded
+   context to be useful per-incident.
+2. **Two spellings of the wave state key.** `WarehouseState` declares `waves`;
+   wave-domain producers and SOP prose say `wave`. Both are accepted, and the
+   sealed-snapshot nesting under `state` is unwrapped. This is tolerance of two
+   known shapes, not a general search — but a single canonical state view would
+   be better. The same latent mismatch exists for equipment
+   (`equipment_type` vs `type`).
+3. **One wave predicate, not a graduated family.** Equipment has three
+   predicates of increasing strength across three steps; wave has a single
+   terminal post-condition, because Proof SOP A declares a single
+   STATE_PREDICATE step.
 
 ---
 
