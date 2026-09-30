@@ -1758,6 +1758,146 @@ migration's rationale is re-examined rather than silently invalidated.
 
 ---
 
+## Proof SOP B — Equipment Failure / Recovery
+
+**IMPLEMENTED** — branch `feat/sop-proof-b-equipment-recovery`, based on
+`6383c24` (PR #124).
+
+- Executable SOP: `agents/sops/equipment/equipment_failure_recovery.v1.yaml`
+  (`equipment.equipment_failure_recovery` v1.0, 8 steps)
+- Predicates: `packages/maiw-agents/maiw_agents/equipment/predicates.py`
+- Tests: `packages/maiw-agents/tests/test_sop_equipment_failure_recovery.py` (57)
+- Human doc: `docs/sops/EQUIPMENT_FAILURE_RECOVERY.md`
+
+### What this proof adds over Proof SOP A
+
+Proof SOP A (`wave_risk_resolution_v2`) demonstrated the post-write invariant on
+a **single step**, with a predicate registered only inside the test. Proof SOP B
+runs the invariant through a **whole procedure**, with predicates registered in
+**production code by the domain that owns them**.
+
+Three things are new:
+
+1. **A registered production predicate.** Before this change, no equipment or
+   wave predicate was registered anywhere outside a test fixture — the
+   `wave_risk_reduced` name referenced by `wave_risk_resolution.v2.yaml` resolves
+   to nothing at runtime and would validate as "unknown predicate". Proof SOP B
+   establishes the registration pattern: `maiw_agents/equipment/predicates.py`
+   calls `register_predicate()` at import, and `maiw_agents/equipment/__init__.py`
+   imports it, so *loading the equipment domain* is what makes equipment
+   semantics available. The generic validator engine still knows nothing about
+   forklifts — a test asserts no equipment token leaks into `validators.py`.
+
+2. **Graduated proof, not a single check.** The three terminal steps use three
+   predicates of increasing strength:
+
+   | Step | Predicate | Question |
+   |---|---|---|
+   | `wait_for_governance` | `equipment_write_landed` | Did the mutation land at all? |
+   | `verify_execution` | `equipment_replacement_assigned` | Was it the intended transition? |
+   | `verify_recovery` | `equipment_recovery_complete` | Is the objective restored? |
+
+   The separation is load-bearing: **execution succeeding is not recovery
+   succeeding**. A run where steps 6 and 7 pass and step 8 fails is a real,
+   tested outcome — the write landed, the transition was correct, and the
+   warehouse objective is still not met. The procedure does not complete.
+
+3. **Governance resume as the reread seam.** `resume_after_governance()` is the
+   first moment post-write authoritative state exists, so that is where the
+   weakest predicate sits. It is also the only place the engine can distinguish
+   `EXECUTION_INDETERMINATE` from `VALIDATION_FAILED`, because it is the only
+   place `execution_status` is in scope.
+
+### Governance boundary proof
+
+The engine halts at step 6 with `ProcedureStatus.WAITING_FOR_GOVERNANCE` and
+runs nothing further. Tested directly: at the pause, `completed_step_ids` is
+exactly the five pre-governance steps, the executor was never asked for
+`verify_execution` or `verify_recovery`, and the pause step's
+`validation_result` is `None` — validation is deferred until there is state to
+read.
+
+The pause step deliberately carries **no** `retry_policy`, so resume cannot
+re-execute it. `resume_after_governance()` never calls the executor.
+
+Two structural facts reinforce this beyond test assertions:
+
+- `validate_sop()`'s write-capability pattern rejects
+  `warehouse.equipment.assign`, so this SOP is *structurally incapable* of
+  declaring the write it asks for. The capability list contains only READ and
+  non-assign PROPOSAL capabilities.
+- `RetryPolicy._no_write_retry` rejects `retry_on: [EXECUTION_INDETERMINATE]` at
+  construction, so a blind write retry cannot be configured.
+
+### Authoritative post-write completion proof
+
+The test suite separates the **world** (`FakeEquipmentWorld`) from the
+**executor response** (`RecordingActionExecutor`), which is what makes the
+decisive cases expressible:
+
+| Executor said | World changed | Result |
+|---|---|---|
+| `EXECUTED` | yes | `COMPLETED` |
+| `EXECUTED` | **no** | `ESCALATED` / `VALIDATION_FAILED` |
+| `UNKNOWN` | yes | `COMPLETED` (reconciled by re-read) |
+| `UNKNOWN` | no | `ESCALATED` / `EXECUTION_INDETERMINATE` |
+| rejected | n/a | `ESCALATED`, write count **0** |
+
+Write count is asserted at exactly 1 across every ambiguous path — including the
+retry-exhaustion paths, where retries are shown to increase the *read* count
+while leaving the write count untouched. `LiveSnapshot` re-reads world state on
+every `model_dump()`, so a STATE_PREDICATE retry is a genuine fresh read rather
+than a re-check of a stale dict.
+
+### Cross-runtime behaviour
+
+Both executors run the same SOP against independent worlds and are compared on
+completed step IDs, traversal order, `(validator_type, valid)` per step,
+governance pause timing, and write count. All equal; only `StepResult.runtime`
+differs. Prose, rationale and reasoning are never compared.
+
+The Deep Agents side additionally asserts it receives exactly one step per
+invocation, cannot reach `verify_recovery` before the engine offers it, holds no
+WRITE-class tool (checked against `SKILL_REGISTRY.capability_class`), returns
+only `StepResult`, and contains no reference to `next_step_id` or
+`current_step_id` in its source.
+
+### Contract change
+
+`StepActionType` gained five additive equipment action types
+(`read_equipment_state`, `assess_equipment_impact`,
+`inspect_alternate_equipment`, `determine_recovery_strategy`,
+`verify_equipment_recovery`), mirroring the existing labor and wave domain
+blocks. None is a write action. No engine semantics changed; all V1 SOPs
+traverse identically.
+
+### Remaining gaps for Proof SOP C
+
+1. **Predicate args are literal in YAML.** Asset IDs are constants in
+   `predicate_args`. Binding them from bounded context needs parameter
+   substitution the engine does not have. Proof SOP C should decide whether to
+   add scoped substitution or accept per-incident SOP instantiation — *not* an
+   expression language.
+2. **`wave_risk_reduced` is still unregistered.** Proof SOP A's YAML names a
+   predicate that resolves to nothing in production. The wave domain should adopt
+   the `equipment/predicates.py` pattern.
+3. **Equipment status has no enum.** `status` is a bare `str` and the DB comment
+   (`out_of_service`) disagrees with the contract vocabulary (`offline`). A
+   shared status enum is a prerequisite for predicates that are safe across
+   deployments.
+4. **No cross-domain recovery.** Falling back to manual labor when no equipment
+   alternative exists requires delegation from the equipment SOP to the labor
+   agent mid-procedure. Untested.
+5. **No `HUMAN` validator.** Still correctly unnecessary — governance already
+   owns approval — but a procedure needing physical confirmation (lockout/tagout)
+   would need it built.
+6. **Evidence requirements are declarative only.** `evidence_requirements` is
+   never enforced by the engine; it only reaches the Deep Agents prompt. Tests
+   assert evidence *presence* and predicate naming, but nothing checks the
+   declared list against what was actually collected.
+
+---
+
 ## Appendix: Current Package Structure Snapshot
 
 ```
