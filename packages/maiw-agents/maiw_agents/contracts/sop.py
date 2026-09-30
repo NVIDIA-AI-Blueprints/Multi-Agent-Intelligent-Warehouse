@@ -29,7 +29,13 @@ from typing import Any, Literal
 import yaml
 from pydantic import BaseModel, Field, model_validator
 
-from .sop_v2 import LoopPolicy, RetryPolicy, StepCompletionSpec, ValidatorType
+from .sop_v2 import (
+    EvidenceRequirement,
+    LoopPolicy,
+    RetryPolicy,
+    StepCompletionSpec,
+    ValidatorType,
+)
 
 
 # ── Condition (declarative) ───────────────────────────────────────────────────
@@ -235,10 +241,44 @@ class SOPStep(BaseModel):
         default=None,
         description="Overrides the default escalation message for this step.",
     )
-    evidence_requirements: list[str] | None = Field(
+    evidence_requirements: list[str | EvidenceRequirement] | None = Field(
         default=None,
-        description="Evidence type names that must be collected for this step.",
+        description=(
+            "Evidence this step must produce. Two forms are accepted, and they "
+            "mean different things:\n"
+            "  - a bare string ('state_snapshot') is a DECLARATIVE HINT. It "
+            "    documents the intent and is surfaced to an adaptive runtime in "
+            "    the step prompt, but it is not enforced. This is the pre-"
+            "    hardening form and every existing SOP uses it.\n"
+            "  - an EvidenceRequirement mapping is an ENFORCED PRECONDITION. The "
+            "    step cannot complete unless matching structured evidence is "
+            "    present. Used on the steps where absence of proof is dangerous: "
+            "    governance handoff, post-write reread, final validation.\n"
+            "Hints were left unenforced deliberately: the existing string tags "
+            "name evidence kinds no component actually emits, so enforcing them "
+            "retroactively would fail every step rather than prove anything."
+        ),
     )
+
+    def enforced_evidence(self) -> list[EvidenceRequirement]:
+        """
+        The subset of ``evidence_requirements`` that blocks completion.
+
+        Bare-string hints are excluded — see the field description for why the
+        two forms are not equivalent.
+        """
+        if not self.evidence_requirements:
+            return []
+        return [r for r in self.evidence_requirements if isinstance(r, EvidenceRequirement)]
+
+    def evidence_requirement_labels(self) -> list[str]:
+        """Human/prompt-facing names for every declared requirement, both forms."""
+        if not self.evidence_requirements:
+            return []
+        return [
+            r if isinstance(r, str) else r.evidence_type
+            for r in self.evidence_requirements
+        ]
 
     @model_validator(mode="after")
     def _check_loop_policy(self) -> "SOPStep":
