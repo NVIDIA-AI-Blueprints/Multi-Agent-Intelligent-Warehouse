@@ -29,7 +29,7 @@ from typing import Any, Literal
 import yaml
 from pydantic import BaseModel, Field, model_validator
 
-from .sop_v2 import RetryPolicy, StepCompletionSpec
+from .sop_v2 import LoopPolicy, RetryPolicy, StepCompletionSpec, ValidatorType
 
 
 # ── Condition (declarative) ───────────────────────────────────────────────────
@@ -124,8 +124,30 @@ StepActionType = Literal[
     "inspect_alternate_equipment",
     "determine_recovery_strategy",
     "verify_equipment_recovery",
+    # Inventory / picking domain (Proof SOP C — picking inventory exception).
+    # Additive, mirroring the labor, wave and equipment blocks above. None of
+    # these are write actions: they read inventory state, classify an exception,
+    # select a picking strategy from deterministic facility configuration,
+    # evaluate replenishment options, and re-read state to decide whether the
+    # exception cleared. The adjustment itself is never an SOP action — it is
+    # performed by ActionExecutor outside the agent package after governance
+    # approves.
+    "read_inventory_state",
+    "classify_inventory_exception",
+    "determine_picking_strategy",
+    "inspect_alternate_inventory_locations",
+    "evaluate_replenishment_options",
+    "verify_inventory_reconciled",
+    "return_inventory_assessment",
+    "escalate_inventory_exception",
     "no_op",
 ]
+
+# Step actions that hand control to the governance boundary. A step with one of
+# these actions pauses at WAITING_FOR_GOVERNANCE and may be followed by a real
+# warehouse mutation performed by ActionExecutor. Repeating such a step can
+# duplicate a physical side effect, so it may never carry a loop policy.
+GOVERNED_WRITE_ACTIONS: frozenset[str] = frozenset({"emit_recommended_action"})
 
 
 class SOPStep(BaseModel):
@@ -197,6 +219,14 @@ class SOPStep(BaseModel):
         default=None,
         description="Per-step retry budget. None = no retry (single attempt).",
     )
+    loop: LoopPolicy | None = Field(
+        default=None,
+        description=(
+            "Bounded, validator-driven repetition of this step. None = the step "
+            "runs once and the procedure moves on. See LoopPolicy: the engine, "
+            "not the runtime or the model, decides whether the loop continues."
+        ),
+    )
     timeout_seconds: float | None = Field(
         default=None,
         description="Step-level wall-clock budget. None = no step-level timeout.",
@@ -209,6 +239,64 @@ class SOPStep(BaseModel):
         default=None,
         description="Evidence type names that must be collected for this step.",
     )
+
+    @model_validator(mode="after")
+    def _check_loop_policy(self) -> "SOPStep":
+        """
+        A loop is only safe if it is validator-driven, singly-budgeted, and
+        cannot repeat a write. All four rules below are structural: a SOP that
+        breaks one cannot be constructed, so it can never reach the engine.
+        """
+        loop = self.loop
+        if loop is None:
+            return self
+
+        # 1. The loop must be decided by evidence, not by a runtime's say-so.
+        #    LEGACY_SUCCESS ("the runtime returned") would exit on iteration 1
+        #    every time, which is a loop in name only.
+        if self.completion is None:
+            raise ValueError(
+                f"SOPStep '{self.id}' declares a loop but no completion spec. A loop "
+                "must be driven by an explicit completion criterion — otherwise "
+                "nothing but the runtime decides when it ends."
+            )
+        if self.completion.validator_type is ValidatorType.LEGACY_SUCCESS:
+            raise ValueError(
+                f"SOPStep '{self.id}' declares a loop with validator_type=LEGACY_SUCCESS. "
+                "Legacy success means 'the runtime returned', which is not a loop exit "
+                "criterion — use STATE_PREDICATE, SCHEMA or CAPABILITY_RESULT."
+            )
+
+        # 2. One repetition budget per step. Two budgets would make "attempts"
+        #    and "iterations" different numbers and the loop counter ambiguous.
+        if self.retry_policy is not None:
+            raise ValueError(
+                f"SOPStep '{self.id}' declares both a loop and a retry_policy. "
+                "These are mutually exclusive repetition budgets: loop.max_iterations "
+                "is the authoritative attempt count for a looping step."
+            )
+
+        # 3. A governed write must never be loop-retried. Re-entering a step that
+        #    hands off to ActionExecutor can duplicate a physical side effect.
+        if self.action in GOVERNED_WRITE_ACTIONS:
+            raise ValueError(
+                f"SOPStep '{self.id}' declares a loop on governed write action "
+                f"'{self.action}'. An ambiguous write is resolved by re-reading "
+                "authoritative state, never by repeating the write."
+            )
+
+        # 4. A loop target pointing at the loop step itself would make the
+        #    bound meaningless.
+        if loop.exit_step_id == self.id:
+            raise ValueError(
+                f"SOPStep '{self.id}': loop.exit_step_id must not be the loop step itself."
+            )
+        if loop.exhaustion_step_id == self.id:
+            raise ValueError(
+                f"SOPStep '{self.id}': loop.exhaustion_step_id must not be the loop step itself."
+            )
+
+        return self
 
 
 # ── SOP definition ────────────────────────────────────────────────────────────
@@ -266,7 +354,8 @@ class SOPDefinition(BaseModel):
 
 # Write capabilities are never allowed inside a SOP.
 _WRITE_CAPABILITY_PATTERNS = re.compile(
-    r"^(warehouse\.(labor\.assign|wave\.assign|equipment\.(assign|release_direct|deploy))|"
+    r"^(warehouse\.(labor\.assign|wave\.assign|equipment\.(assign|release_direct|deploy)|"
+    r"inventory\.(adjust|allocate|reserve|replenish_direct))|"
     r"action_executor\.|exec\.)",
     re.IGNORECASE,
 )
@@ -304,6 +393,9 @@ def validate_sop(
     6. If known_capabilities is provided, all listed capabilities must be known.
     7. If known_agents is provided, all listed subagents must be known.
     8. No circular step dependencies (via next_step_id).
+    9. Loop targets (exit_step_id / exhaustion_step_id) must name real steps.
+   10. A loop must not be re-enterable from its own exit or exhaustion branch,
+       which would make the iteration bound meaningless.
     """
     errors: list[str] = []
 
@@ -367,6 +459,61 @@ def validate_sop(
                 break
             visited.add(current)
             current = next_map.get(current)
+
+    # Rule 9: loop targets must resolve.
+    known_step_ids = set(step_ids)
+    for step in sop.steps:
+        if step.loop is None:
+            continue
+        for field_name in ("exit_step_id", "exhaustion_step_id"):
+            target = getattr(step.loop, field_name)
+            if target is not None and target not in known_step_ids:
+                errors.append(
+                    f"Step '{step.id}' loop.{field_name} references unknown step '{target}'."
+                )
+
+    # Rule 10: a loop must be exited for good.
+    #
+    # The loop's own back-edge is implicit (the engine re-enters the same step)
+    # and is bounded by max_iterations. What is NOT bounded is an *outer* cycle:
+    # if the exit or exhaustion branch can walk back to the loop step, the
+    # iteration counter is reset and the bound means nothing. Only forward
+    # edges the engine actually follows are considered here.
+    forward_edges: dict[str, set[str]] = {}
+    for step in sop.steps:
+        targets: set[str] = set()
+        if step.next_step_id:
+            targets.add(step.next_step_id)
+        if step.on_failure_step_id:
+            targets.add(step.on_failure_step_id)
+        if step.loop is not None:
+            if step.loop.exit_step_id:
+                targets.add(step.loop.exit_step_id)
+            if step.loop.exhaustion_step_id:
+                targets.add(step.loop.exhaustion_step_id)
+        forward_edges[step.id] = targets
+
+    for step in sop.steps:
+        if step.loop is None:
+            continue
+        branch_starts = {
+            t
+            for t in (step.loop.exit_step_id, step.loop.exhaustion_step_id, step.next_step_id)
+            if t is not None
+        }
+        seen: set[str] = set()
+        frontier = list(branch_starts)
+        while frontier:
+            node = frontier.pop()
+            if node in seen:
+                continue
+            seen.add(node)
+            frontier.extend(forward_edges.get(node, ()))
+        if step.id in seen:
+            errors.append(
+                f"Step '{step.id}' is a loop step reachable from its own exit or "
+                "exhaustion branch — the iteration bound would be meaningless."
+            )
 
     if errors:
         raise SOPValidationError(sop.id, errors)
