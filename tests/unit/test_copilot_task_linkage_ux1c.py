@@ -348,9 +348,9 @@ class TestArchitectureInvariants:
             "node_state",
         }
         for field_name in prohibited:
-            assert (
-                field_name not in model_fields
-            ), f"Prohibited field '{field_name}' found in CopilotTurnResponse"
+            assert field_name not in model_fields, (
+                f"Prohibited field '{field_name}' found in CopilotTurnResponse"
+            )
 
     def test_agent_task_id_is_optional_not_required(self):
         """agent_task_id must be optional — no breaking change for existing clients."""
@@ -368,6 +368,6 @@ class TestArchitectureInvariants:
         for route in router.routes:
             methods = getattr(route, "methods", set())
             non_get = methods - {"GET", "HEAD", "OPTIONS"}
-            assert (
-                not non_get
-            ), f"Agent tasks route {route.path} has non-GET methods: {non_get}"
+            assert not non_get, (
+                f"Agent tasks route {route.path} has non-GET methods: {non_get}"
+            )

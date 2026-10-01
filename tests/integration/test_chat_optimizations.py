@@ -207,7 +207,7 @@ async def test_deduplication(session: aiohttp.ClientSession):
 
     # Analyze responses
     print(f"\n⏱️  Total Time: {total_time:.2f}s")
-    print(f"   Average Time per Request: {total_time/num_concurrent_requests:.2f}s")
+    print(f"   Average Time per Request: {total_time / num_concurrent_requests:.2f}s")
 
     # Check if responses are identical (indicating deduplication worked)
     response_texts = [r.get("reply", "") for r in responses]
@@ -225,7 +225,7 @@ async def test_deduplication(session: aiohttp.ClientSession):
     else:
         print("   ⚠️  Responses differ - Deduplication may not be working")
         for i, response in enumerate(unique_responses):
-            print(f"      Response {i+1}: {response[:100]}...")
+            print(f"      Response {i + 1}: {response[:100]}...")
 
     # Check request IDs or timestamps to verify deduplication
     # (If responses have request IDs, they should be the same for deduplicated requests)

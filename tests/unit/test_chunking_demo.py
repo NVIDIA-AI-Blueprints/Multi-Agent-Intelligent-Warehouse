@@ -82,7 +82,7 @@ def main():
 
     # Display chunk details
     for i, chunk in enumerate(chunks):
-        print(f"📄 Chunk {i+1}:")
+        print(f"📄 Chunk {i + 1}:")
         print(f"   ID: {chunk.metadata.chunk_id}")
         print(f"   Tokens: {chunk.metadata.token_count}")
         print(f"   Characters: {chunk.metadata.char_count}")

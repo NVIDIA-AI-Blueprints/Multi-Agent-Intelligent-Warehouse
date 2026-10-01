@@ -268,7 +268,9 @@ def enhance_report_with_error_analysis(report_path: Path, results_path: Path):
                 priority_emoji = (
                     "🔴"
                     if rec["priority"] == "high"
-                    else "🟡" if rec["priority"] == "medium" else "🟢"
+                    else "🟡"
+                    if rec["priority"] == "medium"
+                    else "🟢"
                 )
                 enhanced_recs += f"### {priority_emoji} {rec['title']} ({rec['priority'].upper()} Priority)\n\n"
                 enhanced_recs += f"**Category**: {rec['category']}\n\n"

@@ -202,9 +202,9 @@ def test_traversal_matches_intended_chain(migrated):
 def test_traversal_reaches_every_defined_step(migrated):
     sop, _ = migrated
     chain = _traverse(sop)
-    assert len(chain) == len(
-        sop.steps
-    ), f"{sop.id}: traversal reaches {len(chain)} of {len(sop.steps)} steps"
+    assert len(chain) == len(sop.steps), (
+        f"{sop.id}: traversal reaches {len(chain)} of {len(sop.steps)} steps"
+    )
     assert set(chain) == {s.id for s in sop.steps}
 
 
@@ -313,9 +313,9 @@ async def test_engine_completes_every_step_not_just_the_first(migrated):
     assert state.status is ProcedureStatus.COMPLETED
     assert state.completed_step_ids == expected_chain
     assert state.branch_history == expected_chain
-    assert (
-        len(state.completed_step_ids) > 1
-    ), "regression: the procedure terminated after a single step"
+    assert len(state.completed_step_ids) > 1, (
+        "regression: the procedure terminated after a single step"
+    )
 
 
 @pytest.mark.asyncio
@@ -402,9 +402,9 @@ async def test_labor_sop_traverses_all_steps_without_iteration_cap():
         context=_make_context(),
     )
 
-    assert (
-        state.status is ProcedureStatus.COMPLETED
-    ), f"labor SOP escalated under max_iterations={budget}"
+    assert state.status is ProcedureStatus.COMPLETED, (
+        f"labor SOP escalated under max_iterations={budget}"
+    )
     assert state.completed_step_ids == [s.id for s in sop.steps]
     assert len(state.completed_step_ids) == 8
 
@@ -487,9 +487,9 @@ async def test_runaway_loop_still_escalates():
         context=_make_context(),
     )
 
-    assert (
-        state.status is ProcedureStatus.ESCALATED
-    ), "runaway loop was not stopped by the transition budget"
+    assert state.status is ProcedureStatus.ESCALATED, (
+        "runaway loop was not stopped by the transition budget"
+    )
     reasons = {
         r.escalation_reason
         for r in state.step_results.values()
@@ -532,6 +532,6 @@ def test_migrated_sops_declare_no_v2_step_fields(migrated):
 def test_versions_were_incremented(migrated):
     """Traversal semantics changed, so the SOP version must have moved off 1.0."""
     sop, _ = migrated
-    assert (
-        sop.version != "1.0"
-    ), f"{sop.id}: traversal semantics changed but version is still 1.0"
+    assert sop.version != "1.0", (
+        f"{sop.id}: traversal semantics changed but version is still 1.0"
+    )

@@ -236,7 +236,6 @@ def _make_wave_skill(result=None, side_effect=None):
 
 
 class TestWarehouseStateProviderDeadline:
-
     def _make_provider(
         self,
         equipment_skill=None,
@@ -557,7 +556,6 @@ class _BaseExecutorSubclass(BaseActionExecutor):
 
 
 class TestBaseActionExecutorDeadline:
-
     def _make_executor(self, **kwargs) -> _BaseExecutorSubclass:
         return _BaseExecutorSubclass(**kwargs)
 

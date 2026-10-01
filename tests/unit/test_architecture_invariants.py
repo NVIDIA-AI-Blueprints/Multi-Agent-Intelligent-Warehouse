@@ -362,9 +362,9 @@ class TestWarehouseIdPropagation:
             await executor._check_state_drift(proposal)
 
         asyncio.run(run())
-        assert (
-            "WH-CUSTOM" in captured_warehouse_ids
-        ), "_check_state_drift must use proposal.parameters['warehouse_id'] not 'default'"
+        assert "WH-CUSTOM" in captured_warehouse_ids, (
+            "_check_state_drift must use proposal.parameters['warehouse_id'] not 'default'"
+        )
 
 
 # ── Invariant 9: MCP server exposes only execution tools ──────────────────────

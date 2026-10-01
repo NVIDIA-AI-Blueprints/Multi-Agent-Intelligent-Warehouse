@@ -121,6 +121,7 @@ def _rendered_kwargs(policy: RuntimeCapabilityPolicy, **overrides):
 
 # ── Write isolation ───────────────────────────────────────────────────────────
 
+
 class TestWriteIsolation:
     """WRITE has four possible routes into a sandbox policy. All four are shut."""
 
@@ -204,7 +205,9 @@ class TestWriteIsolation:
         """
         rendered = render_sandbox_policy(policy, config=config)
         assert "warehouse.wave.reprioritize" in rendered.allowed_capability_ids
-        assert "warehouse.wave.reprioritize_direct" not in rendered.allowed_capability_ids
+        assert (
+            "warehouse.wave.reprioritize_direct" not in rendered.allowed_capability_ids
+        )
         assert (
             SKILL_REGISTRY["warehouse.wave.reprioritize_direct"].capability_class
             is CapabilityClass.WRITE
@@ -212,6 +215,7 @@ class TestWriteIsolation:
 
 
 # ── Credentials ───────────────────────────────────────────────────────────────
+
 
 class TestCredentialCustody:
     def test_renderer_injects_no_credentials(self, policy, config):
@@ -239,6 +243,7 @@ class TestCredentialCustody:
 
 # ── Network ───────────────────────────────────────────────────────────────────
 
+
 class TestNetworkPolicy:
     def test_network_is_deny_by_default(self, policy, config):
         rendered = render_sandbox_policy(policy, config=config)
@@ -255,6 +260,7 @@ class TestNetworkPolicy:
 
 
 # ── Filesystem ────────────────────────────────────────────────────────────────
+
 
 class TestFilesystemPolicy:
     def test_only_procedure_state_is_writable(self, policy, config):
@@ -282,6 +288,7 @@ class TestFilesystemPolicy:
 
 
 # ── Monotonicity ──────────────────────────────────────────────────────────────
+
 
 class TestMonotonicity:
     def test_rendered_policy_is_a_subset_of_the_maiw_policy(self, policy, config):
@@ -340,6 +347,7 @@ class TestMonotonicity:
 
 # ── Immutability ──────────────────────────────────────────────────────────────
 
+
 class TestImmutability:
     def test_rendered_policy_is_frozen(self, policy, config):
         rendered = render_sandbox_policy(policy, config=config)
@@ -357,6 +365,7 @@ class TestImmutability:
 
 
 # ── Determinism + golden ──────────────────────────────────────────────────────
+
 
 class TestDeterminism:
     def test_same_inputs_render_identical_yaml(self, policy, config):

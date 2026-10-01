@@ -272,9 +272,9 @@ def test_g15_get_only_routes():
 
     for route in router.routes:
         if isinstance(route, APIRoute):
-            assert route.methods == {
-                "GET"
-            }, f"Route {route.path} must be GET-only, got {route.methods}"
+            assert route.methods == {"GET"}, (
+                f"Route {route.path} must be GET-only, got {route.methods}"
+            )
 
 
 # ── G16. Temporal edge fields ─────────────────────────────────────────────────

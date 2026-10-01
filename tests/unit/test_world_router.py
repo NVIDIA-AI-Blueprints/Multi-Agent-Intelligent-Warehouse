@@ -36,9 +36,9 @@ class TestWorldRouterBoundary:
 
         for route in world_module.router.routes:
             if isinstance(route, APIRoute):
-                assert route.methods == {
-                    "GET"
-                }, f"Route {route.path} must be GET-only, got {route.methods}"
+                assert route.methods == {"GET"}, (
+                    f"Route {route.path} must be GET-only, got {route.methods}"
+                )
 
     def test_world_router_does_not_import_executor(self):
         router_path = REPO_ROOT / "apps" / "api" / "maiw_api" / "routers" / "world.py"
@@ -50,9 +50,9 @@ class TestWorldRouterBoundary:
             "GovernedActionOrchestrator",
         ]
         found = [sym for sym in forbidden if sym in content]
-        assert (
-            found == []
-        ), f"world.py must not import governance/execution symbols: {found}"
+        assert found == [], (
+            f"world.py must not import governance/execution symbols: {found}"
+        )
 
 
 class TestWorldConfig:

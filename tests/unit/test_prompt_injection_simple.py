@@ -45,9 +45,9 @@ def test_template_injection_protection():
     assert safe_template.count("{{") >= 1, "Should contain escaped braces as literals"
     assert safe_template.count("}}") >= 1, "Should contain escaped braces as literals"
     # Should not have single unescaped braces that could be evaluated
-    assert safe_template.count("{") == safe_template.count(
-        "}"
-    ), "Braces should be balanced"
+    assert safe_template.count("{") == safe_template.count("}"), (
+        "Braces should be balanced"
+    )
     print("   ✓ PASSED: Template injection prevented")
 
     # Test 2: Variable access attempt
@@ -65,9 +65,9 @@ def test_template_injection_protection():
     result = sanitize_prompt_input(malicious)
     print(f"   Input:  {repr(malicious)}")
     print(f"   Output: {repr(result)}")
-    assert (
-        "\x00" not in result and "\x01" not in result
-    ), "Control chars should be removed"
+    assert "\x00" not in result and "\x01" not in result, (
+        "Control chars should be removed"
+    )
     print("   ✓ PASSED: Control characters removed")
 
     # Test 4: Normal text preservation
@@ -126,9 +126,9 @@ def test_template_injection_protection():
         # Verify braces are escaped - result should contain {{ or }}
         if "{" in scenario or "}" in scenario:
             # Check that braces in result are escaped (double braces)
-            assert (
-                "{{" in result or "}}" in result or result.count("{") == 0
-            ), f"Failed for: {scenario}"
+            assert "{{" in result or "}}" in result or result.count("{") == 0, (
+                f"Failed for: {scenario}"
+            )
     print("   ✓ PASSED: Real-world scenarios handled correctly")
 
     print("\n" + "=" * 60)

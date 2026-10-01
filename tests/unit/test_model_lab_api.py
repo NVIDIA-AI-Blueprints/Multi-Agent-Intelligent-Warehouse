@@ -89,17 +89,17 @@ class TestArchitectureInvariants:
         imports = self._parse_imports()
         for imp in imports:
             assert "DecisionEngine" not in imp, f"Forbidden import found: {imp}"
-            assert (
-                "decision_engine" not in imp.lower() or "maiw_decision" not in imp
-            ), f"Unexpected decision engine import: {imp}"
+            assert "decision_engine" not in imp.lower() or "maiw_decision" not in imp, (
+                f"Unexpected decision engine import: {imp}"
+            )
 
     def test_no_approval_store_import(self):
         imports = self._parse_imports()
         for imp in imports:
             assert "ApprovalStore" not in imp, f"Forbidden import found: {imp}"
-            assert (
-                "approval" not in imp.lower() or "maiw_decision" not in imp
-            ), f"Unexpected approval import: {imp}"
+            assert "approval" not in imp.lower() or "maiw_decision" not in imp, (
+                f"Unexpected approval import: {imp}"
+            )
 
     def test_no_action_executor_import(self):
         imports = self._parse_imports()
@@ -117,9 +117,9 @@ class TestArchitectureInvariants:
         ]
         for imp in imports:
             for fragment in forbidden_module_fragments:
-                assert (
-                    fragment not in imp.lower()
-                ), f"Forbidden import fragment '{fragment}' found in import: {imp}"
+                assert fragment not in imp.lower(), (
+                    f"Forbidden import fragment '{fragment}' found in import: {imp}"
+                )
 
     def test_all_endpoints_are_get_only(self):
         source = self._ROUTER_PATH.read_text(encoding="utf-8")
@@ -170,9 +170,9 @@ class TestListRuns:
         resp = _client.get("/api/v1/model-lab/runs")
         response_text = resp.text.lower()
         for secret in ["api_key", "authorization", "password", "token", "secret"]:
-            assert (
-                f'"{secret}"' not in response_text
-            ), f"Secret field '{secret}' found in /runs response"
+            assert f'"{secret}"' not in response_text, (
+                f"Secret field '{secret}' found in /runs response"
+            )
 
 
 # ── /runs/18c ────────────────────────────────────────────────────────────────
@@ -424,6 +424,6 @@ class TestModelLabPathSecurity:
             body = resp.json()
             text = str(body).lower()
             for secret_term in ["api_key", "authorization", "password"]:
-                assert (
-                    secret_term not in text
-                ), f"Run list response contains secret field: {secret_term!r}"
+                assert secret_term not in text, (
+                    f"Run list response contains secret field: {secret_term!r}"
+                )

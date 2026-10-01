@@ -94,9 +94,9 @@ def test_scenario_has_timed_events(scenario_yaml):
 def test_scenario_has_worker_absence_event(scenario_yaml):
     """worker_absence event must be present (primary disruption for Scenario 001)."""
     event_types = {e["type"] for e in scenario_yaml.get("timed_events", [])}
-    assert (
-        "worker_absence" in event_types
-    ), f"worker_absence event not found. Event types: {event_types}"
+    assert "worker_absence" in event_types, (
+        f"worker_absence event not found. Event types: {event_types}"
+    )
 
 
 def test_scenario_has_recovery_conditions(scenario_yaml):
@@ -139,9 +139,9 @@ def test_scenario_registry_contains_five_scenarios():
     import glob
 
     scenario_files = glob.glob(os.path.join(_SCENARIOS_DIR, "*.yaml"))
-    assert (
-        len(scenario_files) == 5
-    ), f"Expected 5 scenario files, found {len(scenario_files)}: {scenario_files}"
+    assert len(scenario_files) == 5, (
+        f"Expected 5 scenario files, found {len(scenario_files)}: {scenario_files}"
+    )
 
 
 def test_golden_invariant_checker():

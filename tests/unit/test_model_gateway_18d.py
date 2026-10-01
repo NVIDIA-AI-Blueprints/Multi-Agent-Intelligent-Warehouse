@@ -908,9 +908,9 @@ class TestFixture18DRegistration:
     def test_18d_cases_use_same_context_entities(self):
         """Fixed-context invariant: same context_entities as 18B (§5)."""
         for case in ALL_18D_FIXTURE_CASES:
-            assert set(case.context_entities) == set(
-                FIXTURE_CONTEXT_ENTITIES
-            ), f"{case.case_id} uses different context_entities"
+            assert set(case.context_entities) == set(FIXTURE_CONTEXT_ENTITIES), (
+                f"{case.case_id} uses different context_entities"
+            )
 
     def test_18d_cases_nano_eligible(self):
         """18D low/medium cases are POLICY ELIGIBLE for Nano."""
@@ -942,9 +942,9 @@ class TestFixture18DRegistration:
         not_eligible = [wave17_labor_risk, equipment_failure]
         for case in not_eligible:
             label = policy_label(case.risk_level, case.reasoning_level)
-            assert (
-                label == "RESEARCH ONLY — NOT PRODUCTION ELIGIBLE"
-            ), f"{case.case_id} should be NOT PRODUCTION ELIGIBLE"
+            assert label == "RESEARCH ONLY — NOT PRODUCTION ELIGIBLE", (
+                f"{case.case_id} should be NOT PRODUCTION ELIGIBLE"
+            )
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -107,6 +107,7 @@ def _governance_input(**overrides) -> SandboxGovernanceInput:
 
 # ── sandbox → host ────────────────────────────────────────────────────────────
 
+
 class TestRecommendedActionEgress:
     def test_well_formed_output_is_accepted_and_unwrapped(self):
         action = validate_sandbox_output(_output(), procedure_state=_proc_state())
@@ -130,14 +131,16 @@ class TestRecommendedActionEgress:
         """A recommendation computed against a world that has already moved."""
         with pytest.raises(SandboxBoundaryViolation, match="stale"):
             validate_sandbox_output(
-                _output(procedure_state_revision=2), procedure_state=_proc_state(revision=3)
+                _output(procedure_state_revision=2),
+                procedure_state=_proc_state(revision=3),
             )
 
     def test_future_revision_is_rejected(self):
         """The sandbox cannot know a revision the host has not written yet."""
         with pytest.raises(SandboxBoundaryViolation, match="revision"):
             validate_sandbox_output(
-                _output(procedure_state_revision=9), procedure_state=_proc_state(revision=3)
+                _output(procedure_state_revision=9),
+                procedure_state=_proc_state(revision=3),
             )
 
     @pytest.mark.parametrize(
@@ -168,14 +171,20 @@ class TestRecommendedActionEgress:
         """
         fields = set(RecommendedAction.model_fields)
         assert fields == {
-            "domain", "capability", "target", "objective",
-            "rationale", "priority", "subtype",
+            "domain",
+            "capability",
+            "target",
+            "objective",
+            "rationale",
+            "priority",
+            "subtype",
         }
         for forbidden in ("params", "parameters", "mcp_tool", "payload", "sql"):
             assert forbidden not in fields
 
 
 # ── host → sandbox ────────────────────────────────────────────────────────────
+
 
 class TestGovernanceIngress:
     def test_well_formed_outcome_is_accepted(self):
@@ -271,7 +280,9 @@ class TestGovernanceIdempotency:
     def test_validate_drops_duplicates_through_the_inbox(self):
         inbox = GovernanceInbox()
         state = _proc_state(status=ProcedureStatus.WAITING_FOR_GOVERNANCE)
-        validate_governance_input(_governance_input(), procedure_state=state, inbox=inbox)
+        validate_governance_input(
+            _governance_input(), procedure_state=state, inbox=inbox
+        )
         assert inbox.accept(_governance_input()) is False
 
     def test_mismatch_is_rejected_before_the_inbox_records_it(self):

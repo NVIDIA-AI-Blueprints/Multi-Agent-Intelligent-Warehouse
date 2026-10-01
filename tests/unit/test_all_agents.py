@@ -404,9 +404,7 @@ async def main():
             "🎉 All tests passed! The Warehouse Operations Assistant is fully functional!"
         )
     else:
-        logger.warning(
-            f"⚠️ {total - passed} tests failed. Please check the logs above."
-        )
+        logger.warning(f"⚠️ {total - passed} tests failed. Please check the logs above.")
 
     return passed == total
 

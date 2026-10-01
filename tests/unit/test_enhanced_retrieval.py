@@ -125,13 +125,13 @@ async def test_chunking_service():
     for i, doc in enumerate(SAMPLE_DOCUMENTS):
         chunks = chunking_service.create_chunks(
             text=doc["content"],
-            source_id=f"doc_{i+1}",
+            source_id=f"doc_{i + 1}",
             source_type="manual",
             category=doc["category"],
             section=doc["section"],
         )
         all_chunks.extend(chunks)
-        logger.info(f"Document {i+1}: Created {len(chunks)} chunks")
+        logger.info(f"Document {i + 1}: Created {len(chunks)} chunks")
 
     # Display chunk statistics
     stats = chunking_service.get_chunk_statistics(all_chunks)
@@ -139,7 +139,7 @@ async def test_chunking_service():
 
     # Display sample chunks
     for i, chunk in enumerate(all_chunks[:3]):  # Show first 3 chunks
-        logger.info(f"Chunk {i+1}:")
+        logger.info(f"Chunk {i + 1}:")
         logger.info(f"  ID: {chunk.metadata.chunk_id}")
         logger.info(f"  Tokens: {chunk.metadata.token_count}")
         logger.info(f"  Quality: {chunk.metadata.quality_score:.2f}")

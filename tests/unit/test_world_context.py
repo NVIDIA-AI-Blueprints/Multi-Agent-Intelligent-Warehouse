@@ -278,9 +278,9 @@ class TestWorldContextByTurnEndpoint:
                 context_route = route
                 break
         assert context_route is not None, "Route /context/by-turn/{turn_id} not found"
-        assert context_route.methods == {
-            "GET"
-        }, f"Expected GET-only, got {context_route.methods}"
+        assert context_route.methods == {"GET"}, (
+            f"Expected GET-only, got {context_route.methods}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -362,6 +362,6 @@ class TestWorldRouterImportBoundary:
             "GovernedActionOrchestrator",
         ]
         found = [sym for sym in forbidden if sym in content]
-        assert (
-            found == []
-        ), f"world.py must not import governance/execution symbols: {found}"
+        assert found == [], (
+            f"world.py must not import governance/execution symbols: {found}"
+        )

@@ -167,9 +167,9 @@ async def test_full_flow_wave17_stops_at_governance():
     result = await runtime.run_task(definition, sop, state, context)
 
     # Must stop at governance boundary
-    assert (
-        result.final_status == AgentTaskStatus.WAITING_FOR_GOVERNANCE
-    ), f"Expected WAITING_FOR_GOVERNANCE, got {result.final_status.value}"
+    assert result.final_status == AgentTaskStatus.WAITING_FOR_GOVERNANCE, (
+        f"Expected WAITING_FOR_GOVERNANCE, got {result.final_status.value}"
+    )
     assert result.stop_reason == "WAITING_FOR_GOVERNANCE"
     assert result.task_id == state.task_id
     assert result.agent_id == definition.agent_id
@@ -192,9 +192,9 @@ async def test_full_flow_produces_recommendation():
 
     assert result.final_status == AgentTaskStatus.WAITING_FOR_GOVERNANCE
     # Should have a recommendation
-    assert (
-        result.recommendation is not None
-    ), "Expected recommendation before governance handoff"
+    assert result.recommendation is not None, (
+        "Expected recommendation before governance handoff"
+    )
     assert "action" in result.recommendation or "domain" in result.recommendation
 
 

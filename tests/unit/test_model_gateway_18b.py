@@ -310,9 +310,9 @@ class TestBehavioralEquivalence:
                 modality=modality,
             )
             decision = router.route(req)
-            assert (
-                decision.routing_strategy == "rules"
-            ), f"routing_strategy must be 'rules', got {decision.routing_strategy!r}"
+            assert decision.routing_strategy == "rules", (
+                f"routing_strategy must be 'rules', got {decision.routing_strategy!r}"
+            )
 
     def test_routing_latency_present_and_positive(self):
         """routing_latency_ms must be set and >= 0 after 18B."""
@@ -471,9 +471,9 @@ class TestPolicyFilter:
         )
         candidates = self._filter(registry, req, DeploymentMode.NVIDIA_HOSTED)
         roles = {c.role for c in candidates}
-        assert (
-            "nano" not in roles
-        ), "nano.tool_use=False must be excluded when tool_use required"
+        assert "nano" not in roles, (
+            "nano.tool_use=False must be excluded when tool_use required"
+        )
         assert "lightning" in roles, "lightning.tool_use=True must be included"
 
     def test_empty_candidates_when_all_disabled(self):
@@ -629,9 +629,9 @@ class TestRiskLevelAuthority:
                 risk_level=RiskLevel.CRITICAL,
             )
         )
-        assert (
-            decision.selected_role == "super"
-        ), f"CRITICAL risk must route to super minimum; got {decision.selected_role}"
+        assert decision.selected_role == "super", (
+            f"CRITICAL risk must route to super minimum; got {decision.selected_role}"
+        )
         assert decision.routing_rule == "critical_risk"
 
     def test_critical_risk_candidate_models_excludes_weak(self):
@@ -651,9 +651,9 @@ class TestRiskLevelAuthority:
         )
         weak_ids = {"test/nano-model", "test/lightning-model"}
         overlap = set(decision.candidate_models) & weak_ids
-        assert (
-            not overlap
-        ), f"CRITICAL risk candidate_models must not include weak models; found {overlap}"
+        assert not overlap, (
+            f"CRITICAL risk candidate_models must not include weak models; found {overlap}"
+        )
 
     def test_high_risk_allows_routing_to_super(self):
         """HIGH risk with HIGH reasoning routes to super — no change from pre-18B."""
@@ -701,9 +701,9 @@ class TestRiskLevelAuthority:
             )
             candidates = policy.filter(req, mode)
             roles = {c.role for c in candidates}
-            assert (
-                "lightning" not in roles
-            ), f"CRITICAL risk must block lightning in {mode}"
+            assert "lightning" not in roles, (
+                f"CRITICAL risk must block lightning in {mode}"
+            )
             assert "nano" not in roles, f"CRITICAL risk must block nano in {mode}"
 
 
@@ -734,9 +734,9 @@ class TestReasoningLevelAuthority:
                 risk_level=RiskLevel.LOW,
             )
         )
-        assert (
-            decision.selected_role == "super"
-        ), f"HIGH reasoning must select super; got {decision.selected_role}"
+        assert decision.selected_role == "super", (
+            f"HIGH reasoning must select super; got {decision.selected_role}"
+        )
 
     def test_high_reasoning_candidate_models_excludes_weak(self):
         """candidate_models for HIGH reasoning must not include lightning or nano."""
@@ -755,9 +755,9 @@ class TestReasoningLevelAuthority:
         )
         weak_ids = {"test/nano-model", "test/lightning-model"}
         overlap = set(decision.candidate_models) & weak_ids
-        assert (
-            not overlap
-        ), f"HIGH reasoning candidate_models must not include weak models; found {overlap}"
+        assert not overlap, (
+            f"HIGH reasoning candidate_models must not include weak models; found {overlap}"
+        )
 
     def test_policy_filter_high_reasoning_invariant(self):
         """PolicyFilter must exclude weak models for HIGH reasoning across all modes."""
@@ -775,9 +775,9 @@ class TestReasoningLevelAuthority:
             )
             candidates = policy.filter(req, mode)
             roles = {c.role for c in candidates}
-            assert (
-                "lightning" not in roles
-            ), f"HIGH reasoning must block lightning in {mode}"
+            assert "lightning" not in roles, (
+                f"HIGH reasoning must block lightning in {mode}"
+            )
             assert "nano" not in roles, f"HIGH reasoning must block nano in {mode}"
 
 
@@ -1108,9 +1108,9 @@ class TestArchitectureInvariants:
         import inspect
 
         for grader in default_graders():
-            assert not inspect.iscoroutinefunction(
-                grader.grade
-            ), f"{type(grader).__name__}.grade must be synchronous"
+            assert not inspect.iscoroutinefunction(grader.grade), (
+                f"{type(grader).__name__}.grade must be synchronous"
+            )
 
     def test_evaluation_grader_does_not_import_action_modules(self):
         """Grader module must not import ActionProposal, DecisionEngine, ActionExecutor."""
@@ -1127,9 +1127,9 @@ class TestArchitectureInvariants:
             "ApprovalStore",
         ]
         for attr in forbidden_attrs:
-            assert not hasattr(
-                grader_mod, attr
-            ), f"Evaluation graders must not reference {attr}"
+            assert not hasattr(grader_mod, attr), (
+                f"Evaluation graders must not reference {attr}"
+            )
 
     def test_evaluation_models_do_not_import_mcp_writes(self):
         """Evaluation models must not import MCP write capabilities."""
@@ -1146,9 +1146,9 @@ class TestArchitectureInvariants:
             "DecisionEngine",
         ]
         for attr in forbidden_attrs:
-            assert not hasattr(
-                eval_mod, attr
-            ), f"Evaluation models must not reference {attr}"
+            assert not hasattr(eval_mod, attr), (
+                f"Evaluation models must not reference {attr}"
+            )
 
     def test_routing_module_does_not_import_action_modules(self):
         """PolicyFilter/RoutingStrategy must not reference governance modules."""
@@ -1160,9 +1160,9 @@ class TestArchitectureInvariants:
             routing_mod = importlib.import_module("maiw_models.routing")
         forbidden_attrs = ["ActionProposal", "DecisionEngine", "ActionExecutor"]
         for attr in forbidden_attrs:
-            assert not hasattr(
-                routing_mod, attr
-            ), f"Routing module must not reference {attr}"
+            assert not hasattr(routing_mod, attr), (
+                f"Routing module must not reference {attr}"
+            )
 
     def test_gateway_is_sole_inference_boundary(self):
         """ModelGateway must be the only class with a provider call path."""
@@ -1314,15 +1314,15 @@ class TestRoutingProvenance:
         assert len(captured_records) >= 1, "Telemetry must emit at least one log record"
         record = captured_records[0]
         # extra fields are added to the LogRecord __dict__ by Python's logging infrastructure
-        assert hasattr(
-            record, "routing_strategy"
-        ), "telemetry must emit routing_strategy"
-        assert hasattr(
-            record, "routing_latency_ms"
-        ), "telemetry must emit routing_latency_ms"
-        assert hasattr(
-            record, "candidate_models"
-        ), "telemetry must emit candidate_models"
+        assert hasattr(record, "routing_strategy"), (
+            "telemetry must emit routing_strategy"
+        )
+        assert hasattr(record, "routing_latency_ms"), (
+            "telemetry must emit routing_latency_ms"
+        )
+        assert hasattr(record, "candidate_models"), (
+            "telemetry must emit candidate_models"
+        )
         assert record.routing_strategy == "rules"
         assert record.routing_latency_ms >= 0.0
 
@@ -1886,9 +1886,9 @@ class TestEvaluationEndToEnd:
         forbidden_result = next(
             gr for gr in grader_results if gr.grader_name == "forbidden_claims"
         )
-        assert (
-            forbidden_result.passed
-        ), "Healthy baseline response must not contain forbidden crisis claims"
+        assert forbidden_result.passed, (
+            "Healthy baseline response must not contain forbidden crisis claims"
+        )
 
     def test_evaluation_grader_result_completeness(self):
         """Each GraderResult must have grader_name and passed fields."""

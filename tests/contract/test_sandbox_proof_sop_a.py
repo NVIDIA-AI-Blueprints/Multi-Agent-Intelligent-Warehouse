@@ -67,7 +67,11 @@ from integrations.nemoclaw import (
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SOP_A_PATH = (
-    REPO_ROOT / "agents" / "sops" / "operations_coordination" / "wave_risk_resolution.v2.yaml"
+    REPO_ROOT
+    / "agents"
+    / "sops"
+    / "operations_coordination"
+    / "wave_risk_resolution.v2.yaml"
 )
 
 WRITE_CLASSES = (CapabilityClass.WRITE, CapabilityClass.EMERGENCY_WRITE)
@@ -78,6 +82,7 @@ def _now() -> datetime:
 
 
 # ── The world the procedure reads ─────────────────────────────────────────────
+
 
 class FakeWaveWorld:
     """
@@ -201,6 +206,7 @@ class RecordingProvisioner:
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture(scope="module", autouse=True)
 def _predicates() -> None:
     """Resolve ``wave_risk_reduced`` through the production registration path."""
@@ -259,8 +265,8 @@ def config() -> SandboxConfig:
 
 # ── The proof ─────────────────────────────────────────────────────────────────
 
-class TestProofSopAAcrossTheSandboxBoundary:
 
+class TestProofSopAAcrossTheSandboxBoundary:
     async def test_sandboxed_procedure_pauses_for_governance_without_writing(
         self, sop_a, definition, context, config
     ):
@@ -505,9 +511,7 @@ class TestProofSopAAcrossTheSandboxBoundary:
             f"(ran {restarted_executor.steps})"
         )
 
-    async def test_policy_is_identical_after_a_restart(
-        self, sop_a, definition, config
-    ):
+    async def test_policy_is_identical_after_a_restart(self, sop_a, definition, config):
         """
         Policies are derived, not restored. A restarted sandbox rebuilds the
         same grant from the same reviewed inputs, so there is no stored policy
@@ -515,15 +519,19 @@ class TestProofSopAAcrossTheSandboxBoundary:
         """
         before = render_sandbox_policy(
             build_capability_policy(
-                definition=definition, sop=sop_a,
-                agent_task_id="task-wave-resolution", runtime="deterministic",
+                definition=definition,
+                sop=sop_a,
+                agent_task_id="task-wave-resolution",
+                runtime="deterministic",
             ),
             config=config,
         )
         after = render_sandbox_policy(
             build_capability_policy(
-                definition=definition, sop=sop_a,
-                agent_task_id="task-wave-resolution", runtime="deterministic",
+                definition=definition,
+                sop=sop_a,
+                agent_task_id="task-wave-resolution",
+                runtime="deterministic",
             ),
             config=config,
         )
@@ -533,6 +541,7 @@ class TestProofSopAAcrossTheSandboxBoundary:
 
 
 # ── The real thing, when there is one ─────────────────────────────────────────
+
 
 @pytest.mark.sandbox
 class TestProofSopAInARealSandbox:

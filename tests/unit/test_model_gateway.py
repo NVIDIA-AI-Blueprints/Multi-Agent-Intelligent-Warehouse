@@ -798,9 +798,9 @@ class TestModelCapabilityFields:
             ("ultra", {"ultra_enabled": True}),
         ]:
             cap = _make_registry(**kw).get_by_role(role)
-            assert (
-                cap.structured_output is False
-            ), f"{role}.structured_output must be False until confirmed"
+            assert cap.structured_output is False, (
+                f"{role}.structured_output must be False until confirmed"
+            )
 
     # ── Enabled defaults ───────────────────────────────────────────────────────
 
@@ -856,9 +856,9 @@ class TestModelCapabilityFields:
             ]:
                 os.environ.pop(key, None)
             registry = ModelRegistry()
-        assert (
-            registry.get_enabled_by_role("ultra") is None
-        ), "Ultra must be disabled by default"
+        assert registry.get_enabled_by_role("ultra") is None, (
+            "Ultra must be disabled by default"
+        )
 
     def test_nano_omni_disabled_by_default_no_model_configured(self):
         """Nano Omni is NOT_CURRENTLY_DEPLOYED — disabled unless operator configures a model."""
@@ -991,9 +991,9 @@ class TestDefaultModelIds:
         legacy_prefixes = ("llama-3.3-nemotron", "llama-3.1-nemotron", "llama-nemotron")
         for cap in registry._capabilities.values():
             for prefix in legacy_prefixes:
-                assert (
-                    prefix not in cap.model_id
-                ), f"Legacy model ID found in role={cap.role}: {cap.model_id}"
+                assert prefix not in cap.model_id, (
+                    f"Legacy model ID found in role={cap.role}: {cap.model_id}"
+                )
 
     def test_moe_suffix_in_nemotron3_model_ids(self):
         """Nemotron 3 MoE models have active-param suffix (a3b, a12b, a55b)."""
@@ -1005,9 +1005,9 @@ class TestDefaultModelIds:
             ("ultra", "a55b"),
         ]:
             cap = registry.get_by_role(role)
-            assert (
-                expected_suffix in cap.model_id
-            ), f"{role}: expected '{expected_suffix}' suffix in model_id={cap.model_id}"
+            assert expected_suffix in cap.model_id, (
+                f"{role}: expected '{expected_suffix}' suffix in model_id={cap.model_id}"
+            )
 
 
 # ── Phase 1B: ModelRouteDecision fields ───────────────────────────────────────
@@ -1330,9 +1330,9 @@ class TestRoutingMatrix:
         if expect_fallback:
             assert decision.fallback_from is not None
         else:
-            assert (
-                decision.fallback_from is None
-            ), f"{label}: unexpected fallback_from={decision.fallback_from}"
+            assert decision.fallback_from is None, (
+                f"{label}: unexpected fallback_from={decision.fallback_from}"
+            )
 
     def test_requested_role_recorded(
         self, label, task, reasoning, risk, modality, expected_role, expect_fallback

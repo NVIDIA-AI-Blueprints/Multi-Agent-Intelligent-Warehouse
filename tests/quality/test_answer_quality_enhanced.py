@@ -165,9 +165,7 @@ class LogAnalyzer:
                 line.strip()
                 for line in lines
                 if re.search(pattern_info["pattern"], line, re.IGNORECASE)
-            ][
-                :5
-            ]  # Keep first 5 examples
+            ][:5]  # Keep first 5 examples
 
             analysis["patterns"][pattern_name] = {
                 "count": pattern_info["count"],
@@ -303,9 +301,9 @@ async def test_agent_response(
     agent_name: str, query: str, agent, query_class, log_analyzer: LogAnalyzer
 ) -> Dict[str, Any]:
     """Test a single agent response with log analysis."""
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
     print(f"Testing {agent_name}: {query}")
-    print(f"{'='*80}")
+    print(f"{'=' * 80}")
 
     # Clear logs before test
     log_analyzer.clear_logs()
@@ -474,9 +472,9 @@ async def run_quality_tests():
 
     # Test each agent
     for agent_name, queries in TEST_QUERIES.items():
-        print(f"\n{'#'*80}")
+        print(f"\n{'#' * 80}")
         print(f"Testing {agent_name.upper()} Agent")
-        print(f"{'#'*80}")
+        print(f"{'#' * 80}")
 
         agent = {
             "operations": operations_agent,
@@ -500,9 +498,9 @@ async def run_quality_tests():
             await asyncio.sleep(1)
 
     # Generate comprehensive summary
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
     print("COMPREHENSIVE TEST SUMMARY")
-    print(f"{'='*80}")
+    print(f"{'=' * 80}")
 
     total_tests = len(results)
     successful_tests = len([r for r in results if "error" not in r])
@@ -554,14 +552,14 @@ async def run_quality_tests():
     print(f"\n📊 Overall Statistics:")
     print(f"   Total Tests: {total_tests}")
     print(
-        f"   Successful: {successful_tests} ({successful_tests/total_tests*100:.1f}%)"
+        f"   Successful: {successful_tests} ({successful_tests / total_tests * 100:.1f}%)"
     )
-    print(f"   Failed: {failed_tests} ({failed_tests/total_tests*100:.1f}%)")
+    print(f"   Failed: {failed_tests} ({failed_tests / total_tests * 100:.1f}%)")
     print(
-        f"   Valid Responses: {valid_responses} ({valid_responses/successful_tests*100:.1f}%)"
+        f"   Valid Responses: {valid_responses} ({valid_responses / successful_tests * 100:.1f}%)"
     )
     print(
-        f"   Invalid Responses: {invalid_responses} ({invalid_responses/successful_tests*100:.1f}%)"
+        f"   Invalid Responses: {invalid_responses} ({invalid_responses / successful_tests * 100:.1f}%)"
     )
     print(f"   Average Validation Score: {avg_score:.2f}")
     print(f"   Average Confidence: {avg_confidence:.2f}")

@@ -38,7 +38,10 @@ from integrations.nemoclaw import (
 )
 
 MANIFEST_PATH = (
-    Path(__file__).resolve().parents[2] / "integrations" / "nemoclaw" / "agent_manifest.yaml"
+    Path(__file__).resolve().parents[2]
+    / "integrations"
+    / "nemoclaw"
+    / "agent_manifest.yaml"
 )
 
 CAPS = [
@@ -91,8 +94,10 @@ def _config(**overrides) -> SandboxConfig:
 def manifest(definition, sop):
     config = _config()
     policy = build_capability_policy(
-        definition=definition, sop=sop,
-        agent_task_id="task-manifest", runtime="deterministic",
+        definition=definition,
+        sop=sop,
+        agent_task_id="task-manifest",
+        runtime="deterministic",
     ).model_copy(update={"policy_id": "00000000-0000-4000-8000-000000000000"})
     return render_agent_manifest(
         render_sandbox_policy(policy, config=config), config=config
@@ -114,7 +119,8 @@ class TestManifestDeclaresTheBoundary:
         assert "WRITE" not in manifest["capabilities"]["allowed_classes"]
         assert "EMERGENCY_WRITE" not in manifest["capabilities"]["allowed_classes"]
         assert manifest["capabilities"]["denied_classes"] == [
-            "EMERGENCY_WRITE", "WRITE",
+            "EMERGENCY_WRITE",
+            "WRITE",
         ]
 
     def test_network_is_deny_by_default(self, manifest):
@@ -158,8 +164,10 @@ class TestManifestIsHonestAboutQualification:
             image_reference="nvcr.io/nvidia/maiw-agent:0.1.0",
         )
         policy = build_capability_policy(
-            definition=definition, sop=sop,
-            agent_task_id="task-manifest", runtime="deterministic",
+            definition=definition,
+            sop=sop,
+            agent_task_id="task-manifest",
+            runtime="deterministic",
         )
         rendered = render_agent_manifest(
             render_sandbox_policy(policy, config=config), config=config
@@ -175,8 +183,10 @@ class TestManifestIsDeterministic:
     def test_same_inputs_render_an_equal_manifest(self, definition, sop):
         config = _config()
         policy = build_capability_policy(
-            definition=definition, sop=sop,
-            agent_task_id="task-manifest", runtime="deterministic",
+            definition=definition,
+            sop=sop,
+            agent_task_id="task-manifest",
+            runtime="deterministic",
         )
         rendered = render_sandbox_policy(policy, config=config)
         assert render_agent_manifest(rendered, config=config) == render_agent_manifest(

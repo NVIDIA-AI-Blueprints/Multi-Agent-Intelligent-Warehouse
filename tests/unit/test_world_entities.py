@@ -137,7 +137,6 @@ def _make_snapshot(
 
 
 class TestGetGraphEntities:
-
     def test_e1_returns_paginated_response(self):
         from maiw_api.routers.world import get_graph_entities
 
@@ -280,7 +279,6 @@ class TestGetGraphEntities:
 
 
 class TestListContextSnapshots:
-
     def _make_copilot_svc(self, snapshots=None):
         from maiw_api.copilot.store import InMemoryCopilotStore
 

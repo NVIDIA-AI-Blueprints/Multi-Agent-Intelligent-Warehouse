@@ -242,11 +242,11 @@ async def test_implementation_comparison(sdk_service, pattern_service):
 
         print(
             f"    SDK:      {sdk_status} {'SAFE' if sdk_result.is_safe else 'UNSAFE'} "
-            f"(conf: {sdk_result.confidence:.2f}, time: {sdk_time*1000:.1f}ms)"
+            f"(conf: {sdk_result.confidence:.2f}, time: {sdk_time * 1000:.1f}ms)"
         )
         print(
             f"    Pattern:  {pattern_status} {'SAFE' if pattern_result.is_safe else 'UNSAFE'} "
-            f"(conf: {pattern_result.confidence:.2f}, time: {pattern_time*1000:.1f}ms)"
+            f"(conf: {pattern_result.confidence:.2f}, time: {pattern_time * 1000:.1f}ms)"
         )
 
         if sdk_result.is_safe != pattern_result.is_safe:
@@ -259,15 +259,15 @@ async def test_implementation_comparison(sdk_service, pattern_service):
     print(f"Total Tests: {results['total']}")
     print(
         f"SDK Correct: {results['sdk_correct']}/{results['total']} "
-        f"({results['sdk_correct']/results['total']*100:.1f}%)"
+        f"({results['sdk_correct'] / results['total'] * 100:.1f}%)"
     )
     print(
         f"Pattern Correct: {results['pattern_correct']}/{results['total']} "
-        f"({results['pattern_correct']/results['total']*100:.1f}%)"
+        f"({results['pattern_correct'] / results['total'] * 100:.1f}%)"
     )
     print(
         f"Both Correct: {results['both_correct']}/{results['total']} "
-        f"({results['both_correct']/results['total']*100:.1f}%)"
+        f"({results['both_correct'] / results['total'] * 100:.1f}%)"
     )
     print(f"Disagreements: {len(results['disagreements'])}")
     print(f"SDK Faster: {results['sdk_faster']} tests")
@@ -287,12 +287,12 @@ async def test_implementation_comparison(sdk_service, pattern_service):
     # Assertions
     assert results["total"] > 0
     # Both implementations should have reasonable accuracy
-    assert (
-        results["sdk_correct"] >= results["total"] * 0.7
-    ), f"SDK accuracy too low: {results['sdk_correct']}/{results['total']}"
-    assert (
-        results["pattern_correct"] >= results["total"] * 0.7
-    ), f"Pattern accuracy too low: {results['pattern_correct']}/{results['total']}"
+    assert results["sdk_correct"] >= results["total"] * 0.7, (
+        f"SDK accuracy too low: {results['sdk_correct']}/{results['total']}"
+    )
+    assert results["pattern_correct"] >= results["total"] * 0.7, (
+        f"Pattern accuracy too low: {results['pattern_correct']}/{results['total']}"
+    )
 
 
 @pytest.mark.asyncio
@@ -348,10 +348,10 @@ async def test_performance_benchmark(sdk_service, pattern_service):
         pattern_max = max(pattern_times)
 
         print(
-            f"  SDK:      avg={sdk_avg*1000:.1f}ms, min={sdk_min*1000:.1f}ms, max={sdk_max*1000:.1f}ms"
+            f"  SDK:      avg={sdk_avg * 1000:.1f}ms, min={sdk_min * 1000:.1f}ms, max={sdk_max * 1000:.1f}ms"
         )
         print(
-            f"  Pattern:  avg={pattern_avg*1000:.1f}ms, min={pattern_min*1000:.1f}ms, max={pattern_max*1000:.1f}ms"
+            f"  Pattern:  avg={pattern_avg * 1000:.1f}ms, min={pattern_min * 1000:.1f}ms, max={pattern_max * 1000:.1f}ms"
         )
 
         if sdk_avg < pattern_avg:

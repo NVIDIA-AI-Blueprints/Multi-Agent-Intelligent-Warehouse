@@ -179,9 +179,9 @@ class TestPromptIsolation:
         messages = _build_fixture_messages(wave17_risk_low)
         text = self._get_all_message_text(messages)
         # case_id should not be in the system prompt
-        assert (
-            "wave17-risk-low-v1" not in text
-        ), "case_id 'wave17-risk-low-v1' leaked into model prompt"
+        assert "wave17-risk-low-v1" not in text, (
+            "case_id 'wave17-risk-low-v1' leaked into model prompt"
+        )
 
     def test_case_id_not_in_prompt_equipment_ask(self) -> None:
         messages = _build_fixture_messages(equipment_ask_low)
@@ -207,27 +207,27 @@ class TestPromptIsolation:
         """18E §2: case.metadata dict must not be serialized into the model prompt."""
         messages = _build_fixture_messages(wave17_risk_low)
         text = self._get_all_message_text(messages)
-        assert (
-            "Evaluation case metadata" not in text
-        ), "Verbatim 'Evaluation case metadata' leaked into prompt"
-        assert (
-            "benchmark_case" not in text
-        ), "'benchmark_case' metadata key leaked into prompt"
-        assert (
-            "policy_eligibility" not in text
-        ), "'policy_eligibility' metadata key leaked into prompt"
+        assert "Evaluation case metadata" not in text, (
+            "Verbatim 'Evaluation case metadata' leaked into prompt"
+        )
+        assert "benchmark_case" not in text, (
+            "'benchmark_case' metadata key leaked into prompt"
+        )
+        assert "policy_eligibility" not in text, (
+            "'policy_eligibility' metadata key leaked into prompt"
+        )
 
     def test_policy_eligibility_label_not_in_prompt(self) -> None:
         """18E §2: Policy eligibility labels (POLICY ELIGIBLE, RESEARCH ONLY) must not appear."""
         for case in NANO_QUALIFICATION_CORPUS:
             messages = _build_fixture_messages(case)
             text = self._get_all_message_text(messages)
-            assert (
-                "POLICY ELIGIBLE" not in text
-            ), f"Policy eligibility label leaked into prompt for {case.case_id}"
-            assert (
-                "RESEARCH ONLY" not in text
-            ), f"Research-only label leaked into prompt for {case.case_id}"
+            assert "POLICY ELIGIBLE" not in text, (
+                f"Policy eligibility label leaked into prompt for {case.case_id}"
+            )
+            assert "RESEARCH ONLY" not in text, (
+                f"Research-only label leaked into prompt for {case.case_id}"
+            )
 
     def test_expected_capability_not_in_prompt(self) -> None:
         """18E §2: expected_capability values must not appear in model prompt."""
@@ -236,9 +236,9 @@ class TestPromptIsolation:
                 continue
             messages = _build_fixture_messages(case)
             text = self._get_all_message_text(messages)
-            assert (
-                case.expected_capability not in text
-            ), f"expected_capability '{case.expected_capability}' leaked into prompt for {case.case_id}"
+            assert case.expected_capability not in text, (
+                f"expected_capability '{case.expected_capability}' leaked into prompt for {case.case_id}"
+            )
 
     def test_expected_target_not_in_grading_context(self) -> None:
         """
@@ -255,35 +255,35 @@ class TestPromptIsolation:
                 # list itself should not be passed to the model as instructions.
                 # (The user prompt may organically mention them; we check that
                 # "forbidden_claims" as a field label is not exposed.)
-                assert (
-                    "forbidden_claims" not in text
-                ), f"'forbidden_claims' key leaked for {case.case_id}"
+                assert "forbidden_claims" not in text, (
+                    f"'forbidden_claims' key leaked for {case.case_id}"
+                )
 
     def test_required_facts_list_not_in_prompt(self) -> None:
         """18E §2: required_facts field label must not appear in model prompt."""
         for case in NANO_QUALIFICATION_CORPUS:
             messages = _build_fixture_messages(case)
             text = self._get_all_message_text(messages)
-            assert (
-                "required_facts" not in text
-            ), f"'required_facts' key leaked into prompt for {case.case_id}"
+            assert "required_facts" not in text, (
+                f"'required_facts' key leaked into prompt for {case.case_id}"
+            )
 
     def test_fixture_label_not_in_system_prompt(self) -> None:
         """18E §2: 'fixture: <case_id>' pattern from old runner must be absent."""
         for case in ALL_KNOWN_CASES:
             messages = _build_fixture_messages(case)
             system_content = messages[0]["content"]
-            assert (
-                f"fixture: {case.case_id}" not in system_content
-            ), f"'fixture: {case.case_id}' label leaked into system prompt"
+            assert f"fixture: {case.case_id}" not in system_content, (
+                f"'fixture: {case.case_id}' label leaked into system prompt"
+            )
 
     def test_prompt_contains_only_system_and_user_turns(self) -> None:
         """18E §2: Messages must be exactly [system, user] — no extra leakage turns."""
         for case in NANO_QUALIFICATION_CORPUS:
             messages = _build_fixture_messages(case)
-            assert (
-                len(messages) == 2
-            ), f"Expected 2 messages (system+user) for {case.case_id}, got {len(messages)}"
+            assert len(messages) == 2, (
+                f"Expected 2 messages (system+user) for {case.case_id}, got {len(messages)}"
+            )
             assert messages[0]["role"] == "system"
             assert messages[1]["role"] == "user"
 
@@ -291,9 +291,9 @@ class TestPromptIsolation:
         """18E §2: User turn must be exactly case.prompt — no appended metadata."""
         for case in NANO_QUALIFICATION_CORPUS:
             messages = _build_fixture_messages(case)
-            assert (
-                messages[1]["content"] == case.prompt
-            ), f"User turn for {case.case_id} does not match case.prompt"
+            assert messages[1]["content"] == case.prompt, (
+                f"User turn for {case.case_id} does not match case.prompt"
+            )
 
     def test_same_messages_for_all_models(self) -> None:
         """
@@ -306,9 +306,9 @@ class TestPromptIsolation:
         for case in NANO_QUALIFICATION_CORPUS:
             msgs_a = _build_fixture_messages(case)
             msgs_b = _build_fixture_messages(case)
-            assert (
-                msgs_a == msgs_b
-            ), f"Message builder is non-deterministic for {case.case_id}"
+            assert msgs_a == msgs_b, (
+                f"Message builder is non-deterministic for {case.case_id}"
+            )
 
     def test_messages_hash_stable(self) -> None:
         """18E §17: Deterministic run identity — message content hash must be stable."""
@@ -384,9 +384,9 @@ class TestResponseCompleteness:
 
         # Verify that truncated preview at 300 chars would NOT contain the fact.
         preview = long_resp[:300]
-        assert (
-            "labor-shift-afternoon" not in preview
-        ), "Test is invalid: fact appears within first 300 chars"
+        assert "labor-shift-afternoon" not in preview, (
+            "Test is invalid: fact appears within first 300 chars"
+        )
 
     def test_hallucination_grader_uses_full_response(self) -> None:
         """
@@ -409,12 +409,12 @@ class TestResponseCompleteness:
 
         grader = HallucinationGrader()
         gr = grader.grade(case, result)
-        assert (
-            not gr.passed
-        ), "HallucinationGrader must detect hallucination appearing after char 300"
-        assert "wave-99" in " ".join(
-            gr.evidence
-        ), f"Evidence must include 'wave-99', got: {gr.evidence}"
+        assert not gr.passed, (
+            "HallucinationGrader must detect hallucination appearing after char 300"
+        )
+        assert "wave-99" in " ".join(gr.evidence), (
+            f"Evidence must include 'wave-99', got: {gr.evidence}"
+        )
 
     def test_benchmark_model_result_raw_response_field(self) -> None:
         """
@@ -439,9 +439,9 @@ class TestResponseCompleteness:
             display_preview=long_text[:300],
         )
         assert result.raw_response == long_text, "raw_response must be full text"
-        assert (
-            result.display_preview == long_text[:300]
-        ), "display_preview must be truncated"
+        assert result.display_preview == long_text[:300], (
+            "display_preview must be truncated"
+        )
         assert len(result.display_preview) == 300
         assert len(result.raw_response) == 500
 
@@ -462,9 +462,9 @@ class TestResponseCompleteness:
             raw_response=long_text,
             display_preview=long_text[:300],
         )
-        assert (
-            result.raw_response != result.display_preview
-        ), "raw_response and display_preview must differ for responses > 300 chars"
+        assert result.raw_response != result.display_preview, (
+            "raw_response and display_preview must differ for responses > 300 chars"
+        )
 
     def test_to_dict_includes_raw_response_not_response_snippet(self) -> None:
         """18E §4: to_dict() must output 'raw_response' and 'display_preview', not 'response_snippet'."""
@@ -529,17 +529,17 @@ class TestNanoQualificationCorpus:
     def test_qualification_corpus_case_ids(self) -> None:
         """18E §7: All six required case IDs present."""
         corpus_ids = {c.case_id for c in NANO_QUALIFICATION_CORPUS}
-        assert (
-            corpus_ids == self.EXPECTED_CASE_IDS
-        ), f"Corpus case IDs mismatch. Got: {corpus_ids}"
+        assert corpus_ids == self.EXPECTED_CASE_IDS, (
+            f"Corpus case IDs mismatch. Got: {corpus_ids}"
+        )
 
     def test_all_corpus_cases_policy_eligible(self) -> None:
         """18E §7: All qualification corpus cases must be POLICY ELIGIBLE."""
         for case in NANO_QUALIFICATION_CORPUS:
             eligibility = get_policy_eligibility(case.case_id)
-            assert (
-                eligibility == "POLICY ELIGIBLE"
-            ), f"Case {case.case_id} expected POLICY ELIGIBLE, got: {eligibility}"
+            assert eligibility == "POLICY ELIGIBLE", (
+                f"Case {case.case_id} expected POLICY ELIGIBLE, got: {eligibility}"
+            )
 
     def test_all_corpus_cases_low_or_medium_risk(self) -> None:
         """18E §7: Policy eligibility requires low/medium risk."""
@@ -555,15 +555,17 @@ class TestNanoQualificationCorpus:
             assert case.reasoning_level in (
                 "low",
                 "medium",
-            ), f"Case {case.case_id}: reasoning_level={case.reasoning_level!r} is not low/medium"
+            ), (
+                f"Case {case.case_id}: reasoning_level={case.reasoning_level!r} is not low/medium"
+            )
 
     def test_18b_high_risk_cases_research_only(self) -> None:
         """18E §7: 18B high-risk cases (wave17-labor-risk, equipment-failure) are RESEARCH ONLY."""
         for case_id in ["wave17-labor-risk-v1", "equipment-failure-v1"]:
             label = get_policy_eligibility(case_id)
-            assert (
-                label == "RESEARCH ONLY — NOT PRODUCTION ELIGIBLE"
-            ), f"Expected RESEARCH ONLY for {case_id}, got: {label}"
+            assert label == "RESEARCH ONLY — NOT PRODUCTION ELIGIBLE", (
+                f"Expected RESEARCH ONLY for {case_id}, got: {label}"
+            )
 
     def test_case_a_wave17_risk_low(self) -> None:
         """18E §7 Case A: wave17-risk-low has correct fields."""
@@ -593,9 +595,9 @@ class TestNanoQualificationCorpus:
     def test_18e_cases_use_fixture_context_entities(self) -> None:
         """18E §5: New 18E cases must use the same FIXTURE_CONTEXT_ENTITIES."""
         for case in ALL_18E_FIXTURE_CASES:
-            assert (
-                case.context_entities == FIXTURE_CONTEXT_ENTITIES
-            ), f"Case {case.case_id} uses different context entities"
+            assert case.context_entities == FIXTURE_CONTEXT_ENTITIES, (
+                f"Case {case.case_id} uses different context entities"
+            )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -630,9 +632,9 @@ class TestWarmupMethodology:
         ]
         result = compute_qualification_run(samples)
         # Warm-up latency (9999ms) must not appear in stats.
-        assert (
-            result.latency_max_ms < 500.0
-        ), f"Warm-up latency leaked into stats: max={result.latency_max_ms}"
+        assert result.latency_max_ms < 500.0, (
+            f"Warm-up latency leaked into stats: max={result.latency_max_ms}"
+        )
         assert result.warmup_count == 1
 
     def test_warmup_samples_excluded_from_accept_count(self) -> None:
@@ -694,9 +696,9 @@ class TestWarmupMethodology:
         result = compute_qualification_run(samples)
         assert result.fallback_count == 1
         # Fallback latency (9999ms) must not appear in stats.
-        assert (
-            result.latency_max_ms < 500.0
-        ), f"Fallback latency leaked into stats: max={result.latency_max_ms}"
+        assert result.latency_max_ms < 500.0, (
+            f"Fallback latency leaked into stats: max={result.latency_max_ms}"
+        )
         assert result.n_measured == 4  # 5 non-warmup, 1 fallback → 4 measured
 
     def test_warmup_count_preserved_in_result(self) -> None:
@@ -727,9 +729,9 @@ class TestQualificationClassification:
 
     def test_material_latency_threshold_defined(self) -> None:
         """18E §13: Material latency advantage threshold is defined before results."""
-        assert (
-            MATERIAL_LATENCY_ADVANTAGE_THRESHOLD == 0.20
-        ), "Threshold must be 20% as defined in spec §13"
+        assert MATERIAL_LATENCY_ADVANTAGE_THRESHOLD == 0.20, (
+            "Threshold must be 20% as defined in spec §13"
+        )
 
     def test_nano_qualified_when_faster_and_passes(self) -> None:
         """18E §14: NANO QUALIFIED when Nano passes all critical graders and is ≥20% faster."""
@@ -957,18 +959,18 @@ class TestContextInvariance:
     def test_all_qualification_corpus_cases_share_context_entities(self) -> None:
         """18E §5: All corpus cases use the same FIXTURE_CONTEXT_ENTITIES."""
         for case in NANO_QUALIFICATION_CORPUS:
-            assert sorted(case.context_entities) == sorted(
-                FIXTURE_CONTEXT_ENTITIES
-            ), f"Case {case.case_id} has different context entities"
+            assert sorted(case.context_entities) == sorted(FIXTURE_CONTEXT_ENTITIES), (
+                f"Case {case.case_id} has different context entities"
+            )
 
     def test_message_system_content_identical_for_same_case(self) -> None:
         """18E §5: Two calls to _build_fixture_messages for same case must produce identical system prompt."""
         for case in NANO_QUALIFICATION_CORPUS:
             m1 = _build_fixture_messages(case)
             m2 = _build_fixture_messages(case)
-            assert (
-                m1[0]["content"] == m2[0]["content"]
-            ), f"System prompt not identical for {case.case_id}"
+            assert m1[0]["content"] == m2[0]["content"], (
+                f"System prompt not identical for {case.case_id}"
+            )
 
     def test_entity_list_in_system_prompt(self) -> None:
         """18E §5: Each fixture entity ID must appear in the system prompt."""
@@ -976,6 +978,6 @@ class TestContextInvariance:
             messages = _build_fixture_messages(case)
             system = messages[0]["content"]
             for entity in FIXTURE_CONTEXT_ENTITIES:
-                assert (
-                    entity in system
-                ), f"Entity '{entity}' missing from system prompt for {case.case_id}"
+                assert entity in system, (
+                    f"Entity '{entity}' missing from system prompt for {case.case_id}"
+                )

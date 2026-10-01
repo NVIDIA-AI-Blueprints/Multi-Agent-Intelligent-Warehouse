@@ -68,6 +68,7 @@ CAPS = [
 
 # ── Doubles ───────────────────────────────────────────────────────────────────
 
+
 class RecordingRuntime:
     """An inner runtime that records whether it was ever reached."""
 
@@ -129,6 +130,7 @@ class ExplodingProbeProvisioner(WorkingProvisioner):
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def definition() -> AgentDefinition:
     return AgentDefinition(
@@ -185,6 +187,7 @@ def _config(mode: SandboxMode, **overrides) -> SandboxConfig:
 
 # ── Fail closed ───────────────────────────────────────────────────────────────
 
+
 class TestFailClosed:
     async def test_required_mode_never_reaches_the_inner_runtime(
         self, definition, sop, state, context
@@ -233,7 +236,9 @@ class TestFailClosed:
             config=_config(SandboxMode.SANDBOX_REQUIRED),
             provisioner=ExplodingProvisioner(),
         )
-        with pytest.raises(SandboxPolicyApplicationError, match="kernel module missing"):
+        with pytest.raises(
+            SandboxPolicyApplicationError, match="kernel module missing"
+        ):
             await runtime.run_task(definition, sop, state, context)
         assert inner.calls == 0
 
@@ -322,6 +327,7 @@ class TestFailClosed:
 
 # ── Configuration fails closed too ────────────────────────────────────────────
 
+
 class TestConfigurationFailsClosed:
     def test_unknown_mode_raises_rather_than_defaulting(self):
         """Defaulting a typo to DISABLED would silently unsandbox a deployment."""
@@ -329,7 +335,9 @@ class TestConfigurationFailsClosed:
             SandboxConfig.from_env({"MAIW_SANDBOX_MODE": "requried"})
 
     def test_sandbox_mode_without_a_runtime_raises(self):
-        with pytest.raises(SandboxConfigurationError, match="requires a sandbox runtime"):
+        with pytest.raises(
+            SandboxConfigurationError, match="requires a sandbox runtime"
+        ):
             SandboxConfig.from_env({"MAIW_SANDBOX_MODE": "required"})
 
     def test_endpoint_with_embedded_credentials_is_rejected(self):
@@ -354,17 +362,22 @@ class TestConfigurationFailsClosed:
         assert _config(SandboxMode.SANDBOX_REQUIRED).is_qualified is False
 
     def test_openshell_config_is_qualified_only_with_both_versions(self):
-        assert _config(
-            SandboxMode.SANDBOX_REQUIRED,
-            nemoclaw_version="0.1.0",
-            openshell_version="0.1.0",
-        ).is_qualified is True
-        assert _config(
-            SandboxMode.SANDBOX_REQUIRED, nemoclaw_version="0.1.0"
-        ).is_qualified is False
+        assert (
+            _config(
+                SandboxMode.SANDBOX_REQUIRED,
+                nemoclaw_version="0.1.0",
+                openshell_version="0.1.0",
+            ).is_qualified
+            is True
+        )
+        assert (
+            _config(SandboxMode.SANDBOX_REQUIRED, nemoclaw_version="0.1.0").is_qualified
+            is False
+        )
 
 
 # ── Prompt injection ──────────────────────────────────────────────────────────
+
 
 class TestPromptInjectionCannotObtainWriteAuthority:
     """
@@ -389,7 +402,8 @@ class TestPromptInjectionCannotObtainWriteAuthority:
         [
             cap_id
             for cap_id, entry in SKILL_REGISTRY.items()
-            if entry.capability_class in (CapabilityClass.WRITE, CapabilityClass.EMERGENCY_WRITE)
+            if entry.capability_class
+            in (CapabilityClass.WRITE, CapabilityClass.EMERGENCY_WRITE)
         ],
     )
     async def test_every_registered_write_capability_is_denied(
@@ -420,9 +434,7 @@ class TestPromptInjectionCannotObtainWriteAuthority:
                 policy, "warehouse.wave.reprioritize_direct", "READ"
             )
 
-    def test_the_rendered_policy_the_sandbox_receives_contains_no_write(
-        self, policy
-    ):
+    def test_the_rendered_policy_the_sandbox_receives_contains_no_write(self, policy):
         rendered = render_sandbox_policy(
             policy, config=_config(SandboxMode.SANDBOX_REQUIRED)
         )
@@ -432,6 +444,7 @@ class TestPromptInjectionCannotObtainWriteAuthority:
 
 
 # ── Static payload audit ──────────────────────────────────────────────────────
+
 
 def _module_imports(path: Path) -> set[str]:
     """Top-level module names imported by a Python file, via AST."""
@@ -466,16 +479,12 @@ and neither tells the truth about what goes in the image.
 
 
 class TestSandboxPayloadIsWriteFree:
-    @pytest.mark.parametrize(
-        "module", SANDBOX_PAYLOAD_MODULES, ids=lambda p: p.name
-    )
+    @pytest.mark.parametrize("module", SANDBOX_PAYLOAD_MODULES, ids=lambda p: p.name)
     def test_no_execution_package_import(self, module: Path):
         assert module.exists(), f"{module} is missing"
         assert "maiw_execution" not in _module_imports(module)
 
-    @pytest.mark.parametrize(
-        "module", SANDBOX_PAYLOAD_MODULES, ids=lambda p: p.name
-    )
+    @pytest.mark.parametrize("module", SANDBOX_PAYLOAD_MODULES, ids=lambda p: p.name)
     def test_no_decision_engine_import(self, module: Path):
         """
         ``DecisionEngine`` is a governance component. The sandbox payload reasons
@@ -483,9 +492,7 @@ class TestSandboxPayloadIsWriteFree:
         """
         assert "maiw_decision" not in _module_imports(module)
 
-    @pytest.mark.parametrize(
-        "module", SANDBOX_PAYLOAD_MODULES, ids=lambda p: p.name
-    )
+    @pytest.mark.parametrize("module", SANDBOX_PAYLOAD_MODULES, ids=lambda p: p.name)
     def test_no_action_executor_binding(self, module: Path):
         """
         Mentions in prose are fine and frequent — the modules document the
@@ -517,7 +524,12 @@ class TestSandboxPayloadIsWriteFree:
         """A secret-shaped scan over everything this phase added."""
         for path in sorted(INTEGRATION_PKG.glob("*.py")):
             text = path.read_text(encoding="utf-8")
-            for needle in ("NVIDIA_API_KEY=", "MAIW_NIM_API_KEY=", "Bearer ", "-----BEGIN"):
+            for needle in (
+                "NVIDIA_API_KEY=",
+                "MAIW_NIM_API_KEY=",
+                "Bearer ",
+                "-----BEGIN",
+            ):
                 assert needle not in text, f"{needle!r} in {path.name}"
 
     def test_integration_package_is_not_imported_by_maiw_agents(self):
@@ -533,6 +545,7 @@ class TestSandboxPayloadIsWriteFree:
 
 # ── Container argument mapping ────────────────────────────────────────────────
 
+
 class TestContainerArgumentMapping:
     def test_network_is_none_regardless_of_allowed_endpoints(self, definition, sop):
         """
@@ -541,8 +554,10 @@ class TestContainerArgumentMapping:
         put the allow-list inside the blast radius of what it constrains.
         """
         policy = build_capability_policy(
-            definition=definition, sop=sop,
-            agent_task_id="task-args", runtime="deterministic",
+            definition=definition,
+            sop=sop,
+            agent_task_id="task-args",
+            runtime="deterministic",
         )
         rendered = render_sandbox_policy(
             policy, config=_config(SandboxMode.SANDBOX_REQUIRED)
@@ -559,16 +574,21 @@ class TestContainerArgumentMapping:
 
 # ── Provisioners are honest about being unqualified ───────────────────────────
 
+
 class TestProvisionerHonesty:
     async def test_openshell_provisioner_reports_unavailable_when_not_installed(self):
         availability = await OpenShellSandboxProvisioner().probe()
         assert availability.available is False
         assert availability.runtime_kind is SandboxRuntimeKind.OPENSHELL
 
-    async def test_openshell_apply_policy_raises_rather_than_pretending(self, definition, sop):
+    async def test_openshell_apply_policy_raises_rather_than_pretending(
+        self, definition, sop
+    ):
         policy = build_capability_policy(
-            definition=definition, sop=sop,
-            agent_task_id="task-honest", runtime="deterministic",
+            definition=definition,
+            sop=sop,
+            agent_task_id="task-honest",
+            runtime="deterministic",
         )
         rendered = render_sandbox_policy(
             policy, config=_config(SandboxMode.SANDBOX_REQUIRED)

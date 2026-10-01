@@ -620,7 +620,9 @@ def generate_summary():
     print(f"❌ Failed: {failed}")
     print(f"⏭️  Skipped: {skipped}")
     print(
-        f"Success Rate: {(passed/total_tests*100):.1f}%" if total_tests > 0 else "N/A"
+        f"Success Rate: {(passed / total_tests * 100):.1f}%"
+        if total_tests > 0
+        else "N/A"
     )
 
     # Response time statistics
@@ -661,7 +663,7 @@ def generate_summary():
 
     # Check for high failure rate
     if total_tests > 0 and (failed / total_tests) > 0.2:
-        issues.append(f"High failure rate: {(failed/total_tests*100):.1f}%")
+        issues.append(f"High failure rate: {(failed / total_tests * 100):.1f}%")
         recommendations.append("Review error handling and API endpoint implementations")
 
     if issues:

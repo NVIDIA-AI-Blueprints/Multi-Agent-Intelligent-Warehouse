@@ -145,9 +145,9 @@ class TestForbiddenDependencies:
     def test_maiw_decision_no_api_import(self):
         pkg = PROJECT_ROOT / "packages" / "maiw-decision" / "maiw_decision"
         imports = _source_imports(pkg)
-        assert (
-            "src" not in imports
-        ), "maiw_decision must not import from src (API layer)"
+        assert "src" not in imports, (
+            "maiw_decision must not import from src (API layer)"
+        )
 
     def test_maiw_models_no_api_import(self):
         pkg = PROJECT_ROOT / "packages" / "maiw-models" / "maiw_models"
@@ -188,9 +188,9 @@ class TestForbiddenDependencies:
     def test_maiw_execution_no_src_import(self):
         pkg = PROJECT_ROOT / "packages" / "maiw-execution" / "maiw_execution"
         imports = _source_imports(pkg)
-        assert (
-            "src" not in imports
-        ), "maiw_execution must not import from src (API layer)"
+        assert "src" not in imports, (
+            "maiw_execution must not import from src (API layer)"
+        )
 
     def test_maiw_agents_no_src_import(self):
         pkg = PROJECT_ROOT / "packages" / "maiw-agents" / "maiw_agents"
@@ -208,9 +208,9 @@ class TestForbiddenDependencies:
     def test_maiw_execution_no_agents_import(self):
         pkg = PROJECT_ROOT / "packages" / "maiw-execution" / "maiw_execution"
         imports = _source_imports(pkg)
-        assert (
-            "maiw_agents" not in imports
-        ), "maiw_execution must not depend on maiw_agents (would create cycle)"
+        assert "maiw_agents" not in imports, (
+            "maiw_execution must not depend on maiw_agents (would create cycle)"
+        )
 
 
 # ── Phase 9A smoke tests: new packages importable ─────────────────────────────
