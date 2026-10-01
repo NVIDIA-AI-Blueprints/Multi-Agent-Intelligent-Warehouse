@@ -79,6 +79,7 @@ for _pkg in ("packages/maiw-models", "packages/maiw-agents"):
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
+
 def _make_model_response(content: str = "gateway response"):
     """Build a minimal valid ModelResponse for use in stubs."""
     from maiw_models.models import (
@@ -139,6 +140,7 @@ class _FailingGateway:
 # T1 — MAIWTestModelAdapter sends ModelRequest
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.asyncio
 async def test_adapter_constructs_model_request():
     """
@@ -151,7 +153,9 @@ async def test_adapter_constructs_model_request():
     from maiw_agents.runtime.model_adapter import MAIWTestModelAdapter
 
     gw = _RecordingGateway()
-    adapter = MAIWTestModelAdapter(model_gateway=gw, risk_level="low", reasoning_level="medium")
+    adapter = MAIWTestModelAdapter(
+        model_gateway=gw, risk_level="low", reasoning_level="medium"
+    )
 
     result = await adapter.generate(
         prompt="diagnose the constraint",
@@ -160,9 +164,7 @@ async def test_adapter_constructs_model_request():
     )
 
     # The gateway must have been called
-    assert len(gw.calls) == 1, (
-        f"Expected exactly 1 gateway call, got {len(gw.calls)}"
-    )
+    assert len(gw.calls) == 1, f"Expected exactly 1 gateway call, got {len(gw.calls)}"
     call_arg = gw.calls[0]
     assert isinstance(call_arg, ModelRequest), (
         "MAIWTestModelAdapter must pass a ModelRequest to gateway.generate(), "
@@ -175,14 +177,15 @@ async def test_adapter_constructs_model_request():
         "Result came from mock fallback — gateway failure was silently swallowed. "
         "Check broad except Exception in MAIWTestModelAdapter.generate()."
     )
-    assert result.get("text") == "gateway response", (
-        f"Expected gateway content 'gateway response', got: {result.get('text')!r}"
-    )
+    assert (
+        result.get("text") == "gateway response"
+    ), f"Expected gateway content 'gateway response', got: {result.get('text')!r}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # T2 — MAIWModelGatewayChat sends ModelRequest
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def test_chat_adapter_constructs_model_request():
     """
@@ -208,9 +211,7 @@ def test_chat_adapter_constructs_model_request():
 
     result = model._generate([HumanMessage(content="diagnose the constraint")])
 
-    assert len(gw.calls) == 1, (
-        f"Expected exactly 1 gateway call, got {len(gw.calls)}"
-    )
+    assert len(gw.calls) == 1, f"Expected exactly 1 gateway call, got {len(gw.calls)}"
     call_arg = gw.calls[0]
     assert isinstance(call_arg, ModelRequest), (
         "MAIWModelGatewayChat must pass a ModelRequest to gateway.generate(), "
@@ -229,6 +230,7 @@ def test_chat_adapter_constructs_model_request():
 # ══════════════════════════════════════════════════════════════════════════════
 # T3 — MAIWTestModelAdapter propagates gateway failure (no silent mock)
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 @pytest.mark.asyncio
 async def test_adapter_gateway_failure_propagates():
@@ -250,14 +252,15 @@ async def test_adapter_gateway_failure_propagates():
     # The real requirement: the call must raise, not return
     assert exc_info.value is not None
     # Optionally: verify it's not a mock-flavoured KeyError
-    assert "NIM connection refused" in str(exc_info.value), (
-        f"Exception should propagate from gateway, not be replaced. Got: {exc_info.value}"
-    )
+    assert "NIM connection refused" in str(
+        exc_info.value
+    ), f"Exception should propagate from gateway, not be replaced. Got: {exc_info.value}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # T4 — MAIWModelGatewayChat propagates gateway failure (no silent mock)
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def test_chat_adapter_gateway_failure_propagates():
     """
@@ -279,14 +282,15 @@ def test_chat_adapter_gateway_failure_propagates():
         model._generate([HumanMessage(content="diagnose the constraint")])
 
     assert exc_info.value is not None
-    assert "provider unreachable" in str(exc_info.value), (
-        f"Exception must propagate from gateway, not be swallowed. Got: {exc_info.value}"
-    )
+    assert "provider unreachable" in str(
+        exc_info.value
+    ), f"Exception must propagate from gateway, not be swallowed. Got: {exc_info.value}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # T5 — MAIWTestModelAdapter: exactly one gateway call per inference
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 @pytest.mark.asyncio
 async def test_adapter_call_count_per_inference():
@@ -299,15 +303,16 @@ async def test_adapter_call_count_per_inference():
     await adapter.generate(prompt="step A", trace_id="t5a")
     await adapter.generate(prompt="step B", trace_id="t5b")
 
-    assert len(gw.calls) == 2, (
-        f"Expected 2 gateway calls (one per inference), got {len(gw.calls)}"
-    )
+    assert (
+        len(gw.calls) == 2
+    ), f"Expected 2 gateway calls (one per inference), got {len(gw.calls)}"
     assert adapter.call_count == 2
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # T6 — MAIWModelGatewayChat: exactly one gateway call per _generate()
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def test_chat_adapter_call_count_per_inference():
     """T6 — Gateway receives exactly 1 call per _generate() invocation."""
@@ -323,14 +328,13 @@ def test_chat_adapter_call_count_per_inference():
     model._generate([HumanMessage(content="step A")])
     model._generate([HumanMessage(content="step B")])
 
-    assert len(gw.calls) == 2, (
-        f"Expected 2 gateway calls, got {len(gw.calls)}"
-    )
+    assert len(gw.calls) == 2, f"Expected 2 gateway calls, got {len(gw.calls)}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # T7 — MAIWTestModelAdapter: explicit test mode (gateway=None → mock allowed)
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 @pytest.mark.asyncio
 async def test_adapter_test_mode_explicit_mock():
@@ -355,6 +359,7 @@ async def test_adapter_test_mode_explicit_mock():
 # ══════════════════════════════════════════════════════════════════════════════
 # T8 — MAIWModelGatewayChat: explicit test mode (gateway=None → mock allowed)
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def test_chat_adapter_test_mode_explicit_mock():
     """
@@ -382,6 +387,7 @@ def test_chat_adapter_test_mode_explicit_mock():
 # T9 — trace_id propagation through MAIWTestModelAdapter
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 @pytest.mark.asyncio
 async def test_adapter_model_request_preserves_trace_id():
     """T9 — trace_id from caller reaches ModelRequest.trace_id."""
@@ -396,14 +402,15 @@ async def test_adapter_model_request_preserves_trace_id():
     assert len(gw.calls) == 1
     request = gw.calls[0]
     assert isinstance(request, ModelRequest)
-    assert request.trace_id == "my-trace-9", (
-        f"Expected trace_id='my-trace-9' in ModelRequest, got {request.trace_id!r}"
-    )
+    assert (
+        request.trace_id == "my-trace-9"
+    ), f"Expected trace_id='my-trace-9' in ModelRequest, got {request.trace_id!r}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # T10 — trace_id propagation through MAIWModelGatewayChat
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def test_chat_adapter_model_request_preserves_trace_id():
     """T10 — trace_id from MAIWModelGatewayChat.trace_id reaches ModelRequest."""
@@ -422,14 +429,15 @@ def test_chat_adapter_model_request_preserves_trace_id():
     assert len(gw.calls) == 1
     request = gw.calls[0]
     assert isinstance(request, ModelRequest)
-    assert request.trace_id == "my-trace-10", (
-        f"Expected trace_id='my-trace-10' in ModelRequest, got {request.trace_id!r}"
-    )
+    assert (
+        request.trace_id == "my-trace-10"
+    ), f"Expected trace_id='my-trace-10' in ModelRequest, got {request.trace_id!r}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # T11 — ModelUnavailable propagates from MAIWTestModelAdapter
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 @pytest.mark.asyncio
 async def test_model_unavailable_propagates_from_adapter():
@@ -447,6 +455,7 @@ async def test_model_unavailable_propagates_from_adapter():
 # ══════════════════════════════════════════════════════════════════════════════
 # T12 — ModelUnavailable propagates from MAIWModelGatewayChat
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def test_model_unavailable_propagates_from_chat_adapter():
     """T12 — Typed ModelUnavailable from gateway reaches caller through chat adapter."""
@@ -468,6 +477,7 @@ def test_model_unavailable_propagates_from_chat_adapter():
 # T13 — MAIWModelGatewayChat: ModelResponse.content reaches AIMessage.content
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def test_chat_adapter_response_content_returned():
     """
     T13 — ModelResponse.content is translated to AIMessage.content correctly.
@@ -488,15 +498,16 @@ def test_chat_adapter_response_content_returned():
     result = model._generate([HumanMessage(content="diagnose")])
 
     content = result.generations[0].message.content
-    assert content == expected, (
-        f"Expected ModelResponse.content {expected!r} to be passed through, got {content!r}"
-    )
+    assert (
+        content == expected
+    ), f"Expected ModelResponse.content {expected!r} to be passed through, got {content!r}"
     assert isinstance(result.generations[0].message, AIMessage)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # T14 — DeepAgentsRuntime wires MAIWModelGatewayChat with context.model_gateway
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def test_deep_agents_runtime_uses_chat_adapter_with_gateway():
     """

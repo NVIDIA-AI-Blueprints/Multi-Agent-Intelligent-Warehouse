@@ -113,7 +113,9 @@ def _to_reasoning_level(s: str) -> ReasoningLevel:
     }
     result = _map.get(s.lower())
     if result is None:
-        logger.warning("_to_reasoning_level: unknown value %r — defaulting to MEDIUM", s)
+        logger.warning(
+            "_to_reasoning_level: unknown value %r — defaulting to MEDIUM", s
+        )
         return ReasoningLevel.MEDIUM
     return result
 
@@ -189,7 +191,10 @@ class MAIWTestModelAdapter:
 
         logger.debug(
             "MAIWTestModelAdapter.generate: step=%s trace=%s call=%d risk=%s",
-            step_id, trace_id, self._call_count, self._risk_level,
+            step_id,
+            trace_id,
+            self._call_count,
+            self._risk_level,
         )
 
         # ── EXPLICIT TEST MODE: gateway=None → deterministic mock ─────────────
@@ -333,7 +338,12 @@ MAIWModelAdapter = MAIWTestModelAdapter
 
 try:
     from langchain_core.language_models import BaseChatModel
-    from langchain_core.messages import BaseMessage, AIMessage, HumanMessage, SystemMessage
+    from langchain_core.messages import (
+        BaseMessage,
+        AIMessage,
+        HumanMessage,
+        SystemMessage,
+    )
     from langchain_core.outputs import ChatResult, ChatGeneration
     from langchain_core.callbacks import CallbackManagerForLLMRun
 
@@ -421,7 +431,9 @@ try:
                 prompt = "\n".join(msg["content"] for msg in gw_messages)
                 response_text = self._mock_response(prompt)
                 return ChatResult(
-                    generations=[ChatGeneration(message=AIMessage(content=response_text))]
+                    generations=[
+                        ChatGeneration(message=AIMessage(content=response_text))
+                    ]
                 )
 
             # ── PRODUCTION PATH: construct canonical ModelRequest ─────────────
@@ -440,7 +452,10 @@ try:
 
             logger.debug(
                 "MAIWModelGatewayChat._generate: task=%s trace=%s risk=%s reasoning=%s",
-                request.task, request.trace_id, request.risk_level, request.reasoning,
+                request.task,
+                request.trace_id,
+                request.risk_level,
+                request.reasoning,
             )
 
             # Run the async gateway call in a worker thread to avoid blocking
@@ -455,7 +470,9 @@ try:
                 response = future.result()  # ModelResponse — raises on gateway failure
 
             return ChatResult(
-                generations=[ChatGeneration(message=AIMessage(content=response.content))]
+                generations=[
+                    ChatGeneration(message=AIMessage(content=response.content))
+                ]
             )
 
         async def _agenerate(
@@ -482,7 +499,9 @@ try:
                 prompt = "\n".join(msg["content"] for msg in gw_messages)
                 response_text = self._mock_response(prompt)
                 return ChatResult(
-                    generations=[ChatGeneration(message=AIMessage(content=response_text))]
+                    generations=[
+                        ChatGeneration(message=AIMessage(content=response_text))
+                    ]
                 )
 
             # ── PRODUCTION PATH ────────────────────────────────────────────────
@@ -496,14 +515,19 @@ try:
 
             logger.debug(
                 "MAIWModelGatewayChat._agenerate: task=%s trace=%s risk=%s reasoning=%s",
-                request.task, request.trace_id, request.risk_level, request.reasoning,
+                request.task,
+                request.trace_id,
+                request.risk_level,
+                request.reasoning,
             )
 
             # Raises on gateway failure — no silent mock fallback.
             response = await self.model_gateway.generate(request)
 
             return ChatResult(
-                generations=[ChatGeneration(message=AIMessage(content=response.content))]
+                generations=[
+                    ChatGeneration(message=AIMessage(content=response.content))
+                ]
             )
 
         def _mock_response(self, prompt: str) -> str:
