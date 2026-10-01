@@ -540,9 +540,9 @@ class TestFixedContextInvariant:
         # Same messages sent to both models.
         msgs_nano = captured_requests[0][1]
         msgs_super = captured_requests[1][1]
-        assert msgs_nano == msgs_super, (
-            "Fixed-context invariant violated — messages differ"
-        )
+        assert (
+            msgs_nano == msgs_super
+        ), "Fixed-context invariant violated — messages differ"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1217,9 +1217,9 @@ class TestNoGovernanceSideEffects:
             "executor",
             "conversation_turn",
         }
-        assert fields.isdisjoint(forbidden_fields), (
-            f"EvaluationCallResult has governance fields: {fields & forbidden_fields}"
-        )
+        assert fields.isdisjoint(
+            forbidden_fields
+        ), f"EvaluationCallResult has governance fields: {fields & forbidden_fields}"
 
     def test_evaluation_runner_does_not_import_governance(self):
         """evaluation.runner does not import governance modules."""
@@ -1241,9 +1241,9 @@ class TestNoGovernanceSideEffects:
             "import maiw_execution",
         ]
         for forbidden in forbidden_imports:
-            assert forbidden not in import_text, (
-                f"evaluation.runner has governance import: {forbidden}"
-            )
+            assert (
+                forbidden not in import_text
+            ), f"evaluation.runner has governance import: {forbidden}"
 
     def test_benchmark_module_does_not_import_governance(self):
         """evaluation.benchmark does not import governance modules."""

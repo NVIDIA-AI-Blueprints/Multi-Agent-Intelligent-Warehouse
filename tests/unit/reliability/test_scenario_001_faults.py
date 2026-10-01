@@ -379,9 +379,9 @@ async def test_f06_ambiguous_write_outcome_unknown_no_retry():
     exec_result = await executor.execute(proposal, decision, trace_id="trace-f06")
 
     # Core assertions — UNKNOWN, not FAILED
-    assert exec_result.outcome == ExecutionOutcome.UNKNOWN, (
-        f"Expected UNKNOWN, got {exec_result.outcome.value}"
-    )
+    assert (
+        exec_result.outcome == ExecutionOutcome.UNKNOWN
+    ), f"Expected UNKNOWN, got {exec_result.outcome.value}"
     assert exec_result.physical_mutation_occurred is True
     assert exec_result.execution_id is not None
 

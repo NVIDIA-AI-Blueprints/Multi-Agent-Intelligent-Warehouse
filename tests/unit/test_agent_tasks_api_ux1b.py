@@ -295,9 +295,9 @@ class TestAgentTaskViewFields:
             "objective",
             "status",
         }
-        assert required_operator <= fields, (
-            f"Missing operator fields: {required_operator - fields}"
-        )
+        assert (
+            required_operator <= fields
+        ), f"Missing operator fields: {required_operator - fields}"
 
     def test_view_exposes_all_required_developer_fields(self):
         from maiw_api.routers.agent_tasks import AgentTaskView
@@ -313,9 +313,9 @@ class TestAgentTaskViewFields:
             "completed_steps",
             "iteration",
         }
-        assert required_dev <= fields, (
-            f"Missing developer fields: {required_dev - fields}"
-        )
+        assert (
+            required_dev <= fields
+        ), f"Missing developer fields: {required_dev - fields}"
 
     def test_view_includes_sop_steps_for_ui(self):
         from maiw_api.routers.agent_tasks import AgentTaskView

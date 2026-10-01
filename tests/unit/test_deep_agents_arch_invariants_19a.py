@@ -125,9 +125,9 @@ def test_skill_adapter_blocks_write_skills():
     tools = adapter.get_agent_callable_tools()
 
     write_tools = [t for t in tools if t.capability_class == CapabilityClass.WRITE]
-    assert len(write_tools) == 0, (
-        f"Expected no WRITE tools, found: {[t.skill_id for t in write_tools]}"
-    )
+    assert (
+        len(write_tools) == 0
+    ), f"Expected no WRITE tools, found: {[t.skill_id for t in write_tools]}"
 
 
 def test_skill_adapter_blocks_emergency_write_skills():
@@ -141,9 +141,9 @@ def test_skill_adapter_blocks_emergency_write_skills():
     emergency_write_tools = [
         t for t in tools if t.capability_class == CapabilityClass.EMERGENCY_WRITE
     ]
-    assert len(emergency_write_tools) == 0, (
-        f"Expected no EMERGENCY_WRITE tools, found: {[t.skill_id for t in emergency_write_tools]}"
-    )
+    assert (
+        len(emergency_write_tools) == 0
+    ), f"Expected no EMERGENCY_WRITE tools, found: {[t.skill_id for t in emergency_write_tools]}"
 
 
 def test_skill_adapter_blocks_write_even_when_explicitly_requested():
@@ -179,15 +179,15 @@ def test_skill_adapter_is_blocked_method_identifies_write():
 
     adapter = MAIWSkillAdapter()
     # Known WRITE skill from SKILL_REGISTRY
-    assert adapter.is_blocked("warehouse.labor.assign_direct"), (
-        "warehouse.labor.assign_direct is WRITE — must be blocked"
-    )
-    assert adapter.is_blocked("warehouse.wave.reprioritize_direct"), (
-        "warehouse.wave.reprioritize_direct is WRITE — must be blocked"
-    )
-    assert adapter.is_blocked("warehouse.equipment.assign_direct"), (
-        "warehouse.equipment.assign_direct is WRITE — must be blocked"
-    )
+    assert adapter.is_blocked(
+        "warehouse.labor.assign_direct"
+    ), "warehouse.labor.assign_direct is WRITE — must be blocked"
+    assert adapter.is_blocked(
+        "warehouse.wave.reprioritize_direct"
+    ), "warehouse.wave.reprioritize_direct is WRITE — must be blocked"
+    assert adapter.is_blocked(
+        "warehouse.equipment.assign_direct"
+    ), "warehouse.equipment.assign_direct is WRITE — must be blocked"
 
 
 # ── Invariant 5: Uses ModelGateway adapter ────────────────────────────────────
@@ -238,9 +238,9 @@ def test_deep_agents_runtime_accepts_agent_task_state():
 
     # Verify type annotation references AgentTaskState
     source = inspect.getsource(DeepAgentsRuntime.run_task)
-    assert "AgentTaskState" in source, (
-        "run_task must use MAIW AgentTaskState, not opaque framework state"
-    )
+    assert (
+        "AgentTaskState" in source
+    ), "run_task must use MAIW AgentTaskState, not opaque framework state"
 
 
 def test_agent_task_state_transition_is_validated():
@@ -293,9 +293,9 @@ def test_deep_agents_runtime_accepts_sop_definition():
     assert "sop" in params, "run_task must accept 'sop' (SOPDefinition) parameter"
 
     source = inspect.getsource(DeepAgentsRuntime.run_task)
-    assert "SOPDefinition" in source or "sop.steps" in source, (
-        "run_task must use MAIW SOPDefinition"
-    )
+    assert (
+        "SOPDefinition" in source or "sop.steps" in source
+    ), "run_task must use MAIW SOPDefinition"
 
 
 # ── Invariant 8 & 9: Skill adapter READ/ANALYTICAL allowed ───────────────────
@@ -310,9 +310,9 @@ def test_skill_adapter_allows_read_skills():
     tools = adapter.get_agent_callable_tools()
 
     read_tools = [t for t in tools if t.capability_class == CapabilityClass.READ]
-    assert len(read_tools) >= 1, (
-        f"Expected READ skills to be exposed, found zero. Total tools: {len(tools)}"
-    )
+    assert (
+        len(read_tools) >= 1
+    ), f"Expected READ skills to be exposed, found zero. Total tools: {len(tools)}"
 
 
 def test_skill_adapter_allows_analytical_skills():
@@ -326,9 +326,9 @@ def test_skill_adapter_allows_analytical_skills():
     analytical_tools = [
         t for t in tools if t.capability_class == CapabilityClass.ANALYTICAL
     ]
-    assert len(analytical_tools) >= 1, (
-        f"Expected ANALYTICAL skills to be exposed, found zero. Total tools: {len(tools)}"
-    )
+    assert (
+        len(analytical_tools) >= 1
+    ), f"Expected ANALYTICAL skills to be exposed, found zero. Total tools: {len(tools)}"
 
 
 # ── Invariant 10: PROPOSAL skills allowed for recommendation ──────────────────
@@ -351,14 +351,14 @@ def test_skill_adapter_allows_proposal_skills_when_opted_in():
     proposal_tools = [
         t for t in tools if t.capability_class == CapabilityClass.PROPOSAL
     ]
-    assert len(proposal_tools) >= 1, (
-        "PROPOSAL skills should be accessible when explicitly included"
-    )
+    assert (
+        len(proposal_tools) >= 1
+    ), "PROPOSAL skills should be accessible when explicitly included"
     # Verify none are write
     for t in proposal_tools:
-        assert not t.is_write, (
-            f"PROPOSAL skill {t.skill_id} must not be marked as write"
-        )
+        assert (
+            not t.is_write
+        ), f"PROPOSAL skill {t.skill_id} must not be marked as write"
 
 
 def test_skill_adapter_excludes_proposal_by_default():
@@ -372,9 +372,9 @@ def test_skill_adapter_excludes_proposal_by_default():
     proposal_tools = [
         t for t in default_tools if t.capability_class == CapabilityClass.PROPOSAL
     ]
-    assert len(proposal_tools) == 0, (
-        "PROPOSAL skills should not appear in default READ+ANALYTICAL tool set"
-    )
+    assert (
+        len(proposal_tools) == 0
+    ), "PROPOSAL skills should not appear in default READ+ANALYTICAL tool set"
 
 
 # ── Invariant 11: SOP conformance — governance handoff mandatory ──────────────
@@ -501,9 +501,9 @@ def test_get_runtime_default_is_deterministic():
     # Unset env var to test default
     os.environ.pop("MAIW_AGENT_RUNTIME", None)
     rt = get_runtime()
-    assert isinstance(rt, MAIWDeterministicRuntime), (
-        f"Default runtime should be MAIWDeterministicRuntime, got {type(rt).__name__}"
-    )
+    assert isinstance(
+        rt, MAIWDeterministicRuntime
+    ), f"Default runtime should be MAIWDeterministicRuntime, got {type(rt).__name__}"
 
 
 def test_get_runtime_env_deterministic():
@@ -529,9 +529,9 @@ def test_get_runtime_env_deep_agents():
     os.environ["MAIW_AGENT_RUNTIME"] = "deep_agents"
     try:
         rt = get_runtime()
-        assert isinstance(rt, DeepAgentsRuntime), (
-            f"Expected DeepAgentsRuntime, got {type(rt).__name__}"
-        )
+        assert isinstance(
+            rt, DeepAgentsRuntime
+        ), f"Expected DeepAgentsRuntime, got {type(rt).__name__}"
     finally:
         os.environ.pop("MAIW_AGENT_RUNTIME", None)
 
@@ -564,9 +564,9 @@ def test_deep_agents_runtime_satisfies_agent_runtime_protocol():
     from maiw_agents.contracts.runtime import AgentRuntime
 
     rt = DeepAgentsRuntime()
-    assert isinstance(rt, AgentRuntime), (
-        "DeepAgentsRuntime must satisfy the AgentRuntime Protocol"
-    )
+    assert isinstance(
+        rt, AgentRuntime
+    ), "DeepAgentsRuntime must satisfy the AgentRuntime Protocol"
 
 
 def test_deterministic_runtime_satisfies_agent_runtime_protocol():
@@ -575,9 +575,9 @@ def test_deterministic_runtime_satisfies_agent_runtime_protocol():
     from maiw_agents.contracts.runtime import AgentRuntime
 
     rt = MAIWDeterministicRuntime()
-    assert isinstance(rt, AgentRuntime), (
-        "MAIWDeterministicRuntime must satisfy the AgentRuntime Protocol"
-    )
+    assert isinstance(
+        rt, AgentRuntime
+    ), "MAIWDeterministicRuntime must satisfy the AgentRuntime Protocol"
 
 
 # ── Phase 19A Real Integration Invariants (19A.6–19A.9) ─────────────────────
@@ -624,9 +624,9 @@ def test_maiw_model_gateway_chat_llm_type():
     from maiw_agents.runtime.model_adapter import MAIWModelGatewayChat
 
     chat = MAIWModelGatewayChat(model_gateway=None)
-    assert chat._llm_type == "maiw-model-gateway", (
-        f"Expected _llm_type='maiw-model-gateway', got {chat._llm_type!r}"
-    )
+    assert (
+        chat._llm_type == "maiw-model-gateway"
+    ), f"Expected _llm_type='maiw-model-gateway', got {chat._llm_type!r}"
 
 
 def test_build_maiw_tools_blocks_write_capabilities():
@@ -698,9 +698,9 @@ def test_sop_definition_runtime_profile_defaults_to_strict():
         escalation=[],
         required_context=[],
     )
-    assert sop.runtime_profile == "strict", (
-        f"Expected runtime_profile='strict', got {sop.runtime_profile!r}"
-    )
+    assert (
+        sop.runtime_profile == "strict"
+    ), f"Expected runtime_profile='strict', got {sop.runtime_profile!r}"
 
 
 def test_get_runtime_with_adaptive_sop_returns_deep_agents():
@@ -724,9 +724,9 @@ def test_get_runtime_with_adaptive_sop_returns_deep_agents():
     )
     os.environ.pop("MAIW_AGENT_RUNTIME", None)
     rt = get_runtime(sop=sop)
-    assert isinstance(rt, DeepAgentsRuntime), (
-        f"Expected DeepAgentsRuntime for adaptive profile, got {type(rt).__name__}"
-    )
+    assert isinstance(
+        rt, DeepAgentsRuntime
+    ), f"Expected DeepAgentsRuntime for adaptive profile, got {type(rt).__name__}"
 
 
 def test_get_runtime_with_strict_sop_returns_deterministic():
@@ -751,9 +751,9 @@ def test_get_runtime_with_strict_sop_returns_deterministic():
     )
     os.environ.pop("MAIW_AGENT_RUNTIME", None)
     rt = get_runtime(sop=sop)
-    assert isinstance(rt, MAIWDeterministicRuntime), (
-        f"Expected MAIWDeterministicRuntime for strict profile, got {type(rt).__name__}"
-    )
+    assert isinstance(
+        rt, MAIWDeterministicRuntime
+    ), f"Expected MAIWDeterministicRuntime for strict profile, got {type(rt).__name__}"
 
 
 def test_get_runtime_config_overrides_sop_profile():
@@ -800,9 +800,9 @@ def test_wave_risk_resolution_sop_has_adaptive_profile():
     if not sop_path.exists():
         pytest.skip("SOP file not found")
     sop = load_sop(sop_path)
-    assert sop.runtime_profile == "adaptive", (
-        f"wave_risk_resolution.v1 should have runtime_profile='adaptive', got {sop.runtime_profile!r}"
-    )
+    assert (
+        sop.runtime_profile == "adaptive"
+    ), f"wave_risk_resolution.v1 should have runtime_profile='adaptive', got {sop.runtime_profile!r}"
 
 
 def test_maiw_test_model_adapter_importable():
@@ -834,6 +834,6 @@ def test_model_adapter_has_no_framework_imports_updated():
     # deep_agents, langchain (base), langgraph, nemoagent are forbidden
     still_forbidden = frozenset({"deep_agents", "langchain", "langgraph", "nemoagent"})
     found = imports & still_forbidden
-    assert not found, (
-        f"model_adapter.py contains still-forbidden framework imports: {found}"
-    )
+    assert (
+        not found
+    ), f"model_adapter.py contains still-forbidden framework imports: {found}"

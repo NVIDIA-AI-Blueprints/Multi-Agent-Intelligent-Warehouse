@@ -343,9 +343,9 @@ def test_domain_extraction_from_capability():
     for capability, expected_domain in cases:
         parts = capability.split(".")
         domain = parts[1] if len(parts) >= 3 else "unknown"
-        assert domain == expected_domain, (
-            f"Expected {expected_domain!r} for {capability!r}"
-        )
+        assert (
+            domain == expected_domain
+        ), f"Expected {expected_domain!r} for {capability!r}"
 
 
 # ---------------------------------------------------------------------------

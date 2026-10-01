@@ -58,9 +58,9 @@ class TestOCAGovernanceBoundary:
     def test_oca_may_not_invoke_action_executor(self):
         AGENT_DEFINITIONS, _, _, _, _ = _import_contracts()
         oca = AGENT_DEFINITIONS["operations_coordination"]
-        assert oca.governance_boundary.may_invoke_action_executor is False, (
-            "OCA governance_boundary.may_invoke_action_executor must be False"
-        )
+        assert (
+            oca.governance_boundary.may_invoke_action_executor is False
+        ), "OCA governance_boundary.may_invoke_action_executor must be False"
 
     def test_oca_allowed_capabilities_contain_no_write_skills(self):
         AGENT_DEFINITIONS, CapabilityClass, SKILL_REGISTRY, _, _ = _import_contracts()
@@ -116,9 +116,9 @@ class TestSpecialistAgentBoundary:
     def test_specialist_no_subagents(self, agent_id):
         AGENT_DEFINITIONS, _, _, _, _ = _import_contracts()
         agent = AGENT_DEFINITIONS[agent_id]
-        assert agent.allowed_subagents == [], (
-            f"Specialist agent {agent_id!r} must not delegate to subagents"
-        )
+        assert (
+            agent.allowed_subagents == []
+        ), f"Specialist agent {agent_id!r} must not delegate to subagents"
 
 
 # ── C. SafetyComplianceAgent ──────────────────────────────────────────────────
@@ -189,9 +189,9 @@ class TestAgentRuntimeProtocol:
         _, _, _, AgentRuntime, _ = _import_contracts()
         MAIWDeterministicRuntime = _import_runtime()
         rt = MAIWDeterministicRuntime()
-        assert isinstance(rt, AgentRuntime), (
-            "MAIWDeterministicRuntime must satisfy the AgentRuntime Protocol"
-        )
+        assert isinstance(
+            rt, AgentRuntime
+        ), "MAIWDeterministicRuntime must satisfy the AgentRuntime Protocol"
 
     def test_runtime_has_run_task_method(self):
         MAIWDeterministicRuntime = _import_runtime()
@@ -222,9 +222,9 @@ class TestOCAGovernanceClosure:
             user_query="allocate worker to zone A",
         )
         result = await agent._execute_action_tools(query, context=None)
-        assert result == [], (
-            "_execute_action_tools() must return [] after Phase 18H governance closure"
-        )
+        assert (
+            result == []
+        ), "_execute_action_tools() must return [] after Phase 18H governance closure"
 
     @pytest.mark.asyncio
     async def test_execute_action_tools_with_action_tools_still_noop(self):

@@ -88,9 +88,9 @@ class TestCanonicalSOPs:
         oca_sop = SOP_DIR / "operations_coordination" / "wave_risk_resolution.v1.yaml"
         sop = load_sop(oca_sop)
         step_ids = [s.id for s in sop.steps]
-        assert "observe" in step_ids, (
-            "OCA SOP must have an 'observe' step (post-execution state evaluation)"
-        )
+        assert (
+            "observe" in step_ids
+        ), "OCA SOP must have an 'observe' step (post-execution state evaluation)"
 
     def test_oca_sop_has_submit_step(self):
         from maiw_agents.contracts import load_sop
@@ -98,9 +98,9 @@ class TestCanonicalSOPs:
         oca_sop = SOP_DIR / "operations_coordination" / "wave_risk_resolution.v1.yaml"
         sop = load_sop(oca_sop)
         step_ids = [s.id for s in sop.steps]
-        assert "submit" in step_ids, (
-            "OCA SOP must have a 'submit' step (emit_recommended_action)"
-        )
+        assert (
+            "submit" in step_ids
+        ), "OCA SOP must have a 'submit' step (emit_recommended_action)"
 
 
 # ── SOP rejection tests ───────────────────────────────────────────────────────

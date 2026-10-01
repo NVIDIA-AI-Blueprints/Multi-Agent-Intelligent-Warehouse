@@ -208,9 +208,9 @@ def test_wave_delay_sets_low_priority(ctrl):
     pending_after = [t for t in wave_after.tasks if t.status == "pending"]
 
     for t in pending_after:
-        assert t.priority == "low", (
-            f"Task {t.task_id} priority should be 'low' after wave_delay, got {t.priority}"
-        )
+        assert (
+            t.priority == "low"
+        ), f"Task {t.task_id} priority should be 'low' after wave_delay, got {t.priority}"
 
     _log(
         "healthy_baseline",
@@ -293,9 +293,9 @@ def test_stale_state_clock_is_before_shift_start(ctrl):
     elapsed = ctrl.world.clock.elapsed_seconds
 
     # EPOCH=08:00 UTC; offset=-2700 → 07:15:00 UTC
-    assert "07:15" in clock_iso, (
-        f"stale_state clock should show 07:15 UTC (45 min before shift), got {clock_iso}"
-    )
+    assert (
+        "07:15" in clock_iso
+    ), f"stale_state clock should show 07:15 UTC (45 min before shift), got {clock_iso}"
 
     eq_total = s["world"]["equipment"]["total"]
     assert eq_total > 0
@@ -320,9 +320,9 @@ def test_state_drift_has_mismatch_statuses(ctrl):
 
     # At least one AGV is charging (WMS says available — drift)
     charging = [a for a in agvs if a.status == "charging"]
-    assert len(charging) >= 1, (
-        f"state_drift must have at least one AGV in 'charging' (WMS drift) status"
-    )
+    assert (
+        len(charging) >= 1
+    ), f"state_drift must have at least one AGV in 'charging' (WMS drift) status"
 
     s = ctrl.status()
     _log(
@@ -368,9 +368,9 @@ def test_reset_is_deterministic(ctrl):
 
     # Faulted asset restored
     agv_reset = ctrl.world.equipment[asset_id]
-    assert agv_reset.status == status_at_start, (
-        f"After reset: expected {status_at_start}, got {agv_reset.status}"
-    )
+    assert (
+        agv_reset.status == status_at_start
+    ), f"After reset: expected {status_at_start}, got {agv_reset.status}"
     assert agv_reset.fault_code is None
 
     # Run 2: same tick sequence — timed events fire identically (equipment_failure scenario
@@ -476,9 +476,9 @@ def test_low_stock_inject_propagates_to_inventory_provider(ctrl):
 
 def test_all_five_scenarios_registered():
     files = list_scenario_files()
-    assert set(files.keys()) == set(SCENARIO_REGISTRY.keys()), (
-        f"Scenario registry mismatch: {set(files.keys())}"
-    )
+    assert set(files.keys()) == set(
+        SCENARIO_REGISTRY.keys()
+    ), f"Scenario registry mismatch: {set(files.keys())}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════

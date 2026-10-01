@@ -165,7 +165,9 @@ class LogAnalyzer:
                 line.strip()
                 for line in lines
                 if re.search(pattern_info["pattern"], line, re.IGNORECASE)
-            ][:5]  # Keep first 5 examples
+            ][
+                :5
+            ]  # Keep first 5 examples
 
             analysis["patterns"][pattern_name] = {
                 "count": pattern_info["count"],

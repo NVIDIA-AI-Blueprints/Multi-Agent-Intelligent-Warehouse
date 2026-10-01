@@ -538,9 +538,9 @@ class TestSandboxPayloadIsWriteFree:
         sandbox exists, so that deleting this integration cannot break it.
         """
         for path in AGENTS_PKG.rglob("*.py"):
-            assert "integrations.nemoclaw" not in path.read_text(encoding="utf-8"), (
-                f"{path} imports the sandbox integration"
-            )
+            assert "integrations.nemoclaw" not in path.read_text(
+                encoding="utf-8"
+            ), f"{path} imports the sandbox integration"
 
 
 # ── Container argument mapping ────────────────────────────────────────────────

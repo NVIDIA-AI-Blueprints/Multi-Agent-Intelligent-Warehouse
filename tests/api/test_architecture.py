@@ -76,9 +76,10 @@ def test_package_does_not_import_api_layer(pkg_path: Path):
                 if imp == forbidden or imp.startswith(forbidden + "."):
                     violations.append(f"{py_file.relative_to(REPO_ROOT)}: import {imp}")
 
-    assert not violations, (
-        f"Dependency direction violation in {pkg_path.parent.name}:\n"
-        + "\n".join(violations)
+    assert (
+        not violations
+    ), f"Dependency direction violation in {pkg_path.parent.name}:\n" + "\n".join(
+        violations
     )
 
 
@@ -105,9 +106,9 @@ def test_bootstrap_imports_from_packages_only():
         if imp == forbidden or imp.startswith(forbidden + ".")
     ]
 
-    assert not violations, (
-        "bootstrap.py imports from forbidden src.api paths:\n" + "\n".join(violations)
-    )
+    assert (
+        not violations
+    ), "bootstrap.py imports from forbidden src.api paths:\n" + "\n".join(violations)
 
 
 def test_maiw_api_routers_do_not_import_src_agents():
@@ -122,9 +123,10 @@ def test_maiw_api_routers_do_not_import_src_agents():
             if imp.startswith("src.api.agents"):
                 violations.append(f"{py_file.name}: import {imp}")
 
-    assert not violations, (
-        "Canonical routers must not import from src.api.agents:\n"
-        + "\n".join(violations)
+    assert (
+        not violations
+    ), "Canonical routers must not import from src.api.agents:\n" + "\n".join(
+        violations
     )
 
 
@@ -153,9 +155,9 @@ def test_canonical_entrypoint_in_dockerfile_backend():
         pytest.skip("Dockerfile.backend not found")
     content = dockerfile.read_text()
     assert "maiw_api.app:app" in content, "Dockerfile.backend must use maiw_api.app:app"
-    assert "src.api.app:app" not in content, (
-        "Dockerfile.backend must not reference src.api.app:app"
-    )
+    assert (
+        "src.api.app:app" not in content
+    ), "Dockerfile.backend must not reference src.api.app:app"
 
 
 def test_no_load_dotenv_at_import_time_in_app():
@@ -210,6 +212,6 @@ def test_mcp_server_containers_in_compose():
         pytest.skip("docker-compose.dev.yaml not found")
     content = compose.read_text()
     for domain in ("mcp-inventory", "mcp-equipment", "mcp-labor", "mcp-wave"):
-        assert domain in content, (
-            f"docker-compose.dev.yaml must define {domain} service"
-        )
+        assert (
+            domain in content
+        ), f"docker-compose.dev.yaml must define {domain} service"

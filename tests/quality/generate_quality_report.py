@@ -400,9 +400,7 @@ def generate_markdown_report(analysis: Dict[str, Any], results: Dict[str, Any]) 
             priority_emoji = (
                 "🔴"
                 if rec["priority"] == "high"
-                else "🟡"
-                if rec["priority"] == "medium"
-                else "🟢"
+                else "🟡" if rec["priority"] == "medium" else "🟢"
             )
             report += f"### {priority_emoji} {rec['title']} ({rec['priority'].upper()} Priority)\n\n"
             report += f"**Category**: {rec['category']}\n\n"

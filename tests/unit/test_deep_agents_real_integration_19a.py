@@ -155,9 +155,9 @@ async def test_A_real_runtime_basic_sop_run():
 
     result = await runtime.run_task(definition, sop, state, context)
 
-    assert result.task_id == "task-A-basic", (
-        f"Expected task_id='task-A-basic', got {result.task_id!r}"
-    )
+    assert (
+        result.task_id == "task-A-basic"
+    ), f"Expected task_id='task-A-basic', got {result.task_id!r}"
     assert result.agent_id == definition.agent_id
     assert result.sop_id == sop.id
     assert result.sop_version == sop.version
@@ -325,9 +325,9 @@ async def test_F_resume_after_governance_approved():
         governance_outcome=governance_outcome,
     )
 
-    assert result.final_status == AgentTaskStatus.COMPLETED, (
-        f"Expected COMPLETED after APPROVED governance, got {result.final_status.value}"
-    )
+    assert (
+        result.final_status == AgentTaskStatus.COMPLETED
+    ), f"Expected COMPLETED after APPROVED governance, got {result.final_status.value}"
     assert result.stop_reason == "OBJECTIVE_MET"
     assert result.task_id == "task-F-resume"
 
@@ -407,9 +407,9 @@ def test_maiw_model_gateway_chat_test_mode_mock():
     ]
     result = chat._generate(messages)
     content = result.generations[0].message.content
-    assert "WAITING_FOR_GOVERNANCE" in content or "GOVERNANCE" in content.upper(), (
-        f"Expected governance signal in mock response, got: {content!r}"
-    )
+    assert (
+        "WAITING_FOR_GOVERNANCE" in content or "GOVERNANCE" in content.upper()
+    ), f"Expected governance signal in mock response, got: {content!r}"
 
 
 def test_maiw_model_gateway_chat_is_langchain_base_chat_model():
@@ -432,6 +432,6 @@ def test_maiw_model_gateway_chat_bind_tools_returns_self():
 
     chat = MAIWModelGatewayChat(model_gateway=None)
     result = chat.bind_tools([])
-    assert result is chat, (
-        "bind_tools() must return self (no-op) — MAIW mock model uses text output, not tool calls"
-    )
+    assert (
+        result is chat
+    ), "bind_tools() must return self (no-op) — MAIW mock model uses text output, not tool calls"

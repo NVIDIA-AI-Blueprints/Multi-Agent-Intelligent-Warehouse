@@ -143,28 +143,28 @@ class TestWorldLiveImportBoundary:
 
     def test_no_action_executor_import(self):
         import_lines = "\n".join(self._import_lines())
-        assert "ActionExecutor" not in import_lines, (
-            "ActionExecutor must not be imported in world router"
-        )
+        assert (
+            "ActionExecutor" not in import_lines
+        ), "ActionExecutor must not be imported in world router"
 
     def test_no_decision_engine_import(self):
         import_lines = "\n".join(self._import_lines())
-        assert "DecisionEngine" not in import_lines, (
-            "DecisionEngine must not be imported in world router"
-        )
+        assert (
+            "DecisionEngine" not in import_lines
+        ), "DecisionEngine must not be imported in world router"
 
     def test_no_approval_store_import(self):
         import_lines = "\n".join(self._import_lines())
         # InMemoryApprovalStore is allowed in controller.py — NOT in the router
-        assert "maiw_decision.approval" not in import_lines, (
-            "ApprovalStore must not be imported in world router"
-        )
+        assert (
+            "maiw_decision.approval" not in import_lines
+        ), "ApprovalStore must not be imported in world router"
 
     def test_no_governed_action_orchestrator_import(self):
         import_lines = "\n".join(self._import_lines())
-        assert "GovernedActionOrchestrator" not in import_lines, (
-            "GovernedActionOrchestrator must not be imported in world router"
-        )
+        assert (
+            "GovernedActionOrchestrator" not in import_lines
+        ), "GovernedActionOrchestrator must not be imported in world router"
 
 
 # ── L1: LIVE initial state (no scenario) ─────────────────────────────────────
@@ -478,9 +478,9 @@ class TestWorldLiveResetClears:
         from maiw_api.demo.controller import DemoScenarioController
 
         ctrl = DemoScenarioController()
-        assert hasattr(ctrl, "set_execution_record"), (
-            "DemoScenarioController must expose set_execution_record()"
-        )
+        assert hasattr(
+            ctrl, "set_execution_record"
+        ), "DemoScenarioController must expose set_execution_record()"
         rec = {
             "execution_id": "x",
             "trace_id": "y",
@@ -514,9 +514,9 @@ class TestWorldLiveEntityIdentity:
 
         live_keys = set(live_world.workers.keys())
         changed_ids = {e.entity_id for e in result.changed_entities}
-        assert changed_ids.issubset(live_keys), (
-            "All changed entity_ids must match world.workers keys"
-        )
+        assert changed_ids.issubset(
+            live_keys
+        ), "All changed entity_ids must match world.workers keys"
 
 
 # ── L10: Bounded payload ──────────────────────────────────────────────────────

@@ -66,9 +66,9 @@ class TestMCPV2Protocol:
     def test_protocol_version_is_2026(self):
         from mcp.types import LATEST_PROTOCOL_VERSION
 
-        assert "2026" in LATEST_PROTOCOL_VERSION, (
-            f"Expected 2026-07-28 protocol, got {LATEST_PROTOCOL_VERSION}"
-        )
+        assert (
+            "2026" in LATEST_PROTOCOL_VERSION
+        ), f"Expected 2026-07-28 protocol, got {LATEST_PROTOCOL_VERSION}"
 
     def test_mcp_server_import_from_v2_path(self):
         from mcp.server import MCPServer
@@ -154,9 +154,9 @@ class TestMCPToolDiscovery:
                 return [t.name for t in tools.tools]
 
         tool_names = asyncio.run(run())
-        assert "warehouse.inventory.get" in tool_names, (
-            f"Expected 'warehouse.inventory.get' in {tool_names}"
-        )
+        assert (
+            "warehouse.inventory.get" in tool_names
+        ), f"Expected 'warehouse.inventory.get' in {tool_names}"
 
     def test_tools_list_returns_inventory_locate(self):
         server = _get_configured_server()
@@ -184,9 +184,9 @@ class TestMCPToolDiscovery:
         assert tool is not None
         # v2: input_schema (snake_case), not inputSchema (camelCase)
         props = tool.input_schema.get("properties", {})
-        assert "sku" in props, (
-            f"'sku' not in input_schema.properties: {list(props.keys())}"
-        )
+        assert (
+            "sku" in props
+        ), f"'sku' not in input_schema.properties: {list(props.keys())}"
 
     def test_inventory_get_has_description(self):
         server = _get_configured_server()
@@ -348,9 +348,9 @@ class TestMCPErrorHandling:
 
         result = asyncio.run(run())
         # v2: is_error (snake_case)
-        assert result.is_error is True, (
-            "BackendUnavailable should produce is_error=True in CallToolResult"
-        )
+        assert (
+            result.is_error is True
+        ), "BackendUnavailable should produce is_error=True in CallToolResult"
 
     def test_empty_sku_handled_gracefully(self):
         """Server does not crash when sku is empty string."""

@@ -318,9 +318,9 @@ class TestProofSopAAcrossTheSandboxBoundary:
         # ── 3. No write authority was exercised inside ────────────────────────
         for capability_id in executor.capabilities_invoked:
             entry = SKILL_REGISTRY.get(capability_id)
-            assert entry is None or entry.capability_class not in WRITE_CLASSES, (
-                f"sandboxed procedure invoked write capability {capability_id!r}"
-            )
+            assert (
+                entry is None or entry.capability_class not in WRITE_CLASSES
+            ), f"sandboxed procedure invoked write capability {capability_id!r}"
         assert world.at_risk_count == 3, "the world changed while the agent reasoned"
 
         # ── 4. The recommendation crosses, and is validated on the host ───────
@@ -369,9 +369,9 @@ class TestProofSopAAcrossTheSandboxBoundary:
             governance_outcome=outcome,
             warehouse_state_snapshot=world,
         )
-        assert executor.steps == steps_before_resume, (
-            "resume_after_governance re-executed a step; it must validate only"
-        )
+        assert (
+            executor.steps == steps_before_resume
+        ), "resume_after_governance re-executed a step; it must validate only"
 
         finished = await engine.run_procedure(
             definition=definition,
@@ -384,9 +384,10 @@ class TestProofSopAAcrossTheSandboxBoundary:
 
         assert finished.status is ProcedureStatus.COMPLETED
         assert "observe" in finished.completed_step_ids
-        assert executor.steps == [*steps_before_resume, "observe"], (
-            "finishing the procedure replayed steps that had already run"
-        )
+        assert executor.steps == [
+            *steps_before_resume,
+            "observe",
+        ], "finishing the procedure replayed steps that had already run"
         assert world.reads > 0, "the terminal predicate did not read the world"
 
     async def test_governance_outcome_is_rejected_before_the_engine_sees_it(

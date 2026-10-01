@@ -287,12 +287,12 @@ async def test_implementation_comparison(sdk_service, pattern_service):
     # Assertions
     assert results["total"] > 0
     # Both implementations should have reasonable accuracy
-    assert results["sdk_correct"] >= results["total"] * 0.7, (
-        f"SDK accuracy too low: {results['sdk_correct']}/{results['total']}"
-    )
-    assert results["pattern_correct"] >= results["total"] * 0.7, (
-        f"Pattern accuracy too low: {results['pattern_correct']}/{results['total']}"
-    )
+    assert (
+        results["sdk_correct"] >= results["total"] * 0.7
+    ), f"SDK accuracy too low: {results['sdk_correct']}/{results['total']}"
+    assert (
+        results["pattern_correct"] >= results["total"] * 0.7
+    ), f"Pattern accuracy too low: {results['pattern_correct']}/{results['total']}"
 
 
 @pytest.mark.asyncio

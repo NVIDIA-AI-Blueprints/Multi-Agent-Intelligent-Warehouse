@@ -56,18 +56,18 @@ class TestNoMaiwExecutionImport:
             "equipment/agent.py must not import from maiw_execution — "
             "ActionExecutor belongs in apps/api (execution service layer)."
         )
-        assert "import maiw_execution" not in src, (
-            "equipment/agent.py must not import maiw_execution."
-        )
+        assert (
+            "import maiw_execution" not in src
+        ), "equipment/agent.py must not import maiw_execution."
 
     def test_state_aware_ops_does_not_import_maiw_execution(self):
         """state_aware_ops.py must not import ActionExecutor from maiw_execution."""
         import maiw_agents.equipment.state_aware_ops as m
 
         src = _get_source(m)
-        assert "from maiw_execution" not in src, (
-            "state_aware_ops.py must not import from maiw_execution."
-        )
+        assert (
+            "from maiw_execution" not in src
+        ), "state_aware_ops.py must not import from maiw_execution."
         assert "import maiw_execution" not in src
 
     def test_maiw_agents_package_no_maiw_execution_in_top_level(self):
@@ -97,18 +97,18 @@ class TestNoActionExecutorConstructorParam:
         import inspect
 
         sig = inspect.signature(LaborAgent.__init__)
-        assert "action_executor" not in sig.parameters, (
-            "LaborAgent.__init__ must not accept action_executor."
-        )
+        assert (
+            "action_executor" not in sig.parameters
+        ), "LaborAgent.__init__ must not accept action_executor."
 
     def test_wave_agent_constructor_has_no_action_executor(self):
         from maiw_agents.wave.agent import WaveAgent
         import inspect
 
         sig = inspect.signature(WaveAgent.__init__)
-        assert "action_executor" not in sig.parameters, (
-            "WaveAgent.__init__ must not accept action_executor."
-        )
+        assert (
+            "action_executor" not in sig.parameters
+        ), "WaveAgent.__init__ must not accept action_executor."
 
 
 # ---------------------------------------------------------------------------
@@ -135,9 +135,9 @@ class TestEquipmentAgentHasNoActionExecutor:
         agent = EquipmentAssetOperationsAgent()
         # Agents may have methods starting with 'propose_' but not 'execute_'
         execute_methods = [name for name in dir(agent) if name.startswith("execute_")]
-        assert execute_methods == [], (
-            f"Agent must not have execute_* methods: {execute_methods}"
-        )
+        assert (
+            execute_methods == []
+        ), f"Agent must not have execute_* methods: {execute_methods}"
 
 
 # ---------------------------------------------------------------------------
@@ -261,12 +261,12 @@ class TestEquipmentProposalReturnsDecisionDict:
         assert isinstance(result, dict)
         assert "status" in result
         # Private keys must be present for the apps/api layer
-        assert "_proposal" in result, (
-            "state_aware_ops must include '_proposal' key for apps/api execution layer."
-        )
-        assert "_decision" in result, (
-            "state_aware_ops must include '_decision' key for apps/api execution layer."
-        )
+        assert (
+            "_proposal" in result
+        ), "state_aware_ops must include '_proposal' key for apps/api execution layer."
+        assert (
+            "_decision" in result
+        ), "state_aware_ops must include '_decision' key for apps/api execution layer."
 
 
 # ---------------------------------------------------------------------------
@@ -291,9 +291,9 @@ class TestGovernanceBoundaryFalse:
         from maiw_agents.contracts.definitions import AGENT_DEFINITIONS
 
         defn = AGENT_DEFINITIONS[agent_id]
-        assert defn.governance_boundary.may_invoke_action_executor is False, (
-            f"{agent_id}: governance_boundary.may_invoke_action_executor must be False."
-        )
+        assert (
+            defn.governance_boundary.may_invoke_action_executor is False
+        ), f"{agent_id}: governance_boundary.may_invoke_action_executor must be False."
 
     def test_equipment_definition_may_invoke_action_executor_is_false(self):
         """EQUIPMENT_AGENT_DEFINITION.governance_boundary is now truthful."""
@@ -370,9 +370,9 @@ class TestSharedCapabilityAlignment:
         """MAIWDeterministicRuntime module must import check_capability_alignment."""
         import maiw_agents.runtime.deterministic as m
 
-        assert hasattr(m, "check_capability_alignment"), (
-            "deterministic.py must import check_capability_alignment from contracts.runtime."
-        )
+        assert hasattr(
+            m, "check_capability_alignment"
+        ), "deterministic.py must import check_capability_alignment from contracts.runtime."
 
     def test_deep_agents_runtime_uses_same_function(self):
         """DeepAgentsRuntime._check_capability_alignment must delegate to contracts.runtime."""
@@ -395,17 +395,17 @@ class TestProhibitedPrefixesRemoved:
     def test_prohibited_capability_prefixes_not_in_sop_module(self):
         import maiw_agents.contracts.sop as sop_module
 
-        assert not hasattr(sop_module, "_PROHIBITED_CAPABILITY_PREFIXES"), (
-            "_PROHIBITED_CAPABILITY_PREFIXES was dead code and must be removed from sop.py."
-        )
+        assert not hasattr(
+            sop_module, "_PROHIBITED_CAPABILITY_PREFIXES"
+        ), "_PROHIBITED_CAPABILITY_PREFIXES was dead code and must be removed from sop.py."
 
     def test_write_capability_patterns_still_present(self):
         """_WRITE_CAPABILITY_PATTERNS (the regex) must still be present."""
         import maiw_agents.contracts.sop as sop_module
 
-        assert hasattr(sop_module, "_WRITE_CAPABILITY_PATTERNS"), (
-            "_WRITE_CAPABILITY_PATTERNS must remain (active write-blocking regex)."
-        )
+        assert hasattr(
+            sop_module, "_WRITE_CAPABILITY_PATTERNS"
+        ), "_WRITE_CAPABILITY_PATTERNS must remain (active write-blocking regex)."
 
 
 # ---------------------------------------------------------------------------
@@ -477,9 +477,9 @@ class TestRuntimeEnvVarPrecedence:
         with patch.dict(os.environ, {"MAIW_AGENT_RUNTIME": "deep_agents"}):
             runtime = get_runtime()
 
-        assert isinstance(runtime, DeepAgentsRuntime), (
-            "When no config and no SOP, MAIW_AGENT_RUNTIME env var should be used."
-        )
+        assert isinstance(
+            runtime, DeepAgentsRuntime
+        ), "When no config and no SOP, MAIW_AGENT_RUNTIME env var should be used."
 
     def test_explicit_config_overrides_both_sop_and_env(self):
         """Explicit config parameter takes precedence over both SOP and env var."""
@@ -500,9 +500,9 @@ class TestRuntimeEnvVarPrecedence:
         with patch.dict(os.environ, {"MAIW_AGENT_RUNTIME": "deep_agents"}):
             runtime = get_runtime(config="deterministic", sop=sop)
 
-        assert isinstance(runtime, MAIWDeterministicRuntime), (
-            "Explicit config='deterministic' must override both SOP adaptive and env var."
-        )
+        assert isinstance(
+            runtime, MAIWDeterministicRuntime
+        ), "Explicit config='deterministic' must override both SOP adaptive and env var."
 
 
 # ---------------------------------------------------------------------------
