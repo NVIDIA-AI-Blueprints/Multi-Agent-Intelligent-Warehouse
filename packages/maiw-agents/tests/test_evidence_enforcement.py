@@ -25,6 +25,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from conftest import (
+    SOP_DIR,
     ScriptedExecutor,
     make_procedure_state,
     make_sop,
@@ -34,7 +35,8 @@ from conftest import (
 from maiw_agents.contracts.agent import AgentDefinition
 from maiw_agents.contracts.procedure_state import ProcedureStatus
 from maiw_agents.contracts.runtime import AgentExecutionContext
-from maiw_agents.contracts.sop import SOPStep
+from maiw_agents.contracts.sop import SOPStep, load_sop
+from maiw_agents.domain_predicates import register_all_domain_predicates
 from maiw_agents.contracts.sop_v2 import (
     EscalationReasonCode,
     EvidenceRequirement,
@@ -535,3 +537,183 @@ def test_evidence_ref_is_a_pointer_not_a_transcript():
     assert not (fields & forbidden)
     # It carries a reference and a summary — deliberately not the content.
     assert {"type", "source", "reference_id", "summary"} <= fields
+
+
+# ── Enforcement in the three proof SOPs ───────────────────────────────────────
+#
+# The proof SOPs must declare enforced requirements on the steps where absence
+# of proof is dangerous — the governance handoff, the post-write reread, and
+# final validation. Both directions are asserted for each: evidence present ->
+# the step completes, evidence absent -> it does not, with a structured reason.
+
+PROOF_SOPS = {
+    "A_wave_risk_resolution": (
+        SOP_DIR / "operations_coordination" / "wave_risk_resolution.v2.yaml",
+        {"observe"},
+    ),
+    "B_equipment_failure_recovery": (
+        SOP_DIR / "equipment" / "equipment_failure_recovery.v1.yaml",
+        {"wait_for_governance", "verify_execution"},
+    ),
+    "C_picking_inventory_exception": (
+        SOP_DIR / "inventory" / "picking_inventory_exception.v1.yaml",
+        {"propose_resolution", "reassess_inventory_state"},
+    ),
+}
+
+
+@pytest.mark.parametrize("name", sorted(PROOF_SOPS))
+def test_proof_sop_declares_enforced_evidence_on_its_critical_steps(name):
+    """
+    The enforced requirements land on the steps that matter, not decoratively.
+
+    Each is a step where a claim of success is cheap and a proof of success is
+    what the operator actually needs.
+    """
+    path, expected_steps = PROOF_SOPS[name]
+    sop = load_sop(path)
+
+    enforced = {s.id for s in sop.steps if s.enforced_evidence()}
+    assert enforced == expected_steps, (
+        f"{name}: enforced evidence on {sorted(enforced)}, "
+        f"expected {sorted(expected_steps)}"
+    )
+
+    for step in sop.steps:
+        for req in step.enforced_evidence():
+            assert req.evidence_type == "state_snapshot"
+            assert req.source == "authoritative_reread"
+            assert req.optional is False
+
+
+@pytest.mark.parametrize("name", sorted(PROOF_SOPS))
+def test_proof_sop_hints_are_preserved_alongside_enforced_requirements(name):
+    """Adding enforcement did not delete the existing declarative documentation."""
+    path, expected_steps = PROOF_SOPS[name]
+    sop = load_sop(path)
+    for step in sop.steps:
+        if step.id in expected_steps:
+            labels = step.evidence_requirement_labels()
+            assert len(labels) > len(step.enforced_evidence()), (
+                f"{name}/{step.id}: hint requirements were lost"
+            )
+
+
+@pytest.mark.parametrize("name", sorted(PROOF_SOPS))
+@pytest.mark.asyncio
+async def test_proof_sop_step_completes_when_evidence_is_present(name):
+    """Positive control: a real authoritative snapshot satisfies the requirement."""
+    path, expected_steps = PROOF_SOPS[name]
+    sop = load_sop(path)
+    step = next(s for s in sop.steps if s.id in expected_steps)
+
+    result = make_step_result(step.id).model_copy(update={
+        "evidence": [_ref(metadata={"step_id": step.id, "sop_id": sop.id})]
+    })
+    assert (await _check(step, result)).valid is True
+
+
+@pytest.mark.parametrize("name", sorted(PROOF_SOPS))
+@pytest.mark.asyncio
+async def test_proof_sop_step_blocked_when_evidence_is_absent(name):
+    """
+    Negative: no authoritative snapshot means the step cannot complete.
+
+    This is the case the hardening exists for. Before enforcement this step
+    would have been judged on its completion criterion alone and could pass
+    having proven nothing about authoritative state.
+    """
+    path, expected_steps = PROOF_SOPS[name]
+    sop = load_sop(path)
+    step = next(s for s in sop.steps if s.id in expected_steps)
+
+    verdict = await _check(step, make_step_result(step.id))
+    assert verdict.valid is False
+    assert "state_snapshot" in verdict.reason
+    assert "authoritative_reread" in verdict.reason
+
+
+@pytest.mark.parametrize("name", sorted(PROOF_SOPS))
+@pytest.mark.asyncio
+async def test_proof_sop_step_blocked_when_evidence_has_the_wrong_source(name):
+    """A snapshot the model produced is not an authoritative re-read."""
+    path, expected_steps = PROOF_SOPS[name]
+    sop = load_sop(path)
+    step = next(s for s in sop.steps if s.id in expected_steps)
+
+    result = make_step_result(step.id).model_copy(update={
+        "evidence": [
+            _ref(source="model_assertion",
+                 metadata={"step_id": step.id, "sop_id": sop.id})
+        ]
+    })
+    assert (await _check(step, result)).valid is False
+
+
+def _approved_outcome():
+    class _Outcome:
+        decision_outcome = "APPROVED"
+        execution_status = "SUCCESS"
+
+    return _Outcome()
+
+
+def _paused_at(sop, step_id):
+    return make_procedure_state(
+        sop_id=sop.id,
+        version=sop.version,
+        current_step_id=step_id,
+        status=ProcedureStatus.WAITING_FOR_GOVERNANCE,
+        attempt_by_step={step_id: 1},
+    )
+
+
+@pytest.mark.asyncio
+async def test_governance_resume_without_an_authoritative_reread_is_refused():
+    """
+    End-to-end on the real Proof SOP B: resuming after governance without
+    re-reading authoritative state must not complete the write-verification
+    step, and must say so as EVIDENCE_MISSING — before the predicate is even
+    consulted.
+
+    "Governance returned APPROVED" is the weakest possible basis for believing
+    a warehouse write landed. This is the test that says MAIW does not accept it.
+    """
+    register_all_domain_predicates()
+    sop = load_sop(PROOF_SOPS["B_equipment_failure_recovery"][0])
+
+    engine = SOPEngine(executor=ScriptedExecutor())
+    resumed = await engine.resume_after_governance(
+        definition=_definition(), sop=sop,
+        proc_state=_paused_at(sop, "wait_for_governance"),
+        context=_context(), governance_outcome=_approved_outcome(),
+        warehouse_state_snapshot=None,        # never re-read
+    )
+
+    assert resumed.status == ProcedureStatus.ESCALATED
+    assert "wait_for_governance" not in resumed.completed_step_ids
+    assert resumed.step_results["wait_for_governance"].escalation_reason is (
+        EscalationReasonCode.EVIDENCE_MISSING
+    )
+
+
+@pytest.mark.asyncio
+async def test_governance_resume_with_an_authoritative_reread_satisfies_evidence():
+    """Positive control for the test above, on the same real SOP."""
+    register_all_domain_predicates()
+    sop = load_sop(PROOF_SOPS["B_equipment_failure_recovery"][0])
+
+    engine = SOPEngine(executor=ScriptedExecutor())
+    resumed = await engine.resume_after_governance(
+        definition=_definition(), sop=sop,
+        proc_state=_paused_at(sop, "wait_for_governance"),
+        context=_context(), governance_outcome=_approved_outcome(),
+        warehouse_state_snapshot={
+            "equipment": [{"asset_id": "FL-204", "status": "assigned"}],
+        },
+    )
+
+    result = resumed.step_results["wait_for_governance"]
+    assert result.escalation_reason is not EscalationReasonCode.EVIDENCE_MISSING, (
+        "an authoritative re-read must satisfy the evidence requirement"
+    )

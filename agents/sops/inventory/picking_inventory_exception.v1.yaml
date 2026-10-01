@@ -300,6 +300,15 @@ steps:
     evidence_requirements:
       - governance_outcome_ref
       - post_write_inventory_state
+      # ENFORCED (structured form): this step may not complete unless the
+      # engine actually held an authoritative state snapshot when it judged it.
+      # Governance returning APPROVED and an executor reporting success are both
+      # claims; this is the record that real state was read and compared.
+      - evidence_type: state_snapshot
+        source: authoritative_reread
+        required_fields:
+          - step_id
+          - sop_id
     escalation_reason: >
       Authoritative inventory state does not show the approved adjustment
       reaching the warehouse — escalating without retrying the write.
@@ -349,6 +358,15 @@ steps:
     evidence_requirements:
       - post_write_inventory_state
       - reassessment_validation_result
+      # ENFORCED (structured form): this step may not complete unless the
+      # engine actually held an authoritative state snapshot when it judged it.
+      # Governance returning APPROVED and an executor reporting success are both
+      # claims; this is the record that real state was read and compared.
+      - evidence_type: state_snapshot
+        source: authoritative_reread
+        required_fields:
+          - step_id
+          - sop_id
     escalation_reason: >
       Inventory did not reconcile within the bounded reassessment budget — the
       pick cannot be confirmed and a human must count the location.

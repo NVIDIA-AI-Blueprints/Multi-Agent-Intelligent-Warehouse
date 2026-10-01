@@ -456,15 +456,30 @@ class SOPEngine:
             "execution_status": execution_status,
         }
 
+        resume_attempt = proc_state.attempt_by_step.get(step_id, 1)
+
+        # The authoritative re-read is the evidence that the write landed. The
+        # caller performs the read (the engine holds no read capability and no
+        # credentials) and hands the snapshot in; recording it here is what lets
+        # a post-write step demand proof rather than accept "governance said
+        # APPROVED". Resuming with no snapshot leaves this list empty, and a
+        # step that declares the requirement will correctly refuse to complete.
+        resume_evidence: list[EvidenceRef] = []
+        snapshot_ref = self._authoritative_snapshot_evidence(
+            step, resume_attempt, warehouse_state_snapshot, proc_state
+        )
+        if snapshot_ref is not None:
+            resume_evidence.append(snapshot_ref)
+
         step_result = StepResult(
             step_id=step_id,
             status=StepStatus.RUNNING,
             output=outcome_output,
             runtime="governance_resume",
-            attempt=proc_state.attempt_by_step.get(step_id, 1),
+            attempt=resume_attempt,
             started_at=proc_state.started_at,
             completed_at=_now(),
-            evidence=[],
+            evidence=resume_evidence,
         )
 
         val_ctx = StepValidationContext(
@@ -738,7 +753,17 @@ class SOPEngine:
             warehouse_state_snapshot=warehouse_state_snapshot,
         )
 
-        # 4a. Evidence requirements run FIRST. A step that cannot show its work
+        # 4a. An authoritative snapshot in hand is itself evidence. Record it
+        #     before the requirement check so a verification step can demand it.
+        snapshot_ref = self._authoritative_snapshot_evidence(
+            step, attempt, warehouse_state_snapshot, proc_state
+        )
+        if snapshot_ref is not None:
+            result = result.model_copy(
+                update={"evidence": result.evidence + [snapshot_ref]}
+            )
+
+        # 4b. Evidence requirements run FIRST. A step that cannot show its work
         #     has not completed, whatever its completion criterion would have
         #     said — and it is reported as EVIDENCE_MISSING rather than
         #     VALIDATION_FAILED, because the two call for different responses.
@@ -1014,6 +1039,47 @@ class SOPEngine:
             return []
         bounded = context.bounded_context or {}
         return [key for key in step.required_inputs if key not in bounded]
+
+    @staticmethod
+    def _authoritative_snapshot_evidence(
+        step: SOPStep,
+        attempt: int,
+        warehouse_state_snapshot: Any | None,
+        proc_state: ProcedureExecutionState,
+    ) -> EvidenceRef | None:
+        """
+        Record that this step was validated against a real authoritative snapshot.
+
+        Without this, a post-write verification step could never satisfy an
+        evidence requirement: the proof that a write landed is the *snapshot*,
+        and until now nothing turned that snapshot into a structured record.
+
+        The distinction it captures is the one that matters at a write
+        boundary — "authoritative state was read and this step was judged
+        against it" versus "a runtime said it was fine". It is emitted
+        identically under every runtime, because the snapshot is supplied by
+        the caller rather than produced by a model, which is what makes
+        ``state_snapshot`` / ``authoritative_reread`` a requirement a SOP can
+        enforce without pinning itself to one runtime.
+        """
+        if warehouse_state_snapshot is None:
+            return None
+        return EvidenceRef(
+            type="state_snapshot",
+            source="authoritative_reread",
+            reference_id=proc_state.trace_id or None,
+            timestamp=_now(),
+            summary=(
+                f"authoritative state snapshot supplied for step {step.id!r} "
+                f"(attempt {attempt})"
+            ),
+            metadata={
+                "step_id": step.id,
+                "attempt": attempt,
+                "sop_id": proc_state.sop_id,
+                "sop_version": proc_state.sop_version,
+            },
+        )
 
     @staticmethod
     def _version_mismatch(
