@@ -84,6 +84,86 @@ class EscalationReasonCode(str, Enum):
     which means a *single* step attempt kept failing: here every attempt ran
     cleanly and the world simply never reached the required state."""
 
+    EVIDENCE_MISSING = "evidence_missing"
+    """A step's declared mandatory evidence was absent, of the wrong type, from
+    the wrong source, incomplete, or stale. Distinct from VALIDATION_FAILED:
+    the completion criterion was never even reached, because the step could not
+    show its work. See ``EvidenceRequirement``."""
+
+    CAPABILITY_DENIED = "capability_denied"
+    """A runtime attempted a capability the RuntimeCapabilityPolicy does not
+    permit. Deny-by-default: the capability was not on the allow-list, or its
+    class is permanently denied (WRITE / EMERGENCY_WRITE)."""
+
+
+# ── Evidence requirements ─────────────────────────────────────────────────────
+
+class EvidenceRequirement(BaseModel):
+    """
+    A mandatory, typed precondition on what a step must have *shown* to complete.
+
+    The gap this closes: SOPs have long declared ``evidence_requirements``, but
+    the declaration was decorative — it shaped a prompt and nothing checked it.
+    A step could assert it had re-read authoritative state while producing no
+    record that it ever did. This contract makes the declaration enforceable.
+
+    The rule that gives it teeth:
+
+        Model text cannot satisfy an evidence requirement. Only a structured
+        ``EvidenceRef`` with a matching type, matching source, and the required
+        fields present will do. Prose asserting that something was observed is
+        not an observation.
+
+    Deliberately not an expression language. There is no DSL, no comparison
+    operators, no eval — the same no-eval principle that governs StepCondition
+    and StepCompletionSpec. Five typed fields is the whole vocabulary, which
+    keeps a SOP author (and a model) from writing logic here.
+    """
+
+    evidence_type: str = Field(
+        description=(
+            "Required EvidenceRef.type, e.g. 'capability_result', "
+            "'state_snapshot', 'validator_result', 'step_execution'."
+        ),
+    )
+    source: str | None = Field(
+        default=None,
+        description=(
+            "Required EvidenceRef.source — a specific capability id, validator "
+            "type, or a marker such as 'authoritative_reread'. None means any "
+            "source of the right type will satisfy this requirement."
+        ),
+    )
+    min_count: int = Field(
+        default=1,
+        ge=1,
+        description="How many matching EvidenceRefs must be present.",
+    )
+    required_fields: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Keys that must be present in the matching EvidenceRef.metadata. "
+            "This is how a requirement demands substance rather than a bare tag."
+        ),
+    )
+    max_age_seconds: int | None = Field(
+        default=None,
+        gt=0,
+        description=(
+            "Freshness bound measured against EvidenceRef.timestamp. None means "
+            "no bound. Set this on post-write rereads, where evidence captured "
+            "before the write proves nothing about the state after it."
+        ),
+    )
+    optional: bool = Field(
+        default=False,
+        description=(
+            "An advisory requirement: recorded and reported, never blocking. "
+            "Present so a SOP can document evidence it would like without "
+            "turning every absence into an escalation."
+        ),
+    )
+
 
 # ── Step completion specification ─────────────────────────────────────────────
 
@@ -265,6 +345,7 @@ class LoopPolicy(BaseModel):
 __all__ = [
     "ValidatorType",
     "EscalationReasonCode",
+    "EvidenceRequirement",
     "StepCompletionSpec",
     "RetryPolicy",
     "LoopPolicy",

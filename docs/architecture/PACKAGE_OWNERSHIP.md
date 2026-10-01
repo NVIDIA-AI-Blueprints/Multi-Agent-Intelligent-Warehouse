@@ -17,7 +17,24 @@ It describes the current-state architecture; migration status codes are not used
 | `maiw-decision` | `DecisionEngine`, constraint rules, `ApprovalStore` | `maiw-contracts`, `maiw-skills`, `maiw-state` |
 | `maiw-execution` | `BaseActionExecutor`, domain executors, `ExecutionRegistry` | `maiw-decision`, `maiw-skills`, `maiw-mcp` |
 | `maiw-world` | `WarehouseWorldGenerator`, BASE/SCENARIO/LIVE world states, `OperationalContextSnapshot` | `maiw-state` |
-| `maiw-agents` | `AgentRuntime`, `MAIWDeterministicRuntime`, `DeepAgentsRuntime`, `AgentDefinition`, `SOPDefinition` | `maiw-execution`, `maiw-skills`, `maiw-state`, `maiw-models` |
+| `maiw-agents` | `AgentRuntime`, `MAIWDeterministicRuntime`, `DeepAgentsRuntime`, `AgentDefinition`, `SOPDefinition`, SOP Engine V2 | `maiw-skills`, `maiw-state`, `maiw-models` |
+
+`maiw-agents` does **not** depend on `maiw-execution`. The dependency was removed when operational write authority was taken out of the agent package; a test asserts the absence of any `maiw_execution` or `ActionExecutor` import rather than trusting this table.
+
+### `maiw-agents` internal ownership
+
+| Module | Owns |
+|---|---|
+| `sop_engine/engine.py` | Procedure lifecycle: step progression, branching, retry, bounded loops, escalation, checkpointing. Domain-neutral — asserted by an AST import test. |
+| `sop_engine/validators.py` | Step completion validators (`SCHEMA`, `STATE_PREDICATE`, `CAPABILITY_RESULT`, `LEGACY_SUCCESS`) and `EvidenceRequirementsValidator`. Holds the code-registered state predicate registry. |
+| `sop_engine/state_store.py` | `ProcedureStateStore` protocol; `InMemoryProcedureStateStore`; `JsonFileProcedureStateStore`. Record keeper only — `save` / `load` / `delete` and nothing else. |
+| `sop_engine/executor.py` | `SOPStepExecutor` — the per-step runtime seam. |
+| `contracts/procedure_state.py` | `ProcedureExecutionState`, the unit a store persists, including `revision`. |
+| `contracts/capability_policy.py` | `RuntimeCapabilityPolicy`, `build_capability_policy`, and the deny-by-default `authorize_*` seam shared by both runtimes. |
+| `contracts/sop_v2.py` | Declarative step semantics: `StepCompletionSpec`, `RetryPolicy`, `LoopPolicy`, `EvidenceRequirement`, escalation reason codes. |
+| `{wave,equipment,inventory}/predicates.py` | Domain-owned state predicates, registered into the engine's registry at import. The engine never imports these. |
+
+What `maiw-agents` deliberately does not own: `ActionExecutor`, `DecisionEngine`, MCP write clients, and warehouse credentials. Persisting procedure state did not change that — a `ProcedureStateStore` cannot act, only record.
 
 ---
 

@@ -118,6 +118,49 @@ After every write, the executor records the outcome in `ExecutionRegistry`:
 
 ---
 
+## Procedure Checkpoint / Restore
+
+When the SOP Engine is given a `ProcedureStateStore`, each procedure-level
+transition is checkpointed, so the flow above can be interrupted at any point
+and resumed without re-executing completed work.
+
+```
+                        ┌──────────────── checkpoint ────────────────┐
+procedure created ──────┤                                            │
+  → step started ───────┤                                            │
+  → StepResult accepted ┤   save(state, expected_revision=N)          │
+  → validation recorded ┤   revision N → N+1                          │
+  → retry/loop count ───┤   StaleRevisionError if another writer won  │
+  → branch taken ───────┤                                            │
+  → WAITING_FOR_GOVERNANCE                                           │
+  → governance resume ──┤                                            │
+  → escalation ─────────┤                                            │
+  → terminal ───────────┘  (written exactly once, then immutable)    │
+                        └────────────────────────────────────────────┘
+```
+
+Not checkpointed: token-level model activity and partial runtime output. A
+checkpoint is a point the procedure can resume from, not a trace.
+
+**Restore:**
+
+```
+load(procedure_execution_id)
+  → verify sop_id and sop_version match the SOP supplied   (else POLICY_CONFLICT)
+  → if terminal: return unchanged, execute nothing
+  → else resume at current_step_id with attempt_by_step, completed_step_ids,
+        branch_history, evidence_refs and loop budgets intact
+```
+
+Interaction with the write path above: a procedure restored in
+`WAITING_FOR_GOVERNANCE` stays there — restoring is not approving. A procedure
+restored *after* a write landed resumes at the authoritative re-read and never
+re-issues the write, which is the same rule `UNKNOWN` already follows.
+
+See [SOP_ENGINE_V2_DESIGN.md § Production Hardening](SOP_ENGINE_V2_DESIGN.md#production-hardening).
+
+---
+
 ## Architecture Invariants
 
 | # | Invariant | Enforcement |

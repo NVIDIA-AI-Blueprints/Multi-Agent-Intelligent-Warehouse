@@ -170,6 +170,57 @@ Agents execute SOPs. SOPs do not own agents. An SOP defines the policy envelope;
 
 ---
 
+## SOP Engine V2
+
+A SOP is not a system prompt. It is a versioned, reviewable artifact that the engine executes one step at a time, and the engine — not the model, not the runtime — decides what happens next.
+
+The rule the whole design exists to enforce:
+
+> **A step advances because its declared completion criterion was proven — not because a runtime or a model said it was done.**
+
+**Explicit executable SOPs.** Procedures live in `agents/sops/**.yaml` as typed, versioned steps. No expression language, no `eval`, no dynamic import. A SOP names a registered predicate; it cannot supply one.
+
+**Step-by-step runtime control.** The runtime is handed exactly one step and returns one claim about it. It is never asked which step comes next, never told how many iterations remain, and never offered a choice of successor.
+
+**Validator-owned completion authority.** A runtime reporting `status=COMPLETED` is a *claim*. The engine runs the step's declared validator — `SCHEMA`, `STATE_PREDICATE`, `CAPABILITY_RESULT`, or `LEGACY_SUCCESS` — and the validator's verdict is what advances the procedure.
+
+**Bounded loops and retries.** A loop is bounded twice over, by iteration count and optionally by wall clock, and both bounds are held by the engine. A model returning `COMPLETED` does not exit the loop; a model returning `FAILED` does not extend it. Loops are structurally forbidden on governed-write steps, because re-entering a write can duplicate a physical side effect.
+
+**Runtime neutrality.** The engine knows nothing about waves, equipment, inventory or labour — asserted by a test that inspects its import graph. The same machinery serves any domain that supplies a step executor and registered predicates.
+
+**External governance.** Governance never runs inside the SOP Engine. A write-related step pauses at `WAITING_FOR_GOVERNANCE` and the caller resumes it only after governance has completed.
+
+**Authoritative outcome verification.** A write-related step is not complete because governance returned `APPROVED` or because a call returned 2xx. It completes when a re-read of authoritative state proves the change landed. An indeterminate outcome escalates as `EXECUTION_INDETERMINATE` — it is never resolved by repeating the write.
+
+**Persistence and recovery.** Supplying a `ProcedureStateStore` makes a procedure recoverable. The engine checkpoints every lifecycle transition, so a restart restores exactly which SOP version was running, which step and attempt were active, what evidence had been proven, and whether a write may already have occurred. The SOP version is *pinned*: a procedure never auto-upgrades, because half its steps completing under v1.0 and the rest under v1.1 is a procedure that never existed. Terminal states are immutable, so a restart cannot re-open a finished procedure.
+
+**Evidence enforcement.** Steps declare `evidence_requirements`, and the critical ones are enforced as completion preconditions — checked *before* the completion validator, so a step that cannot show its work reports `EVIDENCE_MISSING` rather than a misleading validation failure. Only a structured `EvidenceRef` with a matching type, source and fields counts. **Model prose cannot satisfy an evidence requirement**: a confident sentence is not an observation.
+
+**Runtime capability boundary (deny-by-default).** Each task is issued an immutable `RuntimeCapabilityPolicy` built only from the `AgentDefinition`, the SOP and the capability registry — never from model output, a prompt, or anything a sandbox declares about itself. A capability absent from the allow-list is denied, including one that did not exist when the policy was issued. `WRITE` and `EMERGENCY_WRITE` are denied unconditionally and cannot be argued back in. Enforcement sits at the invocation seam in **both** runtimes, via one shared function, so there is no second implementation to drift.
+
+### Proof SOPs
+
+| SOP | Property it proves |
+|-----|--------------------|
+| [`wave_risk_resolution.v2`](agents/sops/operations_coordination/wave_risk_resolution.v2.yaml) | Multi-domain coordination ending in a governed recommendation, with post-execution state verification |
+| [`equipment_failure_recovery.v1`](agents/sops/equipment/equipment_failure_recovery.v1.yaml) | Execution succeeding is not recovery succeeding — the write landing, the intended transition, and actual recovery are three separate proofs |
+| [`picking_inventory_exception.v1`](agents/sops/inventory/picking_inventory_exception.v1.yaml) | A bounded reassessment loop, plus facility-strategy variation: one procedure behaves differently in zone- and discrete-picking facilities without a separate code path |
+
+### Authority model
+
+```
+Context → SOP Engine / AgentRuntime → RecommendedAction
+→ Governance → Approval → ActionExecutor → MCP → Operational Systems
+```
+
+Everything left of `Governance` is advisory. The SOP Engine imports no `ActionExecutor`, no `DecisionEngine`, no MCP write client and no warehouse credentials — enforced by AST inspection in CI, not by convention. Adding persistence did not move any authority into the engine: a restored procedure that was waiting on governance is still waiting on governance.
+
+**Pre-NemoClaw status:** the agent/SOP layer is structurally prepared for sandbox integration — procedure state is recoverable, evidence requirements are enforced, and runtime capabilities are explicitly deny-by-default.
+
+See [docs/architecture/SOP_ENGINE_V2_DESIGN.md](docs/architecture/SOP_ENGINE_V2_DESIGN.md).
+
+---
+
 ## Runtime Architecture
 
 MAIW provides two runtimes behind the `AgentRuntime` protocol:

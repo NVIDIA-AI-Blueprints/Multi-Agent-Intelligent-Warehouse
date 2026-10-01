@@ -194,6 +194,15 @@ steps:
     evidence_requirements:
       - state_snapshot
       - state_comparison
+      # ENFORCED (structured form): this step may not complete unless the
+      # engine actually held an authoritative state snapshot when it judged it.
+      # Governance returning APPROVED and an executor reporting success are both
+      # claims; this is the record that real state was read and compared.
+      - evidence_type: state_snapshot
+        source: authoritative_reread
+        required_fields:
+          - step_id
+          - sop_id
     escalation_reason: >
       Authoritative warehouse state does not confirm the approved intervention
       took effect — human review required before any further action.

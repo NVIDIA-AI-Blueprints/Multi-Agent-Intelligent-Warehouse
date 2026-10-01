@@ -36,6 +36,12 @@ from datetime import datetime, timezone
 from typing import Any
 
 from ..contracts.agent import AgentDefinition
+from ..contracts.capability_policy import (
+    CapabilityDeniedError,
+    RuntimeCapabilityPolicy,
+    authorize_step,
+    build_capability_policy,
+)
 from ..contracts.procedure_state import ProcedureExecutionState, ProcedureStatus
 from ..contracts.registry import CapabilityClass, SKILL_REGISTRY
 from ..contracts.runtime import AgentExecutionContext, AgentTaskResult, check_capability_alignment
@@ -119,9 +125,15 @@ def _build_step_system_prompt(
         if step.required_inputs
         else ""
     )
+    # Both requirement forms are surfaced to the model — the enforced ones
+    # because it must produce them, the hints because they document intent.
+    # Note what this does NOT do: telling the model what evidence is required
+    # is not how the requirement is satisfied. The engine checks structured
+    # EvidenceRefs afterwards, so prose here cannot stand in for proof.
+    evidence_labels = step.evidence_requirement_labels()
     evidence_line = (
-        f"EVIDENCE REQUIRED: {', '.join(step.evidence_requirements)}\n"
-        if step.evidence_requirements
+        f"EVIDENCE REQUIRED: {', '.join(evidence_labels)}\n"
+        if evidence_labels
         else ""
     )
 
@@ -147,10 +159,21 @@ def _build_step_system_prompt(
     )
 
 
-def _build_maiw_tools(context: AgentExecutionContext, allowed_caps: list[str]) -> list:
+def _build_maiw_tools(
+    context: AgentExecutionContext,
+    allowed_caps: list[str],
+    policy: RuntimeCapabilityPolicy | None = None,
+) -> list:
     """
     Build LangChain BaseTool objects from MAIW skill registry.
-    Only READ and ANALYTICAL skills are exposed. WRITE/EMERGENCY_WRITE are NEVER included.
+
+    Only READ and ANALYTICAL skills are exposed. WRITE/EMERGENCY_WRITE are
+    NEVER included.
+
+    When a ``policy`` is supplied it is the authority, and ``allowed_caps`` is
+    narrowed to it: the model's tool surface is derived from the same artifact
+    that the per-step ``authorize_step`` gate enforces, so the two cannot
+    disagree about what is permitted.
     """
     try:
         from langchain_core.tools import StructuredTool
@@ -165,6 +188,14 @@ def _build_maiw_tools(context: AgentExecutionContext, allowed_caps: list[str]) -
         # HARD BLOCK: never expose WRITE or EMERGENCY_WRITE
         if entry.capability_class in (CapabilityClass.WRITE, CapabilityClass.EMERGENCY_WRITE):
             logger.warning("Blocking WRITE capability %s from Deep Agents tools", cap_id)
+            continue
+        if policy is not None and not policy.permits_capability(
+            cap_id, entry.capability_class.value
+        ):
+            logger.warning(
+                "Excluding capability %s from Deep Agents tools — not permitted by policy %s",
+                cap_id, policy.policy_id,
+            )
             continue
 
         skill_id = entry.skill_id
@@ -326,6 +357,7 @@ class _DeepAgentsStepExecutor:
         tools: list,
         subagents: list,
         max_iterations: int,
+        policy: RuntimeCapabilityPolicy | None = None,
     ) -> None:
         self._runtime = runtime
         self._sop = sop
@@ -333,6 +365,7 @@ class _DeepAgentsStepExecutor:
         self._tools = tools
         self._subagents = subagents
         self._max_iterations = max_iterations
+        self._policy = policy
         self.message_count = 0
 
     async def execute_step(
@@ -348,6 +381,32 @@ class _DeepAgentsStepExecutor:
         from langchain_core.messages import HumanMessage
 
         started_at = datetime.now(timezone.utc)
+
+        # Deny-by-default gate before the model is invoked for this step. The
+        # tool list was already derived from the policy, but a filtered tool
+        # list is a *construction-time* restriction; this is the runtime check
+        # that holds even if the graph is rebuilt, a tool leaks in, or the model
+        # reaches a capability by another route.
+        if self._policy is not None:
+            try:
+                await authorize_step(self._policy, step)
+            except CapabilityDeniedError as denied:
+                logger.warning(
+                    "DeepAgentsRuntime: step %s denied by policy %s — %s",
+                    step.id, self._policy.policy_id, denied.reason,
+                )
+                return StepResult(
+                    step_id=step.id,
+                    status=StepStatus.ESCALATED,
+                    output={},
+                    runtime=self.RUNTIME_NAME,
+                    attempt=attempt,
+                    started_at=started_at,
+                    completed_at=datetime.now(timezone.utc),
+                    error=str(denied),
+                    escalation_reason=EscalationReasonCode.CAPABILITY_DENIED,
+                    escalation_message=str(denied),
+                )
 
         # The graph is rebuilt per step because the step prompt IS the system
         # prompt — this is what guarantees the model never sees the full SOP.
@@ -578,6 +637,15 @@ class DeepAgentsRuntime:
         # 0. Validate capability alignment (WRITE block)
         self._check_capability_alignment(definition, sop)
 
+        # 0b. Issue this task's capability policy. Same builder, same inputs and
+        #     same deny-by-default rules as the deterministic runtime.
+        policy = build_capability_policy(
+            definition=definition,
+            sop=sop,
+            agent_task_id=state.task_id,
+            runtime=self.RUNTIME_NAME,
+        )
+
         if not sop.steps:
             return self._terminal(state, AgentTaskStatus.FAILED, "SOP has no steps.")
 
@@ -589,8 +657,8 @@ class DeepAgentsRuntime:
             trace_id=context.trace_id,
         )
 
-        # 2. Build tools (READ/ANALYTICAL only — WRITE hard-blocked)
-        tools = _build_maiw_tools(context, sop.allowed_capabilities)
+        # 2. Build tools from the policy (READ/ANALYTICAL only — WRITE hard-blocked)
+        tools = _build_maiw_tools(context, sop.allowed_capabilities, policy)
 
         # 3. Build subagent specs from MAIW SOP (not framework-invented)
         subagents = _build_subagent_specs(sop, context)
@@ -608,6 +676,7 @@ class DeepAgentsRuntime:
             tools=tools,
             subagents=subagents,
             max_iterations=max_iter,
+            policy=policy,
         )
 
         remaining_budget = max(max_iter - state.iteration, 0)
@@ -833,13 +902,24 @@ class DeepAgentsRuntime:
             model_gateway=context.model_gateway,
             trace_id=context.trace_id,
         )
+        # Standalone step execution gets its own policy rather than running
+        # ungoverned. It is built from the same inputs as the run_task path, so
+        # a step executed this way is no more permitted than the same step
+        # executed inside a full procedure.
+        policy = build_capability_policy(
+            definition=definition,
+            sop=sop,
+            agent_task_id=procedure_state.agent_task_id,
+            runtime=self.RUNTIME_NAME,
+        )
         executor = _DeepAgentsStepExecutor(
             runtime=self,
             sop=sop,
             model=model,
-            tools=_build_maiw_tools(context, definition.allowed_capabilities),
+            tools=_build_maiw_tools(context, definition.allowed_capabilities, policy),
             subagents=[],
             max_iterations=definition.termination_policy.max_iterations,
+            policy=policy,
         )
         return await executor.execute_step(
             definition=definition,

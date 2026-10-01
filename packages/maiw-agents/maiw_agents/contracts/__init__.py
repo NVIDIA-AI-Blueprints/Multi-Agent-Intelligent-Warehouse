@@ -50,9 +50,18 @@ from .sop import (
 from .sop_v2 import (
     ValidatorType,
     EscalationReasonCode,
+    EvidenceRequirement,
     StepCompletionSpec,
     RetryPolicy,
     LoopPolicy,
+)
+from .capability_policy import (
+    ALWAYS_DENIED_CAPABILITY_CLASSES,
+    CapabilityDeniedError,
+    RuntimeCapabilityPolicy,
+    authorize_capability,
+    authorize_subagent,
+    build_capability_policy,
 )
 # SOP Engine V2 step result. Exported under explicit V2 names here because
 # contracts/task.py already owns the Phase 18H `StepResult`/`StepStatus` names.
@@ -121,6 +130,7 @@ __all__ = [
     # SOP v2 step semantics
     "ValidatorType",
     "EscalationReasonCode",
+    "EvidenceRequirement",
     "StepCompletionSpec",
     "RetryPolicy",
     "LoopPolicy",
@@ -130,6 +140,13 @@ __all__ = [
     "ValidationResult",
     "ProcedureExecutionState",
     "ProcedureStatus",
+    # Runtime capability boundary (deny-by-default)
+    "RuntimeCapabilityPolicy",
+    "build_capability_policy",
+    "authorize_capability",
+    "authorize_subagent",
+    "CapabilityDeniedError",
+    "ALWAYS_DENIED_CAPABILITY_CLASSES",
     # Delegation
     "AgentDelegationRequest",
     "AgentDelegationResult",

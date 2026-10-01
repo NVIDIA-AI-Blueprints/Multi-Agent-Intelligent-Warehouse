@@ -29,7 +29,7 @@ from ..contracts.procedure_state import ProcedureExecutionState
 from ..contracts.runtime import AgentExecutionContext
 from ..contracts.sop import SOPStep
 from ..contracts.step_result import EvidenceRef, StepResult, StepStatus, ValidationResult
-from ..contracts.sop_v2 import ValidatorType
+from ..contracts.sop_v2 import EvidenceRequirement, ValidatorType
 
 logger = logging.getLogger(__name__)
 
@@ -417,6 +417,166 @@ class LegacySuccessValidator:
         )
 
 
+# ── EVIDENCE REQUIREMENTS ─────────────────────────────────────────────────────
+
+class EvidenceRequirementsValidator:
+    """
+    Enforces a step's declared ``EvidenceRequirement``s as completion preconditions.
+
+    This is not one of the ``ValidatorType`` alternatives — it does not compete
+    with SCHEMA or STATE_PREDICATE for a step. It runs *before* whichever of
+    those the step selected:
+
+        StepResult → evidence requirement check → completion validator → engine
+
+    Ordering matters. A step that cannot show its work should be reported as
+    EVIDENCE_MISSING, not as a completion-criterion failure, because the two
+    call for different operator responses: one means the procedure is not
+    instrumented correctly, the other means the world is not in the expected
+    state.
+
+    What counts as evidence:
+        A structured ``EvidenceRef`` whose ``type`` matches, whose ``source``
+        matches when one is demanded, whose ``metadata`` carries every required
+        field, and whose ``timestamp`` is inside the freshness bound. Nothing
+        else. A model writing "I re-read inventory and it was correct" into
+        ``output`` produces no EvidenceRef and satisfies nothing — which is the
+        entire point of the contract.
+
+    Attempt correlation:
+        Only evidence belonging to *this* attempt of *this* step is considered.
+        Evidence from a previous failed attempt does not carry forward. If
+        attempt 1 re-read state and failed, attempt 2 must re-read again — the
+        stale observation is exactly what a retry exists to replace.
+    """
+
+    async def validate(
+        self,
+        step: SOPStep,
+        result: StepResult,
+        context: StepValidationContext,
+    ) -> ValidationResult:
+        requirements = step.enforced_evidence()
+        if not requirements:
+            return ValidationResult(
+                valid=True,
+                validator_type=ValidatorType.SCHEMA,
+                reason="no enforced evidence requirements",
+                evidence=[],
+            )
+
+        available = self._attempt_evidence(step, result, context)
+        now = datetime.now(timezone.utc)
+
+        failures: list[str] = []
+        satisfied: list[str] = []
+
+        for req in requirements:
+            matches = [ref for ref in available if self._matches(ref, req, now)]
+            label = self._label(req)
+            if len(matches) >= req.min_count:
+                satisfied.append(label)
+                continue
+            if req.optional:
+                logger.debug(
+                    "EvidenceRequirementsValidator: optional requirement %s unmet on step %s",
+                    label, step.id,
+                )
+                continue
+            failures.append(
+                f"{label}: required {req.min_count}, found {len(matches)}"
+            )
+
+        if failures:
+            return ValidationResult(
+                valid=False,
+                validator_type=ValidatorType.SCHEMA,
+                reason=f"missing required evidence — {'; '.join(failures)}",
+                # Re-running the step is how missing evidence gets produced, so
+                # this is retryable. A step that structurally cannot emit the
+                # evidence will exhaust its budget and escalate with this reason
+                # intact rather than being silently passed.
+                retryable=True,
+                evidence=[
+                    _evidence(
+                        ValidatorType.SCHEMA, step, context,
+                        f"evidence requirements not met on attempt {result.attempt}",
+                        unmet_requirements=failures,
+                        satisfied_requirements=satisfied,
+                        attempt=result.attempt,
+                    )
+                ],
+                metadata={
+                    "unmet_evidence_requirements": failures,
+                    "attempt": result.attempt,
+                },
+            )
+
+        return ValidationResult(
+            valid=True,
+            validator_type=ValidatorType.SCHEMA,
+            reason=f"all required evidence present: {satisfied}",
+            evidence=[
+                _evidence(
+                    ValidatorType.SCHEMA, step, context,
+                    f"evidence requirements satisfied on attempt {result.attempt}",
+                    satisfied_requirements=satisfied,
+                    attempt=result.attempt,
+                )
+            ],
+            metadata={"satisfied_evidence_requirements": satisfied},
+        )
+
+    @staticmethod
+    def _attempt_evidence(
+        step: SOPStep,
+        result: StepResult,
+        context: StepValidationContext,
+    ) -> list[EvidenceRef]:
+        """
+        Evidence attributable to this step at this attempt.
+
+        ``result.evidence`` is what the runtime just produced and is by
+        construction current-attempt. The procedure state may additionally hold
+        refs the engine already stamped for this exact step and attempt (a
+        governance resume path, for example); those are included. Anything
+        stamped with a different attempt is not.
+        """
+        refs = list(result.evidence)
+        seen = {id(r) for r in refs}
+        for ref in context.procedure_state.evidence_for_attempt(step.id, result.attempt):
+            if id(ref) not in seen:
+                refs.append(ref)
+        return refs
+
+    @staticmethod
+    def _matches(ref: EvidenceRef, req: EvidenceRequirement, now: datetime) -> bool:
+        if ref.type != req.evidence_type:
+            return False
+        if req.source is not None and ref.source != req.source:
+            return False
+        if req.required_fields:
+            if any(f not in ref.metadata for f in req.required_fields):
+                return False
+        if req.max_age_seconds is not None:
+            ts = ref.timestamp
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            if (now - ts).total_seconds() > req.max_age_seconds:
+                return False
+        return True
+
+    @staticmethod
+    def _label(req: EvidenceRequirement) -> str:
+        return (
+            f"{req.evidence_type}"
+            + (f" from {req.source}" if req.source else "")
+        )
+
+
+DEFAULT_EVIDENCE_VALIDATOR = EvidenceRequirementsValidator()
+
+
 # ── Registry ──────────────────────────────────────────────────────────────────
 
 class ValidatorRegistry:
@@ -469,6 +629,8 @@ __all__ = [
     "StatePredicateValidator",
     "CapabilityResultValidator",
     "LegacySuccessValidator",
+    "EvidenceRequirementsValidator",
+    "DEFAULT_EVIDENCE_VALIDATOR",
     "ValidatorRegistry",
     "DEFAULT_VALIDATOR_REGISTRY",
     "register_predicate",

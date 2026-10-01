@@ -265,6 +265,15 @@ steps:
     evidence_requirements:
       - governance_outcome_ref
       - post_write_equipment_state
+      # ENFORCED (structured form): this step may not complete unless the
+      # engine actually held an authoritative state snapshot when it judged it.
+      # Governance returning APPROVED and an executor reporting success are both
+      # claims; this is the record that real state was read and compared.
+      - evidence_type: state_snapshot
+        source: authoritative_reread
+        required_fields:
+          - step_id
+          - sop_id
     escalation_reason: >
       Authoritative equipment state does not show the approved assignment
       reaching the warehouse — escalating without retrying the write.
@@ -296,6 +305,15 @@ steps:
     timeout_seconds: 30.0
     evidence_requirements:
       - post_write_equipment_state
+      # ENFORCED (structured form): this step may not complete unless the
+      # engine actually held an authoritative state snapshot when it judged it.
+      # Governance returning APPROVED and an executor reporting success are both
+      # claims; this is the record that real state was read and compared.
+      - evidence_type: state_snapshot
+        source: authoritative_reread
+        required_fields:
+          - step_id
+          - sop_id
     escalation_reason: >
       The replacement asset is not in the intended 'assigned' state — the
       execution did not produce the transition the recommendation specified.

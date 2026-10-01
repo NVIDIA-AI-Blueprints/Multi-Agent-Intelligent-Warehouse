@@ -216,8 +216,159 @@ def test_engine_constructor_takes_no_executor_of_actions():
 
     params = set(inspect.signature(SOPEngine.__init__).parameters)
     assert params == {
-        "self", "executor", "validator_registry", "trace_id", "max_transitions"
+        "self", "executor", "validator_registry", "trace_id", "max_transitions",
+        "store",
     }
     # 'executor' here is a SOPStepExecutor (a step runner), not an ActionExecutor.
     annotation = inspect.signature(SOPEngine.__init__).parameters["executor"].annotation
     assert "SOPStepExecutor" in str(annotation)
+
+    # 'store' is a ProcedureStateStore — a record keeper, not an actor. It can
+    # save, load and delete procedure state and nothing else, so handing the
+    # engine persistence grants it no operational authority.
+    store_annotation = str(
+        inspect.signature(SOPEngine.__init__).parameters["store"].annotation
+    )
+    assert "ProcedureStateStore" in store_annotation
+
+    from maiw_agents.sop_engine import ProcedureStateStore
+
+    store_api = {n for n in dir(ProcedureStateStore) if not n.startswith("_")}
+    assert store_api == {"save", "load", "delete"}, (
+        f"ProcedureStateStore exposes unexpected API: {sorted(store_api)}"
+    )
+
+
+# ── Engine domain neutrality ──────────────────────────────────────────────────
+
+# Domain packages the generic SOP Engine must never reach into. The engine
+# expresses loops, retries and validation in terms of steps and budgets; the
+# moment it imports a warehouse domain it has stopped being an engine and
+# started being one procedure's implementation.
+_DOMAIN_MODULES = (
+    "wave", "equipment", "inventory", "labor", "safety_compliance",
+    "domain_predicates", "assessment",
+)
+
+
+@pytest.mark.parametrize("path", _source_files(), ids=lambda p: p.name)
+def test_sop_engine_imports_no_domain_modules(path):
+    imported = _imported_modules(path)
+    leaked = {
+        name for name in imported
+        if any(
+            name == dom or name.endswith(f".{dom}") or f".{dom}." in name
+            for dom in _DOMAIN_MODULES
+        )
+    }
+    assert not leaked, (
+        f"{path.name} imports domain-specific modules {sorted(leaked)} — the "
+        "generic SOP Engine must stay domain-neutral"
+    )
+
+
+def test_sop_engine_source_names_no_warehouse_domain_concepts():
+    """
+    Belt-and-suspenders on the import check: the engine's *code* must not
+    mention SKUs, pallets, forklifts or waves either.
+    """
+    forbidden_terms = ("sku", "pallet", "forklift", "wave_id", "picker", "carrier")
+    for path in _source_files():
+        # Strip docstrings and comments — prose explaining the boundary is fine,
+        # executable code referencing a domain is not.
+        tree = ast.parse(path.read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Name) or isinstance(node, ast.Attribute):
+                text = getattr(node, "id", None) or getattr(node, "attr", "")
+                lowered = text.lower()
+                for term in forbidden_terms:
+                    assert term not in lowered, (
+                        f"{path.name} references warehouse domain concept "
+                        f"{term!r} in executable code ({text})"
+                    )
+
+
+# ── Credential boundary (sandbox-target layer) ────────────────────────────────
+
+_AGENTS_PACKAGE_DIR = SOP_ENGINE_DIR.parent
+
+# Patterns that would indicate a real secret, as opposed to prose asserting that
+# the package holds none. Assignment and env lookup are what matter.
+_CREDENTIAL_PATTERNS = (
+    "NVIDIA_API_KEY",
+    "WMS_PASSWORD",
+    "DATABASE_URL",
+    "AWS_SECRET",
+)
+
+
+def _package_sources() -> list[Path]:
+    return sorted(
+        p for p in _AGENTS_PACKAGE_DIR.rglob("*.py")
+        if "__pycache__" not in p.parts
+    )
+
+
+def test_agent_package_holds_no_operational_credentials():
+    """
+    The sandbox-target layer must carry no warehouse credentials.
+
+    This is a precondition for handing any part of this package to a sandboxed
+    executor: a sandbox that cannot reach a credential cannot leak one. Checked
+    against executable code, so docstrings documenting the boundary are fine.
+    """
+    offenders: list[str] = []
+    for path in _package_sources():
+        tree = ast.parse(path.read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                # A docstring is an ast.Constant too; skip ones used as such.
+                if any(pat in node.value for pat in _CREDENTIAL_PATTERNS):
+                    if len(node.value) < 200:   # a literal, not a prose block
+                        offenders.append(f"{path.name}:{node.lineno} {node.value[:60]}")
+    assert not offenders, f"credential-like literals found: {offenders}"
+
+
+def test_agent_package_reads_no_credential_environment_variables():
+    """No os.environ / os.getenv lookup of a warehouse or provider credential."""
+    offenders: list[str] = []
+    for path in _package_sources():
+        tree = ast.parse(path.read_text())
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            name = getattr(func, "attr", None) or getattr(func, "id", None)
+            if name not in ("getenv", "environ"):
+                continue
+            for arg in node.args:
+                if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                    if any(pat in arg.value for pat in _CREDENTIAL_PATTERNS):
+                        offenders.append(f"{path.name}:{node.lineno} {arg.value}")
+    assert not offenders, f"credential env lookups found: {offenders}"
+
+
+# ── Capability policy cannot be widened from outside ──────────────────────────
+
+def test_capability_policy_is_built_only_from_maiw_controlled_inputs():
+    """
+    build_capability_policy's signature is the whole list of things that can
+    influence authority. If a prompt, an env var or a model response ever
+    becomes a parameter, this test is the tripwire.
+    """
+    from maiw_agents.contracts.capability_policy import build_capability_policy
+
+    params = set(inspect.signature(build_capability_policy).parameters)
+    assert params == {
+        "definition", "sop", "agent_task_id", "runtime", "policy_revision"
+    }, f"unexpected policy inputs: {sorted(params)}"
+
+
+def test_capability_policy_module_imports_no_model_or_execution_surface():
+    policy_path = SOP_ENGINE_DIR.parent / "contracts" / "capability_policy.py"
+    imported = _imported_modules(policy_path)
+    for forbidden in ("maiw_execution", "maiw_models", "model_gateway", "os"):
+        assert not any(forbidden in name for name in imported), (
+            f"capability_policy imports {forbidden} — policy must be derived "
+            "from MAIW contracts alone"
+        )
