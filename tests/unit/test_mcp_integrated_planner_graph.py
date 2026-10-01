@@ -430,7 +430,6 @@ class TestMCPPlannerGraph:
                 "src.api.graphs.mcp_integrated_planner_graph.MCPManager"
             ) as mock_mcp_manager_class,
         ):
-
             mock_tool_discovery = AsyncMock()
             mock_tool_discovery.start_discovery = AsyncMock(return_value=None)
             mock_tool_discovery_class.return_value = mock_tool_discovery
@@ -471,7 +470,6 @@ class TestMCPPlannerGraph:
                 "src.api.graphs.mcp_integrated_planner_graph.MCPManager"
             ) as mock_mcp_manager_class,
         ):
-
             mock_tool_discovery = AsyncMock()
             mock_tool_discovery.start_discovery = AsyncMock(
                 side_effect=asyncio.TimeoutError()
@@ -509,7 +507,6 @@ class TestMCPPlannerGraph:
                 "src.api.graphs.mcp_integrated_planner_graph.MCPManager"
             ) as mock_mcp_manager_class,
         ):
-
             mock_tool_discovery = AsyncMock()
             mock_tool_discovery.start_discovery = AsyncMock(
                 side_effect=Exception("Discovery failed")
@@ -558,7 +555,6 @@ class TestMCPPlannerGraph:
             patch.object(planner_graph, "_mcp_synthesize_response", return_value={}),
             patch.object(planner_graph, "_route_to_agent", return_value="equipment"),
         ):
-
             graph = planner_graph._create_graph()
             assert graph is not None
 

@@ -152,6 +152,7 @@ markers = [
     "performance: marks tests as performance tests",
     "scalability: marks tests as scalability tests",
     "endurance: marks tests as endurance tests",
+    "sandbox: requires a qualified NemoClaw/OpenShell sandbox host (run with -m sandbox)",
 ]
 
 [tool.coverage.run]

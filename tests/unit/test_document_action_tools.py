@@ -98,7 +98,6 @@ class TestDocumentActionToolsInitialization:
             ),
             patch.object(tools, "_load_status_data"),
         ):
-
             await tools.initialize()
 
             assert tools.nim_client == mock_nim_client
@@ -131,7 +130,6 @@ class TestDocumentActionToolsInitialization:
             ),
             patch.object(tools, "_load_status_data"),
         ):
-
             await tools.initialize()
 
             assert tools.nim_client == mock_nim_client

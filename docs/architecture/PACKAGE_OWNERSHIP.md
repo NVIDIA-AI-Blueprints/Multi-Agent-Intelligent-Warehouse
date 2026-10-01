@@ -38,6 +38,43 @@ What `maiw-agents` deliberately does not own: `ActionExecutor`, `DecisionEngine`
 
 ---
 
+## Integration / Adapter Ownership (`integrations/`)
+
+| Integration | Owns | Depends on |
+|---|---|---|
+| `integrations/nemoclaw` | `SandboxConfig`, `RenderedSandboxPolicy`, the two sandbox boundary messages and their host-side validators, `SandboxedAgentRuntime`, provisioners, NemoClaw manifest rendering | `maiw-agents` |
+
+**The dependency points one way and a test enforces it.** `integrations/nemoclaw`
+imports from `maiw_agents`; nothing under `packages/` may import
+`integrations.nemoclaw`. That is what keeps the agent package sandbox-agnostic —
+deleting the integration cannot break capability enforcement, governance or
+procedure persistence, because none of them know it exists.
+
+What `integrations/nemoclaw` deliberately does not own: SOP semantics, step
+sequencing, capability authorisation, model selection, and anything that writes.
+It renders policy and validates boundary messages. `SandboxedAgentRuntime` is a
+decorator over an unmodified `AgentRuntime`, not a reimplementation of one —
+a second implementation of MAIW's operational semantics is exactly what
+containment-not-migration exists to avoid.
+
+### Sandbox payload vs. host-side modules
+
+`maiw-agents` is *mostly* sandbox-safe, but not uniformly. The payload is an
+enumerated module list rather than "the package":
+
+| Module | Side | Why |
+|---|---|---|
+| `sop_engine/*`, `runtime/{deterministic,deep_agents_runtime}.py`, `contracts/{capability_policy,procedure_state}.py`, `*/predicates.py` | sandbox-safe | import closure is stdlib + `pydantic` + `yaml` + MAIW contracts |
+| `operations/state_aware_ops.py`, `equipment/state_aware_ops.py` | **host-side** | import `DecisionEngine` from `maiw_decision` — governance orchestration |
+
+A test asserts both halves, including that the exclusion is still justified: a
+stale exclusion list is how a module quietly rejoins a payload it was removed
+from.
+
+See [NEMOCLAW_OPENSHELL_INTEGRATION.md](NEMOCLAW_OPENSHELL_INTEGRATION.md).
+
+---
+
 ## Application Shell (`apps/api/`)
 
 | Module | Role |

@@ -74,7 +74,14 @@ MAIW Agent Runtime
 | **Deep Agents** | Adaptive runtime loop, tool/subagent scheduling, working context |
 | **ModelGateway** | Model access, eligibility, routing, deployment |
 | **MCP** | Standardized interoperability |
+| **OpenShell / NemoClaw** *(optional)* | Sandbox isolation and agent packaging — enforcement only, never authority |
 | **WMS / WES / etc.** | Operational systems of record |
+
+The sandbox layer is optional and additive. It wraps the *Reason* stage of the
+lifecycle below — the half that was already advisory — and leaves *Govern*,
+*Approve* and *Execute* on the host untouched. Isolation narrows what a
+compromised agent can reach; it grants nothing. See
+[NEMOCLAW_OPENSHELL_INTEGRATION.md](NEMOCLAW_OPENSHELL_INTEGRATION.md).
 
 ---
 
@@ -153,4 +160,5 @@ The architectural source of truth remains the current MAIW v2 contracts, ownersh
 | [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md) | All 13 capabilities, read/write classification |
 | [RUNTIME_EXECUTION_FLOW.md](RUNTIME_EXECUTION_FLOW.md) | Full pipeline sequence diagrams |
 | [DEPENDENCY_BOUNDARIES.md](DEPENDENCY_BOUNDARIES.md) | Package boundary enforcement |
+| [NEMOCLAW_OPENSHELL_INTEGRATION.md](NEMOCLAW_OPENSHELL_INTEGRATION.md) | Sandbox containment layer, policy mapping, threat model |
 | [TEST_STRATEGY.md](TEST_STRATEGY.md) | CORE CI structure, exclusion rationale |

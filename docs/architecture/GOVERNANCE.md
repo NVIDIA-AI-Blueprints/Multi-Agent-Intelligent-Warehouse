@@ -115,6 +115,52 @@ MAIW can *remember*, not what the agent layer is allowed to *do*.
 
 ---
 
+## Sandbox Isolation Is Not Authorization
+
+Phase 20A can place the agent runtime inside an OpenShell sandbox. This is the
+same category of change as persistence above, and it deserves the same explicit
+statement: **isolation narrows what a compromised agent can reach. It grants
+nothing, and it relaxes nothing.**
+
+Three consequences follow, and the third is the one that matters in review:
+
+1. **Every capability check still runs.** `authorize_step` executes in the same
+   place, through the same code, sandboxed or not. The sandbox is a second wall
+   behind the first — for the case where the first is defeated by a bug.
+
+2. **The authority boundary did not move.** `RecommendedAction` still leaves the
+   agent; `DecisionEngine`, approval and `ActionExecutor` still run on the host.
+   The sandbox contains the half of the pipeline that was already advisory. It
+   does not contain, replace, or sit between any part of the governed half.
+
+3. **A sandbox must never be traded against the policy.** The reasoning "the
+   agent is contained now, so the capability policy can be looser" inverts the
+   design: it replaces two independent controls with one. A deployment that took
+   it would have *fewer* walls after adding a sandbox than before.
+
+What the boundary looks like in both directions:
+
+| Direction | Message | Validated against |
+|---|---|---|
+| sandbox → host | `SandboxRecommendedActionOutput` | host-held procedure id, task id, revision, non-terminal status |
+| host → sandbox | `SandboxGovernanceInput` | host-held procedure id, task id, revision, `WAITING_FOR_GOVERNANCE` status, duplicate ledger |
+
+Both validators assume the sandbox is compromised and is sending whatever it
+likes — which is the only assumption under which they are worth having.
+`SOPEngine.resume_after_governance` duck-types the outcome it is handed, correct
+for a runtime-neutral engine and insufficient at a trust boundary, so the
+binding check lives on the host side of the boundary rather than in the engine.
+
+**What a sandbox compromise still achieves:** bad *recommendations*. A
+compromised agent can recommend a harmful-but-well-formed intervention. That is
+unchanged, and it is precisely what `DecisionEngine` and human approval exist
+for. The sandbox narrows the blast radius to "can propose" — the authority an
+agent was always supposed to have.
+
+See [NEMOCLAW_OPENSHELL_INTEGRATION.md](NEMOCLAW_OPENSHELL_INTEGRATION.md).
+
+---
+
 ## Evidence, Not Assurances, Closes a Write
 
 A write-related step does not complete because governance returned `APPROVED` or

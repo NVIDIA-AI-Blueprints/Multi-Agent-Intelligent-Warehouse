@@ -163,8 +163,67 @@ identical grant set from the same reviewed inputs.
 `assert_not_broadened(baseline)` is the assertion, exercised end-to-end in
 `test_runtime_capability_policy.py`.
 
-This is the contract a future sandboxed executor is handed instead of being
-trusted to restrain itself within a wider surface.
+This is the contract a sandboxed executor is handed instead of being trusted to
+restrain itself within a wider surface. Phase 20A took delivery of it — see
+below.
+
+---
+
+## Sandbox Execution Context (Phase 20A)
+
+Either runtime can run inside a sandbox boundary. The boundary is a decorator,
+not a port:
+
+```python
+runtime = SandboxedAgentRuntime(
+    inner=MAIWDeterministicRuntime(...),   # or DeepAgentsRuntime
+    config=SandboxConfig.from_env(),
+    provisioner=OpenShellSandboxProvisioner(),
+)
+```
+
+`SandboxedAgentRuntime` implements the `AgentRuntime` Protocol structurally and
+adds exactly three things around the wrapped runtime:
+
+1. render the `RuntimeCapabilityPolicy` into a sandbox policy
+2. obtain a sandbox and apply that policy — or fail closed
+3. delegate to the wrapped runtime
+
+It reimplements no step sequencing, no capability check and no governance
+transition. **The wrapped runtime is unaware it is sandboxed.** That is the
+containment property stated as a code fact: deleting
+`integrations/nemoclaw/` would leave capability enforcement, governance handoff
+and procedure persistence exactly as they are, and remove only the second wall.
+
+Order matters and is not an implementation detail. The policy is built and
+rendered *before* the sandbox is consulted, so a policy that cannot be rendered
+safely fails the task without anything having been started. The sandbox is then
+asked to enforce a policy that already exists, rather than asked what it is
+willing to enforce.
+
+| Mode | Sandbox unavailable |
+|---|---|
+| `DISABLED` | delegate directly; no policy rendered |
+| `SANDBOX_REQUIRED` | **raise.** No path reaches the inner runtime |
+| `SANDBOX_PREFERRED` | warn and continue; `RuntimeCapabilityPolicy` still applies |
+
+A sandbox that starts but cannot apply its policy is treated as *unavailable*,
+not as partially contained — an uncontained process that happens to be in a
+container is worse than no sandbox, because it looks contained in the logs.
+
+**What the sandbox does not do:** authorise anything. Every `authorize_step`
+call that runs unsandboxed still runs sandboxed, in the same place. A deployment
+that treated the sandbox as the control and relaxed the policy would have fewer
+walls, not more.
+
+Inference is unchanged in authority: `MAIWModelGatewayChat` reaches a host-side
+MAIW endpoint fronting `ModelGateway`. The sandbox holds no provider key and
+selects no model. NemoClaw's Model Router is explicitly not adopted
+(`use_platform_model_router: false` in the manifest) — it would bypass
+`PolicyFilter`, `DeploymentResolver` and routing provenance in one step.
+
+See [NEMOCLAW_OPENSHELL_INTEGRATION.md](NEMOCLAW_OPENSHELL_INTEGRATION.md) for
+the ownership matrix, threat model, and current qualification status.
 
 ---
 

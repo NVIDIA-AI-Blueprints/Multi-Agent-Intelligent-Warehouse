@@ -291,12 +291,12 @@ def generate_markdown_report(analysis: Dict[str, Any], results: Dict[str, Any]) 
 
 | Metric | Value | Status |
 |--------|-------|--------|
-| **Total Tests** | {results['summary']['total_tests']} | - |
-| **Successful Tests** | {results['summary']['successful_tests']} ({results['summary']['successful_tests']/results['summary']['total_tests']*100:.1f}%) | {'✅' if results['summary']['successful_tests'] == results['summary']['total_tests'] else '⚠️'} |
-| **Valid Responses** | {results['summary']['valid_responses']} ({results['summary']['valid_responses']/results['summary']['successful_tests']*100:.1f}%) | {'✅' if results['summary']['valid_responses'] == results['summary']['successful_tests'] else '⚠️'} |
-| **Average Validation Score** | {results['summary']['avg_validation_score']:.2f} | {'✅' if results['summary']['avg_validation_score'] >= 0.9 else '⚠️'} |
-| **Average Confidence** | {results['summary']['avg_confidence']:.2f} | {'✅' if results['summary']['avg_confidence'] >= 0.8 else '⚠️'} |
-| **Average Processing Time** | {results['summary']['avg_processing_time_seconds']:.2f}s | {'✅' if results['summary']['avg_processing_time_seconds'] < 30 else '⚠️'} |
+| **Total Tests** | {results["summary"]["total_tests"]} | - |
+| **Successful Tests** | {results["summary"]["successful_tests"]} ({results["summary"]["successful_tests"] / results["summary"]["total_tests"] * 100:.1f}%) | {"✅" if results["summary"]["successful_tests"] == results["summary"]["total_tests"] else "⚠️"} |
+| **Valid Responses** | {results["summary"]["valid_responses"]} ({results["summary"]["valid_responses"] / results["summary"]["successful_tests"] * 100:.1f}%) | {"✅" if results["summary"]["valid_responses"] == results["summary"]["successful_tests"] else "⚠️"} |
+| **Average Validation Score** | {results["summary"]["avg_validation_score"]:.2f} | {"✅" if results["summary"]["avg_validation_score"] >= 0.9 else "⚠️"} |
+| **Average Confidence** | {results["summary"]["avg_confidence"]:.2f} | {"✅" if results["summary"]["avg_confidence"] >= 0.8 else "⚠️"} |
+| **Average Processing Time** | {results["summary"]["avg_processing_time_seconds"]:.2f}s | {"✅" if results["summary"]["avg_processing_time_seconds"] < 30 else "⚠️"} |
 
 ### Key Achievements
 

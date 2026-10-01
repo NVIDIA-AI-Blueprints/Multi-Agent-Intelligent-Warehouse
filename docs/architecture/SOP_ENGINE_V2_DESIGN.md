@@ -2396,13 +2396,41 @@ An unregistered capability is **denied**, not given the benefit of the doubt: a 
 
 **No privilege expansion.** `is_narrower_or_equal_to` / `assert_not_broadened` are exercised across `start → loop → retry → governance pause → restart → resume`; the live policy must be equal to or narrower than the initial one at every checkpoint. Policies are *derived, not stored*, so a restored procedure rebuilds the identical grant set from the same reviewed inputs.
 
-### Future sandbox boundary — DEFERRED (by design)
+### Sandbox boundary — CONTRACTS IMPLEMENTED (Phase 20A), RUNTIME DEFERRED
 
-This is where NemoClaw, OpenShell or any other sandboxed executor attaches. The integration contract is already the one above: a sandbox is handed a `RuntimeCapabilityPolicy` and must cross `authorize_capability` — it is not trusted to restrain itself within a wider surface.
+This is where NemoClaw, OpenShell or any other sandboxed executor attaches. The integration contract is the one above: a sandbox is handed a `RuntimeCapabilityPolicy` and must cross `authorize_capability` — it is not trusted to restrain itself within a wider surface.
 
-Preconditions already met: no `ActionExecutor` or `maiw_execution` import anywhere in `packages/maiw-agents`; no warehouse credentials, credential literals, or credential environment lookups in the package; procedure state recoverable; evidence enforced.
+Preconditions met before 20A: no `ActionExecutor` or `maiw_execution` import anywhere in `packages/maiw-agents`; no warehouse credentials, credential literals, or credential environment lookups in the package; procedure state recoverable; evidence enforced.
 
-Not yet built, and explicitly out of scope here: the sandbox process boundary itself, syscall/network confinement, per-sandbox credential brokering, and multi-replica durable state. See the roadmap's WS4.
+**Phase 20A took delivery of the contract** in [`integrations/nemoclaw/`](../../integrations/nemoclaw/). Nothing in `packages/maiw-agents` changed — the integration imports from it, never the reverse, which is what keeps the SOP Engine sandbox-agnostic.
+
+#### Sandbox deployment of the SOP Engine
+
+| | Sandbox | Host |
+|---|---|---|
+| `sop_engine/{engine,validators,executor,state_store}.py` | ✓ runs here | — |
+| `contracts/{capability_policy,procedure_state}.py` | ✓ | — |
+| `{wave,equipment,inventory}/predicates.py` | ✓ | — |
+| **authoritative** `ProcedureExecutionState` | working copy at `/workspace/procedure_state` | ✓ `ProcedureStateStore` |
+| `operations/state_aware_ops.py`, `equipment/state_aware_ops.py` | ✗ — hold a `DecisionEngine` | ✓ |
+| `DecisionEngine`, `ActionExecutor`, MCP write clients | ✗ never | ✓ |
+
+The engine's import closure — stdlib + `pydantic` + `yaml` + MAIW contracts — is what makes it shippable into an image at all. The domain-neutrality AST test that already guarded the engine now also serves as the payload audit.
+
+**What crosses the boundary, and what checks it.** The engine already stops at `WAITING_FOR_GOVERNANCE` and already refuses to complete a post-write step without authoritative re-read evidence. Phase 20A adds the host-side binding checks around those two moments:
+
+| Direction | Message | Host validates against `ProcedureExecutionState` |
+|---|---|---|
+| sandbox → host | `SandboxRecommendedActionOutput` | `procedure_execution_id`, `agent_task_id`, `revision`, non-terminal |
+| host → sandbox | `SandboxGovernanceInput` | the same, plus status must be `WAITING_FOR_GOVERNANCE`, plus a duplicate ledger |
+
+`revision` earns its keep twice here: it is the optimistic-concurrency counter for `save()` *and* the staleness check at the boundary. A recommendation computed against a revision the host no longer holds describes a world that already moved, and is rejected.
+
+`SOPEngine.resume_after_governance` duck-types the outcome it is handed. That is correct for a runtime-neutral engine and insufficient at a trust boundary, so the binding check lives on the host side of the boundary rather than being pushed into the engine — which would have made the engine aware of sandboxes.
+
+Policies remain *derived, not stored*, so a restarted sandbox rebuilds the identical grant and there is no stored policy to tamper with between runs.
+
+Not yet built, and explicitly out of scope here: the sandbox process boundary itself (OpenShell is not installed on any host this has run on), syscall/network confinement, per-sandbox credential brokering, and multi-replica durable state. See [NEMOCLAW_OPENSHELL_INTEGRATION.md](NEMOCLAW_OPENSHELL_INTEGRATION.md) § Current qualification status.
 
 ### Deferred items
 
@@ -2412,4 +2440,4 @@ Not yet built, and explicitly out of scope here: the sandbox process boundary it
 | Multi-replica / HA procedure state | DEFERRED | Revision checks detect a concurrent writer; they do not coordinate hosts. |
 | Enforcing the legacy string `evidence_requirements` | DEFERRED | Would fail every step — the tags name evidence kinds nothing emits. Migrate per-step to the mapping form. |
 | `MODEL_JUDGE` / `HUMAN` / `COMPOSITE` validators | DEFERRED | Unchanged from the V2 foundation. |
-| Sandbox process isolation | DEFERRED | WS4 / NemoClaw. |
+| Sandbox process isolation | DEFERRED | Contracts and policy mapping landed in Phase 20A; the process boundary needs a host with NemoClaw/OpenShell installed. |

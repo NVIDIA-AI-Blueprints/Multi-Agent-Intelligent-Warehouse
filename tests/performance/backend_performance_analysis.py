@@ -493,7 +493,7 @@ async def main():
     print(f"   Total Requests: {total_requests}")
     print(f"   Total Errors: {total_errors}")
     print(
-        f"   Overall Error Rate: {(total_errors/total_requests*100):.2f}%"
+        f"   Overall Error Rate: {(total_errors / total_requests * 100):.2f}%"
         if total_requests > 0
         else "N/A"
     )
@@ -511,7 +511,7 @@ async def main():
             print(
                 f"      Requests: {test_result.get('success', 0)}/{test_result.get('total', 0)} successful"
             )
-            print(f"      Error Rate: {test_result.get('error_rate', 0)*100:.2f}%")
+            print(f"      Error Rate: {test_result.get('error_rate', 0) * 100:.2f}%")
             if "latency" in test_result:
                 lat = test_result["latency"]
                 print(
@@ -522,7 +522,7 @@ async def main():
                 )
             if test_result.get("cache_hit_rate", 0) > 0:
                 print(
-                    f"      Cache Hit Rate: {test_result.get('cache_hit_rate', 0)*100:.2f}%"
+                    f"      Cache Hit Rate: {test_result.get('cache_hit_rate', 0) * 100:.2f}%"
                 )
             if test_result.get("throughput", 0) > 0:
                 print(f"      Throughput: {test_result.get('throughput', 0):.2f} req/s")
@@ -533,9 +533,9 @@ async def main():
         perf = results["backend_stats"].get("performance", {})
         if perf:
             print(f"   Total Requests: {perf.get('total_requests', 0)}")
-            print(f"   Cache Hit Rate: {perf.get('cache_hit_rate', 0)*100:.2f}%")
-            print(f"   Error Rate: {perf.get('error_rate', 0)*100:.2f}%")
-            print(f"   Success Rate: {perf.get('success_rate', 0)*100:.2f}%")
+            print(f"   Cache Hit Rate: {perf.get('cache_hit_rate', 0) * 100:.2f}%")
+            print(f"   Error Rate: {perf.get('error_rate', 0) * 100:.2f}%")
+            print(f"   Success Rate: {perf.get('success_rate', 0) * 100:.2f}%")
             if "latency" in perf:
                 lat = perf["latency"]
                 print(
@@ -588,7 +588,7 @@ async def main():
     if high_error_tests:
         print(f"   ⚠️  High Error Rate Detected:")
         for test_name, error_rate in high_error_tests:
-            print(f"      - {test_name}: {error_rate*100:.2f}% error rate")
+            print(f"      - {test_name}: {error_rate * 100:.2f}% error rate")
         print(f"      → Investigate error causes and improve error handling")
 
     # Check cache performance
@@ -602,7 +602,7 @@ async def main():
             [r.get("cache_hit_rate", 0) for r in cache_tests]
         )
         if avg_cache_hit_rate < 0.1:  # Less than 10%
-            print(f"   ⚠️  Low Cache Hit Rate: {avg_cache_hit_rate*100:.2f}%")
+            print(f"   ⚠️  Low Cache Hit Rate: {avg_cache_hit_rate * 100:.2f}%")
             print(f"      → Consider cache warming or increasing TTL")
 
     # Check concurrent performance
@@ -611,7 +611,7 @@ async def main():
         if concurrent_result.get("error_rate", 0) > 0.2:  # 20%
             print(f"   ⚠️  Poor Concurrent Request Handling:")
             print(
-                f"      - Error rate: {concurrent_result.get('error_rate', 0)*100:.2f}%"
+                f"      - Error rate: {concurrent_result.get('error_rate', 0) * 100:.2f}%"
             )
             print(f"      → Consider request queuing or rate limiting")
 
