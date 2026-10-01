@@ -342,14 +342,27 @@ by `ModelGateway`. Deep Agents cannot bypass `ModelGateway`.
 `MAIWModelGatewayChat` (`packages/maiw-agents/maiw_agents/runtime/model_adapter.py`):
 
 - Implements `BaseChatModel._generate()` and `_agenerate()`
+- **Canonical call path:** constructs a `ModelRequest` object and calls
+  `gateway.generate(request)` — never passes bare kwargs to the gateway
 - All model calls route through `context.model_gateway` — `RiskLevel`,
   `ReasoningLevel`, `DeploymentMode`, routing provenance, deadlines, fallback,
   telemetry, and `trace_id` are all preserved
-- In test mode (`model_gateway=None`): returns deterministic mock responses
-  without any network calls
+- **EXPLICIT test mode only:** when `model_gateway=None`, returns deterministic
+  mock responses without any network call. Mock responses are NEVER triggered
+  by a gateway exception — a failing gateway surfaces as a typed exception,
+  not as a silent mock replacement
+- `ModelResponse.content` is translated directly to `AIMessage.content`; the
+  adapter does not interpret or re-wrap the gateway response
 
 `MAIWTestModelAdapter` in the same module is a test-only wrapper; it is not
-used in production routing.
+used in production routing. It follows the same contract: constructs
+`ModelRequest`, calls `gateway.generate(request)`, and propagates gateway
+failures to the caller rather than falling back to a mock response.
+
+**Adapter mock policy:** mock inference is permitted in EXACTLY one case —
+`model_gateway=None` (explicit test mode, adapter constructed for testing).
+This must be set explicitly by the caller; it cannot be triggered by a runtime
+exception. Any other path to a mock response is a bug.
 
 ### Emergency rollback
 
