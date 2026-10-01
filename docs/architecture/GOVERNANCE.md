@@ -77,6 +77,54 @@ The boundary is enforced at multiple levels — not by convention:
    path is unidirectional — agents flow up to `RecommendedAction`; governance flows down
    from `ActionProposal` to `ActionExecutor`. These are separate code paths.
 
+6. **`RuntimeCapabilityPolicy`** is an immutable, deny-by-default grant issued per agent
+   task, enforced at the capability invocation seam in both runtimes. `WRITE` and
+   `EMERGENCY_WRITE` cannot appear in any policy that can be constructed — a model
+   validator rejects it, so a hand-built policy cannot bypass the builder to get one.
+
+---
+
+## Procedure Persistence Does Not Move Authority
+
+The SOP Engine can now checkpoint `ProcedureExecutionState` to a
+`ProcedureStateStore` so a procedure survives a crash. This is worth stating
+explicitly because "the engine now remembers things across restarts" is exactly
+the kind of change that quietly relocates authority — and here it does not.
+
+A store's entire API is `save` / `load` / `delete`. It holds no `ActionExecutor`,
+no `DecisionEngine`, no MCP client and no credentials, and a test asserts that
+API is exactly three methods rather than trusting this paragraph.
+
+What the boundary looks like across a restart:
+
+- A procedure that was `WAITING_FOR_GOVERNANCE` is **still** waiting after
+  recovery. Restoring it does not approve it, does not re-emit a proposal, and
+  does not advance past the approval it never received.
+- A procedure that crashed *after* a governed write landed does not repeat the
+  write. It resumes at the authoritative re-read and proves the outcome by
+  reading, never by writing. The recovery test asserts `write_count == 1`
+  across the crash.
+- Terminal procedures are immutable, so a restart cannot re-open a closed
+  procedure and run its write path a second time.
+- The SOP version is pinned. A restored procedure never silently continues
+  under a newer SOP, because the steps already completed and the steps still to
+  come would then have come from different documents.
+
+Governance still runs entirely outside the SOP Engine. Persistence changed what
+MAIW can *remember*, not what the agent layer is allowed to *do*.
+
+---
+
+## Evidence, Not Assurances, Closes a Write
+
+A write-related step does not complete because governance returned `APPROVED` or
+because a call returned 2xx. Steps may declare `EvidenceRequirement`s, enforced
+ahead of the completion validator, and only a structured `EvidenceRef` satisfies
+one — model prose cannot. The three proof SOPs require `state_snapshot` evidence
+from source `authoritative_reread` on their post-write steps, so resuming after
+governance **without** re-reading authoritative state escalates as
+`EVIDENCE_MISSING` rather than completing.
+
 ---
 
 ## DecisionEngine

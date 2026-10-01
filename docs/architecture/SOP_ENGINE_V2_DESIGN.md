@@ -2226,3 +2226,190 @@ agents/sops/
 All four declare explicit next_step_id chains and a single terminal step.
 See "V1 Procedure Migration" above.
 ```
+
+---
+
+## Production Hardening
+
+The pre-NemoClaw gate. Everything in this section exists to satisfy one acceptance statement:
+
+> After a crash or restart, MAIW must know exactly which procedure version was running, which step and attempt were active, what evidence had been proven, what capabilities were permitted, and whether a warehouse write may already have occurred — **without granting the sandbox any additional authority**.
+
+Three gaps were closed. Each item below is marked **IMPLEMENTED** or **DEFERRED**.
+
+### State-store abstraction — IMPLEMENTED
+
+`maiw_agents/sop_engine/state_store.py`
+
+```python
+class ProcedureStateStore(Protocol):
+    async def save(self, state, *, expected_revision: int | None = None) -> ProcedureExecutionState
+    async def load(self, procedure_execution_id: str) -> ProcedureExecutionState | None
+    async def delete(self, procedure_execution_id: str) -> None
+```
+
+Three methods and nothing else. A store is a record keeper, not an actor: it holds no `ActionExecutor`, no `DecisionEngine`, no MCP client and no credentials, which is asserted by `test_security_boundary.py` rather than left to review.
+
+`ProcedureExecutionState` gains `revision: int`, starting at 0 and incremented on every successful save.
+
+**Two implementations:**
+
+| Implementation | Durability claim |
+|----------------|------------------|
+| `InMemoryProcedureStateStore` | Canonical semantics. Survives an *engine* restart within one process — the recovery tests discard the engine and rebuild it against the same store. Does **not** survive the process exiting. |
+| `JsonFileProcedureStateStore` | One atomically-written JSON file per procedure (temp file + `os.replace`). **Survives process exit, crash and restart on the same filesystem.** Does **not** provide multi-replica coordination, failover, HA, or cross-host locking. |
+
+**Why not a database-backed store:** MAIW has no durable persistence layer to adopt. `InMemoryApprovalStore` (maiw-decision) and `InMemoryCopilotStore` (apps/api) are both process-local, and there is no Postgres/Redis repository abstraction anywhere in `packages/` or `apps/`. The JSON file store exists so that "procedure state is recoverable across restart" is a demonstrable property rather than a notional one, while being explicit that single-node is its limit.
+
+### Revision / optimistic concurrency — IMPLEMENTED
+
+`save(expected_revision=N)` raises `StaleRevisionError` when the store holds a different revision. Two writers that both read the same state cannot both win. For a procedure that may be governing a real warehouse write, losing loudly is the only safe outcome — a silent last-writer-wins would let one writer's record of "the write already happened" be overwritten by another's.
+
+### Terminal-state immutability — IMPLEMENTED
+
+`COMPLETED`, `FAILED` and `ESCALATED` are final; any later `save` raises `TerminalStateError`. This is what stops a restart from re-opening a finished procedure and advancing it a second time. The engine writes a terminal state exactly once, at the single exit point of `run_procedure`, and resuming an already-terminal procedure is a no-op that does not write at all.
+
+### Procedure checkpointing — IMPLEMENTED
+
+`SOPEngine.__init__(store=None)`. With `None` the engine behaves exactly as before — every pre-hardening caller is unaffected.
+
+**Checkpointed:** procedure created; step started; `StepResult` accepted; validation recorded; retry/loop count changed; branch taken; `WAITING_FOR_GOVERNANCE`; governance resume; escalation; terminal.
+
+**Not checkpointed:** token-level model activity, partial runtime output, transient runtime detail. A checkpoint is a point the procedure can be resumed from, not a trace.
+
+### Restart recovery semantics — IMPLEMENTED
+
+Restored exactly: `current_step_id`, `completed_step_ids` (no re-execution), `attempt_by_step` (no loop/retry reset), `branch_history`, `evidence_refs`, `loop_started_at` / `loop_exhausted_step_ids`, governance status, terminal status.
+
+**SOP version pinning.** A restored procedure runs the version it started under or it does not run. A procedure that completed steps 1–4 under v1.0 and would run steps 5–9 under v1.1 has executed a procedure that never existed, and no audit of either document describes what happened. There is no auto-upgrade path and deliberately no override: if the pinned version cannot be supplied, the procedure escalates with `POLICY_CONFLICT` and a human decides. The same rule applies to a mismatched `sop_id`.
+
+**Scenarios tested** (`test_procedure_state_store.py`):
+
+| | Scenario | Behaviour |
+|---|----------|-----------|
+| A | Crash before `StepResult` stored | Safe re-execution for READ/ANALYTICAL. Governance and write-adjacent steps are **not** assumed replayable — see D and E, neither of which re-executes. |
+| B | Crash after `StepResult`, before validation | Stored result is reused; the step is not re-executed. Asserted by executor call count across both lifetimes. |
+| C | Crash after validation, before advance | Idempotent: no duplicate `completed_step_id`, no duplicated evidence. |
+| D | Crash in `WAITING_FOR_GOVERNANCE` | Remains waiting. No step reruns, no second proposal emitted. |
+| E | Crash after write, before authoritative reread | Write is **not** repeated. Recovery re-reads and reconciles. `write_count == 1` is asserted across the crash. |
+| F | Crash inside a bounded loop | Attempt 2 of 3 is still 2 of 3. An exhausted loop does not get a fresh budget. |
+
+### Private reasoning must never persist — IMPLEMENTED
+
+`ProcedureExecutionState` carries no `chain_of_thought`, `scratchpad`, `hidden_reasoning`, `raw_reasoning`, `system_prompt` or private memory — enforced by a model validator on the field names themselves, so a carelessly added field fails at construction rather than at review. `StepResult.output` already rejected the same keys. `EvidenceRef` is a *reference plus a summary*, never a transcript. A test greps the serialised JSON of a real persisted procedure for each banned term.
+
+### Evidence enforcement — IMPLEMENTED
+
+**The gap:** `evidence_requirements` was declared on every step of every proof SOP and checked by nothing. A step could claim it had re-read authoritative state while producing no record that it ever did.
+
+**Contract** (`contracts/sop_v2.py`):
+
+```python
+class EvidenceRequirement(BaseModel):
+    evidence_type: str            # 'state_snapshot', 'capability_result', ...
+    source: str | None = None     # a capability id, or 'authoritative_reread'
+    min_count: int = 1
+    required_fields: list[str] = []
+    max_age_seconds: int | None = None
+    optional: bool = False
+```
+
+No expression language — five typed fields is the entire vocabulary, which keeps a SOP author (and a model) from writing logic here.
+
+**Enforcement order:**
+
+```
+StepResult → evidence requirement check → step completion validator → SOPEngine progression
+```
+
+Ordering is deliberate. A step that cannot show its work reports `EVIDENCE_MISSING`, not `VALIDATION_FAILED`: the first means the procedure is not instrumented to prove what it claims, the second means the world is not in the expected state, and they call for different operator responses.
+
+**Model text cannot satisfy a requirement.** Only a structured `EvidenceRef` with matching type, matching source and the required metadata fields counts. A step whose `output` asserts in four different ways that it re-read authoritative state, with no `EvidenceRef`, does not complete.
+
+**Attempt correlation.** Evidence is matched to this step at this attempt. A failed attempt's observation does not carry forward to justify the next one — if attempt 1 re-read state and the step still failed, attempt 2 must re-read again.
+
+**Two YAML forms, meaning different things:**
+
+- a bare string (`- state_snapshot`) is a **declarative hint**: documented, surfaced to an adaptive runtime in the step prompt, not enforced;
+- a mapping is an **enforced precondition**.
+
+Hints were left unenforced deliberately. The pre-existing string tags name evidence kinds no component emits, so enforcing them retroactively would fail every step rather than prove anything.
+
+**Authoritative-snapshot evidence.** For a post-write step to be able to demand proof, the proof has to be a record. The engine now emits a `state_snapshot` / `authoritative_reread` `EvidenceRef` whenever it holds a warehouse state snapshot while judging a step — in the normal path and in `resume_after_governance`. Because the snapshot is supplied by the caller rather than produced by a model, the requirement means the same thing under both runtimes.
+
+**Applied to the proof SOPs:**
+
+| SOP | Enforced steps |
+|-----|----------------|
+| A — `wave_risk_resolution.v2` | `observe` |
+| B — `equipment_failure_recovery.v1` | `wait_for_governance`, `verify_execution` |
+| C — `picking_inventory_exception.v1` | `propose_resolution`, `reassess_inventory_state` |
+
+The consequence that matters: resuming after governance **without** re-reading authoritative state now escalates as `EVIDENCE_MISSING` instead of completing. "Governance returned `APPROVED`" is the weakest possible basis for believing a warehouse write landed.
+
+### RuntimeCapabilityPolicy — IMPLEMENTED
+
+`contracts/capability_policy.py`
+
+Before this, "what may this runtime do?" was answered by three partial mechanisms — a load-time alignment check, a tool-list filter in the Deep Agents runtime, and an action-name blacklist in the deterministic one. None was a single artifact you could hold, log, restore after a crash, or compare against a later one to prove authority had not grown.
+
+```python
+class RuntimeCapabilityPolicy(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    policy_id: str                                  # UUID4
+    policy_revision: int
+    agent_task_id: str
+    sop_id: str
+    sop_version: str
+    runtime: str                                    # 'deterministic' | 'deep_agents'
+    allowed_capability_ids: frozenset[str]
+    allowed_capability_classes: frozenset[str]      # READ, ANALYTICAL, PROPOSAL
+    denied_capability_classes: frozenset[str]       # WRITE, EMERGENCY_WRITE always
+    allowed_subagents: frozenset[str]
+    issued_at: datetime
+```
+
+**Immutable.** `frozen=True` *and* frozenset members — a frozen model with mutable collections would still be mutable.
+
+**MAIW-authored.** Built from `AgentDefinition.allowed_capabilities`, `SOPDefinition.allowed_capabilities`, the two subagent lists, `GovernanceBoundary.allowed_capability_classes`, the capability registry, and the runtime selection. Never from model text, an environment request, a user prompt, or a sandbox self-declaration. `build_capability_policy`'s parameter set is pinned by a test, so a prompt or env var becoming an input to authority trips CI.
+
+The capability set is the **intersection** of the agent's and the SOP's allow-lists: a SOP naming something the agent does not have does not grant it.
+
+**Write-free, unconditionally.** `WRITE` / `EMERGENCY_WRITE` are re-added to the deny list after every other input is considered, and a model validator rejects any policy that tried to allow one — so a hand-built policy cannot skip the rule by bypassing the builder. Naming a write capability by *id* does not sidestep the *class* deny-list either.
+
+### Deny-by-default authorization — IMPLEMENTED
+
+```python
+async def authorize_capability(policy, capability_id, capability_class=None) -> None
+async def authorize_subagent(policy, agent_id) -> None
+async def authorize_step(policy, step) -> None        # both runtimes call this one
+```
+
+Placed at the **invocation seam**, not at load time. A load-time check proves a SOP was well-formed when it was read; it proves nothing about what a runtime does three steps later.
+
+They raise `CapabilityDeniedError` rather than returning a boolean. A caller that forgets to check a boolean silently gains authority; a caller that forgets to catch an exception fails closed.
+
+An unregistered capability is **denied**, not given the benefit of the doubt: a capability MAIW cannot classify is one MAIW cannot vouch for.
+
+`authorize_step` covers all three capability surfaces of a step — `skill_id`, `completion.required_capability_result` (consuming a capability's result *is* using it), and `delegate_to`. Both runtimes call the same function, so there is no second implementation to drift. The Deep Agents tool list is now derived from the policy as well, so the model's tool surface and the enforcement gate read the same artifact.
+
+**No privilege expansion.** `is_narrower_or_equal_to` / `assert_not_broadened` are exercised across `start → loop → retry → governance pause → restart → resume`; the live policy must be equal to or narrower than the initial one at every checkpoint. Policies are *derived, not stored*, so a restored procedure rebuilds the identical grant set from the same reviewed inputs.
+
+### Future sandbox boundary — DEFERRED (by design)
+
+This is where NemoClaw, OpenShell or any other sandboxed executor attaches. The integration contract is already the one above: a sandbox is handed a `RuntimeCapabilityPolicy` and must cross `authorize_capability` — it is not trusted to restrain itself within a wider surface.
+
+Preconditions already met: no `ActionExecutor` or `maiw_execution` import anywhere in `packages/maiw-agents`; no warehouse credentials, credential literals, or credential environment lookups in the package; procedure state recoverable; evidence enforced.
+
+Not yet built, and explicitly out of scope here: the sandbox process boundary itself, syscall/network confinement, per-sandbox credential brokering, and multi-replica durable state. See the roadmap's WS4.
+
+### Deferred items
+
+| Item | Status | Note |
+|------|--------|------|
+| Database-backed `ProcedureStateStore` | DEFERRED | No MAIW persistence layer exists to adopt. The JSON file store covers single-node restart. |
+| Multi-replica / HA procedure state | DEFERRED | Revision checks detect a concurrent writer; they do not coordinate hosts. |
+| Enforcing the legacy string `evidence_requirements` | DEFERRED | Would fail every step — the tags name evidence kinds nothing emits. Migrate per-step to the mapping form. |
+| `MODEL_JUDGE` / `HUMAN` / `COMPOSITE` validators | DEFERRED | Unchanged from the V2 foundation. |
+| Sandbox process isolation | DEFERRED | WS4 / NemoClaw. |

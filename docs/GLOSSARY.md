@@ -73,6 +73,43 @@
 : A concrete, parameterized proposal for an action. Created by WRITE skills or the
   `GovernedActionOrchestrator` from a `RecommendedAction`. Flows to `DecisionEngine`.
 
+**ProcedureExecutionState**
+: The SOP Engine's record of one run of one SOP — current step, completed steps,
+  per-step attempt counts, step results, accumulated evidence, loop budgets, branch
+  history and status. Distinct from `AgentTaskState` (what the operator sees); the two
+  are linked by `agent_task_id` and `trace_id` rather than merged. Carries a `revision`
+  counter for optimistic concurrency. Never carries chain-of-thought, scratchpads,
+  prompts or any model-internal reasoning.
+
+**ProcedureStateStore**
+: The persistence protocol for `ProcedureExecutionState` — `save`, `load`, `delete`, and
+  nothing else. Makes a crashed procedure recoverable without re-executing completed work.
+  A record keeper, not an actor: it holds no `ActionExecutor`, `DecisionEngine`, MCP client
+  or credentials, so persistence grants the SOP Engine no authority.
+  `InMemoryProcedureStateStore` is the canonical in-process implementation;
+  `JsonFileProcedureStateStore` survives process restart on a single node.
+
+**EvidenceRef**
+: A structured pointer to something that was observed — type, source, reference id,
+  timestamp, summary and metadata. A *reference plus a summary*, never a transcript.
+
+**EvidenceRequirement**
+: A typed precondition on what a step must have shown in order to complete
+  (`evidence_type`, `source`, `min_count`, `required_fields`, `max_age_seconds`,
+  `optional`). Enforced ahead of the step's completion validator. Only a matching
+  `EvidenceRef` satisfies one — model prose cannot. An unmet requirement escalates as
+  `EVIDENCE_MISSING`, which is distinct from `VALIDATION_FAILED`: the step could not show
+  its work, as opposed to the world not being in the expected state.
+
+**RuntimeCapabilityPolicy**
+: The immutable, deny-by-default set of capabilities and subagents one runtime may invoke
+  for one agent task under one SOP version. Built only from the `AgentDefinition`, the
+  `SOPDefinition` and the capability registry — never from model output, a prompt, an
+  environment variable, or a sandbox's self-declaration. `WRITE` and `EMERGENCY_WRITE` are
+  denied in every policy that can be constructed. Enforced at the capability invocation
+  seam in both runtimes via `authorize_capability` / `authorize_step`, which raise
+  `CapabilityDeniedError` rather than returning a boolean.
+
 ---
 
 ## Governance

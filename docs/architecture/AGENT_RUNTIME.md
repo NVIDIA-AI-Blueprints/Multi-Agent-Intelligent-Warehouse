@@ -117,6 +117,57 @@ delegate to it before graph/step invocation.
 
 ---
 
+## RuntimeCapabilityPolicy — the runtime receives a bounded grant it cannot expand
+
+`check_capability_alignment` above is a **load-time** check: it proves a SOP was
+well-formed when it was read. It says nothing about what a runtime does three
+steps later. `RuntimeCapabilityPolicy` is the complementary **runtime** contract.
+
+```python
+from maiw_agents.contracts.capability_policy import (
+    build_capability_policy, authorize_step,
+)
+
+policy = build_capability_policy(
+    definition=definition, sop=sop,
+    agent_task_id=state.task_id, runtime=self.RUNTIME_NAME,
+)
+...
+await authorize_step(policy, step)   # raises CapabilityDeniedError
+```
+
+**The runtime does not construct its own authority and cannot widen what it is
+given.** The policy is a frozen model with frozenset members, derived only from
+the `AgentDefinition`, the `SOPDefinition` and the capability registry — never
+from model output, a prompt, an environment variable, or anything a sandbox
+declares about itself. The capability set is the *intersection* of the agent's
+and the SOP's allow-lists, so a SOP naming something the agent lacks does not
+grant it.
+
+Deny-by-default: a capability absent from the allow-list is denied, including
+one that did not exist when the policy was issued, and one the registry cannot
+classify. `WRITE` and `EMERGENCY_WRITE` are denied unconditionally in every
+policy that can be constructed.
+
+Both runtimes call the same `authorize_step`, so there is no second
+implementation to drift:
+
+| Runtime | How the policy is applied |
+|---|---|
+| `MAIWDeterministicRuntime` | `authorize_step` before each step is fulfilled; a denial returns `ESCALATED` with `CAPABILITY_DENIED`. |
+| `DeepAgentsRuntime` | The tool set handed to the model is *derived from the policy* (`_build_maiw_tools(..., policy)`), **and** `authorize_step` runs before the graph is invoked for each step. The filtered tool list is a construction-time restriction; the runtime check holds even if the graph is rebuilt or a tool leaks in. |
+
+A policy cannot broaden across retry, loop, governance pause or restart —
+policies are derived rather than stored, so a restored procedure rebuilds the
+identical grant set from the same reviewed inputs.
+`assert_not_broadened(baseline)` is the assertion, exercised end-to-end in
+`test_runtime_capability_policy.py`.
+
+This is the contract a future sandboxed executor is handed instead of being
+trusted to restrain itself within a wider surface.
+
+---
+
 ## Long-Term Direction
 
 Deep Agents is the primary adaptive runtime. MAIWDeterministicRuntime remains
@@ -144,6 +195,9 @@ The decision to retain Deep Agents as an optional adaptive runtime was validated
 | `contracts/agent.py` | AgentDefinition, TerminationPolicy, GovernanceBoundary |
 | `contracts/task.py` | AgentTaskState, AgentTaskStatus, valid transition map |
 | `contracts/registry.py` | SKILL_REGISTRY, CapabilityClass |
+| `contracts/capability_policy.py` | RuntimeCapabilityPolicy, build_capability_policy, authorize_capability / authorize_subagent / authorize_step, CapabilityDeniedError |
+| `contracts/procedure_state.py` | ProcedureExecutionState (incl. `revision`), ProcedureStatus |
+| `sop_engine/state_store.py` | ProcedureStateStore, InMemoryProcedureStateStore, JsonFileProcedureStateStore |
 | `runtime/deep_agents_runtime.py` | DeepAgentsRuntime, get_runtime, _build_maiw_tools, _build_subagent_specs, _build_sop_system_prompt |
 | `runtime/deterministic.py` | MAIWDeterministicRuntime |
 | `runtime/model_adapter.py` | MAIWModelGatewayChat (production), MAIWTestModelAdapter (test) |
