@@ -283,6 +283,48 @@ Agents and runtimes never receive raw provider credentials.
 Both production runtimes route through `ModelGateway`. Neither instantiates
 provider clients directly.
 
+### Sandboxed inference flow (Phase 20A)
+
+When a runtime runs inside an OpenShell sandbox, `ModelGateway` stays on the
+**host** and the sandbox reaches it over a single allow-listed endpoint:
+
+```
+Sandboxed AgentRuntime
+    → MAIWModelGatewayChat
+    → authenticated MAIW inference endpoint   ══ sandbox boundary ══
+    → ModelGateway (host)                         PolicyFilter
+                                                  ModelRouter
+                                                  DeploymentResolver
+                                                  routing provenance
+    → NIM / provider
+```
+
+The sandbox holds no provider key — `NVIDIA_API_KEY`, `MAIW_NIM_API_KEY` and
+every other credential stay in host custody, and a rendered sandbox policy
+cannot inject one.
+
+**Hard rule: NemoClaw/OpenShell may proxy the transport. MAIW selects the
+model.** NemoClaw ships its own Model Router; adopting it would bypass
+`PolicyFilter`, `DeploymentResolver` and routing provenance in a single step,
+and a duplicated routing decision is one that can disagree with itself. The
+rejection is declared in the generated agent manifest as data rather than prose,
+so an operator cannot configure around it:
+
+```yaml
+inference:
+  route: maiw_model_gateway
+  model_selection_authority: maiw.ModelGateway
+  use_platform_model_router: false
+```
+
+> **Gap:** no HTTP endpoint currently exposes inference — `ModelGateway` is
+> instantiated in-process by `apps/api/maiw_api/bootstrap.py`. The
+> `/api/v1/inference` route above is the designed target, not an existing
+> surface, and standing it up is deferred to Phase 20B. Until it exists a
+> sandboxed runtime cannot reach inference at all.
+
+See [NEMOCLAW_OPENSHELL_INTEGRATION.md](NEMOCLAW_OPENSHELL_INTEGRATION.md).
+
 ### MAIWDeterministicRuntime
 
 `MAIWDeterministicRuntime` (`packages/maiw-agents/maiw_agents/runtime/deterministic.py`)

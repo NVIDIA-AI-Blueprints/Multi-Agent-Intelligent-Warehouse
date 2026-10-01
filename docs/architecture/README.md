@@ -29,10 +29,11 @@ material lives in [`docs/history/`](../history/).
 11. **[WAREHOUSE_STATE.md](WAREHOUSE_STATE.md)** — WarehouseState assembly, StateRequirements, freshness, provenance
 12. **[WAREHOUSE_WORLD.md](WAREHOUSE_WORLD.md)** — BASE/SCENARIO/LIVE worlds, OperationalContextSnapshot
 13. **[DEPLOYMENT_ARCHITECTURE.md](DEPLOYMENT_ARCHITECTURE.md)** — Service boundaries, ports, env vars
+14. **[NEMOCLAW_OPENSHELL_INTEGRATION.md](NEMOCLAW_OPENSHELL_INTEGRATION.md)** — Sandbox containment boundary, policy mapping, threat model
 
 **Testing:**
 
-14. **[TEST_STRATEGY.md](TEST_STRATEGY.md)** — CORE CI command, test categories, exclusion rationale
+15. **[TEST_STRATEGY.md](TEST_STRATEGY.md)** — CORE CI command, test categories, exclusion rationale
 
 ---
 
@@ -53,6 +54,7 @@ material lives in [`docs/history/`](../history/).
 | `WAREHOUSE_STATE.md` | Authoritative | State assembly |
 | `WAREHOUSE_WORLD.md` | Authoritative | Synthetic world layer |
 | `DEPLOYMENT_ARCHITECTURE.md` | Authoritative | Deployment topology |
+| `NEMOCLAW_OPENSHELL_INTEGRATION.md` | Authoritative (contracts) / qualification pending | Sandbox containment boundary |
 | `TEST_STRATEGY.md` | Authoritative | CI test strategy |
 | `adr/` | Decision records | Accepted architectural decisions |
 | `diagrams/` | Assets | Architecture diagrams |

@@ -215,7 +215,7 @@ Context → SOP Engine / AgentRuntime → RecommendedAction
 
 Everything left of `Governance` is advisory. The SOP Engine imports no `ActionExecutor`, no `DecisionEngine`, no MCP write client and no warehouse credentials — enforced by AST inspection in CI, not by convention. Adding persistence did not move any authority into the engine: a restored procedure that was waiting on governance is still waiting on governance.
 
-**Pre-NemoClaw status:** the agent/SOP layer is structurally prepared for sandbox integration — procedure state is recoverable, evidence requirements are enforced, and runtime capabilities are explicitly deny-by-default.
+**Sandbox status:** the preparation above is what made Phase 20A possible — procedure state is recoverable, evidence requirements are enforced, and runtime capabilities are explicitly deny-by-default. See [Sandboxed Agent Runtime](#sandboxed-agent-runtime) below.
 
 See [docs/architecture/SOP_ENGINE_V2_DESIGN.md](docs/architecture/SOP_ENGINE_V2_DESIGN.md).
 
@@ -249,6 +249,52 @@ runtime_profile: adaptive  # → DeepAgentsRuntime
 **The dual-runtime architecture is intentional design.** It provides a clean separation between deterministic compliance and adaptive reasoning. `MAIWDeterministicRuntime` is the reference and strict-mode fallback; `DeepAgentsRuntime` is the primary adaptive runtime for complex resolution SOPs.
 
 See [docs/architecture/AGENT_RUNTIME.md](docs/architecture/AGENT_RUNTIME.md).
+
+---
+
+## Sandboxed Agent Runtime
+
+> OpenShell enforces the security boundary; NemoClaw packages and operates it; MAIW continues to define what the agent is allowed to do and remains the sole authority over warehouse actions.
+
+Either runtime can be wrapped in a sandbox boundary. This is **containment, not migration** — nothing in `packages/` changed, and no MAIW semantics moved onto NemoClaw.
+
+```
+┌─ OpenShell sandbox ──────────────────────┐
+│  SOP Engine + AgentRuntime               │
+│  READ / ANALYTICAL / PROPOSAL only       │
+│  network: deny-by-default                │
+│  credentials: none                       │
+└──────────────┬───────────────────────────┘
+               ↓
+       RecommendedAction
+══════════ MAIW AUTHORITY BOUNDARY ══════════
+               ↓
+    Governance → ActionExecutor → MCP WRITE
+```
+
+```python
+runtime = SandboxedAgentRuntime(
+    inner=MAIWDeterministicRuntime(...),   # unchanged, and unaware
+    config=SandboxConfig.from_env(),
+    provisioner=OpenShellSandboxProvisioner(),
+)
+```
+
+`RuntimeCapabilityPolicy` is rendered into a sandbox policy that is **deterministic** (same policy → byte-identical YAML), **monotonic** (rendered ⊆ MAIW policy, checked on every render) and **credential-free**. `WRITE` and `EMERGENCY_WRITE` have no route in — not via the class list, a capability id, a network endpoint, or an injected credential.
+
+Three sandbox modes, and the middle one is the point:
+
+| Mode | Behaviour when the sandbox is unavailable |
+|---|---|
+| `disabled` | normal operation, no sandbox expected |
+| `required` | **fail the task.** No fallback — not as a retry, not behind a flag |
+| `preferred` | warn and continue; the MAIW capability policy still applies |
+
+**A sandbox authorises nothing.** Every capability check that runs unsandboxed still runs sandboxed, through the same `authorize_step`. The sandbox is a second wall behind the first. If `integrations/nemoclaw/` were deleted, capability enforcement, governance and procedure persistence would be unchanged.
+
+**Qualification status:** NemoClaw and OpenShell are **not installed** on the development host, so the architecture, contracts and policy mapping are implemented and tested (127 contract tests in CORE CI) but **no runtime qualification has been performed**. `OpenShellSandboxProvisioner` probes as unavailable and fails closed rather than pretending; `@pytest.mark.sandbox` tests skip.
+
+See [docs/architecture/NEMOCLAW_OPENSHELL_INTEGRATION.md](docs/architecture/NEMOCLAW_OPENSHELL_INTEGRATION.md).
 
 ---
 
@@ -643,6 +689,8 @@ A frozen pre-NemoClaw performance baseline is preserved under `artifacts/baselin
 │  ├─ maiw-agents/         # Equipment, Labor, Wave, Operations, Safety agents
 │  └─ maiw-world/          # Warehouse World — DataPack, ScenarioOverlay, Explorer
 ├─ apps/api/               # FastAPI application (bootstrap.py, MAIWRuntime)
+├─ integrations/           # External integrations (imports packages/, never the reverse)
+│  └─ nemoclaw/            # NemoClaw/OpenShell sandbox boundary — policy renderer, contracts
 ├─ mcp_servers/            # Standalone MCP v2 servers (Inventory, Equipment, Labor, Wave)
 ├─ src/ui/web/             # React web dashboard
 ├─ notebooks/              # Developer notebook (MAIW_v2_Getting_Started.ipynb)
@@ -673,6 +721,7 @@ A frozen pre-NemoClaw performance baseline is preserved under `artifacts/baselin
 | [docs/architecture/CAPABILITY_MATRIX.md](docs/architecture/CAPABILITY_MATRIX.md) | All 13 capabilities, read/write classification |
 | [docs/architecture/DEPENDENCY_BOUNDARIES.md](docs/architecture/DEPENDENCY_BOUNDARIES.md) | Package boundary rules |
 | [docs/architecture/RUNTIME_EXECUTION_FLOW.md](docs/architecture/RUNTIME_EXECUTION_FLOW.md) | Full pipeline sequence diagrams |
+| [docs/architecture/NEMOCLAW_OPENSHELL_INTEGRATION.md](docs/architecture/NEMOCLAW_OPENSHELL_INTEGRATION.md) | Sandbox containment boundary, policy mapping, threat model |
 | [docs/architecture/TEST_STRATEGY.md](docs/architecture/TEST_STRATEGY.md) | CORE CI command, exclusion rationale |
 | [docs/developer/WAREHOUSE_WORLD_MODEL.md](docs/developer/WAREHOUSE_WORLD_MODEL.md) | Warehouse World developer reference |
 | [docs/developer/MODEL_DEPLOYMENT.md](docs/developer/MODEL_DEPLOYMENT.md) | Model deployment modes — hosted, local NIM |

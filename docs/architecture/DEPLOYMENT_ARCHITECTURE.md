@@ -121,6 +121,69 @@ the API container, not run as separate processes:
 
 ---
 
+## Sandbox Topology (Phase 20A — optional)
+
+The agent runtime may be moved out of the API container into an OpenShell
+sandbox. The sandbox is a **leaf**: it reaches only the MAIW API, and nothing
+reaches it.
+
+```
+            ┌─────────────────────────────┐
+            │        MAIW API (8001)       │
+            │  DecisionEngine              │
+            │  ActionExecutor              │
+            │  ApprovalStore               │
+            │  ModelGateway                │
+            │  ProcedureStateStore (auth.) │
+            │  boundary validators         │
+            └──┬────────────────────┬──────┘
+               │ MCP 2.0 (incl.      │  inference  +  read capabilities
+               │ write capabilities) │  (the ONLY two routes in)
+   ┌───────────▼──────────┐    ┌─────▼──────────────────────────┐
+   │  MCP Domain Servers  │    │  OpenShell sandbox             │
+   │  8765–8768           │    │   SOP Engine + AgentRuntime    │
+   │  NEVER reachable     │    │   network: deny-by-default     │
+   │  from the sandbox    │    │   fs: /workspace/* only        │
+   └──────────────────────┘    │   credentials: none            │
+                               └────────────────────────────────┘
+```
+
+Three topology facts do the work:
+
+- **MCP servers are not exposed to the sandbox at all.** `mcp_servers/equipment`
+  serves `get_status` (read) and `assign` (write) on the same port 8766;
+  exposing it for its reads would expose its writes. Reads arrive through the
+  MAIW read endpoint instead.
+- **The sandbox holds no credentials.** No `NVIDIA_API_KEY`, no `DATABASE_URL`,
+  no MCP token. `container_run_args()` emits no `--env` flags.
+- **Only `/workspace/procedure_state` is writable**, and it is a working copy —
+  authoritative procedure state stays in the host `ProcedureStateStore`, so a
+  sandbox that dies mid-procedure loses nothing.
+
+### Sandbox environment variables (host-side only)
+
+Read on the host, before the sandbox exists. None of these can widen a
+capability policy — policies are built from `AgentDefinition` and
+`SOPDefinition`, never from the environment.
+
+| Variable | Default | Description |
+|---|---|---|
+| `MAIW_SANDBOX_MODE` | `disabled` | `disabled` \| `required` \| `preferred`. An unrecognised value **raises** rather than defaulting |
+| `MAIW_SANDBOX_RUNTIME` | `none` | `none` \| `openshell` \| `container` |
+| `MAIW_SANDBOX_MODEL_GATEWAY_ENDPOINT` | `http://maiw-api:8000/api/v1/inference` | host inference route (**not yet implemented** — Phase 20B) |
+| `MAIW_SANDBOX_READ_ENDPOINT` | `http://maiw-api:8000/api/v1/capabilities/read` | host read-capability route (**not yet implemented** — Phase 20B) |
+| `MAIW_SANDBOX_IMAGE` | *(unset)* | pinned agent image reference |
+| `MAIW_NEMOCLAW_VERSION` | *(unset)* | version qualified against; unset ⇒ `CONFIGURATION_PENDING` |
+| `MAIW_OPENSHELL_VERSION` | *(unset)* | version qualified against |
+
+`MAIW_SANDBOX_MODE=required` with no sandbox available **fails every task**.
+That is intended: a deployment claiming containment on a host that cannot
+provide it should not run.
+
+See [NEMOCLAW_OPENSHELL_INTEGRATION.md](NEMOCLAW_OPENSHELL_INTEGRATION.md).
+
+---
+
 ## Environment Variables
 
 ### API / Runtime
