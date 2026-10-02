@@ -75,6 +75,41 @@ Selection priority (highest wins):
 - **Model:** `MAIWModelGatewayChat` → MAIW ModelGateway (hard invariant — no direct providers)
 - **Key property:** Adaptive — selects tools and subagents dynamically within SOP bounds
 
+#### MAIWModelGatewayChat — ModelGateway adapter contract
+
+`DeepAgentsRuntime` passes `MAIWModelGatewayChat(model_gateway=context.model_gateway)` to
+`create_deep_agent()`. All model calls flow through this chain:
+
+```
+DeepAgentsRuntime
+  → MAIWModelGatewayChat._generate() / _agenerate()
+      → ModelRequest(task, messages, reasoning, risk_level, trace_id, ...)
+      → context.model_gateway.generate(request)   # canonical contract
+          → ModelResponse
+      → ModelResponse.content → AIMessage.content → ChatResult
+```
+
+**Invariants:**
+
+1. `MAIWModelGatewayChat` constructs a `ModelRequest` object; it NEVER passes bare
+   `prompt=`, `risk_level=`, or `reasoning_level=` kwargs directly to `gateway.generate()`.
+2. `ModelResponse.content` is translated directly to `AIMessage.content` — no re-wrapping.
+3. Gateway failures (any exception from `gateway.generate()`) propagate to the caller.
+   They are NOT converted into mock or placeholder responses.
+4. Mock responses are returned ONLY when `model_gateway=None` (explicit test mode,
+   set by the caller). This must never be activated by exception handling.
+
+**Test mode vs. production:**
+
+| `model_gateway` | Behavior |
+|----------------|----------|
+| `None` | Explicit test mode — returns deterministic `_mock_response()` without network calls |
+| a `ModelGateway` instance | Production mode — constructs `ModelRequest`, calls `generate(request)`, propagates exceptions |
+
+Tests that need isolation must pass `model_gateway=None` explicitly. Production code
+must never set `model_gateway=None` unless it is intentionally running deterministic
+test fixtures.
+
 ---
 
 ## Authority Boundary

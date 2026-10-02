@@ -80,9 +80,6 @@ class DocumentPipelineTester:
             await preprocessor.initialize()
 
             logger.info(f"API Key available: {bool(preprocessor.api_key)}")
-            logger.info(
-                f"API Key prefix: {preprocessor.api_key[:10] if preprocessor.api_key else 'None'}..."
-            )
             logger.info(f"Base URL: {preprocessor.base_url}")
 
             if not os.path.exists(self.test_file_path):
@@ -117,9 +114,6 @@ class DocumentPipelineTester:
             await ocr_service.initialize()
 
             logger.info(f"API Key available: {bool(ocr_service.api_key)}")
-            logger.info(
-                f"API Key prefix: {ocr_service.api_key[:10] if ocr_service.api_key else 'None'}..."
-            )
             logger.info(f"Base URL: {ocr_service.base_url}")
 
             # Use images from stage 1 preprocessing
@@ -157,9 +151,6 @@ class DocumentPipelineTester:
             await llm_processor.initialize()
 
             logger.info(f"API Key available: {bool(llm_processor.api_key)}")
-            logger.info(
-                f"API Key prefix: {llm_processor.api_key[:10] if llm_processor.api_key else 'None'}..."
-            )
             logger.info(f"Base URL: {llm_processor.base_url}")
 
             # Use mock data from previous stages if available
@@ -196,9 +187,6 @@ class DocumentPipelineTester:
             await judge.initialize()
 
             logger.info(f"API Key available: {bool(judge.api_key)}")
-            logger.info(
-                f"API Key prefix: {judge.api_key[:10] if judge.api_key else 'None'}..."
-            )
             logger.info(f"Base URL: {judge.base_url}")
 
             # Use data from previous stages
@@ -330,7 +318,7 @@ class DocumentPipelineTester:
 async def main():
     """Main test function"""
     logger.info("🚀 Starting Document Extraction Pipeline Test")
-    logger.info(f"Test file: test_invoice.png")
+    logger.info("Test file: test_invoice.png")
     logger.info(f"Environment: {os.getenv('ENVIRONMENT', 'development')}")
 
     # Check environment variables

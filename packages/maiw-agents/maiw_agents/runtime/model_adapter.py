@@ -11,37 +11,116 @@ MAIWTestModelAdapter (Phase 19A POC — TEST ONLY)
     not usable by real deepagents create_deep_agent().
     Previously named MAIWModelAdapter (renamed in 19A.11b for clarity).
 
+    EXPLICIT TEST MODE: when model_gateway is None, returns deterministic mock
+    responses. Mock is NEVER triggered by a gateway exception — callers must
+    pass model_gateway=None explicitly to activate test mode.
+
 MAIWModelGatewayChat (Phase 19A real integration — PRODUCTION)
     LangChain-compatible BaseChatModel backed by MAIW ModelGateway.
     Deep Agents uses this model — it CANNOT bypass ModelGateway.
     All model calls preserve: RiskLevel, ReasoningLevel, DeploymentMode,
     routing provenance, deadline, fallback, telemetry, trace_id.
-    In test mode (model_gateway=None): returns deterministic mock responses.
+
+    EXPLICIT TEST MODE: when model_gateway is None, returns deterministic mock
+    responses. Mock is NEVER triggered by a gateway exception — callers must
+    pass model_gateway=None explicitly to activate test mode.
 
 Architecture:
     DeepAgentsRuntime
         → MAIWModelGatewayChat._generate()
             → context.model_gateway (ModelGateway protocol)
-                → NIM / external provider
+                → gateway.generate(ModelRequest(...))
+                    → NIM / external provider
+
+Canonical gateway call:
+    response = await gateway.generate(ModelRequest(
+        task=..., messages=..., reasoning=ReasoningLevel.MEDIUM,
+        risk_level=RiskLevel.LOW, trace_id=...,
+    ))
+    text = response.content  # ModelResponse.content — always a str
 
 Preserved invariants:
     - RiskLevel from ModelGateway is honored
     - ReasoningLevel from ModelGateway is honored
     - Route provenance (which model/endpoint was used) is preserved
     - trace_id is propagated through all model calls
-    - If model_gateway is None (test mode), returns deterministic mock response
+    - If model_gateway is None (EXPLICIT test mode): deterministic mock response
+    - If model_gateway is not None and raises: exception propagates to caller
+      (no silent mock fallback)
+
+Contract repair (Phase 19A.fix.1):
+    Previous code called gateway.generate(prompt=..., risk_level=...) which
+    does not match ModelGateway.generate(request: ModelRequest). The TypeError
+    was swallowed by a broad except Exception which then returned a mock
+    response, causing production inference to silently fall back to deterministic
+    output. This file corrects both bugs:
+      1. Adapter now constructs a canonical ModelRequest.
+      2. Broad exception handlers that produced silent mock fallbacks are removed.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any, Iterator, Optional
+from typing import Any, Optional
+
+from maiw_models.models import ModelRequest, ReasoningLevel, RiskLevel
 
 logger = logging.getLogger(__name__)
 
-# Risk and reasoning level constants (mirror ModelGateway protocol)
+# Risk and reasoning level constants (mirror ModelGateway protocol).
+# String values are used here for backward-compatibility with callers that
+# pass string arguments; they are mapped to enum values in _to_risk_level /
+# _to_reasoning_level before constructing ModelRequest.
 _DEFAULT_RISK_LEVEL = "standard"
 _DEFAULT_REASONING_LEVEL = "standard"
+
+# ── enum helpers ──────────────────────────────────────────────────────────────
+
+
+def _to_risk_level(s: str) -> RiskLevel:
+    """
+    Map a case-insensitive string to RiskLevel enum value.
+
+    Accepts: "low", "medium", "high", "critical", "standard" (legacy → LOW).
+    Unknown values default to LOW so routing is conservative.
+    """
+    _map: dict[str, RiskLevel] = {
+        "low": RiskLevel.LOW,
+        "medium": RiskLevel.MEDIUM,
+        "high": RiskLevel.HIGH,
+        "critical": RiskLevel.CRITICAL,
+        "standard": RiskLevel.LOW,  # legacy default value → LOW
+    }
+    result = _map.get(s.lower())
+    if result is None:
+        logger.warning("_to_risk_level: unknown value %r — defaulting to LOW", s)
+        return RiskLevel.LOW
+    return result
+
+
+def _to_reasoning_level(s: str) -> ReasoningLevel:
+    """
+    Map a case-insensitive string to ReasoningLevel enum value.
+
+    Accepts: "low", "medium", "high", "standard" (legacy → MEDIUM).
+    Unknown values default to MEDIUM.
+    """
+    _map: dict[str, ReasoningLevel] = {
+        "low": ReasoningLevel.LOW,
+        "medium": ReasoningLevel.MEDIUM,
+        "high": ReasoningLevel.HIGH,
+        "standard": ReasoningLevel.MEDIUM,  # legacy default value → MEDIUM
+    }
+    result = _map.get(s.lower())
+    if result is None:
+        logger.warning(
+            "_to_reasoning_level: unknown value %r — defaulting to MEDIUM", s
+        )
+        return ReasoningLevel.MEDIUM
+    return result
+
+
+# ── MAIWTestModelAdapter ──────────────────────────────────────────────────────
 
 
 class MAIWTestModelAdapter:
@@ -59,8 +138,9 @@ class MAIWTestModelAdapter:
         - Route provenance (which model/endpoint was selected)
         - trace_id correlation through all model calls
 
-    In test mode (model_gateway is None), returns deterministic mock responses
-    without making any network calls.
+    EXPLICIT TEST MODE: when model_gateway is None, returns deterministic mock
+    responses WITHOUT making any network calls. Mock is ONLY returned when
+    model_gateway is None — never as an exception fallback.
 
     Renamed from MAIWModelAdapter in Phase 19A.11b.
     """
@@ -95,22 +175,29 @@ class MAIWTestModelAdapter:
         Generate a model response for the given prompt.
 
         Returns a dict with:
-            text: str           — the model response
-            route: str          — which model/endpoint was used
-            risk_level: str     — risk level applied
+            text: str            — the model response
+            route: str           — which model/endpoint was used
+            risk_level: str      — risk level applied
             reasoning_level: str — reasoning level applied
-            trace_id: str       — propagated trace ID
-            call_index: int     — monotonic call counter for this task
+            trace_id: str        — propagated trace ID
+            call_index: int      — monotonic call counter for this task
 
-        If model_gateway is None (test mode), returns a deterministic mock.
+        EXPLICIT TEST MODE: if model_gateway is None, returns a deterministic
+        mock without any network call. This is the ONLY path to a mock response.
+        Gateway failures are NOT silently converted to mock responses — they
+        propagate to the caller so the failure is visible.
         """
         self._call_count += 1
 
         logger.debug(
             "MAIWTestModelAdapter.generate: step=%s trace=%s call=%d risk=%s",
-            step_id, trace_id, self._call_count, self._risk_level,
+            step_id,
+            trace_id,
+            self._call_count,
+            self._risk_level,
         )
 
+        # ── EXPLICIT TEST MODE: gateway=None → deterministic mock ─────────────
         if self._gateway is None:
             return self._mock_response(
                 prompt=prompt,
@@ -119,49 +206,26 @@ class MAIWTestModelAdapter:
                 call_index=self._call_count,
             )
 
-        # Real ModelGateway invocation
-        try:
-            # ModelGateway exposes: generate(prompt, risk_level, reasoning_level, trace_id, ...)
-            if hasattr(self._gateway, "generate"):
-                raw = await self._gateway.generate(
-                    prompt,
-                    risk_level=self._risk_level,
-                    reasoning_level=self._reasoning_level,
-                    trace_id=trace_id,
-                    max_tokens=max_tokens,
-                )
-            else:
-                # Fallback: treat gateway as callable
-                raw = await self._gateway(prompt)
+        # ── PRODUCTION PATH: construct canonical ModelRequest ─────────────────
+        # ModelGateway.generate(request: ModelRequest) → ModelResponse
+        # Do NOT pass bare kwargs — this was the bug that caused silent mock fallback.
+        request = ModelRequest(
+            task=f"maiw.test.adapter.{step_id or 'unknown'}",
+            messages=[{"role": "user", "content": prompt}],
+            reasoning=_to_reasoning_level(self._reasoning_level),
+            risk_level=_to_risk_level(self._risk_level),
+            trace_id=trace_id,
+            max_tokens=max_tokens,
+        )
 
-            # Normalize raw response
-            if isinstance(raw, str):
-                text = raw
-                route = "model_gateway"
-            elif isinstance(raw, dict):
-                text = raw.get("text", raw.get("content", str(raw)))
-                route = raw.get("route", raw.get("model", "model_gateway"))
-            else:
-                text = str(raw)
-                route = "model_gateway"
-
-        except Exception as exc:
-            logger.error(
-                "MAIWTestModelAdapter: ModelGateway call failed: %s trace=%s",
-                exc, trace_id,
-            )
-            # Fall back to mock on failure to preserve test isolation
-            return self._mock_response(
-                prompt=prompt,
-                trace_id=trace_id,
-                step_id=step_id,
-                call_index=self._call_count,
-                error=str(exc),
-            )
+        # Any exception from the gateway propagates to the caller.
+        # There is NO silent mock fallback here — if the gateway fails,
+        # the caller must see the failure.
+        response = await self._gateway.generate(request)
 
         return {
-            "text": text,
-            "route": route,
+            "text": response.content,
+            "route": response.model_id,
             "risk_level": self._risk_level,
             "reasoning_level": self._reasoning_level,
             "trace_id": trace_id,
@@ -179,10 +243,11 @@ class MAIWTestModelAdapter:
         error: str | None = None,
     ) -> dict[str, Any]:
         """
-        Deterministic mock response for test mode (model_gateway is None).
+        Deterministic mock response for EXPLICIT test mode (model_gateway is None).
 
         Produces realistic-looking output for each step type without
-        requiring live model endpoints.
+        requiring live model endpoints. This method MUST NOT be called as
+        an exception fallback — it is only reachable when model_gateway is None.
         """
         step_label = step_id or "unknown"
 
@@ -273,9 +338,23 @@ MAIWModelAdapter = MAIWTestModelAdapter
 
 try:
     from langchain_core.language_models import BaseChatModel
-    from langchain_core.messages import BaseMessage, AIMessage
+    from langchain_core.messages import (
+        BaseMessage,
+        AIMessage,
+        HumanMessage,
+        SystemMessage,
+    )
     from langchain_core.outputs import ChatResult, ChatGeneration
     from langchain_core.callbacks import CallbackManagerForLLMRun
+
+    def _lc_role(msg: BaseMessage) -> str:
+        """Map a LangChain message type to a role string for ModelRequest.messages."""
+        if isinstance(msg, SystemMessage):
+            return "system"
+        if isinstance(msg, HumanMessage):
+            return "user"
+        # AIMessage, ToolMessage, FunctionMessage, etc.
+        return "assistant"
 
     class MAIWModelGatewayChat(BaseChatModel):
         """
@@ -285,7 +364,18 @@ try:
         All model calls preserve: RiskLevel, ReasoningLevel, DeploymentMode,
         routing provenance, deadline, fallback, telemetry, trace_id.
 
-        In test mode (model_gateway=None): returns deterministic mock responses.
+        EXPLICIT TEST MODE: when model_gateway is None, returns deterministic
+        mock responses. Mock is NEVER triggered by a gateway exception —
+        callers must pass model_gateway=None explicitly to activate test mode.
+
+        Gateway failures surface as typed exceptions, never as silent mock
+        replacements.
+
+        Canonical call path:
+            _generate(messages)
+                → ModelRequest(task, messages, reasoning, risk_level, trace_id)
+                → gateway.generate(request)  → ModelResponse
+                → ModelResponse.content      → AIMessage.content → ChatResult
         """
 
         model_name: str = "maiw-gateway"
@@ -317,46 +407,72 @@ try:
             run_manager: Optional[CallbackManagerForLLMRun] = None,
             **kwargs: Any,
         ) -> ChatResult:
-            # Extract combined prompt from messages
-            prompt = "\n".join(
-                m.content for m in messages
+            """
+            Synchronous LangChain inference hook.
+
+            Routes through ModelGateway when model_gateway is set.
+            Returns deterministic mock only when model_gateway is None (EXPLICIT
+            test mode).
+
+            Gateway failures propagate to the caller — there is no silent
+            mock fallback.
+            """
+            # Build the canonical message list for ModelRequest
+            gw_messages = [
+                {"role": _lc_role(m), "content": m.content}
+                for m in messages
                 if hasattr(m, "content") and isinstance(m.content, str)
+            ]
+
+            # ── EXPLICIT TEST MODE: model_gateway=None → deterministic mock ──
+            if self.model_gateway is None:
+                # Reconstruct flat prompt only for the mock path (mock needs a
+                # text summary; production path uses structured gw_messages).
+                prompt = "\n".join(msg["content"] for msg in gw_messages)
+                response_text = self._mock_response(prompt)
+                return ChatResult(
+                    generations=[
+                        ChatGeneration(message=AIMessage(content=response_text))
+                    ]
+                )
+
+            # ── PRODUCTION PATH: construct canonical ModelRequest ─────────────
+            # ModelGateway.generate(request: ModelRequest) → ModelResponse.
+            # Any exception propagates to the caller — NO silent mock fallback.
+            import asyncio
+            import concurrent.futures
+
+            request = ModelRequest(
+                task="maiw.deep_agents.step",
+                messages=gw_messages,
+                reasoning=_to_reasoning_level(self.reasoning_level),
+                risk_level=_to_risk_level(self.risk_level),
+                trace_id=self.trace_id or None,
             )
 
-            if self.model_gateway is not None:
-                # Route through ModelGateway (real path)
-                try:
-                    import asyncio
-                    import concurrent.futures
-                    if hasattr(self.model_gateway, "generate"):
-                        # Always run in a thread pool to avoid blocking the calling
-                        # event loop and to avoid deprecated get_event_loop() patterns.
-                        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                            future = pool.submit(
-                                asyncio.run,
-                                self.model_gateway.generate(
-                                    prompt=prompt,
-                                    trace_id=self.trace_id,
-                                    risk_level=self.risk_level,
-                                    reasoning_level=self.reasoning_level,
-                                ),
-                            )
-                            raw = future.result()
-                        if isinstance(raw, dict):
-                            response_text = raw.get("text", str(raw))
-                        else:
-                            response_text = str(raw)
-                    else:
-                        response_text = self._mock_response(prompt)
-                except Exception as exc:
-                    logger.error("MAIWModelGatewayChat: gateway error: %s", exc)
-                    response_text = self._mock_response(prompt)
-            else:
-                # Test mode: deterministic mock
-                response_text = self._mock_response(prompt)
+            logger.debug(
+                "MAIWModelGatewayChat._generate: task=%s trace=%s risk=%s reasoning=%s",
+                request.task,
+                request.trace_id,
+                request.risk_level,
+                request.reasoning,
+            )
+
+            # Run the async gateway call in a worker thread to avoid blocking
+            # the calling event loop and to avoid deprecated get_event_loop()
+            # patterns.  future.result() re-raises any exception from the
+            # coroutine, so gateway errors are never swallowed here.
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(
+                    asyncio.run,
+                    self.model_gateway.generate(request),
+                )
+                response = future.result()  # ModelResponse — raises on gateway failure
 
             return ChatResult(
-                generations=[ChatGeneration(message=AIMessage(content=response_text))]
+                generations=[
+                    ChatGeneration(message=AIMessage(content=response.content))
+                ]
             )
 
         async def _agenerate(
@@ -366,11 +482,61 @@ try:
             run_manager: Optional[Any] = None,
             **kwargs: Any,
         ) -> ChatResult:
-            """Async version delegates to synchronous _generate."""
-            return self._generate(messages, stop=stop, **kwargs)
+            """
+            Async LangChain inference hook.
+
+            Calls the gateway directly (no thread pool needed — already async).
+            Gateway failures propagate to the caller — NO silent mock fallback.
+            """
+            gw_messages = [
+                {"role": _lc_role(m), "content": m.content}
+                for m in messages
+                if hasattr(m, "content") and isinstance(m.content, str)
+            ]
+
+            # ── EXPLICIT TEST MODE ─────────────────────────────────────────────
+            if self.model_gateway is None:
+                prompt = "\n".join(msg["content"] for msg in gw_messages)
+                response_text = self._mock_response(prompt)
+                return ChatResult(
+                    generations=[
+                        ChatGeneration(message=AIMessage(content=response_text))
+                    ]
+                )
+
+            # ── PRODUCTION PATH ────────────────────────────────────────────────
+            request = ModelRequest(
+                task="maiw.deep_agents.step",
+                messages=gw_messages,
+                reasoning=_to_reasoning_level(self.reasoning_level),
+                risk_level=_to_risk_level(self.risk_level),
+                trace_id=self.trace_id or None,
+            )
+
+            logger.debug(
+                "MAIWModelGatewayChat._agenerate: task=%s trace=%s risk=%s reasoning=%s",
+                request.task,
+                request.trace_id,
+                request.risk_level,
+                request.reasoning,
+            )
+
+            # Raises on gateway failure — no silent mock fallback.
+            response = await self.model_gateway.generate(request)
+
+            return ChatResult(
+                generations=[
+                    ChatGeneration(message=AIMessage(content=response.content))
+                ]
+            )
 
         def _mock_response(self, prompt: str) -> str:
-            """Deterministic test-mode responses based on prompt content."""
+            """
+            Deterministic test-mode responses based on prompt content.
+
+            ONLY called when model_gateway is None (explicit test mode).
+            NEVER called as an exception fallback from a gateway error.
+            """
             p = prompt.lower()
 
             # When governance boundary is mentioned (always present in SOP system prompt),
