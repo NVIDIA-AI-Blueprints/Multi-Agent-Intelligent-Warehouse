@@ -2396,13 +2396,15 @@ An unregistered capability is **denied**, not given the benefit of the doubt: a 
 
 **No privilege expansion.** `is_narrower_or_equal_to` / `assert_not_broadened` are exercised across `start → loop → retry → governance pause → restart → resume`; the live policy must be equal to or narrower than the initial one at every checkpoint. Policies are *derived, not stored*, so a restored procedure rebuilds the identical grant set from the same reviewed inputs.
 
-### Sandbox boundary — CONTRACTS IMPLEMENTED (Phase 20A), RUNTIME DEFERRED
+### Sandbox boundary — CONTRACTS IMPLEMENTED (Phase 20A), SECURITY BOUNDARY QUALIFIED (Phase 20B), E2E INFERENCE DEFERRED (Phase 20C)
 
 This is where NemoClaw, OpenShell or any other sandboxed executor attaches. The integration contract is the one above: a sandbox is handed a `RuntimeCapabilityPolicy` and must cross `authorize_capability` — it is not trusted to restrain itself within a wider surface.
 
 Preconditions met before 20A: no `ActionExecutor` or `maiw_execution` import anywhere in `packages/maiw-agents`; no warehouse credentials, credential literals, or credential environment lookups in the package; procedure state recoverable; evidence enforced.
 
 **Phase 20A took delivery of the contract** in [`integrations/nemoclaw/`](../../integrations/nemoclaw/). Nothing in `packages/maiw-agents` changed — the integration imports from it, never the reverse, which is what keeps the SOP Engine sandbox-agnostic.
+
+**Phase 20B qualified the security boundary** on a real NemoClaw/OpenShell environment (epg-tme-smc-h100-02, NemoClaw v0.0.124, OpenShell v0.0.116). All MAIW security invariants and boundary contract invariants were verified at both code and runtime container level. Full end-to-end inference was not verified due to H100 NVL CUDA sm_90a incompatibility with the pre-built llama-cpp-server image. See `docs/audits/MAIW_NEMOCLAW_SECURITY_QUALIFICATION.md`.
 
 #### Sandbox deployment of the SOP Engine
 

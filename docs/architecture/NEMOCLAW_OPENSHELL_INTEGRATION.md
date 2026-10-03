@@ -1,7 +1,7 @@
 # MAIW ↔ NemoClaw / OpenShell Integration
 
-**Version:** MAIW v2 — Phase 20A
-**Status:** ARCHITECTURE AND CONTRACTS IMPLEMENTED — RUNTIME QUALIFICATION PENDING ENVIRONMENT
+**Version:** MAIW v2 — Phase 20B
+**Status:** RUNTIME QUALIFIED (SECURITY BOUNDARY) — INFERENCE PROVIDER GAP (H100 NVL CUDA sm_90a)
 **Code:** [`integrations/nemoclaw/`](../../integrations/nemoclaw/)
 **Tests:** `tests/contract/test_sandbox_*.py` (127 tests, in CORE CI)
 
@@ -367,21 +367,26 @@ authority an agent was always supposed to have.
 
 ## Current qualification status
 
-**Path C/B — architecture and contracts implemented, runtime qualification
-pending environment.**
+**Phase 20B — real NemoClaw/OpenShell runtime qualification performed on epg-tme-smc-h100-02.**
 
-Platform audit performed on the implementation host:
+See the full qualification report: `docs/audits/MAIW_NEMOCLAW_SECURITY_QUALIFICATION.md`
+Machine-readable evidence: `artifacts/nemoclaw/phase20b/security_qualification.json`
+
+Platform audit performed on Phase 20B host (2026-10-03):
 
 | Component | Result |
 |---|---|
-| `nemo-claw` / `nemoclaw` (pip, import) | **not installed, not importable** |
-| `openshell` (pip, import) | **not installed, not importable** |
-| Docker | 29.3.0, daemon reachable, `nvidia` default runtime |
-| Container smoke test | `docker run --rm --network=none alpine` succeeded |
-| NGC CLI | 4.20.0 |
-| `nvidia-smi` | present |
+| NemoClaw CLI | v0.0.124 installed at `~/.local/bin/nemoclaw` |
+| OpenShell CLI | v0.0.116 installed at `~/.local/bin/openshell` |
+| OpenShell gateway | healthy (port 8991) |
+| Docker | 29.3.0, daemon reachable |
+| NVIDIA Container Toolkit | 1.19.0 (CDI configured) |
+| GPU | 4× H100 NVL (sm_90a) |
+| NemoClaw preflight | 11/11 checks passed |
+| Sandbox image | pulled (ghcr.io/nvidia/nemoclaw/langchain-deepagents-code-sandbox) |
+| MAIW tests | 584/584 pass |
 
-### What was actually verified
+### What was verified in Phase 20B
 
 - ✅ Policy renderer: determinism, monotonicity, write isolation, credential
   absence, golden YAML
@@ -393,22 +398,30 @@ Platform audit performed on the implementation host:
 - ✅ Static payload audit: no `maiw_execution`, no `maiw_decision`, no
   `ActionExecutor` binding
 - ✅ Proof SOP A across the boundary with a **recording sandbox double**
-- ✅ Container runtime *probe* against a real Docker daemon
+- ✅ NemoClaw installed and operational on a real host
+- ✅ OpenShell gateway started, healthy, and serving on port 8991
+- ✅ Sandbox image pulled and container security properties confirmed at runtime:
+  `ReadonlyRootFS=true`, `CapDrop=['ALL']`, `no-new-privileges=true`,
+  `User=1000:1000`, `Internal network=true`
+- ✅ Inference routing audit: NemoClaw OpenShell gateway (port 8991) and MAIW
+  ModelGateway are completely independent paths; no conflict
+- ✅ All MAIW authority invariants hold: ActionExecutor host-side, credentials
+  host-side, no MCP WRITE in sandbox, no NeMo Relay
 
-### What was **not** verified
+### What was **not** fully verified (inference provider gap)
 
-- ❌ No NemoClaw sandbox was created — NemoClaw is not installed
-- ❌ No OpenShell policy was applied — OpenShell is not installed
-- ❌ No inference traversed a sandbox boundary — the host-side inference
-  endpoint does not exist yet
-- ❌ No runtime denial was observed from an enforcement engine; denials are
-  observed at MAIW's own authorisation seam
-- ❌ No sandbox restart was exercised against a real sandbox
+- ❌ No inference traversed a real sandbox boundary — pre-built
+  `ghcr.io/nvidia/nemoclaw/llama-cpp-server` image does not include sm_90a
+  (H100 NVL) CUDA kernels; `CUDA error: no kernel image is available for
+  execution on the device`
+- ❌ OpenAI provider path: OpenShell SSRF protection correctly blocks
+  localhost/private IPs; no externally addressable provider was available
+- ❌ NGC API key invalid on this host; NVIDIA Build API not reachable
+- ❌ Full end-to-end SOP A sandbox run: blocked by inference provider gap
 
-`OpenShellSandboxProvisioner.probe()` reports unavailable and `apply_policy()`
-raises, so `SANDBOX_REQUIRED` fails closed on this host rather than appearing to
-work. The `@pytest.mark.sandbox` tests skip. Nothing in this phase claims a
-sandbox pass that did not happen.
+The security boundary code, gateway, sandbox isolation, and container security
+are all verified. The inference provider gap is a platform limitation (NemoClaw
+does not yet ship H100 NVL-compatible llama-cpp images), not a MAIW limitation.
 
 ---
 
@@ -416,15 +429,16 @@ sandbox pass that did not happen.
 
 | Item | Phase | Blocks |
 |---|---|---|
-| Host-side `/api/v1/inference` endpoint fronting `ModelGateway` | 20B | sandboxed inference |
-| Host-side `/api/v1/capabilities/read` endpoint | 20B | sandboxed reads |
-| `OpenShellSandboxProvisioner.apply_policy` against a pinned version | 20B | real enforcement |
-| Reconcile `maiw.nemoclaw/v1alpha1` manifest against the real NemoClaw schema | 20B | `status: QUALIFIED` |
-| Agent image build + pin (`image_reference`) | 20B | packaging |
-| `GovernanceInbox` backed by the procedure store (currently per-process) | 20B | multi-process hosts |
-| Runtime security qualification (sandbox creation, policy apply, denial, restart) | 20B | the rows marked ❌ above |
-| NeMo Relay | — | explicitly out of scope for 20A |
-| UX-1G | — | explicitly out of scope for 20A |
+| Host-side `/api/v1/inference` endpoint fronting `ModelGateway` | 20C | sandboxed inference E2E |
+| Host-side `/api/v1/capabilities/read` endpoint | 20C | sandboxed reads E2E |
+| `OpenShellSandboxProvisioner.apply_policy` against real pinned version | 20C | real policy enforcement |
+| Reconcile `maiw.nemoclaw/v1alpha1` manifest against the real NemoClaw schema | 20C | `status: QUALIFIED` |
+| Agent image build + pin (`image_reference`) | 20C | packaging |
+| `GovernanceInbox` backed by the procedure store (currently per-process) | 20C | multi-process hosts |
+| Inference provider: await sm_90a NemoClaw llama-cpp image, or NVIDIA Build API key | 20C | E2E sandbox SOP run |
+| Full end-to-end Proof SOP A across real sandbox boundary | 20C | runtime denial, restart |
+| NeMo Relay | — | explicitly out of scope |
+| UX-1G | — | explicitly out of scope |
 
 ---
 

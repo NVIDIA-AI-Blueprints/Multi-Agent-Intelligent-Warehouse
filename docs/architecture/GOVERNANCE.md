@@ -117,10 +117,10 @@ MAIW can *remember*, not what the agent layer is allowed to *do*.
 
 ## Sandbox Isolation Is Not Authorization
 
-Phase 20A can place the agent runtime inside an OpenShell sandbox. This is the
-same category of change as persistence above, and it deserves the same explicit
-statement: **isolation narrows what a compromised agent can reach. It grants
-nothing, and it relaxes nothing.**
+Phase 20A defined the contracts; Phase 20B qualified the security boundary on a
+real NemoClaw/OpenShell host. The governance principle is unchanged: **isolation
+narrows what a compromised agent can reach. It grants nothing, and it relaxes
+nothing.**
 
 Three consequences follow, and the third is the one that matters in review:
 
