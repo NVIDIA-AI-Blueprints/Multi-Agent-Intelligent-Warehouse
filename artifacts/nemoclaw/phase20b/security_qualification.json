@@ -4,8 +4,8 @@
   "title": "MAIW NemoClaw/OpenShell Deep Agents Security Qualification",
   "date": "2026-10-03",
   "host": "epg-tme-smc-h100-02",
-  "verdict": "INCOMPLETE",
-  "verdict_reason": "H100 NVL sm_90a CUDA kernel incompatibility prevents full sandbox inference qualification. All security invariants and boundary contracts verified at code and container level.",
+  "verdict": "HOST_SIDE_INFERENCE_QUALIFIED",
+  "verdict_reason": "Host-side inference chain (MAIWModelGatewayChat → ModelGateway → NIMProvider → localhost:8002) qualified end-to-end; 16/16 Phase 20B contract tests pass. REAL SANDBOX LEG NOT YET PROVEN: the sandbox→sanctioned-host-ModelGateway→NIM path requires a MAIW ModelGateway HTTP endpoint (Phase 20C prerequisite) that does not yet exist. F01 resolved via host-side NIM workaround. F02 architecture clarified (not yet sandbox-verified). Full qualification is INCOMPLETE pending sandbox leg proof.",
 
   "environment": {
     "os": "Ubuntu 24.04.4 LTS",
@@ -99,12 +99,25 @@
     },
     "openai_provider": {
       "status": "BLOCKED",
-      "failure_reason": "SSRF protection blocks localhost/private IP endpoints",
-      "expected_behavior": true
+      "failure_reason": "SSRF protection blocks localhost/private IP endpoints — expected OpenShell behavior (sandbox→host boundary)",
+      "expected_behavior": true,
+      "note": "ModelGateway runs on HOST; host-side NIM calls are not subject to OpenShell SSRF. No code change needed."
     },
     "ngc_api": {
       "status": "BLOCKED",
       "failure_reason": "NGC API key not configured on host"
+    },
+    "local_nim_host_side": {
+      "status": "HOST_SIDE_QUALIFIED",
+      "model": "nvidia/llama-3.1-nemotron-nano-8b-v1",
+      "container": "wms-nim-nano-8b",
+      "endpoint": "http://localhost:8002/v1",
+      "gpu_compat": "sm_90a (H100 NVL native)",
+      "auth": "no-auth (Bearer token ignored by local NIM)",
+      "inference_path": "MAIWModelGatewayChat (host pytest) -> ModelGateway -> NIMProvider -> NIMClient -> localhost:8002",
+      "path_note": "All tests run on HOST. REAL SANDBOX LEG (sandbox→host-ModelGateway-HTTP-endpoint→NIM) is NOT YET PROVEN. ModelGateway HTTP endpoint doesn't exist yet (Phase 20C).",
+      "real_inference_test": "test_step7_real_inference_via_model_gateway: PASS (host only)",
+      "sop_governance_test": "test_step8_sop_a_governance_boundary_with_real_gateway: PASS (host pytest, not inside real OpenShell sandbox)"
     }
   },
 
@@ -212,19 +225,24 @@
       "symptom": "CUDA error: no kernel image is available for execution on the device",
       "root_cause": "ghcr.io/nvidia/nemoclaw/llama-cpp-server image compiled for sm_80/86, not sm_90a",
       "maiw_impact": "None — inference provider only, MAIW security boundary unaffected",
-      "resolution": "Await NemoClaw llama-cpp-server image rebuild for sm_90a, or use external OpenAI-compatible provider",
-      "fixed": false
+      "resolution": "Resolved via workaround: H100-compatible local NIM containers (wms-nim-nano-8b on port 8002, wms-nim-teacher-49b on port 8010) were already running on the host. Selected nvidia/llama-3.1-nemotron-nano-8b-v1 via ModelGateway on host side.",
+      "fixed": true,
+      "workaround": true,
+      "workaround_details": "ModelGateway runs on HOST and calls localhost:8002 directly (not through OpenShell SSRF). NemoClaw llama-cpp image issue does not affect this path."
     },
     {
       "id": "F02",
       "severity": "P1",
       "category": "Expected_Behavior",
-      "title": "OpenAI SSRF protection blocks local NIM endpoints",
-      "symptom": "HTTP 401 for both Responses API and Chat Completions API via localhost/private IPs",
-      "root_cause": "NemoClaw SSRF protection correctly blocks private/internal IP addresses",
-      "maiw_impact": "Cannot use local NIM during qualification without external provider",
-      "resolution": "Use externally addressable NIM URL or NVIDIA Build API endpoint",
-      "fixed": false
+      "title": "OpenShell SSRF blocks sandbox→localhost/private NIM (expected behavior)",
+      "symptom": "HTTP 401/block for localhost/private IPs from inside sandbox",
+      "root_cause": "NemoClaw SSRF correctly blocks sandbox outbound calls to private/localhost IPs — documented behavior",
+      "maiw_impact": "Cannot call local NIM directly from sandbox (by design). SSRF is NOT weakened.",
+      "resolution": "Architecture clarified: MAIW ModelGateway runs on HOST. When a MAIW ModelGateway HTTP endpoint exists (Phase 20C), the sandbox will call that endpoint (a network-addressable, non-localhost URL that passes SSRF). The host-side ModelGateway then calls localhost:8002. This maintains SSRF protection — no code change needed.",
+      "fixed": false,
+      "expected_behavior": true,
+      "architecturally_resolved": "PENDING_SANDBOX_LEG_PROOF",
+      "sandbox_leg_note": "F02 can only be declared 'resolved architecturally' after the sandbox→sanctioned-host-endpoint path is demonstrated in a real OpenShell sandbox. That requires the Phase 20C MAIW ModelGateway HTTP endpoint."
     },
     {
       "id": "F03",
@@ -250,16 +268,51 @@
     }
   ],
 
+  "real_inference_qualification": {
+    "provider_path": "MAIWModelGatewayChat -> ModelGateway -> NIMProvider -> NIMClient -> localhost:8002 (nvidia/llama-3.1-nemotron-nano-8b-v1)",
+    "branch": "fix/phase-20b-inference-requalification",
+    "test_file": "tests/contract/test_phase_20b_real_inference.py",
+    "tests_total": 16,
+    "tests_passing": 16,
+    "tests_nim_required": 3,
+    "nim_required_note": "3 tests require live NIM at localhost:8002; skipped automatically when NIM not reachable",
+    "sandbox_leg_tested": false,
+    "sandbox_leg_gap": "Real sandbox→host-ModelGateway→NIM path not yet proven; MAIW ModelGateway HTTP endpoint (Phase 20C) does not exist",
+    "qualification_date": "2026-10-03",
+    "key_tests": [
+      "test_step7_real_inference_via_model_gateway: PASS (@nim_required)",
+      "test_step7_chat_adapter_real_inference_via_gateway: PASS (@nim_required)",
+      "test_step7_exactly_one_gateway_call_per_inference: PASS",
+      "test_step7_trace_id_propagated_through_gateway: PASS",
+      "test_step7_no_direct_provider_call_from_agent_code: PASS",
+      "test_step8_sop_a_governance_boundary_with_real_gateway: PASS (@nim_required)",
+      "test_step9_agent_code_cannot_instantiate_nim_client: PASS",
+      "test_step9_model_adapter_only_imports_model_request: PASS",
+      "test_step10_gateway_failure_is_failure_not_mock: PASS",
+      "test_step10_chat_adapter_gateway_failure_is_failure_not_mock: PASS",
+      "test_step11_availability_does_not_override_eligibility: PASS",
+      "test_step12_expired_deadline_raises_before_provider_call: PASS",
+      "test_step13_injected_prompt_does_not_alter_model_request_routing: PASS",
+      "test_step13_credentials_not_injected_into_adapter_response: PASS",
+      "test_step14_sandbox_policy_network_default_deny: PASS",
+      "test_step14_sandbox_policy_write_never_rendered: PASS"
+    ]
+  },
+
   "phase_20c_readiness": {
     "maiw_source_baseline": "READY",
     "nemoclaw_cli": "READY",
     "openshell_gateway": "READY",
     "sandbox_image": "READY",
-    "inference_provider": "NOT_READY",
+    "inference_provider": "PARTIAL",
+    "inference_provider_note": "Host-side NIM (localhost:8002) qualified via MAIW ModelGateway on host. Sandbox→host-ModelGateway HTTP endpoint does not exist yet (Phase 20C prerequisite).",
     "security_boundary_code": "READY",
     "security_boundary_runtime": "PARTIAL",
+    "security_boundary_runtime_note": "Host-side inference chain and policy code verified. Real sandbox→host-endpoint leg not yet proven.",
     "sop_a_sandbox_run": "NOT_READY",
-    "governance_inbox_durability": "DEFERRED"
+    "sop_a_sandbox_note": "test_step8 runs host-side pytest, NOT inside a real OpenShell sandbox. Real sandboxed SOP A run requires Phase 20C MAIW ModelGateway HTTP endpoint.",
+    "governance_inbox_durability": "DEFERRED",
+    "maiw_gateway_http_endpoint": "NOT_READY"
   },
 
   "audit_trail": {
@@ -268,7 +321,11 @@
     "openshell_release": "v0.0.116",
     "model_downloaded": "unsloth/Nemotron-3-Nano-30B-A3B-GGUF (22.8 GB)",
     "container_image": "ghcr.io/nvidia/nemoclaw/llama-cpp-server@sha256:9d0cddd7bcaf98d3b75a7fc8c7ce3af3a9973b5f23a8092e7e93a9afc473a675",
-    "maiw_test_run": "584 passed in 2.23s",
-    "qualification_date": "2026-10-03"
+    "local_nim_container": "wms-nim-nano-8b (nvidia/llama-3.1-nemotron-nano-8b-v1 on port 8002)",
+    "maiw_test_run_baseline": "584 passed in 2.23s",
+    "maiw_test_run_phase20b": "16/16 tests/contract/test_phase_20b_real_inference.py passed",
+    "qualification_date": "2026-10-03",
+    "requalification_date": "2026-10-03",
+    "requalification_branch": "fix/phase-20b-inference-requalification"
   }
 }

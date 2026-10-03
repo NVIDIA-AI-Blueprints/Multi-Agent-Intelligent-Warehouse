@@ -320,12 +320,14 @@ inference:
 > **Gap (Phase 20C):** no HTTP endpoint currently exposes inference — `ModelGateway` is
 > instantiated in-process by `apps/api/maiw_api/bootstrap.py`. The
 > `/api/v1/inference` route above is the designed target, not an existing
-> surface. Phase 20B confirmed the inference routing architecture (NemoClaw
-> OpenShell gateway and MAIW ModelGateway are non-conflicting parallel paths)
-> but standing up the HTTP endpoint is deferred to Phase 20C. Until it exists a
-> sandboxed runtime cannot reach inference end-to-end. The inference provider
-> gap on H100 NVL (sm_90a CUDA incompatibility with NemoClaw's pre-built
-> llama-cpp image) must also be resolved before Phase 20C can run.
+> surface. Phase 20B requalification confirmed the HOST-SIDE inference chain
+> (host pytest → MAIWModelGatewayChat → ModelGateway → NIMProvider → NIMClient →
+> localhost:8002, `nvidia/llama-3.1-nemotron-nano-8b-v1`, H100 NVL sm_90a compatible).
+> F01 resolved via host-side NIM workaround. F02 architecture clarified (SSRF NOT
+> weakened; ModelGateway on HOST). However, the REAL SANDBOX LEG is NOT YET PROVEN:
+> an actual OpenShell sandbox calling a MAIW ModelGateway HTTP endpoint is required
+> for full qualification. This HTTP endpoint is the Phase 20C deliverable that
+> unblocks real sandbox→inference testing.
 
 See [NEMOCLAW_OPENSHELL_INTEGRATION.md](NEMOCLAW_OPENSHELL_INTEGRATION.md).
 
