@@ -208,14 +208,14 @@ async def test_step7_real_inference_via_model_gateway():
 
     # Non-empty, non-mock response
     assert resp.content, "Real NIM returned empty content"
-    assert "[MOCK" not in resp.content, (
-        f"Response looks like a mock string: {resp.content!r}"
-    )
+    assert (
+        "[MOCK" not in resp.content
+    ), f"Response looks like a mock string: {resp.content!r}"
 
     # Real provider ID recorded
-    assert resp.model_id == _LOCAL_NIM_MODEL_ID, (
-        f"Expected model_id={_LOCAL_NIM_MODEL_ID!r}, got {resp.model_id!r}"
-    )
+    assert (
+        resp.model_id == _LOCAL_NIM_MODEL_ID
+    ), f"Expected model_id={_LOCAL_NIM_MODEL_ID!r}, got {resp.model_id!r}"
 
     # Route decision populated
     assert resp.route_decision is not None, "route_decision must be populated"
@@ -271,11 +271,13 @@ async def test_step7_exactly_one_gateway_call_per_inference():
         trace_id="trace-step7-call-count",
     )
 
-    assert len(gateway.calls) == 1, (
-        f"Expected exactly 1 gateway call, got {len(gateway.calls)}"
-    )
+    assert (
+        len(gateway.calls) == 1
+    ), f"Expected exactly 1 gateway call, got {len(gateway.calls)}"
     assert adapter.call_count == 1
-    assert result.get("mock") is not True, "Recording gateway should not return mock flag"
+    assert (
+        result.get("mock") is not True
+    ), "Recording gateway should not return mock flag"
 
 
 @pytest.mark.asyncio
@@ -296,9 +298,9 @@ async def test_step7_trace_id_propagated_through_gateway():
 
     assert len(gateway.calls) == 1
     request = gateway.calls[0]
-    assert isinstance(request, ModelRequest), (
-        f"Gateway must receive ModelRequest, not {type(request).__name__!r}"
-    )
+    assert isinstance(
+        request, ModelRequest
+    ), f"Gateway must receive ModelRequest, not {type(request).__name__!r}"
     assert request.trace_id == "trace-phase20b-step7-propagation", (
         f"trace_id not propagated: expected 'trace-phase20b-step7-propagation', "
         f"got {request.trace_id!r}"
@@ -311,9 +313,7 @@ def test_step7_no_direct_provider_call_from_agent_code():
     import or instantiate NIMClient directly.  The provider layer is owned
     exclusively by ModelGateway.
     """
-    adapter_path = (
-        _REPO / "packages/maiw-agents/maiw_agents/runtime/model_adapter.py"
-    )
+    adapter_path = _REPO / "packages/maiw-agents/maiw_agents/runtime/model_adapter.py"
     assert adapter_path.exists(), f"model_adapter.py not found at {adapter_path}"
 
     source = adapter_path.read_text()
@@ -325,9 +325,9 @@ def test_step7_no_direct_provider_call_from_agent_code():
     )
 
     # ModelRequest MUST be imported (proves canonical call contract)
-    assert "ModelRequest" in source, (
-        "model_adapter.py must construct and pass ModelRequest to the gateway."
-    )
+    assert (
+        "ModelRequest" in source
+    ), "model_adapter.py must construct and pass ModelRequest to the gateway."
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -443,7 +443,11 @@ async def test_step8_sop_a_governance_boundary_with_real_gateway():
             # Populate completion schema fields from canonical context
             completion = step.completion
             output = (
-                {f: _STEP_FACTS[f] for f in completion.schema_fields if f in _STEP_FACTS}
+                {
+                    f: _STEP_FACTS[f]
+                    for f in completion.schema_fields
+                    if f in _STEP_FACTS
+                }
                 if completion is not None and getattr(completion, "schema_fields", None)
                 else {}
             )
@@ -511,9 +515,7 @@ async def test_step8_sop_a_governance_boundary_with_real_gateway():
         },
     )
 
-    engine = SOPEngine(
-        executor=_RealInferenceExecutor(), trace_id=context.trace_id
-    )
+    engine = SOPEngine(executor=_RealInferenceExecutor(), trace_id=context.trace_id)
     paused = await engine.run_procedure(
         definition=definition,
         sop=sop,
@@ -523,21 +525,21 @@ async def test_step8_sop_a_governance_boundary_with_real_gateway():
     )
 
     # The procedure must reach the governance boundary
-    assert paused.status is ProcedureStatus.WAITING_FOR_GOVERNANCE, (
-        f"Expected WAITING_FOR_GOVERNANCE, got {paused.status}"
-    )
+    assert (
+        paused.status is ProcedureStatus.WAITING_FOR_GOVERNANCE
+    ), f"Expected WAITING_FOR_GOVERNANCE, got {paused.status}"
 
     # Real inference happened (gateway was called)
-    assert len(_gateway_calls) > 0, (
-        "No gateway calls were made — expected real inference, not mock"
-    )
+    assert (
+        len(_gateway_calls) > 0
+    ), "No gateway calls were made — expected real inference, not mock"
 
     # No WRITE capabilities were invoked
     for cap_id in capabilities_invoked:
         entry = SKILL_REGISTRY.get(cap_id)
-        assert entry is None or entry.capability_class not in WRITE_CLASSES, (
-            f"WRITE capability {cap_id!r} invoked during sandboxed reasoning"
-        )
+        assert (
+            entry is None or entry.capability_class not in WRITE_CLASSES
+        ), f"WRITE capability {cap_id!r} invoked during sandboxed reasoning"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -560,13 +562,12 @@ def test_step9_agent_code_cannot_instantiate_nim_client():
         # Look for direct imports of provider primitives
         for pattern in ("NIMClient", "NIMProvider", "NIMConfig"):
             if pattern in source:
-                violations.append(
-                    f"{py_file.relative_to(_REPO)}: contains {pattern!r}"
-                )
+                violations.append(f"{py_file.relative_to(_REPO)}: contains {pattern!r}")
 
-    assert not violations, (
-        "Agent code must not reference NIM provider primitives directly:\n"
-        + "\n".join(violations)
+    assert (
+        not violations
+    ), "Agent code must not reference NIM provider primitives directly:\n" + "\n".join(
+        violations
     )
 
 
@@ -580,18 +581,17 @@ def test_step9_model_adapter_only_imports_model_request():
 
     # Any maiw_models imports must not touch the providers sub-package
     from_maiw_models = [
-        line for line in source.splitlines()
+        line
+        for line in source.splitlines()
         if line.strip().startswith("from maiw_models")
     ]
     assert from_maiw_models, "model_adapter.py must import from maiw_models"
 
-    provider_imports = [
-        line for line in from_maiw_models
-        if ".providers" in line
-    ]
-    assert not provider_imports, (
-        "model_adapter.py must not import from maiw_models.providers. "
-        "Found: " + str(provider_imports)
+    provider_imports = [line for line in from_maiw_models if ".providers" in line]
+    assert (
+        not provider_imports
+    ), "model_adapter.py must not import from maiw_models.providers. " "Found: " + str(
+        provider_imports
     )
 
 
@@ -740,6 +740,7 @@ async def test_step12_expired_deadline_raises_before_provider_call():
 
     class _ProbeProvider:
         """Raises if called — the deadline guard must fire first."""
+
         was_called = False
 
         async def call(self, *, model_id, request, capability):
@@ -837,22 +838,22 @@ async def test_step13_injected_prompt_does_not_alter_model_request_routing():
     req: ModelRequest = gateway.calls[0]
 
     # Routing fields must reflect adapter config, NOT injected content
-    assert req.risk_level == RiskLevel.LOW, (
-        f"Injection changed risk_level: got {req.risk_level}"
-    )
-    assert req.reasoning == ReasoningLevel.LOW, (
-        f"Injection changed reasoning: got {req.reasoning}"
-    )
+    assert (
+        req.risk_level == RiskLevel.LOW
+    ), f"Injection changed risk_level: got {req.risk_level}"
+    assert (
+        req.reasoning == ReasoningLevel.LOW
+    ), f"Injection changed reasoning: got {req.reasoning}"
 
     # Injected text must appear in messages (not escape into routing fields)
-    assert any(injection in str(m) for m in req.messages), (
-        "Injected prompt must appear in messages, not be silently dropped"
-    )
+    assert any(
+        injection in str(m) for m in req.messages
+    ), "Injected prompt must appear in messages, not be silently dropped"
 
     # No credential material in task or trace_id
-    assert "API_KEY" not in (req.task or ""), (
-        "Injected credential reference must not appear in task field"
-    )
+    assert "API_KEY" not in (
+        req.task or ""
+    ), "Injected credential reference must not appear in task field"
 
 
 @pytest.mark.asyncio
@@ -862,13 +863,19 @@ async def test_step13_credentials_not_injected_into_adapter_response():
     environment, even when the prompt attempts to extract env vars.
     """
     from maiw_agents.runtime.model_adapter import MAIWTestModelAdapter
-    from maiw_models.models import ModelResponse, ModelRouteDecision, ReasoningLevel, RiskLevel
+    from maiw_models.models import (
+        ModelResponse,
+        ModelRouteDecision,
+        ReasoningLevel,
+        RiskLevel,
+    )
 
     class _EchoTaskGateway:
         async def generate(self, request):
             decision = ModelRouteDecision(
                 selected_model_id=_LOCAL_NIM_MODEL_ID,
-                selected_role="nano", requested_role="nano",
+                selected_role="nano",
+                requested_role="nano",
                 routing_rule="echo_test",
                 routing_reason="echo for injection test",
                 task=request.task,
@@ -892,9 +899,9 @@ async def test_step13_credentials_not_injected_into_adapter_response():
     actual_key = os.environ.get("NVIDIA_API_KEY", "")
     if actual_key and len(actual_key) > 8:
         # Only check if key looks like a real secret (not empty/placeholder)
-        assert actual_key not in response_text, (
-            "Credential value leaked into adapter response"
-        )
+        assert (
+            actual_key not in response_text
+        ), "Credential value leaked into adapter response"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -953,9 +960,9 @@ def test_step14_sandbox_policy_network_default_deny():
     rendered = render_sandbox_policy(policy, config=config)
 
     # Default must be deny
-    assert rendered.network_default == "deny", (
-        f"sandbox network_default must be 'deny', got {rendered.network_default!r}"
-    )
+    assert (
+        rendered.network_default == "deny"
+    ), f"sandbox network_default must be 'deny', got {rendered.network_default!r}"
 
     # Allowed endpoints must be limited to MAIW-approved READ/ANALYTICAL endpoints
     for endpoint in rendered.allowed_network_endpoints:
@@ -1010,13 +1017,16 @@ def test_step14_sandbox_policy_write_never_rendered():
         read_capability_endpoint="http://maiw-api:8000/api/v1/capabilities/read",
     )
     policy = build_capability_policy(
-        definition=definition, sop=sop, agent_task_id="task-step14-write", runtime="test"
+        definition=definition,
+        sop=sop,
+        agent_task_id="task-step14-write",
+        runtime="test",
     )
     rendered = render_sandbox_policy(policy, config=config)
 
-    assert "WRITE" not in rendered.allowed_capability_classes, (
-        "WRITE must never appear in sandbox policy allowed_capability_classes"
-    )
-    assert "EMERGENCY_WRITE" not in rendered.allowed_capability_classes, (
-        "EMERGENCY_WRITE must never appear in sandbox policy allowed_capability_classes"
-    )
+    assert (
+        "WRITE" not in rendered.allowed_capability_classes
+    ), "WRITE must never appear in sandbox policy allowed_capability_classes"
+    assert (
+        "EMERGENCY_WRITE" not in rendered.allowed_capability_classes
+    ), "EMERGENCY_WRITE must never appear in sandbox policy allowed_capability_classes"
