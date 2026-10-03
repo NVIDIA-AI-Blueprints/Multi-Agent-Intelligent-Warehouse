@@ -153,6 +153,7 @@ markers = [
     "scalability: marks tests as scalability tests",
     "endurance: marks tests as endurance tests",
     "sandbox: requires a qualified NemoClaw/OpenShell sandbox host (run with -m sandbox)",
+    "nim_required: requires a live NVIDIA NIM endpoint (skipped when NIM is not reachable)",
 ]
 
 [tool.coverage.run]
