@@ -292,7 +292,7 @@ Three sandbox modes, and the middle one is the point:
 
 **A sandbox authorises nothing.** Every capability check that runs unsandboxed still runs sandboxed, through the same `authorize_step`. The sandbox is a second wall behind the first. If `integrations/nemoclaw/` were deleted, capability enforcement, governance and procedure persistence would be unchanged.
 
-**Qualification status:** NemoClaw and OpenShell are **not installed** on the development host, so the architecture, contracts and policy mapping are implemented and tested (127 contract tests in CORE CI) but **no runtime qualification has been performed**. `OpenShellSandboxProvisioner` probes as unavailable and fails closed rather than pretending; `@pytest.mark.sandbox` tests skip.
+**Qualification status (Phase 20B):** NemoClaw v0.0.124 and OpenShell v0.0.116 are **installed and operational** on epg-tme-smc-h100-02. The security boundary, gateway, sandbox image, and all MAIW security invariants are verified at code and container level. Inference provider qualification is **incomplete** due to H100 NVL CUDA sm_90a incompatibility with the pre-built NemoClaw llama-cpp-server image. Full end-to-end SOP sandbox run is deferred to Phase 20C pending inference provider resolution. See `docs/audits/MAIW_NEMOCLAW_SECURITY_QUALIFICATION.md` for the full qualification report.
 
 See [docs/architecture/NEMOCLAW_OPENSHELL_INTEGRATION.md](docs/architecture/NEMOCLAW_OPENSHELL_INTEGRATION.md).
 

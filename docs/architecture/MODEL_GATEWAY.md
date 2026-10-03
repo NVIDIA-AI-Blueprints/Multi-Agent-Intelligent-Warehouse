@@ -317,11 +317,15 @@ inference:
   use_platform_model_router: false
 ```
 
-> **Gap:** no HTTP endpoint currently exposes inference — `ModelGateway` is
+> **Gap (Phase 20C):** no HTTP endpoint currently exposes inference — `ModelGateway` is
 > instantiated in-process by `apps/api/maiw_api/bootstrap.py`. The
 > `/api/v1/inference` route above is the designed target, not an existing
-> surface, and standing it up is deferred to Phase 20B. Until it exists a
-> sandboxed runtime cannot reach inference at all.
+> surface. Phase 20B confirmed the inference routing architecture (NemoClaw
+> OpenShell gateway and MAIW ModelGateway are non-conflicting parallel paths)
+> but standing up the HTTP endpoint is deferred to Phase 20C. Until it exists a
+> sandboxed runtime cannot reach inference end-to-end. The inference provider
+> gap on H100 NVL (sm_90a CUDA incompatibility with NemoClaw's pre-built
+> llama-cpp image) must also be resolved before Phase 20C can run.
 
 See [NEMOCLAW_OPENSHELL_INTEGRATION.md](NEMOCLAW_OPENSHELL_INTEGRATION.md).
 

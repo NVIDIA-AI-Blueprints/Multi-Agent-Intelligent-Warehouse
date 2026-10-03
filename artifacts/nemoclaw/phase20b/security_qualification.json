@@ -1,0 +1,274 @@
+{
+  "schema_version": "1.0",
+  "phase": "20B",
+  "title": "MAIW NemoClaw/OpenShell Deep Agents Security Qualification",
+  "date": "2026-10-03",
+  "host": "epg-tme-smc-h100-02",
+  "verdict": "INCOMPLETE",
+  "verdict_reason": "H100 NVL sm_90a CUDA kernel incompatibility prevents full sandbox inference qualification. All security invariants and boundary contracts verified at code and container level.",
+
+  "environment": {
+    "os": "Ubuntu 24.04.4 LTS",
+    "kernel": "6.8.0-136-generic",
+    "gpus": "4x NVIDIA H100 NVL (95830 MiB each)",
+    "gpu_compute_capability": "sm_90a",
+    "nvidia_driver": "580.173.02",
+    "cuda": "13.0",
+    "docker": "29.3.0",
+    "nvidia_container_toolkit": "1.19.0",
+    "python": "3.12.3",
+    "nodejs": "24.1.0",
+    "nemoclaw_version": "0.0.124",
+    "openshell_version": "0.0.116"
+  },
+
+  "maiw_baseline": {
+    "git_sha": "3ab9505",
+    "branch": "main",
+    "test_count": 584,
+    "test_result": "PASS",
+    "test_duration_seconds": 2.23,
+    "key_files_verified": [
+      "integrations/nemoclaw/sandbox_policy.py",
+      "integrations/nemoclaw/boundary_contracts.py",
+      "packages/maiw-agents/maiw_agents/contracts/capability_policy.py",
+      "packages/maiw-agents/maiw_agents/contracts/procedure_state.py",
+      "packages/maiw-agents/runtime/model_adapter.py"
+    ]
+  },
+
+  "platform_classification": "SUPPORTED_WITH_LIMITATIONS",
+
+  "preflight_checks": {
+    "result": "PASS",
+    "checks_passed": 11,
+    "checks_total": 11,
+    "details": [
+      "Docker daemon: server 29.3.0",
+      "Docker CDI GPU support detected (/var/run/cdi/nvidia.yaml)",
+      "Docker can start bridge containers",
+      "Docker container DNS resolution works",
+      "Container runtime: docker",
+      "Container runtime resources: 96 vCPU / 503.6 GiB",
+      "openshell CLI: openshell 0.0.116",
+      "Port 8991 available (OpenShell gateway)",
+      "NVIDIA GPU detected (4x NVIDIA H100 NVL, 383320 MB)",
+      "Sandbox GPU: enabled (auto)",
+      "Memory OK: 515644 MB RAM + 8191 MB swap"
+    ]
+  },
+
+  "installation": {
+    "nemoclaw_cli": {
+      "installed": true,
+      "path": "~/.local/bin/nemoclaw",
+      "version": "0.0.124"
+    },
+    "nemo_deepagents_cli": {
+      "installed": true,
+      "path": "~/.local/bin/nemo-deepagents",
+      "version": "0.0.124"
+    },
+    "openshell_cli": {
+      "installed": true,
+      "path": "~/.local/bin/openshell",
+      "version": "0.0.116"
+    },
+    "openshell_gateway": {
+      "installed": true,
+      "path": "~/.local/bin/openshell-gateway",
+      "version": "0.0.116"
+    },
+    "openshell_sandbox": {
+      "installed": true,
+      "path": "~/.local/bin/openshell-sandbox",
+      "version": "0.0.116"
+    },
+    "gateway_port": 8991,
+    "gateway_service": "~/.config/systemd/user/nemoclaw-openshell-gateway.service",
+    "checksums_verified": true
+  },
+
+  "inference_providers": {
+    "llama_cpp": {
+      "status": "FAILED",
+      "failure_reason": "CUDA sm_90a kernel not in pre-built image",
+      "error": "CUDA error: no kernel image is available for execution on the device",
+      "container_image": "ghcr.io/nvidia/nemoclaw/llama-cpp-server@sha256:9d0cddd7bcaf98d3b75a7fc8c7ce3af3a9973b5f23a8092e7e93a9afc473a675",
+      "model": "unsloth/Nemotron-3-Nano-30B-A3B-GGUF"
+    },
+    "openai_provider": {
+      "status": "BLOCKED",
+      "failure_reason": "SSRF protection blocks localhost/private IP endpoints",
+      "expected_behavior": true
+    },
+    "ngc_api": {
+      "status": "BLOCKED",
+      "failure_reason": "NGC API key not configured on host"
+    }
+  },
+
+  "security_invariants": {
+    "write_authority_absent": {
+      "result": "VERIFIED",
+      "evidence": "RenderedSandboxPolicy._write_is_never_rendered Pydantic validator; ALWAYS_DENIED_CAPABILITY_CLASSES = frozenset({'WRITE', 'EMERGENCY_WRITE'})"
+    },
+    "credential_custody_host_only": {
+      "result": "VERIFIED",
+      "evidence": "credential_custody: Literal['host_only'] = 'host_only'; injected_credentials always empty, validator rejects non-empty"
+    },
+    "network_default_deny": {
+      "result": "VERIFIED",
+      "evidence": "network_default: Literal['deny'] = 'deny' in RenderedSandboxPolicy"
+    },
+    "write_shaped_urls_rejected": {
+      "result": "VERIFIED",
+      "evidence": "SandboxNetworkEndpoint._not_write_shaped validator blocks tokens: write, execute, approve, proposal, mutate, commit"
+    },
+    "embedded_credential_urls_rejected": {
+      "result": "VERIFIED",
+      "evidence": "SandboxNetworkEndpoint._not_write_shaped validator blocks '@' in endpoint URL"
+    },
+    "filesystem_scoped_to_workspace": {
+      "result": "VERIFIED",
+      "evidence": "RenderedSandboxPolicy._paths_are_disjoint_and_scoped validator requires /workspace/ prefix"
+    },
+    "monotonic_rendering": {
+      "result": "VERIFIED",
+      "evidence": "assert_not_broadened() called on every render_sandbox_policy() call"
+    },
+    "deterministic_output": {
+      "result": "VERIFIED",
+      "evidence": "render_policy_yaml() hand-orders keys, sorts all collections, emits no timestamps or UUIDs"
+    }
+  },
+
+  "boundary_contract_invariants": {
+    "procedure_execution_id_binding": {
+      "result": "VERIFIED",
+      "evidence": "validate_sandbox_output checks against host-held ProcedureExecutionState"
+    },
+    "agent_task_id_binding": {
+      "result": "VERIFIED",
+      "evidence": "validate_sandbox_output checks agent_task_id against host-held state"
+    },
+    "stale_revision_rejected": {
+      "result": "VERIFIED",
+      "evidence": "procedure_state_revision must match host revision exactly"
+    },
+    "terminal_procedure_final": {
+      "result": "VERIFIED",
+      "evidence": "validate_sandbox_output calls procedure_state.is_terminal() and raises on match"
+    },
+    "governance_duplicate_detection": {
+      "result": "VERIFIED",
+      "evidence": "GovernanceInbox.accept() idempotency set rejects duplicate outcomes"
+    },
+    "governance_revision_binding": {
+      "result": "VERIFIED",
+      "evidence": "expected_procedure_revision must match host revision in validate_governance_input"
+    },
+    "wrong_procedure_rejected": {
+      "result": "VERIFIED",
+      "evidence": "validate_governance_input checks ProcedureStatus.WAITING_FOR_GOVERNANCE"
+    }
+  },
+
+  "container_security": {
+    "container": "nemoclaw-llama-cpp (ghcr.io/nvidia/nemoclaw/llama-cpp-server)",
+    "readonly_rootfs": true,
+    "cap_drop": ["ALL"],
+    "security_opt": ["no-new-privileges=true"],
+    "user": "1000:1000",
+    "network_mode": "nemoclaw-llama-cpp-internal",
+    "network_internal": true,
+    "model_mount_readonly": true,
+    "api_key_secret_mounted": true
+  },
+
+  "inference_routing_audit": {
+    "result": "NO_CONFLICT",
+    "nemoclaw_path": "Sandbox -> OpenShell gateway (port 8991) -> Provider (SSRF-validated)",
+    "maiw_path": "DeepAgentsRuntime -> MAIWModelGatewayChat._generate() -> MAIW ModelGateway -> Provider",
+    "paths_independent": true,
+    "deployment_constraint": "MAIW ModelGateway endpoint must be network-addressable (non-localhost) URL to pass OpenShell SSRF validation"
+  },
+
+  "maiw_authority_invariants": {
+    "action_executor_not_in_sandbox": true,
+    "decision_engine_not_in_sandbox": true,
+    "mcp_write_not_in_sandbox": true,
+    "warehouse_credentials_not_in_sandbox": true,
+    "nemo_relay_not_added": true,
+    "inference_routing_no_conflict": true
+  },
+
+  "failures": [
+    {
+      "id": "F01",
+      "severity": "P1",
+      "category": "Platform",
+      "title": "llama-cpp CUDA kernel incompatibility with H100 NVL",
+      "symptom": "CUDA error: no kernel image is available for execution on the device",
+      "root_cause": "ghcr.io/nvidia/nemoclaw/llama-cpp-server image compiled for sm_80/86, not sm_90a",
+      "maiw_impact": "None — inference provider only, MAIW security boundary unaffected",
+      "resolution": "Await NemoClaw llama-cpp-server image rebuild for sm_90a, or use external OpenAI-compatible provider",
+      "fixed": false
+    },
+    {
+      "id": "F02",
+      "severity": "P1",
+      "category": "Expected_Behavior",
+      "title": "OpenAI SSRF protection blocks local NIM endpoints",
+      "symptom": "HTTP 401 for both Responses API and Chat Completions API via localhost/private IPs",
+      "root_cause": "NemoClaw SSRF protection correctly blocks private/internal IP addresses",
+      "maiw_impact": "Cannot use local NIM during qualification without external provider",
+      "resolution": "Use externally addressable NIM URL or NVIDIA Build API endpoint",
+      "fixed": false
+    },
+    {
+      "id": "F03",
+      "severity": "P2",
+      "category": "Fixed",
+      "title": "HF cache group-writable permission",
+      "symptom": "The shared Hugging Face cache is not current-user filesystem authority",
+      "root_cause": "~/.cache/huggingface/ had mode 0775 (group-writable)",
+      "maiw_impact": "None — installation-time check",
+      "resolution": "chmod 755 ~/.cache/huggingface/",
+      "fixed": true
+    },
+    {
+      "id": "F04",
+      "severity": "P2",
+      "category": "Environment",
+      "title": "NGC API key invalid",
+      "symptom": "ngc config current shows Invalid apikey",
+      "root_cause": "NGC credentials not configured on this host",
+      "maiw_impact": "Cannot use NVIDIA Build API for inference",
+      "resolution": "Configure NGC API key from build.nvidia.com",
+      "fixed": false
+    }
+  ],
+
+  "phase_20c_readiness": {
+    "maiw_source_baseline": "READY",
+    "nemoclaw_cli": "READY",
+    "openshell_gateway": "READY",
+    "sandbox_image": "READY",
+    "inference_provider": "NOT_READY",
+    "security_boundary_code": "READY",
+    "security_boundary_runtime": "PARTIAL",
+    "sop_a_sandbox_run": "NOT_READY",
+    "governance_inbox_durability": "DEFERRED"
+  },
+
+  "audit_trail": {
+    "nemoclaw_installer_url": "https://raw.githubusercontent.com/NVIDIA/NemoClaw/refs/heads/main/install.sh",
+    "nemoclaw_source_commit": "6f3cced4230ae9660c049cc11804daf37797c595",
+    "openshell_release": "v0.0.116",
+    "model_downloaded": "unsloth/Nemotron-3-Nano-30B-A3B-GGUF (22.8 GB)",
+    "container_image": "ghcr.io/nvidia/nemoclaw/llama-cpp-server@sha256:9d0cddd7bcaf98d3b75a7fc8c7ce3af3a9973b5f23a8092e7e93a9afc473a675",
+    "maiw_test_run": "584 passed in 2.23s",
+    "qualification_date": "2026-10-03"
+  }
+}

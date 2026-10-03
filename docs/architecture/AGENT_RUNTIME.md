@@ -204,7 +204,7 @@ below.
 
 ---
 
-## Sandbox Execution Context (Phase 20A)
+## Sandbox Execution Context (Phase 20A contracts, Phase 20B security boundary qualified)
 
 Either runtime can run inside a sandbox boundary. The boundary is a decorator,
 not a port:
