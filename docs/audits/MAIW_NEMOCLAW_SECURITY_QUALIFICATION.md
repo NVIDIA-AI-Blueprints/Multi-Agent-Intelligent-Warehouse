@@ -6,7 +6,7 @@
 **Baseline:** nvidia/main @ 3ab9505  
 **NemoClaw version:** v0.0.124  
 **OpenShell version:** v0.0.116  
-**Qualification verdict:** QUALIFIED
+**Qualification verdict:** HOST_SIDE_INFERENCE_QUALIFIED (real sandbox leg INCOMPLETE)
 
 ---
 
@@ -30,7 +30,9 @@ MAIW was qualified against a real NVIDIA NemoClaw/OpenShell Deep Agents environm
 - OpenShell SSRF blocks sandbox→localhost/private IPs: **EXPECTED BEHAVIOR, NOT A BUG** — MAIW ModelGateway runs on HOST; host→localhost:8002 is not subject to sandbox SSRF policy
 - NGC API key: invalid on this host — remains unresolved, not needed for local NIM path
 
-**Phase 20B requalification:** COMPLETE — 16/16 contract tests pass (`tests/contract/test_phase_20b_real_inference.py`). Real inference chain verified: `MAIWModelGatewayChat → ModelGateway → NIMProvider → NIMClient → localhost:8002`. SSRF protection NOT weakened. ModelGateway NOT bypassed.
+**Phase 20B requalification:** HOST-SIDE INFERENCE QUALIFIED — 16/16 contract tests pass (`tests/contract/test_phase_20b_real_inference.py`). Host-side inference chain verified: `MAIWModelGatewayChat → ModelGateway → NIMProvider → NIMClient → localhost:8002`. SSRF NOT weakened. ModelGateway NOT bypassed.
+
+**REAL SANDBOX LEG: INCOMPLETE** — The real OpenShell sandbox→sanctioned-host-ModelGateway-endpoint→NIM path is NOT yet proven. The MAIW ModelGateway HTTP endpoint does not exist (Phase 20C prerequisite). All Phase 20B tests run on the host, not inside a real OpenShell sandbox.
 
 ---
 
@@ -215,13 +217,13 @@ These paths are completely independent:
 - **Resolution (applied):** Two H100-compatible NIM containers were already running on the host (`wms-nim-nano-8b` on port 8002, `wms-nim-teacher-49b` on port 8010). Selected `nvidia/llama-3.1-nemotron-nano-8b-v1` via MAIW ModelGateway running on the host. NemoClaw llama-cpp-server image path is not used for MAIW inference.
 - **Status:** FIXED (workaround)
 
-### F02: OpenShell SSRF blocks sandbox→localhost/private NIMs (P1 — RESOLVED: expected behavior, architecture clarified)
+### F02: OpenShell SSRF blocks sandbox→localhost/private NIMs (P1 — EXPECTED BEHAVIOR, SANDBOX LEG NOT YET PROVEN)
 
 - **Symptom:** OpenShell SSRF validation rejects sandbox outbound calls to localhost/private IPs
-- **Root cause:** NemoClaw correctly prevents SSRF from sandbox — documented behavior
-- **MAIW impact:** None — **MAIW ModelGateway runs on HOST**, not inside the OpenShell sandbox. Host→localhost:8002 calls are not subject to OpenShell SSRF policy. SSRF protection is NOT weakened. ModelGateway is NOT bypassed.
-- **Resolution:** Architecture clarified; no code change needed. The inference path is: `[sandbox] → [host MAIW ModelGateway] → [host NIM at localhost:8002]`. The sandbox→ModelGateway URL must be a non-localhost address (deployment constraint documented in `Inference Routing Conflict Audit` section above).
-- **Status:** FIXED (architecture clarification only; no code change)
+- **Root cause:** NemoClaw correctly prevents SSRF from sandbox — documented behavior. SSRF is NOT weakened.
+- **Architecture clarification:** MAIW ModelGateway runs on HOST. When Phase 20C delivers a MAIW ModelGateway HTTP endpoint, the sandbox will call that URL (network-addressable, passes SSRF). The host-side ModelGateway then calls localhost:8002. The sandbox never calls localhost directly.
+- **Status:** ARCHITECTURE CLARIFIED — NOT YET SANDBOX-VERIFIED. F02 can only be declared resolved after the sandbox→sanctioned-host-endpoint path is demonstrated in a real OpenShell sandbox (requires Phase 20C MAIW ModelGateway HTTP endpoint).
+- **What is proven:** Host-side inference chain (host pytest → host ModelGateway → localhost:8002) works. What is NOT proven: actual OpenShell sandbox calling the MAIW ModelGateway endpoint.
 
 ### F03: HF cache group-writable permission (P2 — Fixed)
 
@@ -283,13 +285,14 @@ The following MAIW design principles are proven intact through this qualificatio
 | NemoClaw CLI installed | READY | — |
 | OpenShell gateway | READY | — |
 | Sandbox image | READY | — |
-| Inference provider | READY | — (host-side local NIM via ModelGateway) |
+| Inference provider | PARTIAL | Host-side NIM qualified; no sandbox→host-ModelGateway HTTP endpoint yet |
 | Security boundary code | READY | — |
-| Security boundary runtime | READY | — (16/16 tests pass) |
-| SOP A real sandbox run | READY | — (test_step8 passes with real inference) |
+| Security boundary runtime | PARTIAL | Host-side proven; real sandbox leg requires Phase 20C ModelGateway HTTP endpoint |
+| SOP A real sandbox run | NOT READY | test_step8 is host-side pytest; real sandboxed run requires Phase 20C |
 | GovernanceInbox durability | DEFERRED | In-memory only (documented) |
+| MAIW ModelGateway HTTP endpoint | NOT READY | Phase 20C blocker — required for sandbox→host inference |
 
-**Phase 20C:** All inference and security qualification prerequisites met. GovernanceInbox durability remains the only deferred item (documented, in-memory only).
+**Phase 20B status:** Host-side inference chain qualified. Real sandbox leg requires a MAIW ModelGateway HTTP endpoint (Phase 20C). Phase 20C cannot proceed until that endpoint exists and the sandbox→endpoint→NIM topology is demonstrated.
 
 ---
 

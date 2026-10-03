@@ -1,9 +1,9 @@
 # MAIW ↔ NemoClaw / OpenShell Integration
 
 **Version:** MAIW v2 — Phase 20B (requalified)
-**Status:** QUALIFIED — security boundary + real inference end-to-end (16/16 Phase 20B contract tests pass)
+**Status:** HOST_SIDE_INFERENCE_QUALIFIED — security boundary code + host-side inference chain verified; real sandbox leg INCOMPLETE (requires Phase 20C MAIW ModelGateway HTTP endpoint)
 **Code:** [`integrations/nemoclaw/`](../../integrations/nemoclaw/)
-**Tests:** `tests/contract/test_sandbox_*.py` (127 tests, in CORE CI) + `tests/contract/test_phase_20b_real_inference.py` (16 tests)
+**Tests:** `tests/contract/test_sandbox_*.py` (127 tests, in CORE CI) + `tests/contract/test_phase_20b_real_inference.py` (16 tests, host-side)
 
 ---
 
@@ -417,29 +417,40 @@ Platform audit performed on Phase 20B host (2026-10-03):
 `wms-nim-teacher-49b` on port 8010) were already running on the host. Selected
 `nvidia/llama-3.1-nemotron-nano-8b-v1` via MAIW ModelGateway running on the host.
 
-**F02 resolved (architecture clarification):** OpenShell SSRF blocks sandbox→private IPs
-(expected behavior). MAIW ModelGateway runs on HOST, not inside the sandbox. Host-side
-calls to `localhost:8002` are not subject to OpenShell SSRF. SSRF is NOT weakened.
-ModelGateway is NOT bypassed.
+**F02 — architecture clarification (sandbox leg NOT YET PROVEN):** OpenShell SSRF blocks
+sandbox→private IPs (expected behavior, SSRF NOT weakened). MAIW ModelGateway runs on HOST.
+When Phase 20C delivers an HTTP endpoint for ModelGateway, the sandbox will call that URL
+(passes SSRF); host-side ModelGateway then calls localhost:8002. The sandbox→host-endpoint
+path has NOT been demonstrated in a real OpenShell sandbox.
 
-**Real inference chain qualified:**
+**Host-side inference chain qualified (ALL TESTS RUN ON HOST, NOT IN REAL SANDBOX):**
 ```
-MAIWModelGatewayChat → ModelGateway → NIMProvider → NIMClient → localhost:8002
-                                                                 (nvidia/llama-3.1-nemotron-nano-8b-v1)
+host pytest → MAIWModelGatewayChat → ModelGateway → NIMProvider → NIMClient → localhost:8002
+                                                                              (nvidia/llama-3.1-nemotron-nano-8b-v1)
 ```
 
-- ✅ Real inference via `ModelGateway` (`test_step7_real_inference_via_model_gateway`)
-- ✅ Real inference via `MAIWModelGatewayChat` (`test_step7_chat_adapter_real_inference_via_gateway`)
+**Real sandbox leg NOT YET PROVEN** — requires Phase 20C MAIW ModelGateway HTTP endpoint:
+```
+real OpenShell sandbox → [SSRF] → sanctioned MAIW ModelGateway HTTP endpoint
+                                  ════ OPENSHELL BOUNDARY ════
+                                  host ModelGateway → NIMProvider → localhost:8002
+```
+
+- ✅ Host-side real inference via `ModelGateway` (`test_step7_real_inference_via_model_gateway`, @nim_required)
+- ✅ Host-side real inference via `MAIWModelGatewayChat` (`test_step7_chat_adapter_real_inference_via_gateway`, @nim_required)
 - ✅ Exactly one gateway call per inference (`test_step7_exactly_one_gateway_call_per_inference`)
 - ✅ Trace ID propagated through gateway (`test_step7_trace_id_propagated_through_gateway`)
 - ✅ No direct provider calls from agent code (`test_step7_no_direct_provider_call_from_agent_code`)
-- ✅ SOP A governance boundary with real inference (`test_step8_sop_a_governance_boundary_with_real_gateway`)
+- ✅ HOST-SIDE SOP A governance boundary with real inference (`test_step8_sop_a_governance_boundary_with_real_gateway`, @nim_required) — NOTE: runs on host pytest, not inside real OpenShell sandbox
 - ✅ Agent code cannot instantiate NIMClient (`test_step9_agent_code_cannot_instantiate_nim_client`)
 - ✅ Gateway failure is failure, not mock (`test_step10_gateway_failure_is_failure_not_mock`)
 - ✅ Expired deadline raises before provider call (`test_step12_expired_deadline_raises_before_provider_call`)
 - ✅ Credentials not injected into adapter response (`test_step13_credentials_not_injected_into_adapter_response`)
-- ✅ Sandbox policy network default deny (`test_step14_sandbox_policy_network_default_deny`)
-- ✅ Write authority never rendered in policy (`test_step14_sandbox_policy_write_never_rendered`)
+- ✅ Sandbox policy network default deny (code invariant, `test_step14_sandbox_policy_network_default_deny`)
+- ✅ Write authority never rendered in policy (code invariant, `test_step14_sandbox_policy_write_never_rendered`)
+- ❌ Real OpenShell sandbox making inference request — NOT TESTED (requires Phase 20C)
+- ❌ Sandbox→sanctioned-host-endpoint path — NOT TESTED (requires Phase 20C)
+- ❌ localhost:8002 unreachable FROM sandbox — not demonstrated (SSRF expectation documented but not runtime-verified in this PR)
 
 ---
 
