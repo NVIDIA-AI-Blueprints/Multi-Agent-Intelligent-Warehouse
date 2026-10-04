@@ -49,10 +49,10 @@ from .graders import GraderResult
 # ── Configuration ─────────────────────────────────────────────────────────────
 
 MATERIAL_LATENCY_ADVANTAGE_THRESHOLD = 0.20  # 20% median improvement required (§13)
-QUALIFICATION_ACCEPTANCE_RATE = 0.90         # 90% of N runs must pass all critical (§12)
-DEFAULT_N_REPS = 5                           # measured repetitions per case (§8)
-DEFAULT_WARMUP_REPS = 1                      # warm-up calls excluded from stats (§8)
-DISPLAY_PREVIEW_CHARS = 300                  # max chars for display_preview (§4)
+QUALIFICATION_ACCEPTANCE_RATE = 0.90  # 90% of N runs must pass all critical (§12)
+DEFAULT_N_REPS = 5  # measured repetitions per case (§8)
+DEFAULT_WARMUP_REPS = 1  # warm-up calls excluded from stats (§8)
+DISPLAY_PREVIEW_CHARS = 300  # max chars for display_preview (§4)
 
 
 @dataclass
@@ -221,7 +221,7 @@ class CaseComparisonRow:
 
     case_id: str
     policy_eligibility: str
-    nano_accept: int | None       # None when Nano not available
+    nano_accept: int | None  # None when Nano not available
     nano_n: int | None
     super_accept: int | None
     super_n: int | None
@@ -229,7 +229,9 @@ class CaseComparisonRow:
     super_median_ms: float | None
     nano_critical_fails: int | None
     super_critical_fails: int | None
-    classification: str  # NANO QUALIFIED | SUPER REQUIRED | NO MATERIAL DIFFERENCE | INCONCLUSIVE
+    classification: (
+        str  # NANO QUALIFIED | SUPER REQUIRED | NO MATERIAL DIFFERENCE | INCONCLUSIVE
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -287,7 +289,9 @@ def compute_qualification_run(
     latencies = [s.total_latency_ms for s in measured]
     lat_median = statistics.median(latencies) if latencies else 0.0
     lat_p90 = (
-        sorted(latencies)[int(len(latencies) * 0.9)] if len(latencies) >= 2 else (latencies[0] if latencies else 0.0)
+        sorted(latencies)[int(len(latencies) * 0.9)]
+        if len(latencies) >= 2
+        else (latencies[0] if latencies else 0.0)
     )
     lat_min = min(latencies) if latencies else 0.0
     lat_max = max(latencies) if latencies else 0.0

@@ -118,11 +118,31 @@ LEGACY_ULTRA_LLAMA31 = "nvidia/llama-3.1-nemotron-ultra-253b-v1"
 LEGACY_NANO_VL = "nvidia/llama-nemotron-nano-vl-8b-v1"
 LEGACY_EMBED_VL_1B_V2 = "nvidia/llama-nemotron-embed-vl-1b-v2"
 
+# ── Phase 20B transport smoke-test model ───────────────────────────────────────
+# Phase 20B (PR #133) used this model to qualify the HOST-SIDE inference
+# transport chain (MAIWModelGatewayChat → ModelGateway → NIMProvider → NIMClient).
+# It proved: NIM provider path works, real ModelResponse returned, failure handling
+# correct, deadline propagation correct, prompt injection cannot alter routing.
+#
+# CLASSIFICATION: TRANSPORT_SMOKE_TEST_MODEL
+# This is a Llama-family model (nvidia/llama-3.1-nemotron-nano-8b-v1) and is
+# NOT an approved MAIW v2 qualification model.  MAIW v2 production and
+# qualification profiles permit ONLY Nemotron 3 and Nemotron 3.5 models.
+# Llama-family Nemotron variants MUST NOT be used as production or
+# qualification evidence for MAIW v2 model-family compliance.
+#
+# Evidence from PR #133 is retained for audit history only.
+TRANSPORT_SMOKE_TEST_MODEL = "nvidia/llama-3.1-nemotron-nano-8b-v1"
+"""
+Phase 20B transport smoke-test only.  NOT approved for MAIW v2 production or
+qualification.  Family: Llama-family Nemotron (not Nemotron 3 / Nemotron 3.5).
+"""
+
 # ── Enabled defaults ───────────────────────────────────────────────────────────
 
 _ENABLED_DEFAULTS: dict[str, bool] = {
     _LIGHTNING_ENABLED_ENV: True,  # validated DEPLOYED; fast path now available
-    _NANO_ENABLED_ENV: True,   # validated DEPLOYED 2026-08-20; enabled by default (same tier as Lightning/Super)
+    _NANO_ENABLED_ENV: True,  # validated DEPLOYED 2026-08-20; enabled by default (same tier as Lightning/Super)
     _SUPER_ENABLED_ENV: True,  # validated DEPLOYED; primary deployment
     _ULTRA_ENABLED_ENV: False,  # validated DEPLOYED but ~31s latency; operator opt-in
     _NANO_OMNI_ENABLED_ENV: False,  # NOT_CURRENTLY_DEPLOYED; requires operator model config
@@ -259,7 +279,12 @@ class ModelRegistry:
                 model_id=nano_omni_model,
                 role="nano-omni",
                 family="nemotron",
-                generation="unknown",
+                # Nano Omni is designed as a Nemotron 3 multimodal model.  No verified
+                # model ID exists yet on NVIDIA NIM (as of 2026-08-20), but the role is
+                # architectural Nemotron 3 — set generation accordingly so PolicyFilter
+                # treats it as an approved-family candidate.  The enabled=False default
+                # prevents it from being actually selected until a model ID is configured.
+                generation="nemotron-3",
                 provider="nvidia-nim",
                 # No verified Nemotron-3 Nano Omni model ID found on NIM as of 2026-08-20.
                 deployment_status=DeploymentStatus.NOT_CURRENTLY_DEPLOYED,

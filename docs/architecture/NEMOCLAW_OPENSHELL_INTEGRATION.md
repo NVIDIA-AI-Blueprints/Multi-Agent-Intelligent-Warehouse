@@ -1,9 +1,9 @@
 # MAIW ↔ NemoClaw / OpenShell Integration
 
-**Version:** MAIW v2 — Phase 20B (requalified)
-**Status:** HOST_SIDE_INFERENCE_QUALIFIED — security boundary code + host-side inference chain verified; real sandbox leg INCOMPLETE (requires Phase 20C MAIW ModelGateway HTTP endpoint)
+**Version:** MAIW v2 — Phase 20C-A (approved Nemotron + HTTP boundary)
+**Status:** APPROVED_NEMOTRON_HTTP_BOUNDARY_COMPLETE — PolicyFilter enforces Nemotron 3/3.5 family; POST /api/v1/inference live; sandbox HTTP client built; real sandbox leg qualification PENDING (requires live NemoClaw sandbox to run @real_sandbox tests)
 **Code:** [`integrations/nemoclaw/`](../../integrations/nemoclaw/)
-**Tests:** `tests/contract/test_sandbox_*.py` (127 tests, in CORE CI) + `tests/contract/test_phase_20b_real_inference.py` (16 tests, host-side)
+**Tests:** `tests/contract/test_sandbox_*.py` (127 tests, in CORE CI) + `tests/contract/test_phase_20b_real_inference.py` (16 tests, host-side) + `tests/contract/test_phase_20c_approved_nemotron.py` (54 tests, Phase 20C-A contract)
 
 ---
 
@@ -429,42 +429,55 @@ host pytest → MAIWModelGatewayChat → ModelGateway → NIMProvider → NIMCli
                                                                               (nvidia/llama-3.1-nemotron-nano-8b-v1)
 ```
 
-**Real sandbox leg NOT YET PROVEN** — requires Phase 20C MAIW ModelGateway HTTP endpoint:
+**Phase 20C-A HTTP boundary is IMPLEMENTED** — `POST /api/v1/inference` is live:
 ```
-real OpenShell sandbox → [SSRF] → sanctioned MAIW ModelGateway HTTP endpoint
+real OpenShell sandbox → [SSRF] → POST http://maiw-api:8000/api/v1/inference
                                   ════ OPENSHELL BOUNDARY ════
-                                  host ModelGateway → NIMProvider → localhost:8002
+                                  host ModelGateway → PolicyFilter (Nemotron 3/3.5 only)
+                                  → ModelRouter → NIMProvider → approved Nemotron provider
 ```
+
+Sandbox-side: `MAIWHTTPModelGatewayClient` in `integrations/nemoclaw/http_model_gateway_client.py`
+
+**APPROVED MODEL FAMILY:** Only Nemotron 3 and Nemotron 3.5 may serve production/qualification
+inference. `nvidia/llama-3.1-nemotron-nano-8b-v1` (Phase 20B transport smoke test) is NOT
+approved — it proved transport mechanics only (TRANSPORT_SMOKE_TEST_ONLY label in qualification docs).
 
 - ✅ Host-side real inference via `ModelGateway` (`test_step7_real_inference_via_model_gateway`, @nim_required)
 - ✅ Host-side real inference via `MAIWModelGatewayChat` (`test_step7_chat_adapter_real_inference_via_gateway`, @nim_required)
 - ✅ Exactly one gateway call per inference (`test_step7_exactly_one_gateway_call_per_inference`)
 - ✅ Trace ID propagated through gateway (`test_step7_trace_id_propagated_through_gateway`)
 - ✅ No direct provider calls from agent code (`test_step7_no_direct_provider_call_from_agent_code`)
-- ✅ HOST-SIDE SOP A governance boundary with real inference (`test_step8_sop_a_governance_boundary_with_real_gateway`, @nim_required) — NOTE: runs on host pytest, not inside real OpenShell sandbox
+- ✅ HOST-SIDE SOP A governance boundary with real inference (`test_step8_sop_a_governance_boundary_with_real_gateway`, @nim_required)
 - ✅ Agent code cannot instantiate NIMClient (`test_step9_agent_code_cannot_instantiate_nim_client`)
 - ✅ Gateway failure is failure, not mock (`test_step10_gateway_failure_is_failure_not_mock`)
 - ✅ Expired deadline raises before provider call (`test_step12_expired_deadline_raises_before_provider_call`)
 - ✅ Credentials not injected into adapter response (`test_step13_credentials_not_injected_into_adapter_response`)
 - ✅ Sandbox policy network default deny (code invariant, `test_step14_sandbox_policy_network_default_deny`)
 - ✅ Write authority never rendered in policy (code invariant, `test_step14_sandbox_policy_write_never_rendered`)
-- ❌ Real OpenShell sandbox making inference request — NOT TESTED (requires Phase 20C)
-- ❌ Sandbox→sanctioned-host-endpoint path — NOT TESTED (requires Phase 20C)
-- ❌ localhost:8002 unreachable FROM sandbox — not demonstrated (SSRF expectation documented but not runtime-verified in this PR)
+- ✅ HTTP inference API contract (54 tests, `tests/contract/test_phase_20c_approved_nemotron.py`)
+- ✅ Approved Nemotron family enforced by PolicyFilter (Nemotron 3/3.5 only; Llama-family rejected)
+- ✅ Forbidden fields (provider_url, api_key, force_model_id, deployment_mode) rejected at HTTP layer
+- ✅ Sandbox HTTP client never falls back to local gateway or direct NIM
+- ❌ Real OpenShell sandbox making real inference call — PENDING @real_sandbox tests on qualified host
+- ❌ Approved Nemotron 3/3.5 real response from real sandbox — PENDING real NIM deployment
+- ❌ localhost:8002 unreachable FROM real sandbox — SSRF documented, not runtime-verified in this PR
 
 ---
 
 ## Deferred work
 
-| Item | Phase | Blocks |
+| Item | Phase | Status |
 |---|---|---|
-| Host-side `/api/v1/inference` endpoint fronting `ModelGateway` | 20C | sandboxed inference E2E |
+| ~~Host-side `/api/v1/inference` endpoint fronting `ModelGateway`~~ | 20C-A | **DONE** — `src/api/routers/inference.py` |
+| ~~Approved Nemotron 3/3.5 model family policy enforcement~~ | 20C-A | **DONE** — `PolicyFilter.APPROVED_MODEL_GENERATIONS` |
+| ~~Sandbox HTTP transport client~~ | 20C-A | **DONE** — `integrations/nemoclaw/http_model_gateway_client.py` |
+| Real OpenShell sandbox inference call with approved Nemotron | 20C-B | @real_sandbox qualification required |
 | Host-side `/api/v1/capabilities/read` endpoint | 20C | sandboxed reads E2E |
 | `OpenShellSandboxProvisioner.apply_policy` against real pinned version | 20C | real policy enforcement |
 | Reconcile `maiw.nemoclaw/v1alpha1` manifest against the real NemoClaw schema | 20C | `status: QUALIFIED` |
 | Agent image build + pin (`image_reference`) | 20C | packaging |
 | `GovernanceInbox` backed by the procedure store (currently per-process) | 20C | multi-process hosts |
-| Host-side `/api/v1/inference` HTTP endpoint fronting `ModelGateway` (for sandbox→gateway calls) | 20C | sandboxed inference via HTTP |
 | Full end-to-end Proof SOP A across real sandbox boundary | 20C | runtime denial, restart |
 | NeMo Relay | — | explicitly out of scope |
 | UX-1G | — | explicitly out of scope |
@@ -480,12 +493,15 @@ real OpenShell sandbox → [SSRF] → sanctioned MAIW ModelGateway HTTP endpoint
 | `integrations/nemoclaw/boundary_contracts.py` | the two boundary messages, host-side validators, `GovernanceInbox` |
 | `integrations/nemoclaw/sandbox_adapter.py` | `SandboxedAgentRuntime`, provisioners, `container_run_args` |
 | `integrations/nemoclaw/manifest.py` | `render_agent_manifest` |
+| `integrations/nemoclaw/http_model_gateway_client.py` | **Phase 20C-A** — thin sandbox→host inference HTTP transport |
 | `integrations/nemoclaw/agent_manifest.yaml` | generated draft, `CONFIGURATION_PENDING` |
+| `src/api/routers/inference.py` | **Phase 20C-A** — bounded `POST /api/v1/inference` HTTP endpoint |
 | `tests/contract/test_sandbox_policy_render.py` | write isolation, monotonicity, determinism, golden |
 | `tests/contract/test_sandbox_boundary_contracts.py` | egress/ingress validation, idempotency |
 | `tests/contract/test_sandbox_fail_closed.py` | fail-closed, prompt injection, static payload audit |
 | `tests/contract/test_sandbox_proof_sop_a.py` | Proof SOP A across the boundary |
 | `tests/contract/test_sandbox_manifest.py` | manifest derivation and honesty |
+| `tests/contract/test_phase_20c_approved_nemotron.py` | **Phase 20C-A** — model family policy, HTTP contract, client contract |
 
 ---
 

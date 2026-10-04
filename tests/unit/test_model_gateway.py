@@ -729,11 +729,17 @@ class TestModelCapabilityFields:
         cap = registry.get_by_role("ultra")
         assert cap.generation == "nemotron-3"
 
-    def test_nano_omni_generation_unknown_until_model_verified(self):
-        """Nano Omni generation must remain 'unknown' until a real model is validated."""
+    def test_nano_omni_generation_nemotron3(self):
+        """Nano Omni generation is 'nemotron-3' (its intended Nemotron 3 family).
+
+        Phase 20C-A: generation was changed from 'unknown' to 'nemotron-3' so
+        that PolicyFilter's approved-family gate allows nano-omni through
+        (production guard is enabled=False by default; an operator opts in by
+        configuring NEMOTRON_NANO_OMNI_MODEL and NEMOTRON_NANO_OMNI_ENABLED).
+        """
         registry = _make_registry(nano_omni_enabled=True)
         cap = registry.get_by_role("nano-omni")
-        assert cap.generation == "unknown"
+        assert cap.generation == "nemotron-3"
 
     # ── DeploymentStatus (endpoint-validated 2026-08-20) ──────────────────────
 

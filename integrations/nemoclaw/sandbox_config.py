@@ -35,6 +35,7 @@ logger = logging.getLogger(__name__)
 
 # ── Modes ─────────────────────────────────────────────────────────────────────
 
+
 class SandboxMode(str, Enum):
     """
     How hard a missing sandbox should fail.
@@ -87,19 +88,22 @@ class SandboxRuntimeKind(str, Enum):
 
 # ── Errors ────────────────────────────────────────────────────────────────────
 
+
 class SandboxConfigurationError(ValueError):
     """A configuration was rejected before any sandbox was created."""
 
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-_FORBIDDEN_ENDPOINT_SUBSTRINGS: frozenset[str] = frozenset({
-    "/write",
-    "/execute",
-    "/approve",
-    "/proposals",
-    "/actions",
-})
+_FORBIDDEN_ENDPOINT_SUBSTRINGS: frozenset[str] = frozenset(
+    {
+        "/write",
+        "/execute",
+        "/approve",
+        "/proposals",
+        "/actions",
+    }
+)
 """
 Path fragments that would place a governance or execution surface inside the
 sandbox's reach. Matched case-insensitively against every configured endpoint.

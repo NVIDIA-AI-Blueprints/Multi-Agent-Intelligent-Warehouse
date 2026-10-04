@@ -144,15 +144,33 @@ class PolicyFilter:
 
     Policy constraints applied (all must pass to be eligible):
         1. Model must be enabled (enabled=True in registry).
-        2. Modality must be supported by the model.
-        3. DeploymentMode must be compatible with the model's provider.
-        4. RiskLevel constraint: CRITICAL risk → high-capability roles only.
-        5. ReasoningLevel constraint: HIGH reasoning → high-capability roles only.
-        6. Required capabilities (tool_use, structured_output, etc.).
+        2. Model generation must be in APPROVED_MODEL_GENERATIONS (Nemotron 3 / 3.5).
+        3. Modality must be supported by the model.
+        4. DeploymentMode must be compatible with the model's provider.
+        5. RiskLevel constraint: CRITICAL risk → high-capability roles only.
+        6. ReasoningLevel constraint: HIGH reasoning → high-capability roles only.
+        7. Required capabilities (tool_use, structured_output, etc.).
+
+    Constraint 2 is the MAIW v2 MODEL FAMILY POLICY:
+        production/qualification profiles → ModelRequest → PolicyFilter →
+        eligible deployments → ONLY Nemotron 3 / Nemotron 3.5
+
+    Llama-family Nemotron models (e.g. nvidia/llama-3.1-nemotron-nano-8b-v1),
+    arbitrary Llama, Qwen, or any other non-Nemotron-3/3.5 model are REJECTED.
+    This policy is enforced by the generation field on ModelCapability, not by
+    string matching against model IDs.
 
     PolicyFilter does NOT rank candidates — that is the routing strategy's job.
     Routing strategy MUST NOT select a model excluded by PolicyFilter.
     """
+
+    # MAIW v2 approved model generations.  Only these values pass constraint 2.
+    # This set is fixed for production routing and CANNOT be widened by any
+    # constructor argument, environment variable, or runtime configuration.
+    # Evaluation Lab must use PolicyFilter._for_evaluation() (isolated path).
+    APPROVED_MODEL_GENERATIONS: frozenset[str] = frozenset(
+        {"nemotron-3", "nemotron-3.5"}
+    )
 
     # Roles that satisfy HIGH-risk or HIGH-reasoning minimum capability.
     _HIGH_CAPABILITY_ROLES: frozenset[str] = frozenset({"super", "ultra"})
@@ -168,7 +186,55 @@ class PolicyFilter:
     }
 
     def __init__(self, registry: ModelRegistry) -> None:
+        """
+        Create a production PolicyFilter with the fixed approved model set.
+
+        The approved generation set is always ``APPROVED_MODEL_GENERATIONS``
+        (Nemotron 3 / Nemotron 3.5).  It cannot be widened through this
+        constructor — neither by a subclass constructor argument nor by an
+        environment variable.
+
+        For evaluation contexts that need to test non-production models, use
+        ``PolicyFilter._for_evaluation(registry, approved_generations)``.
+        """
         self._registry = registry
+        self._approved_generations: frozenset[str] = self.APPROVED_MODEL_GENERATIONS
+
+    @classmethod
+    def _for_evaluation(
+        cls,
+        registry: ModelRegistry,
+        approved_generations: frozenset[str],
+    ) -> "PolicyFilter":
+        """
+        Factory for evaluation-only PolicyFilter with a broader approved set.
+
+        MUST NOT be used in production routing paths.  The name prefix ``_``
+        signals that this is an internal / test-only escape hatch — not a
+        general-purpose override.
+
+        Parameters
+        ----------
+        registry:
+            Model registry for the evaluation context.
+        approved_generations:
+            Explicit set of generation strings accepted in this evaluation run.
+            Must be a frozenset — callers cannot pass a mutable set.
+
+        Returns
+        -------
+        PolicyFilter
+            A PolicyFilter instance that accepts the explicitly-supplied
+            generation set instead of the production APPROVED_MODEL_GENERATIONS.
+        """
+        instance = cls(registry)
+        instance._approved_generations = approved_generations
+        return instance
+
+    @property
+    def approved_generations(self) -> frozenset[str]:
+        """Read-only view of the approved model generation set for this filter."""
+        return self._approved_generations
 
     def filter(
         self,
@@ -211,11 +277,20 @@ class PolicyFilter:
         if not cap.enabled:
             return False
 
-        # 2. Provider must match the deployment mode.
+        # 2. MODEL FAMILY POLICY: generation must be in approved set.
+        # Nemotron 3 and Nemotron 3.5 are approved for MAIW v2 production and
+        # qualification.  Llama-family Nemotron, arbitrary Llama, Qwen, and
+        # any unknown generation are REJECTED.  This check is authoritative —
+        # the registry populates generation from explicit strings, never from
+        # model_id parsing, so it cannot be bypassed by model_id injection.
+        if cap.generation not in self._approved_generations:
+            return False
+
+        # 3. Provider must match the deployment mode.
         if cap.provider not in allowed_providers:
             return False
 
-        # 3. Modality support.
+        # 4. Modality support.
         req_modality = request.modality.value
         if req_modality != Modality.TEXT.value:
             # Non-text request → model must explicitly support the modality.
@@ -226,19 +301,19 @@ class PolicyFilter:
             if "text" not in cap.modalities:
                 return False
 
-        # 4. RiskLevel constraint.
+        # 5. RiskLevel constraint.
         # CRITICAL risk → only high-capability models allowed.
         if request.risk_level == RiskLevel.CRITICAL:
             if cap.role not in self._HIGH_CAPABILITY_ROLES:
                 return False
 
-        # 5. ReasoningLevel constraint.
+        # 6. ReasoningLevel constraint.
         # HIGH reasoning → only high-capability models allowed.
         if request.reasoning.value == "high":
             if cap.role not in self._HIGH_CAPABILITY_ROLES:
                 return False
 
-        # 6. Required capability tags.
+        # 7. Required capability tags.
         if request.required_capabilities:
             if "tool_use" in request.required_capabilities and not cap.tool_use:
                 return False

@@ -204,7 +204,7 @@ below.
 
 ---
 
-## Sandbox Execution Context (Phase 20A contracts, Phase 20B security boundary qualified)
+## Sandbox Execution Context (Phase 20A contracts, Phase 20B+20C-A security boundary qualified)
 
 Either runtime can run inside a sandbox boundary. The boundary is a decorator,
 not a port:
@@ -256,6 +256,21 @@ MAIW endpoint fronting `ModelGateway`. The sandbox holds no provider key and
 selects no model. NemoClaw's Model Router is explicitly not adopted
 (`use_platform_model_router: false` in the manifest) — it would bypass
 `PolicyFilter`, `DeploymentResolver` and routing provenance in one step.
+
+**MAIW v2 Approved Model Family (Phase 20C-A):** `PolicyFilter` enforces
+`APPROVED_MODEL_GENERATIONS = frozenset({"nemotron-3", "nemotron-3.5"})` as a
+hard constraint on every model selection. Llama-family Nemotron, Qwen, and any
+model with an unknown or uncatalogued generation are rejected at routing time,
+before any provider call. The sandbox cannot influence this policy — it is
+derived from the registry and the `PolicyFilter` class attribute, not from any
+sandbox declaration or model output. Approved Nemotron 3 / 3.5 model IDs are
+defined in `packages/maiw-models/maiw_models/registry.py`.
+
+The sandbox calls inference via `POST /api/v1/inference` (network-addressable
+URL, passes NemoClaw SSRF). The host-side `ModelGateway` then selects from only
+the approved model set. The sandbox HTTP transport client
+(`MAIWHTTPModelGatewayClient`) rejects localhost endpoints at construction and
+has no fallback path — HTTP failure is always failure.
 
 See [NEMOCLAW_OPENSHELL_INTEGRATION.md](NEMOCLAW_OPENSHELL_INTEGRATION.md) for
 the ownership matrix, threat model, and current qualification status.

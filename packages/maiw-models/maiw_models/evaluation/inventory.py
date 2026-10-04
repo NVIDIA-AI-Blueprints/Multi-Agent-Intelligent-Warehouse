@@ -30,10 +30,10 @@ Usage:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
-from ..models import DeploymentMode, DeploymentStatus, ModelCapability, ModelRequest
+from ..models import DeploymentMode, DeploymentStatus, ModelRequest
 from ..registry import ModelRegistry
 from ..routing import PolicyFilter
 

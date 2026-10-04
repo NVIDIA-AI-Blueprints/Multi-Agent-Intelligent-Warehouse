@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Optional
 
 from .errors import (
     ModelConfigurationError,
@@ -40,7 +39,7 @@ from .models import (
 )
 from .providers.nim import NIMProvider
 from .providers.nim_client import NIMClient, LLMResponse
-from .registry import ModelRegistry
+from .registry import ModelRegistry, TRANSPORT_SMOKE_TEST_MODEL
 from .router import ModelRouter
 from .routing import ModelCandidate, PolicyFilter, RoutingContext, RoutingStrategy
 from .telemetry import GatewayTelemetry
@@ -140,4 +139,6 @@ __all__ = [
     "PolicyFilter",
     "ModelCandidate",
     "RoutingContext",
+    # Phase 20C: model family compliance
+    "TRANSPORT_SMOKE_TEST_MODEL",
 ]

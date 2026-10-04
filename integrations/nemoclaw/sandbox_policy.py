@@ -63,9 +63,16 @@ would be a change to the authority model rather than a change to this file.
 """
 
 
-_WRITE_SHAPED_ENDPOINT_TOKENS: frozenset[str] = frozenset({
-    "write", "execute", "approve", "proposal", "mutate", "commit",
-})
+_WRITE_SHAPED_ENDPOINT_TOKENS: frozenset[str] = frozenset(
+    {
+        "write",
+        "execute",
+        "approve",
+        "proposal",
+        "mutate",
+        "commit",
+    }
+)
 """
 Substrings that must not appear in an allowed endpoint URL.
 
@@ -77,11 +84,13 @@ the rendered policy, whatever produced it.
 
 # ── Errors ────────────────────────────────────────────────────────────────────
 
+
 class SandboxPolicyError(ValueError):
     """A sandbox policy could not be rendered, or was rendered unsafely."""
 
 
 # ── Rendered policy ───────────────────────────────────────────────────────────
+
 
 class SandboxNetworkEndpoint(BaseModel):
     """One endpoint the sandbox is permitted to reach, and why."""
@@ -226,9 +235,7 @@ class RenderedSandboxPolicy(BaseModel):
             )
         for path in (*self.writable_paths, *self.readable_paths):
             if not path.startswith("/workspace/"):
-                raise SandboxPolicyError(
-                    f"sandbox path {path!r} escapes /workspace/"
-                )
+                raise SandboxPolicyError(f"sandbox path {path!r} escapes /workspace/")
         return self
 
     # ── Monotonicity ──────────────────────────────────────────────────────────
@@ -262,6 +269,7 @@ class RenderedSandboxPolicy(BaseModel):
 
 
 # ── Rendering ─────────────────────────────────────────────────────────────────
+
 
 def render_sandbox_policy(
     policy: RuntimeCapabilityPolicy,
@@ -339,6 +347,7 @@ def render_sandbox_policy(
 
 # ── Serialisation ─────────────────────────────────────────────────────────────
 
+
 def render_policy_yaml(rendered: RenderedSandboxPolicy) -> str:
     """
     Serialise a rendered policy to the YAML a sandbox runtime consumes.
@@ -408,9 +417,7 @@ def render_policy_yaml(rendered: RenderedSandboxPolicy) -> str:
     lines.append("")
     lines.append("credentials:")
     lines.append(f"  custody: {rendered.credential_custody}")
-    lines.append(
-        "  managed: [" + ", ".join(sorted(rendered.managed_credentials)) + "]"
-    )
+    lines.append("  managed: [" + ", ".join(sorted(rendered.managed_credentials)) + "]")
     lines.append("  injected: []  # empty — the sandbox holds no credentials")
     lines.append("")
     return "\n".join(lines)
