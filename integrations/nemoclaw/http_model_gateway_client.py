@@ -54,7 +54,6 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-
 logger = logging.getLogger(__name__)
 
 # ── Import guard: ModelGateway types must come from the host package ──────────
@@ -65,8 +64,6 @@ try:
         ModelRouteDecision,
         ModelUnavailable,
         ModelGatewayError,
-        ReasoningLevel,
-        RiskLevel,
     )
     from maiw_mcp.deadline import RequestDeadlineExceeded
 

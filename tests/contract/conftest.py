@@ -36,8 +36,6 @@ for _p in reversed(_LOCAL_PACKAGES):
 # Force reimport of maiw_models from local source if already imported
 # from the venv.  This is necessary when the full test suite has already
 # imported the installed package before this conftest runs.
-import importlib
-
 for _mod in list(sys.modules.keys()):
     if _mod.startswith(("maiw_models", "maiw_mcp", "maiw_agents", "nemoclaw")):
         del sys.modules[_mod]
