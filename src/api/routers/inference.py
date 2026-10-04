@@ -100,8 +100,12 @@ _MAX_DEADLINE_MS = 300_000  # 5 minutes
 
 # ── Internal trust header ──────────────────────────────────────────────────────
 # The sandbox presents this shared-secret header (configured per deployment).
-# None disables the check (development mode only — not for production use).
+# Fail-closed: if no token is configured AND MAIW_INFERENCE_ALLOW_UNAUTHENTICATED
+# is not explicitly "true", the endpoint returns 503 rather than allowing
+# unauthenticated requests.  Set MAIW_INFERENCE_ALLOW_UNAUTHENTICATED=true ONLY
+# for development / local testing — never in production or sandbox-required mode.
 _INFERENCE_INTERNAL_TOKEN_ENV = "MAIW_INFERENCE_INTERNAL_TOKEN"
+_INFERENCE_ALLOW_UNAUTHENTICATED_ENV = "MAIW_INFERENCE_ALLOW_UNAUTHENTICATED"
 
 
 # ── Request / Response contracts ───────────────────────────────────────────────
@@ -259,16 +263,43 @@ def _verify_internal_token(
     This is a lightweight bearer-style check for the internal sandbox→host
     network.  It supplements (not replaces) network-level isolation.
 
-    When MAIW_INFERENCE_INTERNAL_TOKEN is not configured, the check is
-    skipped — suitable for development only.
+    FAIL-CLOSED BEHAVIOUR
+        If MAIW_INFERENCE_INTERNAL_TOKEN is not configured, the endpoint
+        returns HTTP 503 (misconfigured) unless the operator has explicitly
+        set MAIW_INFERENCE_ALLOW_UNAUTHENTICATED=true.
+
+        ``MAIW_INFERENCE_ALLOW_UNAUTHENTICATED=true`` is for development and
+        local testing ONLY.  It must never be set in a production deployment
+        or in any environment that processes real warehouse credentials.
     """
     from fastapi import HTTPException
 
     expected = os.getenv(_INFERENCE_INTERNAL_TOKEN_ENV)
     if not expected:
-        # Development mode: no token configured.  Log but do not reject.
-        logger.debug("inference: internal token check disabled (no token configured)")
-        return
+        allow_unauth = (
+            os.getenv(_INFERENCE_ALLOW_UNAUTHENTICATED_ENV, "").lower() == "true"
+        )
+        if allow_unauth:
+            logger.warning(
+                "inference: unauthenticated access permitted "
+                "(MAIW_INFERENCE_ALLOW_UNAUTHENTICATED=true — development mode only)"
+            )
+            return
+        # Fail closed: no token configured and development override not set.
+        logger.error(
+            "inference: %s not set and %s is not 'true'. "
+            "Endpoint is not configured for authenticated access.",
+            _INFERENCE_INTERNAL_TOKEN_ENV,
+            _INFERENCE_ALLOW_UNAUTHENTICATED_ENV,
+        )
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Inference endpoint misconfigured: "
+                f"{_INFERENCE_INTERNAL_TOKEN_ENV} is required. "
+                f"For development only, set {_INFERENCE_ALLOW_UNAUTHENTICATED_ENV}=true."
+            ),
+        )
     if x_maiw_internal_token != expected:
         logger.warning("inference: rejected request with invalid internal token")
         raise HTTPException(status_code=401, detail="Invalid internal token.")
@@ -388,9 +419,10 @@ async def sandbox_inference(
         )
 
     # ── 5. Build safe route metadata ─────────────────────────────────────────
-    # Retrieve the generation from the registry — the registry is the single
-    # source of truth for which generation a model_id belongs to.
-    cap = gateway._registry.get_by_id(response.model_id)
+    # Retrieve the generation from the registry via the public property.
+    # The registry is the single source of truth for which generation a
+    # model_id belongs to.
+    cap = gateway.registry.get_by_id(response.model_id)
     generation = cap.generation if cap is not None else "unknown"
     from maiw_models.routing import PolicyFilter
 

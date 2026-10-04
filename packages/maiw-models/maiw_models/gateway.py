@@ -76,6 +76,14 @@ class ModelGateway:
         self._telemetry = telemetry or GatewayTelemetry()
         self._nim_circuit = nim_circuit
 
+    @property
+    def registry(self) -> ModelRegistry:
+        """Read-only public access to the model registry.
+
+        Prefer this over ``_registry`` from outside the class.
+        """
+        return self._registry
+
     async def generate(self, request: ModelRequest) -> ModelResponse:
         """
         Route and execute a model request.

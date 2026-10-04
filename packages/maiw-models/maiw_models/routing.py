@@ -165,9 +165,9 @@ class PolicyFilter:
     """
 
     # MAIW v2 approved model generations.  Only these values pass constraint 2.
-    # Configuration: set MAIW_APPROVED_MODEL_GENERATIONS (comma-separated) to
-    # override in evaluation-only environments.  Default is strictly production.
-    # Evaluation Lab may intentionally broaden this set; production MUST NOT.
+    # This set is fixed for production routing and CANNOT be widened by any
+    # constructor argument, environment variable, or runtime configuration.
+    # Evaluation Lab must use PolicyFilter._for_evaluation() (isolated path).
     APPROVED_MODEL_GENERATIONS: frozenset[str] = frozenset(
         {"nemotron-3", "nemotron-3.5"}
     )
@@ -185,18 +185,51 @@ class PolicyFilter:
         DeploymentMode.ENTERPRISE: {"nvidia-nim"},
     }
 
-    def __init__(
-        self,
-        registry: ModelRegistry,
-        approved_generations: frozenset[str] | None = None,
-    ) -> None:
+    def __init__(self, registry: ModelRegistry) -> None:
+        """
+        Create a production PolicyFilter with the fixed approved model set.
+
+        The approved generation set is always ``APPROVED_MODEL_GENERATIONS``
+        (Nemotron 3 / Nemotron 3.5).  It cannot be widened through this
+        constructor — neither by a subclass constructor argument nor by an
+        environment variable.
+
+        For evaluation contexts that need to test non-production models, use
+        ``PolicyFilter._for_evaluation(registry, approved_generations)``.
+        """
         self._registry = registry
-        # Allow evaluation environments to supply a broader set explicitly.
-        # Production callers MUST NOT pass a broader set.
-        if approved_generations is None:
-            self._approved_generations = self.APPROVED_MODEL_GENERATIONS
-        else:
-            self._approved_generations = approved_generations
+        self._approved_generations: frozenset[str] = self.APPROVED_MODEL_GENERATIONS
+
+    @classmethod
+    def _for_evaluation(
+        cls,
+        registry: ModelRegistry,
+        approved_generations: frozenset[str],
+    ) -> "PolicyFilter":
+        """
+        Factory for evaluation-only PolicyFilter with a broader approved set.
+
+        MUST NOT be used in production routing paths.  The name prefix ``_``
+        signals that this is an internal / test-only escape hatch — not a
+        general-purpose override.
+
+        Parameters
+        ----------
+        registry:
+            Model registry for the evaluation context.
+        approved_generations:
+            Explicit set of generation strings accepted in this evaluation run.
+            Must be a frozenset — callers cannot pass a mutable set.
+
+        Returns
+        -------
+        PolicyFilter
+            A PolicyFilter instance that accepts the explicitly-supplied
+            generation set instead of the production APPROVED_MODEL_GENERATIONS.
+        """
+        instance = cls(registry)
+        instance._approved_generations = approved_generations
+        return instance
 
     @property
     def approved_generations(self) -> frozenset[str]:

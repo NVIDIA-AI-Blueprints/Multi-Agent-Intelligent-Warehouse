@@ -218,13 +218,22 @@ class MAIWHTTPModelGatewayClient:
 
         # ── Deserialize response ──────────────────────────────────────────
         if resp.status_code == 200:
-            return self._parse_success(resp)
+            return self._parse_success(resp, request)
 
         # Structured error response.
         return self._raise_structured_error(resp)
 
-    def _parse_success(self, resp: Any) -> "ModelResponse":
-        """Parse a successful inference response."""
+    def _parse_success(self, resp: Any, request: "ModelRequest") -> "ModelResponse":
+        """Parse a successful inference response.
+
+        Parameters
+        ----------
+        resp:
+            The raw httpx response object.
+        request:
+            The original ModelRequest — used to preserve routing provenance
+            (task identity, requested_reasoning, requested_risk_level).
+        """
         try:
             data = resp.json()
         except Exception as exc:
@@ -232,22 +241,27 @@ class MAIWHTTPModelGatewayClient:
                 "Failed to parse inference response JSON.", status_code=resp.status_code
             ) from exc
 
-        # Reconstruct a minimal ModelRouteDecision from route metadata.
+        # Reconstruct ModelRouteDecision from route metadata.
+        # Provenance fields (task, reasoning, risk_level) are taken from the
+        # ORIGINAL request, not from the response body — the response echoes the
+        # model's view, but the authoritative intent is the caller's request.
         route = data.get("route", {})
+        selected_model_id = route.get("selected_model_id", data.get("model_id", ""))
         route_decision = ModelRouteDecision(
-            selected_model_id=route.get("selected_model_id", data.get("model_id", "")),
+            selected_model_id=selected_model_id,
             selected_role=route.get("selected_role", ""),
             requested_role=route.get("selected_role", ""),
             routing_rule=route.get("routing_rule", ""),
             routing_reason=f"Sandbox HTTP transport: {route.get('routing_rule', '')}",
             fallback_from=None,
             fallback_reason=None,
-            task=data.get("task", ""),
-            requested_reasoning=ReasoningLevel.MEDIUM,
-            requested_risk_level=RiskLevel.LOW,
+            # Preserve request identity — NOT hard-coded defaults.
+            task=request.task,
+            requested_reasoning=request.reasoning,
+            requested_risk_level=request.risk_level,
             routing_strategy="http_sandbox",
             routing_latency_ms=0.0,
-            candidate_models=[route.get("selected_model_id", data.get("model_id", ""))],
+            candidate_models=[selected_model_id],
         )
 
         return ModelResponse(
