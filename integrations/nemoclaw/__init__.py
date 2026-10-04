@@ -14,11 +14,12 @@ enforcement, governance and procedure persistence exactly as they are.
 
 Module map:
 
-    sandbox_config.py      deployment facts (mode, runtime kind, endpoints)
-    sandbox_policy.py      RuntimeCapabilityPolicy → RenderedSandboxPolicy
-    boundary_contracts.py  the two messages that cross, and host-side validation
-    sandbox_adapter.py     SandboxedAgentRuntime + provisioners + fail-closed
-    manifest.py            NemoClaw agent manifest rendering
+    sandbox_config.py            deployment facts (mode, runtime kind, endpoints)
+    sandbox_policy.py            RuntimeCapabilityPolicy → RenderedSandboxPolicy
+    boundary_contracts.py        the two messages that cross, and host-side validation
+    sandbox_adapter.py           SandboxedAgentRuntime + provisioners + fail-closed
+    manifest.py                  NemoClaw agent manifest rendering
+    http_model_gateway_client.py thin HTTP transport client (sandbox → host ModelGateway)
 
 Import boundary: this package imports from ``maiw_agents``; nothing in
 ``packages/`` imports from here. The dependency points one way so that the
@@ -68,6 +69,10 @@ from .sandbox_policy import (
     render_policy_yaml,
     render_sandbox_policy,
 )
+from .http_model_gateway_client import (
+    MAIWHTTPModelGatewayClient,
+    SandboxInferenceError,
+)
 
 __all__ = [
     "MANIFEST_SCHEMA_VERSION",
@@ -97,4 +102,7 @@ __all__ = [
     "render_sandbox_policy",
     "validate_governance_input",
     "validate_sandbox_output",
+    # Phase 20C-A: HTTP inference transport
+    "MAIWHTTPModelGatewayClient",
+    "SandboxInferenceError",
 ]

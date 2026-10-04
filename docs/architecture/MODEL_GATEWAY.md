@@ -242,7 +242,47 @@ model IDs. Operators override via env var for self-hosted or alternate deploymen
 | `nano` | Nemotron 3 | MEDIUM reasoning — moderate analysis |
 | `super` | Nemotron 3 | HIGH reasoning, CRITICAL risk, wave recovery |
 | `ultra` | Nemotron 3 | Teacher/judge evaluation workloads |
-| `nano-omni` | *unverified* | Multimodal (IMAGE/VIDEO/AUDIO) — operator must configure |
+| `nano-omni` | Nemotron 3 *(no verified model ID yet)* | Multimodal (IMAGE/VIDEO/AUDIO) — operator must configure |
+
+---
+
+## MAIW v2 Approved Model Family Policy (Phase 20C-A)
+
+**Production and qualification profiles permit ONLY Nemotron 3 and Nemotron 3.5.**
+
+`PolicyFilter` enforces this via the `generation` field on `ModelCapability`:
+
+```
+production/qualification profile
+  → ModelRequest
+  → PolicyFilter (constraint 2: generation ∈ {nemotron-3, nemotron-3.5})
+  → eligible deployments
+  → ONLY Nemotron 3 / Nemotron 3.5
+```
+
+The authoritative approved set is `PolicyFilter.APPROVED_MODEL_GENERATIONS`.
+
+**NOT approved for MAIW v2 production or qualification:**
+
+| Model | Family | Status |
+|-------|--------|--------|
+| `nvidia/llama-3.1-nemotron-nano-8b-v1` | Llama-family (Phase 20B transport smoke test) | TRANSPORT_SMOKE_TEST_ONLY |
+| `nvidia/llama-3.3-nemotron-super-49b-v1.5` | Llama-family | LEGACY — unavailable on NIM |
+| `nvidia/llama-3.1-nemotron-nano-4b-v1.1` | Llama-family | LEGACY — unavailable on NIM |
+| `nvidia/llama-3.1-nemotron-ultra-253b-v1` | Llama-family | LEGACY — unavailable on NIM |
+| Arbitrary Llama, Qwen, or other families | — | REJECTED by PolicyFilter |
+
+**Phase 20B evidence (`nvidia/llama-3.1-nemotron-nano-8b-v1`):**
+PR #133 proved host-side inference transport mechanics, NIM provider path, real `ModelResponse`
+handling, failure behavior, deadline propagation, and prompt injection resistance.
+It did NOT prove MAIW v2 model-family compliance.
+Label: `TRANSPORT_SMOKE_TEST_ONLY`.
+
+**Evaluation Lab isolation:**
+`PolicyFilter` accepts an explicit `approved_generations` override for evaluation environments
+that intentionally test legacy or unapproved models.  Production callers MUST NOT pass a
+broader set.  The policy file (`PolicyFilter.APPROVED_MODEL_GENERATIONS`) is the single source
+of truth for the production posture.
 
 ---
 
@@ -317,17 +357,26 @@ inference:
   use_platform_model_router: false
 ```
 
-> **Gap (Phase 20C):** no HTTP endpoint currently exposes inference — `ModelGateway` is
-> instantiated in-process by `apps/api/maiw_api/bootstrap.py`. The
-> `/api/v1/inference` route above is the designed target, not an existing
-> surface. Phase 20B requalification confirmed the HOST-SIDE inference chain
-> (host pytest → MAIWModelGatewayChat → ModelGateway → NIMProvider → NIMClient →
-> localhost:8002, `nvidia/llama-3.1-nemotron-nano-8b-v1`, H100 NVL sm_90a compatible).
-> F01 resolved via host-side NIM workaround. F02 architecture clarified (SSRF NOT
-> weakened; ModelGateway on HOST). However, the REAL SANDBOX LEG is NOT YET PROVEN:
-> an actual OpenShell sandbox calling a MAIW ModelGateway HTTP endpoint is required
-> for full qualification. This HTTP endpoint is the Phase 20C deliverable that
-> unblocks real sandbox→inference testing.
+> **Phase 20C-A (implemented):** `POST /api/v1/inference` is now live in
+> `src/api/routers/inference.py`. It exposes a **bounded HTTP inference surface**
+> for sandboxed runtimes. The endpoint:
+>   - Uses the canonical `get_model_gateway()` singleton (never a new gateway per request)
+>   - Accepts only a strict field allowlist (no provider URL, API key, base URL, or model override)
+>   - Enforces approved model family policy via `PolicyFilter` (Nemotron 3 / Nemotron 3.5 only)
+>   - Maps errors to structured JSON codes (never mock or silent fallback)
+>   - Propagates deadline and trace IDs end-to-end
+>
+> **Approved model families (MAIW v2 production/qualification):** Nemotron 3 and Nemotron 3.5 only.
+> `nvidia/llama-3.1-nemotron-nano-8b-v1` (Phase 20B transport smoke test) is NOT an approved
+> v2 qualification model. It proved transport mechanics only — see Phase 20B evidence record.
+>
+> **HTTP transport is not the routing authority.** The endpoint calls the host ModelGateway;
+> it never selects a model itself. The sandbox calls `POST /api/v1/inference`; `PolicyFilter`
+> and `ModelRouter` on the host select the Nemotron 3/3.5 model.
+>
+> **Sandbox HTTP client:** `integrations/nemoclaw/http_model_gateway_client.py` provides
+> `MAIWHTTPModelGatewayClient` — a thin transport-only client for the sandbox runtime.
+> It never falls back to a local gateway, direct NIM, or mock response. Failure stays failure.
 
 See [NEMOCLAW_OPENSHELL_INTEGRATION.md](NEMOCLAW_OPENSHELL_INTEGRATION.md).
 

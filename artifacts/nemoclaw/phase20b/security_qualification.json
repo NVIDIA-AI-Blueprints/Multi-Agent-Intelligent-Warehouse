@@ -1,11 +1,75 @@
 {
-  "schema_version": "1.0",
-  "phase": "20B",
+  "schema_version": "1.1",
+  "phase": "20B+20C-A",
   "title": "MAIW NemoClaw/OpenShell Deep Agents Security Qualification",
   "date": "2026-10-03",
+  "phase_20c_date": "2026-10-03",
   "host": "epg-tme-smc-h100-02",
-  "verdict": "HOST_SIDE_INFERENCE_QUALIFIED",
-  "verdict_reason": "Host-side inference chain (MAIWModelGatewayChat → ModelGateway → NIMProvider → localhost:8002) qualified end-to-end; 16/16 Phase 20B contract tests pass. REAL SANDBOX LEG NOT YET PROVEN: the sandbox→sanctioned-host-ModelGateway→NIM path requires a MAIW ModelGateway HTTP endpoint (Phase 20C prerequisite) that does not yet exist. F01 resolved via host-side NIM workaround. F02 architecture clarified (not yet sandbox-verified). Full qualification is INCOMPLETE pending sandbox leg proof.",
+  "verdict": "HOST_SIDE_INFERENCE_QUALIFIED+HTTP_BOUNDARY_COMPLETE",
+  "verdict_reason": "Phase 20B: Host-side inference chain (MAIWModelGatewayChat → ModelGateway → NIMProvider → localhost:8002) qualified end-to-end; 16/16 Phase 20B contract tests pass. Phase 20C-A: Approved Nemotron 3/3.5 model family policy enforced by PolicyFilter; POST /api/v1/inference HTTP endpoint live; sandbox HTTP transport client built; 54 contract tests pass. REAL SANDBOX LEG NOT YET PROVEN: sandbox→sanctioned-host-endpoint with real approved Nemotron requires @real_sandbox tests on the qualified host.",
+
+  "model_policy": {
+    "approved_families": ["nemotron-3", "nemotron-3.5"],
+    "approved_models_by_role": {
+      "lightning": "nvidia/nemotron-3.5-lightning-30b-a3b",
+      "nano": "nvidia/nemotron-3-nano-30b-a3b",
+      "super": "nvidia/nemotron-3-super-120b-a12b",
+      "ultra": "nvidia/nemotron-3-ultra-550b-a55b"
+    },
+    "policy_enforcement": "PolicyFilter.APPROVED_MODEL_GENERATIONS = frozenset({'nemotron-3', 'nemotron-3.5'})",
+    "policy_location": "packages/maiw-models/maiw_models/routing.py :: PolicyFilter._is_eligible (constraint 2)",
+    "unapproved_model_rejection": "Models with generation not in APPROVED_MODEL_GENERATIONS are rejected before routing",
+    "evaluation_isolation": "Evaluation Lab may supply explicit approved_generations override; production callers must not"
+  },
+
+  "phase_20b_inference_provider_reclassification": {
+    "model_id": "nvidia/llama-3.1-nemotron-nano-8b-v1",
+    "constant": "TRANSPORT_SMOKE_TEST_MODEL",
+    "classification": "TRANSPORT_SMOKE_TEST_ONLY",
+    "family": "Llama-family Nemotron (NOT approved for MAIW v2 production or qualification)",
+    "pr_133_evidence": "Proved: NIM provider path works, real ModelResponse returned, failure handling correct, deadline propagation correct, prompt injection cannot alter routing, host-side inference chain end-to-end. Did NOT prove: approved model-family compliance. Cannot be used as MAIW v2 qualification evidence.",
+    "approved_for_v2_qualification": false,
+    "approved_for_v2_production": false,
+    "retained_for": "historical audit, transport smoke test reference, evaluation tooling"
+  },
+
+  "phase_20c_a_deliverables": {
+    "http_inference_endpoint": {
+      "path": "POST /api/v1/inference",
+      "file": "src/api/routers/inference.py",
+      "status": "LIVE",
+      "field_allowlist": ["task", "messages", "reasoning", "risk_level", "modality", "deadline_ms", "trace_id", "agent_task_id", "procedure_execution_id", "step_execution_id"],
+      "forbidden_fields": ["provider_url", "api_key", "base_url", "api_key_env_var", "deployment_endpoint", "force_model_id", "model_id", "deployment_mode"],
+      "gateway_singleton": "Uses canonical get_model_gateway() singleton — never creates new gateway per request",
+      "policy_enforcement": "PolicyFilter (host-side) enforces Nemotron 3/3.5 only",
+      "error_mapping": {"503": "MODEL_UNAVAILABLE / PROVIDER_FAILURE", "504": "DEADLINE_EXCEEDED", "422": "validation error / forbidden field"},
+      "no_governance": "No ActionExecutor, DecisionEngine, ApprovalStore below this endpoint"
+    },
+    "http_transport_client": {
+      "file": "integrations/nemoclaw/http_model_gateway_client.py",
+      "class": "MAIWHTTPModelGatewayClient",
+      "status": "IMPLEMENTED",
+      "no_transport_fallback": "HTTP failure stays failure — never falls back to local gateway, direct NIM, or mock",
+      "localhost_rejected_at_construction": true,
+      "deadline_propagation": "remaining_ms forwarded in payload",
+      "trace_propagation": "trace_id, agent_task_id, procedure_execution_id, step_execution_id forwarded"
+    },
+    "model_family_policy": {
+      "approved_generations": ["nemotron-3", "nemotron-3.5"],
+      "policy_filter_constraint": 2,
+      "production_posture": "Reject any model with generation not in approved set",
+      "legacy_llama_nemotron_rejected": true,
+      "arbitrary_llama_rejected": true,
+      "qwen_rejected": true,
+      "unknown_generation_rejected": true
+    },
+    "tests": {
+      "file": "tests/contract/test_phase_20c_approved_nemotron.py",
+      "count": 54,
+      "all_passing": true,
+      "categories": ["model_family_policy", "http_api_contract", "http_client_contract", "sandbox_policy", "registry_reclassification", "model_inventory"]
+    }
+  },
 
   "environment": {
     "os": "Ubuntu 24.04.4 LTS",
@@ -23,103 +87,24 @@
   },
 
   "maiw_baseline": {
-    "git_sha": "3ab9505",
+    "git_sha": "6cc6567",
     "branch": "main",
-    "test_count": 584,
+    "test_count": 600,
     "test_result": "PASS",
-    "test_duration_seconds": 2.23,
     "key_files_verified": [
       "integrations/nemoclaw/sandbox_policy.py",
       "integrations/nemoclaw/boundary_contracts.py",
+      "integrations/nemoclaw/http_model_gateway_client.py",
       "packages/maiw-agents/maiw_agents/contracts/capability_policy.py",
       "packages/maiw-agents/maiw_agents/contracts/procedure_state.py",
-      "packages/maiw-agents/runtime/model_adapter.py"
+      "packages/maiw-agents/maiw_agents/runtime/model_adapter.py",
+      "packages/maiw-models/maiw_models/routing.py",
+      "packages/maiw-models/maiw_models/registry.py",
+      "src/api/routers/inference.py"
     ]
   },
 
   "platform_classification": "SUPPORTED_WITH_LIMITATIONS",
-
-  "preflight_checks": {
-    "result": "PASS",
-    "checks_passed": 11,
-    "checks_total": 11,
-    "details": [
-      "Docker daemon: server 29.3.0",
-      "Docker CDI GPU support detected (/var/run/cdi/nvidia.yaml)",
-      "Docker can start bridge containers",
-      "Docker container DNS resolution works",
-      "Container runtime: docker",
-      "Container runtime resources: 96 vCPU / 503.6 GiB",
-      "openshell CLI: openshell 0.0.116",
-      "Port 8991 available (OpenShell gateway)",
-      "NVIDIA GPU detected (4x NVIDIA H100 NVL, 383320 MB)",
-      "Sandbox GPU: enabled (auto)",
-      "Memory OK: 515644 MB RAM + 8191 MB swap"
-    ]
-  },
-
-  "installation": {
-    "nemoclaw_cli": {
-      "installed": true,
-      "path": "~/.local/bin/nemoclaw",
-      "version": "0.0.124"
-    },
-    "nemo_deepagents_cli": {
-      "installed": true,
-      "path": "~/.local/bin/nemo-deepagents",
-      "version": "0.0.124"
-    },
-    "openshell_cli": {
-      "installed": true,
-      "path": "~/.local/bin/openshell",
-      "version": "0.0.116"
-    },
-    "openshell_gateway": {
-      "installed": true,
-      "path": "~/.local/bin/openshell-gateway",
-      "version": "0.0.116"
-    },
-    "openshell_sandbox": {
-      "installed": true,
-      "path": "~/.local/bin/openshell-sandbox",
-      "version": "0.0.116"
-    },
-    "gateway_port": 8991,
-    "gateway_service": "~/.config/systemd/user/nemoclaw-openshell-gateway.service",
-    "checksums_verified": true
-  },
-
-  "inference_providers": {
-    "llama_cpp": {
-      "status": "FAILED",
-      "failure_reason": "CUDA sm_90a kernel not in pre-built image",
-      "error": "CUDA error: no kernel image is available for execution on the device",
-      "container_image": "ghcr.io/nvidia/nemoclaw/llama-cpp-server@sha256:9d0cddd7bcaf98d3b75a7fc8c7ce3af3a9973b5f23a8092e7e93a9afc473a675",
-      "model": "unsloth/Nemotron-3-Nano-30B-A3B-GGUF"
-    },
-    "openai_provider": {
-      "status": "BLOCKED",
-      "failure_reason": "SSRF protection blocks localhost/private IP endpoints — expected OpenShell behavior (sandbox→host boundary)",
-      "expected_behavior": true,
-      "note": "ModelGateway runs on HOST; host-side NIM calls are not subject to OpenShell SSRF. No code change needed."
-    },
-    "ngc_api": {
-      "status": "BLOCKED",
-      "failure_reason": "NGC API key not configured on host"
-    },
-    "local_nim_host_side": {
-      "status": "HOST_SIDE_QUALIFIED",
-      "model": "nvidia/llama-3.1-nemotron-nano-8b-v1",
-      "container": "wms-nim-nano-8b",
-      "endpoint": "http://localhost:8002/v1",
-      "gpu_compat": "sm_90a (H100 NVL native)",
-      "auth": "no-auth (Bearer token ignored by local NIM)",
-      "inference_path": "MAIWModelGatewayChat (host pytest) -> ModelGateway -> NIMProvider -> NIMClient -> localhost:8002",
-      "path_note": "All tests run on HOST. REAL SANDBOX LEG (sandbox→host-ModelGateway-HTTP-endpoint→NIM) is NOT YET PROVEN. ModelGateway HTTP endpoint doesn't exist yet (Phase 20C).",
-      "real_inference_test": "test_step7_real_inference_via_model_gateway: PASS (host only)",
-      "sop_governance_test": "test_step8_sop_a_governance_boundary_with_real_gateway: PASS (host pytest, not inside real OpenShell sandbox)"
-    }
-  },
 
   "security_invariants": {
     "write_authority_absent": {
@@ -153,6 +138,25 @@
     "deterministic_output": {
       "result": "VERIFIED",
       "evidence": "render_policy_yaml() hand-orders keys, sorts all collections, emits no timestamps or UUIDs"
+    },
+    "model_family_policy_enforced": {
+      "result": "VERIFIED",
+      "evidence": "PolicyFilter constraint 2: generation ∈ {nemotron-3, nemotron-3.5}; 54 Phase 20C-A contract tests pass",
+      "added_in": "Phase 20C-A"
+    },
+    "http_inference_field_allowlist": {
+      "result": "VERIFIED",
+      "evidence": "InferenceRequest._reject_forbidden_fields validator rejects: provider_url, api_key, base_url, api_key_env_var, deployment_endpoint, force_model_id, model_id, deployment_mode",
+      "added_in": "Phase 20C-A"
+    },
+    "no_transport_fallback": {
+      "result": "VERIFIED",
+      "evidence": "MAIWHTTPModelGatewayClient: network failure raises SandboxInferenceError; no fallback to local gateway, direct NIM, or mock",
+      "added_in": "Phase 20C-A"
+    },
+    "ssrf_not_weakened": {
+      "result": "VERIFIED",
+      "evidence": "MAIWHTTPModelGatewayClient rejects localhost/loopback endpoints at construction; inference endpoint does not expose provider URLs; SandboxConfig does not allow write-shaped paths"
     }
   },
 
@@ -187,24 +191,26 @@
     }
   },
 
-  "container_security": {
-    "container": "nemoclaw-llama-cpp (ghcr.io/nvidia/nemoclaw/llama-cpp-server)",
-    "readonly_rootfs": true,
-    "cap_drop": ["ALL"],
-    "security_opt": ["no-new-privileges=true"],
-    "user": "1000:1000",
-    "network_mode": "nemoclaw-llama-cpp-internal",
-    "network_internal": true,
-    "model_mount_readonly": true,
-    "api_key_secret_mounted": true
-  },
-
-  "inference_routing_audit": {
-    "result": "NO_CONFLICT",
-    "nemoclaw_path": "Sandbox -> OpenShell gateway (port 8991) -> Provider (SSRF-validated)",
-    "maiw_path": "DeepAgentsRuntime -> MAIWModelGatewayChat._generate() -> MAIW ModelGateway -> Provider",
-    "paths_independent": true,
-    "deployment_constraint": "MAIW ModelGateway endpoint must be network-addressable (non-localhost) URL to pass OpenShell SSRF validation"
+  "inference_providers": {
+    "phase_20b_transport_smoke_test": {
+      "model_id": "nvidia/llama-3.1-nemotron-nano-8b-v1",
+      "classification": "TRANSPORT_SMOKE_TEST_ONLY",
+      "approved_for_v2": false,
+      "status": "HOST_SIDE_QUALIFIED",
+      "container": "wms-nim-nano-8b",
+      "endpoint": "http://localhost:8002/v1",
+      "gpu_compat": "sm_90a (H100 NVL native)",
+      "inference_path": "MAIWModelGatewayChat (host pytest) → ModelGateway → NIMProvider → NIMClient → localhost:8002",
+      "evidence_scope": "transport mechanics, NIM provider path, real ModelResponse, failure handling, deadline propagation, prompt injection resistance",
+      "evidence_NOT_scope": "approved MAIW v2 model-family compliance",
+      "real_sandbox_tested": false
+    },
+    "phase_20c_a_approved_nemotron": {
+      "status": "CONTRACT_TESTS_PASS_REAL_NIM_PENDING",
+      "approved_model_roles": ["lightning", "nano", "super", "ultra"],
+      "approved_generations": ["nemotron-3", "nemotron-3.5"],
+      "note": "Real inference with approved Nemotron 3/3.5 requires @real_sandbox tests on the qualified host with the approved NIM deployment"
+    }
   },
 
   "maiw_authority_invariants": {
@@ -213,7 +219,10 @@
     "mcp_write_not_in_sandbox": true,
     "warehouse_credentials_not_in_sandbox": true,
     "nemo_relay_not_added": true,
-    "inference_routing_no_conflict": true
+    "inference_routing_no_conflict": true,
+    "approved_model_family_enforced": true,
+    "http_inference_field_allowlist_enforced": true,
+    "no_governance_in_inference_endpoint": true
   },
 
   "failures": [
@@ -225,10 +234,10 @@
       "symptom": "CUDA error: no kernel image is available for execution on the device",
       "root_cause": "ghcr.io/nvidia/nemoclaw/llama-cpp-server image compiled for sm_80/86, not sm_90a",
       "maiw_impact": "None — inference provider only, MAIW security boundary unaffected",
-      "resolution": "Resolved via workaround: H100-compatible local NIM containers (wms-nim-nano-8b on port 8002, wms-nim-teacher-49b on port 8010) were already running on the host. Selected nvidia/llama-3.1-nemotron-nano-8b-v1 via ModelGateway on host side.",
+      "resolution": "Resolved via workaround: H100-compatible local NIM containers (wms-nim-nano-8b on port 8002) deployed on host. Used nvidia/llama-3.1-nemotron-nano-8b-v1 as TRANSPORT SMOKE TEST ONLY (not approved for v2 qualification).",
       "fixed": true,
       "workaround": true,
-      "workaround_details": "ModelGateway runs on HOST and calls localhost:8002 directly (not through OpenShell SSRF). NemoClaw llama-cpp image issue does not affect this path."
+      "model_family_note": "nvidia/llama-3.1-nemotron-nano-8b-v1 is classified TRANSPORT_SMOKE_TEST_ONLY. Approved Nemotron 3/3.5 NIM deployment is the production path."
     },
     {
       "id": "F02",
@@ -238,94 +247,51 @@
       "symptom": "HTTP 401/block for localhost/private IPs from inside sandbox",
       "root_cause": "NemoClaw SSRF correctly blocks sandbox outbound calls to private/localhost IPs — documented behavior",
       "maiw_impact": "Cannot call local NIM directly from sandbox (by design). SSRF is NOT weakened.",
-      "resolution": "Architecture clarified: MAIW ModelGateway runs on HOST. When a MAIW ModelGateway HTTP endpoint exists (Phase 20C), the sandbox will call that endpoint (a network-addressable, non-localhost URL that passes SSRF). The host-side ModelGateway then calls localhost:8002. This maintains SSRF protection — no code change needed.",
+      "resolution": "Architecture implemented in Phase 20C-A: MAIW ModelGateway runs on HOST. Sandbox calls POST /api/v1/inference (network-addressable URL that passes SSRF). Host-side ModelGateway calls NIM provider (which may be localhost from the host perspective). SSRF protection maintained — no code change needed.",
       "fixed": false,
       "expected_behavior": true,
-      "architecturally_resolved": "PENDING_SANDBOX_LEG_PROOF",
-      "sandbox_leg_note": "F02 can only be declared 'resolved architecturally' after the sandbox→sanctioned-host-endpoint path is demonstrated in a real OpenShell sandbox. That requires the Phase 20C MAIW ModelGateway HTTP endpoint."
+      "architecturally_resolved": "ENDPOINT_LIVE_SANDBOX_LEG_PENDING",
+      "phase_20c_a_status": "HTTP endpoint is live. Sandbox→endpoint call requires @real_sandbox qualification test."
     },
     {
       "id": "F03",
       "severity": "P2",
       "category": "Fixed",
       "title": "HF cache group-writable permission",
-      "symptom": "The shared Hugging Face cache is not current-user filesystem authority",
-      "root_cause": "~/.cache/huggingface/ had mode 0775 (group-writable)",
-      "maiw_impact": "None — installation-time check",
-      "resolution": "chmod 755 ~/.cache/huggingface/",
-      "fixed": true
+      "fixed": true,
+      "resolution": "chmod 755 ~/.cache/huggingface/"
     },
     {
       "id": "F04",
       "severity": "P2",
       "category": "Environment",
       "title": "NGC API key invalid",
-      "symptom": "ngc config current shows Invalid apikey",
-      "root_cause": "NGC credentials not configured on this host",
-      "maiw_impact": "Cannot use NVIDIA Build API for inference",
-      "resolution": "Configure NGC API key from build.nvidia.com",
-      "fixed": false
+      "fixed": false,
+      "resolution": "Configure NGC API key from build.nvidia.com"
     }
   ],
 
-  "real_inference_qualification": {
-    "provider_path": "MAIWModelGatewayChat -> ModelGateway -> NIMProvider -> NIMClient -> localhost:8002 (nvidia/llama-3.1-nemotron-nano-8b-v1)",
-    "branch": "fix/phase-20b-inference-requalification",
-    "test_file": "tests/contract/test_phase_20b_real_inference.py",
-    "tests_total": 16,
-    "tests_passing": 16,
-    "tests_nim_required": 3,
-    "nim_required_note": "3 tests require live NIM at localhost:8002; skipped automatically when NIM not reachable",
-    "sandbox_leg_tested": false,
-    "sandbox_leg_gap": "Real sandbox→host-ModelGateway→NIM path not yet proven; MAIW ModelGateway HTTP endpoint (Phase 20C) does not exist",
-    "qualification_date": "2026-10-03",
-    "key_tests": [
-      "test_step7_real_inference_via_model_gateway: PASS (@nim_required)",
-      "test_step7_chat_adapter_real_inference_via_gateway: PASS (@nim_required)",
-      "test_step7_exactly_one_gateway_call_per_inference: PASS",
-      "test_step7_trace_id_propagated_through_gateway: PASS",
-      "test_step7_no_direct_provider_call_from_agent_code: PASS",
-      "test_step8_sop_a_governance_boundary_with_real_gateway: PASS (@nim_required)",
-      "test_step9_agent_code_cannot_instantiate_nim_client: PASS",
-      "test_step9_model_adapter_only_imports_model_request: PASS",
-      "test_step10_gateway_failure_is_failure_not_mock: PASS",
-      "test_step10_chat_adapter_gateway_failure_is_failure_not_mock: PASS",
-      "test_step11_availability_does_not_override_eligibility: PASS",
-      "test_step12_expired_deadline_raises_before_provider_call: PASS",
-      "test_step13_injected_prompt_does_not_alter_model_request_routing: PASS",
-      "test_step13_credentials_not_injected_into_adapter_response: PASS",
-      "test_step14_sandbox_policy_network_default_deny: PASS",
-      "test_step14_sandbox_policy_write_never_rendered: PASS"
-    ]
-  },
-
-  "phase_20c_readiness": {
-    "maiw_source_baseline": "READY",
-    "nemoclaw_cli": "READY",
-    "openshell_gateway": "READY",
-    "sandbox_image": "READY",
-    "inference_provider": "PARTIAL",
-    "inference_provider_note": "Host-side NIM (localhost:8002) qualified via MAIW ModelGateway on host. Sandbox→host-ModelGateway HTTP endpoint does not exist yet (Phase 20C prerequisite).",
-    "security_boundary_code": "READY",
-    "security_boundary_runtime": "PARTIAL",
-    "security_boundary_runtime_note": "Host-side inference chain and policy code verified. Real sandbox→host-endpoint leg not yet proven.",
-    "sop_a_sandbox_run": "NOT_READY",
-    "sop_a_sandbox_note": "test_step8 runs host-side pytest, NOT inside a real OpenShell sandbox. Real sandboxed SOP A run requires Phase 20C MAIW ModelGateway HTTP endpoint.",
-    "governance_inbox_durability": "DEFERRED",
-    "maiw_gateway_http_endpoint": "NOT_READY"
+  "phase_20c_a_readiness": {
+    "approved_nemotron_policy_code": "COMPLETE",
+    "http_inference_endpoint": "COMPLETE",
+    "sandbox_http_client": "COMPLETE",
+    "model_family_policy_tests": "COMPLETE — 54 contract tests pass",
+    "real_sandbox_qualification": "PENDING — requires @real_sandbox tests with live NemoClaw sandbox + approved Nemotron NIM",
+    "ssrf_end_to_end": "PENDING — code complete, runtime verification requires real sandbox",
+    "approved_nemotron_real_response": "PENDING — requires live approved Nemotron 3/3.5 NIM on host"
   },
 
   "audit_trail": {
     "nemoclaw_installer_url": "https://raw.githubusercontent.com/NVIDIA/NemoClaw/refs/heads/main/install.sh",
     "nemoclaw_source_commit": "6f3cced4230ae9660c049cc11804daf37797c595",
     "openshell_release": "v0.0.116",
-    "model_downloaded": "unsloth/Nemotron-3-Nano-30B-A3B-GGUF (22.8 GB)",
-    "container_image": "ghcr.io/nvidia/nemoclaw/llama-cpp-server@sha256:9d0cddd7bcaf98d3b75a7fc8c7ce3af3a9973b5f23a8092e7e93a9afc473a675",
-    "local_nim_container": "wms-nim-nano-8b (nvidia/llama-3.1-nemotron-nano-8b-v1 on port 8002)",
-    "maiw_test_run_baseline": "584 passed in 2.23s",
-    "maiw_test_run_phase20b": "16/16 tests/contract/test_phase_20b_real_inference.py passed",
+    "phase_20b_test_model": "nvidia/llama-3.1-nemotron-nano-8b-v1 (TRANSPORT_SMOKE_TEST_ONLY)",
+    "phase_20b_local_nim": "wms-nim-nano-8b (port 8002)",
+    "phase_20c_a_branch": "feat/phase-20c-approved-nemotron-http-boundary",
+    "phase_20c_a_test_count": 54,
+    "maiw_test_run_baseline": "600+ passed",
+    "maiw_test_run_phase20c": "54/54 tests/contract/test_phase_20c_approved_nemotron.py passed",
     "qualification_date": "2026-10-03",
-    "requalification_date": "2026-10-03",
-    "requalification_branch": "fix/phase-20b-inference-requalification"
+    "phase_20c_date": "2026-10-03"
   }
 }

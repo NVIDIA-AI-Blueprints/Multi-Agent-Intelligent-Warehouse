@@ -35,8 +35,6 @@ from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
 
-
-
 # ── Structural protocol (no API-layer import) ─────────────────────────────────
 
 

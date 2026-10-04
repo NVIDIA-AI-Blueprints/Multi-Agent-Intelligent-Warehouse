@@ -25,8 +25,8 @@ import json
 import asyncio
 import hashlib
 import math
-from typing import TYPE_CHECKING, Dict, List, Optional, Any, Union
-from dataclasses import dataclass, asdict
+from typing import TYPE_CHECKING, Dict, List, Optional, Any
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 import os
@@ -121,9 +121,8 @@ class NIMConfig:
     """
 
     llm_api_key: str = os.getenv("MAIW_NIM_API_KEY") or os.getenv("NVIDIA_API_KEY", "")
-    llm_base_url: str = (
-        os.getenv("MAIW_NIM_BASE_URL")
-        or os.getenv("LLM_NIM_URL", "https://integrate.api.nvidia.com/v1")
+    llm_base_url: str = os.getenv("MAIW_NIM_BASE_URL") or os.getenv(
+        "LLM_NIM_URL", "https://integrate.api.nvidia.com/v1"
     )
     embedding_api_key: str = os.getenv("EMBEDDING_API_KEY") or os.getenv(
         "NVIDIA_API_KEY", ""
@@ -131,13 +130,10 @@ class NIMConfig:
     embedding_base_url: str = os.getenv(
         "EMBEDDING_NIM_URL", "https://integrate.api.nvidia.com/v1"
     )
-    llm_model: str = (
-        os.getenv("MAIW_NIM_MODEL")
-        or os.getenv("LLM_MODEL", "nvidia/nemotron-3-super-120b-a12b")
+    llm_model: str = os.getenv("MAIW_NIM_MODEL") or os.getenv(
+        "LLM_MODEL", "nvidia/nemotron-3-super-120b-a12b"
     )
-    embedding_model: str = os.getenv(
-        "EMBEDDING_MODEL", "nvidia/nemotron-3-embed-1b"
-    )
+    embedding_model: str = os.getenv("EMBEDDING_MODEL", "nvidia/nemotron-3-embed-1b")
     timeout: int = _getenv_int(
         "LLM_CLIENT_TIMEOUT", 240
     )  # 240s code default (doubled) to prevent premature timeouts
@@ -257,9 +253,9 @@ class NIMClient:
             or "0.0.0.0" in parsed_url.netloc
         ):
             logger.warning(
-                f"⚠️  SECURITY WARNING: LLM_NIM_URL uses HTTP protocol (insecure). "
-                f"Use HTTPS for production deployments to encrypt API communications. "
-                f"HTTP is only acceptable for localhost/development environments."
+                "⚠️  SECURITY WARNING: LLM_NIM_URL uses HTTP protocol (insecure). "
+                "Use HTTPS for production deployments to encrypt API communications. "
+                "HTTP is only acceptable for localhost/development environments."
             )
 
         # Log configuration (without exposing API key)
@@ -601,7 +597,7 @@ class NIMClient:
                     )
                     # Don't retry 404 errors - configuration issue
                     raise ConnectionError(
-                        f"LLM service endpoint not found. Please check the LLM service configuration."
+                        "LLM service endpoint not found. Please check the LLM service configuration."
                     ) from e
                 elif status_code == 401 or status_code == 403:
                     logger.error(
@@ -609,7 +605,7 @@ class NIMClient:
                     )
                     # Don't retry auth errors
                     raise ConnectionError(
-                        f"LLM service authentication failed. Please check API key configuration."
+                        "LLM service authentication failed. Please check API key configuration."
                     ) from e
                 elif status_code == 429:
                     # Rate limit - retry with backoff

@@ -53,7 +53,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import time
 from datetime import datetime, timezone
 from typing import Any
 
@@ -67,7 +66,6 @@ from .benchmark import (
     BenchmarkMetadata,
     BenchmarkModelResult,
     BenchmarkRun,
-    OracleResult,
     RouterSelectionRecord,
     compute_decision_gate,
     compute_oracle,
@@ -77,7 +75,6 @@ from .benchmark import (
 from .fixtures import (
     FIXTURE_DATASET_ID,
     FIXTURE_DATAPACK_CHECKSUM,
-    get_fixture_input,
 )
 from .graders import EvaluationGrader, default_graders, run_graders
 from .models import EvaluationCase, make_evaluation_run_key

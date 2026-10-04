@@ -48,7 +48,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from .graders import GraderResult, default_graders, run_graders
+from .graders import run_graders
 from .models import EvaluationCase, ModelEvaluationResult
 
 # ── Grader criticality ────────────────────────────────────────────────────────

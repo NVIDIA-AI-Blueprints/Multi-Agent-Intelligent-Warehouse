@@ -555,10 +555,10 @@ POLICY_ELIGIBILITY: dict[str, str] = {
     "analyze-action-v1": "POLICY ELIGIBLE",
     "comparative-reasoning-v1": "POLICY ELIGIBLE",
     # 18E corpus (Cases A–F)
-    "wave17-risk-low-v1": "POLICY ELIGIBLE",        # Case A
+    "wave17-risk-low-v1": "POLICY ELIGIBLE",  # Case A
     # Case B = evidence-ask-labor-v1 (18D)          # Case B
-    "equipment-ask-low-v1": "POLICY ELIGIBLE",       # Case C
-    "healthy-baseline-ask-v1": "POLICY ELIGIBLE",    # Case D
+    "equipment-ask-low-v1": "POLICY ELIGIBLE",  # Case C
+    "healthy-baseline-ask-v1": "POLICY ELIGIBLE",  # Case D
     # Case E = analyze-action-v1 (18D)               # Case E
     # Case F = comparative-reasoning-v1 (18D)        # Case F
 }
@@ -594,8 +594,8 @@ ALL_18D_FIXTURE_INPUTS = [
 
 # 18E additions — Nano qualification corpus (Cases A, C, D; B/E/F reuse 18D)
 ALL_18E_FIXTURE_CASES = [
-    wave17_risk_low,       # Case A
-    equipment_ask_low,     # Case C
+    wave17_risk_low,  # Case A
+    equipment_ask_low,  # Case C
     healthy_baseline_ask,  # Case D
 ]
 
@@ -607,12 +607,12 @@ ALL_18E_FIXTURE_INPUTS = [
 
 # 18E qualification corpus — all 6 policy-eligible cases (A–F)
 NANO_QUALIFICATION_CORPUS: list[EvaluationCase] = [
-    wave17_risk_low,          # A
-    evidence_ask_labor,       # B
-    equipment_ask_low,        # C
-    healthy_baseline_ask,     # D
-    analyze_action,           # E
-    comparative_reasoning,    # F
+    wave17_risk_low,  # A
+    evidence_ask_labor,  # B
+    equipment_ask_low,  # C
+    healthy_baseline_ask,  # D
+    analyze_action,  # E
+    comparative_reasoning,  # F
 ]
 
 # Combined registry (all 18B + 18D + 18E cases)

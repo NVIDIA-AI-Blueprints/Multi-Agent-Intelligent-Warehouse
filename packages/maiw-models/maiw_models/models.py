@@ -231,9 +231,13 @@ class ModelRouteDecision(BaseModel):
     requested_reasoning: ReasoningLevel
     requested_risk_level: RiskLevel
     # Phase 18B provenance fields.
-    routing_strategy: str = "rules"  # always "rules" until adaptive routing is introduced
+    routing_strategy: str = (
+        "rules"  # always "rules" until adaptive routing is introduced
+    )
     routing_latency_ms: float = 0.0  # monotonic time for route selection only
-    candidate_models: list[str] = Field(default_factory=list)  # model_ids post-policy-filter
+    candidate_models: list[str] = Field(
+        default_factory=list
+    )  # model_ids post-policy-filter
 
 
 # ── Response ──────────────────────────────────────────────────────────────────

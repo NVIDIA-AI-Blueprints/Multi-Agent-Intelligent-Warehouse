@@ -52,6 +52,7 @@ logger = logging.getLogger(__name__)
 
 # ── Errors ────────────────────────────────────────────────────────────────────
 
+
 class SandboxBoundaryViolation(ValueError):
     """
     A message crossing the sandbox boundary failed host-side validation.
@@ -62,17 +63,24 @@ class SandboxBoundaryViolation(ValueError):
     operator, not for control flow.
     """
 
-    def __init__(self, *, reason: str, procedure_execution_id: str | None = None) -> None:
+    def __init__(
+        self, *, reason: str, procedure_execution_id: str | None = None
+    ) -> None:
         self.reason = reason
         self.procedure_execution_id = procedure_execution_id
         super().__init__(
-            f"sandbox boundary violation"
-            + (f" (procedure={procedure_execution_id})" if procedure_execution_id else "")
+            "sandbox boundary violation"
+            + (
+                f" (procedure={procedure_execution_id})"
+                if procedure_execution_id
+                else ""
+            )
             + f": {reason}"
         )
 
 
 # ── sandbox → host ────────────────────────────────────────────────────────────
+
 
 class SandboxRecommendedActionOutput(BaseModel):
     """
@@ -92,9 +100,7 @@ class SandboxRecommendedActionOutput(BaseModel):
     trace_id: str
     recommended_action: RecommendedAction
     procedure_state_revision: int = Field(ge=0)
-    timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 def validate_sandbox_output(
@@ -183,6 +189,7 @@ def validate_sandbox_output(
 
 # ── host → sandbox ────────────────────────────────────────────────────────────
 
+
 class SandboxGovernanceInput(BaseModel):
     """
     The serialised form of a ``GovernanceOutcome`` returning to a procedure.
@@ -199,9 +206,7 @@ class SandboxGovernanceInput(BaseModel):
     agent_task_id: str
     governance_outcome: GovernanceOutcome
     expected_procedure_revision: int = Field(ge=0)
-    timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     @property
     def idempotency_key(self) -> tuple[str, str, int]:
@@ -281,7 +286,10 @@ def validate_governance_input(
     inbox records the drop. A caller that needs to distinguish "newly applied"
     from "already applied" calls ``inbox.accept`` itself and branches on that.
     """
-    if governance_input.procedure_execution_id != procedure_state.procedure_execution_id:
+    if (
+        governance_input.procedure_execution_id
+        != procedure_state.procedure_execution_id
+    ):
         raise SandboxBoundaryViolation(
             procedure_execution_id=governance_input.procedure_execution_id,
             reason=(

@@ -178,8 +178,7 @@ async def _run_benchmark(args: argparse.Namespace) -> int:
 
 def _validate_infrastructure(registry: Any, cases: list, deployment_mode: Any) -> None:
     """Validate that all infrastructure is importable and functional."""
-    from maiw_models.evaluation.runner import EvaluationRunner, record_router_selection
-    from maiw_models.evaluation.benchmark import compute_oracle, compute_router_regret
+    from maiw_models.evaluation.runner import record_router_selection
     from maiw_models.evaluation.inventory import build_candidate_inventory
 
     inventory = build_candidate_inventory(registry, deployment_mode)
@@ -208,13 +207,11 @@ def _make_dry_run_result(
         BenchmarkRun,
         BenchmarkModelResult,
         OracleResult,
-        compute_decision_gate,
     )
     from maiw_models.evaluation.fixtures import (
         FIXTURE_DATASET_ID,
         FIXTURE_DATAPACK_CHECKSUM,
     )
-    from maiw_models.evaluation.inventory import build_candidate_inventory
     from maiw_models.evaluation.runner import record_router_selection
     from maiw_models.routing import PolicyFilter
     from maiw_models.evaluation.runner import (
@@ -361,8 +358,8 @@ def _generate_markdown_report(data: dict) -> str:
     lines.append("")
     lines.append("## Evaluation Identity")
     lines.append("")
-    lines.append(f"| Field | Value |")
-    lines.append(f"|-------|-------|")
+    lines.append("| Field | Value |")
+    lines.append("|-------|-------|")
     lines.append(f"| Phase | {meta.get('phase', '18C')} |")
     lines.append(f"| Dataset | `{meta.get('dataset_id', '')}` |")
     lines.append(f"| Semantic Checksum | `{meta.get('semantic_checksum', '')}` |")
@@ -433,7 +430,7 @@ def _generate_markdown_report(data: dict) -> str:
                 f"- Fastest passing: `{fp.get('model_id', 'N/A')}` "
                 f"({fp.get('total_latency_ms', 0):.0f}ms)"
             )
-            lines.append(f"- Lowest cost: unavailable (no pricing metadata)")
+            lines.append("- Lowest cost: unavailable (no pricing metadata)")
             lines.append("")
 
         regret = case.get("regret")

@@ -1,12 +1,23 @@
-# MAIW Phase 20B — NemoClaw/OpenShell Deep Agents Security Qualification
+# MAIW Phase 20B + 20C-A — NemoClaw/OpenShell Deep Agents Security Qualification
 
-**Date:** 2026-10-03  
+**Date:** 2026-10-03 (Phase 20B) / 2026-10-03 (Phase 20C-A addendum)
 **Host:** epg-tme-smc-h100-02  
-**Qualification branch:** fix/phase-20b-inference-requalification  
-**Baseline:** nvidia/main @ 3ab9505  
+**Qualification branch:** feat/phase-20c-approved-nemotron-http-boundary  
+**Phase 20B baseline:** nvidia/main @ 3ab9505  
+**Phase 20C-A baseline:** nvidia/main @ 6cc6567  
 **NemoClaw version:** v0.0.124  
 **OpenShell version:** v0.0.116  
-**Qualification verdict:** HOST_SIDE_INFERENCE_QUALIFIED (real sandbox leg INCOMPLETE)
+**Qualification verdict:** HOST_SIDE_INFERENCE_QUALIFIED+HTTP_BOUNDARY_COMPLETE (real sandbox leg INCOMPLETE — pending @real_sandbox tests with approved Nemotron NIM)
+
+---
+
+> **HISTORICAL MODEL EVIDENCE CORRECTION (Phase 20C-A):**
+> Phase 20B used `nvidia/llama-3.1-nemotron-nano-8b-v1` as the inference provider.
+> This model is reclassified as **TRANSPORT_SMOKE_TEST_ONLY** — it proved NIM transport
+> mechanics but is **NOT approved** for MAIW v2 production or qualification.
+> It belongs to the Llama-family Nemotron lineage, not Nemotron 3 / Nemotron 3.5.
+> MAIW v2 approved families: `nemotron-3`, `nemotron-3.5` only.
+> Constant: `TRANSPORT_SMOKE_TEST_MODEL` in `packages/maiw-models/maiw_models/registry.py`.
 
 ---
 
@@ -26,13 +37,15 @@ MAIW was qualified against a real NVIDIA NemoClaw/OpenShell Deep Agents environm
 - Network isolation (internal Docker network) confirmed
 
 **What is limited / resolved:**
-- llama.cpp managed inference: FAILED due to H100 NVL CUDA compute capability (sm_90a) mismatch — **RESOLVED** via host-side NIM workaround (nvidia/llama-3.1-nemotron-nano-8b-v1 on port 8002, H100-native, running on host before qualification)
-- OpenShell SSRF blocks sandbox→localhost/private IPs: **EXPECTED BEHAVIOR, NOT A BUG** — MAIW ModelGateway runs on HOST; host→localhost:8002 is not subject to sandbox SSRF policy
+- llama.cpp managed inference: FAILED due to H100 NVL CUDA compute capability (sm_90a) mismatch — **RESOLVED** via host-side NIM workaround (nvidia/llama-3.1-nemotron-nano-8b-v1 on port 8002, H100-native, running on host before qualification). **NOTE:** This model is `TRANSPORT_SMOKE_TEST_ONLY` — not approved for MAIW v2 qualification. Production path: approved Nemotron 3/3.5 NIM.
+- OpenShell SSRF blocks sandbox→localhost/private IPs: **EXPECTED BEHAVIOR, NOT A BUG** — MAIW ModelGateway runs on HOST; host→localhost:8002 is not subject to sandbox SSRF policy. Phase 20C-A delivers `POST /api/v1/inference` HTTP endpoint (network-addressable, passes SSRF).
 - NGC API key: invalid on this host — remains unresolved, not needed for local NIM path
 
-**Phase 20B requalification:** HOST-SIDE INFERENCE QUALIFIED — 16/16 contract tests pass (`tests/contract/test_phase_20b_real_inference.py`). Host-side inference chain verified: `MAIWModelGatewayChat → ModelGateway → NIMProvider → NIMClient → localhost:8002`. SSRF NOT weakened. ModelGateway NOT bypassed.
+**Phase 20B requalification:** HOST-SIDE INFERENCE QUALIFIED — 16/16 contract tests pass (`tests/contract/test_phase_20b_real_inference.py`). Host-side inference chain verified: `MAIWModelGatewayChat → ModelGateway → NIMProvider → NIMClient → localhost:8002`. SSRF NOT weakened. ModelGateway NOT bypassed. Model used: `nvidia/llama-3.1-nemotron-nano-8b-v1` (TRANSPORT_SMOKE_TEST_ONLY — NOT approved for MAIW v2 qualification).
 
-**REAL SANDBOX LEG: INCOMPLETE** — The real OpenShell sandbox→sanctioned-host-ModelGateway-endpoint→NIM path is NOT yet proven. The MAIW ModelGateway HTTP endpoint does not exist (Phase 20C prerequisite). All Phase 20B tests run on the host, not inside a real OpenShell sandbox.
+**Phase 20C-A addendum:** APPROVED NEMOTRON POLICY + HTTP BOUNDARY COMPLETE — 54/54 contract tests pass (`tests/contract/test_phase_20c_approved_nemotron.py`). `PolicyFilter` now enforces `APPROVED_MODEL_GENERATIONS = frozenset({"nemotron-3", "nemotron-3.5"})`. `POST /api/v1/inference` HTTP endpoint live with strict field allowlist. `MAIWHTTPModelGatewayClient` sandbox transport client built; no fallback path. SSRF NOT weakened.
+
+**REAL SANDBOX LEG: INCOMPLETE** — The real OpenShell sandbox→sanctioned-host-ModelGateway-endpoint→approved-Nemotron-NIM path is NOT yet proven. All tests run on the host. Real sandbox leg requires @real_sandbox qualification tests with a live NemoClaw sandbox and an approved Nemotron 3/3.5 NIM deployment.
 
 ---
 
@@ -169,6 +182,10 @@ All invariants are enforced by Pydantic validators that run on every constructio
 | Monotonicity | `assert_not_broadened` called on every render | VERIFIED |
 | Credential custody host-only | `credential_custody: Literal["host_only"] = "host_only"` | VERIFIED |
 | DETERMINISTIC output | Hand-ordered YAML, no timestamps or UUIDs emitted | VERIFIED |
+| Approved model family (Phase 20C-A) | `PolicyFilter.APPROVED_MODEL_GENERATIONS = frozenset({"nemotron-3", "nemotron-3.5"})` — constraint 2 in `_is_eligible()` | VERIFIED |
+| HTTP field allowlist (Phase 20C-A) | `InferenceRequest._reject_forbidden_fields` blocks provider_url, api_key, force_model_id, deployment_mode, etc. | VERIFIED |
+| No transport fallback (Phase 20C-A) | `MAIWHTTPModelGatewayClient` raises on failure; no fallback to local gateway, NIM, or mock | VERIFIED |
+| SSRF not weakened (Phase 20C-A) | `MAIWHTTPModelGatewayClient` rejects localhost/loopback at construction | VERIFIED |
 
 ### Sandbox Boundary Message Validation (Code-Verified)
 
@@ -251,6 +268,10 @@ The following MAIW design principles are proven intact through this qualificatio
 4. **Warehouse credentials are NOT in the sandbox** — confirmed by `injected_credentials=()` invariant and container secret-mount pattern
 5. **NeMo Relay is NOT added** — confirmed; MAIW uses MAIW ModelGateway directly
 6. **NemoClaw inference routing does NOT conflict with MAIW ModelGateway** — confirmed as parallel independent paths
+7. **Approved model family enforced (Phase 20C-A)** — `PolicyFilter.APPROVED_MODEL_GENERATIONS = frozenset({"nemotron-3", "nemotron-3.5"})` rejects Llama-family, Qwen, and unknown-generation models at routing time
+8. **HTTP inference field allowlist enforced (Phase 20C-A)** — `InferenceRequest._reject_forbidden_fields` blocks `provider_url`, `api_key`, `base_url`, `api_key_env_var`, `deployment_endpoint`, `force_model_id`, `model_id`, `deployment_mode`
+9. **No transport fallback (Phase 20C-A)** — `MAIWHTTPModelGatewayClient` raises `SandboxInferenceError` on any HTTP failure; no fallback to local gateway, direct NIM, or mock
+10. **SSRF not weakened (Phase 20C-A)** — `MAIWHTTPModelGatewayClient` rejects localhost/loopback at construction; inference endpoint does not expose provider URLs
 
 ---
 
@@ -277,22 +298,57 @@ The following MAIW design principles are proven intact through this qualificatio
 
 **Total: 16/16 PASS**
 
-## Phase 20C Readiness Assessment
+**Model evidence correction:** Phase 20B tests used `nvidia/llama-3.1-nemotron-nano-8b-v1`. This model is **TRANSPORT_SMOKE_TEST_ONLY** — it proved transport mechanics (NIM provider path, real ModelResponse, failure handling, deadline propagation, prompt injection resistance) but is NOT approved for MAIW v2 qualification. MAIW v2 approved families: `nemotron-3`, `nemotron-3.5`.
 
-| Area | Status | Blocker |
-|------|--------|---------|
-| MAIW source baseline | READY | — |
-| NemoClaw CLI installed | READY | — |
-| OpenShell gateway | READY | — |
-| Sandbox image | READY | — |
-| Inference provider | PARTIAL | Host-side NIM qualified; no sandbox→host-ModelGateway HTTP endpoint yet |
-| Security boundary code | READY | — |
-| Security boundary runtime | PARTIAL | Host-side proven; real sandbox leg requires Phase 20C ModelGateway HTTP endpoint |
-| SOP A real sandbox run | NOT READY | test_step8 is host-side pytest; real sandboxed run requires Phase 20C |
-| GovernanceInbox durability | DEFERRED | In-memory only (documented) |
-| MAIW ModelGateway HTTP endpoint | NOT READY | Phase 20C blocker — required for sandbox→host inference |
+---
 
-**Phase 20B status:** Host-side inference chain qualified. Real sandbox leg requires a MAIW ModelGateway HTTP endpoint (Phase 20C). Phase 20C cannot proceed until that endpoint exists and the sandbox→endpoint→NIM topology is demonstrated.
+## Phase 20C-A Contract Test Results
+
+| Test Class | Tests | Status |
+|------------|-------|--------|
+| TestModelFamilyPolicy | 8 | PASS |
+| TestInferenceHTTPContract | 20 | PASS |
+| TestHTTPClientContract | 10 | PASS |
+| TestSandboxPolicy | 8 | PASS |
+| TestRegistryReclassification | 4 | PASS |
+| TestModelInventory | 4 | PASS |
+| **TOTAL** | **54** | **PASS** |
+
+File: `tests/contract/test_phase_20c_approved_nemotron.py`
+
+Key invariants exercised:
+- `PolicyFilter` rejects generation not in `{"nemotron-3", "nemotron-3.5"}`
+- All four approved Nemotron roles (lightning, nano, super, ultra) are eligible
+- `nvidia/llama-3.1-nemotron-nano-8b-v1` (Llama-family Nemotron) is rejected
+- `POST /api/v1/inference` field allowlist rejects all forbidden fields
+- `INTERNAL_TOKEN` auth gate enforced (401 without token)
+- `DeploymentMode.NVIDIA_HOSTED` always set; sandbox cannot override
+- `get_model_gateway()` singleton used; never re-created per request
+- `MAIWHTTPModelGatewayClient` rejects localhost endpoints at construction
+- HTTP errors map to 504 DEADLINE_EXCEEDED / 503 MODEL_UNAVAILABLE / 503 PROVIDER_FAILURE
+- `TRANSPORT_SMOKE_TEST_MODEL` constant exists; `approved_for_v2_qualification = False`
+
+---
+
+## Phase 20C-A Completion Assessment
+
+| Area | Status | Notes |
+|------|--------|-------|
+| MAIW source baseline | COMPLETE | nvidia/main @ 6cc6567 |
+| NemoClaw CLI installed | COMPLETE | v0.0.124 |
+| OpenShell gateway | COMPLETE | v0.0.116 |
+| Sandbox image | COMPLETE | ghcr.io/nvidia/nemoclaw/langchain-deepagents-code-sandbox |
+| Approved model family policy | COMPLETE | PolicyFilter enforces nemotron-3/3.5; 54 contract tests pass |
+| HTTP inference endpoint | COMPLETE | POST /api/v1/inference live; field allowlist enforced |
+| Sandbox HTTP transport client | COMPLETE | MAIWHTTPModelGatewayClient; no fallback; localhost rejected |
+| Security boundary code | COMPLETE | All invariants enforced |
+| TRANSPORT_SMOKE_TEST_MODEL reclassification | COMPLETE | llama-3.1-nemotron-nano-8b-v1 → TRANSPORT_SMOKE_TEST_ONLY |
+| Real sandbox leg (sandbox→endpoint→approved-NIM) | PENDING | Requires @real_sandbox tests + approved Nemotron 3/3.5 NIM |
+| SOP A real sandbox run | PENDING | test_step8 host-side; real sandbox requires live NemoClaw session |
+| GovernanceInbox durability | DEFERRED | In-memory only (documented, pre-Phase-20C concern) |
+| Approved Nemotron 3/3.5 NIM deployment | PENDING | ngc key needed; requires separate NIM container for approved model |
+
+**Phase 20C-A status:** Code complete. 54 new contract tests pass. Real sandbox qualification requires a live NemoClaw sandbox session with an approved Nemotron 3/3.5 NIM deployed on the host. Phase 20C-B (real sandbox qualification round) is the next phase.
 
 ---
 
@@ -303,5 +359,10 @@ The following MAIW design principles are proven intact through this qualificatio
 - OpenShell release: `v0.0.116`
 - Model downloaded: `unsloth/Nemotron-3-Nano-30B-A3B-GGUF` (22.8 GB, SHA verified)
 - Container image: `ghcr.io/nvidia/nemoclaw/llama-cpp-server@sha256:9d0cddd7bcaf98d3b75a7fc8c7ce3af3a9973b5f23a8092e7e93a9afc473a675`
-- MAIW test run: 584 passed in 2.23s
-- Qualification date: 2026-10-03
+- Phase 20B MAIW test run: 584 passed in 2.23s
+- Phase 20B transport model: `nvidia/llama-3.1-nemotron-nano-8b-v1` — reclassified **TRANSPORT_SMOKE_TEST_ONLY** in Phase 20C-A
+- Phase 20C-A MAIW test run: 54/54 `tests/contract/test_phase_20c_approved_nemotron.py` passed
+- Phase 20C-A branch: `feat/phase-20c-approved-nemotron-http-boundary`
+- Phase 20C-A baseline: nvidia/main @ 6cc6567
+- Phase 20B qualification date: 2026-10-03
+- Phase 20C-A qualification date: 2026-10-03

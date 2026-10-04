@@ -35,7 +35,7 @@ import asyncio
 import logging
 import shutil
 from dataclasses import dataclass
-from typing import Any, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from maiw_agents.contracts.agent import AgentDefinition
 from maiw_agents.contracts.capability_policy import (
@@ -57,6 +57,7 @@ logger = logging.getLogger(__name__)
 
 
 # ── Errors ────────────────────────────────────────────────────────────────────
+
 
 class SandboxUnavailableError(RuntimeError):
     """
@@ -90,6 +91,7 @@ class SandboxPolicyApplicationError(SandboxUnavailableError):
 
 # ── Availability ──────────────────────────────────────────────────────────────
 
+
 @dataclass(frozen=True)
 class SandboxAvailability:
     """Whether a sandbox can be provided, and what is backing it."""
@@ -101,6 +103,7 @@ class SandboxAvailability:
 
 
 # ── Provisioner seam ──────────────────────────────────────────────────────────
+
 
 @runtime_checkable
 class SandboxProvisioner(Protocol):
@@ -236,7 +239,10 @@ class ContainerSandboxProvisioner:
             )
         try:
             proc = await asyncio.create_subprocess_exec(
-                path, "info", "--format", "{{.ServerVersion}}",
+                path,
+                "info",
+                "--format",
+                "{{.ServerVersion}}",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -321,6 +327,7 @@ def container_run_args(rendered: RenderedSandboxPolicy) -> list[str]:
 
 
 # ── The decorator ─────────────────────────────────────────────────────────────
+
 
 class SandboxedAgentRuntime:
     """
@@ -424,14 +431,14 @@ class SandboxedAgentRuntime:
 
         if not availability.available:
             if mode is SandboxMode.SANDBOX_REQUIRED:
-                raise SandboxUnavailableError(
-                    reason=availability.detail, mode=mode
-                )
+                raise SandboxUnavailableError(reason=availability.detail, mode=mode)
             logger.warning(
                 "SANDBOX UNAVAILABLE — continuing unsandboxed (mode=%s): %s. "
                 "MAIW capability policy %s still applies; the sandbox was the "
                 "second wall, not the only one.",
-                mode.value, availability.detail, policy.policy_id,
+                mode.value,
+                availability.detail,
+                policy.policy_id,
             )
             return
 
@@ -452,9 +459,10 @@ class SandboxedAgentRuntime:
                     reason=f"{type(exc).__name__}: {exc}", mode=mode
                 ) from exc
             logger.warning(
-                "SANDBOX POLICY NOT APPLIED — continuing unsandboxed (mode=%s): "
-                "%s: %s",
-                mode.value, type(exc).__name__, exc,
+                "SANDBOX POLICY NOT APPLIED — continuing unsandboxed (mode=%s): %s: %s",
+                mode.value,
+                type(exc).__name__,
+                exc,
             )
             return
 
@@ -474,7 +482,8 @@ class SandboxedAgentRuntime:
         except Exception as exc:  # noqa: BLE001 — a probe that errors has not proved availability
             logger.warning(
                 "sandbox probe raised %s: %s — treating as unavailable",
-                type(exc).__name__, exc,
+                type(exc).__name__,
+                exc,
             )
             return SandboxAvailability(
                 available=False,

@@ -292,7 +292,7 @@ Three sandbox modes, and the middle one is the point:
 
 **A sandbox authorises nothing.** Every capability check that runs unsandboxed still runs sandboxed, through the same `authorize_step`. The sandbox is a second wall behind the first. If `integrations/nemoclaw/` were deleted, capability enforcement, governance and procedure persistence would be unchanged.
 
-**Qualification status (Phase 20B):** NemoClaw v0.0.124 and OpenShell v0.0.116 are **installed and operational** on epg-tme-smc-h100-02. The security boundary, gateway, sandbox image, and all MAIW security invariants are verified at code and container level. Inference provider qualification is **incomplete** due to H100 NVL CUDA sm_90a incompatibility with the pre-built NemoClaw llama-cpp-server image. Full end-to-end SOP sandbox run is deferred to Phase 20C pending inference provider resolution. See `docs/audits/MAIW_NEMOCLAW_SECURITY_QUALIFICATION.md` for the full qualification report.
+**Qualification status (Phase 20B + 20C-A):** NemoClaw v0.0.124 and OpenShell v0.0.116 are **installed and operational** on epg-tme-smc-h100-02. The security boundary, gateway, sandbox image, and all MAIW security invariants are verified at code and container level. Phase 20C-A adds: approved Nemotron 3/3.5 model family policy in `PolicyFilter`, `POST /api/v1/inference` HTTP inference endpoint (with strict field allowlist), and `MAIWHTTPModelGatewayClient` sandbox transport client. 54 Phase 20C-A contract tests pass. Full end-to-end SOP sandbox run with approved Nemotron NIM is deferred to Phase 20C-B. See `docs/audits/MAIW_NEMOCLAW_SECURITY_QUALIFICATION.md` for the full qualification report.
 
 See [docs/architecture/NEMOCLAW_OPENSHELL_INTEGRATION.md](docs/architecture/NEMOCLAW_OPENSHELL_INTEGRATION.md).
 
@@ -319,6 +319,21 @@ NVIDIA NIM / Hosted / Local
 Agents express **what level of reasoning a decision requires** (via `ReasoningLevel`). `ModelGateway` selects the physical model. Agents never reference model IDs directly.
 
 Nemotron model roles: `lightning` (fast, low-risk), `nano` (local NIM), `super` (default), `ultra` (opt-in for highest complexity).
+
+### MAIW v2 Supported Models
+
+MAIW v2 permits **only Nemotron 3 and Nemotron 3.5** for production and qualification. This is a hard policy enforced by `PolicyFilter` at routing time, not a configuration default.
+
+| Role | Model ID | Generation | Status |
+|------|----------|------------|--------|
+| `lightning` | `nvidia/nemotron-3.5-lightning-30b-a3b` | `nemotron-3.5` | Approved |
+| `nano` | `nvidia/nemotron-3-nano-30b-a3b` | `nemotron-3` | Approved |
+| `super` | `nvidia/nemotron-3-super-120b-a12b` | `nemotron-3` | Approved |
+| `ultra` | `nvidia/nemotron-3-ultra-550b-a55b` | `nemotron-3` | Approved |
+| `nano-omni` | `nvidia/nemotron-3-nano-omni-30b-a3b` | `nemotron-3` | Approved (disabled by default; operator-configured) |
+| `llama-3.1-nemotron-nano-8b-v1` | `nvidia/llama-3.1-nemotron-nano-8b-v1` | Llama-family | **TRANSPORT_SMOKE_TEST_ONLY — NOT approved for v2** |
+
+Any model whose `generation` is not in `{"nemotron-3", "nemotron-3.5"}` is rejected by `PolicyFilter` before any provider call. This includes Llama-family Nemotron, Qwen, and any model with an unknown or uncatalogued generation. See `packages/maiw-models/maiw_models/routing.py` (`PolicyFilter.APPROVED_MODEL_GENERATIONS`).
 
 See [docs/architecture/MODEL_GATEWAY.md](docs/architecture/MODEL_GATEWAY.md).
 
