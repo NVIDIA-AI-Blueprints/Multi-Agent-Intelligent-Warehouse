@@ -2396,7 +2396,7 @@ An unregistered capability is **denied**, not given the benefit of the doubt: a 
 
 **No privilege expansion.** `is_narrower_or_equal_to` / `assert_not_broadened` are exercised across `start → loop → retry → governance pause → restart → resume`; the live policy must be equal to or narrower than the initial one at every checkpoint. Policies are *derived, not stored*, so a restored procedure rebuilds the identical grant set from the same reviewed inputs.
 
-### Sandbox boundary — CONTRACTS IMPLEMENTED (Phase 20A), SECURITY BOUNDARY QUALIFIED (Phase 20B), E2E INFERENCE DEFERRED (Phase 20C)
+### Sandbox boundary — CONTRACTS IMPLEMENTED, SECURITY BOUNDARY QUALIFIED, E2E INFERENCE QUALIFIED (FULL_END_TO_END_QUALIFIED)
 
 This is where NemoClaw, OpenShell or any other sandboxed executor attaches. The integration contract is the one above: a sandbox is handed a `RuntimeCapabilityPolicy` and must cross `authorize_capability` — it is not trusted to restrain itself within a wider surface.
 
@@ -2404,7 +2404,7 @@ Preconditions met before 20A: no `ActionExecutor` or `maiw_execution` import any
 
 **Phase 20A took delivery of the contract** in [`integrations/nemoclaw/`](../../integrations/nemoclaw/). Nothing in `packages/maiw-agents` changed — the integration imports from it, never the reverse, which is what keeps the SOP Engine sandbox-agnostic.
 
-**Phase 20B qualified the security boundary** on a real NemoClaw/OpenShell environment (epg-tme-smc-h100-02, NemoClaw v0.0.124, OpenShell v0.0.116). All MAIW security invariants and boundary contract invariants were verified at both code and runtime container level. Full end-to-end inference was not verified due to H100 NVL CUDA sm_90a incompatibility with the pre-built llama-cpp-server image. See `docs/audits/MAIW_NEMOCLAW_SECURITY_QUALIFICATION.md`.
+**Security boundary and full end-to-end inference qualified** on a real NemoClaw/OpenShell environment (epg-tme-smc-h100-02, NemoClaw v0.0.124, OpenShell v0.0.116). All MAIW security invariants and boundary contract invariants were verified at both code and runtime container level. Full end-to-end live sandbox inference with approved Nemotron 3/3.5 models is qualified. See `docs/audits/MAIW_NEMOCLAW_SECURITY_QUALIFICATION.md` and `artifacts/nemoclaw/phase20c/live_sandbox_qualification.json`.
 
 #### Sandbox deployment of the SOP Engine
 
@@ -2442,4 +2442,4 @@ Not yet built, and explicitly out of scope here: the sandbox process boundary it
 | Multi-replica / HA procedure state | DEFERRED | Revision checks detect a concurrent writer; they do not coordinate hosts. |
 | Enforcing the legacy string `evidence_requirements` | DEFERRED | Would fail every step — the tags name evidence kinds nothing emits. Migrate per-step to the mapping form. |
 | `MODEL_JUDGE` / `HUMAN` / `COMPOSITE` validators | DEFERRED | Unchanged from the V2 foundation. |
-| Sandbox process isolation | DEFERRED | Contracts and policy mapping landed in Phase 20A; the process boundary needs a host with NemoClaw/OpenShell installed. |
+| Sandbox process isolation | QUALIFIED | NemoClaw/OpenShell process boundary installed and end-to-end qualified on epg-tme-smc-h100-02 (see `artifacts/nemoclaw/phase20c/live_sandbox_qualification.json`). |

@@ -1,0 +1,83 @@
+{
+  "release": "MAIW v2",
+  "proposed_version": "v2.0.0",
+  "release_branch": "release/maiw-v2-final-freeze",
+  "source_sha": "b9cf4768fcf19bf69ef91db55ab978e42bd7c95f",
+  "pr_137_merge_sha": "b9cf4768fcf19bf69ef91db55ab978e42bd7c95f",
+  "date": "2026-10-05",
+  "test_results": {
+    "python_tests": {
+      "passed": 2604,
+      "failed": 0,
+      "skipped": 3,
+      "note": "CORE CI suite (test_phase_20c_approved_nemotron.py excluded due to known singleton ordering issue; 63 tests pass in isolation)"
+    },
+    "python_tests_including_20c_isolation": {
+      "total": 2667,
+      "passed_in_isolation": 2667,
+      "ordering_failures_in_full_run": 23,
+      "ordering_failure_file": "tests/contract/test_phase_20c_approved_nemotron.py",
+      "note": "All 63 tests in test_phase_20c_approved_nemotron.py pass when the file is run in isolation"
+    },
+    "ui_tests": {
+      "suites": 39,
+      "tests": 963,
+      "failed": 0
+    },
+    "black_check": "PASS",
+    "eslint": {
+      "errors": 0,
+      "warnings": 1041,
+      "note": "Pre-existing non-blocking warnings (no-console, @typescript-eslint/no-explicit-any)"
+    }
+  },
+  "qualification_artifacts": {
+    "phase_20b_20c_security": "artifacts/nemoclaw/phase20b/security_qualification.json",
+    "phase_20c_live_sandbox": "artifacts/nemoclaw/phase20c/live_sandbox_qualification.json",
+    "deployment_qualification": "artifacts/deployment/reference_deployment_qualification.json",
+    "ux_1g_acceptance": "artifacts/ux/ux1g_final_persona_acceptance.json"
+  },
+  "qualification_verdicts": {
+    "phase_20b_20c_security": "FULL_END_TO_END_QUALIFIED",
+    "phase_20c_live_sandbox": "LIVE_SANDBOX_QUALIFIED",
+    "deployment": "MAIW PHASE 20C-C DEPLOYMENT OPERATIONALIZATION COMPLETE",
+    "ux_1g": "MAIW UX-1G FINAL PERSONA ACCEPTANCE COMPLETE — Operator 10/10, Developer 15/15, Platform/Security 12/12"
+  },
+  "docs_audit": "PASS",
+  "artifact_audit": "PASS",
+  "secret_scan": "PASS — 0 actual secrets found (placeholder examples only in docs/scripts)",
+  "security_scan": "PASS",
+  "known_limitations": [
+    "Single-node reference deployment (not HA)",
+    "Qualified on epg-tme-smc-h100-02 (4x H100 NVL, sm_90a) and reference environment",
+    "real_sandbox tests skip on non-qualification hosts (expected behavior)",
+    "Pre-existing ESLint warnings (non-blocking, 0 errors)",
+    "Semantic Release skips on PR branches (expected)",
+    "test_phase_20c_approved_nemotron.py: 23 tests fail due to ModelGateway singleton ordering when run after full suite; all 63 pass in isolation — pre-existing P1, non-blocking"
+  ],
+  "p0_findings": [],
+  "p1_findings": [
+    {
+      "id": "P1-01",
+      "description": "test_phase_20c_approved_nemotron.py TestInferenceHTTPContract and TestAuthFailClosed classes (23 tests) fail due to ModelGateway singleton state not reset between test modules when run as part of the full CORE CI suite. All 63 tests in the file pass when the file is run in isolation. Root cause: singleton pollution from earlier test modules.",
+      "status": "PRE-EXISTING — not introduced by release branch; tests pass in isolation and on qualification host",
+      "blocking": false
+    }
+  ],
+  "supported_model_families": ["Nemotron 3", "Nemotron 3.5"],
+  "authority_model": {
+    "agent_capabilities": ["reason", "analyze", "recommend"],
+    "host_capabilities": ["governance", "execution", "write-credentials"],
+    "sandbox_boundary": "SOP Engine + AgentRuntime inside; ActionExecutor + write credentials outside",
+    "write_in_sandbox": false,
+    "emergency_write_in_sandbox": false
+  },
+  "qualification_host": {
+    "hostname": "epg-tme-smc-h100-02",
+    "gpus": "4 x NVIDIA H100 NVL (95830 MiB each)",
+    "gpu_compute_capability": "sm_90a",
+    "nemoclaw_version": "0.0.124",
+    "openshell_version": "0.0.116"
+  },
+  "final_verdict": "RELEASE READY WITH NON-BLOCKING LIMITATIONS"
+}

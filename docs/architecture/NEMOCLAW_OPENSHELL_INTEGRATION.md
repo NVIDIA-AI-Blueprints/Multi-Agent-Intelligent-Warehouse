@@ -268,12 +268,11 @@ NemoClaw's Model Router would bypass `PolicyFilter`, `DeploymentResolver` and
 routing provenance in one step, and a duplicated routing decision is one that
 can disagree with itself.
 
-> **Gap:** `ModelGateway` is currently instantiated in-process by
-> `apps/api/maiw_api/bootstrap.py`; **no HTTP endpoint exposes inference today**.
-> The `/api/v1/inference` route in the config above is the designed target, not
-> an existing surface. Standing it up is Phase 20B work and is listed under
-> Deferred work. Until it exists, a sandbox cannot actually reach inference —
-> which is one of the reasons this phase does not claim runtime qualification.
+> **Implemented:** `ModelGateway` is instantiated in-process by
+> `apps/api/maiw_api/bootstrap.py` and exposed via the live `POST /api/v1/inference`
+> endpoint (strict field allowlist). The sandbox reaches the host-side ModelGateway
+> through this endpoint. Full end-to-end live sandbox inference is qualified
+> (see `artifacts/nemoclaw/phase20c/live_sandbox_qualification.json`).
 
 ---
 
@@ -417,19 +416,14 @@ Platform audit performed on Phase 20B host (2026-10-03):
 `wms-nim-teacher-49b` on port 8010) were already running on the host. Selected
 `nvidia/llama-3.1-nemotron-nano-8b-v1` via MAIW ModelGateway running on the host.
 
-**F02 — architecture clarification (sandbox leg NOT YET PROVEN):** OpenShell SSRF blocks
-sandbox→private IPs (expected behavior, SSRF NOT weakened). MAIW ModelGateway runs on HOST.
-When Phase 20C delivers an HTTP endpoint for ModelGateway, the sandbox will call that URL
-(passes SSRF); host-side ModelGateway then calls localhost:8002. The sandbox→host-endpoint
-path has NOT been demonstrated in a real OpenShell sandbox.
+**F02 — RESOLVED (live sandbox qualified):** OpenShell SSRF blocks sandbox→private IPs (expected behavior, SSRF NOT weakened). MAIW ModelGateway runs on HOST. The sandbox calls `POST http://maiw-api:8000/api/v1/inference` (passes SSRF); host-side ModelGateway calls the NIM provider. The sandbox→host-endpoint path is **fully qualified** in a real OpenShell sandbox (see `artifacts/nemoclaw/phase20c/live_sandbox_qualification.json`).
 
-**Host-side inference chain qualified (ALL TESTS RUN ON HOST, NOT IN REAL SANDBOX):**
+**Host-side inference chain (Phase 20B transport qualification — Llama-family Nemotron TRANSPORT_SMOKE_TEST_ONLY, NOT approved for production):**
 ```
 host pytest → MAIWModelGatewayChat → ModelGateway → NIMProvider → NIMClient → localhost:8002
-                                                                              (nvidia/llama-3.1-nemotron-nano-8b-v1)
 ```
 
-**Phase 20C-A HTTP boundary is IMPLEMENTED** — `POST /api/v1/inference` is live:
+**HTTP boundary is LIVE** — `POST /api/v1/inference` is implemented and qualified:
 ```
 real OpenShell sandbox → [SSRF] → POST http://maiw-api:8000/api/v1/inference
                                   ════ OPENSHELL BOUNDARY ════
