@@ -180,9 +180,12 @@ function Legend() {
 // ── Main component ────────────────────────────────────────────────────────────
 
 const CounterfactualPanel: React.FC = () => {
-  const { data, isLoading, error } = useQuery<CounterfactualResult>({
+  const { data, isLoading, error } = useQuery<CounterfactualResult | null>({
     queryKey: ['counterfactual'],
-    queryFn: () => demoAPI.getCounterfactualResult(),
+    queryFn: async () => {
+      const res = await demoAPI.getCounterfactualResult();
+      return res ?? null;  // TanStack Query v5 forbids undefined; null is valid
+    },
     retry: false,
     staleTime: 300_000,
   });

@@ -324,7 +324,9 @@ describe('ApproveStage — action buttons', () => {
     });
 
     wrap(<ApproveStage {...makeProps()} />);
-    fireEvent.click(screen.getByTestId('approve-execute-button'));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('approve-execute-button'));
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId('approval-result')).toBeInTheDocument();
@@ -338,7 +340,9 @@ describe('ApproveStage — action buttons', () => {
     });
 
     wrap(<ApproveStage {...makeProps()} />);
-    fireEvent.click(screen.getByTestId('reject-button'));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('reject-button'));
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId('approval-result')).toBeInTheDocument();
@@ -352,7 +356,9 @@ describe('ApproveStage — action buttons', () => {
     (demoAPI.approvePending as jest.Mock).mockRejectedValue(err);
 
     wrap(<ApproveStage {...makeProps()} />);
-    fireEvent.click(screen.getByTestId('approve-execute-button'));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('approve-execute-button'));
+    });
 
     await waitFor(() => {
       expect(screen.getByText('CONSUMED')).toBeInTheDocument();
@@ -365,7 +371,9 @@ describe('ApproveStage — action buttons', () => {
     (demoAPI.rejectPending as jest.Mock).mockRejectedValue(err);
 
     wrap(<ApproveStage {...makeProps()} />);
-    fireEvent.click(screen.getByTestId('reject-button'));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('reject-button'));
+    });
 
     await waitFor(() => {
       expect(screen.getByText('CONSUMED')).toBeInTheDocument();
@@ -433,9 +441,12 @@ describe('ApproveStage — expired approval', () => {
   it('DOES call API when old approval is actioned — backend validates TTL', async () => {
     demoAPI.approvePending = jest.fn().mockResolvedValue({ ok: true, status: 'executed', execution_id: 'ex-001' });
     wrap(<ApproveStage {...makeProps({ pendingApprovals: [expiredApproval] })} />);
-    fireEvent.click(screen.getByTestId('approve-execute-button'));
-    await new Promise(r => setTimeout(r, 50));
-    expect(demoAPI.approvePending).toHaveBeenCalledWith('pa-expired', 'operator');
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('approve-execute-button'));
+    });
+    await waitFor(() => {
+      expect(demoAPI.approvePending).toHaveBeenCalledWith('pa-expired', 'operator');
+    });
   });
 });
 

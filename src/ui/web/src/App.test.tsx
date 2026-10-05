@@ -1,5 +1,5 @@
 import React from 'react';
-import { render } from '@testing-library/react';
+import { render, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@mui/material/styles';
@@ -59,19 +59,31 @@ function renderWithProviders(ui: React.ReactElement, initialEntries = ['/login']
 }
 
 describe('App Component', () => {
-  test('renders without crashing', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.clearAllTimers();
+    jest.useRealTimers();
+  });
+
+  test('renders without crashing', async () => {
     renderWithProviders(<App />);
+    await act(async () => {}); // drain VersionFooter async effects
     expect(document.body).toBeInTheDocument();
   });
 
-  test('renders main content', () => {
+  test('renders main content', async () => {
     renderWithProviders(<App />);
+    await act(async () => {}); // drain VersionFooter async effects
     const appElement = document.querySelector('[data-testid="app"]') || document.body;
     expect(appElement).toBeInTheDocument();
   });
 
-  test('handles routing', () => {
+  test('handles routing', async () => {
     renderWithProviders(<App />, ['/login']);
+    await act(async () => {}); // drain VersionFooter async effects
     expect(window.location.pathname).toBeDefined();
   });
 });
