@@ -1,9 +1,9 @@
 # MAIW ↔ NemoClaw / OpenShell Integration
 
-**Version:** MAIW v2 — Phase 20C-A (approved Nemotron + HTTP boundary)
-**Status:** APPROVED_NEMOTRON_HTTP_BOUNDARY_COMPLETE — PolicyFilter enforces Nemotron 3/3.5 family; POST /api/v1/inference live; sandbox HTTP client built; real sandbox leg qualification PENDING (requires live NemoClaw sandbox to run @real_sandbox tests)
+**Version:** MAIW v2 — Phase 20C-B (live sandbox + approved Nemotron end-to-end qualified)
+**Status:** FULL_END_TO_END_QUALIFIED — Real OpenShell sandbox (maiw-qual-20c-b) ran inference through MAIW HTTP boundary to approved Nemotron 3/3.5 model. 51 real_sandbox tests pass on qualification host (epg-tme-smc-h100-02).
 **Code:** [`integrations/nemoclaw/`](../../integrations/nemoclaw/)
-**Tests:** `tests/contract/test_sandbox_*.py` (127 tests, in CORE CI) + `tests/contract/test_phase_20b_real_inference.py` (16 tests, host-side) + `tests/contract/test_phase_20c_approved_nemotron.py` (54 tests, Phase 20C-A contract)
+**Tests:** `tests/contract/test_sandbox_*.py` (127 tests, in CORE CI) + `tests/contract/test_phase_20b_real_inference.py` (16 tests, host-side) + `tests/contract/test_phase_20c_approved_nemotron.py` (63 tests, Phase 20C-A contract) + `tests/real_sandbox/test_phase_20c_live_sandbox.py` (51 tests, real_sandbox mark)
 
 ---
 

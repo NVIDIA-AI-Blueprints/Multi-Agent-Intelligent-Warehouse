@@ -170,7 +170,9 @@ class LLMResponse:
     """LLM response structure."""
 
     content: str
-    usage: Dict[str, int]
+    # usage may contain sub-objects (e.g. prompt_tokens_details) from newer
+    # OpenAI-compatible NIM API versions — typed as Dict[str, Any] to accept them.
+    usage: Dict[str, Any]
     model: str
     finish_reason: str
 
@@ -180,7 +182,8 @@ class EmbeddingResponse:
     """Embedding response structure."""
 
     embeddings: List[List[float]]
-    usage: Dict[str, int]
+    # usage may contain sub-objects from newer NIM API versions.
+    usage: Dict[str, Any]
     model: str
 
 

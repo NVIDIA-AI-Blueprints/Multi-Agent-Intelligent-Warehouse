@@ -96,6 +96,7 @@ describe('WorldContextSnapshot — WT1–WT7, WT10', () => {
     mockGetContextByTurn.mockResolvedValue(SAMPLE_SNAPSHOT);
     renderWithTheme(<WorldContextSnapshot ctx={CTX} />);
     expect(screen.getByTestId('world-context-snapshot')).toBeInTheDocument();
+    await act(async () => {}); // drain async effects from useEffect fetch
   });
 
   test('WT2: historical-context-banner visible after data loads', async () => {
@@ -142,14 +143,18 @@ describe('WorldContextSnapshot — WT1–WT7, WT10', () => {
     expect(btn).toBeInTheDocument();
     fireEvent.click(btn);
     expect(onReturnToCopilot).toHaveBeenCalledTimes(1);
+    await act(async () => {}); // drain async effects from useEffect fetch
   });
 
   test('WT6: loading spinner renders while API call is in-flight', async () => {
-    // Never resolves during this test
-    mockGetContextByTurn.mockReturnValue(new Promise(() => {}));
+    // Use a resolvable promise so the worker can exit cleanly after the test
+    let resolveCtx!: (v: typeof SAMPLE_SNAPSHOT) => void;
+    mockGetContextByTurn.mockReturnValue(new Promise(r => { resolveCtx = r; }));
     renderWithTheme(<WorldContextSnapshot ctx={CTX} />);
     // historical-context-banner should NOT be present yet
     expect(screen.queryByTestId('historical-context-banner')).not.toBeInTheDocument();
+    // Resolve the in-flight promise to prevent worker process teardown warning
+    await act(async () => { resolveCtx(SAMPLE_SNAPSHOT); });
   });
 
   test('WT7: error state renders when API returns 404-like error', async () => {

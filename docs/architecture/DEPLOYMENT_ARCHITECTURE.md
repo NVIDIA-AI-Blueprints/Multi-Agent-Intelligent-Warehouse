@@ -170,8 +170,8 @@ capability policy — policies are built from `AgentDefinition` and
 |---|---|---|
 | `MAIW_SANDBOX_MODE` | `disabled` | `disabled` \| `required` \| `preferred`. An unrecognised value **raises** rather than defaulting |
 | `MAIW_SANDBOX_RUNTIME` | `none` | `none` \| `openshell` \| `container` |
-| `MAIW_SANDBOX_MODEL_GATEWAY_ENDPOINT` | `http://maiw-api:8000/api/v1/inference` | host inference route (**not yet implemented** — Phase 20B) |
-| `MAIW_SANDBOX_READ_ENDPOINT` | `http://maiw-api:8000/api/v1/capabilities/read` | host read-capability route (**not yet implemented** — Phase 20B) |
+| `MAIW_SANDBOX_MODEL_GATEWAY_ENDPOINT` | `http://maiw-api:8000/api/v1/inference` | host inference route (live — `POST /api/v1/inference`, Phase 20C-A/20C-B qualified) |
+| `MAIW_SANDBOX_READ_ENDPOINT` | `http://maiw-api:8000/api/v1/capabilities/read` | host read-capability route (not yet implemented) |
 | `MAIW_SANDBOX_IMAGE` | *(unset)* | pinned agent image reference |
 | `MAIW_NEMOCLAW_VERSION` | *(unset)* | version qualified against; unset ⇒ `CONFIGURATION_PENDING` |
 | `MAIW_OPENSHELL_VERSION` | *(unset)* | version qualified against |
