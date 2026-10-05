@@ -1,6 +1,67 @@
 # MAIW v2 Deployment Architecture
 
+**Phase 20C-C: Deployment Operationalization** — Phase 20C-B LIVE_SANDBOX_QUALIFIED (PR #135, 2026-10-05)
 
+---
+
+## Reference Deployment Topology (Phase 20C-C)
+
+The qualified single-node reference deployment topology:
+
+```
+HOST (single node — epg-tme-smc-h100-02, 4×H100 NVL)
+├── MAIW API (port 8001)
+│   ├── ModelGateway ──→ PolicyFilter (nemotron-3 / nemotron-3.5 ONLY)
+│   │                ──→ ModelRouter ──→ NIMProvider ──→ NIM endpoint
+│   ├── POST /api/v1/inference  (auth-required: X-Maiw-Internal-Token)
+│   ├── DecisionEngine + GovernanceInbox (JsonFileGovernanceInbox, restart-safe)
+│   ├── ActionExecutor (write path — host only, never sandbox)
+│   ├── SOP Engine (ProcedureStateStore: JsonFileProcedureStateStore)
+│   └── MCP domain clients (Inventory/Equipment/Labor/Wave)
+│
+├── Approved Nemotron 3 / 3.5 deployment
+│   └── nvidia/nemotron-3-super-120b-a12b (gen=nemotron-3, qualified 2026-10-05)
+│       • Hosted: https://integrate.api.nvidia.com/v1  (NVIDIA cloud)
+│       • OR Local NIM: http://localhost:8000/v1
+│
+└── NemoClaw/OpenShell sandbox runtime
+    ├── SandboxedAgentRuntime + SOP Engine (agent-side)
+    ├── RuntimeCapabilityPolicy (deny-by-default; WRITE always denied)
+    ├── MAIWHTTPModelGatewayClient → POST http://<HOST_IP>:8020/api/v1/inference
+    └── NEVER holds: NIM credentials, warehouse write credentials, ApprovalStore
+
+Persistence root: /var/lib/maiw/
+├── procedures/   JsonFileProcedureStateStore (atomic .json per procedure)
+├── governance/   JsonFileGovernanceInbox (governance_inbox.jsonl, append-only)
+└── runtime/      maiw-api.pid, maiw-api.log
+```
+
+### Version Matrix (Qualified)
+
+| Component | Pinned Version | Status |
+|---|---|---|
+| NemoClaw | 0.0.124 | QUALIFIED |
+| OpenShell | 0.0.116 | QUALIFIED |
+| Python (host) | 3.12.3 | QUALIFIED |
+| nvidia/nemotron-3-super-120b-a12b | gen=nemotron-3 | QUALIFIED |
+| Approved generations | nemotron-3, nemotron-3.5 | PolicyFilter enforced |
+
+### Trust Boundaries
+
+- **Sandbox cannot call ActionExecutor, ApprovalStore, or warehouse MCP directly**
+- **Sandbox cannot hold NIM credentials or warehouse write credentials**
+- **Sandbox reaches inference ONLY via POST /api/v1/inference (auth-required)**
+- **PolicyFilter enforces approved model generations at the host level**
+- **GovernanceInbox deduplication is host-side — sandbox cannot bypass it**
+
+### Restart / Rollback Semantics
+
+- Procedure state: file-backed, atomic write, survives process crash
+- Governance inbox: file-backed, append-only, duplicate-safe across restarts
+- Rollback: stop → restore previous app → preserve durable state → start
+- DO NOT delete procedure/governance state as a rollback strategy
+
+---
 
 ## Service Boundaries
 
