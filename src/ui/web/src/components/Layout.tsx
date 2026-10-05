@@ -12,12 +12,13 @@ interface LayoutProps {
 }
 
 const NAV = [
-  { label: 'OPERATIONS', path: '/demo' },   // Primary operator surface
+  { label: 'OPERATIONS', path: '/demo' },        // Primary operator surface
   { label: 'WORLD', path: '/world' },
-  { label: 'RELIABILITY', path: '/command' }, // Governance & system overview
+  { label: 'RELIABILITY', path: '/command' },    // Governance & system overview
   { label: 'MODELS', path: '/models' },
   { label: 'CAPABILITIES', path: '/capabilities' },
   { label: 'ACTIVITY', path: '/activity' },
+  { label: 'DEPLOYMENT', path: '/deployment' },  // Platform/Security: sandbox, model policy, auth
 ];
 
 const WAREHOUSE_ID = process.env.REACT_APP_WAREHOUSE_ID || 'DC-47';

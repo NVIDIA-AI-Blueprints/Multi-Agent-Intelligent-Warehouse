@@ -199,6 +199,39 @@ function AgentPanel({ identity, agentTask, copilotTurn, onNavigate }: {
   );
 }
 
+// ── Approved-family badge ──────────────────────────────────────────────────────
+
+function ApprovedFamilyBadge({ status }: { status: 'approved' | 'unapproved' | 'unknown' | undefined }) {
+  if (!status || status === 'unknown') { return null; }
+  const color   = status === 'approved' ? '#3FB950' : '#F85149';
+  const label   = status === 'approved' ? 'APPROVED FAMILY' : 'UNAPPROVED FAMILY';
+  const desc    = status === 'approved'
+    ? 'Nemotron 3 / 3.5 — eligible for production'
+    : 'Rejected by approved-model policy — not eligible for production';
+  return (
+    <Box
+      data-testid="approved-family-badge"
+      aria-label={`Model family status: ${label}`}
+      sx={{ display: 'flex', flexDirection: 'column', gap: '3px', mb: '6px' }}
+    >
+      <Box sx={{
+        display: 'inline-flex', alignItems: 'center', gap: '4px',
+        px: '6px', py: '2px', borderRadius: '3px',
+        border: `1px solid ${color}33`, backgroundColor: `${color}11`,
+        alignSelf: 'flex-start',
+      }}>
+        <Box sx={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: color, flexShrink: 0 }} />
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700, color, letterSpacing: '0.08em' }}>
+          {label}
+        </Typography>
+      </Box>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.57rem', color: '#484F58' }}>
+        {desc}
+      </Typography>
+    </Box>
+  );
+}
+
 function ModelPanel({ identity, analysisResult, copilotTurn, onNavigate }: {
   identity: ArtifactIdentity;
   analysisResult: AnalysisResult | null;
@@ -228,10 +261,26 @@ function ModelPanel({ identity, analysisResult, copilotTurn, onNavigate }: {
   const selectedRole = copilotTurn?.selected_role ?? null;
   const requestedRole = copilotTurn?.requested_role ?? null;
 
+  // Approved-family fields: from ArtifactIdentity if set, otherwise infer from model_id
+  const approvedFamily: 'approved' | 'unapproved' | 'unknown' | undefined =
+    identity.model_approved_family
+    ?? (modelId.includes('nemotron-3') ? 'approved'
+      : modelId.includes('llama') ? 'unapproved'
+      : 'unknown');
+
+  const modelGeneration: string | undefined =
+    identity.model_generation
+    ?? (modelId.includes('nemotron-3.5') ? 'Nemotron 3.5'
+      : modelId.includes('nemotron-3') ? 'Nemotron 3'
+      : undefined);
+
   return (
     <Box>
+      {/* Approved-family policy status — always visible in MODEL panel */}
+      <ApprovedFamilyBadge status={approvedFamily} />
       <PanelSection title="ModelGateway Route">
         <FieldRow label="model_id" value={modelId} />
+        <FieldRow label="model_generation" value={modelGeneration} />
         <FieldRow label="routing_rule" value={routingRule} />
         <FieldRow label="routing_reason" value={routingReason} />
         <FieldRow label="requested_role" value={requestedRole} />
