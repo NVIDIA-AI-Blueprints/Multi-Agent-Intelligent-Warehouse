@@ -35,8 +35,11 @@ all of them compare against host-held state.
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 from datetime import datetime, timezone
+from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -263,6 +266,106 @@ class GovernanceInbox:
         return governance_input.idempotency_key in self._seen
 
 
+class JsonFileGovernanceInbox:
+    """
+    Host-restart-safe dedupe ledger for governance outcomes.
+
+    Identical semantics to ``GovernanceInbox`` but backed by an append-only
+    JSON-lines file on the host filesystem. Each accepted idempotency key is
+    flushed to disk before ``accept`` returns, so a process restart that
+    interrupts delivery after the key was written but before the SOP Engine
+    processed the outcome will correctly recognise the re-delivery as a
+    duplicate rather than applying the governance decision a second time.
+
+    Durability claim (single-node, same as JsonFileProcedureStateStore):
+        SURVIVES      process exit, crash, and restart on the same filesystem.
+        SURVIVES      partial writes (entries are line-delimited JSON; a
+                      truncated tail line is skipped on load with a warning).
+        DOES NOT      provide multi-replica coordination or HA.
+
+    File format: one JSON object per line, each with keys
+        ``procedure_execution_id``, ``proposal_id``, ``expected_revision``.
+    The file grows monotonically — entries are never removed. Keys are
+    re-loaded into an in-memory set on construction, so lookup is O(1).
+
+    The inbox directory is the same root as ``JsonFileProcedureStateStore``
+    when the caller uses the shared persistence root; the two stores do not
+    share files.
+    """
+
+    _FILENAME = "governance_inbox.jsonl"
+
+    def __init__(self, directory: str | os.PathLike[str]) -> None:
+        self._dir = Path(directory)
+        self._dir.mkdir(parents=True, exist_ok=True)
+        self._path = self._dir / self._FILENAME
+        self._seen: set[tuple[str, str, int]] = set()
+        self._load()
+
+    def _load(self) -> None:
+        """Replay the persisted log into ``_seen`` on startup."""
+        if not self._path.exists():
+            return
+        with self._path.open(encoding="utf-8") as fh:
+            for lineno, raw in enumerate(fh, start=1):
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    entry = json.loads(raw)
+                    key = (
+                        str(entry["procedure_execution_id"]),
+                        str(entry["proposal_id"]),
+                        int(entry["expected_revision"]),
+                    )
+                    self._seen.add(key)
+                except (KeyError, ValueError, json.JSONDecodeError) as exc:
+                    logger.warning(
+                        "JsonFileGovernanceInbox: skipping malformed entry at "
+                        "line %d in %s: %s",
+                        lineno,
+                        self._path,
+                        exc,
+                    )
+
+    def _persist(self, key: tuple[str, str, int]) -> None:
+        """Atomically append one key to the on-disk log."""
+        entry = (
+            json.dumps(
+                {
+                    "procedure_execution_id": key[0],
+                    "proposal_id": key[1],
+                    "expected_revision": key[2],
+                }
+            )
+            + "\n"
+        )
+        # Open in append mode then fsync so the entry survives a crash.
+        # We do NOT use tempfile+replace for append-only logs — the file grows
+        # monotonically and atomicity at the line level is sufficient.
+        with self._path.open("a", encoding="utf-8") as fh:
+            fh.write(entry)
+            fh.flush()
+            os.fsync(fh.fileno())
+
+    def accept(self, governance_input: SandboxGovernanceInput) -> bool:
+        """Return True if newly accepted, False if already applied."""
+        key = governance_input.idempotency_key
+        if key in self._seen:
+            logger.warning(
+                "duplicate governance outcome dropped: procedure=%s proposal=%s "
+                "revision=%d",
+                *key,
+            )
+            return False
+        self._persist(key)
+        self._seen.add(key)
+        return True
+
+    def has_seen(self, governance_input: SandboxGovernanceInput) -> bool:
+        return governance_input.idempotency_key in self._seen
+
+
 def validate_governance_input(
     governance_input: SandboxGovernanceInput,
     *,
@@ -340,6 +443,7 @@ def validate_governance_input(
 
 __all__ = [
     "GovernanceInbox",
+    "JsonFileGovernanceInbox",
     "SandboxBoundaryViolation",
     "SandboxGovernanceInput",
     "SandboxRecommendedActionOutput",

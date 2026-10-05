@@ -33,6 +33,7 @@ from __future__ import annotations
 
 from .boundary_contracts import (
     GovernanceInbox,
+    JsonFileGovernanceInbox,
     SandboxBoundaryViolation,
     SandboxGovernanceInput,
     SandboxRecommendedActionOutput,
@@ -80,6 +81,7 @@ __all__ = [
     "STATUS_QUALIFIED",
     "ContainerSandboxProvisioner",
     "GovernanceInbox",
+    "JsonFileGovernanceInbox",
     "OpenShellSandboxProvisioner",
     "RenderedSandboxPolicy",
     "SandboxAvailability",
@@ -96,6 +98,7 @@ __all__ = [
     "SandboxRuntimeKind",
     "SandboxUnavailableError",
     "SandboxedAgentRuntime",
+    "UnavailableSandboxProvisioner",
     "container_run_args",
     "render_agent_manifest",
     "render_policy_yaml",
