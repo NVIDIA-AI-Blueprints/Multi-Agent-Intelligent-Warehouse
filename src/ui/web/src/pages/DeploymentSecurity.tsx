@@ -33,7 +33,6 @@ import {
 import {
   CheckCircle as OkIcon,
   Warning as WarnIcon,
-  Error as ErrIcon,
   Block as DeniedIcon,
   Shield as PolicyIcon,
   Storage as PersistIcon,

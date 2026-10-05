@@ -23,7 +23,6 @@ import '@testing-library/jest-dom';
 
 import ExecutionOutcomeBadge, {
   ExecutionOutcome,
-  ReconciliationOutcome,
 } from '../components/reliability/ExecutionOutcomeBadge';
 import { OPERATOR_LABELS, DEVELOPER_LABELS, DECISION_STATUS_LABEL } from '../constants/authorityStates';
 import { JOURNEY_STAGE_LABEL, JOURNEY_STAGES } from '../constants/journeyIdentity';
