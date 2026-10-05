@@ -204,7 +204,7 @@ below.
 
 ---
 
-## Sandbox Execution Context (Phase 20A contracts, Phase 20B+20C-A security boundary qualified)
+## Sandbox Execution Context (Phase 20A contracts, Phase 20B+20C-B security boundary fully qualified)
 
 Either runtime can run inside a sandbox boundary. The boundary is a decorator,
 not a port:
@@ -257,7 +257,7 @@ selects no model. NemoClaw's Model Router is explicitly not adopted
 (`use_platform_model_router: false` in the manifest) — it would bypass
 `PolicyFilter`, `DeploymentResolver` and routing provenance in one step.
 
-**MAIW v2 Approved Model Family (Phase 20C-A):** `PolicyFilter` enforces
+**MAIW v2 Approved Model Family (Phase 20C-A / 20C-B qualified):** `PolicyFilter` enforces
 `APPROVED_MODEL_GENERATIONS = frozenset({"nemotron-3", "nemotron-3.5"})` as a
 hard constraint on every model selection. Llama-family Nemotron, Qwen, and any
 model with an unknown or uncatalogued generation are rejected at routing time,
@@ -271,6 +271,12 @@ URL, passes NemoClaw SSRF). The host-side `ModelGateway` then selects from only
 the approved model set. The sandbox HTTP transport client
 (`MAIWHTTPModelGatewayClient`) rejects localhost endpoints at construction and
 has no fallback path — HTTP failure is always failure.
+
+**Phase 20C-B (live qualification 2026-10-05):** Real end-to-end inference from inside
+OpenShell sandbox `maiw-qual-20c-b` through `POST /api/v1/inference` to
+`nvidia/nemotron-3-super-120b-a12b` (gen=nemotron-3) confirmed on epg-tme-smc-h100-02.
+51 `@real_sandbox` tests pass. Auth fail-closed (401 without token). All forbidden fields
+return 422. SSRF blocks (localhost, direct NIM, arbitrary internet) confirmed from sandbox.
 
 See [NEMOCLAW_OPENSHELL_INTEGRATION.md](NEMOCLAW_OPENSHELL_INTEGRATION.md) for
 the ownership matrix, threat model, and current qualification status.

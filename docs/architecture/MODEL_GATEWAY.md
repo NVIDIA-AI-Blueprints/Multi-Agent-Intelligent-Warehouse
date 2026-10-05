@@ -366,6 +366,12 @@ inference:
 >   - Maps errors to structured JSON codes (never mock or silent fallback)
 >   - Propagates deadline and trace IDs end-to-end
 >
+> **Phase 20C-B (qualified 2026-10-05):** Real OpenShell sandbox inference through full chain
+> confirmed. Sandbox `maiw-qual-20c-b` → `POST /api/v1/inference` → `PolicyFilter` →
+> `nvidia/nemotron-3-super-120b-a12b` (gen=nemotron-3, latency 572ms). 51 `@real_sandbox`
+> tests pass on epg-tme-smc-h100-02. Bug fixed: `ModelResponse.usage` now `dict[str, Any]`
+> to accept nested NIM API sub-objects (`prompt_tokens_details`, `completion_tokens_details`).
+>
 > **Approved model families (MAIW v2 production/qualification):** Nemotron 3 and Nemotron 3.5 only.
 > `nvidia/llama-3.1-nemotron-nano-8b-v1` (Phase 20B transport smoke test) is NOT an approved
 > v2 qualification model. It proved transport mechanics only — see Phase 20B evidence record.

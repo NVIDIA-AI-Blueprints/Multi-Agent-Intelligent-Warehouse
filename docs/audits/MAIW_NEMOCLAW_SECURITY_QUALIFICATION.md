@@ -1,13 +1,13 @@
-# MAIW Phase 20B + 20C-A — NemoClaw/OpenShell Deep Agents Security Qualification
+# MAIW Phase 20B + 20C-A + 20C-B — NemoClaw/OpenShell Deep Agents Security Qualification
 
-**Date:** 2026-10-03 (Phase 20B) / 2026-10-03 (Phase 20C-A addendum)
+**Date:** 2026-10-03 (Phase 20B) / 2026-10-03 (Phase 20C-A addendum) / 2026-10-05 (Phase 20C-B)
 **Host:** epg-tme-smc-h100-02  
-**Qualification branch:** feat/phase-20c-approved-nemotron-http-boundary  
+**Qualification branch (20C-B):** test/phase-20c-live-sandbox-approved-nemotron  
 **Phase 20B baseline:** nvidia/main @ 3ab9505  
 **Phase 20C-A baseline:** nvidia/main @ 6cc6567  
 **NemoClaw version:** v0.0.124  
 **OpenShell version:** v0.0.116  
-**Qualification verdict:** HOST_SIDE_INFERENCE_QUALIFIED+HTTP_BOUNDARY_COMPLETE (real sandbox leg INCOMPLETE — pending @real_sandbox tests with approved Nemotron NIM)
+**Qualification verdict:** FULL_END_TO_END_QUALIFIED — real OpenShell sandbox inference through MAIW HTTP boundary to approved Nemotron 3/3.5 complete. 51 real_sandbox tests pass.
 
 ---
 
@@ -45,7 +45,7 @@ MAIW was qualified against a real NVIDIA NemoClaw/OpenShell Deep Agents environm
 
 **Phase 20C-A addendum:** APPROVED NEMOTRON POLICY + HTTP BOUNDARY COMPLETE — 54/54 contract tests pass (`tests/contract/test_phase_20c_approved_nemotron.py`). `PolicyFilter` now enforces `APPROVED_MODEL_GENERATIONS = frozenset({"nemotron-3", "nemotron-3.5"})`. `POST /api/v1/inference` HTTP endpoint live with strict field allowlist. `MAIWHTTPModelGatewayClient` sandbox transport client built; no fallback path. SSRF NOT weakened.
 
-**REAL SANDBOX LEG: INCOMPLETE** — The real OpenShell sandbox→sanctioned-host-ModelGateway-endpoint→approved-Nemotron-NIM path is NOT yet proven. All tests run on the host. Real sandbox leg requires @real_sandbox qualification tests with a live NemoClaw sandbox and an approved Nemotron 3/3.5 NIM deployment.
+**Phase 20C-B:** LIVE SANDBOX QUALIFICATION COMPLETE — Real OpenShell sandbox (maiw-qual-20c-b, id 1d0d1faf-a797-42b0-8ea9-6d27df5c3e12) executed real inference through MAIW HTTP boundary. Approved model: `nvidia/nemotron-3-super-120b-a12b` (gen=nemotron-3, latency 572ms). 51 `@real_sandbox` tests pass on qualification host. Auth fail-closed confirmed (401). All 8 forbidden-field tests return 422. SSRF blocks confirmed from inside sandbox. No WRITE authority in sandbox. Proof SOP A reached `WAITING_FOR_GOVERNANCE`. Bug fixed: NIM API nested usage sub-objects required `dict[str, Any]` instead of `dict[str, int]`.
 
 ---
 

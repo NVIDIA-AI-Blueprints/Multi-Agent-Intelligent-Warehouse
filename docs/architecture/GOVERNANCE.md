@@ -118,9 +118,10 @@ MAIW can *remember*, not what the agent layer is allowed to *do*.
 ## Sandbox Isolation Is Not Authorization
 
 Phase 20A defined the contracts; Phase 20B qualified the security boundary on a
-real NemoClaw/OpenShell host. The governance principle is unchanged: **isolation
-narrows what a compromised agent can reach. It grants nothing, and it relaxes
-nothing.**
+real NemoClaw/OpenShell host; Phase 20C-B (2026-10-05) confirmed the full end-to-end
+path from real OpenShell sandbox through MAIW HTTP inference boundary to approved
+Nemotron 3/3.5 model. The governance principle is unchanged: **isolation narrows
+what a compromised agent can reach. It grants nothing, and it relaxes nothing.**
 
 Three consequences follow, and the third is the one that matters in review:
 

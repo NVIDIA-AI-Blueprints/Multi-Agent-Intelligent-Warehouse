@@ -154,6 +154,8 @@ markers = [
     "endurance: marks tests as endurance tests",
     "sandbox: requires a qualified NemoClaw/OpenShell sandbox host (run with -m sandbox)",
     "nim_required: requires a live NVIDIA NIM endpoint (skipped when NIM is not reachable)",
+    "real_sandbox: requires a running OpenShell sandbox and approved Nemotron deployment; mandatory on qualification host, skipped elsewhere",
+    "approved_model_required: requires an approved Nemotron 3 or 3.5 deployment",
 ]
 
 [tool.coverage.run]

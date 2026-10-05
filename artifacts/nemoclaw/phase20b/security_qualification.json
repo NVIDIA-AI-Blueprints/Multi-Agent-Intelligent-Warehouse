@@ -1,12 +1,13 @@
 {
-  "schema_version": "1.1",
-  "phase": "20B+20C-A",
+  "schema_version": "1.2",
+  "phase": "20B+20C-A+20C-B",
   "title": "MAIW NemoClaw/OpenShell Deep Agents Security Qualification",
   "date": "2026-10-03",
   "phase_20c_date": "2026-10-03",
+  "phase_20c_b_date": "2026-10-05",
   "host": "epg-tme-smc-h100-02",
-  "verdict": "HOST_SIDE_INFERENCE_QUALIFIED+HTTP_BOUNDARY_COMPLETE",
-  "verdict_reason": "Phase 20B: Host-side inference chain (MAIWModelGatewayChat → ModelGateway → NIMProvider → localhost:8002) qualified end-to-end; 16/16 Phase 20B contract tests pass. Phase 20C-A: Approved Nemotron 3/3.5 model family policy enforced by PolicyFilter; POST /api/v1/inference HTTP endpoint live; sandbox HTTP transport client built; 54 contract tests pass. REAL SANDBOX LEG NOT YET PROVEN: sandbox→sanctioned-host-endpoint with real approved Nemotron requires @real_sandbox tests on the qualified host.",
+  "verdict": "FULL_END_TO_END_QUALIFIED",
+  "verdict_reason": "Phase 20B: Host-side inference chain (MAIWModelGatewayChat → ModelGateway → NIMProvider → localhost:8002) qualified end-to-end; 16/16 Phase 20B contract tests pass. Phase 20C-A: Approved Nemotron 3/3.5 model family policy enforced by PolicyFilter; POST /api/v1/inference HTTP endpoint live; sandbox HTTP transport client built; 54 contract tests pass. Phase 20C-B: Real OpenShell sandbox (maiw-qual-20c-b, id 1d0d1faf-a797-42b0-8ea9-6d27df5c3e12) executed real inference from inside sandbox through MAIW HTTP boundary to nvidia/nemotron-3-super-120b-a12b (gen=nemotron-3, latency 572ms). 51 real_sandbox tests pass. All denial tests pass. Auth fail-closed confirmed. Proof SOP A reached WAITING_FOR_GOVERNANCE. Full security boundary verified.",
 
   "model_policy": {
     "approved_families": ["nemotron-3", "nemotron-3.5"],
@@ -276,9 +277,26 @@
     "http_inference_endpoint": "COMPLETE",
     "sandbox_http_client": "COMPLETE",
     "model_family_policy_tests": "COMPLETE — 54 contract tests pass",
-    "real_sandbox_qualification": "PENDING — requires @real_sandbox tests with live NemoClaw sandbox + approved Nemotron NIM",
-    "ssrf_end_to_end": "PENDING — code complete, runtime verification requires real sandbox",
-    "approved_nemotron_real_response": "PENDING — requires live approved Nemotron 3/3.5 NIM on host"
+    "real_sandbox_qualification": "COMPLETE — Phase 20C-B: 51 real_sandbox tests pass on qualified host",
+    "ssrf_end_to_end": "COMPLETE — sandbox→MAIW endpoint→NIM chain verified; localhost blocked from sandbox",
+    "approved_nemotron_real_response": "COMPLETE — nvidia/nemotron-3-super-120b-a12b real response received (latency 572ms)"
+  },
+
+  "phase_20c_b_results": {
+    "sandbox_name": "maiw-qual-20c-b",
+    "sandbox_id": "1d0d1faf-a797-42b0-8ea9-6d27df5c3e12",
+    "real_inference_hard_gate": "PASSED",
+    "approved_model": "nvidia/nemotron-3-super-120b-a12b",
+    "model_generation": "nemotron-3",
+    "latency_ms": 572.52,
+    "real_sandbox_test_count": 51,
+    "real_sandbox_tests_pass": true,
+    "auth_fail_closed": true,
+    "forbidden_fields_422": true,
+    "ssrf_blocked": true,
+    "write_authority_absent": true,
+    "proof_sop_a_waiting_for_governance": true,
+    "bug_fix_nim_usage_schema": "Fixed dict[str, int] → dict[str, Any] for NIM nested usage sub-objects"
   },
 
   "audit_trail": {

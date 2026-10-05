@@ -256,7 +256,9 @@ class ModelResponse(BaseModel):
     model_family: str
     latency_ms: float
     finish_reason: str
-    usage: dict[str, int] = Field(default_factory=dict)
+    # Typed as dict[str, Any] to accept sub-objects from newer NIM API versions
+    # (e.g. prompt_tokens_details, completion_tokens_details) without validation failure.
+    usage: dict[str, Any] = Field(default_factory=dict)
     route_decision: ModelRouteDecision
     structured_output: Any | None = None
     raw_provider_metadata: dict[str, Any] = Field(default_factory=dict)
