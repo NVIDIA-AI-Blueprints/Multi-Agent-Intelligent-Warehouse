@@ -87,11 +87,13 @@ _TOKEN_CONFIGURED = bool(MAIW_INFERENCE_TOKEN)
 # ── Marks ─────────────────────────────────────────────────────────────────────
 
 # real_sandbox: requires running OpenShell sandbox AND live MAIW endpoint.
-# On the qualification host, these are mandatory (not skipable).
+# On the qualification host (epg-tme-smc-h100-02) these are MANDATORY; the
+# test suite fails rather than skipping when infrastructure is absent.
 _QUAL_HOST = os.uname().nodename == "epg-tme-smc-h100-02"
+_INFRA_READY = _ENDPOINT_AVAILABLE and _SANDBOX_AVAILABLE and _TOKEN_CONFIGURED
 
 real_sandbox = pytest.mark.skipif(
-    not (_ENDPOINT_AVAILABLE and _SANDBOX_AVAILABLE and _TOKEN_CONFIGURED),
+    not _INFRA_READY and not _QUAL_HOST,
     reason=(
         "real_sandbox tests require: running MAIW inference endpoint at "
         f"{MAIW_INFERENCE_ENDPOINT}, running OpenShell sandbox '{SANDBOX_NAME}', "
