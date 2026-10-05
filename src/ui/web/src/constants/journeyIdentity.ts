@@ -72,6 +72,14 @@ export interface ArtifactIdentity {
   // Model
   model_id?: string;
   routing_rule?: string;
+  /** Whether the selected model belongs to an approved model family.
+   *  'approved' = on the Nemotron 3/3.5 approved list.
+   *  'unapproved' = rejected by policy (e.g. Llama-family).
+   *  'unknown' = eligibility not yet determined.
+   */
+  model_approved_family?: 'approved' | 'unapproved' | 'unknown';
+  /** Human-readable generation label, e.g. "Nemotron 3" or "Nemotron 3.5". */
+  model_generation?: string;
 
   // Decision
   proposal_id?: string;

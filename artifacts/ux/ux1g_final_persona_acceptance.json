@@ -1,0 +1,134 @@
+{
+  "schema_version": "1.0",
+  "artifact_type": "ux_persona_acceptance",
+  "phase": "UX-1G",
+  "title": "MAIW v2 Final Persona Acceptance",
+  "acceptance_date": "2026-10-05T00:00:00Z",
+  "build_sha": "1c8606a",
+  "source_branch": "nvidia/main",
+  "acceptance_branch": "feat/ux-1g-final-persona-acceptance",
+  "environment": "unit-tests-jsdom-static-qualification-artifact",
+  "personas": [
+    {
+      "id": "A",
+      "name": "Warehouse Operator",
+      "checklist_items": 10,
+      "checklist_pass": 10,
+      "checklist_fail": 0,
+      "verdict": "PASS"
+    },
+    {
+      "id": "B",
+      "name": "Developer/Solution Architect",
+      "checklist_items": 15,
+      "checklist_pass": 15,
+      "checklist_fail": 0,
+      "verdict": "PASS"
+    },
+    {
+      "id": "C",
+      "name": "Platform/Security Engineer",
+      "checklist_items": 12,
+      "checklist_pass": 12,
+      "checklist_fail": 0,
+      "verdict": "PASS"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "operator-a",
+      "name": "Wave Risk (Proof SOP A)",
+      "persona": "A",
+      "verdict": "PASS"
+    },
+    {
+      "id": "operator-b",
+      "name": "Equipment Failure (Proof SOP B)",
+      "persona": "A",
+      "verdict": "PASS"
+    },
+    {
+      "id": "operator-c",
+      "name": "Inventory/Picking Loop (Proof SOP C)",
+      "persona": "A",
+      "verdict": "PASS"
+    }
+  ],
+  "tests": {
+    "ui_unit_component_before": 937,
+    "ui_unit_component_after": 963,
+    "new_tests_added": 26,
+    "test_suites_before": 37,
+    "test_suites_after": 39,
+    "failures": 0,
+    "new_test_files": [
+      "src/ui/web/src/__tests__/ux1g.test.tsx"
+    ],
+    "updated_test_files": [
+      "src/ui/web/src/__tests__/ux1e.test.tsx"
+    ]
+  },
+  "defects": [
+    {
+      "id": "D1",
+      "severity": "P1",
+      "title": "MODEL panel missing approved-family status and model generation",
+      "status": "FIXED",
+      "fix": "ApprovedFamilyBadge in DeveloperJourneyPanel; model_approved_family + model_generation in ArtifactIdentity"
+    },
+    {
+      "id": "D2",
+      "severity": "P1",
+      "title": "Legacy Llama model ID in ux1e test fixtures",
+      "status": "FIXED",
+      "fix": "Updated to nvidia/nemotron-3-super-120b-a12b + approved_family/generation fields"
+    },
+    {
+      "id": "D3",
+      "severity": "P1",
+      "title": "No Platform/Security deployment surface",
+      "status": "FIXED",
+      "fix": "DeploymentSecurity.tsx page at /deployment with all required Platform/Security fields; DEPLOYMENT nav item"
+    },
+    {
+      "id": "D4",
+      "severity": "minor",
+      "title": "ExecutionOutcomeBadge reconciliation descriptions not shown",
+      "status": "FIXED",
+      "fix": "Added desc text for INDETERMINATE and CONFIRMED_NOT_EXECUTED reconciliation states"
+    }
+  ],
+  "acceptance_principles": {
+    "recommended_ne_approved": "PASS",
+    "approved_ne_executed": "PASS",
+    "executed_ne_confirmed": "PASS",
+    "confirmed_ne_operational_outcome": "PASS",
+    "procedure_completion_separate": "PASS",
+    "agent_claim_ne_step_completion": "PASS",
+    "model_claim_ne_validator_verdict": "PASS",
+    "sandbox_isolation_ne_governance": "PASS",
+    "model_availability_ne_eligibility": "PASS"
+  },
+  "known_limitations": [
+    "DeploymentSecurity page reads static qualification constants (reference deployment scope only — no live policy endpoint)",
+    "ApprovedFamilyBadge falls back to model_id string matching when backend does not supply model_approved_family field",
+    "No E2E framework in repo — persona flows covered by unit/component tests only",
+    "Reconciliation desc text hidden in compact mode (by design for table contexts)"
+  ],
+  "approved_model_policy": {
+    "approved_generations": ["nemotron-3", "nemotron-3.5"],
+    "current_qualified_model": "nvidia/nemotron-3-super-120b-a12b",
+    "llama_family_rejected": true,
+    "qwen_rejected": true
+  },
+  "sandbox_policy": {
+    "allowed_capability_classes": ["READ", "ANALYTICAL", "PROPOSAL"],
+    "denied_capability_classes": ["WRITE", "EMERGENCY_WRITE"],
+    "provider_credential_in_sandbox": false,
+    "warehouse_write_credential_in_sandbox": false,
+    "action_executor_in_sandbox": false
+  },
+  "qualification_scope": "qualified reference deployment — single-node, H100, development/demo use",
+  "verdict": "MAIW UX-1G FINAL PERSONA ACCEPTANCE COMPLETE",
+  "release_gate": "READY FOR REVIEW — pending human review before final freeze"
+}

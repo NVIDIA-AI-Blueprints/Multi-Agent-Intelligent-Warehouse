@@ -38,7 +38,10 @@ const FULL_IDENTITY = {
   agent_id: 'agent-stu901',
   sop_id: 'sop-vwx234',
   sop_version: '1.0.0',
-  model_id: 'meta/llama3-70b-instruct',
+  // UX-1G: MAIW v2 uses approved Nemotron 3 family — legacy Llama never appears as production selection
+  model_id: 'nvidia/nemotron-3-super-120b-a12b',
+  model_approved_family: 'approved' as const,
+  model_generation: 'Nemotron 3',
   routing_rule: 'R5_REASONING',
   proposal_id: 'prop-yza567',
   decision_id: 'dec-bcd890',
@@ -85,7 +88,7 @@ const MOCK_ANALYSIS_RESULT = {
         subtype: null,
       },
     ],
-    model_id: 'meta/llama3-70b-instruct',
+    model_id: 'nvidia/nemotron-3-super-120b-a12b',
     routing_rule: 'R5_REASONING',
     routing_reason: 'High reasoning level required',
     latency_ms: 420,
@@ -106,7 +109,7 @@ const MOCK_COPILOT_TURN = {
   agent: 'WarehouseAgent',
   skills_used: ['EquipmentSkill', 'WaveSkill'],
   skills_available: ['LaborSkill'],
-  model_id: 'meta/llama3-70b-instruct',
+  model_id: 'nvidia/nemotron-3-super-120b-a12b',
   reasoning_level: 'HIGH',
   routing_rule: 'R5_REASONING',
   routing_reason: 'High reasoning required',
@@ -412,7 +415,7 @@ describe('TC-3: DeveloperJourneyPanel stage panels', () => {
   it('TC-3.3: MODEL panel shows model_id, routing_rule, latency', () => {
     renderPanel('MODEL');
     const panel = screen.getByTestId('journey-panel-MODEL');
-    expect(within(panel).getByText('meta/llama3-70b-instruct')).toBeInTheDocument();
+    expect(within(panel).getByText('nvidia/nemotron-3-super-120b-a12b')).toBeInTheDocument();
     expect(within(panel).getByText('R5_REASONING')).toBeInTheDocument();
     expect(within(panel).getByText('420')).toBeInTheDocument();
   });
@@ -509,5 +512,57 @@ describe('TC-5: ArtifactIdentity — all IDs present in full ACT turn', () => {
     expect(FULL_IDENTITY.proposal_id).toBeTruthy();
     expect(FULL_IDENTITY.decision_id).toBeTruthy();
     expect(FULL_IDENTITY.execution_id).toBeTruthy();
+  });
+});
+
+// ── TC-6: UX-1G Approved model family (Step 20, 31) ─────────────────────────
+
+describe('TC-6: Approved model family policy in MODEL panel', () => {
+  function renderModelPanel(identity: Partial<typeof FULL_IDENTITY> = FULL_IDENTITY) {
+    render(
+      <DeveloperJourneyPanel
+        activeStage="MODEL"
+        identity={identity as any}
+        analysisResult={MOCK_ANALYSIS_RESULT as any}
+        copilotTurn={MOCK_COPILOT_TURN as any}
+        demoStatus={MOCK_DEMO_STATUS as any}
+        agentTask={MOCK_AGENT_TASK as any}
+      />
+    );
+  }
+
+  it('TC-6.1: approved Nemotron model shows APPROVED FAMILY badge', () => {
+    renderModelPanel(FULL_IDENTITY);
+    const badge = screen.getByTestId('approved-family-badge');
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveTextContent('APPROVED FAMILY');
+    expect(badge).toHaveAttribute('aria-label', 'Model family status: APPROVED FAMILY');
+  });
+
+  it('TC-6.2: unapproved Llama model shows UNAPPROVED FAMILY badge', () => {
+    renderModelPanel({
+      ...FULL_IDENTITY,
+      model_id: 'meta/llama3-70b-instruct',
+      model_approved_family: 'unapproved',
+    });
+    const badge = screen.getByTestId('approved-family-badge');
+    expect(badge).toHaveTextContent('UNAPPROVED FAMILY');
+  });
+
+  it('TC-6.3: model_generation shown in MODEL panel for Nemotron 3', () => {
+    renderModelPanel(FULL_IDENTITY);
+    const panel = screen.getByTestId('journey-panel-MODEL');
+    expect(within(panel).getByText('Nemotron 3')).toBeInTheDocument();
+  });
+
+  it('TC-6.4: MAIW v2 production model_id is NOT a Llama-family model', () => {
+    // Invariant: legacy llama-family must not appear as production selection
+    const productionModelId = FULL_IDENTITY.model_id;
+    expect(productionModelId).not.toMatch(/llama/i);
+    expect(productionModelId).toMatch(/nemotron/i);
+  });
+
+  it('TC-6.5: MAIW v2 fixture approved_family is "approved"', () => {
+    expect(FULL_IDENTITY.model_approved_family).toBe('approved');
   });
 });

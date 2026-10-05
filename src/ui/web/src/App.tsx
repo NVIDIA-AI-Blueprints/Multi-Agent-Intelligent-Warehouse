@@ -27,6 +27,7 @@ import WorldShell from './components/world/WorldShell';
 import CapabilityPlane from './pages/CapabilityPlane';
 import ActivityFeed from './pages/ActivityFeed';
 import SystemHealth from './pages/SystemHealth';
+import DeploymentSecurity from './pages/DeploymentSecurity';
 
 function App() {
   return (
@@ -48,6 +49,7 @@ function App() {
                   <Route path="/capabilities" element={<CapabilityPlane />} />
                   <Route path="/activity" element={<ActivityFeed />} />
                   <Route path="/health" element={<SystemHealth />} />
+                  <Route path="/deployment" element={<DeploymentSecurity />} />
                   <Route path="/chat" element={<ChatInterfaceNew />} />
                   <Route path="/equipment" element={<Equipment />} />
                   <Route path="/forecasting" element={<Forecasting />} />

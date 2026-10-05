@@ -65,19 +65,26 @@ export default function ExecutionOutcomeBadge({ outcome, reconciliation, compact
       )}
 
       {reconciliation && (
-        <Box sx={{
-          display: 'inline-flex', alignItems: 'center', gap: 0.5,
-          px: compact ? 0.5 : 0.75, py: compact ? 0.1 : 0.25,
-          borderRadius: 0.5,
-          border: `1px solid ${RECONCILE_META[reconciliation].color}33`,
-          backgroundColor: `${RECONCILE_META[reconciliation].color}11`,
-        }}>
-          <Typography sx={{
-            fontFamily: 'monospace', fontSize: compact ? '0.55rem' : '0.62rem',
-            color: RECONCILE_META[reconciliation].color, letterSpacing: '0.04em',
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <Box sx={{
+            display: 'inline-flex', alignItems: 'center', gap: 0.5,
+            px: compact ? 0.5 : 0.75, py: compact ? 0.1 : 0.25,
+            borderRadius: 0.5,
+            border: `1px solid ${RECONCILE_META[reconciliation].color}33`,
+            backgroundColor: `${RECONCILE_META[reconciliation].color}11`,
           }}>
-            → {RECONCILE_META[reconciliation].label}
-          </Typography>
+            <Typography sx={{
+              fontFamily: 'monospace', fontSize: compact ? '0.55rem' : '0.62rem',
+              color: RECONCILE_META[reconciliation].color, letterSpacing: '0.04em',
+            }}>
+              → {RECONCILE_META[reconciliation].label}
+            </Typography>
+          </Box>
+          {!compact && (
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#6E7681' }}>
+              {RECONCILE_META[reconciliation].desc}
+            </Typography>
+          )}
         </Box>
       )}
     </Box>
