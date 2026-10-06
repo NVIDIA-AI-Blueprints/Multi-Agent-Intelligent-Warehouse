@@ -118,7 +118,7 @@ Qualification host: epg-tme-smc-h100-02 (4 x H100 NVL, sm_90a, NemoClaw 0.0.124,
 
 ## Test Baseline
 
-- Python CORE CI: 2604 passed, 0 failed, 3 skipped (2667 total including `test_phase_20c_approved_nemotron.py` run in isolation)
+- Python CORE CI: 2667 passed, 0 failed, 3 skipped (full combined suite)
 - UI: 963 passed across 39 test suites
 - Black: PASS
 - ESLint: 0 errors
@@ -130,7 +130,6 @@ Qualification host: epg-tme-smc-h100-02 (4 x H100 NVL, sm_90a, NemoClaw 0.0.124,
 - **real_sandbox tests skip on non-qualification hosts.** Tests marked `@pytest.mark.real_sandbox` require NemoClaw/OpenShell installed and skip elsewhere — this is expected behavior.
 - **Pre-existing ESLint warnings.** 1041 warnings (no-console, no-explicit-any); 0 errors. Non-blocking.
 - **Semantic Release skips on PR branches.** Expected CI behavior for release branches.
-- **test_phase_20c_approved_nemotron.py ordering issue.** 23 tests fail when run after the full CORE CI suite due to ModelGateway singleton state; all 63 tests pass when the file is run in isolation. Pre-existing, non-blocking.
 
 ## Deferred (Post-v2)
 
