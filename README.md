@@ -332,7 +332,7 @@ MAIW v2 permits **only Nemotron 3 and Nemotron 3.5** for production and qualific
 | `ultra` | `nvidia/nemotron-3-ultra-550b-a55b` | `nemotron-3` | Approved |
 | `nano-omni` | `nvidia/nemotron-3-nano-omni-30b-a3b` | `nemotron-3` | Approved (disabled by default; operator-configured) |
 
-Any model whose `generation` is not in `{"nemotron-3", "nemotron-3.5"}` is rejected by `PolicyFilter` before any provider call. This includes Llama-family Nemotron, Qwen, and any model with an unknown or uncatalogued generation. See `packages/maiw-models/maiw_models/routing.py` (`PolicyFilter.APPROVED_MODEL_GENERATIONS`).
+MAIW v2 supports Nemotron 3 and Nemotron 3.5 model families. Any model whose `generation` is not in `{"nemotron-3", "nemotron-3.5"}` is rejected by `PolicyFilter` before any provider call. See `packages/maiw-models/maiw_models/routing.py` (`PolicyFilter.APPROVED_MODEL_GENERATIONS`).
 
 See [docs/architecture/MODEL_GATEWAY.md](docs/architecture/MODEL_GATEWAY.md).
 
@@ -693,10 +693,10 @@ A frozen pre-NemoClaw performance baseline is preserved under `artifacts/baselin
 ```
 .
 ├─ packages/               # Canonical Python packages
-│  ├─ maiw-contracts/      # Shared contracts (ActionProposal, governance types)
+│  ├─ maiw-contracts/      # Domain value objects (equipment, labor, wave, inventory contracts)
 │  ├─ maiw-mcp/            # MCP client, capability registry, circuit breakers
 │  ├─ maiw-state/          # WarehouseState, domain state models
-│  ├─ maiw-decision/       # DecisionEngine — APPROVED/REJECTED/DEFERRED
+│  ├─ maiw-decision/       # ActionProposal, DecisionEngine — APPROVED/REJECTED/DEFERRED
 │  ├─ maiw-models/         # ModelGateway, NIM provider, PolicyFilter, ModelRouter
 │  ├─ maiw-skills/         # Inventory, Equipment, Labor, Wave skills
 │  ├─ maiw-execution/      # BaseActionExecutor (6-guard pattern), domain executors

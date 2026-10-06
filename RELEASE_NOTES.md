@@ -18,10 +18,10 @@ MAIW v2 is organized around a set of canonical packages, each with a clear, enfo
 
 | Package | Owns |
 |---------|------|
-| `maiw-contracts` | Shared contracts: `ActionProposal`, governance types, `RecommendedAction` |
+| `maiw-contracts` | Domain value objects (equipment, labor, wave, inventory contracts) |
 | `maiw-mcp` | MCP client, capability registry, circuit breakers |
 | `maiw-state` | `WarehouseState`, domain state models |
-| `maiw-decision` | `DecisionEngine` — synchronous, no I/O, APPROVED/REJECTED/DEFERRED |
+| `maiw-decision` | `ActionProposal`, `DecisionResult`, `ApprovalRecord`, `DecisionEngine` — synchronous, no I/O, APPROVED/REJECTED/DEFERRED |
 | `maiw-models` | `ModelGateway`, NIM provider, `PolicyFilter`, `ModelRouter` |
 | `maiw-skills` | Inventory, Equipment, Labor, Wave skills |
 | `maiw-execution` | `BaseActionExecutor` (6-guard pattern), domain executors |

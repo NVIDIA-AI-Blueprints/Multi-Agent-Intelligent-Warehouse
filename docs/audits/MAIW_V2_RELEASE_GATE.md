@@ -1,10 +1,10 @@
 # MAIW v2 Release Gate Audit
 
-**Audit Date:** 2026-10-05
+**Audit Date:** 2026-10-06 (final correction pass)
 **Release Branch:** `release/maiw-v2-final-freeze`
 **Source SHA:** `b9cf4768fcf19bf69ef91db55ab978e42bd7c95f` (nvidia/main HEAD = PR #137 merge commit)
 **Proposed Tag:** `v2.0.0` (do NOT apply until human review confirms)
-**Auditor:** Claude Code (automated release gate pass)
+**Auditor:** Claude Code (automated release gate pass — final correction pass)
 
 ---
 
@@ -17,7 +17,7 @@
 | Release branch | `release/maiw-v2-final-freeze` |
 | Source SHA | `b9cf4768fcf19bf69ef91db55ab978e42bd7c95f` |
 | PR #137 merge SHA | `b9cf4768fcf19bf69ef91db55ab978e42bd7c95f` (confirmed reachable) |
-| Audit date | 2026-10-05 |
+| Audit date | 2026-10-06 |
 
 **Source identity gate: PASS.** nvidia/main HEAD SHA matches PR #137 merge commit. Artifact `artifacts/ux/ux1g_final_persona_acceptance.json` exists and loads. Artifact `artifacts/nemoclaw/phase20b/security_qualification.json` exists with verdict `FULL_END_TO_END_QUALIFIED`. Artifact `artifacts/deployment/reference_deployment_qualification.json` exists.
 
@@ -63,7 +63,26 @@ The following invariants are confirmed to hold at source SHA:
 
 `PolicyFilter.APPROVED_MODEL_GENERATIONS = frozenset({"nemotron-3", "nemotron-3.5"})`
 
-No unsupported model names appear in product-facing docs (README, RELEASE_NOTES) as of this release gate. Architecture docs reference `llama-3.1-nemotron-nano-8b-v1` only in qualification evidence context (Phase 20B transport smoke test, explicitly labelled TRANSPORT_SMOKE_TEST_ONLY / NOT approved).
+MAIW v2 supports Nemotron 3 and Nemotron 3.5 model families. No unsupported or competitor model names appear in product-facing docs (README, RELEASE_NOTES) as of this release gate. Architecture docs reference `llama-3.1-nemotron-nano-8b-v1` only in qualification evidence context (Phase 20B transport smoke test, explicitly labelled TRANSPORT_SMOKE_TEST_ONLY / NOT approved).
+
+**README model-language audit: PASS.** Sentence enumerating Llama-family Nemotron, Qwen, and unknown model families removed. Policy statement updated to: "MAIW v2 supports Nemotron 3 and Nemotron 3.5 model families."
+
+---
+
+## Package Ownership Audit
+
+| Type | Actual Package | Doc Claims (pre-fix) | Status |
+|------|---------------|----------------------|--------|
+| `ActionProposal` | `maiw-decision` | `maiw-contracts` | CORRECTED in PACKAGE_OWNERSHIP.md, RELEASE_NOTES.md, README.md |
+| `DecisionResult` | `maiw-decision` | `maiw-contracts` | CORRECTED |
+| `ApprovalRecord` | `maiw-decision` | `maiw-contracts` | CORRECTED |
+| `DecisionEngine` | `maiw-decision` | listed separately | CONSISTENT |
+| `ModelGateway` | `maiw-models` | `maiw-models` | CORRECT |
+| `RuntimeCapabilityPolicy` | `maiw-agents` | `maiw-agents` | CORRECT |
+| `ProcedureStateStore` | `maiw-agents` | `maiw-agents` | CORRECT |
+| `maiw-contracts` actual owns | Domain value objects (equipment, labor, wave, inventory) | listed governance types | CORRECTED |
+
+All ownership corrections applied to `docs/architecture/PACKAGE_OWNERSHIP.md`, `RELEASE_NOTES.md`, and `README.md` repository structure section.
 
 ---
 
@@ -120,14 +139,14 @@ All 9 acceptance principles verified (recommended ≠ approved, approved ≠ exe
 
 | Test suite | Passed | Failed | Skipped | Notes |
 |-----------|--------|--------|---------|-------|
-| Python CORE CI (standard) | 2604 | 0 | 3 | Excludes 20c due to known ordering issue |
-| test_phase_20c_approved_nemotron.py (isolation) | 63 | 0 | 0 | All 63 pass in isolation |
-| Python CORE CI (combined, full suite) | 2644 | 23 | 3 | 23 ordering failures in 20c; pre-existing |
+| Python CORE CI (full combined suite) | 2667 | 0 | 3 | Singleton ordering defect resolved; 0 failures |
 | UI (Jest) | 963 | 0 | 0 | 39 suites |
-| Black | PASS | — | — | 131 files |
+| Black | PASS | — | — | 131+ files |
 | ESLint | 0 errors | — | — | 1041 warnings (pre-existing) |
 
-**Black check: PASS.** `black --check tests/ 2>&1 → All done! 131 files would be left unchanged.`
+**Python test suite: 2667 passed, 0 failed, 3 skipped.** Singleton ordering defect (P1-01) resolved: root cause was hardcoded `sys.path.insert(0, "/home/nvidia/Multi-Agent-Intelligent-Warehouse")` in `tests/unit/reliability/test_ambiguous_write.py` which caused `src` module to resolve from main checkout (which lacks `src/api/routers/inference.py`). Fix: removed the unnecessary sys.path insertion; `maiw_api` is available via venv. Belt-and-suspenders: added module-level autouse `_reset_gateway_singleton` fixture to `test_phase_20c_approved_nemotron.py`.
+
+**Black check: PASS.** `black --check tests/ 2>&1 → All done! files would be left unchanged.`
 
 **ESLint: 0 errors.** 1041 pre-existing non-blocking warnings.
 
@@ -150,11 +169,13 @@ All 9 acceptance principles verified (recommended ≠ approved, approved ≠ exe
 | Describes governance boundary (ActionExecutor is host-side) | PASS |
 | Describes reference deployment | PASS |
 | Describes Developer Journey UX | PASS |
-| States qualification status (FULL_END_TO_END_QUALIFIED) | PASS (updated) |
+| States qualification status (FULL_END_TO_END_QUALIFIED) | PASS |
 | Does NOT contain: "planned", "future work" | PASS |
-| Does NOT contain Phase 18/19/20 internal phase language | PASS (fixed "Phase 20A" ref) |
-| Does NOT enumerate unsupported models by name | PASS (llama row removed) |
+| Does NOT contain Phase 18/19/20 internal phase language | PASS |
+| Does NOT enumerate unsupported models by name | PASS (corrected: Llama/Qwen removed) |
 | Does NOT say "agent executes" or "agent approves" | PASS |
+| maiw-contracts described correctly (domain value objects) | PASS (corrected) |
+| maiw-decision described correctly (ActionProposal, DecisionEngine) | PASS (corrected) |
 
 ### Architecture docs
 
@@ -162,26 +183,32 @@ Stale patterns fixed:
 
 | File | Fix |
 |------|-----|
-| `docs/architecture/NEMOCLAW_OPENSHELL_INTEGRATION.md` | Removed stale "no HTTP endpoint exposes inference today" Gap note; replaced with current qualified state |
-| `docs/architecture/NEMOCLAW_OPENSHELL_INTEGRATION.md` | F02 "sandbox leg NOT YET PROVEN" updated to "RESOLVED (live sandbox qualified)" |
-| `docs/architecture/NEMOCLAW_OPENSHELL_INTEGRATION.md` | "Host-side only, NOT IN REAL SANDBOX" note updated to reflect qualification status |
-| `docs/architecture/SOP_ENGINE_V2_DESIGN.md` | Sandbox boundary header: "E2E INFERENCE DEFERRED" → "E2E INFERENCE QUALIFIED" |
-| `docs/architecture/SOP_ENGINE_V2_DESIGN.md` | "Full end-to-end inference was not verified" → updated to reflect qualification |
-| `docs/architecture/SOP_ENGINE_V2_DESIGN.md` | DEFERRED table row "Sandbox process isolation" → QUALIFIED |
+| `docs/architecture/NEMOCLAW_OPENSHELL_INTEGRATION.md` | Removed stale "no HTTP endpoint exposes inference today" Gap note |
+| `docs/architecture/NEMOCLAW_OPENSHELL_INTEGRATION.md` | F02 "sandbox leg NOT YET PROVEN" updated to "RESOLVED" |
+| `docs/architecture/SOP_ENGINE_V2_DESIGN.md` | Sandbox boundary header updated to reflect qualification |
+| `docs/architecture/PACKAGE_OWNERSHIP.md` | maiw-contracts owns domain value objects (not ActionProposal/governance) |
+| `docs/architecture/PACKAGE_OWNERSHIP.md` | maiw-decision owns ActionProposal, DecisionResult, ApprovalRecord |
 
 ### Static scan results
 
-| Pattern | Hits in current-product docs | Action |
-|---------|------------------------------|--------|
+| Pattern | Hits | Action |
+|---------|------|--------|
+| `Llama\|Qwen` in README.md model policy section | 0 | Fixed (removed) |
+| `unsupported model` enumeration in README.md | 0 | Fixed |
+| `ActionProposal is in maiw-contracts` | 0 | Fixed in all three docs |
 | `generate(prompt=` in docs/ | 0 | No action needed |
 | `ActionExecutor` in maiw-agents/ pyproject.toml | 0 | No action needed |
 | `maiw-execution` in maiw-agents/ | 0 | No action needed |
-| `meta/llama` in docs/architecture/ | 0 | No action needed |
-| `llama-3.1-nemotron` in README.md | 0 (removed) | Fixed |
-| `mock fallback production` in docs/ | 0 (existing text describes prohibition) | No action needed |
 | `WRITE.*sandbox.*allow` | 0 | No action needed |
-| `EMERGENCY_WRITE.*sandbox.*allow` | 0 | No action needed |
-| Phase 18/19/20 in docs/architecture/ (stale "DEFERRED") | Fixed per table above | Fixed |
+| `ALLOW_UNAUTHENTICATED=true` in committed config | 0 actual | PASS |
+
+---
+
+## Secret Scan
+
+No actual secrets found in `docs/`, `artifacts/`, `scripts/`. Pattern matches were all substrings in normal content (e.g., `task-`, `case_id`, `wave17-risk`). One RUNBOOK doc references `MAIW_INFERENCE_ALLOW_UNAUTHENTICATED=true` in a **DO NOT DO** instruction context — not a committed secret.
+
+**Secret scan: PASS (0 actual secrets).**
 
 ---
 
@@ -193,19 +220,18 @@ Stale patterns fixed:
 | `artifacts/nemoclaw/phase20c/live_sandbox_qualification.json` | EXISTS | `verdict: LIVE_SANDBOX_QUALIFIED` |
 | `artifacts/deployment/reference_deployment_qualification.json` | EXISTS | Operationalization complete |
 | `artifacts/ux/ux1g_final_persona_acceptance.json` | EXISTS | `verdict: MAIW UX-1G FINAL PERSONA ACCEPTANCE COMPLETE` |
-| `artifacts/release/maiw_v2_release_gate.json` | CREATED | `final_verdict: RELEASE READY WITH NON-BLOCKING LIMITATIONS` |
-| `RELEASE_NOTES.md` | CREATED | Full v2 release notes |
+| `artifacts/release/maiw_v2_release_gate.json` | UPDATED | `final_verdict: RELEASE READY` |
+| `RELEASE_NOTES.md` | EXISTS | Full v2 release notes (corrected package ownership) |
 
 ---
 
-## Known Limitations
+## Known Limitations (Platform, non-defects)
 
 1. **Single-node reference deployment (not HA).** No multi-replica coordination or HA persistence.
 2. **Qualified on epg-tme-smc-h100-02 and reference environment.** H100 NVL, sm_90a, NemoClaw 0.0.124, OpenShell 0.0.116.
 3. **real_sandbox tests skip on non-qualification hosts.** Expected behavior.
 4. **Pre-existing ESLint warnings.** 1041 non-blocking warnings; 0 errors.
 5. **Semantic Release skips on PR branches.** Expected CI behavior.
-6. **test_phase_20c_approved_nemotron.py ordering issue.** 23 tests fail when run after full suite due to ModelGateway singleton state; all 63 pass in isolation. Pre-existing defect, non-blocking.
 
 ---
 
@@ -217,18 +243,26 @@ None.
 
 ## P1 Findings
 
-**P1-01: test_phase_20c_approved_nemotron.py test ordering issue**
+None. (P1-01 resolved — see singleton defect fix in Test Results section above.)
 
-23 tests in `TestInferenceHTTPContract` and `TestAuthFailClosed` classes fail when run after the full CORE CI suite. Root cause: `reset_model_gateway()` fixture does not fully isolate the singleton when the module runs after other tests that interact with the ModelGateway. All 63 tests in the file pass when the file is run in isolation. This is a pre-existing issue on nvidia/main, not introduced by this release branch.
+---
 
-Status: PRE-EXISTING, NON-BLOCKING. Fix recommended post-v2 (add module-scoped autouse fixture to isolate singleton before module runs).
+## Singleton Defect Resolution (was P1-01)
+
+**Root cause identified and fixed.** `tests/unit/reliability/test_ambiguous_write.py` had a hardcoded `sys.path.insert(0, "/home/nvidia/Multi-Agent-Intelligent-Warehouse")` in the `TestProviderFaultInjection._make_world()` method. This inserted the main checkout root into sys.path, shadowing the worktree's `src/` with the main checkout's `src/`, which does NOT contain `src/api/routers/inference.py`. After `test_model_gateway.py` cached the `src` module from the wrong path, subsequent attempts by `TestInferenceHTTPContract` and `TestAuthFailClosed` to `from src.api.routers.inference import router` failed with `ModuleNotFoundError`.
+
+**Fix:** Removed the unnecessary `sys.path.insert` call. `maiw_api` is importable from the venv without it.
+
+**Belt-and-suspenders:** Added module-level autouse `_reset_gateway_singleton` fixture to `test_phase_20c_approved_nemotron.py` to isolate ModelGateway singleton across test modules regardless of run order.
+
+**Result:** Full combined suite now passes: 2667 passed, 0 failed.
 
 ---
 
 ## Final Verdict
 
 ```
-MAIW V2 RELEASE GATE PASSED
+MAIW V2 RELEASE GATE PASSED — RELEASE READY
 ```
 
-**The release is READY FOR HUMAN REVIEW.** No P0 findings. One P1 finding (test ordering, pre-existing, non-blocking). All qualification artifacts present and verified. All invariants hold. Proposed version: `v2.0.0`. Do NOT apply the tag or merge the PR until human review confirms.
+**P0: 0. P1: 0.** All qualification artifacts present and verified. All invariants hold. README model-language PASS. Package ownership corrected throughout. Singleton ordering defect resolved. Proposed version: `v2.0.0`. Do NOT apply the tag or merge the PR until human review confirms.
