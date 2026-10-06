@@ -63,7 +63,7 @@ Observe → Reason → Recommend → Govern → Approve → Execute → Observe 
 
 ![MAIW Runtime Pipeline](docs/architecture/diagrams/maiw-runtime-pipeline.png)
 
-The diagram expresses: **Operator/Human Authority** → **MAIW Copilot** → **MAIW Agent Runtime** (AgentDefinition / SOP / TaskState) → **Deterministic Runtime** and **Deep Agents Runtime** → canonical agents → **Warehouse World** + **ModelGateway** → **RecommendedAction** → **MAIW Authority Boundary** → **ActionProposal** → **DecisionEngine** → **Human Approval** → **ActionExecutor** → **MCP Interoperability Layer** → **Warehouse Systems** → **Observability & Trace** → **LIVE World & Outcome** → **Closed-Loop Outcome Observation**.
+MAIW v2 is a closed-loop decision architecture in which sandboxed agents reason over a governed warehouse state, generate typed operational proposals, and pass those proposals through deterministic decision, approval, commit-validation, and execution layers before any warehouse system is changed. Execution outcomes are then measured, traced, and fed back into the warehouse state, creating an auditable learning loop while preserving a strict separation between AI reasoning and operational authority.
 
 See [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) for the full architecture document.
 
