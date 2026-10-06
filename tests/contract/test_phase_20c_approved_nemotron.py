@@ -127,6 +127,7 @@ from maiw_models import (
     RiskLevel,
     LatencyClass,
     CostClass,
+    reset_model_gateway,
 )
 
 # TRANSPORT_SMOKE_TEST_MODEL may not be in the installed package yet; import
@@ -148,6 +149,23 @@ from nemoclaw.sandbox_config import (
     SandboxMode,
     SandboxRuntimeKind,
 )
+
+# ── Module-level singleton reset ──────────────────────────────────────────────
+
+
+@pytest.fixture(autouse=True)
+def _reset_gateway_singleton():
+    """Ensure ModelGateway singleton does not leak between tests.
+
+    This module-level autouse fixture resets the singleton before and after
+    every test in this file, preventing state contamination when this file is
+    run as part of the combined test suite after other tests that may have
+    initialised the singleton.
+    """
+    reset_model_gateway()
+    yield
+    reset_model_gateway()
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

@@ -239,9 +239,6 @@ class TestProviderFaultInjection:
     """
 
     def _make_world(self):
-        import sys
-
-        sys.path.insert(0, "/home/nvidia/Multi-Agent-Intelligent-Warehouse")
         from maiw_api.demo.world import DemoWarehouseWorld
         from maiw_api.demo.events import ScenarioEventBus
 

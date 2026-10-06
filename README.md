@@ -215,7 +215,7 @@ Context → SOP Engine / AgentRuntime → RecommendedAction
 
 Everything left of `Governance` is advisory. The SOP Engine imports no `ActionExecutor`, no `DecisionEngine`, no MCP write client and no warehouse credentials — enforced by AST inspection in CI, not by convention. Adding persistence did not move any authority into the engine: a restored procedure that was waiting on governance is still waiting on governance.
 
-**Sandbox status:** the preparation above is what made Phase 20A possible — procedure state is recoverable, evidence requirements are enforced, and runtime capabilities are explicitly deny-by-default. See [Sandboxed Agent Runtime](#sandboxed-agent-runtime) below.
+**Sandbox status:** procedure state is recoverable, evidence requirements are enforced, and runtime capabilities are explicitly deny-by-default. See [Sandboxed Agent Runtime](#sandboxed-agent-runtime) below.
 
 See [docs/architecture/SOP_ENGINE_V2_DESIGN.md](docs/architecture/SOP_ENGINE_V2_DESIGN.md).
 
@@ -292,7 +292,7 @@ Three sandbox modes, and the middle one is the point:
 
 **A sandbox authorises nothing.** Every capability check that runs unsandboxed still runs sandboxed, through the same `authorize_step`. The sandbox is a second wall behind the first. If `integrations/nemoclaw/` were deleted, capability enforcement, governance and procedure persistence would be unchanged.
 
-**Qualification status (Phase 20B + 20C-A):** NemoClaw v0.0.124 and OpenShell v0.0.116 are **installed and operational** on epg-tme-smc-h100-02. The security boundary, gateway, sandbox image, and all MAIW security invariants are verified at code and container level. Phase 20C-A adds: approved Nemotron 3/3.5 model family policy in `PolicyFilter`, `POST /api/v1/inference` HTTP inference endpoint (with strict field allowlist), and `MAIWHTTPModelGatewayClient` sandbox transport client. 54 Phase 20C-A contract tests pass. Full end-to-end SOP sandbox run with approved Nemotron NIM is deferred to Phase 20C-B. See `docs/audits/MAIW_NEMOCLAW_SECURITY_QUALIFICATION.md` for the full qualification report.
+**Qualification status (FULL_END_TO_END_QUALIFIED):** NemoClaw v0.0.124 and OpenShell v0.0.116 are **installed and qualified** on epg-tme-smc-h100-02. The security boundary, gateway, sandbox image, and all MAIW security invariants are verified at code and container level. The approved Nemotron 3/3.5 model family policy is enforced by `PolicyFilter`. The `POST /api/v1/inference` HTTP inference endpoint (strict field allowlist) and `MAIWHTTPModelGatewayClient` sandbox transport client are live and qualified. Full end-to-end SOP sandbox run with approved Nemotron NIM is **qualified** — real OpenShell sandbox inference through the full chain verified. See `docs/audits/MAIW_NEMOCLAW_SECURITY_QUALIFICATION.md` and `artifacts/nemoclaw/` for the full qualification record.
 
 See [docs/architecture/NEMOCLAW_OPENSHELL_INTEGRATION.md](docs/architecture/NEMOCLAW_OPENSHELL_INTEGRATION.md).
 
@@ -331,9 +331,8 @@ MAIW v2 permits **only Nemotron 3 and Nemotron 3.5** for production and qualific
 | `super` | `nvidia/nemotron-3-super-120b-a12b` | `nemotron-3` | Approved |
 | `ultra` | `nvidia/nemotron-3-ultra-550b-a55b` | `nemotron-3` | Approved |
 | `nano-omni` | `nvidia/nemotron-3-nano-omni-30b-a3b` | `nemotron-3` | Approved (disabled by default; operator-configured) |
-| `llama-3.1-nemotron-nano-8b-v1` | `nvidia/llama-3.1-nemotron-nano-8b-v1` | Llama-family | **TRANSPORT_SMOKE_TEST_ONLY — NOT approved for v2** |
 
-Any model whose `generation` is not in `{"nemotron-3", "nemotron-3.5"}` is rejected by `PolicyFilter` before any provider call. This includes Llama-family Nemotron, Qwen, and any model with an unknown or uncatalogued generation. See `packages/maiw-models/maiw_models/routing.py` (`PolicyFilter.APPROVED_MODEL_GENERATIONS`).
+MAIW v2 supports Nemotron 3 and Nemotron 3.5 model families. Any model whose `generation` is not in `{"nemotron-3", "nemotron-3.5"}` is rejected by `PolicyFilter` before any provider call. See `packages/maiw-models/maiw_models/routing.py` (`PolicyFilter.APPROVED_MODEL_GENERATIONS`).
 
 See [docs/architecture/MODEL_GATEWAY.md](docs/architecture/MODEL_GATEWAY.md).
 
@@ -652,7 +651,7 @@ python -m pytest tests/unit/ tests/contract/ tests/mcp/ \
   --ignore=tests/unit/test_prompt_injection_simple.py
 ```
 
-**MAIW v2 test baseline: ~1600 Python unit tests (+ 388 reliability tests + 94 frontend tests)**
+**MAIW v2 test baseline: 2400+ Python tests (CORE CI suite) + 963 UI tests (39 suites)**
 
 | Test tier | Command | Requires |
 |-----------|---------|---------|
@@ -694,10 +693,10 @@ A frozen pre-NemoClaw performance baseline is preserved under `artifacts/baselin
 ```
 .
 ├─ packages/               # Canonical Python packages
-│  ├─ maiw-contracts/      # Shared contracts (ActionProposal, governance types)
+│  ├─ maiw-contracts/      # Domain value objects (equipment, labor, wave, inventory contracts)
 │  ├─ maiw-mcp/            # MCP client, capability registry, circuit breakers
 │  ├─ maiw-state/          # WarehouseState, domain state models
-│  ├─ maiw-decision/       # DecisionEngine — APPROVED/REJECTED/DEFERRED
+│  ├─ maiw-decision/       # ActionProposal, DecisionEngine — APPROVED/REJECTED/DEFERRED
 │  ├─ maiw-models/         # ModelGateway, NIM provider, PolicyFilter, ModelRouter
 │  ├─ maiw-skills/         # Inventory, Equipment, Labor, Wave skills
 │  ├─ maiw-execution/      # BaseActionExecutor (6-guard pattern), domain executors
@@ -748,7 +747,7 @@ A frozen pre-NemoClaw performance baseline is preserved under `artifacts/baselin
 ## Contributing
 
 1. Fork the repository and create a feature branch.
-2. All changes must keep CORE CI green: current baseline ~1600 Python tests + 94 frontend tests.
+2. All changes must keep CORE CI green: current baseline 2400+ Python tests + 963 UI tests (39 suites).
 3. New canonical code goes in `packages/`, never in `src.*` for business logic.
 4. No `src.*` imports in any `packages/` code — enforced by the test suite.
 5. Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/).

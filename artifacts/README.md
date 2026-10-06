@@ -35,10 +35,17 @@ Public endpoints and commit SHAs are acceptable.
 ```
 artifacts/
 ├─ baselines/                      # Frozen performance snapshots
-│  └─ pre_nemoclaw_performance.json  # Phase 19B baseline before NemoClaw integration (CURRENT)
+│  └─ pre_nemoclaw_performance.json  # Pre-NemoClaw baseline (CURRENT)
 ├─ demo/                           # Counterfactual evaluation + trace artifacts for the canonical demo
 │  ├─ labor_wave_control_vs_maiw.* # Simulated: control vs MAIW-governed world comparison
 │  └─ labor_constraint_wave_risk_trace.*  # Execution trace for labor-constraint/wave-risk scenario
+├─ deployment/                     # Reference deployment qualification (CURRENT — v2 release)
+│  └─ reference_deployment_qualification.json  # Phase 20C-C deployment operationalization qualification
+├─ nemoclaw/                       # NemoClaw/OpenShell security and sandbox qualification (CURRENT)
+│  ├─ phase20b/
+│  │  └─ security_qualification.json  # Phase 20B+20C-A+20C-B: FULL_END_TO_END_QUALIFIED
+│  └─ phase20c/
+│     └─ live_sandbox_qualification.json  # Phase 20C-B live sandbox: LIVE_SANDBOX_QUALIFIED
 ├─ phase11/                        # Phase 11 validation report (HISTORICAL)
 │  └─ phase11_report.md
 ├─ phase18/                        # Model Gateway evaluation artifacts (CURRENT — phases 18C–18F)
@@ -52,10 +59,14 @@ artifacts/
 │  ├─ runtime_comparison.json      # Initial POC: deterministic vs simulated DeepAgentsRuntime
 │  ├─ runtime_comparison_simulated.json  # POC with simulated Deep Agents (pre-integration)
 │  └─ runtime_comparison_real_deepagents.json  # Real DeepAgentsRuntime integration (adoption evidence)
-└─ reliability/                    # Reliability and phase validation results
-   ├─ phase10e_validation.md       # Phase 10E operational hardening validation
-   ├─ scenario001_normal.*         # Scenario 001 normal-path reliability run
-   └─ summary.*                    # Reliability suite summary
+├─ release/                        # Release gate artifacts (CURRENT — v2 release)
+│  └─ maiw_v2_release_gate.json    # Machine-readable v2 release gate verdict
+├─ reliability/                    # Reliability and phase validation results
+│  ├─ phase10e_validation.md       # Phase 10E operational hardening validation
+│  ├─ scenario001_normal.*         # Scenario 001 normal-path reliability run
+│  └─ summary.*                    # Reliability suite summary
+└─ ux/                             # UX qualification artifacts (CURRENT — v2 release)
+   └─ ux1g_final_persona_acceptance.json  # UX-1G final persona acceptance: PASS (Operator/Developer/Platform)
 ```
 
 ## Phase 19A Runtime Comparison Files

@@ -1,0 +1,83 @@
+{
+  "release": "MAIW v2",
+  "proposed_version": "v2.0.0",
+  "release_branch": "release/maiw-v2-final-freeze",
+  "source_sha": "b9cf4768fcf19bf69ef91db55ab978e42bd7c95f",
+  "pr_137_merge_sha": "b9cf4768fcf19bf69ef91db55ab978e42bd7c95f",
+  "date": "2026-10-06",
+  "test_results": {
+    "python_tests": {
+      "passed": 2667,
+      "failed": 0,
+      "skipped": 3,
+      "note": "Full CORE CI suite including test_phase_20c_approved_nemotron.py (63 tests); singleton ordering defect resolved by removing hardcoded sys.path insertion in test_ambiguous_write.py"
+    },
+    "ui_tests": {
+      "suites": 39,
+      "tests": 963,
+      "failed": 0
+    },
+    "black_check": "PASS",
+    "eslint": {
+      "errors": 0,
+      "warnings": 1041,
+      "note": "Pre-existing non-blocking warnings (no-console, @typescript-eslint/no-explicit-any)"
+    }
+  },
+  "qualification_artifacts": {
+    "phase_20b_20c_security": "artifacts/nemoclaw/phase20b/security_qualification.json",
+    "phase_20c_live_sandbox": "artifacts/nemoclaw/phase20c/live_sandbox_qualification.json",
+    "deployment_qualification": "artifacts/deployment/reference_deployment_qualification.json",
+    "ux_1g_acceptance": "artifacts/ux/ux1g_final_persona_acceptance.json"
+  },
+  "qualification_verdicts": {
+    "phase_20b_20c_security": "FULL_END_TO_END_QUALIFIED",
+    "phase_20c_live_sandbox": "LIVE_SANDBOX_QUALIFIED",
+    "deployment": "MAIW PHASE 20C-C DEPLOYMENT OPERATIONALIZATION COMPLETE",
+    "ux_1g": "MAIW UX-1G FINAL PERSONA ACCEPTANCE COMPLETE — Operator 10/10, Developer 15/15, Platform/Security 12/12"
+  },
+  "docs_audit": "PASS",
+  "artifact_audit": "PASS",
+  "secret_scan": "PASS — 0 actual secrets found (placeholder examples only in docs/scripts)",
+  "security_scan": "PASS",
+  "readme_model_language": "PASS — README states only Nemotron 3 and Nemotron 3.5 as supported families; unsupported model names removed",
+  "package_ownership_audit": {
+    "ActionProposal": "maiw-decision (corrected from maiw-contracts in PACKAGE_OWNERSHIP.md, RELEASE_NOTES.md, README.md)",
+    "DecisionResult": "maiw-decision",
+    "ApprovalRecord": "maiw-decision",
+    "ModelGateway": "maiw-models",
+    "RuntimeCapabilityPolicy": "maiw-agents",
+    "ProcedureStateStore": "maiw-agents"
+  },
+  "singleton_defect_P1_01": {
+    "status": "RESOLVED",
+    "root_cause": "test_ambiguous_write.py had hardcoded sys.path.insert(0, '/home/nvidia/Multi-Agent-Intelligent-Warehouse') which caused src module to resolve from main checkout (no inference.py router there) after src was cached by earlier unit tests",
+    "fix": "Removed unnecessary sys.path insertion; maiw_api is available via venv without it",
+    "test_file_autouse_fixture": "Added module-level autouse _reset_gateway_singleton fixture to test_phase_20c_approved_nemotron.py as belt-and-suspenders defense"
+  },
+  "known_limitations": [
+    "Single-node reference deployment (not HA)",
+    "Qualified on epg-tme-smc-h100-02 (4x H100 NVL, sm_90a) and reference environment",
+    "real_sandbox tests skip on non-qualification hosts (expected behavior)",
+    "Pre-existing ESLint warnings (non-blocking, 0 errors)",
+    "Semantic Release skips on PR branches (expected)"
+  ],
+  "p0_findings": [],
+  "p1_findings": [],
+  "supported_model_families": ["Nemotron 3", "Nemotron 3.5"],
+  "authority_model": {
+    "agent_capabilities": ["reason", "analyze", "recommend"],
+    "host_capabilities": ["governance", "execution", "write-credentials"],
+    "sandbox_boundary": "SOP Engine + AgentRuntime inside; ActionExecutor + write credentials outside",
+    "write_in_sandbox": false,
+    "emergency_write_in_sandbox": false
+  },
+  "qualification_host": {
+    "hostname": "epg-tme-smc-h100-02",
+    "gpus": "4 x NVIDIA H100 NVL (95830 MiB each)",
+    "gpu_compute_capability": "sm_90a",
+    "nemoclaw_version": "0.0.124",
+    "openshell_version": "0.0.116"
+  },
+  "final_verdict": "RELEASE READY"
+}

@@ -9,12 +9,12 @@ It describes the current-state architecture; migration status codes are not used
 
 | Package | Owns | Depends on |
 |---|---|---|
-| `maiw-contracts` | `ActionProposal`, `DecisionResult`, `ExecutionResult`, `ApprovalRecord`, domain value objects | *(none)* |
+| `maiw-contracts` | Domain value objects (equipment, labor, wave, inventory contracts) | *(none)* |
 | `maiw-mcp` | `MAIWMCPClient`, `CapabilityRegistry`, MCP transport config | `maiw-contracts` |
 | `maiw-models` | `ModelGateway`, `PolicyFilter`, `ModelRouter`, `DeploymentResolver`, `ModelRegistry` | `maiw-contracts` |
 | `maiw-state` | `WarehouseStateProvider`, `WarehouseStateSnapshot`, `StateRequirements`, domain state models | `maiw-contracts`, `maiw-mcp` |
 | `maiw-skills` | Proposal skills, execution skills, read skills per domain | `maiw-state`, `maiw-mcp`, `maiw-models` |
-| `maiw-decision` | `DecisionEngine`, constraint rules, `ApprovalStore` | `maiw-contracts`, `maiw-skills`, `maiw-state` |
+| `maiw-decision` | `ActionProposal`, `DecisionResult`, `ApprovalRecord`, `DecisionEngine`, constraint rules, `ApprovalStore` | `maiw-contracts`, `maiw-skills`, `maiw-state` |
 | `maiw-execution` | `BaseActionExecutor`, domain executors, `ExecutionRegistry` | `maiw-decision`, `maiw-skills`, `maiw-mcp` |
 | `maiw-world` | `WarehouseWorldGenerator`, BASE/SCENARIO/LIVE world states, `OperationalContextSnapshot` | `maiw-state` |
 | `maiw-agents` | `AgentRuntime`, `MAIWDeterministicRuntime`, `DeepAgentsRuntime`, `AgentDefinition`, `SOPDefinition`, SOP Engine V2 | `maiw-skills`, `maiw-state`, `maiw-models` |
