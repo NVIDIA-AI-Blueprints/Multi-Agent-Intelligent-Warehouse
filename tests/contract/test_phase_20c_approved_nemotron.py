@@ -127,6 +127,7 @@ from maiw_models import (
     RiskLevel,
     LatencyClass,
     CostClass,
+    reset_model_gateway,
 )
 
 # TRANSPORT_SMOKE_TEST_MODEL may not be in the installed package yet; import
@@ -161,11 +162,9 @@ def _reset_gateway_singleton():
     run as part of the combined test suite after other tests that may have
     initialised the singleton.
     """
-    import maiw_models
-
-    maiw_models.reset_model_gateway()
+    reset_model_gateway()
     yield
-    maiw_models.reset_model_gateway()
+    reset_model_gateway()
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
