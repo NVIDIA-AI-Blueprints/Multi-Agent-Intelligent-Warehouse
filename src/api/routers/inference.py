@@ -71,7 +71,7 @@ from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Header
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from maiw_models import (
     ModelRequest,
@@ -119,6 +119,8 @@ class InferenceMessage(BaseModel):
     Only role and content are accepted — no function call metadata.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     role: Literal["user", "assistant", "system"]
     content: str = Field(..., max_length=_MAX_CONTENT_BYTES)
 
@@ -139,7 +141,13 @@ class InferenceRequest(BaseModel):
       - raw model override      (PolicyFilter is authoritative)
 
     The sandbox describes task *intent*.  ModelGateway decides the model.
+
+    Unknown fields are rejected (``extra="forbid"``, v2.0.1): a field the
+    endpoint does not understand — ``model``, ``provider``, ``routing_hints``,
+    ``endpoint`` … — is a 422, never silently ignored.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     task: str = Field(..., max_length=_MAX_TASK_BYTES, description="Agent task name.")
     messages: list[InferenceMessage] = Field(

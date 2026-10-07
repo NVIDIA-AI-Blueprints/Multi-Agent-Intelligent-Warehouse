@@ -23,6 +23,8 @@ docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md for the full authority graph):
         demo          simulation controls (MAIW_DEMO_MODE only) + governed
                       approve/reject/reconcile
         copilot       POST /turn — ACT goes through GovernedActionOrchestrator
+        inference     POST /api/v1/inference — bounded ModelGateway endpoint,
+                      fail-closed internal token, no governance below it
 
     Legacy (src.api.routers) — mounted READ-ONLY unless listed
         auth                       full (identity; own auth dependencies)
@@ -67,6 +69,10 @@ from maiw_api.routers.world import router as world_router
 from maiw_api.routers.model_lab import router as model_lab_router
 from maiw_api.routers.agent_tasks import router as agent_tasks_router
 from maiw_api.route_policy import curated_view, read_only_view
+
+# Bounded sandbox inference endpoint (one implementation, shared with the
+# legacy dev server): POST /api/v1/inference → canonical ModelGateway.
+from src.api.routers.inference import router as inference_router
 
 # ── Legacy routers (mounted through route_policy views only) ─────────────────
 from src.api.routers.auth import router as auth_router
@@ -242,6 +248,9 @@ app.include_router(world_router)
 
 app.include_router(model_lab_router)
 app.include_router(agent_tasks_router)
+
+# Bounded inference boundary (v2.0.1, audit P1-02)
+app.include_router(inference_router)
 
 # Legacy — identity management keeps its own auth dependencies.
 app.include_router(auth_router)
