@@ -21,7 +21,6 @@ ever returns a synthetic APPROVE.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import os
 import subprocess
@@ -87,7 +86,10 @@ def main() -> None:
         _run("judge_no_key", {"NVIDIA_API_KEY": ""}),
         _run(
             "judge_provider_down",
-            {"LLM_NIM_URL": "http://127.0.0.1:9/v1", "MAIW_NIM_BASE_URL": "http://127.0.0.1:9/v1"},
+            {
+                "LLM_NIM_URL": "http://127.0.0.1:9/v1",
+                "MAIW_NIM_BASE_URL": "http://127.0.0.1:9/v1",
+            },
         ),
         _run("ocr_vision", {}),
     ]
@@ -95,7 +97,11 @@ def main() -> None:
         r.get("decision") == "APPROVE" and r["case"] != "judge_real_provider"
         for r in results
     )
-    print(json.dumps({"results": results, "synthetic_approve_on_failure": synthetic_approve}))
+    print(
+        json.dumps(
+            {"results": results, "synthetic_approve_on_failure": synthetic_approve}
+        )
+    )
 
 
 if __name__ == "__main__":

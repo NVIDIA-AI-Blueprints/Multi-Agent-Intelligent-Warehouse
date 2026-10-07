@@ -181,23 +181,25 @@ def install_gateway(fake: FakeNIM, *, api_key: str = "fake-test-key-not-real") -
     config points at the fake provider. Registry/PolicyFilter/Router are real.
     """
     import maiw_models
-    from maiw_models import ModelGateway, ModelRegistry, reset_model_gateway
-    from maiw_models.providers.nim import NIMProvider
-    from maiw_models.providers.nim_client import NIMClient, NIMConfig
-    from maiw_models.router import ModelRouter
-    from maiw_models.telemetry import GatewayTelemetry
+    import maiw_models.providers.nim
+    import maiw_models.providers.nim_client
+    import maiw_models.router
+    import maiw_models.telemetry
 
-    reset_model_gateway()
-    client = NIMClient(
-        config=NIMConfig(llm_base_url=fake.base_url, llm_api_key=api_key, timeout=10),
+    nim_client = maiw_models.providers.nim_client
+    maiw_models.reset_model_gateway()
+    client = nim_client.NIMClient(
+        config=nim_client.NIMConfig(
+            llm_base_url=fake.base_url, llm_api_key=api_key, timeout=10
+        ),
         enable_cache=False,
     )
-    registry = ModelRegistry()
-    gateway = ModelGateway(
-        provider=NIMProvider(client),
+    registry = maiw_models.ModelRegistry()
+    gateway = maiw_models.ModelGateway(
+        provider=maiw_models.providers.nim.NIMProvider(client),
         registry=registry,
-        router=ModelRouter(registry),
-        telemetry=GatewayTelemetry(),
+        router=maiw_models.router.ModelRouter(registry),
+        telemetry=maiw_models.telemetry.GatewayTelemetry(),
     )
     maiw_models._gateway_instance = gateway  # noqa: SLF001 — same as the factory
     return gateway

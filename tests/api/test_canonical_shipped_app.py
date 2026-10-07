@@ -933,12 +933,10 @@ async def test_p1_04_ready_fails_when_persistence_unconstructible(
 
 
 async def test_p1_04_ready_fails_when_model_gateway_unavailable(canonical, monkeypatch):
-    import maiw_models
-
     async def _boom(*a, **k):
         raise RuntimeError("gateway construction failed")
 
-    monkeypatch.setattr(maiw_models, "get_model_gateway", _boom)
+    monkeypatch.setattr("maiw_models.get_model_gateway", _boom)
     async with running_canonical_app() as (_, client):
         r = await client.get("/api/v1/ready")
         live = await client.get("/api/v1/live")
