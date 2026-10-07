@@ -18,8 +18,8 @@ docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md for the full authority graph):
                       EquipmentActionExecutor only when APPROVED)
         operations    GET only in the shipped app (SQL task writes unmounted)
         safety        GET only in the shipped app (SQL incident writes unmounted)
-        mcp_status, runtime_status, world, model_lab, agent_tasks
-                      GET only
+        mcp_status, runtime_status, world, model_lab, agent_tasks,
+        procedures    GET only
         demo          simulation controls (MAIW_DEMO_MODE only) + governed
                       approve/reject/reconcile
         copilot       POST /turn — ACT goes through GovernedActionOrchestrator
@@ -68,6 +68,7 @@ from maiw_api.routers.world import router as world_router
 
 from maiw_api.routers.model_lab import router as model_lab_router
 from maiw_api.routers.agent_tasks import router as agent_tasks_router
+from maiw_api.routers.procedures import router as procedures_router
 from maiw_api.route_policy import curated_view, read_only_view
 
 # Bounded sandbox inference endpoint (one implementation, shared with the
@@ -248,6 +249,7 @@ app.include_router(world_router)
 
 app.include_router(model_lab_router)
 app.include_router(agent_tasks_router)
+app.include_router(procedures_router)
 
 # Bounded inference boundary (v2.0.1, audit P1-02)
 app.include_router(inference_router)

@@ -122,6 +122,14 @@ class MAIWRuntime:
     world_graph: Any = None  # maiw_world.graph.CanonicalWarehouseGraph
     world_datapack_manifest: dict = field(default_factory=dict)
 
+    # Durable procedure state + governance dedupe ledger (v2.0.1, P1-03).
+    # Built once by maiw_api.persistence.build_persistence() from
+    # MAIW_PERSISTENCE_MODE / MAIW_PERSISTENCE_ROOT.  /api/v1/ready probes them.
+    persistence: Any = None  # maiw_api.persistence.PersistenceRuntime
+    procedure_store: Any = None  # JsonFileProcedureStateStore (reference profile)
+    governance_inbox: Any = None  # JsonFileGovernanceInbox (reference profile)
+    procedure_host: Any = None  # maiw_api.procedure_host.ProcedureHost
+
 
 async def get_runtime() -> MAIWRuntime:
     """
@@ -148,6 +156,36 @@ async def get_runtime() -> MAIWRuntime:
         logger.info("MAIW bootstrap: SOP domain predicates registered")
     except Exception as exc:  # pragma: no cover - defensive, mirrors block style
         logger.warning("MAIW bootstrap: SOP domain predicates unavailable — %s", exc)
+
+    # ── 0y. Durable persistence (v2.0.1, P1-03) ───────────────────────────────
+    # The ONE construction site for the ProcedureStateStore and GovernanceInbox
+    # used by the shipped app. Reference profile: JSON files under
+    # MAIW_PERSISTENCE_ROOT. Failures are recorded (never silently downgraded to
+    # memory) and surface as NOT_READY on /api/v1/ready.
+    try:
+        from maiw_api.persistence import build_persistence
+        from maiw_api.procedure_host import ProcedureHost
+
+        runtime.persistence = build_persistence()
+        runtime.procedure_store = runtime.persistence.procedure_store
+        runtime.governance_inbox = runtime.persistence.governance_inbox
+        if runtime.persistence.ok:
+            runtime.procedure_host = ProcedureHost(
+                store=runtime.procedure_store,
+                inbox=runtime.governance_inbox,
+            )
+            logger.info(
+                "MAIW bootstrap: ProcedureHost ready (%s, durable=%s)",
+                type(runtime.procedure_store).__name__,
+                runtime.persistence.config.durable,
+            )
+        else:
+            logger.error(
+                "MAIW bootstrap: persistence unavailable — %s",
+                "; ".join(runtime.persistence.errors),
+            )
+    except Exception as exc:  # pragma: no cover - defensive, mirrors block style
+        logger.error("MAIW bootstrap: persistence wiring failed — %s", exc)
 
     # ── 0a. Circuit breakers — created before all network-touching components ──
     # Domain isolation: each MCP domain has its own independent circuit breaker.
