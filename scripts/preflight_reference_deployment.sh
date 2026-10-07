@@ -303,13 +303,19 @@ for dir in "${PERSIST_DIRS[@]}"; do
     fi
 done
 
-# Disk space for persistence (Step 63)
-PERSIST_PARTITION=$(df --output=avail -m "${MAIW_PERSISTENCE_ROOT}" 2>/dev/null | tail -1 | tr -d ' ' || echo 0)
+# Disk space for persistence (Step 63). Measured on the nearest existing
+# ancestor: on a fresh host the root does not exist yet and `df` on a missing
+# path reported 0MB (false failure, found during v2.0.1 live qualification).
+PERSIST_PROBE="${MAIW_PERSISTENCE_ROOT}"
+while [[ ! -e "$PERSIST_PROBE" && "$PERSIST_PROBE" != "/" ]]; do
+    PERSIST_PROBE="$(dirname "$PERSIST_PROBE")"
+done
+PERSIST_PARTITION=$(df --output=avail -m "${PERSIST_PROBE}" 2>/dev/null | tail -1 | tr -d ' ' || echo 0)
 if [[ -n "$PERSIST_PARTITION" ]] && [[ "$PERSIST_PARTITION" -ge "$MIN_DISK_MB_STATE" ]]; then
     _pass "Persistence disk: ${PERSIST_PARTITION}MB available (>= ${MIN_DISK_MB_STATE}MB)"
 else
     _fail "Persistence disk" ">= ${MIN_DISK_MB_STATE}MB" "${PERSIST_PARTITION:-unknown}MB" \
-        "Free disk space on $(df --output=target "${MAIW_PERSISTENCE_ROOT}" 2>/dev/null | tail -1)"
+        "Free disk space on $(df --output=target "${PERSIST_PROBE}" 2>/dev/null | tail -1)"
 fi
 
 # ── Check 11: Auth token ──────────────────────────────────────────────────────

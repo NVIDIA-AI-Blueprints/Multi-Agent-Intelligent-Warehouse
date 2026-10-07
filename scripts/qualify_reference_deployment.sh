@@ -115,14 +115,14 @@ echo "--- Phase 5: API restart + resume verification ---"
 # Snapshot pre-restart procedure state
 PROC_DIR="${MAIW_PERSISTENCE_ROOT}/procedures"
 PRE_COUNT=$(find "$PROC_DIR" -name "*.json" 2>/dev/null | wc -l || echo 0)
-PRE_WAITING=$(grep -l '"status": "waiting_for_governance"' "$PROC_DIR"/*.json 2>/dev/null | wc -l || echo 0)
+PRE_WAITING=$(grep -lE '"status": ?"waiting_for_governance"' "$PROC_DIR"/*.json 2>/dev/null | wc -l || echo 0)
 
 RESTART_T=$(date +%s)
 if bash "$SCRIPT_DIR/restart_reference_deployment.sh" --skip-preflight 2>&1; then
     RESTART_END_T=$(date +%s)
     RESTART_S=$((RESTART_END_T - RESTART_T))
     POST_COUNT=$(find "$PROC_DIR" -name "*.json" 2>/dev/null | wc -l || echo 0)
-    POST_WAITING=$(grep -l '"status": "waiting_for_governance"' "$PROC_DIR"/*.json 2>/dev/null | wc -l || echo 0)
+    POST_WAITING=$(grep -lE '"status": ?"waiting_for_governance"' "$PROC_DIR"/*.json 2>/dev/null | wc -l || echo 0)
     echo "  Restart time baseline: ${RESTART_S}s"  # Step 60
     echo "  Procedure count: $PRE_COUNT → $POST_COUNT"
     echo "  WAITING_FOR_GOVERNANCE: $PRE_WAITING → $POST_WAITING"
@@ -150,7 +150,7 @@ if [[ "$SANDBOX_MODE" == "required" ]]; then
     fi
     # Verify host state still readable
     POST_KILL_COUNT=$(find "$PROC_DIR" -name "*.json" 2>/dev/null | wc -l || echo 0)
-    POST_KILL_WAITING=$(grep -l '"status": "waiting_for_governance"' "$PROC_DIR"/*.json 2>/dev/null | wc -l || echo 0)
+    POST_KILL_WAITING=$(grep -lE '"status": ?"waiting_for_governance"' "$PROC_DIR"/*.json 2>/dev/null | wc -l || echo 0)
     if [[ "$POST_KILL_COUNT" -ge "$PRE_COUNT" ]] && [[ "$POST_KILL_WAITING" -ge "$PRE_WAITING" ]]; then
         _qpass "Sandbox kill preserved host procedure/governance state"
     else

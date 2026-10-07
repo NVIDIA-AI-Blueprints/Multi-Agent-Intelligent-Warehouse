@@ -43,7 +43,7 @@ if [[ -d "$PROC_DIR" ]]; then
     PRE_PROC_COUNT=$(find "$PROC_DIR" -name "*.json" 2>/dev/null | wc -l)
     echo "  Procedure state files before restart: $PRE_PROC_COUNT"
     # Note WAITING_FOR_GOVERNANCE procedures
-    WAITING=$(grep -l '"status": "waiting_for_governance"' "$PROC_DIR"/*.json 2>/dev/null | wc -l || echo 0)
+    WAITING=$(grep -lE '"status": ?"waiting_for_governance"' "$PROC_DIR"/*.json 2>/dev/null | wc -l || echo 0)
     echo "  WAITING_FOR_GOVERNANCE procedures: $WAITING"
 fi
 
@@ -74,7 +74,7 @@ echo "--- Post-restart durable state verification ---"
 if [[ -d "$PROC_DIR" ]]; then
     POST_PROC_COUNT=$(find "$PROC_DIR" -name "*.json" 2>/dev/null | wc -l)
     echo "  Procedure state files after restart: $POST_PROC_COUNT"
-    POST_WAITING=$(grep -l '"status": "waiting_for_governance"' "$PROC_DIR"/*.json 2>/dev/null | wc -l || echo 0)
+    POST_WAITING=$(grep -lE '"status": ?"waiting_for_governance"' "$PROC_DIR"/*.json 2>/dev/null | wc -l || echo 0)
     echo "  WAITING_FOR_GOVERNANCE procedures: $POST_WAITING"
     if [[ "${PRE_PROC_COUNT:-0}" -gt 0 ]] && [[ "$POST_PROC_COUNT" -lt "${PRE_PROC_COUNT:-0}" ]]; then
         echo "  WARNING: fewer procedure state files after restart ($POST_PROC_COUNT < ${PRE_PROC_COUNT})" >&2

@@ -31,30 +31,26 @@ echo "=== MAIW v2 Reference Deployment — Stop ==="
 
 ANYTHING_REMAINED=0
 
-# ── Step 1: Stop sandbox/OpenShell runtime ───────────────────────────────────
+# ── Step 1: Sandbox/OpenShell runtime (report only) ──────────────────────────
+# v2.0.1: this script no longer signals processes matched by a name pattern
+# (`pgrep -f "openshell.*maiw"`), which could hit unrelated sandboxes, CLI
+# sessions or gateways on a shared host. OpenShell sandboxes are owned by the
+# OpenShell control plane: stop or delete one explicitly with
+#   openshell sandbox delete <name>
+# Stopping the MAIW API never requires killing a sandbox — a sandboxed agent
+# simply cannot reach the inference endpoint while the API is down.
 echo ""
 echo "--- Sandbox runtime ---"
-if command -v openshell &>/dev/null; then
-    # Graceful: signal any running MAIW sandboxes to terminate
-    SANDBOX_PIDS=$(pgrep -f "openshell.*maiw" 2>/dev/null || true)
-    if [[ -n "$SANDBOX_PIDS" ]]; then
-        echo "  Sending SIGTERM to OpenShell sandbox process(es): $SANDBOX_PIDS"
-        kill -TERM $SANDBOX_PIDS 2>/dev/null || true
-        sleep 2
-        # Force if still running
-        REMAINING=$(echo "$SANDBOX_PIDS" | while read -r p; do
-            kill -0 "$p" 2>/dev/null && echo "$p" || true
-        done)
-        if [[ -n "$REMAINING" ]]; then
-            echo "  Sandbox process(es) still running after SIGTERM; sending SIGKILL"
-            kill -KILL $REMAINING 2>/dev/null || true
-        fi
-        echo "  Sandbox stopped"
-    else
-        echo "  No OpenShell sandbox processes found"
-    fi
+if command -v openshell &>/dev/null && [[ -n "${MAIW_SANDBOX_NAME:-}" ]]; then
+    PHASE=$(openshell sandbox list -o json 2>/dev/null | python3 -c "
+import sys, json
+for s in json.load(sys.stdin):
+    if s.get('name') == '${MAIW_SANDBOX_NAME}':
+        print(s.get('phase', '')); break
+" 2>/dev/null || echo "")
+    echo "  Sandbox '${MAIW_SANDBOX_NAME}': ${PHASE:-not found} (left running; manage with openshell)"
 else
-    echo "  OpenShell not installed or not in PATH — skipping"
+    echo "  No sandbox action (set MAIW_SANDBOX_NAME to report its phase)"
 fi
 
 # ── Step 2: Stop MAIW API ────────────────────────────────────────────────────
