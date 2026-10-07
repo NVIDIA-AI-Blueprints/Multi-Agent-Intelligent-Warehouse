@@ -37,7 +37,9 @@ APPROVED_GENERATIONS=("nemotron-3" "nemotron-3.5")
 MAIW_PERSISTENCE_ROOT="${MAIW_PERSISTENCE_ROOT:-/var/lib/maiw}"
 
 # Required ports (Step 64)
-REQUIRED_PORTS=(8001 8020)
+# v2.0.1: inference is served by the canonical app on the API port — there is
+# no separate inference port.
+REQUIRED_PORTS=("${MAIW_API_PORT:-8001}")
 
 # Disk thresholds in MB (Step 63)
 MIN_DISK_MB_STATE=1024

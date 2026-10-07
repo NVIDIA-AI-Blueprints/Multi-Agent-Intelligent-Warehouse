@@ -1,8 +1,14 @@
 # MAIW v2 Reference Deployment Runbook
 
-**Phase**: 20C-C — Deployment Operationalization
-**Status**: Phase 20C-B LIVE_SANDBOX_QUALIFIED (PR #135)
-**Last updated**: 2026-10-05
+**Phase**: 20C-C — Deployment Operationalization; v2.0.1 canonical-app remediation
+**Status**: v2.0.1 release candidate — awaiting independent re-audit
+**Last updated**: 2026-10-07
+
+> **v2.0.1 change.** Everything in this runbook targets ONE process: the
+> canonical shipped app `maiw_api.app:app`. It serves `POST /api/v1/inference`
+> on the API port (8001); there is no separate `:8020` inference server and the
+> legacy `src/api/app.py` is never started for a deployment. See
+> `docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md`.
 
 ---
 
@@ -25,13 +31,16 @@ Kubernetes autoscaling, NeMo Relay, SOP Engine extraction.
 
 ```
 HOST (single node)
-├── MAIW API (port 8001)
+├── MAIW API — uvicorn maiw_api.app:app (port 8001, the only API process)
 │   ├── ModelGateway  →  PolicyFilter (nemotron-3 / nemotron-3.5 ONLY)
 │   │                 →  ModelRouter  →  NIMProvider  →  NIM endpoint
-│   ├── DecisionEngine + GovernanceInbox (file-backed, restart-safe)
-│   ├── ProcedureStateStore (file-backed, /var/lib/maiw/procedures/)
-│   ├── SOP Engine (procedure execution, step/loop/retry budgets)
-│   └── POST /api/v1/inference  (auth-required: X-Maiw-Internal-Token)
+│   ├── DecisionEngine → ActionExecutor (governed writes only)
+│   ├── ProcedureHost (maiw_api.procedure_host) — SOP Engine bound to:
+│   │     JsonFileProcedureStateStore  ($MAIW_PERSISTENCE_ROOT/procedures/)
+│   │     JsonFileGovernanceInbox      ($MAIW_PERSISTENCE_ROOT/governance/)
+│   ├── POST /api/v1/inference  (auth-required: X-Maiw-Internal-Token)
+│   ├── GET  /api/v1/procedures (read-only view of the durable store)
+│   └── legacy /api/v1/chat — NOT mounted (v2.0.1)
 ├── Approved Nemotron 3/3.5 deployment
 │   └── nvidia/nemotron-3-super-120b-a12b  (gen=nemotron-3, qualified)
 │       Hosted at: https://integrate.api.nvidia.com/v1
@@ -40,7 +49,7 @@ HOST (single node)
     ├── SOP Engine (agent-side procedure runner)
     ├── DeepAgentsRuntime
     ├── RuntimeCapabilityPolicy (deny-by-default; WRITE/EMERGENCY_WRITE always denied)
-    └── MAIWHTTPModelGatewayClient → POST http://<HOST_IP>:8020/api/v1/inference
+    └── MAIWHTTPModelGatewayClient → POST http://<HOST_IP>:8001/api/v1/inference
 
 Persistence root: /var/lib/maiw/
   procedures/   — JsonFileProcedureStateStore (one .json per procedure, atomic)
@@ -107,7 +116,7 @@ cp .env.example .env
 | `LLM_MODEL` | Approved model ID | `nvidia/nemotron-3-super-120b-a12b` |
 | `MAIW_SANDBOX_MODE` | Must be `required` | `required` |
 | `MAIW_SANDBOX_RUNTIME` | Must be `openshell` | `openshell` |
-| `MAIW_SANDBOX_MODEL_GATEWAY_ENDPOINT` | Sandbox → host inference URL | `http://10.x.x.x:8020/api/v1/inference` |
+| `MAIW_SANDBOX_MODEL_GATEWAY_ENDPOINT` | Sandbox → host inference URL (canonical app, API port) | `http://10.x.x.x:8001/api/v1/inference` |
 
 ### Optional Variables
 
@@ -187,30 +196,34 @@ curl http://localhost:8001/api/v1/ready   # 200 = ready, 503 = not ready
 curl http://localhost:8001/api/v1/live    # 200 = process alive
 ```
 
-Aggregated readiness check (`GET /api/v1/ready`):
-- MAIW runtime initialized
-- DecisionEngine available (canonical write path)
-- MCP client available
-- Equipment agent available
-- At least one MCP domain not CIRCUIT OPEN
+`GET /api/v1/ready` (v2.0.1) answers "can the canonical app safely accept
+work?" from the dependencies it actually uses. Any **critical** component
+failing → HTTP 503 `{"status": "NOT_READY", "failed_components": [...]}`.
 
-Readiness does **not** depend on model provider — provider down = inference
-degrades but API is still ready for governance and write-path operations.
+| Component | Critical | Ready when |
+|---|---|---|
+| `runtime` | yes | lifespan assembled `MAIWRuntime` |
+| `persistence` | yes | `procedures/` and `governance/` exist, are listable, and accept an fsynced write/read/delete probe; stores constructed |
+| `model_gateway` | yes | canonical ModelGateway constructed |
+| `governed_write_path` | yes | DecisionEngine + MCP client + equipment agent present |
+| `mcp_domains` | yes | not every configured MCP domain CIRCUIT OPEN |
+| `database` | yes, unless `MAIW_DEMO_MODE=true` (override: `MAIW_READINESS_REQUIRE_DATABASE`) | `SELECT 1` within 3 s |
+| `model_provider` | no | reported (NIM circuit); provider down → inference 503 per request |
+| `sandbox_runtime` | no | reported; OpenShell calls the API, not the reverse |
 
-### Aggregated readiness fields
+Liveness (`/api/v1/live`) never depends on any of these.
 
-When implementing Step 25, the `/api/v1/ready` endpoint returns:
 ```json
 {
-  "status": "ready",
+  "status": "NOT_READY",
+  "failed_components": ["persistence"],
   "components": {
-    "decision_engine": true,
-    "mcp_client": true,
-    "equipment_agent": true,
-    "model_gateway": true,
-    "copilot_service": true
-  },
-  "domain_health": {"inventory": "HEALTHY", "equipment": "HEALTHY", ...}
+    "persistence": {"status": "failed", "durable": true,
+                    "procedure_store": {"status": "failed", "reason": "directory missing"},
+                    "governance_inbox": {"status": "ready"}},
+    "model_gateway": {"status": "ready"},
+    "database": {"status": "ready"}
+  }
 }
 ```
 
@@ -218,10 +231,10 @@ When implementing Step 25, the `/api/v1/ready` endpoint returns:
 
 | Condition | MAIW behavior |
 |---|---|
-| Model provider down | Inference returns 503 MODEL_UNAVAILABLE; governance/write path unaffected |
-| OpenShell down | New agent tasks fail; in-flight procedures paused; procedure state preserved |
-| ProcedureStateStore down | Engine fails loudly; no silent state loss |
-| GovernanceInbox down | Governance outcome delivery fails loudly; no duplicate write risk |
+| Model provider down | `/ready` stays 200; inference returns 503 `PROVIDER_FAILURE`/`MODEL_UNAVAILABLE`; document stages fail typed; governance/write path unaffected |
+| OpenShell down | `/ready` unaffected (API does not depend on it); new sandboxed tasks cannot start; stored procedures remain in the durable store; smoke test fails its sandbox check |
+| Persistence unavailable (dir missing / unwritable) | `/ready` 503 `persistence` failed; `/api/v1/procedures` 503 if the store could not be built |
+| Database unreachable (reference profile) | `/ready` 503 `database` failed |
 
 ---
 
@@ -231,10 +244,12 @@ When implementing Step 25, the `/api/v1/ready` endpoint returns:
 bash scripts/smoke_test_reference_deployment.sh
 ```
 
-Tests: API liveness, readiness, sandbox available (if required), approved model
-configured, auth-required inference returns 401 without token, 401 with wrong
-token, 200 with correct token, returned model is approved family, sandbox WRITE
-boundary enforced.
+Tests the canonical app only: liveness; readiness 200 READY; durable
+persistence; `/api/v1/inference` mounted; 401 without / with wrong token; 422
+for a forbidden routing field (`model_id`) and for an unknown field (`model`);
+200 with the correct token and an approved Nemotron 3/3.5 generation in
+`route.generation`; legacy `POST /api/v1/chat` → 404; configured model family;
+OpenShell sandbox `MAIW_SANDBOX_NAME` Ready when `MAIW_SANDBOX_MODE=required`.
 
 ---
 
@@ -242,11 +257,13 @@ boundary enforced.
 
 After start and smoke test pass:
 
-- Procedures run via SOP Engine in OpenShell sandbox
-- Inference flows: sandbox → POST /api/v1/inference → PolicyFilter → NIMProvider
-- Governance wait: procedure reaches WAITING_FOR_GOVERNANCE, pauses
-- Governance decision: DecisionEngine routes approval; ActionExecutor executes write via MCP; result forwarded to procedure
-- GovernanceInbox deduplicates deliveries across restarts
+- Procedure state is held host-side by `ProcedureHost` in the durable
+  `JsonFileProcedureStateStore`; the sandboxed runtime reasons for its steps
+- Inference flows: sandbox → POST /api/v1/inference (canonical app, :8001) → ModelGateway → PolicyFilter → NIMProvider
+- Governance wait: procedure reaches WAITING_FOR_GOVERNANCE and is checkpointed to disk
+- Governance decision: DecisionEngine routes approval; ActionExecutor executes the write via MCP; the outcome is applied to the procedure with `ProcedureHost.apply_governance`
+- `JsonFileGovernanceInbox` records each applied outcome before resume, so a redelivery (including after restart) is dropped
+- `GET /api/v1/procedures` shows stored procedures (read-only)
 
 ---
 
@@ -456,7 +473,7 @@ Do not upgrade NemoClaw and OpenShell simultaneously.
 3. Stop deployment: `bash scripts/stop_reference_deployment.sh`
 4. Update sandbox configuration: the sandbox must receive the new token at launch (via environment injection)
 5. Restart deployment: `bash scripts/start_reference_deployment.sh`
-6. Verify: `curl -H "X-Maiw-Internal-Token: <new_token>" http://localhost:8001/api/v1/inference -X POST -d '{"task":"test","modality":"text","reasoning_level":"standard","risk_level":"low","deadline_ms":5000}'` → 200 (or 422 for missing fields, not 401)
+6. Verify: `curl -H "X-Maiw-Internal-Token: <new_token>" http://localhost:8001/api/v1/inference -X POST -H "Content-Type: application/json" -d '{"task":"test","messages":[{"role":"user","content":"OK?"}],"deadline_ms":5000}'` → 200 (never 401)
 7. Verify old token rejected: same request with old token → 401
 
 ### Rotating NVIDIA_API_KEY

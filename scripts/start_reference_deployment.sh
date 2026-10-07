@@ -7,19 +7,28 @@
 # Starts services in the correct dependency order (Step 7):
 #   1. Validate persistence dirs and config (preflight)
 #   2. Ensure approved model provider is reachable
-#   3. Start MAIW API (ModelGateway, PolicyFilter, SOP Engine, GovernanceInbox)
-#   4. Wait for MAIW API readiness
+#   3. Start the canonical shipped app — uvicorn maiw_api.app:app — which
+#      builds ModelGateway/PolicyFilter, the durable ProcedureStateStore and
+#      GovernanceInbox under MAIW_PERSISTENCE_ROOT, and mounts the bounded
+#      POST /api/v1/inference endpoint on the SAME port (v2.0.1)
+#   4. Wait for MAIW API readiness (/api/v1/ready = 200 READY; it is 503 while
+#      persistence, ModelGateway or a required database is unavailable)
 #   5. Print safe deployment summary (no secrets)
+#
+# There is no separate inference server: the legacy src/api/app.py is a
+# development server only and is never started by this script.
 #
 # Usage:
 #   bash scripts/start_reference_deployment.sh [--skip-preflight]
 #
 # Environment variables:
 #   See .env.example and docs/operations/REFERENCE_DEPLOYMENT_RUNBOOK.md
-#   MAIW_PERSISTENCE_ROOT  — durable state root (default /var/lib/maiw)
-#   MAIW_API_PORT          — MAIW API port (default 8001)
+#   MAIW_PERSISTENCE_ROOT  — durable state root (default /var/lib/maiw); read by
+#                            the app itself (maiw_api.persistence)
+#   MAIW_API_PORT          — MAIW API port (default 8001); also serves
+#                            POST /api/v1/inference
 #   MAIW_API_HOST          — MAIW API bind address (default 0.0.0.0)
-#   MAIW_INFERENCE_PORT    — inference sub-endpoint port (default 8020)
+#   MAIW_PYTHON            — Python interpreter to run uvicorn (default python3)
 #
 # Step 9 of Phase 20C-C.
 # ---------------------------------------------------------------------------
@@ -78,7 +87,10 @@ if [[ -f "$PROJECT_ROOT/.env" ]]; then
     echo "  .env loaded"
 fi
 
-# Export persistence paths for the API process
+# Export persistence paths for the API process. maiw_api.persistence reads
+# MAIW_PERSISTENCE_ROOT (and the two explicit dir overrides) at startup.
+export MAIW_PERSISTENCE_ROOT
+unset MAIW_PERSISTENCE_MODE  # reference profile is always file-backed
 export MAIW_PROCEDURE_STATE_DIR="${MAIW_PERSISTENCE_ROOT}/procedures"
 export MAIW_GOVERNANCE_STATE_DIR="${MAIW_PERSISTENCE_ROOT}/governance"
 export MAIW_RUNTIME_STATE_DIR="${MAIW_PERSISTENCE_ROOT}/runtime"
@@ -113,7 +125,8 @@ else
     echo "  Tip: create env with ./scripts/setup/setup_environment.sh"
 fi
 
-if ! python3 -c "import maiw_api" &>/dev/null 2>&1; then
+MAIW_PYTHON="${MAIW_PYTHON:-python3}"
+if ! "$MAIW_PYTHON" -c "import maiw_api" &>/dev/null 2>&1; then
     echo "  Installing packages (editable)..."
     pip install --quiet -e "$PROJECT_ROOT" -e "$PROJECT_ROOT/packages/maiw-models" \
         -e "$PROJECT_ROOT/packages/maiw-agents" -e "$PROJECT_ROOT/packages/maiw-mcp" \
@@ -133,7 +146,10 @@ PIDFILE="${MAIW_RUNTIME_STATE_DIR}/maiw-api.pid"
 if [[ -f "$PIDFILE" ]] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
     echo "  MAIW API already running (PID $(cat "$PIDFILE"))"
 else
-    python3 -m uvicorn maiw_api.app:app \
+    # Run from the project root so the composition root's src.* / integrations.*
+    # imports resolve regardless of the caller's working directory.
+    cd "$PROJECT_ROOT"
+    "$MAIW_PYTHON" -m uvicorn maiw_api.app:app \
         --host "$MAIW_API_HOST" \
         --port "$MAIW_API_PORT" \
         --no-access-log \
@@ -153,7 +169,13 @@ until curl -sf --max-time 5 "$READY_URL" &>/dev/null; do
     if [[ "$ELAPSED" -ge "$READINESS_TIMEOUT_S" ]]; then
         echo "  ERROR: MAIW API did not become ready within ${READINESS_TIMEOUT_S}s" >&2
         echo "  Expected: HTTP 200 from $READY_URL" >&2
-        echo "  Actual:   no response" >&2
+        READY_BODY=$(curl -s --max-time 5 "$READY_URL" 2>/dev/null || echo "")
+        if [[ -n "$READY_BODY" ]]; then
+            FAILED=$(echo "$READY_BODY" | "$MAIW_PYTHON" -c "import sys,json; print(','.join(json.load(sys.stdin).get('failed_components', [])))" 2>/dev/null || echo "?")
+            echo "  Actual:   NOT_READY — failed components: ${FAILED}" >&2
+        else
+            echo "  Actual:   no response" >&2
+        fi
         echo "  Next: check logs at ${MAIW_PERSISTENCE_ROOT}/runtime/maiw-api.log" >&2
         echo "  Run: bash scripts/status_reference_deployment.sh" >&2
         exit 1
@@ -173,7 +195,7 @@ echo "  MAIW API:              http://${MAIW_API_HOST}:${MAIW_API_PORT}"
 echo "  Health:                http://${MAIW_API_HOST}:${MAIW_API_PORT}/api/v1/health"
 echo "  Readiness:             http://${MAIW_API_HOST}:${MAIW_API_PORT}/api/v1/ready"
 echo "  Liveness:              http://${MAIW_API_HOST}:${MAIW_API_PORT}/api/v1/live"
-echo "  Inference endpoint:    POST /api/v1/inference (auth required)"
+echo "  Inference endpoint:    POST http://${MAIW_API_HOST}:${MAIW_API_PORT}/api/v1/inference (X-Maiw-Internal-Token required)"
 echo ""
 echo "  Approved model family: Nemotron 3 / Nemotron 3.5 only"
 echo "  Configured model:      ${MODEL_ID}"

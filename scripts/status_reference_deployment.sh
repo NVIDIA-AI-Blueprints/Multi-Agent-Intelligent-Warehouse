@@ -11,8 +11,8 @@
 #   - OpenShell sandbox availability
 #   - Persistence health
 #   - GovernanceInbox health
-#   - Active procedures count
-#   - Pending governance count
+#   - Stored / waiting / completed procedure counts (GET /api/v1/procedures)
+#   - Readiness component breakdown (GET /api/v1/ready)
 #
 # Usage:
 #   bash scripts/status_reference_deployment.sh [--json]
@@ -52,27 +52,35 @@ else
 fi
 
 # ── 2. Readiness ──────────────────────────────────────────────────────────────
+# v2.0.1: /api/v1/ready is computed from real dependencies (persistence,
+# ModelGateway, governed write path, MCP domains, database) and returns 503
+# NOT_READY with failed_components when any critical one is unavailable.
 echo ""
 echo "--- Readiness ---"
-READY_HTTP=$(curl -so /dev/null -w "%{http_code}" --max-time 5 "${BASE_URL}/api/v1/ready" 2>/dev/null || echo "000")
-READY_BODY=$(curl -sf --max-time 5 "${BASE_URL}/api/v1/ready" 2>/dev/null || echo "{}")
+READY_RAW=$(curl -s --max-time 15 -w '\n%{http_code}' "${BASE_URL}/api/v1/ready" 2>/dev/null || echo -e "\n000")
+READY_HTTP=$(echo "$READY_RAW" | tail -1)
+READY_BODY=$(echo "$READY_RAW" | sed '$d')
+[[ -z "$READY_BODY" ]] && READY_BODY="{}"
 if [[ "$READY_HTTP" == "200" ]]; then
-    READY_STATUS=$(echo "$READY_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status','?'))" 2>/dev/null || echo "?")
-    _status "MAIW API readiness" "ready (HTTP 200)"
-    # Component details
-    COMPONENTS=$(echo "$READY_BODY" | python3 -c "
-import sys, json
-d = json.load(sys.stdin)
-comps = d.get('components', {})
-for k, v in comps.items():
-    print(f'    {k}: {v}')
-" 2>/dev/null || echo "    (could not parse)")
-    echo "$COMPONENTS"
+    _status "MAIW API readiness" "READY (HTTP 200)"
 else
     _status "MAIW API readiness" "NOT READY (HTTP $READY_HTTP)" "false"
-    READY_DETAIL=$(echo "$READY_BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('detail',''))" 2>/dev/null || echo "")
-    [[ -n "$READY_DETAIL" ]] && echo "  Detail: $READY_DETAIL"
 fi
+echo "$READY_BODY" | python3 -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    print('    (no readiness body)'); sys.exit(0)
+if d.get('failed_components'):
+    print('    failed components: ' + ', '.join(d['failed_components']))
+for k, v in (d.get('components') or {}).items():
+    status = v.get('status', '?') if isinstance(v, dict) else v
+    extra = ''
+    if k == 'persistence' and isinstance(v, dict):
+        extra = f\" (durable={v.get('durable')}, mode={v.get('mode')})\"
+    print(f'    {k}: {status}{extra}')
+" 2>/dev/null || echo "    (could not parse)"
 
 # ── 3. ModelGateway / Runtime Status ──────────────────────────────────────────
 echo ""
@@ -117,33 +125,35 @@ else
 fi
 
 # ── 6. Persistence health ─────────────────────────────────────────────────────
+# Procedure counts come from the running app's durable store
+# (GET /api/v1/procedures), not from grepping files.
 echo ""
 echo "--- Persistence ---"
-PROC_DIR="${MAIW_PERSISTENCE_ROOT}/procedures"
 GOV_DIR="${MAIW_PERSISTENCE_ROOT}/governance"
-
-if [[ -d "$PROC_DIR" ]] && [[ -w "$PROC_DIR" ]]; then
-    PROC_COUNT=$(find "$PROC_DIR" -name "*.json" 2>/dev/null | wc -l)
-    _status "Procedure state dir" "ok ($PROC_COUNT files)"
-    # Count by status
-    WAITING=$(grep -l '"status": "waiting_for_governance"' "$PROC_DIR"/*.json 2>/dev/null | wc -l || echo 0)
-    ACTIVE=$(grep -l '"status": "running"' "$PROC_DIR"/*.json 2>/dev/null | wc -l || echo 0)
-    COMPLETED=$(grep -l '"status": "completed"' "$PROC_DIR"/*.json 2>/dev/null | wc -l || echo 0)
-    _status "  Active procedures" "$ACTIVE running"
-    _status "  Waiting for governance" "$WAITING"
-    _status "  Completed procedures" "$COMPLETED"
+PROCS=$(curl -s --max-time 10 -w '\n%{http_code}' "${BASE_URL}/api/v1/procedures" 2>/dev/null || echo -e "\n000")
+PROCS_HTTP=$(echo "$PROCS" | tail -1)
+PROCS_BODY=$(echo "$PROCS" | sed '$d')
+if [[ "$PROCS_HTTP" == "200" ]]; then
+    echo "$PROCS_BODY" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+by = d.get('by_status', {})
+print(f\"  {'Stored procedures':<35} {d.get('count', 0)}\")
+print(f\"  {'  Running':<35} {by.get('running', 0)}\")
+print(f\"  {'  Waiting for governance':<35} {by.get('waiting_for_governance', 0)}\")
+print(f\"  {'  Completed':<35} {by.get('completed', 0)}\")
+print(f\"  {'  Escalated / failed':<35} {by.get('escalated', 0) + by.get('failed', 0)}\")
+" 2>/dev/null || _status "Procedure store" "could not parse /api/v1/procedures" "false"
 else
-    _status "Procedure state dir" "not found or not writable: $PROC_DIR" "false"
+    _status "Procedure store" "unavailable (HTTP $PROCS_HTTP from /api/v1/procedures)" "false"
 fi
 
-if [[ -d "$GOV_DIR" ]]; then
-    GOV_FILE="${GOV_DIR}/governance_inbox.jsonl"
-    if [[ -f "$GOV_FILE" ]]; then
-        GOV_ENTRIES=$(wc -l < "$GOV_FILE" 2>/dev/null || echo 0)
-        _status "GovernanceInbox" "ok ($GOV_ENTRIES entries)"
-    else
-        _status "GovernanceInbox" "inbox file not yet created (ok for fresh deployment)"
-    fi
+GOV_FILE="${GOV_DIR}/governance_inbox.jsonl"
+if [[ -f "$GOV_FILE" ]]; then
+    GOV_ENTRIES=$(wc -l < "$GOV_FILE" 2>/dev/null || echo 0)
+    _status "GovernanceInbox ledger" "ok ($GOV_ENTRIES accepted outcomes)"
+elif [[ -d "$GOV_DIR" ]]; then
+    _status "GovernanceInbox ledger" "no outcomes recorded yet (ok for fresh deployment)"
 else
     _status "GovernanceInbox dir" "not found: $GOV_DIR" "false"
 fi
