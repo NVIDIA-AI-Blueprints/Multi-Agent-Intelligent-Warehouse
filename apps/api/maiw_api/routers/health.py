@@ -5,7 +5,8 @@ Health router — Batch B.
 
 Endpoints preserved from src/api/routers/health.py:
     GET /api/v1/live             — liveness probe
-    GET /api/v1/ready            — readiness probe (checks DB)
+    GET /api/v1/ready            — readiness probe (persistence, ModelGateway,
+                                   governed write path, MCP, DB — v2.0.1)
     GET /api/v1/health           — comprehensive health (DB + Redis + Milvus)
     GET /api/v1/health/simple    — lightweight health for frontend
     GET /api/v1/version          — version info
@@ -33,6 +34,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1", tags=["Health"])
 
 _start_time = datetime.utcnow()
+
+# Bound for every database probe (readiness and /health). A paused or
+# unreachable database must fail the probe, not hang it.
+_READINESS_DB_TIMEOUT_S = 3.0
 
 
 def _uptime() -> str:
@@ -63,9 +68,11 @@ async def _check_database() -> dict:
                 db=os.getenv("POSTGRES_DB", "warehouse"),
             ),
         )
-        conn = await asyncpg.connect(url)
-        await conn.execute("SELECT 1")
-        await conn.close()
+        conn = await asyncpg.connect(url, timeout=_READINESS_DB_TIMEOUT_S)
+        try:
+            await conn.execute("SELECT 1", timeout=_READINESS_DB_TIMEOUT_S)
+        finally:
+            await conn.close()
         return {"status": "healthy", "message": "Database connection successful"}
     except Exception as exc:
         logger.error("Database health check failed: %s", exc)
@@ -122,33 +129,101 @@ async def liveness_check():
     }
 
 
+def _database_required() -> bool:
+    """
+    Whether the backing Postgres is a critical readiness dependency.
+
+    ``MAIW_READINESS_REQUIRE_DATABASE`` (true/false) decides explicitly. When it
+    is unset the database is required unless ``MAIW_DEMO_MODE`` is on: in the
+    reference profile the mounted read routes (equipment, operations, safety,
+    inventory, auth) and the document workflow all depend on it, while demo mode
+    serves the operational flows from in-memory simulation providers.
+    """
+    explicit = os.getenv("MAIW_READINESS_REQUIRE_DATABASE")
+    if explicit is not None and explicit.strip():
+        return explicit.strip().lower() in ("1", "true", "yes")
+    demo = os.getenv("MAIW_DEMO_MODE", "false").strip().lower() in ("1", "true", "yes")
+    return not demo
+
+
+async def _probe_database_for_readiness() -> dict:
+    """SELECT 1 against the configured database, bounded by a short timeout."""
+    try:
+        result = await asyncio.wait_for(
+            _check_database(), timeout=_READINESS_DB_TIMEOUT_S + 2.0
+        )
+    except asyncio.TimeoutError:
+        return {"status": "failed", "reason": "database probe timed out"}
+    if result.get("status") == "healthy":
+        return {"status": "ready"}
+    return {"status": "failed", "reason": str(result.get("message", ""))[:200]}
+
+
 @router.get("/ready")
 async def readiness_check(request: Request):
     """
-    Capability-aware readiness probe.
+    Readiness probe — can the canonical shipped app safely accept work?
 
-    Returns 200 if the MAIW canonical write path is fully operational.
-    A single MCP domain being CIRCUIT OPEN does NOT fail readiness — only that
-    domain's workflows are affected; others remain available.
+    v2.0.1 (audit P1-04): readiness is computed from the dependencies the
+    shipped app actually needs, and every component is reported:
 
-    Returns 503 when ANY of the following are true:
-        - MAIW runtime is not initialized
-        - decision_engine is not available (governed write path is broken)
-        - mcp_client is not available (no MCP connectivity)
-        - equipment_agent is not available (canonical agent not wired)
-        - ALL MCP domains are CIRCUIT OPEN (total loss of MCP capability)
+    Critical (any failure → HTTP 503, ``status: NOT_READY``):
+        runtime              MAIW runtime assembled by the lifespan
+        persistence          durable ProcedureStateStore + GovernanceInbox —
+                             directories exist, are listable and accept an
+                             fsynced write/read/delete probe
+        model_gateway        canonical ModelGateway constructed
+        governed_write_path  DecisionEngine + MCP client + equipment agent
+        mcp_domains          not every configured MCP domain CIRCUIT OPEN
+        database             SELECT 1 succeeds (when required; see
+                             ``_database_required``)
 
-    Optional (degrade gracefully without failing readiness):
-        - ModelGateway (used for NL reasoning only)
-        - Warehouse World / World Explorer
-        - Copilot (separate from core write path)
+    Reported, not critical (the API can still accept work; affected requests
+    fail individually with typed errors):
+        model_provider       NIM circuit state — an unreachable provider makes
+                             inference return 503 PROVIDER_FAILURE per request;
+                             it does not make the process un-ready
+        sandbox_runtime      OpenShell is not a dependency of this process: the
+                             sandbox calls the API, not the reverse
+
+    Liveness (``/api/v1/live``) never depends on any of these.
     """
+    from fastapi.responses import JSONResponse
+
+    from maiw_api.persistence import probe_persistence
+
     rt = getattr(request.app.state, "runtime", None)
+    components: dict = {}
 
     if rt is None:
-        raise HTTPException(status_code=503, detail="MAIW runtime not initialized")
+        components["runtime"] = {"status": "failed", "reason": "not initialized"}
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "NOT_READY",
+                "timestamp": datetime.utcnow().isoformat(),
+                "failed_components": ["runtime"],
+                "components": components,
+            },
+        )
+    components["runtime"] = {"status": "ready"}
 
-    # Check critical MAIW components required for the canonical write path
+    # ── Durable persistence (P1-03 / P1-04) ───────────────────────────────────
+    components["persistence"] = probe_persistence(getattr(rt, "persistence", None))
+    if getattr(rt, "procedure_host", None) is None:
+        components["persistence"]["status"] = "failed"
+        components["persistence"].setdefault("errors", []).append(
+            "procedure_host not constructed"
+        )
+
+    # ── Canonical ModelGateway ────────────────────────────────────────────────
+    components["model_gateway"] = (
+        {"status": "ready"}
+        if rt.model_gateway is not None
+        else {"status": "failed", "reason": "ModelGateway not initialized"}
+    )
+
+    # ── Governed write path ───────────────────────────────────────────────────
     missing: list[str] = []
     if rt.decision_engine is None:
         missing.append("decision_engine")
@@ -156,52 +231,69 @@ async def readiness_check(request: Request):
         missing.append("mcp_client")
     if rt.equipment_agent is None:
         missing.append("equipment_agent")
+    components["governed_write_path"] = (
+        {"status": "failed", "missing": missing} if missing else {"status": "ready"}
+    )
 
-    if missing:
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "error": "Critical MAIW components unavailable",
-                "missing": missing,
-            },
-        )
-
-    # Check per-domain circuit states
+    # ── MCP domains ───────────────────────────────────────────────────────────
     domain_status: dict = {}
     if rt.circuit_registry is not None:
         domain_status = rt.circuit_registry.operational_status()
-
     open_domains = [d for d, s in domain_status.items() if s == "CIRCUIT OPEN"]
     all_open = len(open_domains) > 0 and len(open_domains) == len(domain_status)
-
-    if all_open:
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "error": "All MCP domains CIRCUIT OPEN",
-                "open_domains": open_domains,
-            },
-        )
-
-    healthy_domains = [d for d, s in domain_status.items() if s == "HEALTHY"]
-    degraded_domains = [d for d, s in domain_status.items() if s == "DEGRADED"]
-
-    return {
-        "status": "ready",
-        "timestamp": datetime.utcnow().isoformat(),
-        "version": _version_display(),
-        "components": {
-            "decision_engine": rt.decision_engine is not None,
-            "mcp_client": rt.mcp_client is not None,
-            "equipment_agent": rt.equipment_agent is not None,
-            "model_gateway": rt.model_gateway is not None,
-            "copilot_service": rt.copilot_service is not None,
-        },
+    components["mcp_domains"] = {
+        "status": "failed" if all_open else "ready",
         "domain_health": domain_status,
-        "healthy_domains": healthy_domains,
-        "degraded_domains": degraded_domains,
         "circuit_open_domains": open_domains,
     }
+
+    # ── Database ──────────────────────────────────────────────────────────────
+    if _database_required():
+        components["database"] = await _probe_database_for_readiness()
+    else:
+        components["database"] = {"status": "not_required"}
+
+    # ── Reported, non-critical ────────────────────────────────────────────────
+    nim_state = "unknown"
+    if getattr(rt, "nim_circuit", None) is not None:
+        try:
+            nim_state = rt.nim_circuit.get_stats().get("state", "unknown")
+        except Exception:  # pragma: no cover - defensive
+            nim_state = "unknown"
+    components["model_provider"] = {
+        "status": "degraded" if nim_state == "open" else "ready",
+        "nim_circuit": nim_state,
+        "critical": False,
+    }
+    components["sandbox_runtime"] = {
+        "status": "external",
+        "mode": os.getenv("MAIW_SANDBOX_MODE", "disabled"),
+        "critical": False,
+    }
+
+    critical = (
+        "runtime",
+        "persistence",
+        "model_gateway",
+        "governed_write_path",
+        "mcp_domains",
+        "database",
+    )
+    failed = [c for c in critical if components[c].get("status") == "failed"]
+
+    body = {
+        "status": "NOT_READY" if failed else "READY",
+        "timestamp": datetime.utcnow().isoformat(),
+        "version": _version_display(),
+        "failed_components": failed,
+        "components": components,
+        # Backward-compatible fields (pre-v2.0.1 consumers)
+        "domain_health": domain_status,
+        "healthy_domains": [d for d, s in domain_status.items() if s == "HEALTHY"],
+        "degraded_domains": [d for d, s in domain_status.items() if s == "DEGRADED"],
+        "circuit_open_domains": open_domains,
+    }
+    return JSONResponse(status_code=503 if failed else 200, content=body)
 
 
 @router.get("/health/simple")
