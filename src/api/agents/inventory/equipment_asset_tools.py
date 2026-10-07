@@ -31,7 +31,6 @@ from datetime import datetime, timedelta
 import asyncio
 import json
 
-from src.api.services.llm.nim_client import get_nim_client
 from src.retrieval.structured.sql_retriever import SQLRetriever
 from src.api.services.wms.integration_service import get_wms_service
 from src.api.services.erp.integration_service import get_erp_service
@@ -110,7 +109,8 @@ class EquipmentAssetTools:
         """Initialize the action tools with required services."""
         try:
             self.sql_retriever = SQLRetriever()
-            self.nim_client = await get_nim_client()
+            # v2.0.1: this SQL/MCP adapter makes no model calls; the legacy
+            # NIM client (outside ModelGateway) is no longer constructed here.
             self.wms_service = await get_wms_service()
             self.erp_service = await get_erp_service()
             self.scanning_service = await get_scanning_service()
