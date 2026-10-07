@@ -62,6 +62,12 @@ from tests.real_sandbox.conftest import (  # noqa: E402
     _ENDPOINT_AVAILABLE,
     _SANDBOX_AVAILABLE,
 )
+from urllib.parse import urlparse as _urlparse  # noqa: E402
+
+# v2.0.1: the sandbox's single allowed endpoint is the canonical shipped app
+# (maiw_api.app:app) on the MAIW API port — read it from the endpoint under
+# test instead of assuming the retired :8020 qualification server.
+_MAIW_PORT = _urlparse(MAIW_INFERENCE_ENDPOINT).port or 8001
 
 # ══════════════════════════════════════════════════════════════════════════════
 # STEP 1: QUALIFICATION HOST GATE
@@ -302,11 +308,11 @@ class TestRealSandboxProcess:
         assert (
             "maiw_inference_only" in net_policies
         ), "Expected maiw_inference_only network policy"
-        # Verify the MAIW endpoint is the only endpoint (port 8020)
+        # Verify the MAIW endpoint (canonical app port) is the allowed endpoint
         endpoints = net_policies["maiw_inference_only"].get("endpoints", [])
         assert any(
-            ep.get("port") == 8020 for ep in endpoints
-        ), "Port 8020 (MAIW endpoint) not in allowed endpoints"
+            ep.get("port") == _MAIW_PORT for ep in endpoints
+        ), f"Port {_MAIW_PORT} (MAIW endpoint) not in allowed endpoints"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -319,7 +325,7 @@ class TestSandboxNetworkPolicy:
     """Prove network policy from inside the real sandbox."""
 
     def test_maiw_endpoint_allowed_from_sandbox(self, sandbox_name):
-        """From inside sandbox: MAIW endpoint (10.185.115.61:8020) is reachable."""
+        """From inside sandbox: the MAIW endpoint (canonical app) is reachable."""
         host_port = MAIW_INFERENCE_ENDPOINT.replace("/api/v1/inference", "")
         result = subprocess.run(
             [
@@ -353,7 +359,8 @@ class TestSandboxNetworkPolicy:
                 "--",
                 "python3",
                 "-c",
-                "import urllib.request, sys\ntry:\n  urllib.request.urlopen('http://127.0.0.1:8020/', timeout=3)\n  print('ACCESSIBLE')\nexcept:\n  print('BLOCKED')",
+                "import urllib.request, sys\ntry:\n  urllib.request.urlopen('http://127.0.0.1:%d/', timeout=3)\n  print('ACCESSIBLE')\nexcept:\n  print('BLOCKED')"
+                % _MAIW_PORT,
             ],
             capture_output=True,
             text=True,
@@ -1050,13 +1057,18 @@ class TestPhase20CARegressionGate:
         assert TRANSPORT_SMOKE_TEST_MODEL == "nvidia/llama-3.1-nemotron-nano-8b-v1"
 
     def test_inference_router_registered(self):
-        """Inference router must be importable and have the POST /api/v1/inference route."""
+        """POST /api/v1/inference must be mounted on the canonical shipped app."""
         from src.api.routers.inference import router
 
         routes = {r.path for r in router.routes}
         assert (
             "/api/v1/inference" in routes
         ), f"Expected /api/v1/inference in routes, got: {routes}"
+        from maiw_api.app import app
+
+        assert (
+            "/api/v1/inference" in app.openapi()["paths"]
+        ), "v2.0.1: the inference boundary must be served by maiw_api.app:app"
 
     def test_http_client_class_exists(self):
         """MAIWHTTPModelGatewayClient must exist in integrations."""
