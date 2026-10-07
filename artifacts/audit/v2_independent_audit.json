@@ -1,0 +1,138 @@
+{
+  "audit": "MAIW v2.0.0 Independent Post-Release Audit",
+  "auditor": "independent external reviewer (did not build the release)",
+  "audit_date": "2026-10-07",
+  "tag": "v2.0.0",
+  "tag_object_sha": "0c35a0e9718c2a81e8c79fe297c46f690b5cb42a",
+  "tagged_commit_sha": "816ace73c4561469978094eeedb2641f6db3c4fa",
+  "audit_branch": "audit/v2-independent-post-release",
+  "audit_base_commit_sha": "816ace73c4561469978094eeedb2641f6db3c4fa",
+  "repo": "NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse",
+  "clean_room": {
+    "fresh_clone_path": "/home/nvidia/maiw-v2-audit",
+    "detached_at_tag": true,
+    "isolated_venv": ".venv-audit (python 3.12.3, no user site, maiw_* resolve inside clone)",
+    "isolation_proven": true,
+    "dev_checkout_touched": false
+  },
+  "release_identity_gate": "PASS",
+  "tag_integrity": "PASS (annotated tag -> 816ace7; RELEASE_NOTES.md, artifacts/release/maiw_v2_release_gate.json, docs/audits/MAIW_V2_RELEASE_GATE.md present in tagged tree)",
+  "tag_immutability": "PASS (origin tag object 0c35a0e, target 816ace7 unchanged; tag not moved)",
+  "host": {
+    "hostname": "epg-tme-smc-h100-02",
+    "gpus": "4 x NVIDIA H100 NVL",
+    "nemoclaw_version_runtime": "0.0.124",
+    "openshell_version_runtime": "0.0.116"
+  },
+  "claims_inventoried": 86,
+  "claims_independently_reproduced": 61,
+  "claims_refuted_or_not_as_documented": 14,
+  "claims_not_reproduced_env_limited": 11,
+  "tests": {
+    "python_core_ci": {
+      "command_source": ".github/workflows/ci-cd.yml (verbatim)",
+      "passed": 2667, "failed": 0, "skipped": 3, "duration_s": 91.8,
+      "matches_release_claim_2667_0_3": true,
+      "release_notes_tag_claim": "2604 passed, 0 failed, 3 skipped (2667 incl. isolated file)",
+      "ordering_dependence": "RESOLVED for the canonical command and MG-first/reliability-first/20c-last orders (2667 each). Order-dependent FAILURES remain in OTHER orders not covered by the canonical command: contract-first (40 fail, tests/unit/demo event-loop fixtures) and fully-reversed (158 fail, src-shadowing conftests). These are test-harness coupling, not product defects.",
+      "per_file_isolation": "2655 passed, 0 failed, 2 skipped, 12 errors; all 12 errors are POSTGRES_PASSWORD/DATABASE_URL-dependent tests that the canonical command supplies and that pass with it"
+    },
+    "ui": {
+      "tests_passed": 963, "suites": 39, "failed": 0, "matches_963": true,
+      "eslint_errors": 0, "eslint_warnings": 1041, "build": "PASS (compiled with warnings)",
+      "typecheck_tsc_noEmit": "FAIL — 1 error TS2322 in src/__tests__/ux1e.test.tsx:546 (test-only; not in CI gate, which runs lint not type-check)"
+    },
+    "black_check_tests": "PASS (131 files)"
+  },
+  "security_boundary": {
+    "agent_package_no_execution_dep": "PASS (maiw-agents pyproject has no maiw-execution; no ActionExecutor import)",
+    "canonical_packages_dont_import_integrations": "PASS",
+    "runtime_capability_policy": "PASS (deny-by-default, frozen/immutable, WRITE+EMERGENCY_WRITE permanently denied, undeclared/fabricated/case-variant capabilities denied, model_copy widening still denied by deny-classes, assert_not_broadened catches widening)",
+    "sandbox_render_subset": "PASS (sandbox_allowed subset of MAIW_allowed; 0 WRITE classes)",
+    "live_sandbox_fresh": {
+      "sandbox_name": "maiw-audit-06202519",
+      "sandbox_id": "b23fd982-6b2a-4c34-b019-ea7783bf334e",
+      "image": "ghcr.io/nvidia/openshell-community/sandboxes/base:latest",
+      "policy_hash": "8629827baadc0f0702eb0223494da90fcf50b74aa62220e653deda98e3ed6ef0",
+      "inference_through_gateway": "PASS (sandbox -> host HTTP /api/v1/inference -> canonical ModelGateway -> PolicyFilter -> provider; approved nemotron-3 selected)",
+      "auth_fail_closed": "PASS (401 no token, 401 wrong token)",
+      "direct_provider_denied": "PASS (direct NIM, localhost, host local-NIM ports 8002/8010, fake provider 18101, qual 8020, internet, cloud metadata, raw TCP all denied by sandbox net policy)",
+      "credentials_in_sandbox": "NONE (no provider/write/PAT credentials; only CA/proxy env names)",
+      "filesystem_isolation": "PASS (host home/.ssh/dev-repo/.env/token/openshell-config all absent or unreadable; /root and /etc/shadow unreadable; no docker.sock)",
+      "privilege": "PASS (CapEff=0, NoNewPrivs=1, Seccomp=2, uid 998, no sudo, no openshell CLI)",
+      "maiw_execution_importable_in_sandbox": false,
+      "prompt_injection_structural": "PASS (injection to use unapproved model / self-approve / reveal key had no effect; routing unchanged, key never returned)",
+      "sandbox_deleted_after_audit": true
+    }
+  },
+  "model_policy": {
+    "policyfilter_approved_generations": ["nemotron-3", "nemotron-3.5"],
+    "approved_set_immutable_via_env_and_ctor": "PASS (env MAIW_APPROVED_MODEL_GENERATIONS ignored; ctor cannot widen)",
+    "approved_set_mutable_via_class_attribute": "OBSERVATION — PolicyFilter.APPROVED_MODEL_GENERATIONS is a plain class attribute reassignable in-process (no runtime guard); not reachable from model/prompt/sandbox/env, so not a release-blocking bypass",
+    "no_silent_mock_fallback_in_maiw_models": "PASS (provider failure/deadline/no-eligible-model all raise typed ModelGatewayError; response cache does not mask a later provider failure)",
+    "fallback_preserves_eligibility": "PASS (preferred disabled -> approved fallback or ModelUnavailable; never non-approved)",
+    "deployment_resolver": "NOT PRESENT AS DOCUMENTED — no DeploymentResolver class exists; resolution is ModelRegistry+ModelRouter; every DeploymentMode maps to nvidia-nim (deployment-mode check is effectively a no-op)",
+    "role_label_vs_physical_model": "OBSERVATION/GAP — PolicyFilter checks the registry role's hardcoded generation label, not the actual model_id. NEMOTRON_*_MODEL env can point an approved-labelled role at a Llama/other model and it is sent to the provider (generation label stays nemotron-3). Operator-only (env), not sandbox/model/prompt reachable."
+  },
+  "sop_engine": {
+    "validator_owns_completion": "PASS",
+    "evidence_bypass": "PASS (COMPLETED claim without required EvidenceRef -> EVIDENCE_MISSING, no advance)",
+    "state_predicate_bypass": "PASS (false predicate / unregistered predicate -> no advance)",
+    "loop_retry_bounds_survive_restart": "PASS (loop and retry counters persisted; crash mid-iteration does not reset; no step re-executed after a persisted attempt)",
+    "sop_version_pinning": "PASS (restart under newer version -> POLICY_CONFLICT escalation, no auto-upgrade)",
+    "unknown_execution": "PASS (UNKNOWN + reread-not-landed -> EXECUTION_INDETERMINATE; UNKNOWN + reread-landed -> reconcile/advance with 0 re-executions; no blind retry; governed write never loop-retried by SOPStep.validate)",
+    "duplicate_write_recovery": "PASS (engine issues no write; governed step never re-executed on redelivery; JsonFileGovernanceInbox recognizes redelivery after restart; stale revision rejected)",
+    "procedure_state_store": "PASS (optimistic revision -> StaleRevisionError; terminal immutability; truncated/corrupt file fails closed with ValidationError; atomic temp+replace leaves no .tmp)",
+    "proof_sop_a": "PASS (wave_risk_resolution.v2 reaches WAITING_FOR_GOVERNANCE at submit; observe not run; post-exec predicate wave_risk_reduced must hold or step fails; no write before governance)",
+    "proof_sop_b": "PASS (equipment_failure_recovery.v1: write-landed != intended-transition != recovery proven as 3 separate predicates; EXECUTED-but-unchanged and UNKNOWN-unchanged escalate; UNKNOWN-changed reconciles; wrong-zone/failed-asset-back escalate)",
+    "proof_sop_c": "PASS (picking_inventory_exception.v1: facility strategy variation via StepCondition; bounded reassessment loop exhausts to escalate_to_human; sufficient -> resume_picking; lost write escalates; no strategy hardcoded in engine)"
+  },
+  "http_inference_boundary": {
+    "endpoint": "POST /api/v1/inference (src/api/routers/inference.py)",
+    "mounted_in_shipped_app": false,
+    "mounted_app": "maiw_api.app:app (the reference-deployment entrypoint) does NOT mount it; only legacy src/api/app.py does",
+    "auth_fail_closed": "PASS", "field_denylist_enforced": "PASS (forbidden provider_url/api_key/base_url/model_id/force_model_id/deployment_mode rejected)",
+    "field_denylist_error_code": "OBSERVATION — forbidden fields raise 500 (ValueError not JSON-serializable) over HTTP rather than the documented 422; still rejected, no provider call. Undeclared non-denylisted fields (model/routing_hints/provider/endpoint) are silently ignored (pydantic extra=ignore) and the request proceeds with correct routing (no injection).",
+    "deadline_1ms": "OBSERVATION — a 1ms positive deadline returned 200 (not expired before provider call); 0 and over-max handled as documented"
+  },
+  "governance_durability_wiring": {
+    "classes_exist": true,
+    "wired_into_running_app": false,
+    "detail": "JsonFileProcedureStateStore and JsonFileGovernanceInbox exist and pass their unit behavior, but NO code in apps/, src/api/ or integrations constructs them at runtime; no module reads MAIW_PERSISTENCE_ROOT/MAIW_PROCEDURE_STATE_DIR/MAIW_GOVERNANCE_STATE_DIR. The deployed governance path (demo/copilot) uses InMemoryApprovalStore + InMemoryCopilotStore. The reference-deployment restart drill lost demo scenario state across a stop/start (0 persisted files)."
+  },
+  "deployment": {
+    "runbook_reproducible": "PARTIAL — preflight/start/status scripts run and start reports READY; smoke test FAILS on the reference app because POST /api/v1/inference is 404 on maiw_api.app:app (the app the start script launches). Inference qualification used a separate 'MAIW Qualification Inference Server' on :8020, not the shipped app.",
+    "readiness_degradation": "FAIL — /api/v1/ready returned 200 (ready) with persistence dirs chmod 000, procedures dir removed, and the DB paused. Readiness only checks in-process object presence (decision_engine/mcp_client/equipment_agent) + MCP circuit state, not persistence or DB.",
+    "rollback_baseline_integrity": "GAP — runbook rollback baseline SHA 1745a2c predates the deployment scripts and JsonFileGovernanceInbox themselves (they do not exist at 1745a2c); rolling back to it removes the runbook's own tooling and the file-backed inbox it promises."
+  },
+  "scans": {
+    "secret_scan": "PASS (0 real secrets over 1151 tracked files; 5 hits all placeholder/test context in .env.example and a test 'invalid' token)",
+    "trivy_pip_audit_gitleaks": "not run — tools unavailable on host",
+    "npm_audit_ui": {"critical": 3, "high": 62, "moderate": 13, "low": 5, "note": "direct: axios (high). criticals transitive (proxy-addr, shell-quote, websocket-driver) via react-scripts/webpack-dev-server dev chain"},
+    "doc_link_audit": "PASS with 2 minor breaks (README deploy/brev/ backtick path; DEPLOYMENT.md #complete-setup-guide anchor); neither release-critical"
+  },
+  "tag_vs_main_drift": "post-release docs-only: origin/main is 3 commits ahead (diagram PNG + README line + RELEASE_NOTES: removes the 20c ordering limitation, aligns tag text to 2667). No code/security changes.",
+  "release_notes_vs_github_release": "GitHub Release body (published 2026-10-06) already carries the CORRECTED baseline (2667, no ordering-limitation line) which differs from the tagged-tree RELEASE_NOTES.md (2604 + ordering limitation). Tagged tree and published release body are not identical.",
+  "p0_findings": [],
+  "p1_findings": [
+    {"id": "P1-01", "title": "Shipped app serves an ungoverned, model-driven warehouse write path via POST /api/v1/chat", "evidence": "reproduced: maiw_api.app:app -> /api/v1/chat -> MCP planner -> legacy MCPEquipmentAssetOperationsAgent -> ToolDiscoveryService.execute_tool -> equipment_adapter assign_equipment -> SQL INSERT equipment_assignments + UPDATE equipment_assets; no DecisionEngine/ApprovalRecord/ActionExecutor; unauthenticated; a read-style query naming an asset triggered the write (FL-01 available->assigned) in the audit DB"},
+    {"id": "P1-02", "title": "Reference deployment inference endpoint not served by the deployed app", "evidence": "reproduced: openapi of maiw_api.app:app has no /api/v1/inference (404 host + in-sandbox); runbook smoke test fails; qualification used a separate :8020 server"},
+    {"id": "P1-03", "title": "Durable persistence (ProcedureStateStore + GovernanceInbox) never wired at runtime; restart loses state", "evidence": "no runtime constructor / no env consumer; reference-deployment stop+start lost demo scenario+KPI state (6 KPI history -> 0)"},
+    {"id": "P1-04", "title": "Readiness falsely reports READY under persistence/DB loss", "evidence": "reproduced: /api/v1/ready=200 with persistence dirs chmod 000, procedures dir removed, and DB paused; contradicts runbook Step 26 degraded-state table"},
+    {"id": "P1-05", "title": "Legacy document pipeline (reachable from shipped app /api/v1/document/upload) calls non-Nemotron Llama models directly and silently substitutes mock results on missing key / provider failure", "evidence": "reproduced: SmallLLMProcessor sent meta/llama-3.2-11b-vision-instruct to provider; provider-down returned fabricated invoice fields; LargeLLMJudge with no key returned {overall_score:4.2, decision:APPROVE}; bypasses ModelGateway and PolicyFilter"}
+  ],
+  "p2_findings": [
+    {"id": "P2-01", "title": "Tagged RELEASE_NOTES test baseline (2604 + 20c ordering limitation) contradicts release-gate JSON/GitHub Release (2667, RESOLVED)"},
+    {"id": "P2-02", "title": "Forbidden inference fields return HTTP 500 instead of documented 422; undeclared fields silently ignored"},
+    {"id": "P2-03", "title": "Docs reference a DeploymentResolver class and /api/v1/capabilities/read endpoint that do not exist; DeploymentMode check is a no-op"},
+    {"id": "P2-04", "title": "DecisionOutcome has no DEFERRED value though README/ARCH/GOVERNANCE docs say APPROVED/REJECTED/DEFERRED"},
+    {"id": "P2-05", "title": "UI type-check (tsc --noEmit) has 1 error; not in the CI gate"},
+    {"id": "P2-06", "title": "PolicyFilter.APPROVED_MODEL_GENERATIONS reassignable in-process (no guard); NEMOTRON_*_MODEL env can point an approved role label at a non-Nemotron model (operator-only)"},
+    {"id": "P2-07", "title": "Rollback baseline SHA 1745a2c predates the deployment scripts and JsonFileGovernanceInbox it is supposed to roll back to"},
+    {"id": "P2-08", "title": "npm audit: 3 critical / 62 high (axios direct, rest transitive dev-chain); not reflected in release gate 'security_scan: PASS'"},
+    {"id": "P2-09", "title": "Package-ownership/dependency docs (ARCHITECTURE.md, PACKAGE_OWNERSHIP.md) list wrong maiw-agents/maiw-models/maiw-decision dependencies vs actual pyproject"},
+    {"id": "P2-10", "title": "2 minor broken doc references (README deploy/brev/, DEPLOYMENT.md anchor)"}
+  ],
+  "final_verdict": "MAIW V2 INDEPENDENT POST-RELEASE AUDIT FAIL",
+  "verdict_reason": "No P0. Core v2 security architecture (authority boundary, RuntimeCapabilityPolicy, SOP Engine validator/evidence/state-predicate/version-pinning/UNKNOWN-reconciliation, fresh live-sandbox isolation, ModelGateway canonicality + no-mock-fallback, model-family policy) independently REPRODUCED and holds. But 5 P1 findings — an ungoverned model-driven write path in the shipped app, the inference endpoint absent from the deployed app, durable persistence not wired, false-ready readiness, and a legacy Llama/mock document path — are material correctness/safety-claim failures per spec section 72 (any unresolved P1 => FAIL)."
+}
