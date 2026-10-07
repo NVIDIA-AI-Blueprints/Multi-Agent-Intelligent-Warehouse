@@ -93,6 +93,26 @@ def canonical(monkeypatch, tmp_path, fake_nim):
     reset_model_gateway()
 
 
+@pytest.fixture
+def real_asyncpg(monkeypatch):
+    """
+    tests/api/conftest.py stubs asyncpg with a MagicMock for infra-free tests.
+    The opt-in Postgres tests need the real driver: drop the stub for the
+    duration of the test (monkeypatch restores it afterwards).
+    """
+    import importlib
+
+    if isinstance(sys.modules.get("asyncpg"), MagicMock):
+        monkeypatch.delitem(sys.modules, "asyncpg")
+    try:
+        module = importlib.import_module("asyncpg")
+    except ImportError:  # pragma: no cover
+        pytest.skip("asyncpg not installed")
+    if isinstance(module, MagicMock):  # pragma: no cover
+        pytest.skip("asyncpg is stubbed in this interpreter")
+    return module
+
+
 def _mounted():
     from maiw_api.app import app
     from maiw_api.route_policy import iter_mounted_routes
@@ -323,7 +343,9 @@ async def test_p1_01_audit_chat_scenario_cannot_mutate(canonical, monkeypatch):
     not os.getenv("MAIW_TEST_PG_DSN"),
     reason="set MAIW_TEST_PG_DSN to a DISPOSABLE Postgres loaded with the MAIW schema",
 )
-async def test_p1_01_audit_chat_scenario_against_postgres(canonical, monkeypatch):
+async def test_p1_01_audit_chat_scenario_against_postgres(
+    canonical, monkeypatch, real_asyncpg
+):
     """
     The audit's exact P1-01 reproduction with the real SQL adapter: FL-01 is
     set to 'available' in a disposable database, the audit question and an
@@ -332,9 +354,7 @@ async def test_p1_01_audit_chat_scenario_against_postgres(canonical, monkeypatch
     """
     from urllib.parse import urlparse
 
-    if isinstance(sys.modules.get("asyncpg"), MagicMock):
-        pytest.skip("asyncpg is stubbed in this interpreter")
-    import asyncpg
+    asyncpg = real_asyncpg
 
     dsn = os.environ["MAIW_TEST_PG_DSN"]
     u = urlparse(dsn)
@@ -957,9 +977,9 @@ async def test_p1_04_provider_down_does_not_fail_readiness(canonical):
     not os.getenv("MAIW_TEST_PG_DSN"),
     reason="set MAIW_TEST_PG_DSN to a disposable Postgres to run",
 )
-async def test_p1_04_ready_with_reachable_database(canonical, monkeypatch):
-    if isinstance(sys.modules.get("asyncpg"), MagicMock):
-        pytest.skip("asyncpg is stubbed in this interpreter")
+async def test_p1_04_ready_with_reachable_database(
+    canonical, monkeypatch, real_asyncpg
+):
     monkeypatch.setenv("MAIW_READINESS_REQUIRE_DATABASE", "true")
     monkeypatch.setenv("DATABASE_URL", os.environ["MAIW_TEST_PG_DSN"])
     async with running_canonical_app() as (_, client):
