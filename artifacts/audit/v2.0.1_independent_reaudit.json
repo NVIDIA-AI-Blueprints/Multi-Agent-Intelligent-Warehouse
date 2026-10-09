@@ -1,0 +1,352 @@
+{
+  "audit": "MAIW v2.0.1 independent re-audit of PR #143 candidate",
+  "pr_number": 143,
+  "repository": "NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse",
+  "head_branch": "fix/v2.0.1-canonical-app-remediation",
+  "candidate_head_sha": "785c420604c3b6a16d6e7531fcab2c73da43f67a",
+  "candidate_sha_at_start": "785c420604c3b6a16d6e7531fcab2c73da43f67a",
+  "candidate_sha_at_end": "785c420604c3b6a16d6e7531fcab2c73da43f67a",
+  "base_sha": "944507ec914665c6682d39b95e8713355f486598",
+  "pr0_gate": {
+    "review_threads": 3,
+    "all_resolved": true,
+    "code_verified": true
+  },
+  "audit_environment": {
+    "host": "epg-tme-smc-h100-02",
+    "clone": "/home/nvidia/maiw-v201-reaudit",
+    "detached_head": true,
+    "python": "3.12.3 (CI uses 3.11; 3.11 not available on host)",
+    "venv": "/home/nvidia/maiw-v201-reaudit/.venv",
+    "node": "v24.1.0",
+    "fastapi": "0.142.4",
+    "disposable_postgres": {
+      "name": "maiw-v201-reaudit-pg-20261008022841",
+      "port": 55435,
+      "removed": true
+    },
+    "note": "host port 5435 belongs to a foreign DB; all DB env pinned to 55435"
+  },
+  "python_package_paths": {
+    "maiw_api": "/home/nvidia/maiw-v201-reaudit/apps/api/maiw_api/__init__.py",
+    "maiw_models": "/home/nvidia/maiw-v201-reaudit/packages/maiw-models/maiw_models/__init__.py",
+    "maiw_agents": "/home/nvidia/maiw-v201-reaudit/packages/maiw-agents/maiw_agents/__init__.py",
+    "maiw_world": "/home/nvidia/maiw-v201-reaudit/packages/maiw-world/maiw_world/__init__.py",
+    "contamination": false
+  },
+  "sandbox": {
+    "name": "maiw-v201-reaudit-a",
+    "note": "OpenShell name limit 19 chars",
+    "image": "ghcr.io/nvidia/openshell-community/sandboxes/base:latest",
+    "policy": "maiw_inference_only -> 10.185.115.61:18920 (python3 only)",
+    "created": "2026-10-09T14:35:57Z",
+    "deleted": true,
+    "foreign_sandbox_maiw-qual-20c-b_untouched": true
+  },
+  "test_counts": {
+    "python_core_ci_run1": {
+      "passed": 2720,
+      "failed": 0,
+      "skipped": 5
+    },
+    "python_core_ci_run2": {
+      "passed": 2720,
+      "failed": 0,
+      "skipped": 5
+    },
+    "postgres_opt_in": {
+      "passed": 2
+    },
+    "capability_policy_suites": {
+      "passed": 68
+    },
+    "ordering": {
+      "canonical_first": {
+        "passed": 2720,
+        "failed": 0
+      },
+      "canonical_alone": {
+        "passed": 53,
+        "failed": 0,
+        "skipped": 2
+      },
+      "model_gateway_first": {
+        "passed": 2680,
+        "failed": 40
+      },
+      "reliability_first": {
+        "passed": 2680,
+        "failed": 40
+      },
+      "reversed": {
+        "passed": 2556,
+        "failed": 158,
+        "errors": 6
+      },
+      "minimal_repro": "pytest tests/unit/test_model_gateway.py tests/unit/demo -> 40 failed (demo alone 74 passed)",
+      "note": "first permutation run contaminated by audit .env (lifespan load_dotenv) and discarded"
+    },
+    "jest": {
+      "passed": 963,
+      "failed": 0
+    },
+    "eslint": {
+      "errors": 0,
+      "warnings": 1041
+    },
+    "tsc_noEmit_errors": 0,
+    "npm_build": "success"
+  },
+  "live_test_results": {
+    "inference_through_shipped_app": {
+      "endpoint": "http://10.185.115.61:18920/api/v1/inference",
+      "high": {
+        "http": 200,
+        "model": "nvidia/nemotron-3-super-120b-a12b",
+        "generation": "nemotron-3",
+        "server_latency_ms_fresh": 1528.7,
+        "note": "first HIGH call served from NIMClient cache (1.2 ms)"
+      },
+      "low": {
+        "http": 200,
+        "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "generation": "nemotron-3.5",
+        "server_latency_ms": 709.7
+      },
+      "no_token": 401,
+      "wrong_token": 401,
+      "model_id_field": 422,
+      "provider_url_field": 422
+    },
+    "direct_provider_denial": {
+      "integrate.api.nvidia.com": "403/DNS fail",
+      "internet": "403/refused",
+      "metadata": 403,
+      "host_8001_8002_8010": 403,
+      "localhost": "refused",
+      "db_ports": "refused",
+      "allowed_api_port_full_surface_reachable": true
+    },
+    "credential_isolation": {
+      "sensitive_env_names": 0,
+      "env_total": 28
+    },
+    "filesystem_isolation": "host home/.ssh/.env/.git/persistence absent; /root,/etc/shadow,/proc/1/environ denied; /etc,/usr not writable",
+    "prompt_injection": "routing unchanged (super, approved); no write path below /inference",
+    "restart_durability": {
+      "separate_process": "e1959ee7 rev24 WAITING preserved; govern->completed rev30; 2 replays duplicate, 0 executor calls; ledger 1 line",
+      "via_candidate_restart_script": "6454a5a1 rev24 WAITING preserved with attempts",
+      "crash_after_inbox_accept": "77603fc4 stuck WAITING rev24 permanently (P2-02)"
+    },
+    "deployment_scripts": {
+      "preflight_literal": "9 pass/10 fail",
+      "preflight_exported": "19/19",
+      "start_literal": "exit 1",
+      "start_exported": "exit 0 READY 4s",
+      "smoke_literal": "hit foreign :8001",
+      "smoke_nano_default": "10/2 (503 MODEL_UNAVAILABLE, sandbox absent)",
+      "smoke_final": "13/13",
+      "restart": "preflight failed on host NVML driver/library mismatch (environment); started with --skip-preflight; state preserved",
+      "status": "READY, 1 WAITING",
+      "stop": "pidfile SIGTERM, state preserved"
+    },
+    "stop_script_decoys": {
+      "pidfile_path": "all decoys survived",
+      "no_pidfile_fallback": "unrelated decoy listener on port KILLED (P2-01)",
+      "qualify_script_pattern": "pgrep -f 'openshell.*maiw' matches decoy (not executed)",
+      "decoys_cleaned": true
+    },
+    "incident": "literal smoke (no env) targeted user's dev server :8001 incl. POST /api/v1/chat FL-01 status; read-only DB check: no new assignment rows"
+  },
+  "readiness_matrix": [
+    {
+      "failure": "persistence root chmod 000",
+      "http": 503,
+      "correct": true
+    },
+    {
+      "failure": "procedures dir missing",
+      "http": 503,
+      "correct": true
+    },
+    {
+      "failure": "governance chmod 000",
+      "http": 503,
+      "correct": true
+    },
+    {
+      "failure": "governance replaced by file",
+      "http": 503,
+      "correct": true
+    },
+    {
+      "failure": "procedures read-only",
+      "http": 503,
+      "correct": true
+    },
+    {
+      "failure": "DB paused",
+      "http": 503,
+      "correct": true
+    },
+    {
+      "failure": "provider down",
+      "http": 200,
+      "correct": "as designed (inference 503)"
+    },
+    {
+      "failure": "sandbox unavailable, mode=required",
+      "http": 200,
+      "correct": "explicit non-critical"
+    },
+    {
+      "failure": "no MCP domain configured",
+      "http": 200,
+      "correct": false
+    },
+    {
+      "failure": "only configured MCP domain CIRCUIT OPEN",
+      "http": 200,
+      "correct": false
+    },
+    {
+      "failure": "model gateway not constructed",
+      "http": null,
+      "correct": "NOT REPRODUCED live (not env-injectable)"
+    }
+  ],
+  "readiness_sandbox_result": "sandbox not part of readiness; body explicit (critical:false); acceptable; MAIW_SANDBOX_MODE not enforced by API (P2-11)",
+  "model_identity_result": {
+    "enforced_on_physical_model_id": false,
+    "deployment_resolver_exists": false,
+    "fake_provider": "127.0.0.1:18901 records received model field; never forwards",
+    "cases": [
+      {
+        "config": "NEMOTRON_SUPER_MODEL=example-org/unapproved-model-x",
+        "request": "reasoning=high",
+        "provider_received": "example-org/unapproved-model-x",
+        "app": "200 generation=nemotron-3 approved_family=true"
+      },
+      {
+        "config": "NEMOTRON_LIGHTNING_MODEL=example-org/unapproved-model-z",
+        "request": "reasoning=low",
+        "provider_received": "example-org/unapproved-model-z",
+        "app": "200 generation=nemotron-3.5 approved_family=true"
+      },
+      {
+        "config": "NEMOTRON_NANO_ENABLED=false + unapproved super",
+        "request": "reasoning=medium",
+        "provider_received": "example-org/unapproved-model-x",
+        "app": "200 fallback_used=true approved_family=true"
+      },
+      {
+        "config": "defaults; provider reports example-org/substituted-model-y",
+        "request": "reasoning=high",
+        "provider_received": "nvidia/nemotron-3-super-120b-a12b",
+        "app": "200 approved_family=false (not enforced)"
+      }
+    ],
+    "preflight_with_unapproved_NEMOTRON_SUPER_MODEL": "19/19 pass",
+    "severity": "P1"
+  },
+  "nano_410": {
+    "registry_default": "nvidia/nemotron-3-nano-30b-a3b enabled=true",
+    "hosted_endpoint": "HTTP 410 end of life 2026-09-01",
+    "effect": "default MEDIUM inference -> 503 MODEL_UNAVAILABLE; no fallback on provider error",
+    "classification": "registry/config issue; fails closed; feeds NEW-P1-02"
+  },
+  "original_p1_closure": {
+    "P1-01": {
+      "closed": true,
+      "residual": "unauthenticated governed equipment POSTs (P2-05)"
+    },
+    "P1-02": {
+      "closed": true,
+      "residual": "model identity NEW-P1-01"
+    },
+    "P1-03": {
+      "closed": true,
+      "residual": "crash gap P2-02; no HTTP start P2-10; in-memory approvals"
+    },
+    "P1-04": {
+      "closed": true,
+      "scope": "persistence + DB",
+      "residual": "MCP/governed-write readiness NEW-P1-03"
+    },
+    "P1-05": {
+      "closed": true,
+      "residual": "vision cache crash P2-08; stubs P2-09"
+    }
+  },
+  "new_findings": {
+    "P0": [],
+    "P1": [
+      {
+        "id": "NEW-P1-01",
+        "title": "Final physical model identity not policy-checked (role-label generation; env-bound model IDs; provider substitution accepted; preflight checks unused LLM_MODEL)",
+        "evidence": "packages/maiw-models/maiw_models/registry.py:194-300; routing.py:280-286; providers/nim.py:72-80; src/api/routers/inference.py; .reaudit-probes/fake_provider.py"
+      },
+      {
+        "id": "NEW-P1-02",
+        "title": "Runbook cannot reproduce deployment (.env not loaded by preflight/smoke/status/stop/restart; no sandbox creation/policy step; no DB step; Nano 410 default)",
+        "evidence": "scripts/start_reference_deployment.sh:53-88; preflight_literal.log 9/10; start_literal.log exit 1"
+      },
+      {
+        "id": "NEW-P1-03",
+        "title": "Readiness READY while governed write path cannot function (unconfigured MCP domains HEALTHY; all configured domains CIRCUIT OPEN still READY)",
+        "evidence": "apps/api/maiw_api/routers/health.py:238-248; bootstrap.py:250-318"
+      },
+      {
+        "id": "NEW-P1-04",
+        "title": "CORE CI release tests order-dependent (pre-existing; spec \u00a745)",
+        "evidence": "pytest tests/unit/test_model_gateway.py tests/unit/demo -> 40 failed; reversed order 158 failed + 6 errors"
+      }
+    ],
+    "P2": [
+      "P2-01 stop fallback kills any process on port; qualify pattern-kill",
+      "P2-02 governance crash gap leaves procedure stuck",
+      "P2-03 ExecutionRegistry idempotency inert for canonical callers",
+      "P2-04 unauthenticated upload; chunked size bypass; rate limiter fails open",
+      "P2-05 unauthenticated governed equipment POSTs reachable from sandbox",
+      "P2-06 unauthenticated legacy GETs; blocking socket; GET side effects",
+      "P2-07 smoke default port 8001 sends chat trigger",
+      "P2-08 document vision broken by cache-key crash",
+      "P2-09 document approve/reject stubs; fabricated analytics; typed error not surfaced",
+      "P2-10 no HTTP procedure start; ProcedureHost has no production caller",
+      "P2-11 MAIW_SANDBOX_MODE not enforced by API",
+      "P2-12 preflight false FAIL on deep missing root; NVML error passes",
+      "P2-13 start may pip install into arbitrary python",
+      "P2-14 root Dockerfile cannot import app; backend compose NOT_READY",
+      "P2-15 50 npm highs toolchain-only",
+      "P2-16 hard-coded dev JWT fallback",
+      "P2-17 release-notes missing limitations",
+      "P2-18 v2.0.0 release body still claims full qualification",
+      "P2-19 readiness DB vs SQL data path mismatch (DATABASE_URL vs PGHOST/PGPORT)",
+      "P2-20 no DeploymentResolver; plain-HTTP base URL warning only"
+    ]
+  },
+  "unauthenticated_route_classification": {
+    "warehouse_mutations": "equipment assign/release/maintenance, copilot turn, demo approve/reject/reconcile: governed but unauthenticated (P2-05)",
+    "document": "upload/approve/reject/status/results/analytics unauthenticated (P2-04, P2-09)",
+    "legacy_reads": "114 GET routes unauthenticated incl. /auth/users/public (P2-06)",
+    "inference": "internal token, fail-closed"
+  },
+  "dependency_audit_summary": {
+    "npm": {
+      "critical": 0,
+      "high": 50,
+      "moderate": 34,
+      "low": 3,
+      "highs": "all build/test toolchain; axios 1.20.0 not flagged"
+    },
+    "pip_audit": "NOT RUN",
+    "trivy_local": "NOT RUN",
+    "gitleaks": "NOT RUN",
+    "ci_evidence": "GitHub Trivy + CodeQL pass on head (Trivy non-gating)",
+    "secret_scan": "grep-based: no real secrets"
+  },
+  "v2_0_0_release_notice": "present at top; body below still claims full qualification (P2-18); no v2.0.1 tag",
+  "pr142_preserved": true,
+  "final_verdict": "MAIW V2.0.1 INDEPENDENT RE-AUDIT FAIL",
+  "verdict_reason": "All five original P1s closed and P0=0, but 4 new P1s: NEW-P1-01 physical model identity, NEW-P1-02 runbook reproducibility, NEW-P1-03 MCP/governed-write readiness, NEW-P1-04 order-dependent tests."
+}
