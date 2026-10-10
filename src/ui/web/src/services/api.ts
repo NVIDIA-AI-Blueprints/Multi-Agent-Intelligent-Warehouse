@@ -576,10 +576,10 @@ export interface CircuitStats {
 }
 
 export interface DomainHealth {
-  equipment: 'HEALTHY' | 'DEGRADED' | 'CIRCUIT OPEN';
-  labor: 'HEALTHY' | 'DEGRADED' | 'CIRCUIT OPEN';
-  wave: 'HEALTHY' | 'DEGRADED' | 'CIRCUIT OPEN';
-  inventory: 'HEALTHY' | 'DEGRADED' | 'CIRCUIT OPEN';
+  equipment: 'HEALTHY' | 'DEGRADED' | 'CIRCUIT OPEN' | 'NOT_CONFIGURED';
+  labor: 'HEALTHY' | 'DEGRADED' | 'CIRCUIT OPEN' | 'NOT_CONFIGURED';
+  wave: 'HEALTHY' | 'DEGRADED' | 'CIRCUIT OPEN' | 'NOT_CONFIGURED';
+  inventory: 'HEALTHY' | 'DEGRADED' | 'CIRCUIT OPEN' | 'NOT_CONFIGURED';
 }
 
 export interface CircuitStates {

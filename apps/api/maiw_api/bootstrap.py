@@ -88,6 +88,10 @@ class MAIWRuntime:
     mcp_equipment_available: bool = False
     mcp_labor_available: bool = False
     mcp_wave_available: bool = False
+    # How each configured MCP domain is reached (v2.0.1 round 2):
+    # {domain: ("url", "<url>") | ("in-memory", None)}.  Unconfigured domains
+    # are absent.  /api/v1/ready uses this to probe reachability.
+    mcp_domain_endpoints: dict = field(default_factory=dict)
 
     # Model + decision
     model_gateway: Any = None  # maiw_models.ModelGateway
@@ -251,21 +255,25 @@ async def get_runtime() -> MAIWRuntime:
         if inventory_url:
             registry.register_domain(_INVENTORY_CAPABILITIES, inventory_url)
             runtime.mcp_inventory_available = True
+            runtime.mcp_domain_endpoints["inventory"] = ("url", inventory_url)
 
         equipment_url = os.getenv("MAIW_MCP_SERVER_EQUIPMENT_URL")
         if equipment_url:
             registry.register_domain(_EQUIPMENT_CAPABILITIES, equipment_url)
             runtime.mcp_equipment_available = True
+            runtime.mcp_domain_endpoints["equipment"] = ("url", equipment_url)
 
         labor_url = os.getenv("MAIW_MCP_SERVER_LABOR_URL")
         if labor_url:
             registry.register_domain(_LABOR_CAPABILITIES, labor_url)
             runtime.mcp_labor_available = True
+            runtime.mcp_domain_endpoints["labor"] = ("url", labor_url)
 
         wave_url = os.getenv("MAIW_MCP_SERVER_WAVE_URL")
         if wave_url:
             registry.register_domain(_WAVE_CAPABILITIES, wave_url)
             runtime.mcp_wave_available = True
+            runtime.mcp_domain_endpoints["wave"] = ("url", wave_url)
 
         # Demo mode: register MCPServer instances for in-memory transport.
         # The MCP client's Client(server) accepts either a URL string (HTTP)
@@ -286,6 +294,8 @@ async def get_runtime() -> MAIWRuntime:
                 runtime.mcp_inventory_available = True
                 runtime.mcp_labor_available = True
                 runtime.mcp_wave_available = True
+                for _domain in ("equipment", "inventory", "labor", "wave"):
+                    runtime.mcp_domain_endpoints[_domain] = ("in-memory", None)
 
                 logger.info(
                     "MAIW bootstrap: DEMO MODE — four MCPServer instances registered "
