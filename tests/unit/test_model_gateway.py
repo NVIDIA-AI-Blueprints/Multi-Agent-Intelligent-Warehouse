@@ -512,28 +512,38 @@ class TestNIMClientModelOverride:
 # ── ForecastingAgent vertical slice ───────────────────────────────────────────
 
 
-def _patch_missing_deps():
-    """Inject stub modules so ForecastingAgent imports succeed without heavy deps."""
+def _patch_missing_deps(monkeypatch):
+    """Inject stub modules so ForecastingAgent imports succeed without heavy deps.
+
+    Uses ``monkeypatch`` so every ``sys.modules`` entry and module attribute
+    is restored after the test.  (Assigning directly used to replace the REAL
+    ``asyncpg.create_pool`` with an AsyncMock and swap ``redis.asyncio`` for
+    the rest of the session, so later tests' behaviour depended on whether
+    this class had already run.)
+    """
     import sys
     import types
 
     def _stub(name):
         if name not in sys.modules:
-            sys.modules[name] = types.ModuleType(name)
+            monkeypatch.setitem(sys.modules, name, types.ModuleType(name))
 
     _stub("asyncpg")
-    sys.modules["asyncpg"].create_pool = AsyncMock()
+    monkeypatch.setattr(
+        sys.modules["asyncpg"], "create_pool", AsyncMock(), raising=False
+    )
 
     _stub("redis")
     redis_asyncio = types.ModuleType("redis.asyncio")
     redis_asyncio.Redis = MagicMock
-    sys.modules["redis.asyncio"] = redis_asyncio
-    sys.modules["redis"].asyncio = redis_asyncio
+    monkeypatch.setitem(sys.modules, "redis.asyncio", redis_asyncio)
+    monkeypatch.setattr(sys.modules["redis"], "asyncio", redis_asyncio, raising=False)
 
 
 class TestForecastingAgentGatewaySlice:
-    def setup_method(self):
-        _patch_missing_deps()
+    @pytest.fixture(autouse=True)
+    def _stub_deps(self, monkeypatch):
+        _patch_missing_deps(monkeypatch)
 
     def test_forecasting_agent_has_model_gateway_attribute(self):
         """Agent must declare model_gateway (not just nim_client)."""
@@ -607,7 +617,6 @@ class TestForecastingAgentGatewaySlice:
         assert agent.nim_client is None  # legacy path must NOT be active
 
     def test_forecasting_agent_falls_back_to_nim_when_gateway_disabled(self):
-        _patch_missing_deps()
         from src.api.agents.forecasting.forecasting_agent import ForecastingAgent
 
         mock_nim = MagicMock()
@@ -1434,21 +1443,29 @@ class TestRoutingMatrixFallbacks:
 # ── Phase 1B: OperationsAgent gateway migration ───────────────────────────────
 
 
-def _patch_missing_deps_for_ops():
-    """Stub all heavy deps that block import of operations_agent."""
+def _patch_missing_deps_for_ops(monkeypatch):
+    """Stub all heavy deps that block import of operations_agent.
+
+    ``monkeypatch`` restores everything afterwards; direct assignment used to
+    overwrite the REAL ``redis.asyncio.Redis`` with MagicMock for the rest of
+    the session (order-dependent state for every later test).
+    """
     import sys
     import types
 
     for name in ["asyncpg", "redis", "redis.asyncio"]:
         if name not in sys.modules:
-            sys.modules[name] = types.ModuleType(name)
-    sys.modules["redis"].asyncio = sys.modules["redis.asyncio"]
-    sys.modules["redis.asyncio"].Redis = MagicMock
+            monkeypatch.setitem(sys.modules, name, types.ModuleType(name))
+    monkeypatch.setattr(
+        sys.modules["redis"], "asyncio", sys.modules["redis.asyncio"], raising=False
+    )
+    monkeypatch.setattr(sys.modules["redis.asyncio"], "Redis", MagicMock, raising=False)
 
 
 class TestOperationsAgentGatewaySlice:
-    def setup_method(self):
-        _patch_missing_deps_for_ops()
+    @pytest.fixture(autouse=True)
+    def _stub_deps(self, monkeypatch):
+        _patch_missing_deps_for_ops(monkeypatch)
 
     def test_operations_agent_has_model_gateway_attr(self):
         from src.api.agents.operations.operations_agent import (
@@ -1510,8 +1527,9 @@ class TestOperationsAgentGatewaySlice:
 
 
 class TestEquipmentAgentGatewaySlice:
-    def setup_method(self):
-        _patch_missing_deps_for_ops()
+    @pytest.fixture(autouse=True)
+    def _stub_deps(self, monkeypatch):
+        _patch_missing_deps_for_ops(monkeypatch)
 
     def test_equipment_agent_has_model_gateway_attr(self):
         from src.api.agents.inventory.equipment_agent import (
@@ -1571,8 +1589,9 @@ class TestEquipmentAgentGatewaySlice:
 
 
 class TestSafetyAgentGatewaySlice:
-    def setup_method(self):
-        _patch_missing_deps_for_ops()
+    @pytest.fixture(autouse=True)
+    def _stub_deps(self, monkeypatch):
+        _patch_missing_deps_for_ops(monkeypatch)
 
     def test_safety_agent_has_model_gateway_attr(self):
         from src.api.agents.safety.safety_agent import SafetyComplianceAgent

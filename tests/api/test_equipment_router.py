@@ -92,26 +92,33 @@ def app_with_agent():
         async with _lifespan(app, with_agent=True):
             yield
 
-    with (
-        patch("maiw_api.app.lifespan", ls),
-        patch(
-            "src.api.services.security.rate_limiter.get_rate_limiter",
-            return_value=AsyncMock(check_rate_limit=AsyncMock()),
-        ),
-        patch("src.api.services.monitoring.metrics.record_request_metrics"),
-        patch("src.retrieval.structured.SQLRetriever.initialize", AsyncMock()),
-        patch(
-            "src.retrieval.structured.SQLRetriever.execute_query",
-            AsyncMock(return_value=[]),
-        ),
-    ):
-        import importlib
-        import maiw_api.app as m
+    import importlib
+    import maiw_api.app as m
 
-        importlib.reload(m)
-        # ASGITransport does not trigger ASGI lifespan events; set state directly.
-        m.app.state.runtime = _make_runtime(with_agent=True)
-        yield m.app
+    # reload() mutates the shared module in place; restore it afterwards so
+    # later tests do not inherit this app object / mocked middleware deps.
+    saved_namespace = dict(vars(m))
+    try:
+        with (
+            patch("maiw_api.app.lifespan", ls),
+            patch(
+                "src.api.services.security.rate_limiter.get_rate_limiter",
+                return_value=AsyncMock(check_rate_limit=AsyncMock()),
+            ),
+            patch("src.api.services.monitoring.metrics.record_request_metrics"),
+            patch("src.retrieval.structured.SQLRetriever.initialize", AsyncMock()),
+            patch(
+                "src.retrieval.structured.SQLRetriever.execute_query",
+                AsyncMock(return_value=[]),
+            ),
+        ):
+            importlib.reload(m)
+            # ASGITransport does not trigger ASGI lifespan events; set state directly.
+            m.app.state.runtime = _make_runtime(with_agent=True)
+            yield m.app
+    finally:
+        vars(m).clear()
+        vars(m).update(saved_namespace)
 
 
 @pytest.fixture()
@@ -121,26 +128,33 @@ def app_no_agent():
         async with _lifespan(app, with_agent=False):
             yield
 
-    with (
-        patch("maiw_api.app.lifespan", ls),
-        patch(
-            "src.api.services.security.rate_limiter.get_rate_limiter",
-            return_value=AsyncMock(check_rate_limit=AsyncMock()),
-        ),
-        patch("src.api.services.monitoring.metrics.record_request_metrics"),
-        patch("src.retrieval.structured.SQLRetriever.initialize", AsyncMock()),
-        patch(
-            "src.retrieval.structured.SQLRetriever.execute_query",
-            AsyncMock(return_value=[]),
-        ),
-    ):
-        import importlib
-        import maiw_api.app as m
+    import importlib
+    import maiw_api.app as m
 
-        importlib.reload(m)
-        # ASGITransport does not trigger ASGI lifespan events; set state directly.
-        m.app.state.runtime = _make_runtime(with_agent=False)
-        yield m.app
+    # reload() mutates the shared module in place; restore it afterwards so
+    # later tests do not inherit this app object / mocked middleware deps.
+    saved_namespace = dict(vars(m))
+    try:
+        with (
+            patch("maiw_api.app.lifespan", ls),
+            patch(
+                "src.api.services.security.rate_limiter.get_rate_limiter",
+                return_value=AsyncMock(check_rate_limit=AsyncMock()),
+            ),
+            patch("src.api.services.monitoring.metrics.record_request_metrics"),
+            patch("src.retrieval.structured.SQLRetriever.initialize", AsyncMock()),
+            patch(
+                "src.retrieval.structured.SQLRetriever.execute_query",
+                AsyncMock(return_value=[]),
+            ),
+        ):
+            importlib.reload(m)
+            # ASGITransport does not trigger ASGI lifespan events; set state directly.
+            m.app.state.runtime = _make_runtime(with_agent=False)
+            yield m.app
+    finally:
+        vars(m).clear()
+        vars(m).update(saved_namespace)
 
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
