@@ -1,7 +1,12 @@
 # MAIW v2.0.1 — Release Notes (DRAFT — not tagged)
 
-**Status:** release candidate, pending an independent re-audit. Do not tag
-until that re-audit passes. `v2.0.0` (`816ace73…`) is unchanged.
+**Status:** release candidate after remediation round 2, pending a THIRD
+independent re-audit. Do not tag until that re-audit passes. `v2.0.0`
+(`816ace73…`) is unchanged. The second independent re-audit (PR #144) failed
+the round-1 candidate `785c420` with four new P1s; round 2 addresses them —
+see "Round 2" below, `docs/audits/MAIW_V2.0.1_REMEDIATION_ROUND2.md` and
+`artifacts/audit/v2.0.1_remediation_round2.json`. This is a draft, not a
+PASS claim.
 
 ## Why v2.0.1
 
@@ -16,7 +21,74 @@ canonical app. Details and evidence:
 `docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md`,
 `artifacts/audit/v2.0.1_remediation.json`.
 
-## Changes
+## Round 2 (re-audit PR #144: NEW-P1-01..04, P2-01, P2-02)
+
+### Final physical model enforcement (NEW-P1-01)
+- One canonical approved-deployment table (`maiw_models/deployment.py`)
+  binds each role to its physical model ID and generation; a small
+  `DeploymentResolver` sits between PolicyFilter and provider dispatch and is
+  the only source of the model ID the provider receives. The approved family
+  stays Nemotron 3 / 3.5.
+- `NEMOTRON_<ROLE>_MODEL` can only select the approved ID for that role.
+  Anything else (unknown, look-alike, another role's ID) → `503
+  MODEL_POLICY_VIOLATION` with zero provider calls, `/api/v1/ready` NOT_READY,
+  preflight FAIL. `LLM_MODEL` / `MAIW_NIM_MODEL` are not dispatched.
+- A provider that reports a different model than the one dispatched → `502
+  MODEL_IDENTITY_MISMATCH`; the response is discarded, never relabelled. The
+  inference route reports `provider_reported_model_id` and `identity_verified`.
+- Preflight, smoke and status check the exact bindings the runtime
+  dispatches (`scripts/lib/check_model_config.py`, same registry + resolver).
+- Nano is disabled by default (hosted `nvidia/nemotron-3-nano-30b-a3b`
+  returns HTTP 410); MEDIUM reasoning is served by Super (`fallback_used`).
+
+### Reproducible reference deployment (NEW-P1-02, P2-01)
+- One env loader for every lifecycle script, loaded before preflight;
+  values parsed, never executed.
+- Deployment identity (`runtime/maiw-api.instance`, `MAIW_INSTANCE_ID` on
+  `/api/v1/live`): status/smoke/restart/stop act only on the verified
+  instance; no `localhost:8001` fallback, no kill-by-port or kill-by-name.
+  Restart preflights before stopping.
+- New `scripts/setup/reference_db.sh`, `scripts/setup/reference_sandbox.sh`
+  (committed OpenShell policy template: egress only to the API host:port),
+  `scripts/validate_reference_runbook.sh`; the runbook lists every command of
+  a clean-host deployment in order. `MAIW_API_PORT`, `MAIW_PERSISTENCE_ROOT`,
+  `MAIW_PYTHON` are required (no defaults).
+
+### Capability-aware readiness (NEW-P1-03)
+- Deployment profiles `reference` (governed writes not offered),
+  `reference_governed` (required MCP write domains must be configured,
+  reachable and not circuit-open) and `demo`.
+- MCP domains report READY / DEGRADED / CIRCUIT_OPEN / FAILED /
+  NOT_CONFIGURED — never HEALTHY when unconfigured. Sandbox is critical when
+  `MAIW_SANDBOX_MODE=required`. Readiness probes the data-path database
+  (`PGHOST`/`PGPORT`), not `DATABASE_URL` (P2-19).
+
+### Order-independent test isolation (NEW-P1-04)
+- The CORE CI suite passes in CI, reversed, ModelGateway-first, demo-first,
+  canonical-first, reliability-first and seeded shuffled file orders
+  (event-loop misuse, sys.modules purges, in-place module reloads and
+  unrestored globals fixed; documented singleton/env reset fixture;
+  `PYTHON_DOTENV_DISABLED=1` in tests).
+
+### Crash-safe governance resume (P2-02)
+- The governance inbox persists the accepted outcome and an applied marker;
+  `ProcedureHost.recover_accepted_governance` replays an accepted-but-unapplied
+  resume exactly once after a crash and never re-runs one that already
+  completed. Startup and `/api/v1/ready` report unapplied outcomes.
+
+### Round 2 test baseline (last code commit `9c27c12`)
+- Python CORE CI: **2805 passed, 8 skipped, 0 failed** (two fresh runs), and
+  0 failures in 11 alternative orders (reversed, ModelGateway/demo/canonical/
+  reliability first, two seeded shuffles). 87 new round-2 tests.
+- UI: Jest 964/964, ESLint 0 errors, `tsc --noEmit` 0 errors, build OK;
+  npm audit 0 critical / 50 high (toolchain only).
+- Live (epg-tme-smc-h100-02): clean-shell runbook reproduction; smoke 14/14
+  before and after restart; Super, Lightning and in-sandbox inference with
+  provider-reported model == resolved approved model. Host GPU driver
+  mismatch: preflight GPU check fails (correctly), so start/restart used
+  `--skip-preflight`.
+
+## Changes (round 1)
 
 ### Canonical app alignment
 - `apps/api/maiw_api/app.py` is the only release composition root. The
@@ -84,14 +156,21 @@ canonical app. Details and evidence:
 - Ensure `MAIW_PERSISTENCE_ROOT` is writable by the service user, or
   `/api/v1/ready` will report `persistence` failed. For local development
   either set a writable root or `MAIW_PERSISTENCE_MODE=memory`.
-- If the hosted endpoint does not serve a registry default model (e.g.
-  `nvidia/nemotron-3-nano-30b-a3b` currently returns 410), disable that role
-  (`NEMOTRON_NANO_ENABLED=false`); routing stays within the approved family.
-- The document vision stage is unavailable until an approved multimodal
-  Nemotron model is configured (`NEMOTRON_NANO_OMNI_MODEL`,
-  `NEMOTRON_NANO_OMNI_ENABLED=true`).
+- Nano is disabled by default (round 2). Re-enable it only with a working
+  deployment of `nvidia/nemotron-3-nano-30b-a3b` (`NEMOTRON_NANO_ENABLED=true`).
+- `NEMOTRON_<ROLE>_MODEL` must be unset or the approved ID for that role;
+  any other value now fails closed.
+- The document vision stage is unavailable: no multimodal Nemotron model is
+  in the approved deployment table, so configuring `NEMOTRON_NANO_OMNI_MODEL`
+  does not enable it (it fails closed). Adding one is a reviewed code change.
+- Lifecycle scripts now require `MAIW_API_PORT`, `MAIW_PERSISTENCE_ROOT`,
+  `MAIW_PYTHON` and `MAIW_DEPLOYMENT_PROFILE` in `.env`; see the runbook's
+  clean-host procedure.
+- `/api/v1/ready` in the `reference` profile reports
+  `governed_write_path: not_offered`; use `reference_governed` with the MCP
+  write domains configured to offer governed writes.
 
-## Test baseline
+## Test baseline (round 1 — superseded by round 2, see the round-2 audit)
 - Python CORE CI command: **2720 passed, 0 failed, 5 skipped** (two
   consecutive runs; v2.0.0 baseline 2667/0/3 + 53 canonical-app tests; the 2
   new skips are opt-in Postgres tests, run and passed locally against a

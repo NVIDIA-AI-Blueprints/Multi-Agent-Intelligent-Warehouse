@@ -1,0 +1,446 @@
+{
+ "document": "docs/audits/MAIW_V2.0.1_REMEDIATION_ROUND2.md",
+ "kind": "remediation evidence (not an audit verdict)",
+ "repository": "NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse",
+ "pr": 143,
+ "branch": "fix/v2.0.1-canonical-app-remediation",
+ "responds_to": {
+  "pr": 144,
+  "branch": "audit/v2.0.1-independent-reaudit",
+  "head": "80947b056aa39d545f55afeebc6d38b52be78e81",
+  "verdict": "MAIW V2.0.1 INDEPENDENT RE-AUDIT FAIL"
+ },
+ "source_identity": {
+  "starting_head": "785c420604c3b6a16d6e7531fcab2c73da43f67a",
+  "main": "944507ec914665c6682d39b95e8713355f486598",
+  "v2_0_0": "816ace73c4561469978094eeedb2641f6db3c4fa",
+  "v2_0_1_tag": null,
+  "pr144_unchanged": true
+ },
+ "code_commits": [
+  {
+   "sha": "dd1ad641ad431984f1c068b0ee372e9c34a06018",
+   "subject": "test: make the CORE CI suite order-independent (re-audit NEW-P1-04)"
+  },
+  {
+   "sha": "9b413f978997655e25302a1d13b3deab706daa5e",
+   "subject": "fix(models): enforce final physical model identity before dispatch (re-audit NEW-P1-01)"
+  },
+  {
+   "sha": "f6233cf64679544a7a65e9fd4bb3ec63ec9a478b",
+   "subject": "fix(api): profile-aware readiness; governed writes ready only when usable (re-audit NEW-P1-03)"
+  },
+  {
+   "sha": "8f36c3557fc516db7c48379b86d5e4125ed39172",
+   "subject": "fix(deploy): reproducible reference deployment from the runbook alone (re-audit NEW-P1-02)"
+  },
+  {
+   "sha": "ec66cb7f2a0319ecebcea851587e2f10c5cc5273",
+   "subject": "fix(deploy): stop never kills by port or name; verified PID only (re-audit P2-01)"
+  },
+  {
+   "sha": "35e224ead9509061d91188eaa24fee9fe038bfcb",
+   "subject": "fix(governance): recover accepted-but-unapplied governance after a crash (re-audit P2-02)"
+  },
+  {
+   "sha": "9c27c12f63aedbc1059337735ff55e574b11a195",
+   "subject": "fix(deploy): restart preflight accepts the port held by this deployment's verified instance"
+  }
+ ],
+ "last_code_commit": "9c27c12f63aedbc1059337735ff55e574b11a195",
+ "final_head_note": "The final frozen head is the docs/artifacts commit that adds this file on top of last_code_commit; it changes no code.",
+ "date": "2026-10-10",
+ "host": "epg-tme-smc-h100-02",
+ "new_p1_closure": {
+  "NEW-P1-01": {
+   "status": "CLOSED",
+   "fix": "APPROVED_DEPLOYMENTS + DeploymentResolver before dispatch; PolicyFilter physical-identity check; router hard stop; response identity check (502); NIMProvider refuses empty ID; shared check_model_config.py for preflight/smoke/status; Nano disabled by default",
+   "tests": [
+    "tests/api/test_round2_model_identity.py",
+    "tests/unit/test_round2_deployment_resolver.py"
+   ],
+   "fake_provider_matrix": [
+    {
+     "case": "A",
+     "config": "defaults, reasoning high/low",
+     "http": [
+      200,
+      200
+     ],
+     "provider_calls": [
+      1,
+      1
+     ]
+    },
+    {
+     "case": "A-medium",
+     "config": "defaults, reasoning medium (Nano disabled)",
+     "http": 200,
+     "role": "super",
+     "fallback_used": true,
+     "provider_calls": 1
+    },
+    {
+     "case": "B",
+     "config": "NEMOTRON_SUPER_MODEL / NEMOTRON_LIGHTNING_MODEL unapproved; Nano off + Super unapproved",
+     "http": 503,
+     "code": "MODEL_POLICY_VIOLATION",
+     "provider_calls": 0,
+     "ready": 503
+    },
+    {
+     "case": "C",
+     "config": "role/ID mismatch (approved IDs swapped) and look-alike IDs",
+     "http": 503,
+     "code": "MODEL_POLICY_VIOLATION",
+     "provider_calls": 0
+    },
+    {
+     "case": "D",
+     "config": "provider reports example-org/substituted-model-y (or another approved ID)",
+     "http": 502,
+     "code": "MODEL_IDENTITY_MISMATCH",
+     "provider_calls": 1,
+     "content_returned": false
+    },
+    {
+     "case": "E",
+     "config": "Ultra bound to totally-unknown/model-e, judge task",
+     "http": 503,
+     "code": "MODEL_POLICY_VIOLATION",
+     "provider_calls": 0
+    }
+   ],
+   "live_physical_models": [
+    {
+     "request": "host high",
+     "role": "super",
+     "resolved": "nvidia/nemotron-3-super-120b-a12b",
+     "generation": "nemotron-3",
+     "provider_reported": "nvidia/nemotron-3-super-120b-a12b",
+     "match": true,
+     "approved": true
+    },
+    {
+     "request": "host low",
+     "role": "lightning",
+     "resolved": "nvidia/nemotron-3.5-lightning-30b-a3b",
+     "generation": "nemotron-3.5",
+     "provider_reported": "nvidia/nemotron-3.5-lightning-30b-a3b",
+     "match": true,
+     "approved": true
+    },
+    {
+     "request": "host medium",
+     "role": "super",
+     "fallback_used": true,
+     "resolved": "nvidia/nemotron-3-super-120b-a12b",
+     "generation": "nemotron-3",
+     "provider_reported": "nvidia/nemotron-3-super-120b-a12b",
+     "match": true,
+     "approved": true,
+     "note": "NIMClient cache hit"
+    },
+    {
+     "request": "in-sandbox maiw-v201-r2-a high",
+     "role": "super",
+     "resolved": "nvidia/nemotron-3-super-120b-a12b",
+     "generation": "nemotron-3",
+     "provider_reported": "nvidia/nemotron-3-super-120b-a12b",
+     "match": true,
+     "approved": true
+    }
+   ],
+   "live_failure_injection": [
+    {
+     "injection": "NEMOTRON_SUPER_MODEL=example-org/unapproved-model-x",
+     "ready": 503,
+     "inference_http": 503,
+     "code": "MODEL_POLICY_VIOLATION"
+    },
+    {
+     "injection": "local fake provider answers as example-org/substituted-model-y",
+     "inference_http": 502,
+     "code": "MODEL_IDENTITY_MISMATCH",
+     "fake_provider_received": [
+      "nvidia/nemotron-3-super-120b-a12b"
+     ]
+    }
+   ]
+  },
+  "NEW-P1-02": {
+   "status": "CLOSED",
+   "caveat": "host NVML driver/library mismatch makes preflight GPU check fail; live start/restart used documented --skip-preflight",
+   "fix": "scripts/lib/load_env.sh (one loader, before preflight), deployment_identity.sh (no default port, verified target), setup/reference_db.sh, setup/reference_sandbox.sh + deploy/openshell policy template, runbook clean-host procedure, validate_reference_runbook.sh",
+   "tests": [
+    "tests/unit/test_round2_deployment_scripts.py"
+   ],
+   "clean_shell_reproduction": [
+    [
+     "runbook install block",
+     0
+    ],
+    [
+     "cp .env.example .env + fill",
+     0
+    ],
+    [
+     "validate_reference_runbook.sh",
+     0
+    ],
+    [
+     "setup/reference_db.sh up",
+     0
+    ],
+    [
+     "setup/reference_sandbox.sh create",
+     0
+    ],
+    [
+     "preflight_reference_deployment.sh",
+     1,
+     "26 pass / 1 fail (GPU, host)"
+    ],
+    [
+     "start_reference_deployment.sh",
+     1,
+     "preflight GPU"
+    ],
+    [
+     "start_reference_deployment.sh --skip-preflight",
+     0
+    ],
+    [
+     "status_reference_deployment.sh",
+     0
+    ],
+    [
+     "smoke_test_reference_deployment.sh",
+     0,
+     "14/14"
+    ],
+    [
+     "setup/reference_sandbox.sh probe",
+     0
+    ],
+    [
+     "restart_reference_deployment.sh",
+     1,
+     "refused before stopping (GPU only)"
+    ],
+    [
+     "restart_reference_deployment.sh --skip-preflight",
+     0
+    ],
+    [
+     "status_reference_deployment.sh",
+     0
+    ],
+    [
+     "smoke_test_reference_deployment.sh",
+     0,
+     "14/14"
+    ],
+    [
+     "stop_reference_deployment.sh",
+     0
+    ],
+    [
+     "status_reference_deployment.sh",
+     1,
+     "NOT RUNNING / CANNOT VERIFY"
+    ],
+    [
+     "setup/reference_sandbox.sh delete",
+     0
+    ],
+    [
+     "setup/reference_db.sh down",
+     0
+    ]
+   ],
+   "first_pass_defect_found_and_fixed": "restart preflight failed on the port held by the instance being restarted (fixed in 9c27c12)",
+   "decoy": {
+    "no_state": {
+     "smoke": 2,
+     "status": 1,
+     "restart": 2,
+     "stop": 0
+    },
+    "forged_state": {
+     "stop": 3,
+     "smoke": 2
+    },
+    "decoy_alive": true,
+    "decoy_requests": 0
+   }
+  },
+  "NEW-P1-03": {
+   "status": "CLOSED",
+   "fix": "profiles (reference / reference_governed / demo); per-domain READY/DEGRADED/CIRCUIT_OPEN/FAILED/NOT_CONFIGURED; required-domain, governed-write and sandbox rules; data-path DB probe (P2-19)",
+   "tests": [
+    "tests/api/test_round2_readiness.py",
+    "tests/unit/reliability/test_graceful_degradation.py"
+   ],
+   "readiness_matrix": {
+    "all_required_healthy": 200,
+    "persistence_unavailable": 503,
+    "db_unavailable": 503,
+    "required_mcp_unconfigured": 503,
+    "required_mcp_circuit_open": 503,
+    "required_mcp_unreachable": 503,
+    "optional_mcp_unconfigured": "200 NOT_CONFIGURED",
+    "optional_mcp_circuit_open": 200,
+    "required_sandbox_unavailable": 503,
+    "optional_sandbox_unavailable": "200 degraded/not_configured",
+    "provider_unavailable": "200 non-critical",
+    "unapproved_model_binding": 503,
+    "liveness_in_all_cases": 200
+   },
+   "live": {
+    "reference_default": "200 READY, all MCP NOT_CONFIGURED, governed_write_path not_offered",
+    "reference_governed_no_mcp": 503,
+    "reference_governed_unreachable_equipment": "503 FAILED",
+    "required_sandbox_missing": 503,
+    "unapproved_super": 503
+   }
+  },
+  "NEW-P1-04": {
+   "status": "CLOSED",
+   "root_causes": [
+    "asyncio.get_event_loop() in demo tests",
+    "sys.modules purges -> dual SOPStep identity",
+    "in-place maiw_api.app reloads left mocks",
+    "unrestored asyncpg/redis stubs",
+    "unrestored env var",
+    "stray .env via load_dotenv"
+   ],
+   "order_matrix": {
+    "note": "run on the candidate working tree at 35e224e (9c27c12 changed one script + one test while the matrix ran)",
+    "ci_order_run1": "2805 passed / 8 skipped / 0 failed",
+    "ci_order_run2": "2805/8/0",
+    "mg_then_demo": "191/0/0",
+    "demo_then_mg": "191/0/0",
+    "canonical_then_reliability": "442 passed / 2 skipped",
+    "reliability_then_canonical": "442/2/0",
+    "mg_first": "2805/8/0",
+    "demo_first": "2805/8/0",
+    "canonical_first": "2805/8/0",
+    "reliability_first": "2805/8/0",
+    "reversed": "2805/8/0",
+    "shuffled_seed_20261010": "2805/7/0",
+    "shuffled_seed_4242": "2805/7/0"
+   },
+   "auditor_before": {
+    "mg_first": "40 failed",
+    "reliability_first": "40 failed",
+    "reversed": "158 failed + 6 errors"
+   }
+  }
+ },
+ "p2_closure": {
+  "P2-01": {
+   "status": "CLOSED",
+   "fix": "stop signals only the verified recorded PID; no kill-by-port / kill-by-name; qualify uses openshell sandbox stop/start <name>",
+   "proof": "decoy tests + live decoy (alive, 0 requests)"
+  },
+  "P2-02": {
+   "status": "CLOSED",
+   "fix": "inbox persists accepted payload + applied marker; ProcedureHost.recover_accepted_governance; startup/readiness report unapplied",
+   "crash_matrix": {
+    "A_before_accept": "nothing applied",
+    "B_after_accept_before_resume": "resumed exactly once",
+    "C_after_resume_before_marker": "marked applied, not re-run",
+    "D_duplicate": "dropped"
+   }
+  },
+  "fixed_in_passing": [
+   "P2-07 smoke default port",
+   "P2-12 NVML false PASS / multi-level missing root",
+   "P2-13 start pip install",
+   "P2-19 readiness DB variables"
+  ]
+ },
+ "python_tests": {
+  "command": ".github/workflows/ci-cd.yml CORE CI (verbatim selection + ignores)",
+  "commit": "9c27c12f63aedbc1059337735ff55e574b11a195",
+  "full_runs": [
+   "2805 passed, 8 skipped, 0 failed (215.4s)",
+   "2805 passed, 8 skipped, 0 failed (213.8s)"
+  ],
+  "new_round2_tests": 87,
+  "black_check_tests": "clean",
+  "env_note": "MAIW_PHASE20B_NIM_URL set to a closed port so opt-in real-NIM tests skip (as in GitHub CI)"
+ },
+ "ui": {
+  "jest": "964/964 (39 suites)",
+  "eslint": "0 errors, 1041 warnings",
+  "tsc_noEmit": "0 errors",
+  "build": "ok"
+ },
+ "npm_audit": {
+  "all": {
+   "critical": 0,
+   "high": 50,
+   "moderate": 34,
+   "low": 3
+  },
+  "omit_dev": {
+   "critical": 0,
+   "high": 50,
+   "moderate": 34,
+   "low": 3
+  },
+  "note": "all highs in react-scripts toolchain; no npm audit fix --force"
+ },
+ "host_limitations": [
+  "nvidia-smi: Failed to initialize NVML: Driver/library version mismatch (not modified)"
+ ],
+ "incidents": [
+  "three early order-investigation runs (before a guard) and one contract run reached the pre-existing NIM on localhost:8002 via tests/contract/test_phase_20b_real_inference.py default URL (1 probe + 3 inference requests; plus 1 probe); test made opt-in; 0 connections afterwards"
+ ],
+ "cleanup": {
+  "sandboxes_deleted": [
+   "maiw-v201-r2-t1",
+   "maiw-v201-r2-dry",
+   "maiw-v201-r2-a"
+  ],
+  "containers_removed": [
+   "maiw-v201-r2-pg-dry",
+   "maiw-v201-r2-pg-a"
+  ],
+  "untouched": [
+   "maiw-qual-20c-b",
+   "nemoclaw-llama-cpp",
+   "cuopt",
+   "wms-nim-*",
+   "nemo-microservices-*",
+   "dev server :8001",
+   "wosa-timescaledb :5435"
+  ],
+  "env_files_left": 0,
+  "MAIW_INFERENCE_ALLOW_UNAUTHENTICATED_set": false
+ },
+ "findings": {
+  "p0": [],
+  "open_p1": [],
+  "remaining_p2": [
+   "P2-03",
+   "P2-04",
+   "P2-05",
+   "P2-06",
+   "P2-08",
+   "P2-09",
+   "P2-10",
+   "P2-11",
+   "P2-14",
+   "P2-15",
+   "P2-16",
+   "P2-17 (partly)",
+   "P2-18",
+   "P2-20"
+  ]
+ },
+ "merge": false,
+ "tag": false
+}
