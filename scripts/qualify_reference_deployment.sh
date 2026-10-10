@@ -26,13 +26,21 @@
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
+# v2.0.1 round 2: same env loader and deployment identity as every other
+# lifecycle script; no default port, no kill-by-pattern.
+# shellcheck source=lib/load_env.sh
+source "$SCRIPT_DIR/lib/load_env.sh"
+# shellcheck source=lib/deployment_identity.sh
+source "$SCRIPT_DIR/lib/deployment_identity.sh"
+maiw_load_env "$PROJECT_ROOT"
+maiw_require_vars MAIW_PERSISTENCE_ROOT MAIW_API_PORT MAIW_PYTHON
 
 EVIDENCE_DIR="${2:-${PROJECT_ROOT}/artifacts/deployment/qualification_evidence}"
-MAIW_PERSISTENCE_ROOT="${MAIW_PERSISTENCE_ROOT:-/var/lib/maiw}"
-MAIW_API_PORT="${MAIW_API_PORT:-8001}"
-BASE_URL="http://127.0.0.1:${MAIW_API_PORT}"
+_base_url() {  # base URL of the VERIFIED instance (empty if not verifiable)
+    if maiw_verify_instance; then printf '%s' "$MAIW_TARGET_BASE_URL"; fi
+}
 
 QUAL_PASS=0
 QUAL_FAIL=0
@@ -81,6 +89,7 @@ fi
 # ── Phase 2: Readiness ────────────────────────────────────────────────────────
 echo ""
 echo "--- Phase 2: Readiness ---"
+BASE_URL="$(_base_url)"
 READY_HTTP=$(curl -so /dev/null -w "%{http_code}" --max-time 10 "${BASE_URL}/api/v1/ready" 2>/dev/null || echo "000")
 if [[ "$READY_HTTP" == "200" ]]; then
     _qpass "Readiness check HTTP 200"
@@ -102,7 +111,7 @@ fi
 # ── Phase 4: Safe Proof SOP A (non-consequential) ─────────────────────────────
 echo ""
 echo "--- Phase 4: Safe Proof SOP A (reaches WAITING_FOR_GOVERNANCE) ---"
-if python3 -m pytest tests/contract/test_sandbox_proof_sop_a.py -x -q \
+if "$MAIW_PYTHON" -m pytest tests/contract/test_sandbox_proof_sop_a.py -x -q \
     --no-header 2>&1 | tail -5; then
     _qpass "Proof SOP A test suite passed"
 else
@@ -140,14 +149,14 @@ fi
 echo ""
 echo "--- Phase 6: Sandbox restart (host truth authoritative) ---"
 SANDBOX_MODE="${MAIW_SANDBOX_MODE:-disabled}"
-if [[ "$SANDBOX_MODE" == "required" ]]; then
-    # Kill sandbox processes, verify host state preserved
-    SANDBOX_PIDS=$(pgrep -f "openshell.*maiw" 2>/dev/null || true)
-    if [[ -n "$SANDBOX_PIDS" ]]; then
-        echo "  Killing sandbox processes: $SANDBOX_PIDS"
-        kill -KILL $SANDBOX_PIDS 2>/dev/null || true
-        sleep 2
-    fi
+if [[ "$SANDBOX_MODE" == "required" && -n "${MAIW_SANDBOX_NAME:-}" ]]; then
+    # v2.0.1 round 2: restart ONLY the named reference sandbox through the
+    # OpenShell control plane (no name-pattern process kill, which matched
+    # unrelated processes on a shared host).
+    echo "  Restarting sandbox '$MAIW_SANDBOX_NAME' via openshell"
+    openshell sandbox stop "$MAIW_SANDBOX_NAME" >/dev/null 2>&1 || true
+    openshell sandbox start "$MAIW_SANDBOX_NAME" >/dev/null 2>&1 || true
+    sleep 2
     # Verify host state still readable
     POST_KILL_COUNT=$(find "$PROC_DIR" -name "*.json" 2>/dev/null | wc -l || echo 0)
     POST_KILL_WAITING=$(grep -lE '"status": ?"waiting_for_governance"' "$PROC_DIR"/*.json 2>/dev/null | wc -l || echo 0)
@@ -192,6 +201,7 @@ fi
 RESTORE_T=$(date +%s)
 bash "$SCRIPT_DIR/start_reference_deployment.sh" --skip-preflight >/dev/null 2>&1
 RESTORE_END_T=$(date +%s)
+BASE_URL="$(_base_url)"
 RESTORE_HTTP=$(curl -so /dev/null -w "%{http_code}" --max-time 10 "${BASE_URL}/api/v1/ready" 2>/dev/null || echo "000")
 RESTORE_S=$((RESTORE_END_T - RESTORE_T))
 

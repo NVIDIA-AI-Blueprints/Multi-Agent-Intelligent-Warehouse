@@ -4,52 +4,61 @@
 #
 # start_reference_deployment.sh — bring up the MAIW v2 reference deployment
 #
-# Starts services in the correct dependency order (Step 7):
-#   1. Validate persistence dirs and config (preflight)
-#   2. Ensure approved model provider is reachable
-#   3. Start the canonical shipped app — uvicorn maiw_api.app:app — which
-#      builds ModelGateway/PolicyFilter, the durable ProcedureStateStore and
-#      GovernanceInbox under MAIW_PERSISTENCE_ROOT, and mounts the bounded
-#      POST /api/v1/inference endpoint on the SAME port (v2.0.1)
-#   4. Wait for MAIW API readiness (/api/v1/ready = 200 READY; it is 503 while
-#      persistence, ModelGateway or a required database is unavailable)
-#   5. Print safe deployment summary (no secrets)
+# Order (v2.0.1 round 2 — load env → validate → start):
+#   1. Load the environment (scripts/lib/load_env.sh — the same loader every
+#      deployment script uses)
+#   2. Preflight the EFFECTIVE configuration (unless --skip-preflight)
+#   3. Create persistence dirs
+#   4. Start the canonical shipped app — uvicorn maiw_api.app:app — with a
+#      fresh MAIW_INSTANCE_ID, and record its deployment identity in
+#      $MAIW_PERSISTENCE_ROOT/runtime/maiw-api.instance
+#   5. Wait for /api/v1/ready = 200 on THIS instance (identity checked first)
+#   6. Print a safe summary (no secrets)
 #
-# There is no separate inference server: the legacy src/api/app.py is a
-# development server only and is never started by this script.
+# There is no separate inference server: POST /api/v1/inference is served by
+# the canonical app on MAIW_API_PORT.  The legacy src/api/app.py is never
+# started by this script.
 #
 # Usage:
 #   bash scripts/start_reference_deployment.sh [--skip-preflight]
 #
-# Environment variables:
-#   See .env.example and docs/operations/REFERENCE_DEPLOYMENT_RUNBOOK.md
-#   MAIW_PERSISTENCE_ROOT  — durable state root (default /var/lib/maiw); read by
-#                            the app itself (maiw_api.persistence)
-#   MAIW_API_PORT          — MAIW API port (default 8001); also serves
-#                            POST /api/v1/inference
-#   MAIW_API_HOST          — MAIW API bind address (default 0.0.0.0)
-#   MAIW_PYTHON            — Python interpreter to run uvicorn (default python3)
-#
-# Step 9 of Phase 20C-C.
+# Required (from .env or the shell): MAIW_PERSISTENCE_ROOT, MAIW_API_PORT,
+# MAIW_PYTHON (an interpreter that imports maiw_api from THIS checkout).
+# See .env.example and docs/operations/REFERENCE_DEPLOYMENT_RUNBOOK.md.
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
+# shellcheck source=lib/load_env.sh
+source "$SCRIPT_DIR/lib/load_env.sh"
+# shellcheck source=lib/deployment_identity.sh
+source "$SCRIPT_DIR/lib/deployment_identity.sh"
 
 SKIP_PREFLIGHT="${1:-}"
-MAIW_PERSISTENCE_ROOT="${MAIW_PERSISTENCE_ROOT:-/var/lib/maiw}"
-MAIW_API_PORT="${MAIW_API_PORT:-8001}"
-MAIW_API_HOST="${MAIW_API_HOST:-0.0.0.0}"
-READINESS_TIMEOUT_S=120
+READINESS_TIMEOUT_S="${MAIW_READINESS_TIMEOUT_S:-120}"
 READINESS_POLL_S=2
 
 echo "=== MAIW v2 Reference Deployment — Start ==="
+
+# ── Step 1: Load environment (BEFORE preflight) ───────────────────────────────
+maiw_load_env "$PROJECT_ROOT"
+maiw_require_vars MAIW_PERSISTENCE_ROOT MAIW_API_PORT MAIW_PYTHON
+MAIW_API_HOST="${MAIW_API_HOST:-127.0.0.1}"
+export MAIW_PERSISTENCE_ROOT MAIW_API_PORT MAIW_API_HOST
 echo "Persistence root: $MAIW_PERSISTENCE_ROOT"
-echo "API port: $MAIW_API_PORT"
+echo "API: $MAIW_API_HOST:$MAIW_API_PORT"
+echo "Profile: ${MAIW_DEPLOYMENT_PROFILE:-reference}"
 echo ""
 
-# ── Step 1: Preflight ─────────────────────────────────────────────────────────
+# Refuse to start a second instance over a verified running one.
+if maiw_verify_instance --no-live; then
+    echo "  MAIW API already running (PID $MAIW_TARGET_PID, port $MAIW_TARGET_PORT) — nothing to do."
+    echo "  Use scripts/restart_reference_deployment.sh to restart it."
+    exit 0
+fi
+
+# ── Step 2: Preflight the effective configuration ─────────────────────────────
 if [[ "$SKIP_PREFLIGHT" != "--skip-preflight" ]]; then
     echo "--- Preflight checks ---"
     bash "$SCRIPT_DIR/preflight_reference_deployment.sh"
@@ -57,158 +66,107 @@ else
     echo "--- Preflight skipped (--skip-preflight) ---"
 fi
 
-# ── Step 2: Create persistence dirs ──────────────────────────────────────────
+# ── Step 3: Persistence directories ───────────────────────────────────────────
 echo ""
 echo "--- Persistence directories ---"
-PERSIST_DIRS=(
-    "${MAIW_PERSISTENCE_ROOT}/procedures"
-    "${MAIW_PERSISTENCE_ROOT}/governance"
-    "${MAIW_PERSISTENCE_ROOT}/runtime"
-)
-for dir in "${PERSIST_DIRS[@]}"; do
+export MAIW_PROCEDURE_STATE_DIR="${MAIW_PROCEDURE_STATE_DIR:-${MAIW_PERSISTENCE_ROOT}/procedures}"
+export MAIW_GOVERNANCE_STATE_DIR="${MAIW_GOVERNANCE_STATE_DIR:-${MAIW_PERSISTENCE_ROOT}/governance}"
+export MAIW_RUNTIME_STATE_DIR="${MAIW_RUNTIME_STATE_DIR:-${MAIW_PERSISTENCE_ROOT}/runtime}"
+unset MAIW_PERSISTENCE_MODE  # reference profile is always file-backed
+for dir in "$MAIW_PROCEDURE_STATE_DIR" "$MAIW_GOVERNANCE_STATE_DIR" "$MAIW_RUNTIME_STATE_DIR"; do
     if [[ ! -d "$dir" ]]; then
         mkdir -p "$dir"
         echo "  Created: $dir"
     else
         echo "  Exists:  $dir"
     fi
-    # Enforce permissions: not world-writable (Step 30)
-    chmod 700 "$dir"
+    chmod 700 "$dir"  # never world-writable (Step 30)
 done
 
-# ── Step 3: Load environment ──────────────────────────────────────────────────
-if [[ -f "$PROJECT_ROOT/.env" ]]; then
-    echo ""
-    echo "--- Loading .env ---"
-    set -a
-    # shellcheck disable=SC1091
-    source "$PROJECT_ROOT/.env"
-    set +a
-    echo "  .env loaded"
-fi
-
-# Export persistence paths for the API process. maiw_api.persistence reads
-# MAIW_PERSISTENCE_ROOT (and the two explicit dir overrides) at startup.
-export MAIW_PERSISTENCE_ROOT
-unset MAIW_PERSISTENCE_MODE  # reference profile is always file-backed
-export MAIW_PROCEDURE_STATE_DIR="${MAIW_PERSISTENCE_ROOT}/procedures"
-export MAIW_GOVERNANCE_STATE_DIR="${MAIW_PERSISTENCE_ROOT}/governance"
-export MAIW_RUNTIME_STATE_DIR="${MAIW_PERSISTENCE_ROOT}/runtime"
-
-# ── Step 4: Check approved model provider ────────────────────────────────────
-echo ""
-echo "--- Approved model provider ---"
-NIM_URL="${LLM_NIM_URL:-https://integrate.api.nvidia.com/v1}"
-MODEL_ID="${LLM_MODEL:-nvidia/nemotron-3-super-120b-a12b}"
-
-if curl -sf --max-time 10 "${NIM_URL%/v1}/health/ready" &>/dev/null 2>&1 || \
-   curl -sf --max-time 10 "${NIM_URL}/models" -H "Authorization: Bearer ${NVIDIA_API_KEY:-}" &>/dev/null 2>&1; then
-    echo "  Provider reachable: $NIM_URL"
-    echo "  Model: $MODEL_ID"
-else
-    echo "  WARNING: Provider not immediately reachable at $NIM_URL" >&2
-    echo "  The MAIW API will start but model gateway will be degraded until provider is available." >&2
-    echo "  Check NVIDIA_API_KEY and LLM_NIM_URL." >&2
-fi
-
-# ── Step 5: Check virtual environment / packages ──────────────────────────────
+# ── Step 4: Python interpreter must import maiw_api from THIS checkout ────────
 echo ""
 echo "--- Python packages ---"
-if [[ -d "$PROJECT_ROOT/env" ]]; then
-    echo "  Activating virtual environment: $PROJECT_ROOT/env"
-    # shellcheck disable=SC1091
-    source "$PROJECT_ROOT/env/bin/activate"
-elif [[ -n "${VIRTUAL_ENV:-}" ]]; then
-    echo "  Using active virtual environment: $VIRTUAL_ENV"
-else
-    echo "  No virtual environment found — using system Python"
-    echo "  Tip: create env with ./scripts/setup/setup_environment.sh"
+API_INIT="$("$MAIW_PYTHON" -c 'import maiw_api, os; print(os.path.realpath(maiw_api.__file__))' 2>/dev/null || true)"
+if [[ "$API_INIT" != "$PROJECT_ROOT/"* ]]; then
+    echo "  ERROR: MAIW_PYTHON=$MAIW_PYTHON does not import maiw_api from $PROJECT_ROOT" >&2
+    echo "         (got: ${API_INIT:-not importable}). Install per the runbook § Install." >&2
+    exit 1
 fi
+echo "  maiw_api: $API_INIT"
 
-MAIW_PYTHON="${MAIW_PYTHON:-python3}"
-if ! "$MAIW_PYTHON" -c "import maiw_api" &>/dev/null 2>&1; then
-    echo "  Installing packages (editable)..."
-    pip install --quiet -e "$PROJECT_ROOT" -e "$PROJECT_ROOT/packages/maiw-models" \
-        -e "$PROJECT_ROOT/packages/maiw-agents" -e "$PROJECT_ROOT/packages/maiw-mcp" \
-        -e "$PROJECT_ROOT/apps/api" 2>&1 || true
-fi
-
-# ── Step 6: Start MAIW API ─────────────────────────────────────────────────────
+# ── Step 5: Start MAIW API ────────────────────────────────────────────────────
 echo ""
 echo "--- Starting MAIW API ---"
-echo "  Host: $MAIW_API_HOST"
-echo "  Port: $MAIW_API_PORT"
-echo "  Persistence: $MAIW_PERSISTENCE_ROOT"
-echo "  Sandbox mode: ${MAIW_SANDBOX_MODE:-disabled}"
+INSTANCE_ID="$(maiw_new_instance_id)"
+LOG_FILE="${MAIW_RUNTIME_STATE_DIR}/maiw-api.log"
+cd "$PROJECT_ROOT"
+MAIW_INSTANCE_ID="$INSTANCE_ID" nohup "$MAIW_PYTHON" -m uvicorn maiw_api.app:app \
+    --host "$MAIW_API_HOST" \
+    --port "$MAIW_API_PORT" \
+    --no-access-log \
+    >> "$LOG_FILE" 2>&1 < /dev/null &
+MAIW_PID=$!
+maiw_write_instance "$INSTANCE_ID" "$MAIW_PID" "$MAIW_API_HOST" "$MAIW_API_PORT" "$PROJECT_ROOT"
+echo "  MAIW API started (PID $MAIW_PID, instance ${INSTANCE_ID:0:8}…)"
 
-# Start in background if not already running
-PIDFILE="${MAIW_RUNTIME_STATE_DIR}/maiw-api.pid"
-if [[ -f "$PIDFILE" ]] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
-    echo "  MAIW API already running (PID $(cat "$PIDFILE"))"
-else
-    # Run from the project root so the composition root's src.* / integrations.*
-    # imports resolve regardless of the caller's working directory.
-    cd "$PROJECT_ROOT"
-    "$MAIW_PYTHON" -m uvicorn maiw_api.app:app \
-        --host "$MAIW_API_HOST" \
-        --port "$MAIW_API_PORT" \
-        --no-access-log \
-        >> "${MAIW_PERSISTENCE_ROOT}/runtime/maiw-api.log" 2>&1 &
-    MAIW_PID=$!
-    echo "$MAIW_PID" > "$PIDFILE"
-    echo "  MAIW API started (PID $MAIW_PID)"
-fi
-
-# ── Step 7: Wait for readiness ────────────────────────────────────────────────
+# ── Step 6: Wait for readiness of THIS instance ───────────────────────────────
 echo ""
 echo "--- Waiting for MAIW API readiness (timeout: ${READINESS_TIMEOUT_S}s) ---"
-READY_URL="http://127.0.0.1:${MAIW_API_PORT}/api/v1/ready"
 ELAPSED=0
-
-until curl -sf --max-time 5 "$READY_URL" &>/dev/null; do
+READY_HTTP="000"
+while :; do
+    if ! kill -0 "$MAIW_PID" 2>/dev/null; then
+        echo "  ERROR: MAIW API process $MAIW_PID exited (port in use or startup failure)." >&2
+        echo "  Log: $LOG_FILE" >&2
+        tail -n 20 "$LOG_FILE" >&2 || true
+        maiw_clear_instance
+        exit 1
+    fi
+    if maiw_verify_instance; then
+        READY_HTTP=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 \
+            "${MAIW_TARGET_BASE_URL}/api/v1/ready" 2>/dev/null || echo "000")
+        [[ "$READY_HTTP" == "200" ]] && break
+    fi
     if [[ "$ELAPSED" -ge "$READINESS_TIMEOUT_S" ]]; then
         echo "  ERROR: MAIW API did not become ready within ${READINESS_TIMEOUT_S}s" >&2
-        echo "  Expected: HTTP 200 from $READY_URL" >&2
-        READY_BODY=$(curl -s --max-time 5 "$READY_URL" 2>/dev/null || echo "")
-        if [[ -n "$READY_BODY" ]]; then
-            FAILED=$(echo "$READY_BODY" | "$MAIW_PYTHON" -c "import sys,json; print(','.join(json.load(sys.stdin).get('failed_components', [])))" 2>/dev/null || echo "?")
-            echo "  Actual:   NOT_READY — failed components: ${FAILED}" >&2
+        if [[ -n "${MAIW_TARGET_BASE_URL:-}" ]]; then
+            FAILED=$(curl -s --max-time 15 "${MAIW_TARGET_BASE_URL}/api/v1/ready" 2>/dev/null \
+                | "$MAIW_PYTHON" -c "import sys,json; print(','.join(json.load(sys.stdin).get('failed_components', [])))" 2>/dev/null || echo "?")
+            echo "  Actual:   NOT_READY (HTTP $READY_HTTP) — failed components: ${FAILED}" >&2
         else
-            echo "  Actual:   no response" >&2
+            echo "  Actual:   instance identity not established (${MAIW_VERIFY_REASON:-})" >&2
         fi
-        echo "  Next: check logs at ${MAIW_PERSISTENCE_ROOT}/runtime/maiw-api.log" >&2
-        echo "  Run: bash scripts/status_reference_deployment.sh" >&2
+        echo "  The process is left running for diagnosis: bash scripts/status_reference_deployment.sh" >&2
+        echo "  Log: $LOG_FILE ; stop with: bash scripts/stop_reference_deployment.sh" >&2
         exit 1
     fi
     sleep "$READINESS_POLL_S"
     ELAPSED=$((ELAPSED + READINESS_POLL_S))
     echo "  Waiting... ${ELAPSED}s"
 done
-
 echo "  MAIW API is ready (${ELAPSED}s)"
 
-# ── Step 8: Print safe summary (no secrets) ───────────────────────────────────
+# ── Step 7: Safe summary (no secrets) ─────────────────────────────────────────
 echo ""
 echo "=== MAIW v2 Reference Deployment — RUNNING ==="
 echo ""
 echo "  MAIW API:              http://${MAIW_API_HOST}:${MAIW_API_PORT}"
-echo "  Health:                http://${MAIW_API_HOST}:${MAIW_API_PORT}/api/v1/health"
-echo "  Readiness:             http://${MAIW_API_HOST}:${MAIW_API_PORT}/api/v1/ready"
-echo "  Liveness:              http://${MAIW_API_HOST}:${MAIW_API_PORT}/api/v1/live"
-echo "  Inference endpoint:    POST http://${MAIW_API_HOST}:${MAIW_API_PORT}/api/v1/inference (X-Maiw-Internal-Token required)"
+echo "  Readiness:             http://127.0.0.1:${MAIW_API_PORT}/api/v1/ready"
+echo "  Inference endpoint:    POST /api/v1/inference (X-Maiw-Internal-Token required)"
+echo "  Deployment identity:   $(maiw_instance_file)"
+echo "  Profile:               ${MAIW_DEPLOYMENT_PROFILE:-reference}"
+echo "  Sandbox mode:          ${MAIW_SANDBOX_MODE:-disabled} ${MAIW_SANDBOX_NAME:+(sandbox $MAIW_SANDBOX_NAME)}"
 echo ""
-echo "  Approved model family: Nemotron 3 / Nemotron 3.5 only"
-echo "  Configured model:      ${MODEL_ID}"
-echo "  Sandbox mode:          ${MAIW_SANDBOX_MODE:-disabled}"
+echo "  Approved physical model bindings (same check the gateway runs):"
+"$MAIW_PYTHON" "$SCRIPT_DIR/lib/check_model_config.py" | sed 's/^/    /' || true
 echo ""
-echo "  Procedure state:       ${MAIW_PERSISTENCE_ROOT}/procedures/"
-echo "  Governance state:      ${MAIW_PERSISTENCE_ROOT}/governance/"
-echo "  API log:               ${MAIW_PERSISTENCE_ROOT}/runtime/maiw-api.log"
-echo ""
-echo "  Tokens / credentials:  NOT printed (check .env)"
+echo "  Procedure state:       ${MAIW_PROCEDURE_STATE_DIR}/"
+echo "  Governance state:      ${MAIW_GOVERNANCE_STATE_DIR}/"
+echo "  API log:               ${LOG_FILE}"
+echo "  Tokens / credentials:  NOT printed"
 echo ""
 echo "Next steps:"
-echo "  smoke test:  bash scripts/smoke_test_reference_deployment.sh"
 echo "  status:      bash scripts/status_reference_deployment.sh"
+echo "  smoke test:  bash scripts/smoke_test_reference_deployment.sh"
 echo "  stop:        bash scripts/stop_reference_deployment.sh"
 echo ""

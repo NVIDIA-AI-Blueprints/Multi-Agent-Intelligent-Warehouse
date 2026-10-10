@@ -172,12 +172,19 @@ def _version_display() -> str:
 
 @router.get("/live")
 async def liveness_check():
-    return {
+    body = {
         "status": "alive",
         "timestamp": datetime.utcnow().isoformat(),
         "uptime": _uptime(),
         "version": _version_display(),
     }
+    # v2.0.1 round 2: deployment identity.  start_reference_deployment.sh
+    # launches the app with a random MAIW_INSTANCE_ID (non-secret) and the
+    # lifecycle scripts only act on a port that answers with that id.
+    instance_id = os.getenv("MAIW_INSTANCE_ID")
+    if instance_id:
+        body["instance_id"] = instance_id
+    return body
 
 
 def _database_required() -> bool:
