@@ -437,6 +437,9 @@ def test_lifecycle_start_status_smoke_restart_stop(tmp_path, decoy):
         refused = _run("restart_reference_deployment.sh", env)
         assert refused.returncode == 1, refused.stdout + refused.stderr
         assert "left untouched" in refused.stderr
+        # the port held by OUR verified instance is not a preflight failure
+        assert "held by this deployment's verified instance" in refused.stdout
+        assert "FAIL  Port" not in refused.stderr
         os.kill(pid1, 0)  # still running
         assert inst.exists()
 

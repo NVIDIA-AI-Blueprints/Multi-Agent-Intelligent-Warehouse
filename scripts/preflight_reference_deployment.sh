@@ -30,6 +30,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 # shellcheck source=lib/load_env.sh
 source "$SCRIPT_DIR/lib/load_env.sh"
+# shellcheck source=lib/deployment_identity.sh
+source "$SCRIPT_DIR/lib/deployment_identity.sh"
 maiw_load_env "$PROJECT_ROOT"
 
 # ── Globals ──────────────────────────────────────────────────────────────────
@@ -257,8 +259,14 @@ _header "Port Availability"
 for port in "${REQUIRED_PORTS[@]}"; do
     if ss -tlnp "sport = :$port" 2>/dev/null | grep -q ":$port" || \
        netstat -tln 2>/dev/null | grep -q ":$port "; then
-        _fail "Port $port" "free" "in use" \
-            "Stop the process using port $port: ss -tlnp | grep :$port"
+        # Restart preflights while THIS deployment's verified instance still
+        # holds the port (it is stopped only after preflight passes).
+        if maiw_verify_instance --no-live && [[ "$MAIW_TARGET_PORT" == "$port" ]]; then
+            _pass "Port $port held by this deployment's verified instance (PID $MAIW_TARGET_PID)"
+        else
+            _fail "Port $port" "free" "in use by another process" \
+                "Choose a free MAIW_API_PORT (lifecycle scripts never kill by port)"
+        fi
     else
         _pass "Port $port is free"
     fi
