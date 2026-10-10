@@ -20,6 +20,7 @@ Covers spec §15-§19, §47, §48:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import signal
@@ -464,10 +465,8 @@ def test_lifecycle_start_status_smoke_restart_stop(tmp_path, decoy):
             pid = int(
                 dict(ln.split("=", 1) for ln in inst.read_text().splitlines())["pid"]
             )
-            try:
+            with contextlib.suppress(ProcessLookupError):  # already exited
                 os.kill(pid, signal.SIGTERM)
-            except ProcessLookupError:
-                pass
 
 
 def test_runbook_validation_script_passes():

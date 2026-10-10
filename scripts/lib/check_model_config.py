@@ -122,12 +122,10 @@ def main() -> int:
 
     logging.disable(logging.CRITICAL)  # registry logs; this tool prints its own
     try:
-        import maiw_models  # noqa: F401
+        from maiw_models import default_resolver
     except Exception as exc:  # noqa: BLE001
         print(f"FAIL  cannot import maiw_models: {exc}", file=sys.stderr)
         return 2
-
-    from maiw_models import default_resolver
 
     if args.expect:
         role, model_id = args.expect
