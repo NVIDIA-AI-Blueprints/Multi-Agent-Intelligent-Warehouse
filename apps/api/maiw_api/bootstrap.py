@@ -183,6 +183,19 @@ async def get_runtime() -> MAIWRuntime:
                 type(runtime.procedure_store).__name__,
                 runtime.persistence.config.durable,
             )
+            # v2.0.1 round 2: detect governance outcomes that were accepted
+            # (fsynced) but whose resume never completed before a crash.  They
+            # are replayed exactly once by ProcedureHost.recover_accepted_
+            # governance() from the procedure's owner; /api/v1/ready reports
+            # the count under persistence.unapplied_governance.
+            unapplied = runtime.procedure_host.unapplied_governance()
+            if unapplied:
+                logger.warning(
+                    "MAIW bootstrap: %d accepted governance outcome(s) not yet "
+                    "applied (crash before resume): %s",
+                    len(unapplied),
+                    [g.procedure_execution_id for g in unapplied],
+                )
         else:
             logger.error(
                 "MAIW bootstrap: persistence unavailable — %s",

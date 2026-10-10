@@ -21,6 +21,11 @@ It is the host half of the sandbox boundary described in
                              record it in the durable inbox exactly once, then
                              resume (validation only — the engine never writes)
     resume()                 continue a restored, non-terminal procedure
+    recover_accepted_governance()
+                             v2.0.1 round 2: after a crash between the inbox
+                             fsync and the resume checkpoint, replay the
+                             resume of every accepted-but-unapplied outcome
+                             exactly once (validation only — no write)
 
 Authority: this object holds NO ActionExecutor, NO DecisionEngine, NO MCP
 client and NO credentials. A governance outcome reaching ``apply_governance``
@@ -32,8 +37,8 @@ lets the SOP Engine prove the outcome against authoritative state.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, field
+from typing import Any, Awaitable, Callable
 
 from maiw_agents.contracts.procedure_state import (
     ProcedureExecutionState,
@@ -59,6 +64,32 @@ class GovernanceApplication:
     """True if the durable inbox had already recorded this outcome."""
 
     state: ProcedureExecutionState
+
+
+@dataclass(frozen=True)
+class RecoveryInputs:
+    """What the procedure's owner supplies to replay a governance resume."""
+
+    definition: Any
+    sop: Any
+    context: Any
+    warehouse_state_snapshot: Any | None = None
+
+
+@dataclass
+class GovernanceRecoveryReport:
+    """Result of ``ProcedureHost.recover_accepted_governance``."""
+
+    resumed: list[str] = field(default_factory=list)
+    """Procedures whose resume was replayed now (crash before resume)."""
+
+    already_applied: list[str] = field(default_factory=list)
+    """Procedures that had already moved past the outcome (crash after the
+    resume checkpoint, before the applied marker) — marked applied, NOT re-run."""
+
+    skipped: list[str] = field(default_factory=list)
+    """Accepted outcomes that could not be recovered now (no stored procedure,
+    no recovery inputs, or a binding mismatch) — left unapplied and reported."""
 
 
 class ProcedureHost:
@@ -234,6 +265,9 @@ class ProcedureHost:
             governance_outcome=outcome,
             warehouse_state_snapshot=warehouse_state_snapshot,
         )
+        # 5. (round 2) the resume transition is checkpointed — record it as
+        #    applied so restart recovery never replays it.
+        self._mark_applied(governance_input)
         logger.info(
             "ProcedureHost.apply_governance: procedure=%s decision=%s status=%s "
             "revision=%d",
@@ -243,6 +277,106 @@ class ProcedureHost:
             resumed.revision,
         )
         return GovernanceApplication(applied=True, duplicate=False, state=resumed)
+
+    # ── Crash recovery (v2.0.1 round 2) ──────────────────────────────────────
+
+    def _mark_applied(self, governance_input: Any) -> None:
+        mark = getattr(self._inbox, "mark_applied", None)
+        if mark is not None:
+            mark(governance_input)
+
+    def unapplied_governance(self) -> list[Any]:
+        """Accepted governance outcomes whose resume was never marked applied."""
+        pending = getattr(self._inbox, "accepted_unapplied", None)
+        return list(pending()) if pending is not None else []
+
+    async def recover_accepted_governance(
+        self,
+        inputs_for: Callable[[ProcedureExecutionState], Awaitable[RecoveryInputs | None]],
+    ) -> GovernanceRecoveryReport:
+        """
+        Replay the resume of every accepted-but-unapplied governance outcome.
+
+        Restart-safety argument (audit P2-02):
+          * crash BEFORE ``inbox.accept``: nothing was recorded; the outcome is
+            simply redelivered and applied normally;
+          * crash AFTER the accept fsync, BEFORE the resume checkpoint: the
+            stored procedure is still WAITING_FOR_GOVERNANCE at exactly the
+            revision the outcome was bound to — re-validate and resume once,
+            then mark applied;
+          * crash AFTER the resume checkpoint, BEFORE the applied marker: the
+            stored procedure has already moved past that revision — mark
+            applied WITHOUT running anything again;
+          * a redelivered duplicate is still dropped by ``has_seen``.
+        The resume itself is validation-only (the engine never writes), so a
+        replay cannot repeat a warehouse mutation.
+
+        ``inputs_for(state)`` is supplied by the owner of the procedure (the
+        component that would call ``apply_governance``); returning ``None``
+        leaves the outcome unapplied and reported in ``skipped``.
+        """
+        from integrations.nemoclaw.boundary_contracts import validate_governance_input
+
+        report = GovernanceRecoveryReport()
+        for governance_input in self.unapplied_governance():
+            pid = governance_input.procedure_execution_id
+            state = await self._store.load(pid)
+            if state is None:
+                logger.error("recover_accepted_governance: procedure %s not found", pid)
+                report.skipped.append(pid)
+                continue
+            moved_on = (
+                state.status is not ProcedureStatus.WAITING_FOR_GOVERNANCE
+                or state.revision != governance_input.expected_procedure_revision
+            )
+            if moved_on:
+                # Resume already checkpointed before the crash.
+                self._mark_applied(governance_input)
+                report.already_applied.append(pid)
+                logger.info(
+                    "recover_accepted_governance: procedure=%s already resumed "
+                    "(status=%s revision=%d) — marked applied, not re-run",
+                    pid,
+                    state.status.value,
+                    state.revision,
+                )
+                continue
+            inputs = await inputs_for(state)
+            if inputs is None:
+                report.skipped.append(pid)
+                continue
+            try:
+                outcome = validate_governance_input(
+                    governance_input, procedure_state=state
+                )
+            except Exception as exc:  # noqa: BLE001 - binding mismatch: never apply
+                logger.error(
+                    "recover_accepted_governance: procedure=%s outcome no longer "
+                    "binds to stored state (%s) — left unapplied",
+                    pid,
+                    exc,
+                )
+                report.skipped.append(pid)
+                continue
+            engine = self._engine(None, state.trace_id)
+            resumed = await engine.resume_after_governance(
+                definition=inputs.definition,
+                sop=inputs.sop,
+                proc_state=state,
+                context=inputs.context,
+                governance_outcome=outcome,
+                warehouse_state_snapshot=inputs.warehouse_state_snapshot,
+            )
+            self._mark_applied(governance_input)
+            report.resumed.append(pid)
+            logger.info(
+                "recover_accepted_governance: procedure=%s resumed after crash "
+                "(status=%s revision=%d)",
+                pid,
+                resumed.status.value,
+                resumed.revision,
+            )
+        return report
 
 
 def summarize(state: ProcedureExecutionState) -> dict[str, Any]:
@@ -274,5 +408,7 @@ __all__ = [
     "ProcedureHost",
     "ProcedureNotFound",
     "GovernanceApplication",
+    "GovernanceRecoveryReport",
+    "RecoveryInputs",
     "summarize",
 ]

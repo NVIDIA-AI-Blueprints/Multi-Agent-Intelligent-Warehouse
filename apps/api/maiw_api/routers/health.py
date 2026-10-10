@@ -446,11 +446,21 @@ async def readiness_check(request: Request):
 
     # ── Durable persistence (P1-03 / P1-04) ───────────────────────────────────
     components["persistence"] = probe_persistence(getattr(rt, "persistence", None))
-    if getattr(rt, "procedure_host", None) is None:
+    host = getattr(rt, "procedure_host", None)
+    if host is None:
         components["persistence"]["status"] = "failed"
         components["persistence"].setdefault("errors", []).append(
             "procedure_host not constructed"
         )
+    else:
+        # Round 2: accepted-but-unapplied governance outcomes (reported only).
+        try:
+            pending = host.unapplied_governance()
+            components["persistence"]["unapplied_governance"] = (
+                len(pending) if isinstance(pending, list) else 0
+            )
+        except Exception:  # noqa: BLE001 - non-canonical host object
+            pass
 
     # ── Canonical ModelGateway + physical model bindings (round 2) ────────────
     if rt.model_gateway is None:

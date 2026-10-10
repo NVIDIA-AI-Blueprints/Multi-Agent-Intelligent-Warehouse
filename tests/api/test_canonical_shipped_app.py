@@ -795,7 +795,10 @@ async def test_p1_03_governance_replay_after_restart_is_dropped(canonical):
         assert replay.state.revision == done.revision
 
     ledger = (root / "governance" / "governance_inbox.jsonl").read_text().splitlines()
-    assert len([ln for ln in ledger if ln.strip()]) == 1
+    events = [json.loads(ln)["event"] for ln in ledger if ln.strip()]
+    # v2.0.1 round 2: one accepted entry (with payload) + one applied marker;
+    # the replay added nothing.
+    assert events == ["accepted", "applied"]
 
 
 def test_p1_03_restart_across_separate_processes(tmp_path):
