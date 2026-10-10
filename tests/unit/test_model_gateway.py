@@ -54,6 +54,26 @@ from src.api.services.model_gateway.providers.nim import NIMProvider
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 
+# v2.0.1 round 2: physical model identity is enforced against the approved
+# deployment table.  No multimodal Nemotron model is approved for production,
+# so vision-routing tests inject a TEST deployment table that adds a
+# nano-omni entry.  Its generation must still be an approved generation
+# (DeploymentResolver refuses anything else) — the family is not widened.
+from maiw_models.deployment import (  # noqa: E402
+    APPROVED_DEPLOYMENTS as _APPROVED,
+    ApprovedDeployment as _ApprovedDeployment,
+    DeploymentResolver as _DeploymentResolver,
+)
+
+_TEST_RESOLVER = _DeploymentResolver(
+    _APPROVED
+    + (
+        _ApprovedDeployment("nano-omni", "test/nano-omni-model", "nemotron-3"),
+        _ApprovedDeployment("nano-omni", "test/nano-omni", "nemotron-3"),
+    )
+)
+
+
 def _make_registry(
     super_enabled: bool = True,
     nano_enabled: bool = False,
@@ -69,14 +89,14 @@ def _make_registry(
         "NEMOTRON_ULTRA_ENABLED": "true" if ultra_enabled else "false",
         "NEMOTRON_NANO_OMNI_ENABLED": "true" if nano_omni_enabled else "false",
         # Use sentinel model IDs so tests don't depend on real NIM names
-        "NEMOTRON_SUPER_MODEL": "test/super-model",
-        "NEMOTRON_NANO_MODEL": "test/nano-model",
-        "NEMOTRON_LIGHTNING_MODEL": "test/lightning-model",
-        "NEMOTRON_ULTRA_MODEL": "test/ultra-model",
+        "NEMOTRON_SUPER_MODEL": "nvidia/nemotron-3-super-120b-a12b",
+        "NEMOTRON_NANO_MODEL": "nvidia/nemotron-3-nano-30b-a3b",
+        "NEMOTRON_LIGHTNING_MODEL": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "NEMOTRON_ULTRA_MODEL": "nvidia/nemotron-3-ultra-550b-a55b",
         "NEMOTRON_NANO_OMNI_MODEL": "test/nano-omni-model",
     }
     with patch.dict(os.environ, env):
-        return ModelRegistry()
+        return ModelRegistry(resolver=_TEST_RESOLVER)
 
 
 def _make_gateway(registry: ModelRegistry) -> tuple[ModelGateway, AsyncMock]:
@@ -86,7 +106,7 @@ def _make_gateway(registry: ModelRegistry) -> tuple[ModelGateway, AsyncMock]:
         return_value=MagicMock(
             content="mocked response",
             usage={"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
-            model="test/super-model",
+            model="nvidia/nemotron-3-super-120b-a12b",
             finish_reason="stop",
         )
     )
@@ -136,7 +156,7 @@ class TestModelRegistry:
         cap = registry.get_by_role("super")
         assert cap is not None
         assert cap.role == "super"
-        assert cap.model_id == "test/super-model"
+        assert cap.model_id == "nvidia/nemotron-3-super-120b-a12b"
 
     def test_get_enabled_by_role_none_when_disabled(self):
         registry = _make_registry(nano_enabled=False)
@@ -145,7 +165,7 @@ class TestModelRegistry:
     def test_model_ids_come_from_env(self):
         registry = _make_registry(super_enabled=True)
         cap = registry.get_by_role("super")
-        assert cap.model_id == "test/super-model"
+        assert cap.model_id == "nvidia/nemotron-3-super-120b-a12b"
 
     def test_nano_omni_has_multimodal_modalities(self):
         registry = _make_registry(nano_omni_enabled=True)
@@ -165,7 +185,7 @@ class TestModelRegistry:
             os.environ,
             {
                 "NEMOTRON_SUPER_ENABLED": "true",
-                "NEMOTRON_SUPER_MODEL": "test/super-model",
+                "NEMOTRON_SUPER_MODEL": "nvidia/nemotron-3-super-120b-a12b",
             },
         ):
             registry.reload()
@@ -400,7 +420,7 @@ class TestModelGateway:
 
         mock_provider.call.assert_called_once()
         call_kwargs = mock_provider.call.call_args.kwargs
-        assert call_kwargs["model_id"] == "test/super-model"
+        assert call_kwargs["model_id"] == "nvidia/nemotron-3-super-120b-a12b"
 
     def test_model_unavailable_propagates(self):
         registry = _make_registry(
@@ -819,13 +839,18 @@ class TestModelCapabilityFields:
 
     # ── Enabled defaults ───────────────────────────────────────────────────────
 
-    def test_lightning_and_nano_and_super_enabled_by_default(self):
-        """Phase 1C: Lightning, Nano, Super are all validated DEPLOYED → enabled by default."""
+    def test_lightning_and_super_enabled_nano_disabled_by_default(self):
+        """Lightning and Super are enabled by default; Nano is DISABLED.
+
+        v2.0.1 round 2 (§13): the hosted endpoint retired
+        nvidia/nemotron-3-nano-30b-a3b (HTTP 410), so a default-on Nano role was
+        a known-dead default.
+        """
         env = {
-            "NEMOTRON_LIGHTNING_MODEL": "test/lightning",
-            "NEMOTRON_NANO_MODEL": "test/nano",
-            "NEMOTRON_SUPER_MODEL": "test/super",
-            "NEMOTRON_ULTRA_MODEL": "test/ultra",
+            "NEMOTRON_LIGHTNING_MODEL": "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "NEMOTRON_NANO_MODEL": "nvidia/nemotron-3-nano-30b-a3b",
+            "NEMOTRON_SUPER_MODEL": "nvidia/nemotron-3-super-120b-a12b",
+            "NEMOTRON_ULTRA_MODEL": "nvidia/nemotron-3-ultra-550b-a55b",
             "NEMOTRON_NANO_OMNI_MODEL": "test/nano-omni",
         }
         # Unset all _ENABLED env vars so registry falls through to _ENABLED_DEFAULTS
@@ -846,19 +871,19 @@ class TestModelCapabilityFields:
                 "NEMOTRON_NANO_OMNI_ENABLED",
             ]:
                 os.environ.pop(key, None)
-            registry = ModelRegistry()
+            registry = ModelRegistry(resolver=_TEST_RESOLVER)
         enabled = {c.role for c in registry.all_enabled()}
         assert "lightning" in enabled, "Lightning must be enabled by default"
-        assert "nano" in enabled, "Nano must be enabled by default"
+        assert "nano" not in enabled, "Nano must be disabled by default"
         assert "super" in enabled, "Super must be enabled by default"
 
     def test_ultra_disabled_by_default(self):
         """Ultra has ~31s latency — requires explicit operator opt-in."""
         env = {
-            "NEMOTRON_LIGHTNING_MODEL": "test/lightning",
-            "NEMOTRON_NANO_MODEL": "test/nano",
-            "NEMOTRON_SUPER_MODEL": "test/super",
-            "NEMOTRON_ULTRA_MODEL": "test/ultra",
+            "NEMOTRON_LIGHTNING_MODEL": "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "NEMOTRON_NANO_MODEL": "nvidia/nemotron-3-nano-30b-a3b",
+            "NEMOTRON_SUPER_MODEL": "nvidia/nemotron-3-super-120b-a12b",
+            "NEMOTRON_ULTRA_MODEL": "nvidia/nemotron-3-ultra-550b-a55b",
             "NEMOTRON_NANO_OMNI_MODEL": "test/nano-omni",
         }
         with patch.dict(os.environ, env, clear=False):
@@ -870,7 +895,7 @@ class TestModelCapabilityFields:
                 "NEMOTRON_NANO_OMNI_ENABLED",
             ]:
                 os.environ.pop(key, None)
-            registry = ModelRegistry()
+            registry = ModelRegistry(resolver=_TEST_RESOLVER)
         assert (
             registry.get_enabled_by_role("ultra") is None
         ), "Ultra must be disabled by default"
@@ -878,10 +903,10 @@ class TestModelCapabilityFields:
     def test_nano_omni_disabled_by_default_no_model_configured(self):
         """Nano Omni is NOT_CURRENTLY_DEPLOYED — disabled unless operator configures a model."""
         env = {
-            "NEMOTRON_LIGHTNING_MODEL": "test/lightning",
-            "NEMOTRON_NANO_MODEL": "test/nano",
-            "NEMOTRON_SUPER_MODEL": "test/super",
-            "NEMOTRON_ULTRA_MODEL": "test/ultra",
+            "NEMOTRON_LIGHTNING_MODEL": "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "NEMOTRON_NANO_MODEL": "nvidia/nemotron-3-nano-30b-a3b",
+            "NEMOTRON_SUPER_MODEL": "nvidia/nemotron-3-super-120b-a12b",
+            "NEMOTRON_ULTRA_MODEL": "nvidia/nemotron-3-ultra-550b-a55b",
         }
         with patch.dict(os.environ, env, clear=False):
             for key in [
@@ -893,7 +918,7 @@ class TestModelCapabilityFields:
                 "NEMOTRON_NANO_OMNI_MODEL",
             ]:
                 os.environ.pop(key, None)
-            registry = ModelRegistry()
+            registry = ModelRegistry(resolver=_TEST_RESOLVER)
         assert registry.get_enabled_by_role("nano-omni") is None
 
     # ── Nano Omni sentinel guard ───────────────────────────────────────────────
@@ -907,7 +932,7 @@ class TestModelCapabilityFields:
                 "NEMOTRON_NANO_OMNI_MODEL": "OPERATOR_MUST_CONFIGURE_NEMOTRON_NANO_OMNI_MODEL",
             },
         ):
-            registry = ModelRegistry()
+            registry = ModelRegistry(resolver=_TEST_RESOLVER)
             assert registry.get_enabled_by_role("nano-omni") is None
 
     def test_nano_omni_sentinel_guard_with_env_unset(self):
@@ -916,7 +941,7 @@ class TestModelCapabilityFields:
             os.environ, {"NEMOTRON_NANO_OMNI_ENABLED": "true"}, clear=False
         ):
             os.environ.pop("NEMOTRON_NANO_OMNI_MODEL", None)
-            registry = ModelRegistry()
+            registry = ModelRegistry(resolver=_TEST_RESOLVER)
             assert registry.get_enabled_by_role("nano-omni") is None
 
     # ── Other capability fields ────────────────────────────────────────────────
@@ -944,10 +969,10 @@ class TestDefaultModelIds:
     def _default_registry(self) -> ModelRegistry:
         """Registry constructed with only model IDs fixed to sentinels; enabled flags default."""
         env = {
-            "NEMOTRON_LIGHTNING_MODEL": "test/lightning",
-            "NEMOTRON_NANO_MODEL": "test/nano",
-            "NEMOTRON_SUPER_MODEL": "test/super",
-            "NEMOTRON_ULTRA_MODEL": "test/ultra",
+            "NEMOTRON_LIGHTNING_MODEL": "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "NEMOTRON_NANO_MODEL": "nvidia/nemotron-3-nano-30b-a3b",
+            "NEMOTRON_SUPER_MODEL": "nvidia/nemotron-3-super-120b-a12b",
+            "NEMOTRON_ULTRA_MODEL": "nvidia/nemotron-3-ultra-550b-a55b",
             "NEMOTRON_NANO_OMNI_MODEL": "test/nano-omni",
             "NEMOTRON_LIGHTNING_ENABLED": "true",
             "NEMOTRON_NANO_ENABLED": "true",
@@ -956,7 +981,7 @@ class TestDefaultModelIds:
             "NEMOTRON_NANO_OMNI_ENABLED": "true",
         }
         with patch.dict(os.environ, env):
-            return ModelRegistry()
+            return ModelRegistry(resolver=_TEST_RESOLVER)
 
     def _real_default_registry(self) -> ModelRegistry:
         """Registry with NO model env overrides — reads hard-coded _DEFAULTS."""
@@ -978,7 +1003,7 @@ class TestDefaultModelIds:
         with patch.dict(os.environ, {}, clear=False):
             for k in keys_to_clear:
                 os.environ.pop(k, None)
-            return ModelRegistry()
+            return ModelRegistry(resolver=_TEST_RESOLVER)
 
     def test_default_lightning_model_is_nemotron35(self):
         registry = self._real_default_registry()
@@ -1300,14 +1325,14 @@ class TestRoutingMatrix:
             "NEMOTRON_SUPER_ENABLED": "true",
             "NEMOTRON_ULTRA_ENABLED": "true",
             "NEMOTRON_NANO_OMNI_ENABLED": "true",
-            "NEMOTRON_LIGHTNING_MODEL": "test/lightning",
-            "NEMOTRON_NANO_MODEL": "test/nano",
-            "NEMOTRON_SUPER_MODEL": "test/super",
-            "NEMOTRON_ULTRA_MODEL": "test/ultra",
+            "NEMOTRON_LIGHTNING_MODEL": "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "NEMOTRON_NANO_MODEL": "nvidia/nemotron-3-nano-30b-a3b",
+            "NEMOTRON_SUPER_MODEL": "nvidia/nemotron-3-super-120b-a12b",
+            "NEMOTRON_ULTRA_MODEL": "nvidia/nemotron-3-ultra-550b-a55b",
             "NEMOTRON_NANO_OMNI_MODEL": "test/nano-omni",
         }
         with patch.dict(os.environ, env):
-            return ModelRegistry()
+            return ModelRegistry(resolver=_TEST_RESOLVER)
 
     def test_routes_to_expected_role(
         self, label, task, reasoning, risk, modality, expected_role, expect_fallback

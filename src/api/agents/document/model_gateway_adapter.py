@@ -172,13 +172,15 @@ async def route_provenance(response: Any) -> dict[str, Any]:
     """Safe provenance for stored results: model id, role, registry generation."""
     rd = getattr(response, "route_decision", None)
     model_id = getattr(response, "model_id", None)
-    generation = None
-    try:
-        gateway = await get_model_gateway()
-        cap = gateway.registry.get_by_id(model_id) if model_id else None
-        generation = getattr(cap, "generation", None)
-    except Exception:  # noqa: BLE001 — provenance is best-effort metadata
-        generation = None
+    # v2.0.1 round 2: the gateway stamps the generation bound to the approved
+    # physical model it dispatched (DeploymentResolver).
+    generation = getattr(response, "generation", None)
+    if generation is None:
+        try:
+            gateway = await get_model_gateway()
+            generation = gateway.registry.resolver.generation_for(model_id or "")
+        except Exception:  # noqa: BLE001 — provenance is best-effort metadata
+            generation = None
     return {
         "model_id": model_id,
         "selected_role": getattr(rd, "selected_role", None),

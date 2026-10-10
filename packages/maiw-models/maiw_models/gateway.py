@@ -20,7 +20,11 @@ Agents call:
     response = await gateway.generate(ModelRequest(task=..., messages=..., reasoning=...))
 
 The gateway owns:
-  - routing (via ModelRouter)
+  - routing (via ModelRouter → PolicyFilter)
+  - physical deployment resolution (via DeploymentResolver, v2.0.1 round 2):
+    the provider receives ONLY ``ResolvedDeployment.model_id``, an approved
+    physical model for the selected role; the provider-reported model must
+    match it or the response is discarded (ModelIdentityMismatch)
   - provider dispatch (via NIMProvider)
   - error normalisation
   - structured telemetry
@@ -103,7 +107,7 @@ class ModelGateway:
                 expired_by_ms = (dl._clock() - dl.deadline_at) * 1000.0  # type: ignore[operator]
                 raise RequestDeadlineExceeded(expired_by_ms=expired_by_ms)
 
-            # 1. Route
+            # 1. Route (ModelRouter → PolicyFilter, incl. physical identity)
             decision = self._router.route(request)
 
             # 2. Resolve capability
@@ -114,10 +118,20 @@ class ModelGateway:
                     model_id=decision.selected_model_id,
                 )
 
+            # 2b. Resolve the physical deployment (v2.0.1 round 2).  This is the
+            # last step before dispatch and the ONLY source of the model ID the
+            # provider receives.  Raises ModelPolicyViolation (0 provider calls)
+            # when the selected role is bound to an unapproved physical model.
+            resolved = self._registry.resolver.resolve(
+                decision.selected_role,
+                decision.selected_model_id,
+                request.deployment_mode,
+            )
+
             # 3. Call provider (wrapped in NIM circuit breaker if configured)
             async def _provider_call():
                 return await self._provider.call(
-                    model_id=decision.selected_model_id,
+                    model_id=resolved.model_id,
                     request=request,
                     capability=capability,
                 )
@@ -132,6 +146,16 @@ class ModelGateway:
                     ) from exc
             else:
                 llm_response = await _provider_call()
+
+            # 3b. Response identity (v2.0.1 round 2): a provider that reports a
+            # different model than the approved one dispatched fails closed —
+            # the response is discarded, never relabelled.
+            reported = getattr(llm_response, "provider_model", None)
+            if not isinstance(reported, str):
+                reported = None  # LLMResponse.provider_model is Optional[str]
+            identity_verified = self._registry.resolver.verify_response_identity(
+                resolved, reported
+            )
 
             latency_ms = (time.monotonic() - start) * 1000
 
@@ -148,15 +172,18 @@ class ModelGateway:
             # 5. Return normalised response
             return ModelResponse(
                 content=llm_response.content,
-                model_id=llm_response.model,
+                model_id=resolved.model_id,
                 model_family="nemotron",
                 latency_ms=latency_ms,
                 finish_reason=llm_response.finish_reason,
                 usage=llm_response.usage,
                 route_decision=decision,
                 raw_provider_metadata={
-                    "provider": "nvidia-nim",
+                    "provider": resolved.provider,
                 },
+                generation=resolved.generation,
+                provider_reported_model_id=reported or None,
+                identity_verified=identity_verified,
             )
 
         except ModelGatewayError as exc:
@@ -262,6 +289,30 @@ class ModelGateway:
                 error=err,
             )
 
+        # ── 2b. Physical deployment (v2.0.1 round 2) ──────────────────────────
+        # In-policy evaluation dispatches only an approved physical deployment
+        # and verifies the provider-reported identity.  allow_out_of_policy is
+        # an offline-research escape hatch with no production caller.
+        resolved = None
+        if not allow_out_of_policy:
+            problem = self._registry.resolver.violation(capability.role, model_id)
+            if problem is not None:
+                err = f"evaluate_with_model: MODEL_POLICY_VIOLATION ({problem[0]}): {problem[1]}"
+                logger.warning(err)
+                return EvaluationCallResult(
+                    forced_model_id=model_id,
+                    policy_compliant=False,
+                    response_content=None,
+                    routing_latency_ms=(time.monotonic() - policy_start) * 1000,
+                    inference_latency_ms=0.0,
+                    total_latency_ms=(time.monotonic() - policy_start) * 1000,
+                    candidate_models=candidate_model_ids,
+                    error=err,
+                )
+            resolved = self._registry.resolver.resolve(
+                capability.role, model_id, request.deployment_mode
+            )
+
         routing_latency_ms = (time.monotonic() - policy_start) * 1000
 
         # ── 3. Deadline guard ─────────────────────────────────────────────────
@@ -309,6 +360,11 @@ class ModelGateway:
                 request=request,
                 capability=capability,
             )
+            if resolved is not None:
+                reported = getattr(llm_response, "provider_model", None)
+                self._registry.resolver.verify_response_identity(
+                    resolved, reported if isinstance(reported, str) else None
+                )
             inference_latency_ms = (time.monotonic() - inference_start) * 1000
             total_latency_ms = routing_latency_ms + inference_latency_ms
 

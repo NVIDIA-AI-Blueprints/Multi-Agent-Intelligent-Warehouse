@@ -175,6 +175,11 @@ class LLMResponse:
     usage: Dict[str, Any]
     model: str
     finish_reason: str
+    # v2.0.1 round 2: the model identity exactly as the provider reported it
+    # (``None`` when the provider response carried no ``model`` field).
+    # ``model`` above keeps its legacy meaning (falls back to config); the
+    # ModelGateway identity check uses ONLY this field.
+    provider_model: Optional[str] = None
 
 
 @dataclass
@@ -532,11 +537,17 @@ class NIMClient:
                 data = response.json()
                 message = data["choices"][0]["message"]
 
+                reported_model = data.get("model")
                 llm_response = LLMResponse(
                     content=_extract_message_content(message),
                     usage=data.get("usage", {}),
                     model=data.get("model", self.config.llm_model),
                     finish_reason=data["choices"][0].get("finish_reason", "stop"),
+                    provider_model=(
+                        str(reported_model)
+                        if reported_model not in (None, "")
+                        else None
+                    ),
                 )
 
                 # Cache the response (skip for streaming)

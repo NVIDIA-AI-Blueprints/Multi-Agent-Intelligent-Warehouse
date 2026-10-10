@@ -262,3 +262,12 @@ class ModelResponse(BaseModel):
     route_decision: ModelRouteDecision
     structured_output: Any | None = None
     raw_provider_metadata: dict[str, Any] = Field(default_factory=dict)
+    # v2.0.1 round 2 — physical model identity provenance.
+    # model_id above is the APPROVED physical model that was dispatched (from
+    # the DeploymentResolver), never a provider-supplied relabel.
+    generation: str | None = None  # bound to model_id in APPROVED_DEPLOYMENTS
+    provider_reported_model_id: str | None = None  # what the provider said
+    # True when the provider reported a model identity and it matched model_id;
+    # False when the provider reported none.  A mismatch never produces a
+    # ModelResponse (ModelIdentityMismatch is raised instead).
+    identity_verified: bool = False

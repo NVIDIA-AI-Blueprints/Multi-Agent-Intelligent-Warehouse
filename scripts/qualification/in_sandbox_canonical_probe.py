@@ -65,6 +65,9 @@ def main() -> None:
         "generation": route.get("generation"),
         "approved_family": route.get("approved_family"),
         "selected_role": route.get("selected_role"),
+        "selected_model_id": route.get("selected_model_id"),
+        "provider_reported_model_id": route.get("provider_reported_model_id"),
+        "identity_verified": route.get("identity_verified"),
         "trace_id": body.get("trace_id") if isinstance(body, dict) else None,
         "content_nonempty": bool(isinstance(body, dict) and body.get("content")),
     }

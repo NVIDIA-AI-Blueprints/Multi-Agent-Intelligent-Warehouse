@@ -47,6 +47,11 @@ class FakeNIM:
     def __init__(self, content: str = "FAKE_NIM_OK") -> None:
         self.content = content
         self.mode = "ok"
+        # v2.0.1 round 2: when set, the fake answers as THIS model instead of
+        # echoing the requested one (provider model substitution).
+        self.return_model: str | None = None
+        # When True the response carries no ``model`` field at all.
+        self.omit_model = False
         self.requests: list[dict[str, Any]] = []
         outer = self
 
@@ -88,27 +93,27 @@ class FakeNIM:
                     self._send(500, {"error": "provider down"})
                     return
                 content = "" if outer.mode == "empty" else outer.content
-                self._send(
-                    200,
-                    {
-                        "id": "fake-1",
-                        "object": "chat.completion",
-                        "created": int(time.time()),
-                        "model": body.get("model", "unknown"),
-                        "choices": [
-                            {
-                                "index": 0,
-                                "message": {"role": "assistant", "content": content},
-                                "finish_reason": "stop",
-                            }
-                        ],
-                        "usage": {
-                            "prompt_tokens": 1,
-                            "completion_tokens": 1,
-                            "total_tokens": 2,
-                        },
+                payload = {
+                    "id": "fake-1",
+                    "object": "chat.completion",
+                    "created": int(time.time()),
+                    "model": outer.return_model or body.get("model", "unknown"),
+                    "choices": [
+                        {
+                            "index": 0,
+                            "message": {"role": "assistant", "content": content},
+                            "finish_reason": "stop",
+                        }
+                    ],
+                    "usage": {
+                        "prompt_tokens": 1,
+                        "completion_tokens": 1,
+                        "total_tokens": 2,
                     },
-                )
+                }
+                if outer.omit_model:
+                    payload.pop("model", None)
+                self._send(200, payload)
 
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
         self.port = self._server.server_address[1]

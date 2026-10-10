@@ -135,7 +135,7 @@ class TestModelGatewayDeadlineGuard:
 
         env = {
             "NEMOTRON_SUPER_ENABLED": "true",
-            "NEMOTRON_SUPER_MODEL": "test/super-model",
+            "NEMOTRON_SUPER_MODEL": "nvidia/nemotron-3-super-120b-a12b",
         }
         with _patch.dict(os.environ, env):
             registry = ModelRegistry()
@@ -145,7 +145,7 @@ class TestModelGatewayDeadlineGuard:
             return_value=MagicMock(
                 content="ok",
                 usage={},
-                model="test/super-model",
+                model="nvidia/nemotron-3-super-120b-a12b",
                 finish_reason="stop",
             )
         )
