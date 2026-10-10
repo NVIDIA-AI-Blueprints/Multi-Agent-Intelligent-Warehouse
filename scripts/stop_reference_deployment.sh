@@ -4,143 +4,131 @@
 #
 # stop_reference_deployment.sh — stop the MAIW v2 reference deployment
 #
-# Stop order (Step 7 reverse):
-#   1. Stop sandbox/OpenShell runtime (if running)
-#   2. Stop MAIW API
-#   3. Preserve durable procedure/governance state (do NOT delete by default)
-#   4. Report what remained running
+# v2.0.1 round 2 (P2-01 / NEW-P1-02): this script terminates ONLY the PID
+# recorded in this deployment's own instance-state file, and only after
+# verifying from /proc that the PID is that MAIW instance (uvicorn
+# maiw_api.app:app on the recorded port, started from this checkout, with the
+# recorded MAIW_INSTANCE_ID).  There is NO kill-by-port and NO kill-by-name
+# fallback: with no or stale state it reports "NOT RUNNING / CANNOT VERIFY" and
+# signals nothing.  OpenShell sandboxes are never touched (manage them with
+# `openshell sandbox ...` / scripts/setup/reference_sandbox.sh).
+#
+# Durable procedure/governance state is preserved unless --delete-state.
 #
 # Usage:
 #   bash scripts/stop_reference_deployment.sh [--delete-state]
 #
-# Options:
-#   --delete-state  Remove durable state after stop (destructive — do not use
-#                   in production; use only for clean-slate test cycles)
-#
-# Step 10 of Phase 20C-C.
+# Exit codes: 0 stopped (or already stopped with no state);
+#             3 NOT RUNNING / CANNOT VERIFY (state present but not verifiable).
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
+# shellcheck source=lib/load_env.sh
+source "$SCRIPT_DIR/lib/load_env.sh"
+# shellcheck source=lib/deployment_identity.sh
+source "$SCRIPT_DIR/lib/deployment_identity.sh"
+
 DELETE_STATE="${1:-}"
 
-MAIW_PERSISTENCE_ROOT="${MAIW_PERSISTENCE_ROOT:-/var/lib/maiw}"
-PIDFILE="${MAIW_PERSISTENCE_ROOT}/runtime/maiw-api.pid"
-
 echo "=== MAIW v2 Reference Deployment — Stop ==="
+maiw_load_env "$PROJECT_ROOT"
+maiw_require_vars MAIW_PERSISTENCE_ROOT
+EXIT_CODE=0
 
-ANYTHING_REMAINED=0
-
-# ── Step 1: Sandbox/OpenShell runtime (report only) ──────────────────────────
-# v2.0.1: this script no longer signals processes matched by a name pattern
-# (`pgrep -f "openshell.*maiw"`), which could hit unrelated sandboxes, CLI
-# sessions or gateways on a shared host. OpenShell sandboxes are owned by the
-# OpenShell control plane: stop or delete one explicitly with
-#   openshell sandbox delete <name>
-# Stopping the MAIW API never requires killing a sandbox — a sandboxed agent
-# simply cannot reach the inference endpoint while the API is down.
+# ── Sandbox (report only) ─────────────────────────────────────────────────────
 echo ""
 echo "--- Sandbox runtime ---"
 if command -v openshell &>/dev/null && [[ -n "${MAIW_SANDBOX_NAME:-}" ]]; then
-    PHASE=$(openshell sandbox list -o json 2>/dev/null | python3 -c "
+    PHASE=$(openshell sandbox list -o json 2>/dev/null | "${MAIW_PYTHON:-python3}" -c "
 import sys, json
+name = sys.argv[1]
 for s in json.load(sys.stdin):
-    if s.get('name') == '${MAIW_SANDBOX_NAME}':
+    if s.get('name') == name:
         print(s.get('phase', '')); break
-" 2>/dev/null || echo "")
+" "$MAIW_SANDBOX_NAME" 2>/dev/null || echo "")
     echo "  Sandbox '${MAIW_SANDBOX_NAME}': ${PHASE:-not found} (left running; manage with openshell)"
 else
-    echo "  No sandbox action (set MAIW_SANDBOX_NAME to report its phase)"
+    echo "  No sandbox action (MAIW_SANDBOX_NAME not set)"
 fi
 
-# ── Step 2: Stop MAIW API ────────────────────────────────────────────────────
+# ── MAIW API — verified PID only ──────────────────────────────────────────────
 echo ""
 echo "--- MAIW API ---"
-if [[ -f "$PIDFILE" ]]; then
-    MAIW_PID=$(cat "$PIDFILE")
-    if kill -0 "$MAIW_PID" 2>/dev/null; then
-        echo "  Sending SIGTERM to MAIW API (PID $MAIW_PID)..."
-        kill -TERM "$MAIW_PID" 2>/dev/null || true
+set +e
+maiw_verify_instance --no-live
+VRC=$?
+set -e
+case "$VRC" in
+    0)
+        echo "  Verified MAIW instance: PID $MAIW_TARGET_PID, port $MAIW_TARGET_PORT"
+        echo "  Sending SIGTERM to PID $MAIW_TARGET_PID..."
+        kill -TERM "$MAIW_TARGET_PID" 2>/dev/null || true
         WAIT=0
-        while kill -0 "$MAIW_PID" 2>/dev/null && [[ "$WAIT" -lt 30 ]]; do
+        while kill -0 "$MAIW_TARGET_PID" 2>/dev/null && [[ "$WAIT" -lt 30 ]]; do
             sleep 1
             WAIT=$((WAIT + 1))
         done
-        if kill -0 "$MAIW_PID" 2>/dev/null; then
-            echo "  MAIW API did not exit after ${WAIT}s; sending SIGKILL"
-            kill -KILL "$MAIW_PID" 2>/dev/null || true
+        if kill -0 "$MAIW_TARGET_PID" 2>/dev/null; then
+            # Re-verify identity before escalating: never SIGKILL a reused PID.
+            if maiw_pid_is_instance "$MAIW_TARGET_PID" "$MAIW_TARGET_PORT" "$MAIW_I_ROOT" "$MAIW_TARGET_INSTANCE_ID"; then
+                echo "  MAIW API did not exit after ${WAIT}s; sending SIGKILL to PID $MAIW_TARGET_PID"
+                kill -KILL "$MAIW_TARGET_PID" 2>/dev/null || true
+            fi
         fi
-        echo "  MAIW API stopped (PID $MAIW_PID)"
-        rm -f "$PIDFILE"
-    else
-        echo "  PID $MAIW_PID is not running (stale pidfile)"
-        rm -f "$PIDFILE"
-    fi
-else
-    # Try to find by port
-    MAIW_API_PORT="${MAIW_API_PORT:-8001}"
-    API_PID=$(lsof -ti :"$MAIW_API_PORT" 2>/dev/null || true)
-    if [[ -n "$API_PID" ]]; then
-        echo "  Found MAIW API on port $MAIW_API_PORT (PID $API_PID); stopping..."
-        kill -TERM "$API_PID" 2>/dev/null || true
-        sleep 3
-        if kill -0 "$API_PID" 2>/dev/null; then
-            kill -KILL "$API_PID" 2>/dev/null || true
-        fi
-        echo "  MAIW API stopped"
-    else
-        echo "  MAIW API not found running on port $MAIW_API_PORT"
-        ANYTHING_REMAINED=$((ANYTHING_REMAINED + 1))
-    fi
-fi
+        maiw_clear_instance
+        echo "  MAIW API stopped (PID $MAIW_TARGET_PID)"
+        ;;
+    10)
+        echo "  MAIW API: NOT RUNNING / CANNOT VERIFY — ${MAIW_VERIFY_REASON}"
+        echo "  Nothing was signalled (no kill-by-port fallback)."
+        ;;
+    11)
+        echo "  MAIW API: NOT RUNNING / CANNOT VERIFY — ${MAIW_VERIFY_REASON}"
+        echo "  Removing stale deployment state; nothing was signalled."
+        maiw_clear_instance
+        ;;
+    *)
+        echo "  MAIW API: NOT RUNNING / CANNOT VERIFY — ${MAIW_VERIFY_REASON}" >&2
+        echo "  Nothing was signalled. Investigate manually; state left in place: $(maiw_instance_file)" >&2
+        EXIT_CODE=3
+        ;;
+esac
 
-# ── Step 3: Durable state report ──────────────────────────────────────────────
+# ── Durable state report ──────────────────────────────────────────────────────
 echo ""
 echo "--- Durable state ---"
-PROC_DIR="${MAIW_PERSISTENCE_ROOT}/procedures"
-GOV_DIR="${MAIW_PERSISTENCE_ROOT}/governance"
-
+PROC_DIR="${MAIW_PROCEDURE_STATE_DIR:-${MAIW_PERSISTENCE_ROOT}/procedures}"
+GOV_DIR="${MAIW_GOVERNANCE_STATE_DIR:-${MAIW_PERSISTENCE_ROOT}/governance}"
 if [[ -d "$PROC_DIR" ]]; then
     PROC_COUNT=$(find "$PROC_DIR" -name "*.json" 2>/dev/null | wc -l)
     echo "  Procedure state files preserved: $PROC_COUNT (in $PROC_DIR)"
 else
     echo "  No procedure state directory found"
 fi
-
-if [[ -d "$GOV_DIR" ]]; then
-    GOV_FILE="${GOV_DIR}/governance_inbox.jsonl"
-    if [[ -f "$GOV_FILE" ]]; then
-        GOV_ENTRIES=$(wc -l < "$GOV_FILE" 2>/dev/null || echo 0)
-        echo "  Governance inbox entries preserved: $GOV_ENTRIES (in $GOV_FILE)"
-    else
-        echo "  No governance inbox file found"
-    fi
+GOV_FILE="${GOV_DIR}/governance_inbox.jsonl"
+if [[ -f "$GOV_FILE" ]]; then
+    GOV_ENTRIES=$(grep -vc '"event": "applied"' "$GOV_FILE" 2>/dev/null || true)
+    echo "  Governance inbox accepted outcomes preserved: ${GOV_ENTRIES:-0} (in $GOV_FILE)"
 else
-    echo "  No governance state directory found"
+    echo "  No governance inbox file found"
 fi
 
-# Optionally delete state (destructive — operator must opt in explicitly)
 if [[ "$DELETE_STATE" == "--delete-state" ]]; then
     echo ""
     echo "  WARNING: --delete-state requested — removing all durable state!"
-    echo "  This is irreversible. MAIW will start fresh on next boot."
     read -r -p "  Confirm deletion (type DELETE): " CONFIRM
     if [[ "$CONFIRM" == "DELETE" ]]; then
-        rm -rf "${MAIW_PERSISTENCE_ROOT}/procedures/"
-        rm -rf "${MAIW_PERSISTENCE_ROOT}/governance/"
+        rm -rf "$PROC_DIR" "$GOV_DIR"
         echo "  Durable state deleted."
     else
         echo "  Deletion cancelled."
     fi
 fi
 
-# ── Step 4: Summary ───────────────────────────────────────────────────────────
 echo ""
-echo "=== MAIW v2 Reference Deployment — STOPPED ==="
-echo ""
-if [[ "$ANYTHING_REMAINED" -gt 0 ]]; then
-    echo "  NOTE: Some components were not found running — they may have already been stopped."
-fi
+echo "=== MAIW v2 Reference Deployment — STOP COMPLETE ==="
 echo "  Durable state has been preserved (unless --delete-state was used)."
-echo "  To restart: bash scripts/start_reference_deployment.sh"
-echo ""
+echo "  To start again: bash scripts/start_reference_deployment.sh"
+exit "$EXIT_CODE"
