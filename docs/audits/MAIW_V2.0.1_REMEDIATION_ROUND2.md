@@ -15,7 +15,7 @@ companion: `artifacts/audit/v2.0.1_remediation_round2.json`.
 | Repository | NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse |
 | PR / branch | #143 / `fix/v2.0.1-canonical-app-remediation` |
 | Starting head (audited by PR #144) | `785c420604c3b6a16d6e7531fcab2c73da43f67a` |
-| Last code commit | `9c27c12f63aedbc1059337735ff55e574b11a195` |
+| Last code commit | `722bea3aa9243ea0b520af242754e2dd7601f6db` (style fix; live runs used `9c27c12`, the previous code commit) |
 | Final frozen head | the commit that adds this file (recorded in the PR and in the final report; the JSON lists every code commit) |
 | `main` at start | `944507ec914665c6682d39b95e8713355f486598` |
 | `v2.0.0` | `816ace73c4561469978094eeedb2641f6db3c4fa` (unchanged; no `v2.0.1` tag) |
@@ -399,9 +399,9 @@ not started anywhere.
 
 ## 11. Python Tests (§54)
 
-Full CORE CI command (verbatim `ci-cd.yml` selection), last code commit
-`9c27c12`, two fresh runs: see the JSON (`python_tests.full_runs`) —
-**2805 passed, 8 skipped, 0 failed** each. New round-2 tests: 87
+Full CORE CI command (verbatim `ci-cd.yml` selection), two fresh runs on the
+last code commit `722bea3`: **2805 passed, 8 skipped, 0 failed** each (also
+2805/8/0 twice on `9c27c12`). New round-2 tests: 87
 (`test_round2_model_identity` 17, `test_round2_deployment_resolver` 21,
 `test_round2_readiness` 20, `test_round2_governance_recovery` 6,
 `test_round2_deployment_scripts` 23). `black --check tests`: clean.
@@ -494,4 +494,7 @@ re-audit; no production-reachable high. `npm audit fix --force` not used.
 
 Ready for a third independent re-audit once CI is green on the frozen head
 and there are no unresolved review threads (recorded in the final report).
+Two github-code-quality threads raised on round-2 code (double import in
+`scripts/lib/check_model_config.py`, empty `except` in a test cleanup) were
+fixed in the last code commit and resolved.
 Not merged, not tagged.

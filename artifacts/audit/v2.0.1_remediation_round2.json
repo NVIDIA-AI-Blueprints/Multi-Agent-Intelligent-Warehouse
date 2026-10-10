@@ -45,10 +45,14 @@
   {
    "sha": "9c27c12f63aedbc1059337735ff55e574b11a195",
    "subject": "fix(deploy): restart preflight accepts the port held by this deployment's verified instance"
+  },
+  {
+   "sha": "722bea3aa9243ea0b520af242754e2dd7601f6db",
+   "subject": "style: resolve PR #143 round-2 code-quality comments"
   }
  ],
- "last_code_commit": "9c27c12f63aedbc1059337735ff55e574b11a195",
- "final_head_note": "The final frozen head is the docs/artifacts commit that adds this file on top of last_code_commit; it changes no code.",
+ "last_code_commit": "722bea3aa9243ea0b520af242754e2dd7601f6db",
+ "final_head_note": "The final frozen head is the docs/artifacts commit that updates this file on top of last_code_commit; it changes no code. The live runs used 9c27c12 (the only later code commit, 722bea3, is a style fix to scripts/lib/check_model_config.py imports and a test cleanup).",
  "date": "2026-10-10",
  "host": "epg-tme-smc-h100-02",
  "new_p1_closure": {
@@ -363,14 +367,18 @@
  },
  "python_tests": {
   "command": ".github/workflows/ci-cd.yml CORE CI (verbatim selection + ignores)",
-  "commit": "9c27c12f63aedbc1059337735ff55e574b11a195",
+  "commit": "722bea3aa9243ea0b520af242754e2dd7601f6db",
   "full_runs": [
-   "2805 passed, 8 skipped, 0 failed (215.4s)",
-   "2805 passed, 8 skipped, 0 failed (213.8s)"
+   "2805 passed, 8 skipped, 0 failed (215.9s)",
+   "2805 passed, 8 skipped, 0 failed (217.0s)"
   ],
   "new_round2_tests": 87,
   "black_check_tests": "clean",
-  "env_note": "MAIW_PHASE20B_NIM_URL set to a closed port so opt-in real-NIM tests skip (as in GitHub CI)"
+  "env_note": "MAIW_PHASE20B_NIM_URL set to a closed port so opt-in real-NIM tests skip (as in GitHub CI)",
+  "earlier_full_runs_at_9c27c12": [
+   "2805/8/0 (215.4s)",
+   "2805/8/0 (213.8s)"
+  ]
  },
  "ui": {
   "jest": "964/964 (39 suites)",
@@ -442,5 +450,16 @@
   ]
  },
  "merge": false,
- "tag": false
+ "tag": false,
+ "docs_commits_before_final": [
+  {
+   "sha": "c1e55ce99078aa1f65fef1f426dda4f8eb13f20a",
+   "subject": "docs(audit): v2.0.1 remediation round 2 evidence, artifact and release-notes draft"
+  }
+ ],
+ "review_threads": {
+  "round2_new": 2,
+  "fixed_in": "722bea3aa9243ea0b520af242754e2dd7601f6db",
+  "note": "github-code-quality: double import in check_model_config.py; empty except in test cleanup"
+ }
 }
