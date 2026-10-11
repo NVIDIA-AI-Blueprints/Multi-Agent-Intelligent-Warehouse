@@ -42,8 +42,11 @@ contract tests that validate the adapter's asset-existence check before proposal
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 from datetime import datetime
+from typing import Any
 
 from maiw_decision.proposal import ActionProposal
 from maiw_contracts.equipment import (
@@ -63,7 +66,7 @@ from maiw_contracts.equipment import (
     EquipmentTelemetryResult,
     TelemetryPoint,
 )
-from maiw_mcp.errors import BackendUnavailable
+from maiw_mcp.errors import BackendUnavailable, WriteNotApplied
 
 logger = logging.getLogger(__name__)
 
@@ -80,12 +83,49 @@ class MAIWEquipmentAdapter:
 
     def __init__(self, tools: object) -> None:
         self._tools = tools
+        self._init_lock: asyncio.Lock | None = None
+
+    async def _ready(self) -> object:
+        """
+        v2.0.1 round 4 (fourth re-audit NEW4-P2-03): the shipped server built
+        this adapter around an ``EquipmentAssetTools`` whose ``initialize()``
+        was never called, so every call failed on ``sql_retriever = None``.
+        Initialise once, lazily, inside the serving event loop (the asyncpg
+        pool is bound to the loop that creates it).  Tools objects that need
+        no initialisation (no ``sql_retriever`` attribute) are used as-is.
+        """
+        tools = self._tools
+        if getattr(tools, "sql_retriever", object()) is not None:
+            return tools
+        if self._init_lock is None:
+            self._init_lock = asyncio.Lock()
+        async with self._init_lock:
+            if getattr(tools, "sql_retriever", None) is None:
+                await tools.initialize()  # type: ignore[attr-defined]
+                logger.info("MAIWEquipmentAdapter: EquipmentAssetTools initialised")
+        return tools
+
+    @staticmethod
+    def _write_failure(result: dict, default: str) -> BackendUnavailable:
+        """
+        Map a ``success: False`` tool result to the exception the MCP server
+        reports.  Only a precondition rejection taken before any write
+        statement (``mutation_status: not_applied``) is certified NOT_APPLIED;
+        anything else may hide an applied mutation → generic error (UNKNOWN).
+        """
+        message = result.get("error") or default
+        if result.get("mutation_status") == "not_applied":
+            return WriteNotApplied(
+                message,
+                rejection_code=str(result.get("rejection_code") or "PRECONDITION_FAILED"),
+            )
+        return BackendUnavailable(message)
 
     async def get_equipment_status(
         self, request: EquipmentStatusRequest
     ) -> EquipmentStatusResult:
         try:
-            raw = await self._tools.get_equipment_status(
+            raw = await (await self._ready()).get_equipment_status(
                 asset_id=request.asset_id,
                 equipment_type=request.equipment_type,
                 zone=request.zone,
@@ -108,7 +148,7 @@ class MAIWEquipmentAdapter:
                 owner_user=row.get("owner_user"),
                 next_pm_due=_parse_dt(row.get("next_pm_due")),
                 last_maintenance=_parse_dt(row.get("last_maintenance")),
-                metadata=row.get("metadata") or {},
+                metadata=_as_metadata(row.get("metadata")),
             )
             for row in raw.get("equipment", [])
         ]
@@ -124,7 +164,7 @@ class MAIWEquipmentAdapter:
         self, request: EquipmentTelemetryRequest
     ) -> EquipmentTelemetryResult:
         try:
-            raw = await self._tools.get_equipment_telemetry(
+            raw = await (await self._ready()).get_equipment_telemetry(
                 asset_id=request.asset_id,
                 metric=request.metric,
                 hours_back=request.hours_back,
@@ -176,7 +216,7 @@ class MAIWEquipmentAdapter:
         # Validate that the asset exists before building the proposal.
         # We call get_equipment_status with the specific asset_id only.
         try:
-            raw = await self._tools.get_equipment_status(
+            raw = await (await self._ready()).get_equipment_status(
                 asset_id=request.asset_id,
                 equipment_type=None,
                 zone=None,
@@ -216,7 +256,7 @@ class MAIWEquipmentAdapter:
         self, request: EquipmentExecuteAssignRequest
     ) -> EquipmentExecuteAssignResult:
         try:
-            result = await self._tools.assign_equipment(
+            result = await (await self._ready()).assign_equipment(
                 asset_id=request.asset_id,
                 assignee=request.assignee,
                 assignment_type=request.assignment_type,
@@ -230,7 +270,7 @@ class MAIWEquipmentAdapter:
             ) from exc
 
         if not result.get("success"):
-            raise BackendUnavailable(result.get("error", "Assignment failed"))
+            raise self._write_failure(result, "Assignment failed")
 
         logger.info(
             "MAIWEquipmentAdapter: assignment executed asset=%s assignee=%s assignment_id=%s proposal_id=%s",
@@ -249,7 +289,7 @@ class MAIWEquipmentAdapter:
         self, request: EquipmentExecuteReleaseRequest
     ) -> EquipmentExecuteReleaseResult:
         try:
-            result = await self._tools.release_equipment(
+            result = await (await self._ready()).release_equipment(
                 asset_id=request.asset_id,
                 released_by=request.released_by,
                 notes=request.notes,
@@ -260,7 +300,7 @@ class MAIWEquipmentAdapter:
             ) from exc
 
         if not result.get("success"):
-            raise BackendUnavailable(result.get("error", "Release failed"))
+            raise self._write_failure(result, "Release failed")
 
         logger.info(
             "MAIWEquipmentAdapter: release executed asset=%s proposal_id=%s",
@@ -280,7 +320,7 @@ class MAIWEquipmentAdapter:
         from datetime import datetime as _dt
         try:
             scheduled_for_dt = _dt.fromisoformat(request.scheduled_for.replace("Z", "+00:00"))
-            result = await self._tools.schedule_maintenance(
+            result = await (await self._ready()).schedule_maintenance(
                 asset_id=request.asset_id,
                 maintenance_type=request.maintenance_type,
                 description=request.description,
@@ -295,7 +335,7 @@ class MAIWEquipmentAdapter:
             ) from exc
 
         if not result.get("success"):
-            raise BackendUnavailable(result.get("error", "Maintenance scheduling failed"))
+            raise self._write_failure(result, "Maintenance scheduling failed")
 
         logger.info(
             "MAIWEquipmentAdapter: maintenance scheduled asset=%s proposal_id=%s",
@@ -309,6 +349,25 @@ class MAIWEquipmentAdapter:
             source="maiw-backend",
             message=result.get("message"),
         )
+
+
+def _as_metadata(value: Any) -> dict[str, Any]:
+    """
+    v2.0.1 round 4 (NEW4-P2-03): asyncpg returns a JSONB column as a JSON
+    *string* (no type codec registered), so ``metadata`` reached the contract
+    as ``'{}'`` and ``get_status`` failed contract validation.  Decode it to
+    the dict the canonical contract requires; anything that is not a JSON
+    object becomes ``{}``.
+    """
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, (str, bytes, bytearray)):
+        try:
+            decoded = json.loads(value)
+        except (TypeError, ValueError):
+            return {}
+        return decoded if isinstance(decoded, dict) else {}
+    return {}
 
 
 def _parse_dt(value: object) -> datetime | None:

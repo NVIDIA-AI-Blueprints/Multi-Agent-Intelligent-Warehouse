@@ -39,6 +39,22 @@ from src.api.services.scanning.integration_service import get_scanning_service
 logger = logging.getLogger(__name__)
 
 
+def _not_applied(message: str, rejection_code: str, **extra: Any) -> Dict[str, Any]:
+    """
+    Result of a write rejected by a precondition check BEFORE any write
+    statement ran (v2.0.1 round 4).  ``mutation_status: not_applied`` is the
+    only failure the MCP adapter may certify as NOT_APPLIED; any other
+    ``success: False`` result may hide an applied mutation.
+    """
+    return {
+        "success": False,
+        "error": message,
+        "mutation_status": "not_applied",
+        "rejection_code": rejection_code,
+        **extra,
+    }
+
+
 @dataclass
 class EquipmentAsset:
     """Equipment asset information."""
@@ -304,52 +320,63 @@ class EquipmentAssetTools:
             f"Assigning equipment {asset_id} to {assignee} for {assignment_type}"
         )
 
+        # v2.0.1 round 4: one logical assignment = INSERT assignment + UPDATE
+        # asset, executed in ONE transaction (all-or-nothing).  The asset row is
+        # locked (FOR UPDATE) so the precondition check and the writes see the
+        # same state.  A precondition rejection happens before any write
+        # statement and is reported as ``mutation_status: not_applied``; every
+        # other failure is reported WITHOUT that marker (the caller must treat
+        # it as possibly applied).
         try:
-            # Check if equipment is available
-            status_query = (
-                "SELECT status, owner_user FROM equipment_assets WHERE asset_id = $1"
-            )
-            status_result = await self.sql_retriever.fetch_all(status_query, asset_id)
+            async with self.sql_retriever.transaction() as conn:
+                status_result = await conn.fetchrow(
+                    "SELECT status, owner_user FROM equipment_assets "
+                    "WHERE asset_id = $1 FOR UPDATE",
+                    asset_id,
+                )
 
-            if not status_result:
-                return {
-                    "success": False,
-                    "error": f"Equipment {asset_id} not found",
-                    "assignment_id": None,
-                }
+                if not status_result:
+                    return _not_applied(
+                        f"Equipment {asset_id} not found",
+                        "NOT_FOUND",
+                        assignment_id=None,
+                    )
 
-            current_status = status_result[0]["status"]
-            current_owner = status_result[0]["owner_user"]
+                current_status = status_result["status"]
 
-            if current_status != "available":
-                return {
-                    "success": False,
-                    "error": f"Equipment {asset_id} is not available (current status: {current_status})",
-                    "assignment_id": None,
-                }
+                if current_status != "available":
+                    return _not_applied(
+                        f"Equipment {asset_id} is not available (current status: {current_status})",
+                        "PRECONDITION_FAILED",
+                        assignment_id=None,
+                    )
 
-            # Create assignment
-            assignment_query = """
-                INSERT INTO equipment_assignments 
-                (asset_id, task_id, assignee, assignment_type, notes)
-                VALUES ($1, $2, $3, $4, $5)
-                RETURNING id
-            """
+                # Create assignment
+                assignment_row = await conn.fetchrow(
+                    """
+                    INSERT INTO equipment_assignments
+                    (asset_id, task_id, assignee, assignment_type, notes)
+                    VALUES ($1, $2, $3, $4, $5)
+                    RETURNING id
+                    """,
+                    asset_id,
+                    task_id,
+                    assignee,
+                    assignment_type,
+                    notes,
+                )
+                assignment_id = assignment_row["id"] if assignment_row else None
 
-            assignment_result = await self.sql_retriever.fetch_all(
-                assignment_query, asset_id, task_id, assignee, assignment_type, notes
-            )
-
-            assignment_id = assignment_result[0]["id"] if assignment_result else None
-
-            # Update equipment status
-            update_query = """
-                UPDATE equipment_assets 
-                SET status = 'assigned', owner_user = $1, updated_at = now()
-                WHERE asset_id = $2
-            """
-
-            await self.sql_retriever.execute_command(update_query, assignee, asset_id)
+                # Update equipment status
+                await conn.execute(
+                    """
+                    UPDATE equipment_assets
+                    SET status = 'assigned', owner_user = $1, updated_at = now()
+                    WHERE asset_id = $2
+                    """,
+                    assignee,
+                    asset_id,
+                )
 
             return {
                 "success": True,
@@ -385,55 +412,68 @@ class EquipmentAssetTools:
         """
         logger.info(f"Releasing equipment {asset_id} by {released_by}")
 
+        # v2.0.1 round 4: one logical release = UPDATE assignment + UPDATE
+        # asset in ONE transaction (all-or-nothing); see assign_equipment.
         try:
-            # Get current assignment
-            assignment_query = """
-                SELECT id, assignee, assignment_type 
-                FROM equipment_assignments 
-                WHERE asset_id = $1 AND released_at IS NULL
-                ORDER BY assigned_at DESC
-                LIMIT 1
-            """
-
-            assignment_result = await self.sql_retriever.fetch_all(
-                assignment_query, asset_id
-            )
-
-            if not assignment_result:
-                return {
-                    "success": False,
-                    "error": f"No active assignment found for equipment {asset_id}",
-                    "assignment_id": None,
-                }
-
-            assignment = assignment_result[0]
-            assignment_id = assignment["id"]
-            assignee = assignment["assignee"]
-            assignment_type = assignment["assignment_type"]
-
-            # Update assignment with release info
-            release_query = """
-                UPDATE equipment_assignments 
-                SET released_at = now(), notes = COALESCE(notes || ' | ', '') || $1
-                WHERE id = $2
-            """
-
             release_notes = f"Released by {released_by}"
             if notes:
                 release_notes += f": {notes}"
 
-            await self.sql_retriever.execute_command(
-                release_query, release_notes, assignment_id
-            )
+            async with self.sql_retriever.transaction() as conn:
+                asset_row = await conn.fetchrow(
+                    "SELECT status FROM equipment_assets WHERE asset_id = $1 FOR UPDATE",
+                    asset_id,
+                )
+                if not asset_row:
+                    return _not_applied(
+                        f"Equipment {asset_id} not found",
+                        "NOT_FOUND",
+                        assignment_id=None,
+                    )
 
-            # Update equipment status
-            update_query = """
-                UPDATE equipment_assets 
-                SET status = 'available', owner_user = NULL, updated_at = now()
-                WHERE asset_id = $1
-            """
+                # Get current assignment
+                assignment = await conn.fetchrow(
+                    """
+                    SELECT id, assignee, assignment_type
+                    FROM equipment_assignments
+                    WHERE asset_id = $1 AND released_at IS NULL
+                    ORDER BY assigned_at DESC
+                    LIMIT 1
+                    FOR UPDATE
+                    """,
+                    asset_id,
+                )
 
-            await self.sql_retriever.execute_command(update_query, asset_id)
+                if not assignment:
+                    return _not_applied(
+                        f"No active assignment found for equipment {asset_id}",
+                        "PRECONDITION_FAILED",
+                        assignment_id=None,
+                    )
+
+                assignment_id = assignment["id"]
+                assignee = assignment["assignee"]
+
+                # Update assignment with release info
+                await conn.execute(
+                    """
+                    UPDATE equipment_assignments
+                    SET released_at = now(), notes = COALESCE(notes || ' | ', '') || $1
+                    WHERE id = $2
+                    """,
+                    release_notes,
+                    assignment_id,
+                )
+
+                # Update equipment status
+                await conn.execute(
+                    """
+                    UPDATE equipment_assets
+                    SET status = 'available', owner_user = NULL, updated_at = now()
+                    WHERE asset_id = $1
+                    """,
+                    asset_id,
+                )
 
             return {
                 "success": True,
@@ -568,54 +608,57 @@ class EquipmentAssetTools:
             f"Scheduling {maintenance_type} maintenance for equipment {asset_id}"
         )
 
+        # v2.0.1 round 4: INSERT maintenance (+ UPDATE asset for emergency) in
+        # ONE transaction (all-or-nothing); see assign_equipment.
         try:
-            # Check if equipment exists
-            equipment_query = (
-                "SELECT asset_id, type, model FROM equipment_assets WHERE asset_id = $1"
-            )
-            equipment_result = await self.sql_retriever.fetch_all(
-                equipment_query, asset_id
-            )
-
-            if not equipment_result:
-                return {
-                    "success": False,
-                    "error": f"Equipment {asset_id} not found",
-                    "maintenance_id": None,
-                }
-
-            # Create maintenance record
-            maintenance_query = """
-                INSERT INTO equipment_maintenance 
-                (asset_id, maintenance_type, description, performed_by, performed_at, 
-                 duration_minutes, notes)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
-                RETURNING id
-            """
-
             notes = f"Scheduled by {scheduled_by}, Priority: {priority}, Duration: {estimated_duration_minutes} minutes"
 
-            maintenance_result = await self.sql_retriever.fetch_one(
-                maintenance_query,
-                asset_id,
-                maintenance_type,
-                description,
-                scheduled_by,
-                scheduled_for,
-                estimated_duration_minutes,
-                notes,
-            )
+            async with self.sql_retriever.transaction() as conn:
+                equipment_result = await conn.fetchrow(
+                    "SELECT asset_id, type, model FROM equipment_assets "
+                    "WHERE asset_id = $1 FOR UPDATE",
+                    asset_id,
+                )
 
-            maintenance_id = maintenance_result["id"] if maintenance_result else None
+                if not equipment_result:
+                    return _not_applied(
+                        f"Equipment {asset_id} not found",
+                        "NOT_FOUND",
+                        maintenance_id=None,
+                    )
 
-            # Update equipment status if it's emergency maintenance
-            if maintenance_type == "emergency":
-                update_query = """
-                    UPDATE equipment_assets 
-                    SET status = 'maintenance', updated_at = now()
-                    WHERE asset_id = $1
-                """
-                await self.sql_retriever.execute_command(update_query, asset_id)
+                # Create maintenance record
+                maintenance_result = await conn.fetchrow(
+                    """
+                    INSERT INTO equipment_maintenance
+                    (asset_id, maintenance_type, description, performed_by, performed_at,
+                     duration_minutes, notes)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    RETURNING id
+                    """,
+                    asset_id,
+                    maintenance_type,
+                    description,
+                    scheduled_by,
+                    scheduled_for,
+                    estimated_duration_minutes,
+                    notes,
+                )
+
+                maintenance_id = (
+                    maintenance_result["id"] if maintenance_result else None
+                )
+
+                # Update equipment status if it's emergency maintenance
+                if maintenance_type == "emergency":
+                    await conn.execute(
+                        """
+                        UPDATE equipment_assets
+                        SET status = 'maintenance', updated_at = now()
+                        WHERE asset_id = $1
+                        """,
+                        asset_id,
+                    )
 
             return {
                 "success": True,
