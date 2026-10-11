@@ -24,7 +24,9 @@ The gateway owns:
   - physical deployment resolution (via DeploymentResolver, v2.0.1 round 2):
     the provider receives ONLY ``ResolvedDeployment.model_id``, an approved
     physical model for the selected role; the provider-reported model must
-    match it or the response is discarded (ModelIdentityMismatch)
+    match it or the response is discarded (ModelIdentityMismatch); a
+    response with no usable model identity is discarded too
+    (ModelIdentityUnverifiable, round 3)
   - provider dispatch (via NIMProvider)
   - error normalisation
   - structured telemetry
@@ -147,12 +149,11 @@ class ModelGateway:
             else:
                 llm_response = await _provider_call()
 
-            # 3b. Response identity (v2.0.1 round 2): a provider that reports a
-            # different model than the approved one dispatched fails closed —
-            # the response is discarded, never relabelled.
+            # 3b. Response identity (v2.0.1 round 2 + round 3): a provider that
+            # reports a different model than the approved one dispatched — or
+            # no usable model identity at all — fails closed: the response is
+            # discarded, never relabelled, never returned unverified.
             reported = getattr(llm_response, "provider_model", None)
-            if not isinstance(reported, str):
-                reported = None  # LLMResponse.provider_model is Optional[str]
             identity_verified = self._registry.resolver.verify_response_identity(
                 resolved, reported
             )
@@ -361,9 +362,8 @@ class ModelGateway:
                 capability=capability,
             )
             if resolved is not None:
-                reported = getattr(llm_response, "provider_model", None)
                 self._registry.resolver.verify_response_identity(
-                    resolved, reported if isinstance(reported, str) else None
+                    resolved, getattr(llm_response, "provider_model", None)
                 )
             inference_latency_ms = (time.monotonic() - inference_start) * 1000
             total_latency_ms = routing_latency_ms + inference_latency_ms

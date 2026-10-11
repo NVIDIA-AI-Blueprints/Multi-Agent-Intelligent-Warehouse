@@ -145,14 +145,18 @@ def _make_nim_provider(response_text: str = "mock response") -> NIMProvider:
     from maiw_models.providers.nim_client import LLMResponse
 
     mock_client = MagicMock()
-    mock_client.generate_response = AsyncMock(
-        return_value=LLMResponse(
+
+    async def _generate(**kwargs):
+        # Round 3: a provider answer reports the dispatched model identity.
+        return LLMResponse(
             content=response_text,
             model="mock-model",
             finish_reason="stop",
             usage={"prompt_tokens": 10, "completion_tokens": 20},
+            provider_model=kwargs.get("model_override"),
         )
-    )
+
+    mock_client.generate_response = AsyncMock(side_effect=_generate)
     return NIMProvider(mock_client)
 
 
@@ -516,6 +520,7 @@ class TestFixedContextInvariant:
                 model=model_id,
                 finish_reason="stop",
                 usage={"prompt_tokens": 5, "completion_tokens": 10},
+                provider_model=model_id,
             )
 
         mock_client.generate_response = capture_complete

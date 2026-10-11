@@ -78,6 +78,7 @@ from maiw_models import (
     ModelUnavailable,
     ModelGatewayError,
     ModelIdentityMismatch,
+    ModelIdentityUnverifiable,
     ModelPolicyViolation,
     ReasoningLevel,
     RiskLevel,
@@ -341,7 +342,10 @@ def _verify_internal_token(
         400: {"model": InferenceError, "description": "Malformed request"},
         502: {
             "model": InferenceError,
-            "description": "Provider reported a different model (MODEL_IDENTITY_MISMATCH)",
+            "description": (
+                "Provider reported a different model (MODEL_IDENTITY_MISMATCH) "
+                "or no usable model identity (MODEL_IDENTITY_UNVERIFIABLE)"
+            ),
         },
         401: {"model": InferenceError, "description": "Unauthorized"},
         422: {
@@ -433,6 +437,22 @@ async def sandbox_inference(
             status_code=503,
             content=InferenceError(
                 code="MODEL_POLICY_VIOLATION",
+                message=str(exc),
+                trace_id=body.trace_id,
+            ).model_dump(),
+        )
+    except ModelIdentityUnverifiable as exc:
+        # v2.0.1 round 3: the provider answer carried no usable model
+        # identity — it cannot be verified as the approved model; discarded.
+        logger.error(
+            "inference: provider model identity unverifiable dispatched=%s reason=%s",
+            exc.model_id,
+            exc.reason,
+        )
+        return JSONResponse(
+            status_code=502,
+            content=InferenceError(
+                code="MODEL_IDENTITY_UNVERIFIABLE",
                 message=str(exc),
                 trace_id=body.trace_id,
             ).model_dump(),

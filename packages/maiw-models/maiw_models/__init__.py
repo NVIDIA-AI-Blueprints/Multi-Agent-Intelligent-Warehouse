@@ -27,6 +27,7 @@ from .errors import (
     ModelConfigurationError,
     ModelGatewayError,
     ModelIdentityMismatch,
+    ModelIdentityUnverifiable,
     ModelPolicyViolation,
     ModelResponseError,
     ModelTimeout,
@@ -147,6 +148,7 @@ __all__ = [
     "StructuredOutputError",
     "ModelPolicyViolation",
     "ModelIdentityMismatch",
+    "ModelIdentityUnverifiable",
     # v2.0.1 round 2: physical model identity
     "APPROVED_DEPLOYMENTS",
     "APPROVED_MODEL_GENERATIONS",

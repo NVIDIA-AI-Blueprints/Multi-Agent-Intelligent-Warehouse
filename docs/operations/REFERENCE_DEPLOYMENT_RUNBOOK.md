@@ -433,6 +433,7 @@ Liveness (`/api/v1/live`) never depends on any of these.
 |---|---|
 | Model provider down | `/ready` stays 200; inference returns 503 `PROVIDER_FAILURE`/`MODEL_UNAVAILABLE` |
 | Provider reports a different model | that request: 502 `MODEL_IDENTITY_MISMATCH`, response discarded |
+| Provider reports no / an empty / a non-string model identity | that request: 502 `MODEL_IDENTITY_UNVERIFIABLE`, response discarded (round 3 — a successful answer is always `identity_verified=true`) |
 | Role bound to an unapproved model | `/ready` 503 `model_gateway`; requests routed to that role: 503 `MODEL_POLICY_VIOLATION`, no provider call |
 | Required sandbox not Ready | `/ready` 503 `sandbox_runtime` |
 | Required MCP domain unconfigured / unreachable / circuit-open | `/ready` 503 `mcp_domains` + `governed_write_path` |
@@ -642,6 +643,7 @@ Do not upgrade NemoClaw and OpenShell simultaneously.
 | Inference → 401 (wrong token) | Sandbox using stale token | Sandbox config vs. API config | Restart sandbox with correct token |
 | Inference → 503 `MODEL_POLICY_VIOLATION` | a role is bound to an unapproved physical model | `check_model_config.py`; `/api/v1/ready` → `model_gateway.binding_violations` | unset or fix `NEMOTRON_<ROLE>_MODEL`; restart |
 | Inference → 502 `MODEL_IDENTITY_MISMATCH` | provider served/reported a different model | provider endpoint / NIM deployment | point `MAIW_NIM_BASE_URL` at a deployment serving the approved ID |
+| Inference → 502 `MODEL_IDENTITY_UNVERIFIABLE` | provider response has no usable `model` field | provider / proxy in front of it | use an OpenAI-compatible endpoint that reports the served model ID |
 | Inference → 503 `MODEL_UNAVAILABLE` (medium) | role disabled with no eligible fallback | `check_model_config.py` | enable Super (default) |
 | Sandbox cannot call API | Network policy / wrong endpoint | MAIW_SANDBOX_MODEL_GATEWAY_ENDPOINT | Set correct host IP (not localhost) |
 | Procedure not resuming | State mismatch or inbox duplicate | Check /var/lib/maiw/procedures/*.json | Validate procedure_execution_id + revision |

@@ -161,10 +161,22 @@ def _all_enabled_registry() -> ModelRegistry:
     )
 
 
+def _echo_identity_response(**fields):
+    """
+    v2.0.1 round 3: a provider answer must carry the dispatched model identity
+    (the gateway fails closed otherwise) — the fake echoes ``model_id``.
+    """
+
+    async def _call(*, model_id, request, capability):
+        return MagicMock(provider_model=model_id, **fields)
+
+    return _call
+
+
 def _make_gateway(registry: ModelRegistry):
     mock_provider = MagicMock(spec=NIMProvider)
     mock_provider.call = AsyncMock(
-        return_value=MagicMock(
+        side_effect=_echo_identity_response(
             content="test response",
             usage={"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
             model="nvidia/nemotron-3-super-120b-a12b",

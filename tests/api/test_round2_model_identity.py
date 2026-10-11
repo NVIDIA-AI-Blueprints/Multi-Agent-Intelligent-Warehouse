@@ -264,12 +264,17 @@ async def test_llm_model_selectors_do_not_change_dispatch(app_env, fake, var):
 
 
 async def test_provider_with_no_reported_model_is_not_relabelled(app_env, fake):
-    """A provider that reports no model: dispatched ID returned, unverified."""
+    """
+    A provider that reports no model: the answer is discarded.
+
+    v2.0.1 round 3 (third re-audit N-1): this was 200 with
+    ``identity_verified=false``; an unverifiable identity now fails closed
+    (tests/api/test_round3_identity_and_cache.py has the full matrix).
+    """
     token, _ = app_env
     fake.omit_model = True
     response, _, _ = await _run(fake, token, reasoning="high")
-    assert response.status_code == 200
-    route = response.json()["route"]
-    assert route["selected_model_id"] == SUPER
-    assert route["provider_reported_model_id"] is None
-    assert route["identity_verified"] is False
+    assert response.status_code == 502
+    assert response.json()["code"] == "MODEL_IDENTITY_UNVERIFIABLE"
+    assert "content" not in response.json()
+    assert _provider_models(fake) == [SUPER]

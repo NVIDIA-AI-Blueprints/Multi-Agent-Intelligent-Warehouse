@@ -98,3 +98,28 @@ class ModelIdentityMismatch(ModelGatewayError):
         super().__init__(message, model_id)
         self.reported_model_id = reported_model_id
         self.role = role
+
+
+class ModelIdentityUnverifiable(ModelGatewayError):
+    """
+    Raised AFTER the provider answered when its response carries no usable
+    model identity — the ``model`` field is missing, empty / whitespace, or not
+    a string (v2.0.1 round 3; third re-audit N-1).
+
+    Fail closed: an answer whose physical model cannot be verified against the
+    approved deployment that was dispatched is discarded, exactly like a
+    mismatch.  ``reason`` is ``MISSING`` or ``MALFORMED``.
+    """
+
+    code = "MODEL_IDENTITY_UNVERIFIABLE"
+
+    def __init__(
+        self,
+        message: str,
+        model_id: str | None = None,
+        role: str | None = None,
+        reason: str = "MISSING",
+    ) -> None:
+        super().__init__(message, model_id)
+        self.role = role
+        self.reason = reason

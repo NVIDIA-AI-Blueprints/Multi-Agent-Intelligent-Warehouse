@@ -543,9 +543,12 @@ class NIMClient:
                     usage=data.get("usage", {}),
                     model=data.get("model", self.config.llm_model),
                     finish_reason=data["choices"][0].get("finish_reason", "stop"),
+                    # Round 3: only a non-empty string is an identity; a
+                    # missing / empty / non-string value stays None and the
+                    # gateway fails closed (MODEL_IDENTITY_UNVERIFIABLE).
                     provider_model=(
-                        str(reported_model)
-                        if reported_model not in (None, "")
+                        reported_model
+                        if isinstance(reported_model, str) and reported_model.strip()
                         else None
                     ),
                 )

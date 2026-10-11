@@ -19,6 +19,7 @@ from maiw_models import (
     DeploymentResolver,
     ModelGateway,
     ModelIdentityMismatch,
+    ModelIdentityUnverifiable,
     ModelPolicyViolation,
     ModelRegistry,
     ModelRequest,
@@ -128,9 +129,18 @@ def test_resolver_rejects(role, model_id, reason):
 def test_resolver_response_identity():
     resolved = default_resolver().resolve("super", SUPER)
     assert DeploymentResolver.verify_response_identity(resolved, SUPER) is True
-    assert DeploymentResolver.verify_response_identity(resolved, None) is False
-    with pytest.raises(ModelIdentityMismatch):
-        DeploymentResolver.verify_response_identity(resolved, "x/y")
+    # v2.0.1 round 3: no usable identity fails closed (was: False / accepted)
+    for missing in (None, "", "   "):
+        with pytest.raises(ModelIdentityUnverifiable) as info:
+            DeploymentResolver.verify_response_identity(resolved, missing)
+        assert info.value.reason == "MISSING"
+    for malformed in (123, ["x"], {"id": SUPER}):
+        with pytest.raises(ModelIdentityUnverifiable) as info:
+            DeploymentResolver.verify_response_identity(resolved, malformed)
+        assert info.value.reason == "MALFORMED"
+    for other in ("x/y", SUPER.upper(), f" {SUPER}", LIGHTNING):
+        with pytest.raises(ModelIdentityMismatch):
+            DeploymentResolver.verify_response_identity(resolved, other)
 
 
 # ── gateway: matrix A–E with provider call counts ────────────────────────────

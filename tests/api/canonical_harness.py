@@ -30,6 +30,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 APPROVED_GENERATIONS = {"nemotron-3", "nemotron-3.5"}
+_UNSET = object()
 
 
 class FakeNIM:
@@ -52,6 +53,9 @@ class FakeNIM:
         self.return_model: str | None = None
         # When True the response carries no ``model`` field at all.
         self.omit_model = False
+        # v2.0.1 round 3: when not _UNSET, the ``model`` field is EXACTLY this
+        # JSON value (e.g. "", "   ", 123, None, a list) — malformed identity.
+        self.model_field: Any = _UNSET
         self.requests: list[dict[str, Any]] = []
         outer = self
 
@@ -111,6 +115,8 @@ class FakeNIM:
                         "total_tokens": 2,
                     },
                 }
+                if outer.model_field is not _UNSET:
+                    payload["model"] = outer.model_field
                 if outer.omit_model:
                     payload.pop("model", None)
                 self._send(200, payload)

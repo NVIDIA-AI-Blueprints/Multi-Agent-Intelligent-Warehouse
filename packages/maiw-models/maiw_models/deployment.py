@@ -37,7 +37,10 @@ This module closes that gap with one small, canonical table and one resolver:
     provider call.
 *   After the provider answers, ``verify_response_identity`` compares the model
     the provider reports with the dispatched ID; a substitution raises
-    ``ModelIdentityMismatch`` and the response is discarded.
+    ``ModelIdentityMismatch`` and the response is discarded.  A response with
+    no usable identity (missing, empty, non-string) raises
+    ``ModelIdentityUnverifiable`` and is discarded too (round 3): a successful
+    answer is always ``identity_verified=True``.
 
 Changing the table is a code change (reviewed), never a runtime configuration.
 The approved generation set itself is fixed: it cannot be widened by this
@@ -49,7 +52,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
-from .errors import ModelIdentityMismatch, ModelPolicyViolation
+from .errors import (
+    ModelIdentityMismatch,
+    ModelIdentityUnverifiable,
+    ModelPolicyViolation,
+)
 from .models import DeploymentMode
 
 # MAIW v2 approved model generations (Nemotron 3 / Nemotron 3.5).  This is the
@@ -221,17 +228,42 @@ class DeploymentResolver:
 
     @staticmethod
     def verify_response_identity(
-        resolved: ResolvedDeployment, reported_model_id: str | None
+        resolved: ResolvedDeployment, reported_model_id: object
     ) -> bool:
         """
         Compare the provider-reported model with the dispatched deployment.
 
-        Returns True when the provider reported the dispatched ID, False when
-        the provider reported no model identity at all.  Raises
-        ``ModelIdentityMismatch`` when it reported a different model.
+        Returns True only when the provider reported exactly the dispatched
+        ID.  Fails closed otherwise (v2.0.1 round 3):
+
+        * missing / empty / whitespace-only identity → ``ModelIdentityUnverifiable``
+          (``reason="MISSING"``)
+        * a non-string identity → ``ModelIdentityUnverifiable``
+          (``reason="MALFORMED"``)
+        * any other string (another approved model, a case or whitespace
+          variant, an unapproved model) → ``ModelIdentityMismatch``
         """
-        if reported_model_id is None or reported_model_id == "":
-            return False
+        if reported_model_id is None or (
+            isinstance(reported_model_id, str) and not reported_model_id.strip()
+        ):
+            raise ModelIdentityUnverifiable(
+                f"MODEL_IDENTITY_UNVERIFIABLE: dispatched approved model "
+                f"{resolved.model_id!r} (role {resolved.role!r}) but the provider "
+                "response reported no model identity; response discarded",
+                model_id=resolved.model_id,
+                role=resolved.role,
+                reason="MISSING",
+            )
+        if not isinstance(reported_model_id, str):
+            raise ModelIdentityUnverifiable(
+                f"MODEL_IDENTITY_UNVERIFIABLE: dispatched approved model "
+                f"{resolved.model_id!r} (role {resolved.role!r}) but the provider "
+                f"reported a malformed model identity "
+                f"({type(reported_model_id).__name__}); response discarded",
+                model_id=resolved.model_id,
+                role=resolved.role,
+                reason="MALFORMED",
+            )
         if reported_model_id != resolved.model_id:
             raise ModelIdentityMismatch(
                 f"MODEL_IDENTITY_MISMATCH: dispatched approved model "

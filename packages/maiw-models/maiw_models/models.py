@@ -267,7 +267,8 @@ class ModelResponse(BaseModel):
     # the DeploymentResolver), never a provider-supplied relabel.
     generation: str | None = None  # bound to model_id in APPROVED_DEPLOYMENTS
     provider_reported_model_id: str | None = None  # what the provider said
-    # True when the provider reported a model identity and it matched model_id;
-    # False when the provider reported none.  A mismatch never produces a
-    # ModelResponse (ModelIdentityMismatch is raised instead).
+    # True when the provider reported a model identity and it matched model_id.
+    # Round 3: ModelGateway.generate never returns a ModelResponse otherwise —
+    # a mismatch raises ModelIdentityMismatch and a missing / malformed
+    # identity raises ModelIdentityUnverifiable.
     identity_verified: bool = False
