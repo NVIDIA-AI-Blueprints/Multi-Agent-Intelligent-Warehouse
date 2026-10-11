@@ -155,7 +155,8 @@ Do **not** use floating `latest` tags. Pin exact versions.
 1. NVIDIA H100 or equivalent GPU (sm_90a or compatible) with a working driver (`nvidia-smi` must succeed — preflight checks its exit status)
 2. Python 3.12+ and `python3 -m venv`
 3. Docker (reference database container; NemoClaw)
-4. NemoClaw 0.0.124 and OpenShell 0.0.116 CLIs on `PATH` (`nemoclaw --version`, `openshell --version`) with a running OpenShell gateway
+4. NemoClaw 0.0.124 and OpenShell 0.0.116 binaries on `PATH` (`nemoclaw --version`, `openshell --version`, `openshell-gateway --version`, `openshell-sandbox`). The OpenShell **gateway** is started and verified by step 3 of the clean-host procedure (`reference_gateway.sh`) — it is not an implicit prerequisite any more (round 3).
+7. `openssl` (generates the managed gateway's JWT signing key)
 5. NVIDIA API key (hosted NIM) or a local NIM serving the approved model IDs
 6. `curl`
 
@@ -180,30 +181,38 @@ cp .env.example .env
 #    POSTGRES_PASSWORD, JWT_SECRET_KEY, MAIW_PYTHON=$PWD/.venv/bin/python,
 #    MAIW_PERSISTENCE_ROOT (writable), MAIW_API_PORT (free), PGPORT (free),
 #    MAIW_DB_CONTAINER, MAIW_SANDBOX_NAME,
-#    MAIW_SANDBOX_MODEL_GATEWAY_ENDPOINT=http://<HOST_IP>:<MAIW_API_PORT>/api/v1/inference
+#    MAIW_SANDBOX_MODEL_GATEWAY_ENDPOINT=http://<HOST_IP>:<MAIW_API_PORT>/api/v1/inference,
+#    OPENSHELL_GATEWAY_ENDPOINT + MAIW_OPENSHELL_GATEWAY_{MODE,NAME,PORT} (free port),
+#    reference_governed only: MAIW_OPERATOR_WRITE_TOKEN (fresh random, != inference token)
 
-# 3. Database
+# 3. OpenShell gateway (start + verify: running, version 0.0.116, reachable)
+bash scripts/setup/reference_gateway.sh start
+bash scripts/setup/reference_gateway.sh status
+
+# 4. Database
 bash scripts/setup/reference_db.sh up
 
-# 4. Sandbox + network policy
+# 5. Sandbox + network policy
 bash scripts/setup/reference_sandbox.sh create
 
-# 5. Preflight → start → status → smoke
+# 6. Preflight → start → status → smoke
 bash scripts/preflight_reference_deployment.sh
 bash scripts/start_reference_deployment.sh
 bash scripts/status_reference_deployment.sh
 bash scripts/smoke_test_reference_deployment.sh
 
-# 6. In-sandbox check (sandbox → canonical app → approved model)
+# 7. In-sandbox check (sandbox → canonical app → approved model; every
+#    governed write denied for every credential the sandbox holds)
 bash scripts/setup/reference_sandbox.sh probe
 
-# 7. Restart / stop
+# 8. Restart / stop
 bash scripts/restart_reference_deployment.sh
 bash scripts/stop_reference_deployment.sh
 
-# 8. Teardown (only what steps 3–4 created)
+# 9. Teardown (only what steps 3–5 created)
 bash scripts/setup/reference_sandbox.sh delete
 bash scripts/setup/reference_db.sh down
+bash scripts/setup/reference_gateway.sh stop
 ```
 
 `scripts/validate_reference_runbook.sh` checks that every script and file
@@ -238,6 +247,8 @@ the app reads only what the loader exported.
 | `MAIW_SANDBOX_MODE` | must be `required` | `required` |
 | `MAIW_SANDBOX_NAME` | reference sandbox (<= 19 chars) | `maiw-ref-sandbox` |
 | `MAIW_SANDBOX_MODEL_GATEWAY_ENDPOINT` | sandbox → host inference URL (host's routable IP, API port) | `http://10.x.x.x:8001/api/v1/inference` |
+| `OPENSHELL_GATEWAY_ENDPOINT` | the OpenShell gateway every lifecycle script targets | `http://127.0.0.1:18991` |
+| `MAIW_OPENSHELL_GATEWAY_MODE`, `_NAME`, `_PORT` | managed (own gateway) or external; name / free port of the managed gateway | `managed`, `maiw-ref-gateway`, `18991` |
 
 ### Model bindings (optional — approved defaults apply)
 
@@ -292,6 +303,33 @@ In the `reference` profile all four are optional; unset domains are reported
 - No warehouse write credentials in sandbox — the operator write token is never injected; `reference_sandbox.sh probe` fails if a digest of it (or of the provider key, DB password or JWT secret) is found in the sandbox environment
 - No NIM/provider credential in sandbox
 - `MAIW_INFERENCE_INTERNAL_TOKEN` is the only credential that flows to the sandbox
+
+---
+
+## OpenShell gateway
+
+The sandbox runs under an OpenShell gateway, and every `openshell` call of
+the lifecycle scripts targets exactly `OPENSHELL_GATEWAY_ENDPOINT` (exported
+from `.env` by the shared loader). After a host reboot the gateway is down;
+start and verify it explicitly (v2.0.1 round 3 — this used to be an
+undocumented prerequisite):
+
+```bash
+bash scripts/setup/reference_gateway.sh start    # managed: start this deployment's own gateway; external: verify only
+bash scripts/setup/reference_gateway.sh status   # process (managed) + CLI version 0.0.116 + `openshell status` + `sandbox list` reachable
+bash scripts/setup/reference_gateway.sh stop     # managed only: stop ONLY the gateway this script started
+```
+
+| `MAIW_OPENSHELL_GATEWAY_MODE` | What `start` does |
+|---|---|
+| `managed` (default) | runs `openshell-gateway` 0.0.116 as this deployment's own gateway: name `MAIW_OPENSHELL_GATEWAY_NAME`, `127.0.0.1:MAIW_OPENSHELL_GATEWAY_PORT`, docker driver, its own sandbox namespace and docker network, its own Ed25519 gateway-JWT and sqlite state under `$MAIW_PERSISTENCE_ROOT/openshell-gateway/`. Requires `OPENSHELL_GATEWAY_ENDPOINT=http://127.0.0.1:<port>`. Refuses a port already in use. |
+| `external` | verifies a gateway someone else runs (for example a NemoClaw-managed one) and never starts, stops or reconfigures it; start it with the tool that owns it |
+
+The managed gateway listens on loopback only with TLS disabled and accepts
+unauthenticated local users (the single-node reference topology: anyone with
+a shell on the host can already drive Docker). On a shared multi-user host use
+`external` with an mTLS gateway. Sandbox isolation is enforced by the same
+`openshell-sandbox` supervisor in both modes.
 
 ---
 
@@ -358,7 +396,8 @@ Loads `.env` first, then validates the **effective** configuration: required
 variables present (no default port/root); profile; OS; `MAIW_PYTHON` version
 and that it imports `maiw_api` from this checkout; GPU (`nvidia-smi` exit
 status, driver, compute capability); Docker/Podman; NemoClaw 0.0.124 and
-OpenShell 0.0.116 CLIs; **physical model bindings** — the same
+OpenShell 0.0.116 CLIs; the OpenShell gateway at `OPENSHELL_GATEWAY_ENDPOINT`
+reachable; **physical model bindings** — the same
 `ModelRegistry` + `DeploymentResolver` the gateway runs, on the
 `NEMOTRON_<ROLE>_MODEL` values it dispatches, plus a provider `/models`
 listing probe; API port free; persistence root creatable; auth token set,

@@ -57,7 +57,7 @@ lifecycle = [
     "stop_reference_deployment.sh", "restart_reference_deployment.sh",
     "status_reference_deployment.sh", "smoke_test_reference_deployment.sh",
     "qualify_reference_deployment.sh", "setup/reference_db.sh",
-    "setup/reference_sandbox.sh",
+    "setup/reference_sandbox.sh", "setup/reference_gateway.sh",
 ]
 required = set()
 for name in lifecycle:
@@ -72,7 +72,8 @@ for var in sorted(required):
 
 # 3. sections + policy template
 for heading in ("## Database", "## Sandbox", "### MCP", "## Deployment Profiles",
-                "## Deployment identity", "## Preflight", "## Readiness"):
+                "## Deployment identity", "## Preflight", "## Readiness",
+                "## OpenShell gateway"):
     if heading not in runbook:
         findings.append(f"runbook missing section '{heading}'")
 if not (root / "deploy/openshell/maiw-inference-only.policy.yaml.tmpl").is_file():

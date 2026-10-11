@@ -214,6 +214,7 @@ def test_env_example_loads_cleanly():
         "qualify_reference_deployment.sh",
         "setup/reference_db.sh",
         "setup/reference_sandbox.sh",
+        "setup/reference_gateway.sh",
     ],
 )
 def test_every_lifecycle_script_uses_the_shared_loader(script):

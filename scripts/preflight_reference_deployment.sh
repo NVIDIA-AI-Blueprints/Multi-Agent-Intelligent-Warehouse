@@ -385,6 +385,17 @@ _header "Sandbox Policy"
 SANDBOX_MODE="${MAIW_SANDBOX_MODE:-disabled}"
 if [[ "$SANDBOX_MODE" == "required" ]]; then
     _pass "MAIW_SANDBOX_MODE=required (sandbox enforced; participates in readiness)"
+    # v2.0.1 round 3: the gateway is an explicit, verified step (it was an
+    # undocumented prerequisite).  Targets OPENSHELL_GATEWAY_ENDPOINT only.
+    if [[ -z "${OPENSHELL_GATEWAY_ENDPOINT:-}" ]]; then
+        _fail "OPENSHELL_GATEWAY_ENDPOINT" "set (the gateway this deployment uses)" "not set" \
+            "Set it in .env and run: bash scripts/setup/reference_gateway.sh start"
+    elif command -v openshell &>/dev/null && openshell --gateway-endpoint "$OPENSHELL_GATEWAY_ENDPOINT" status >/dev/null 2>&1; then
+        _pass "OpenShell gateway reachable at $OPENSHELL_GATEWAY_ENDPOINT"
+    else
+        _fail "OpenShell gateway" "reachable at $OPENSHELL_GATEWAY_ENDPOINT" "not reachable" \
+            "bash scripts/setup/reference_gateway.sh start (runbook § OpenShell gateway)"
+    fi
     if [[ -z "${MAIW_SANDBOX_NAME:-}" ]]; then
         _fail "MAIW_SANDBOX_NAME" "name of the reference sandbox" "not set" \
             "Create it: bash scripts/setup/reference_sandbox.sh create (runbook § Sandbox)"
