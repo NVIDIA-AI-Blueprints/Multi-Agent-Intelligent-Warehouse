@@ -557,9 +557,22 @@ class NIMClient:
                     ),
                 )
 
-                # Cache the response (skip for streaming) under the same key
+                # Cache the response (skip for streaming) under the same key —
+                # v2.0.1 round 4 (fourth re-audit NEW4-P2-04): ONLY after the
+                # provider-reported identity matched the dispatched model
+                # exactly (the same rule ModelGateway enforces).  A missing,
+                # malformed or mismatched identity is returned to the caller
+                # (which fails closed) but never cached, so a fixed provider is
+                # called afresh instead of replaying a stale failure / an
+                # unverified answer for the TTL.
                 if cache_key is not None:
-                    await self._cache_response(cache_key, llm_response)
+                    if llm_response.provider_model == effective_model:
+                        await self._cache_response(cache_key, llm_response)
+                    else:
+                        logger.warning(
+                            "LLM response not cached: provider-reported model "
+                            "identity does not match the dispatched model"
+                        )
 
                 return llm_response
 
