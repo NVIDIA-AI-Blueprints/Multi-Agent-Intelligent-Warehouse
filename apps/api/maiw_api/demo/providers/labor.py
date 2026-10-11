@@ -9,7 +9,7 @@ mutation counter, and fault injection support.
 Write outcome semantics
 -----------------------
 allocate:
-    FAILED   — task_id not found in world state (raises BackendUnavailable)
+    FAILED   — task_id not found in world state (raises WriteNotApplied — certified NOT_APPLIED)
     NO_OP    — task already assigned to exactly these worker_ids
     DEFERRED — no workers available (worker_ids list empty and no idle workers)
     EXECUTED — mutation committed
@@ -30,7 +30,7 @@ from maiw_contracts.labor import (
     LaborTaskInfo,
     LaborWorkerInfo,
 )
-from maiw_mcp.errors import BackendUnavailable, WriteNotApplied
+from maiw_mcp.errors import WriteNotApplied
 
 if TYPE_CHECKING:
     from maiw_api.demo.events import ScenarioEventBus
@@ -116,7 +116,7 @@ class SimulationLaborProvider:
     ) -> LaborAllocateResult:
         task = self._world.tasks.get(request.task_id)
 
-        # FAILED: task not found — raise so executor records FAILED (no mutation)
+        # FAILED: task not found — certified NOT_APPLIED (no mutation) → FAILED
         if task is None:
             raise WriteNotApplied(
                 f"Task '{request.task_id}' not found in world state",

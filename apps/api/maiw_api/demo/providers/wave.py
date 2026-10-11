@@ -9,7 +9,7 @@ mutation counter, and fault injection support.
 Write outcome semantics
 -----------------------
 reprioritize:
-    FAILED   — no tasks found for the requested zone/wave (raises BackendUnavailable)
+    FAILED   — no tasks found for the requested zone/wave (raises WriteNotApplied — certified NOT_APPLIED)
     NO_OP    — all matching tasks already have the requested priority
     EXECUTED — mutation committed (at least one task priority changed)
 """
@@ -28,7 +28,7 @@ from maiw_contracts.wave import (
     WaveRiskResult,
     WaveTaskInfo,
 )
-from maiw_mcp.errors import BackendUnavailable, WriteNotApplied
+from maiw_mcp.errors import WriteNotApplied
 
 if TYPE_CHECKING:
     from maiw_api.demo.events import ScenarioEventBus
