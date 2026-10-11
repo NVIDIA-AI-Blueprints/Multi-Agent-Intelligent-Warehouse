@@ -1642,7 +1642,20 @@ _mcp_planner_graph = None
 
 
 async def get_mcp_planner_graph() -> MCPPlannerGraph:
-    """Get the global MCP planner graph instance."""
+    """Get the global planner graph instance.
+
+    Returns the multi-agent supervisor graph when ENABLE_MULTI_AGENT_SUPERVISOR
+    is set, and the default single-route planner otherwise. The supervisor is
+    imported lazily because it extends this module's graph.
+    """
+    from src.api.graphs.supervisor_graph import (
+        get_supervisor_graph,
+        supervisor_enabled,
+    )
+
+    if supervisor_enabled():
+        return await get_supervisor_graph()
+
     global _mcp_planner_graph
     if _mcp_planner_graph is None:
         _mcp_planner_graph = MCPPlannerGraph()
