@@ -35,7 +35,8 @@ from maiw_contracts.wave import (
     WaveReprioritizeRequest,
     WaveRiskRequest,
 )
-from maiw_mcp.errors import BackendUnavailable
+from maiw_mcp.errors import BackendUnavailable, WriteNotApplied
+from maiw_mcp.write_disposition import not_applied_result
 
 logger = logging.getLogger(__name__)
 
@@ -157,6 +158,9 @@ async def warehouse_wave_reprioritize(
     )
     try:
         result = await provider.execute_wave_reprioritize(req)
+    except WriteNotApplied as exc:
+        # v2.0.1 round 4: the provider certified no mutation → typed NOT_APPLIED
+        return not_applied_result(str(exc), exc.rejection_code)
     except Exception as exc:
         raise BackendUnavailable(f"Wave reprioritization write failed: {exc}") from exc
     return json.dumps(result.model_dump())

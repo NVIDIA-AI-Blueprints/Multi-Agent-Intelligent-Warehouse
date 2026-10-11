@@ -30,7 +30,7 @@ from maiw_contracts.labor import (
     LaborTaskInfo,
     LaborWorkerInfo,
 )
-from maiw_mcp.errors import BackendUnavailable
+from maiw_mcp.errors import BackendUnavailable, WriteNotApplied
 
 if TYPE_CHECKING:
     from maiw_api.demo.events import ScenarioEventBus
@@ -118,8 +118,9 @@ class SimulationLaborProvider:
 
         # FAILED: task not found — raise so executor records FAILED (no mutation)
         if task is None:
-            raise BackendUnavailable(
-                f"Task '{request.task_id}' not found in world state"
+            raise WriteNotApplied(
+                f"Task '{request.task_id}' not found in world state",
+                rejection_code="NOT_FOUND",
             )
 
         # DEFERRED: no workers provided and none available
@@ -139,6 +140,7 @@ class SimulationLaborProvider:
                     decision_id=request.decision_id,
                     execution_id=request.execution_id,
                     outcome="deferred",
+                    execution_disposition="NOT_APPLIED",  # round 4: no mutation
                     source=self._world.SOURCE,
                     message=f"[SIM] DEFERRED: no available workers for task {request.task_id}",
                 )

@@ -43,7 +43,7 @@ from maiw_contracts.equipment import (
     EquipmentTelemetryResult,
     TelemetryPoint,
 )
-from maiw_mcp.errors import BackendUnavailable
+from maiw_mcp.errors import BackendUnavailable, WriteNotApplied
 
 if TYPE_CHECKING:
     from maiw_api.demo.events import ScenarioEventBus
@@ -177,8 +177,9 @@ class SimulationEquipmentProvider:
     ) -> EquipmentExecuteAssignResult:
         asset = self._world.equipment.get(request.asset_id)
         if asset is None:
-            raise BackendUnavailable(
-                f"Asset '{request.asset_id}' not found in simulation world"
+            raise WriteNotApplied(
+                f"Asset '{request.asset_id}' not found in simulation world",
+                rejection_code="NOT_FOUND",
             )
 
         current_task = asset.metadata.get("current_task_id")
@@ -213,6 +214,7 @@ class SimulationEquipmentProvider:
                 decision_id=request.decision_id,
                 execution_id=request.execution_id,
                 outcome="conflict",
+                execution_disposition="NOT_APPLIED",  # round 4: no mutation
                 source=self._world.SOURCE,
                 message=f"[SIM] CONFLICT: {request.asset_id} already assigned to task {current_task}; requested {request.task_id}",
             )
@@ -259,8 +261,9 @@ class SimulationEquipmentProvider:
     ) -> EquipmentExecuteReleaseResult:
         asset = self._world.equipment.get(request.asset_id)
         if asset is None:
-            raise BackendUnavailable(
-                f"Asset '{request.asset_id}' not found in simulation world"
+            raise WriteNotApplied(
+                f"Asset '{request.asset_id}' not found in simulation world",
+                rejection_code="NOT_FOUND",
             )
 
         # NO_OP: already available
@@ -312,8 +315,9 @@ class SimulationEquipmentProvider:
     ) -> EquipmentExecuteMaintenanceResult:
         asset = self._world.equipment.get(request.asset_id)
         if asset is None:
-            raise BackendUnavailable(
-                f"Asset '{request.asset_id}' not found in simulation world"
+            raise WriteNotApplied(
+                f"Asset '{request.asset_id}' not found in simulation world",
+                rejection_code="NOT_FOUND",
             )
 
         # NO_OP: already in maintenance

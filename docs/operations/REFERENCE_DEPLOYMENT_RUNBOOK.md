@@ -277,6 +277,20 @@ approved model. Check any configuration with:
 In the `reference` profile all four are optional; unset domains are reported
 `NOT_CONFIGURED` and governed writes are `not_offered`.
 
+The shipped equipment MCP server (PostgreSQL adapter; it reads the same
+`PGHOST` / `PGPORT` / `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD`
+as the API) is started with:
+
+```bash
+MAIW_MCP_TRANSPORT=streamable-http MAIW_MCP_EQUIPMENT_HOST=127.0.0.1 \
+MAIW_MCP_EQUIPMENT_PORT=8766 .venv/bin/python -m mcp_servers.equipment.server
+# → MAIW_MCP_SERVER_EQUIPMENT_URL=http://127.0.0.1:8766/mcp
+```
+
+The labor and wave MCP servers have no shipped PostgreSQL launch entry point
+in v2.0.1; an equipment-only governed deployment sets
+`MAIW_REQUIRED_MCP_DOMAINS=equipment`.
+
 ### Development-Only (NEVER set in reference deployment)
 
 | Variable | Description |
@@ -790,19 +804,46 @@ reconciled as described above.
 3. No unapproved fallback — failure stays failure (no silent fallback to Llama)
 4. When provider recovers, inference resumes automatically
 
-### Ambiguous operational writes (UNKNOWN) and reconciliation (v2.0.1 round 3)
+### Ambiguous operational writes (UNKNOWN) and reconciliation (v2.0.1 rounds 3–4)
 
-A governed write that was sent to the MCP server but whose response was lost
-(server crash, connection reset, read timeout, unreadable answer) is
-**UNKNOWN**, never "failed": the write may have been applied.
+A governed write that was sent to the MCP server is **UNKNOWN**, never
+"failed", unless MAIW can prove it was not applied: the response was lost
+(server crash, connection reset, read timeout, unreadable answer), **or the
+server answered with an error that does not certify non-execution** (round 4:
+an MCP `isError` result says the tool failed, not that it made no change — a
+server can apply a mutation and fail afterwards).
+
+A server certifies a pre-mutation rejection only with the typed
+`structuredContent` field `execution_disposition: "NOT_APPLIED"` (contract:
+`packages/maiw-mcp/maiw_mcp/write_disposition.py`; the shipped equipment MCP
+server emits it for request-validation and precondition rejections taken
+before any write statement).  Text content, `isError` alone, and a missing,
+malformed or unknown disposition are never trusted.
 
 | What the API returns | Meaning |
 |---|---|
-| `200 status=executed` (or `no_op` / `conflict` / `deferred`) | definite outcome |
+| `200 status=executed` / `no_op` | definite outcome |
+| `200 status=conflict` / `deferred` | definite non-execution — the server certified `NOT_APPLIED` |
 | `200 status=failed`, `error_code=MCP_NOT_DISPATCHED` | the request provably never left MAIW (connect / handshake failed, circuit open) — confirmed not executed |
-| `200 status=failed`, `error_code=MCP_TOOL_ERROR` | the MCP server answered with an error |
-| `202 status=unknown`, `executed=null`, `reconciliation_required=true` | sent, response lost — **do not retry** |
+| `200 status=failed`, `error_code=MCP_TOOL_NOT_APPLIED` | the MCP server certified `execution_disposition=NOT_APPLIED` (rejected before any mutation) — confirmed not executed |
+| `202 status=unknown`, `error_code=MCP_RESPONSE_LOST` / `MCP_TIMEOUT` / `MCP_RESPONSE_UNREADABLE` | sent, response lost / unreadable — **do not retry** |
+| `202 status=unknown`, `error_code=MCP_TOOL_ERROR` | the server answered with an error **without** certifying `NOT_APPLIED` — the write may have been applied; **do not retry** |
+| `202 status=unknown`, `error_code=SERVER_FAILURE_UNCERTIFIED` / `SERVER_RESULT_CONTRADICTORY` / `EXECUTION_OUTCOME_UNKNOWN` | a non-error result reported failure without `NOT_APPLIED`, a contradictory result, or an unclassified failure — **do not retry** |
 | `409 code=RECONCILIATION_REQUIRED` | an earlier write to the same asset is still UNKNOWN / in flight; refused before any proposal, decision or write |
+
+Every response and journal record carries `dispatch_status`
+(`not_dispatched` / `rejected_before_mutation` / `dispatched_server_error` /
+`dispatched_no_response` / …), `server_disposition` and, for UNKNOWN,
+`uncertainty_reason`.  Replaying a definite failure with the same
+`Idempotency-Key` answers the same `failed` outcome again (never `no_op`)
+without writing.
+
+The shipped PostgreSQL equipment adapter runs every logical write (assign =
+INSERT assignment + UPDATE asset; release = UPDATE assignment + UPDATE asset;
+emergency maintenance = INSERT maintenance + UPDATE asset) in one database
+transaction: all statements commit or none do.  Transactions remove partial
+writes; they do not remove the uncertainty of a lost response or of an error
+after COMMIT — that is what UNKNOWN + reconciliation is for.
 
 Rules:
 

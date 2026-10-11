@@ -67,7 +67,11 @@ from maiw_contracts.equipment import (
     EquipmentStatusRequest,
     EquipmentTelemetryRequest,
 )
-from maiw_mcp.errors import BackendUnavailable
+from maiw_mcp.errors import BackendUnavailable, WriteNotApplied
+from maiw_mcp.write_disposition import (
+    REJECTION_INVALID_REQUEST,
+    not_applied_result,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +117,13 @@ def _get_provider() -> Any:
 
 
 def _build_default_provider() -> Any:
+    """
+    The shipped PostgreSQL provider.  ``EquipmentAssetTools`` is initialised
+    by the adapter on first use inside the serving event loop (v2.0.1 round 4,
+    NEW4-P2-03 — it was never initialised, so every call failed).  Connection
+    settings come from the standard ``PGHOST`` / ``PGPORT`` / ``POSTGRES_DB`` /
+    ``POSTGRES_USER`` / ``POSTGRES_PASSWORD`` environment (``SQLRetriever``).
+    """
     from mcp_servers.equipment.adapters.maiw_backend import MAIWEquipmentAdapter
     from src.api.agents.inventory.equipment_asset_tools import EquipmentAssetTools
 
@@ -232,11 +243,21 @@ async def warehouse_equipment_assign(
             execution_id=execution_id,
         )
     except Exception as exc:
-        return json.dumps({"error": f"Invalid request: {exc}", "asset_id": asset_id})
+        # v2.0.1 round 4: rejected before the provider was called → the
+        # typed NOT_APPLIED disposition (maiw_mcp.write_disposition).
+        return not_applied_result(f"Invalid request: {exc}", REJECTION_INVALID_REQUEST)
 
     provider = _get_provider()
     try:
         result = await provider.execute_equipment_assignment(request)
+    except WriteNotApplied as exc:
+        logger.info(
+            "warehouse.equipment.assign: rejected before any mutation (%s) for %s: %s",
+            exc.rejection_code,
+            asset_id,
+            exc,
+        )
+        return not_applied_result(str(exc), exc.rejection_code)
     except BackendUnavailable as exc:
         logger.warning(
             "warehouse.equipment.assign: BackendUnavailable for %s: %s",
@@ -275,11 +296,21 @@ async def warehouse_equipment_release(
             execution_id=execution_id,
         )
     except Exception as exc:
-        return json.dumps({"error": f"Invalid request: {exc}", "asset_id": asset_id})
+        # v2.0.1 round 4: rejected before the provider was called → the
+        # typed NOT_APPLIED disposition (maiw_mcp.write_disposition).
+        return not_applied_result(f"Invalid request: {exc}", REJECTION_INVALID_REQUEST)
 
     provider = _get_provider()
     try:
         result = await provider.execute_equipment_release(request)
+    except WriteNotApplied as exc:
+        logger.info(
+            "warehouse.equipment.release: rejected before any mutation (%s) for %s: %s",
+            exc.rejection_code,
+            asset_id,
+            exc,
+        )
+        return not_applied_result(str(exc), exc.rejection_code)
     except BackendUnavailable as exc:
         logger.warning(
             "warehouse.equipment.release: BackendUnavailable for %s: %s",
@@ -326,11 +357,21 @@ async def warehouse_equipment_schedule_maintenance(
             execution_id=execution_id,
         )
     except Exception as exc:
-        return json.dumps({"error": f"Invalid request: {exc}", "asset_id": asset_id})
+        # v2.0.1 round 4: rejected before the provider was called → the
+        # typed NOT_APPLIED disposition (maiw_mcp.write_disposition).
+        return not_applied_result(f"Invalid request: {exc}", REJECTION_INVALID_REQUEST)
 
     provider = _get_provider()
     try:
         result = await provider.execute_schedule_maintenance(request)
+    except WriteNotApplied as exc:
+        logger.info(
+            "warehouse.equipment.schedule_maintenance: rejected before any mutation (%s) for %s: %s",
+            exc.rejection_code,
+            asset_id,
+            exc,
+        )
+        return not_applied_result(str(exc), exc.rejection_code)
     except BackendUnavailable as exc:
         logger.warning(
             "warehouse.equipment.schedule_maintenance: BackendUnavailable for %s: %s",
@@ -345,6 +386,11 @@ async def warehouse_equipment_schedule_maintenance(
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    logging.basicConfig(level=os.getenv("MAIW_MCP_LOG_LEVEL", "INFO"))
+    # Compose the shipped PostgreSQL provider at startup (round 4); tests and
+    # demo mode call configure_server() with their own provider instead.
+    if _provider is None:
+        configure_server(_build_default_provider())
     transport = os.getenv("MAIW_MCP_TRANSPORT", "stdio")
     port = int(os.getenv("MAIW_MCP_EQUIPMENT_PORT", "8766"))
     host = os.getenv("MAIW_MCP_EQUIPMENT_HOST", "0.0.0.0")

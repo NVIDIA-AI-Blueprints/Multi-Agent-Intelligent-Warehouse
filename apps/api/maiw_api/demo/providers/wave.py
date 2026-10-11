@@ -28,7 +28,7 @@ from maiw_contracts.wave import (
     WaveRiskResult,
     WaveTaskInfo,
 )
-from maiw_mcp.errors import BackendUnavailable
+from maiw_mcp.errors import BackendUnavailable, WriteNotApplied
 
 if TYPE_CHECKING:
     from maiw_api.demo.events import ScenarioEventBus
@@ -158,8 +158,9 @@ class SimulationWaveProvider:
 
         # FAILED: no tasks to reprioritize
         if not tasks:
-            raise BackendUnavailable(
-                f"No wave tasks found for zone={request.zone!r} wave_id={request.wave_id!r}"
+            raise WriteNotApplied(
+                f"No wave tasks found for zone={request.zone!r} wave_id={request.wave_id!r}",
+                rejection_code="NOT_FOUND",
             )
 
         # NO_OP: all tasks already have the requested priority
