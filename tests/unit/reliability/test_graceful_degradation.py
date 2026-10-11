@@ -221,10 +221,55 @@ async def test_labor_outage_does_not_affect_equipment():
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
-async def test_ready_returns_200_when_one_domain_open():
-    from maiw_mcp.circuit_registry import DomainCircuitRegistry
+def _ready_runtime(reg):
+    """
+    Runtime double for /ready (v2.0.1 contract): healthy critical components
+    (explicit in-memory persistence, ModelGateway, governed write path) so the
+    MCP-domain rule under test is the only variable.
+    """
+    from maiw_api.persistence import build_persistence
+
+    runtime = MagicMock()
+    runtime.circuit_registry = reg
+    runtime.persistence = build_persistence({"MAIW_PERSISTENCE_MODE": "memory"})
+    runtime.procedure_host = MagicMock()
+    runtime.nim_circuit = None
+    # v2.0.1 round 2: readiness distinguishes configured from unconfigured MCP
+    # domains — every domain the breaker registry knows is configured here
+    # (in-memory transport, so no reachability probe).
+    runtime.mcp_domain_endpoints = {}
+    for domain in ("equipment", "labor", "wave", "inventory"):
+        configured = domain in reg.all_domains()
+        setattr(runtime, f"mcp_{domain}_available", configured)
+        if configured:
+            runtime.mcp_domain_endpoints[domain] = ("in-memory", None)
+    return runtime
+
+
+async def _ready(request, monkeypatch):
+    import json
+
     from maiw_api.routers.health import readiness_check
+
+    monkeypatch.setenv("MAIW_READINESS_REQUIRE_DATABASE", "false")
+    monkeypatch.delenv("MAIW_SANDBOX_MODE", raising=False)
+    monkeypatch.delenv("MAIW_SANDBOX_NAME", raising=False)
+    response = await readiness_check(request)
+    return response.status_code, json.loads(response.body)
+
+
+@pytest.mark.asyncio
+async def test_ready_returns_200_when_one_domain_open(monkeypatch):
+    """v2.0.1 round 2: an OPTIONAL domain circuit-open keeps the API ready.
+
+    Profile reference_governed with only ``equipment`` required: ``labor``
+    (optional) is CIRCUIT_OPEN → still 200, reported in circuit_open_domains.
+    """
+    monkeypatch.setenv("MAIW_DEPLOYMENT_PROFILE", "reference_governed")
+    monkeypatch.setenv("MAIW_REQUIRED_MCP_DOMAINS", "equipment")
+    # v2.0.1 round 3: the governed write path needs the operator credential.
+    monkeypatch.setenv("MAIW_OPERATOR_WRITE_TOKEN", "op-" + "c3" * 20)
+    from maiw_mcp.circuit_registry import DomainCircuitRegistry
 
     clock = FakeClock()
     reg = DomainCircuitRegistry.for_domains(
@@ -238,24 +283,46 @@ async def test_ready_returns_200_when_one_domain_open():
     with pytest.raises(RuntimeError):
         await labor.call(_fail())
 
-    runtime = MagicMock()
-    runtime.circuit_registry = reg
-
     request = MagicMock()
-    request.app.state.runtime = runtime
+    request.app.state.runtime = _ready_runtime(reg)
 
-    # Should NOT raise
-    response = await readiness_check(request)
-    assert response["status"] == "ready"
-    assert "labor" in response["circuit_open_domains"]
-    assert "equipment" not in response["circuit_open_domains"]
+    code, body = await _ready(request, monkeypatch)
+    assert code == 200
+    assert body["status"] == "READY"
+    assert "labor" in body["circuit_open_domains"]
+    assert "equipment" not in body["circuit_open_domains"]
 
 
 @pytest.mark.asyncio
-async def test_ready_returns_503_when_all_domains_open():
-    from fastapi import HTTPException
+async def test_ready_returns_503_when_required_domain_open(monkeypatch):
+    """v2.0.1 round 2: any REQUIRED domain circuit-open → 503 (was: only all)."""
+    monkeypatch.setenv("MAIW_DEPLOYMENT_PROFILE", "reference_governed")
+    monkeypatch.setenv("MAIW_REQUIRED_MCP_DOMAINS", "equipment")
     from maiw_mcp.circuit_registry import DomainCircuitRegistry
-    from maiw_api.routers.health import readiness_check
+
+    clock = FakeClock()
+    reg = DomainCircuitRegistry.for_domains(
+        domains=["equipment", "labor"],
+        failure_threshold=1,
+        cooldown_seconds=30.0,
+        clock=clock,
+    )
+    with pytest.raises(RuntimeError):
+        await reg.get("equipment").call(_fail())
+
+    request = MagicMock()
+    request.app.state.runtime = _ready_runtime(reg)
+
+    code, body = await _ready(request, monkeypatch)
+    assert code == 503
+    assert "mcp_domains" in body["failed_components"]
+    assert body["components"]["mcp_domains"]["required_unusable"] == ["equipment"]
+
+
+@pytest.mark.asyncio
+async def test_ready_returns_503_when_all_domains_open(monkeypatch):
+    monkeypatch.setenv("MAIW_DEPLOYMENT_PROFILE", "reference_governed")
+    from maiw_mcp.circuit_registry import DomainCircuitRegistry
 
     clock = FakeClock()
     reg = DomainCircuitRegistry.for_domains(
@@ -270,46 +337,39 @@ async def test_ready_returns_503_when_all_domains_open():
         with pytest.raises(RuntimeError):
             await b.call(_fail())
 
-    runtime = MagicMock()
-    runtime.circuit_registry = reg
-
     request = MagicMock()
-    request.app.state.runtime = runtime
+    request.app.state.runtime = _ready_runtime(reg)
 
-    with pytest.raises(HTTPException) as exc_info:
-        await readiness_check(request)
-    assert exc_info.value.status_code == 503
+    code, body = await _ready(request, monkeypatch)
+    assert code == 503
+    assert body["status"] == "NOT_READY"
+    assert "mcp_domains" in body["failed_components"]
 
 
 @pytest.mark.asyncio
-async def test_ready_returns_503_when_runtime_none():
-    from fastapi import HTTPException
-    from maiw_api.routers.health import readiness_check
-
+async def test_ready_returns_503_when_runtime_none(monkeypatch):
     request = MagicMock()
     request.app.state.runtime = None
 
-    with pytest.raises(HTTPException) as exc_info:
-        await readiness_check(request)
-    assert exc_info.value.status_code == 503
+    code, body = await _ready(request, monkeypatch)
+    assert code == 503
+    assert body["failed_components"] == ["runtime"]
 
 
 @pytest.mark.asyncio
-async def test_ready_response_includes_domain_health():
+async def test_ready_response_includes_domain_health(monkeypatch):
     from maiw_mcp.circuit_registry import DomainCircuitRegistry
-    from maiw_api.routers.health import readiness_check
 
     reg = DomainCircuitRegistry.for_domains(domains=["equipment", "labor"])
-    runtime = MagicMock()
-    runtime.circuit_registry = reg
-
     request = MagicMock()
-    request.app.state.runtime = runtime
+    request.app.state.runtime = _ready_runtime(reg)
 
-    response = await readiness_check(request)
-    assert "domain_health" in response
-    assert "healthy_domains" in response
-    assert "circuit_open_domains" in response
+    code, body = await _ready(request, monkeypatch)
+    assert code == 200
+    assert "domain_health" in body
+    assert "healthy_domains" in body
+    assert "circuit_open_domains" in body
+    assert body["components"]["persistence"]["status"] == "ready"
 
 
 # ---------------------------------------------------------------------------

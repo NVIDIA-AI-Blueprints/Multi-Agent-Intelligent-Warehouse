@@ -71,12 +71,15 @@ from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Header
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from maiw_models import (
     ModelRequest,
     ModelUnavailable,
     ModelGatewayError,
+    ModelIdentityMismatch,
+    ModelIdentityUnverifiable,
+    ModelPolicyViolation,
     ReasoningLevel,
     RiskLevel,
     Modality,
@@ -119,6 +122,8 @@ class InferenceMessage(BaseModel):
     Only role and content are accepted — no function call metadata.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     role: Literal["user", "assistant", "system"]
     content: str = Field(..., max_length=_MAX_CONTENT_BYTES)
 
@@ -139,7 +144,13 @@ class InferenceRequest(BaseModel):
       - raw model override      (PolicyFilter is authoritative)
 
     The sandbox describes task *intent*.  ModelGateway decides the model.
+
+    Unknown fields are rejected (``extra="forbid"``, v2.0.1): a field the
+    endpoint does not understand — ``model``, ``provider``, ``routing_hints``,
+    ``endpoint`` … — is a 422, never silently ignored.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     task: str = Field(..., max_length=_MAX_TASK_BYTES, description="Agent task name.")
     messages: list[InferenceMessage] = Field(
@@ -211,6 +222,13 @@ class RouteMetadata(BaseModel):
 
     Contains only the information needed for sandbox-side tracing and
     audit.  No provider URLs, API keys, or deployment details are included.
+
+    v2.0.1 round 2: ``selected_model_id`` / ``generation`` describe the
+    APPROVED physical deployment the DeploymentResolver dispatched to (the
+    generation is bound to that physical ID, not to the role).
+    ``provider_reported_model_id`` is what the provider said it served;
+    ``identity_verified`` is true when that matched.  A mismatch never reaches
+    this model — the request fails with 502 MODEL_IDENTITY_MISMATCH.
     """
 
     selected_model_id: str
@@ -220,6 +238,8 @@ class RouteMetadata(BaseModel):
     routing_rule: str
     fallback_used: bool
     candidate_count: int
+    provider_reported_model_id: str | None = None
+    identity_verified: bool = False
 
 
 class InferenceResponse(BaseModel):
@@ -320,6 +340,13 @@ def _verify_internal_token(
     ),
     responses={
         400: {"model": InferenceError, "description": "Malformed request"},
+        502: {
+            "model": InferenceError,
+            "description": (
+                "Provider reported a different model (MODEL_IDENTITY_MISMATCH) "
+                "or no usable model identity (MODEL_IDENTITY_UNVERIFIABLE)"
+            ),
+        },
         401: {"model": InferenceError, "description": "Unauthorized"},
         422: {
             "model": InferenceError,
@@ -327,7 +354,10 @@ def _verify_internal_token(
         },
         503: {
             "model": InferenceError,
-            "description": "Model unavailable or circuit open",
+            "description": (
+                "Model unavailable, circuit open, or MODEL_POLICY_VIOLATION "
+                "(role bound to an unapproved physical model)"
+            ),
         },
         504: {"model": InferenceError, "description": "Deadline exceeded"},
     },
@@ -394,6 +424,55 @@ async def sandbox_inference(
                 trace_id=body.trace_id,
             ).model_dump(),
         )
+    except ModelPolicyViolation as exc:
+        # v2.0.1 round 2: the role is bound to an unapproved physical model.
+        # Rejected before any provider call.
+        logger.error(
+            "inference: model policy violation role=%s model=%s reason=%s",
+            exc.role,
+            exc.model_id,
+            exc.reason,
+        )
+        return JSONResponse(
+            status_code=503,
+            content=InferenceError(
+                code="MODEL_POLICY_VIOLATION",
+                message=str(exc),
+                trace_id=body.trace_id,
+            ).model_dump(),
+        )
+    except ModelIdentityUnverifiable as exc:
+        # v2.0.1 round 3: the provider answer carried no usable model
+        # identity — it cannot be verified as the approved model; discarded.
+        logger.error(
+            "inference: provider model identity unverifiable dispatched=%s reason=%s",
+            exc.model_id,
+            exc.reason,
+        )
+        return JSONResponse(
+            status_code=502,
+            content=InferenceError(
+                code="MODEL_IDENTITY_UNVERIFIABLE",
+                message=str(exc),
+                trace_id=body.trace_id,
+            ).model_dump(),
+        )
+    except ModelIdentityMismatch as exc:
+        # v2.0.1 round 2: the provider reported a different model than the
+        # approved one dispatched.  The response is discarded.
+        logger.error(
+            "inference: provider model identity mismatch dispatched=%s reported=%s",
+            exc.model_id,
+            exc.reported_model_id,
+        )
+        return JSONResponse(
+            status_code=502,
+            content=InferenceError(
+                code="MODEL_IDENTITY_MISMATCH",
+                message=str(exc),
+                trace_id=body.trace_id,
+            ).model_dump(),
+        )
     except ModelUnavailable as exc:
         # Raised when circuit is open (re-raised as ModelUnavailable by gateway),
         # or when no eligible model is available after policy filtering.
@@ -419,14 +498,17 @@ async def sandbox_inference(
         )
 
     # ── 5. Build safe route metadata ─────────────────────────────────────────
-    # Retrieve the generation from the registry via the public property.
-    # The registry is the single source of truth for which generation a
-    # model_id belongs to.
-    cap = gateway.registry.get_by_id(response.model_id)
-    generation = cap.generation if cap is not None else "unknown"
-    from maiw_models.routing import PolicyFilter
+    # v2.0.1 round 2: generation comes from the DeploymentResolver result the
+    # gateway dispatched (physical model ID ↔ generation, approved table), not
+    # from a role label or a provider-supplied model name.
+    from maiw_models import APPROVED_MODEL_GENERATIONS, default_resolver
 
-    approved_family = generation in PolicyFilter.APPROVED_MODEL_GENERATIONS
+    generation = (
+        response.generation
+        or default_resolver().generation_for(response.model_id)
+        or "unknown"
+    )
+    approved_family = generation in APPROVED_MODEL_GENERATIONS
 
     rd = response.route_decision
     route_meta = RouteMetadata(
@@ -437,6 +519,8 @@ async def sandbox_inference(
         routing_rule=rd.routing_rule,
         fallback_used=rd.fallback_from is not None,
         candidate_count=len(rd.candidate_models),
+        provider_reported_model_id=response.provider_reported_model_id,
+        identity_verified=response.identity_verified,
     )
 
     latency = (time.monotonic() - t0) * 1000.0

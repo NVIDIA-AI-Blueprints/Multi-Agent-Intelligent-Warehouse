@@ -9,6 +9,7 @@ model provider, no execution package.
 
 from __future__ import annotations
 
+import os
 import sys
 import uuid
 from datetime import datetime, timezone
@@ -16,6 +17,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+
+# Never read a developer's ``.env`` during tests (python-dotenv honours this
+# variable; see tests/conftest.py).  Needed here too because this directory
+# can be collected first or run on its own.
+os.environ.setdefault("PYTHON_DOTENV_DISABLED", "1")
 
 # Ensure THIS package copy is imported, not a sibling editable install.
 _PACKAGE_ROOT = Path(__file__).resolve().parent.parent

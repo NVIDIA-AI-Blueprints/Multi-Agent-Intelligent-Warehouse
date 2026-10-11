@@ -47,6 +47,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
+from .deployment import APPROVED_MODEL_GENERATIONS
 from .models import (
     DeploymentMode,
     ModelCapability,
@@ -145,6 +146,9 @@ class PolicyFilter:
     Policy constraints applied (all must pass to be eligible):
         1. Model must be enabled (enabled=True in registry).
         2. Model generation must be in APPROVED_MODEL_GENERATIONS (Nemotron 3 / 3.5).
+        2b. PHYSICAL IDENTITY (v2.0.1 round 2): the physical model ID itself must
+            be an approved deployment for the candidate's role
+            (DeploymentResolver / APPROVED_DEPLOYMENTS).
         3. Modality must be supported by the model.
         4. DeploymentMode must be compatible with the model's provider.
         5. RiskLevel constraint: CRITICAL risk → high-capability roles only.
@@ -157,8 +161,12 @@ class PolicyFilter:
 
     Llama-family Nemotron models (e.g. nvidia/llama-3.1-nemotron-nano-8b-v1),
     arbitrary Llama, Qwen, or any other non-Nemotron-3/3.5 model are REJECTED.
-    This policy is enforced by the generation field on ModelCapability, not by
-    string matching against model IDs.
+    The generation is bound to the PHYSICAL model ID in the approved deployment
+    table (maiw_models.deployment) — never to the role name, and never inferred
+    by parsing the ID.  An environment variable that binds a role to an
+    unapproved or mismatched ID makes that role ineligible here, and
+    ModelRouter/ModelGateway reject it with ModelPolicyViolation before any
+    provider call.
 
     PolicyFilter does NOT rank candidates — that is the routing strategy's job.
     Routing strategy MUST NOT select a model excluded by PolicyFilter.
@@ -168,9 +176,7 @@ class PolicyFilter:
     # This set is fixed for production routing and CANNOT be widened by any
     # constructor argument, environment variable, or runtime configuration.
     # Evaluation Lab must use PolicyFilter._for_evaluation() (isolated path).
-    APPROVED_MODEL_GENERATIONS: frozenset[str] = frozenset(
-        {"nemotron-3", "nemotron-3.5"}
-    )
+    APPROVED_MODEL_GENERATIONS: frozenset[str] = APPROVED_MODEL_GENERATIONS
 
     # Roles that satisfy HIGH-risk or HIGH-reasoning minimum capability.
     _HIGH_CAPABILITY_ROLES: frozenset[str] = frozenset({"super", "ultra"})
@@ -199,6 +205,10 @@ class PolicyFilter:
         """
         self._registry = registry
         self._approved_generations: frozenset[str] = self.APPROVED_MODEL_GENERATIONS
+        # Physical identity enforcement is always on in production.  Only the
+        # evaluation-only factory below (offline research registries) turns it
+        # off, together with its explicit generation override.
+        self._enforce_physical_identity: bool = True
 
     @classmethod
     def _for_evaluation(
@@ -229,7 +239,24 @@ class PolicyFilter:
         """
         instance = cls(registry)
         instance._approved_generations = approved_generations
+        instance._enforce_physical_identity = False
         return instance
+
+    def physical_identity_violation(
+        self, role: str, cap: ModelCapability
+    ) -> tuple[str, str] | None:
+        """
+        ``(reason, message)`` when ``cap.model_id`` is not an approved physical
+        deployment for ``role``; ``None`` when it is (or for evaluation-only
+        filters).  ``role`` is the role being routed to, which may differ from
+        ``cap.role`` when two roles were bound to the same ID.
+        """
+        if not self._enforce_physical_identity:
+            return None
+        resolver = getattr(self._registry, "resolver", None)
+        if resolver is None:  # pragma: no cover - registry always has one
+            return ("UNAPPROVED_MODEL_ID", "no DeploymentResolver configured")
+        return resolver.violation(role, cap.model_id)
 
     @property
     def approved_generations(self) -> frozenset[str]:
@@ -280,10 +307,16 @@ class PolicyFilter:
         # 2. MODEL FAMILY POLICY: generation must be in approved set.
         # Nemotron 3 and Nemotron 3.5 are approved for MAIW v2 production and
         # qualification.  Llama-family Nemotron, arbitrary Llama, Qwen, and
-        # any unknown generation are REJECTED.  This check is authoritative —
-        # the registry populates generation from explicit strings, never from
-        # model_id parsing, so it cannot be bypassed by model_id injection.
+        # any unknown generation are REJECTED.  The registry derives generation
+        # from the approved deployment table keyed by physical model ID, so an
+        # injected/unknown ID is labelled "unapproved" and rejected here.
         if cap.generation not in self._approved_generations:
+            return False
+
+        # 2b. PHYSICAL IDENTITY (v2.0.1 round 2): the dispatched model ID must
+        # be the approved deployment for this role — a generation label alone
+        # is not sufficient.
+        if self.physical_identity_violation(cap.role, cap) is not None:
             return False
 
         # 3. Provider must match the deployment mode.

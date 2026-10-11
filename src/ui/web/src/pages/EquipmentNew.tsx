@@ -50,7 +50,7 @@ import {
 } from '@mui/icons-material';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { equipmentAPI, EquipmentAsset } from '../services/api';
+import { equipmentAPI, EquipmentAsset, describeOperationalWriteError } from '../services/api';
 import { TabPanel } from '../components/common';
 
 const EquipmentNew: React.FC = () => {
@@ -349,6 +349,14 @@ const EquipmentNew: React.FC = () => {
           Add Asset
         </Button>
       </Box>
+
+      {[assignMutation, releaseMutation, maintenanceMutation].map((m, i) =>
+        m.isError ? (
+          <Alert key={i} severity="error" sx={{ mb: 2 }} onClose={() => m.reset()}>
+            {describeOperationalWriteError(m.error)}
+          </Alert>
+        ) : null
+      )}
 
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>

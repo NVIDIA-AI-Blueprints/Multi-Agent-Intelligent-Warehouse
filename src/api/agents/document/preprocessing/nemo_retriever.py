@@ -24,7 +24,6 @@ from typing import Dict, Any, List, Optional
 import os
 import uuid
 from datetime import datetime
-import httpx
 import json
 from PIL import Image
 import io
@@ -107,34 +106,13 @@ class NeMoRetrieverPreprocessor:
     """
 
     def __init__(self):
-        self.api_key = os.getenv("NEMO_RETRIEVER_API_KEY", "")
-        self.base_url = os.getenv(
-            "NEMO_RETRIEVER_URL", "https://integrate.api.nvidia.com/v1"
-        )
+        # v2.0.1 (audit P1-05): preprocessing is local (PDF → page images). It
+        # makes no model call; there is no provider URL or API key here.
         self.timeout = 60
 
     async def initialize(self):
-        """Initialize the NeMo Retriever preprocessor."""
-        try:
-            if not self.api_key:
-                logger.warning(
-                    "NEMO_RETRIEVER_API_KEY not found, using mock implementation"
-                )
-                return
-
-            # Test API connection
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(
-                    f"{self.base_url}/models",
-                    headers={"Authorization": f"Bearer {self.api_key}"},
-                )
-                response.raise_for_status()
-
-            logger.info("NeMo Retriever Preprocessor initialized successfully")
-
-        except Exception as e:
-            logger.error(f"Failed to initialize NeMo Retriever Preprocessor: {e}")
-            logger.warning("Falling back to mock implementation")
+        """Nothing to initialize: preprocessing is local."""
+        return None
 
     async def process_document(self, file_path: str) -> Dict[str, Any]:
         """
@@ -321,80 +299,22 @@ class NeMoRetrieverPreprocessor:
 
     async def _detect_page_elements(self, image: Image.Image) -> Dict[str, Any]:
         """
-        Detect page elements using NeMo Retriever models.
+        Page-element (layout) detection.
 
-        Uses:
-        - nv-yolox-page-elements-v1 for element detection
-        - nemotron-page-elements-v1 for semantic regions
+        v2.0.1 (audit P1-05): the v2.0.0 implementation sent a text-only chat
+        request to a provider directly (outside ModelGateway) and then returned
+        hard-coded elements — or mock elements on any failure. No approved
+        Nemotron 3 / 3.5 layout model exists, so layout detection is reported
+        honestly as not performed. Nothing downstream depends on these
+        elements for correctness (OCR runs per page image).
         """
-        # Immediately use mock if no API key - don't wait for timeout
-        if not self.api_key:
-            logger.info("No API key found, using mock page element detection")
-            return await self._mock_page_element_detection(image)
-        
-        try:
-            # Convert image to base64
-            import io
-            import base64
-
-            buffer = io.BytesIO()
-            image.save(buffer, format="PNG")
-            image_base64 = base64.b64encode(buffer.getvalue()).decode()
-
-            # Call NeMo Retriever API for element detection with shorter timeout
-            # Use a shorter timeout to fail fast and fall back to mock
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.post(
-                    f"{self.base_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": "nvidia/nemotron-3-super-120b-a12b",  # Fallback model for page element detection
-                        "messages": [
-                            {
-                                "role": "user",
-                                "content": f"Analyze this document image and detect page elements like text blocks, tables, headers, and other structural components. Image data: {image_base64[:100]}...",
-                            }
-                        ],
-                        "max_tokens": 2000,
-                        "temperature": 0.1,
-                    },
-                )
-                response.raise_for_status()
-
-                result = response.json()
-
-                # Parse element detection results from chat completions response
-                content = result["choices"][0]["message"]["content"]
-                elements = self._parse_element_detection(
-                    {
-                        "elements": [
-                            {
-                                "type": "text_block",
-                                "confidence": 0.9,
-                                "bbox": [0, 0, 100, 100],
-                                "area": 10000,
-                            }
-                        ]
-                    }
-                )
-
-                return {
-                    "elements": elements,
-                    "confidence": 0.9,
-                    "model_used": "nv-yolox-page-elements-v1",
-                }
-
-        except (httpx.TimeoutException, httpx.RequestError) as e:
-            logger.warning(f"API call failed or timed out: {e}. Falling back to mock implementation.")
-            # Fall back to mock implementation immediately on timeout/network error
-            return await self._mock_page_element_detection(image)
-        except Exception as e:
-            logger.warning(f"Page element detection failed: {e}. Falling back to mock implementation.")
-            # Fall back to mock implementation on any other error
-            return await self._mock_page_element_detection(image)
+        return {
+            "elements": [],
+            "confidence": None,
+            "model_used": None,
+            "layout_detection": "not_performed",
+            "reason": "no approved layout-detection model; layout is not inferred",
+        }
 
     def _parse_element_detection(
         self, api_result: Dict[str, Any]
@@ -437,35 +357,3 @@ class NeMoRetrieverPreprocessor:
             logger.error(f"Failed to parse element detection results: {e}")
 
         return elements
-
-    async def _mock_page_element_detection(self, image: Image.Image) -> Dict[str, Any]:
-        """Mock implementation for page element detection."""
-        width, height = image.size
-
-        # Generate mock elements based on image dimensions
-        mock_elements = [
-            {
-                "type": "title",
-                "confidence": 0.95,
-                "bbox": [50, 50, width - 100, 100],
-                "area": (width - 150) * 50,
-            },
-            {
-                "type": "table",
-                "confidence": 0.88,
-                "bbox": [50, 200, width - 100, height - 200],
-                "area": (width - 150) * (height - 400),
-            },
-            {
-                "type": "text",
-                "confidence": 0.92,
-                "bbox": [50, 150, width - 100, 180],
-                "area": (width - 150) * 30,
-            },
-        ]
-
-        return {
-            "elements": mock_elements,
-            "confidence": 0.9,
-            "model_used": "mock-implementation",
-        }

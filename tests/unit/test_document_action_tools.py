@@ -92,15 +92,12 @@ class TestDocumentActionToolsInitialization:
             patch.dict(
                 sys.modules, {"src.api.services.document": mock_document_module}
             ),
-            patch(
-                "src.api.agents.document.action_tools.get_nim_client",
-                return_value=mock_nim_client,
-            ),
             patch.object(tools, "_load_status_data"),
         ):
             await tools.initialize()
 
-            assert tools.nim_client == mock_nim_client
+            # v2.0.1: no legacy NIM client is constructed (ModelGateway only)
+            assert tools.nim_client is None
             assert tools.db_service == mock_db_service
             assert tools.use_database is True
 
@@ -124,15 +121,11 @@ class TestDocumentActionToolsInitialization:
             patch.dict(
                 sys.modules, {"src.api.services.document": mock_document_module}
             ),
-            patch(
-                "src.api.agents.document.action_tools.get_nim_client",
-                return_value=mock_nim_client,
-            ),
             patch.object(tools, "_load_status_data"),
         ):
             await tools.initialize()
 
-            assert tools.nim_client == mock_nim_client
+            assert tools.nim_client is None
             assert tools.db_service is None
             assert tools.use_database is False
 
@@ -530,27 +523,27 @@ class TestDocumentActionToolsStatusManagement:
         assert response["stages"] == []
         assert response["quality_score"] is None
         assert response["routing_decision"] is None
-        assert response["is_mock"] is True
+        # v2.0.1: nothing fabricated — explicitly unavailable, not "mock"
+        assert response["is_mock"] is False
+        assert response["unavailable"] is True
         assert response["reason"] == "test_reason"
         assert response["message"] == "test message"
 
     def test_create_mock_data_response(self):
-        """Test _create_mock_data_response creates mock data with optional fields."""
+        """v2.0.1 (P1-05): the "no results" response fabricates nothing."""
         tools = DocumentActionTools()
 
-        with patch.object(
-            tools, "_get_mock_extraction_data", return_value={"test": "data"}
-        ):
-            response = tools._create_mock_data_response()
+        response = tools._create_mock_data_response()
+        assert response["is_mock"] is False
+        assert response["unavailable"] is True
+        assert response["extraction_results"] == []
+        assert response["quality_score"] is None
 
-            assert response["is_mock"] is True
-            assert response["test"] == "data"
-
-            response_with_reason = tools._create_mock_data_response(
-                reason="test_reason", message="test message"
-            )
-            assert response_with_reason["reason"] == "test_reason"
-            assert response_with_reason["message"] == "test message"
+        response_with_reason = tools._create_mock_data_response(
+            reason="test_reason", message="test message"
+        )
+        assert response_with_reason["reason"] == "test_reason"
+        assert response_with_reason["message"] == "test message"
 
     def test_load_status_data_file_not_exists(self):
         """Test _load_status_data handles missing file gracefully."""
@@ -886,21 +879,12 @@ class TestDocumentActionToolsQualityScore:
 
 
 class TestDocumentActionToolsMockData:
-    """Test mock data generation."""
+    """v2.0.1 (P1-05): the random mock-extraction generator was removed."""
 
-    def test_get_mock_extraction_data(self):
-        """Test _get_mock_extraction_data generates valid structure."""
+    def test_mock_extraction_generator_removed(self):
         tools = DocumentActionTools()
-
-        result = tools._get_mock_extraction_data()
-
-        assert isinstance(result, dict)
-        assert "extraction_results" in result
-        assert "confidence_scores" in result
-        assert "stages" in result
-        assert "quality_score" in result
-        assert "routing_decision" in result
-        assert len(result["extraction_results"]) > 0
+        assert not hasattr(tools, "_get_mock_extraction_data")
+        assert not hasattr(tools, "_process_document_locally")
 
 
 class TestDocumentActionToolsDocumentOperations:

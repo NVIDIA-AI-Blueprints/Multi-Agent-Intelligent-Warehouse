@@ -27,6 +27,13 @@ import sys
 from pathlib import Path
 from typing import Generator
 
+# Tests must never read a developer's ``.env``: the app calls ``load_dotenv()``
+# in its lifespan and health checks, so a stray ``.env`` would leak settings
+# into whichever test happens to start the app first.  python-dotenv >= 1.1
+# makes ``load_dotenv()`` a no-op when PYTHON_DOTENV_DISABLED is truthy.
+# ``setdefault`` keeps an explicit caller value (CI already exports it).
+os.environ.setdefault("PYTHON_DOTENV_DISABLED", "1")
+
 # Project root must precede site-packages so ``from tests.unit...`` resolves here,
 # not a third-party ``tests`` distribution (e.g. transitive test helpers).
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -126,3 +133,97 @@ def test_data_dir(project_root: Path) -> Path:
 def setup_test_environment() -> Generator[None, None, None]:
     """Reserved for per-test environment hooks (project root is set at conftest import)."""
     yield
+
+
+# ── Process-global singleton isolation ───────────────────────────────────────
+#
+# Lazily-created, process-wide singletons that tests under tests/ create or
+# replace.  Every entry's module-level default is ``None`` (or, for
+# _TASK_REGISTRY, an empty dict).  The fixture below snapshots each one (and
+# ``os.environ``) before a test and restores it afterwards, so no test can
+# hand its singleton (often bound to a mock, a closed fake server, a reloaded
+# app or a patched ``SQLRetriever.initialize``) to whichever test runs next.
+# Snapshots are taken after module/class-scoped fixtures run, so state those
+# fixtures install is preserved for their own tests.  A module first imported
+# during the test is reset to the module default.
+#
+#   (module, attribute path)
+_PROCESS_SINGLETONS: tuple[tuple[str, str], ...] = (
+    ("maiw_models", "_gateway_instance"),  # reset_model_gateway()
+    ("maiw_models.providers.nim_client", "_nim_client"),  # close_nim_client()
+    ("maiw_api.bootstrap", "_runtime"),  # reset_runtime()
+    ("maiw_api.demo.controller", "_controller"),  # reset_demo_controller()
+    # configure_server(provider) has no reset hook; None = lazy default build.
+    ("mcp_servers.inventory.server", "_provider"),
+    ("mcp_servers.equipment.server", "_provider"),
+    ("mcp_servers.labor.server", "_provider"),
+    ("mcp_servers.wave.server", "_provider"),
+    ("maiw_api.routers.equipment", "_sql"),
+    ("maiw_api.routers.operations", "_sql"),
+    ("maiw_api.routers.operations", "_task_queries"),
+    ("maiw_api.routers.safety", "_sql"),
+    # SQLRetriever is a __new__ singleton whose DatabaseConfig is read from the
+    # environment on first construction only.
+    ("src.retrieval.structured.sql_retriever", "SQLRetriever._instance"),
+    ("src.retrieval.structured.sql_retriever", "_sql_retriever"),
+    ("src.api.services.llm.nim_client", "_nim_client"),
+    # In-memory request counters live on this singleton (REDIS is stubbed).
+    ("src.api.services.security.rate_limiter", "_rate_limiter"),
+    ("src.api.services.agent_config", "_config_loader"),
+    ("src.api.agents.inventory.equipment_asset_tools", "_equipment_asset_tools"),
+    (
+        "src.api.agents.forecasting.forecasting_action_tools",
+        "_forecasting_action_tools",
+    ),
+)
+_MISSING = object()
+
+
+def _resolve_owner(module_name: str, path: str):
+    """Return (owner object, attribute name) or (None, None) if not imported."""
+    module = sys.modules.get(module_name)
+    if module is None:
+        return None, None
+    owner = module
+    *parents, attr = path.split(".")
+    for part in parents:
+        owner = getattr(owner, part, None)
+        if owner is None:
+            return None, None
+    return owner, attr
+
+
+@pytest.fixture(autouse=True)
+def _isolate_process_singletons() -> Generator[None, None, None]:
+    """Restore documented process-global singletons (and os.environ) after every test."""
+    saved_environ = dict(os.environ)
+    saved = {}
+    for module_name, path in _PROCESS_SINGLETONS:
+        owner, attr = _resolve_owner(module_name, path)
+        if owner is not None:
+            saved[(module_name, path)] = getattr(owner, attr, _MISSING)
+    registry_mod = sys.modules.get("maiw_api.routers.agent_tasks")
+    saved_tasks = (
+        dict(registry_mod._TASK_REGISTRY) if registry_mod is not None else None
+    )
+    yield
+    for module_name, path in _PROCESS_SINGLETONS:
+        owner, attr = _resolve_owner(module_name, path)
+        if owner is None:
+            continue
+        value = saved.get((module_name, path), None)  # first import → default
+        if value is not _MISSING:
+            setattr(owner, attr, value)
+    registry_mod = sys.modules.get("maiw_api.routers.agent_tasks")
+    if registry_mod is not None:
+        registry_mod._TASK_REGISTRY.clear()
+        registry_mod._TASK_REGISTRY.update(saved_tasks or {})
+    # Environment: undo raw ``os.environ`` writes that bypassed monkeypatch
+    # (including production ``os.environ.setdefault`` calls such as
+    # LANGSMITH_TRACING in maiw_agents.runtime.deep_agents_runtime).
+    if os.environ != saved_environ:
+        for key in set(os.environ) - set(saved_environ):
+            del os.environ[key]
+        for key, value in saved_environ.items():
+            if os.environ.get(key) != value:
+                os.environ[key] = value

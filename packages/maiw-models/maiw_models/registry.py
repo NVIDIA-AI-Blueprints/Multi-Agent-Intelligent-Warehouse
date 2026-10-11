@@ -69,6 +69,7 @@ from __future__ import annotations
 import logging
 import os
 
+from .deployment import DeploymentResolver, default_resolver
 from .models import (
     CostClass,
     DeploymentStatus,
@@ -142,7 +143,12 @@ qualification.  Family: Llama-family Nemotron (not Nemotron 3 / Nemotron 3.5).
 
 _ENABLED_DEFAULTS: dict[str, bool] = {
     _LIGHTNING_ENABLED_ENV: True,  # validated DEPLOYED; fast path now available
-    _NANO_ENABLED_ENV: True,  # validated DEPLOYED 2026-08-20; enabled by default (same tier as Lightning/Super)
+    # v2.0.1 round 2: Nano is DISABLED by default.  The hosted endpoint retired
+    # nvidia/nemotron-3-nano-30b-a3b on 2026-09-01 (HTTP 410), so a default-on
+    # Nano role was a known-dead default.  MEDIUM reasoning falls back to Super
+    # (fallback_used=true).  Enable Nano only with a working approved deployment
+    # (e.g. a self-hosted NIM serving that exact model ID).
+    _NANO_ENABLED_ENV: False,
     _SUPER_ENABLED_ENV: True,  # validated DEPLOYED; primary deployment
     _ULTRA_ENABLED_ENV: False,  # validated DEPLOYED but ~31s latency; operator opt-in
     _NANO_OMNI_ENABLED_ENV: False,  # NOT_CURRENTLY_DEPLOYED; requires operator model config
@@ -169,10 +175,26 @@ class ModelRegistry:
     Update after each new NIM catalog release.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, resolver: DeploymentResolver | None = None) -> None:
+        # v2.0.1 round 2: the resolver binds every physical model ID to its
+        # generation.  Production always uses the canonical approved table.
+        self._resolver: DeploymentResolver = resolver or default_resolver()
         self._capabilities: dict[str, ModelCapability] = {}
         self._role_index: dict[str, str] = {}  # role → model_id
         self._build()
+
+    @property
+    def resolver(self) -> DeploymentResolver:
+        """The DeploymentResolver that owns physical model identity."""
+        # A registry assembled without __init__ (test stubs) still enforces
+        # the canonical approved table — never "no resolver".
+        return getattr(self, "_resolver", None) or default_resolver()
+
+    def _generation(self, model_id: str) -> str:
+        # Generation comes from the approved deployment table, keyed by the
+        # PHYSICAL model ID — never from the role.  Unknown IDs are labelled
+        # "unapproved", which PolicyFilter rejects.
+        return self.resolver.generation_for(model_id) or "unapproved"
 
     def _build(self) -> None:
         nano_omni_model = os.getenv(
@@ -191,14 +213,19 @@ class ModelRegistry:
             )
             nano_omni_enabled = False
 
+        lightning_model = os.getenv(
+            _LIGHTNING_MODEL_ENV, _DEFAULTS[_LIGHTNING_MODEL_ENV]
+        )
+        nano_model = os.getenv(_NANO_MODEL_ENV, _DEFAULTS[_NANO_MODEL_ENV])
+        super_model = os.getenv(_SUPER_MODEL_ENV, _DEFAULTS[_SUPER_MODEL_ENV])
+        ultra_model = os.getenv(_ULTRA_MODEL_ENV, _DEFAULTS[_ULTRA_MODEL_ENV])
+
         entries = [
             ModelCapability(
-                model_id=os.getenv(
-                    _LIGHTNING_MODEL_ENV, _DEFAULTS[_LIGHTNING_MODEL_ENV]
-                ),
+                model_id=lightning_model,
                 role="lightning",
                 family="nemotron",
-                generation="nemotron-3.5",
+                generation=self._generation(lightning_model),
                 provider="nvidia-nim",
                 deployment_status=DeploymentStatus.DEPLOYED,
                 modalities={"text"},
@@ -216,10 +243,10 @@ class ModelRegistry:
                 ),
             ),
             ModelCapability(
-                model_id=os.getenv(_NANO_MODEL_ENV, _DEFAULTS[_NANO_MODEL_ENV]),
+                model_id=nano_model,
                 role="nano",
                 family="nemotron",
-                generation="nemotron-3",
+                generation=self._generation(nano_model),
                 provider="nvidia-nim",
                 deployment_status=DeploymentStatus.DEPLOYED,
                 modalities={"text"},
@@ -236,10 +263,10 @@ class ModelRegistry:
                 ),
             ),
             ModelCapability(
-                model_id=os.getenv(_SUPER_MODEL_ENV, _DEFAULTS[_SUPER_MODEL_ENV]),
+                model_id=super_model,
                 role="super",
                 family="nemotron",
-                generation="nemotron-3",
+                generation=self._generation(super_model),
                 provider="nvidia-nim",
                 deployment_status=DeploymentStatus.DEPLOYED,
                 modalities={"text"},
@@ -256,10 +283,10 @@ class ModelRegistry:
                 ),
             ),
             ModelCapability(
-                model_id=os.getenv(_ULTRA_MODEL_ENV, _DEFAULTS[_ULTRA_MODEL_ENV]),
+                model_id=ultra_model,
                 role="ultra",
                 family="nemotron",
-                generation="nemotron-3",
+                generation=self._generation(ultra_model),
                 provider="nvidia-nim",
                 deployment_status=DeploymentStatus.DEPLOYED,
                 modalities={"text"},
@@ -279,12 +306,10 @@ class ModelRegistry:
                 model_id=nano_omni_model,
                 role="nano-omni",
                 family="nemotron",
-                # Nano Omni is designed as a Nemotron 3 multimodal model.  No verified
-                # model ID exists yet on NVIDIA NIM (as of 2026-08-20), but the role is
-                # architectural Nemotron 3 — set generation accordingly so PolicyFilter
-                # treats it as an approved-family candidate.  The enabled=False default
-                # prevents it from being actually selected until a model ID is configured.
-                generation="nemotron-3",
+                # v2.0.1 round 2: generation is bound to the physical model ID.
+                # No multimodal model is in the approved deployment table, so
+                # any configured Nano Omni ID is "unapproved" and fails closed.
+                generation=self._generation(nano_omni_model),
                 provider="nvidia-nim",
                 # No verified Nemotron-3 Nano Omni model ID found on NIM as of 2026-08-20.
                 deployment_status=DeploymentStatus.NOT_CURRENTLY_DEPLOYED,
@@ -303,16 +328,31 @@ class ModelRegistry:
         self._capabilities.clear()
         self._role_index.clear()
         for cap in entries:
-            self._capabilities[cap.model_id] = cap
+            if cap.model_id in self._capabilities:
+                # Two roles bound to one physical ID: keep the first binding;
+                # the later role resolves to a ROLE_MISMATCH violation.
+                logger.error(
+                    "ModelRegistry: role=%s is bound to model %s, already bound "
+                    "to role=%s — role binding rejected (ROLE_MISMATCH)",
+                    cap.role,
+                    cap.model_id,
+                    self._capabilities[cap.model_id].role,
+                )
+            else:
+                self._capabilities[cap.model_id] = cap
             self._role_index[cap.role] = cap.model_id
             status = "enabled" if cap.enabled else "disabled"
-            logger.info(
-                "ModelRegistry: role=%s model=%s generation=%s deployment=%s status=%s",
+            problem = self.resolver.violation(cap.role, cap.model_id)
+            log = logger.error if (problem and cap.enabled) else logger.info
+            log(
+                "ModelRegistry: role=%s model=%s generation=%s deployment=%s "
+                "status=%s physical_binding=%s",
                 cap.role,
                 cap.model_id,
                 cap.generation,
                 cap.deployment_status.value,
                 status,
+                problem[0] if problem else "approved",
             )
 
     def reload(self) -> None:
@@ -327,6 +367,33 @@ class ModelRegistry:
         if model_id is None:
             return None
         return self._capabilities.get(model_id)
+
+    def binding_violations(self) -> list[dict[str, str]]:
+        """
+        Enabled role bindings whose physical model ID is not approved for the
+        role (v2.0.1 round 2).  Empty list = every enabled role is bound to an
+        approved deployment.  Used by readiness and the preflight helper.
+        """
+        out: list[dict[str, str]] = []
+        for role, model_id in self._role_index.items():
+            cap = self._capabilities.get(model_id)
+            enabled = cap is not None and cap.enabled
+            if cap is not None and cap.role != role:
+                # Collision: the role's own binding was dropped (see _build).
+                enabled = True
+            if not enabled:
+                continue
+            problem = self.resolver.violation(role, model_id)
+            if problem is not None:
+                out.append(
+                    {
+                        "role": role,
+                        "model_id": model_id,
+                        "reason": problem[0],
+                        "message": problem[1],
+                    }
+                )
+        return out
 
     def get_enabled_by_role(self, role: str) -> ModelCapability | None:
         cap = self.get_by_role(role)

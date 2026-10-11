@@ -88,6 +88,10 @@ class MAIWRuntime:
     mcp_equipment_available: bool = False
     mcp_labor_available: bool = False
     mcp_wave_available: bool = False
+    # How each configured MCP domain is reached (v2.0.1 round 2):
+    # {domain: ("url", "<url>") | ("in-memory", None)}.  Unconfigured domains
+    # are absent.  /api/v1/ready uses this to probe reachability.
+    mcp_domain_endpoints: dict = field(default_factory=dict)
 
     # Model + decision
     model_gateway: Any = None  # maiw_models.ModelGateway
@@ -122,6 +126,14 @@ class MAIWRuntime:
     world_graph: Any = None  # maiw_world.graph.CanonicalWarehouseGraph
     world_datapack_manifest: dict = field(default_factory=dict)
 
+    # Durable procedure state + governance dedupe ledger (v2.0.1, P1-03).
+    # Built once by maiw_api.persistence.build_persistence() from
+    # MAIW_PERSISTENCE_MODE / MAIW_PERSISTENCE_ROOT.  /api/v1/ready probes them.
+    persistence: Any = None  # maiw_api.persistence.PersistenceRuntime
+    procedure_store: Any = None  # JsonFileProcedureStateStore (reference profile)
+    governance_inbox: Any = None  # JsonFileGovernanceInbox (reference profile)
+    procedure_host: Any = None  # maiw_api.procedure_host.ProcedureHost
+
 
 async def get_runtime() -> MAIWRuntime:
     """
@@ -148,6 +160,49 @@ async def get_runtime() -> MAIWRuntime:
         logger.info("MAIW bootstrap: SOP domain predicates registered")
     except Exception as exc:  # pragma: no cover - defensive, mirrors block style
         logger.warning("MAIW bootstrap: SOP domain predicates unavailable — %s", exc)
+
+    # ── 0y. Durable persistence (v2.0.1, P1-03) ───────────────────────────────
+    # The ONE construction site for the ProcedureStateStore and GovernanceInbox
+    # used by the shipped app. Reference profile: JSON files under
+    # MAIW_PERSISTENCE_ROOT. Failures are recorded (never silently downgraded to
+    # memory) and surface as NOT_READY on /api/v1/ready.
+    try:
+        from maiw_api.persistence import build_persistence
+        from maiw_api.procedure_host import ProcedureHost
+
+        runtime.persistence = build_persistence()
+        runtime.procedure_store = runtime.persistence.procedure_store
+        runtime.governance_inbox = runtime.persistence.governance_inbox
+        if runtime.persistence.ok:
+            runtime.procedure_host = ProcedureHost(
+                store=runtime.procedure_store,
+                inbox=runtime.governance_inbox,
+            )
+            logger.info(
+                "MAIW bootstrap: ProcedureHost ready (%s, durable=%s)",
+                type(runtime.procedure_store).__name__,
+                runtime.persistence.config.durable,
+            )
+            # v2.0.1 round 2: detect governance outcomes that were accepted
+            # (fsynced) but whose resume never completed before a crash.  They
+            # are replayed exactly once by ProcedureHost.recover_accepted_
+            # governance() from the procedure's owner; /api/v1/ready reports
+            # the count under persistence.unapplied_governance.
+            unapplied = runtime.procedure_host.unapplied_governance()
+            if unapplied:
+                logger.warning(
+                    "MAIW bootstrap: %d accepted governance outcome(s) not yet "
+                    "applied (crash before resume): %s",
+                    len(unapplied),
+                    [g.procedure_execution_id for g in unapplied],
+                )
+        else:
+            logger.error(
+                "MAIW bootstrap: persistence unavailable — %s",
+                "; ".join(runtime.persistence.errors),
+            )
+    except Exception as exc:  # pragma: no cover - defensive, mirrors block style
+        logger.error("MAIW bootstrap: persistence wiring failed — %s", exc)
 
     # ── 0a. Circuit breakers — created before all network-touching components ──
     # Domain isolation: each MCP domain has its own independent circuit breaker.
@@ -213,21 +268,25 @@ async def get_runtime() -> MAIWRuntime:
         if inventory_url:
             registry.register_domain(_INVENTORY_CAPABILITIES, inventory_url)
             runtime.mcp_inventory_available = True
+            runtime.mcp_domain_endpoints["inventory"] = ("url", inventory_url)
 
         equipment_url = os.getenv("MAIW_MCP_SERVER_EQUIPMENT_URL")
         if equipment_url:
             registry.register_domain(_EQUIPMENT_CAPABILITIES, equipment_url)
             runtime.mcp_equipment_available = True
+            runtime.mcp_domain_endpoints["equipment"] = ("url", equipment_url)
 
         labor_url = os.getenv("MAIW_MCP_SERVER_LABOR_URL")
         if labor_url:
             registry.register_domain(_LABOR_CAPABILITIES, labor_url)
             runtime.mcp_labor_available = True
+            runtime.mcp_domain_endpoints["labor"] = ("url", labor_url)
 
         wave_url = os.getenv("MAIW_MCP_SERVER_WAVE_URL")
         if wave_url:
             registry.register_domain(_WAVE_CAPABILITIES, wave_url)
             runtime.mcp_wave_available = True
+            runtime.mcp_domain_endpoints["wave"] = ("url", wave_url)
 
         # Demo mode: register MCPServer instances for in-memory transport.
         # The MCP client's Client(server) accepts either a URL string (HTTP)
@@ -248,6 +307,8 @@ async def get_runtime() -> MAIWRuntime:
                 runtime.mcp_inventory_available = True
                 runtime.mcp_labor_available = True
                 runtime.mcp_wave_available = True
+                for _domain in ("equipment", "inventory", "labor", "wave"):
+                    runtime.mcp_domain_endpoints[_domain] = ("in-memory", None)
 
                 logger.info(
                     "MAIW bootstrap: DEMO MODE — four MCPServer instances registered "
@@ -322,21 +383,56 @@ async def get_runtime() -> MAIWRuntime:
                 "MAIW bootstrap: WarehouseStateProvider unavailable — %s", exc
             )
 
+    # ── 5b. Governed-write gate (v2.0.1 round 3, NEW3-P1-01) ─────────────────
+    # Write executors are built ONLY when the deployment profile offers governed
+    # writes (reference_governed, demo).  Before round 3 they were built whenever
+    # an MCP URL was set, so the plain ``reference`` profile executed writes
+    # while /api/v1/ready reported ``governed_write_path: not_offered``.  Read
+    # skills and the state provider above are unaffected.
+    governed_writes = False
+    try:
+        from maiw_api.profile import resolve_profile
+
+        _profile = resolve_profile()
+        governed_writes = bool(_profile.valid and _profile.governed_writes)
+        if not governed_writes:
+            logger.info(
+                "MAIW bootstrap: profile %r does not offer governed writes — "
+                "no ActionExecutor is built (MCP domains are read-only)",
+                _profile.name,
+            )
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.error("MAIW bootstrap: profile resolution failed — %s", exc)
+
+    # Execution journal (round 3, NEW3-P1-02): durable in the reference
+    # profiles, so an UNKNOWN write and the block on its target survive a
+    # restart.  An unreadable journal raises → that executor is not built and
+    # readiness reports the governed write path failed (fail closed).
+    def _execution_registry(domain: str):
+        from maiw_api.persistence import build_execution_registry
+
+        config = getattr(runtime.persistence, "config", None)
+        return build_execution_registry(domain, config)
+
     # ── 6. Equipment execution skills + EquipmentActionExecutor ──────────────
-    if runtime.mcp_client is not None and runtime.mcp_equipment_available:
+    if (
+        governed_writes
+        and runtime.mcp_client is not None
+        and runtime.mcp_equipment_available
+    ):
         try:
             from maiw_skills.equipment.skills import (
                 ExecuteEquipmentAssignmentSkill,
                 ExecuteEquipmentMaintenanceSkill,
                 ExecuteEquipmentReleaseSkill,
             )
-            from maiw_execution import EquipmentActionExecutor, ExecutionRegistry
+            from maiw_execution import EquipmentActionExecutor
 
             assign_skill = ExecuteEquipmentAssignmentSkill(runtime.mcp_client)
             release_skill = ExecuteEquipmentReleaseSkill(runtime.mcp_client)
             maintenance_skill = ExecuteEquipmentMaintenanceSkill(runtime.mcp_client)
 
-            runtime.equipment_registry = ExecutionRegistry()
+            runtime.equipment_registry = _execution_registry("equipment")
             runtime.equipment_executor = EquipmentActionExecutor(
                 assign_skill=assign_skill,
                 release_skill=release_skill,
@@ -353,13 +449,17 @@ async def get_runtime() -> MAIWRuntime:
             )
 
     # ── 7. Labor execution skill + LaborActionExecutor ────────────────────────
-    if runtime.mcp_client is not None and runtime.mcp_labor_available:
+    if (
+        governed_writes
+        and runtime.mcp_client is not None
+        and runtime.mcp_labor_available
+    ):
         try:
             from maiw_skills.labor.skills import ExecuteLaborAllocationSkill
-            from maiw_execution import LaborActionExecutor, ExecutionRegistry
+            from maiw_execution import LaborActionExecutor
 
             allocate_skill = ExecuteLaborAllocationSkill(runtime.mcp_client)
-            runtime.labor_registry = ExecutionRegistry()
+            runtime.labor_registry = _execution_registry("labor")
             runtime.labor_executor = LaborActionExecutor(
                 allocate_skill=allocate_skill,
                 registry=runtime.labor_registry,
@@ -369,13 +469,17 @@ async def get_runtime() -> MAIWRuntime:
             logger.warning("MAIW bootstrap: LaborActionExecutor unavailable — %s", exc)
 
     # ── 8. Wave execution skill + WaveActionExecutor ──────────────────────────
-    if runtime.mcp_client is not None and runtime.mcp_wave_available:
+    if (
+        governed_writes
+        and runtime.mcp_client is not None
+        and runtime.mcp_wave_available
+    ):
         try:
             from maiw_skills.wave.skills import ExecuteWaveReprioritizationSkill
-            from maiw_execution import WaveActionExecutor, ExecutionRegistry
+            from maiw_execution import WaveActionExecutor
 
             reprioritize_skill = ExecuteWaveReprioritizationSkill(runtime.mcp_client)
-            runtime.wave_registry = ExecutionRegistry()
+            runtime.wave_registry = _execution_registry("wave")
             runtime.wave_executor = WaveActionExecutor(
                 reprioritize_skill=reprioritize_skill,
                 registry=runtime.wave_registry,

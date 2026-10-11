@@ -27,7 +27,6 @@ import os
 import json
 from pathlib import Path
 
-from src.api.services.llm.nim_client import get_nim_client
 from src.api.agents.document.models.document_models import (
     ProcessingStage,
     QualityDecision,
@@ -113,13 +112,19 @@ class DocumentActionTools:
         return True, doc_status, None
 
     def _create_mock_data_response(self, reason: Optional[str] = None, message: Optional[str] = None) -> Dict[str, Any]:
-        """Create standardized mock data response with optional reason and message."""
-        response = {**self._get_mock_extraction_data(), "is_mock": True}
-        if reason:
-            response["reason"] = reason
-        if message:
-            response["message"] = message
-        return response
+        """
+        Response for "no real extraction results are available".
+
+        v2.0.1 (audit P1-05): this used to return randomly generated invoice
+        data (with a synthetic ``APPROVE`` quality decision) flagged
+        ``is_mock``. It now returns an explicit, empty *unavailable* response:
+        no fabricated fields, no quality score, no routing decision. The method
+        name is kept so existing callers do not change.
+        """
+        return self._create_empty_extraction_response(
+            reason or "results_unavailable",
+            message or "No extraction results are available for this document.",
+        )
 
     def _create_empty_extraction_response(
         self, reason: str, message: str
@@ -131,7 +136,10 @@ class DocumentActionTools:
             "stages": [],
             "quality_score": None,
             "routing_decision": None,
-            "is_mock": True,
+            # Nothing here was produced by a model or fabricated; the flag is
+            # kept for UI compatibility and is always False since v2.0.1.
+            "is_mock": False,
+            "unavailable": True,
             "reason": reason,
             "message": message,
         }
@@ -315,7 +323,9 @@ class DocumentActionTools:
     async def initialize(self):
         """Initialize document processing tools."""
         try:
-            self.nim_client = await get_nim_client()
+            # v2.0.1: no legacy NIM client is constructed here; document model
+            # inference goes only through the canonical ModelGateway
+            # (src/api/agents/document/model_gateway_adapter.py).
             self._load_status_data()  # Load persistent status data (not async) - fallback
             
             # Initialize database service
@@ -1663,253 +1673,7 @@ class DocumentActionTools:
             logger.error(
                 f"Failed to get extraction data for {document_id}: {e}", exc_info=True
             )
-            return self._get_mock_extraction_data()
-
-    async def _process_document_locally(self, document_id: str) -> Dict[str, Any]:
-        """Process document locally using the local processor."""
-        try:
-            # Get document info from status
-            success, doc_status, error_response = self._get_document_status_or_error(document_id, "process document locally")
-            if not success:
-                return self._create_mock_data_response()
-            file_path = doc_status.get("file_path")
-            
-            if not file_path or not os.path.exists(file_path):
-                logger.warning(f"File not found for document {_sanitize_log_data(document_id)}: {_sanitize_log_data(file_path)}")
-                logger.info(f"Attempting to use document filename: {_sanitize_log_data(doc_status.get('filename', 'N/A'))}")
-                # Return mock data but mark it as such
-                return self._create_mock_data_response("file_not_found")
-            
-            # Try to process the document locally
-            try:
-                from .processing.local_processor import local_processor
-                result = await local_processor.process_document(file_path, doc_status.get("document_type", "invoice"))
-                
-                if not result["success"]:
-                    logger.error(f"Local processing failed for {_sanitize_log_data(document_id)}: {_sanitize_log_data(str(result.get('error', 'Unknown error')))}")
-                    return self._create_mock_data_response("processing_failed")
-            except ImportError as e:
-                logger.warning(f"Local processor not available (missing dependencies): {_sanitize_log_data(str(e))}")
-                missing_module = str(e).replace("No module named ", "").strip("'\"")
-                if "pdfplumber" in missing_module.lower() or "pdf2image" in missing_module.lower():
-                    logger.info("Install PDF processing libraries: pip install pdfplumber pdf2image. Also install poppler-utils: sudo apt-get install poppler-utils")
-                elif "PIL" in missing_module or "Pillow" in missing_module:
-                    logger.info("Install Pillow (PIL) for image processing: pip install Pillow")
-                else:
-                    logger.info(f"Install missing dependency: pip install {_sanitize_log_data(missing_module)}")
-                return self._create_mock_data_response("dependencies_missing")
-            except Exception as e:
-                logger.error(f"Local processing error for {_sanitize_log_data(document_id)}: {_sanitize_log_data(str(e))}")
-                return self._create_mock_data_response("processing_error")
-            
-            # Convert local processing result to expected format
-            from .models.document_models import ExtractionResult, QualityScore, RoutingDecision, QualityDecision
-            
-            extraction_results = []
-            
-            # OCR Result
-            extraction_results.append(
-                ExtractionResult(
-                    stage="ocr_extraction",
-                    raw_data={"text": result["raw_text"]},
-                    processed_data={"extracted_text": result["raw_text"]},
-                    confidence_score=result["confidence_scores"]["ocr"],
-                    processing_time_ms=result["processing_time_ms"],
-                    model_used=result["model_used"],
-                    metadata=result["metadata"]
-                )
-            )
-            
-            # LLM Processing Result
-            extraction_results.append(
-                ExtractionResult(
-                    stage="llm_processing",
-                    raw_data={"raw_response": result["raw_text"]},
-                    processed_data=result["structured_data"],
-                    confidence_score=result["confidence_scores"]["entity_extraction"],
-                    processing_time_ms=result["processing_time_ms"],
-                    model_used=result["model_used"],
-                    metadata=result["metadata"]
-                )
-            )
-            
-            # Quality Score
-            quality_score = QualityScore(
-                overall_score=result["confidence_scores"]["overall"] * 5.0,  # Convert to 0-5 scale
-                completeness_score=result["confidence_scores"]["overall"] * 5.0,
-                accuracy_score=result["confidence_scores"]["overall"] * 5.0,
-                compliance_score=result["confidence_scores"]["overall"] * 5.0,
-                quality_score=result["confidence_scores"]["overall"] * 5.0,
-                decision=QualityDecision.APPROVE if result["confidence_scores"]["overall"] > 0.7 else QualityDecision.REVIEW,
-                reasoning={
-                    "summary": "Document processed successfully using local extraction",
-                    "details": f"Extracted {len(result['structured_data'])} fields with {result['confidence_scores']['overall']:.2f} confidence"
-                },
-                issues_found=[],
-                confidence=result["confidence_scores"]["overall"],
-                judge_model="Local Processing Engine"
-            )
-            
-            # Routing Decision
-            routing_decision = RoutingDecision(
-                routing_action="auto_approve" if result["confidence_scores"]["overall"] > 0.8 else "flag_review",
-                routing_reason="High confidence local processing" if result["confidence_scores"]["overall"] > 0.8 else "Requires human review",
-                wms_integration_status="ready" if result["confidence_scores"]["overall"] > 0.8 else "pending",
-                wms_integration_data=result["structured_data"],
-                human_review_required=result["confidence_scores"]["overall"] <= 0.8,
-                human_reviewer_id=None,
-                estimated_processing_time=3600  # 1 hour
-            )
-            
-            return {
-                "extraction_results": extraction_results,
-                "confidence_scores": result["confidence_scores"],
-                "stages": [result.stage for result in extraction_results],
-                "quality_score": quality_score,
-                "routing_decision": routing_decision,
-                "is_mock": False,  # Mark as real data
-            }
-            
-        except Exception as e:
-            logger.error(f"Failed to process document locally: {_sanitize_log_data(str(e))}", exc_info=True)
-            return self._create_mock_data_response("exception")
-
-    def _get_mock_extraction_data(self) -> Dict[str, Any]:
-        """Fallback mock extraction data that matches the expected API response format."""
-        from .models.document_models import (
-            ExtractionResult,
-            QualityScore,
-            RoutingDecision,
-            QualityDecision,
-        )
-        # Security: Using random module is appropriate here - generating test invoice numbers only
-        # For security-sensitive values (tokens, keys, passwords), use secrets module instead
-        import random
-        import datetime
-
-        # Generate realistic invoice data
-        invoice_number = (
-            f"INV-{datetime.datetime.now().year}-{random.randint(1000, 9999)}"
-        )
-        vendors = [
-            "ABC Supply Co.",
-            "XYZ Manufacturing",
-            "Global Logistics Inc.",
-            "Tech Solutions Ltd.",
-        ]
-        vendor = random.choice(vendors)
-
-        # Generate realistic amounts
-        base_amount = random.randint(500, 5000)
-        tax_rate = 0.08
-        tax_amount = round(base_amount * tax_rate, 2)
-        total_amount = base_amount + tax_amount
-
-        # Generate line items
-        line_items = []
-        num_items = random.randint(2, 8)
-        for _ in range(num_items):
-            item_names = ["Widget A", "Component B", "Part C", "Module D", "Assembly E"]
-            item_name = random.choice(item_names)
-            quantity = random.randint(1, 50)
-            unit_price = round(random.uniform(10, 200), 2)
-            line_total = round(quantity * unit_price, 2)
-            line_items.append(
-                {
-                    "description": item_name,
-                    "quantity": quantity,
-                    "price": unit_price,
-                    "total": line_total,
-                }
-            )
-
-        return {
-            "extraction_results": [
-                ExtractionResult(
-                    stage="ocr_extraction",
-                    raw_data={
-                        "text": f"Invoice #{invoice_number}\nVendor: {vendor}\nAmount: ${base_amount:,.2f}"
-                    },
-                    processed_data={
-                        "invoice_number": invoice_number,
-                        "vendor": vendor,
-                        "amount": base_amount,
-                        "tax_amount": tax_amount,
-                        "total_amount": total_amount,
-                        "date": datetime.datetime.now().strftime("%Y-%m-%d"),
-                        "line_items": line_items,
-                    },
-                    confidence_score=0.96,
-                    processing_time_ms=1200,
-                    model_used=self.MODEL_OCR,
-                    metadata={"page_count": 1, "language": "en", "field_count": 8},
-                ),
-                ExtractionResult(
-                    stage="llm_processing",
-                    raw_data={
-                        "entities": [
-                            invoice_number,
-                            vendor,
-                            str(base_amount),
-                            str(total_amount),
-                        ]
-                    },
-                    processed_data={
-                        "items": line_items,
-                        "line_items_count": len(line_items),
-                        "total_amount": total_amount,
-                        "validation_passed": True,
-                    },
-                    confidence_score=0.94,
-                    processing_time_ms=800,
-                    model_used=self.MODEL_SMALL_LLM,
-                    metadata={"entity_count": 4, "validation_passed": True},
-                ),
-            ],
-            "confidence_scores": {
-                "overall": 0.95,
-                "ocr_extraction": 0.96,
-                "llm_processing": 0.94,
-            },
-            "stages": [
-                "preprocessing",
-                "ocr_extraction",
-                "llm_processing",
-                "validation",
-                "routing",
-            ],
-            "quality_score": QualityScore(
-                overall_score=4.3,
-                completeness_score=4.5,
-                accuracy_score=4.2,
-                compliance_score=4.1,
-                quality_score=4.3,
-                decision=QualityDecision.APPROVE,
-                reasoning={
-                    "completeness": "All required fields extracted successfully",
-                    "accuracy": "High accuracy with minor formatting variations",
-                    "compliance": "Follows standard business rules",
-                    "quality": "Excellent overall quality",
-                },
-                issues_found=["Minor formatting inconsistencies"],
-                confidence=0.91,
-                judge_model=self.MODEL_LARGE_JUDGE,
-            ),
-            "routing_decision": RoutingDecision(
-                routing_action=RoutingAction.AUTO_APPROVE,
-                routing_reason="High quality extraction with accurate data - auto-approve for WMS integration",
-                wms_integration_status="ready_for_integration",
-                wms_integration_data={
-                    "vendor_code": vendor.replace(" ", "_").upper(),
-                    "invoice_number": invoice_number,
-                    "total_amount": total_amount,
-                    "line_items": line_items,
-                },
-                human_review_required=False,
-                human_reviewer_id=None,
-                estimated_processing_time=120,
-            ),
-        }
+            return self._create_mock_data_response("exception", "Failed to read extraction results.")
 
     async def _run_quality_validation(
         self, document_id: str, validation_type: str

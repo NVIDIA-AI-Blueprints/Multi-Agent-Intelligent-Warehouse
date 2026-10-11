@@ -1283,135 +1283,17 @@ def _build_reconciliation_strategy(domain: str, runtime: Any) -> Any:
     """
     Build a concrete ReconciliationStrategy for the requested domain.
 
-    Strategy implementations read authoritative state through canonical MCP read
-    skills only. DemoWarehouseWorld is never accessed directly — this is enforced
-    by only injecting read skills here, not world references.
+    v2.0.1 round 3: the strategies live in ``maiw_api.reconciliation`` and are
+    shared with the operator-authenticated production route
+    ``POST /api/v1/executions/{execution_id}/reconcile`` (no demo dependency).
+    They read authoritative state through canonical MCP read skills only —
+    DemoWarehouseWorld is never accessed directly.
 
     Returns None if the required skills are not wired.
     """
-    from maiw_execution import ReconciliationOutcome
+    from maiw_api.reconciliation import build_reconciliation_strategy
 
-    if domain == "labor" and runtime.mcp_client is not None:
-        try:
-            from maiw_skills.labor.skills import LaborAllocationSkill
-            from maiw_contracts.labor import LaborAllocationRequest
-        except ImportError:
-            return None
-
-        mcp_client = runtime.mcp_client
-
-        class LaborReconciliationStrategy:
-            async def read_current_state(self, intent):
-                skill = LaborAllocationSkill(mcp_client)
-                req = LaborAllocationRequest(
-                    warehouse_id=intent.warehouse_id or "default",
-                )
-                result = await skill.execute(req)
-                return result.model_dump()
-
-            def check_postcondition(self, intent, current_state):
-                expected_task_id = intent.expected_effect.get("task_id")
-                expected_worker_ids = intent.expected_effect.get(
-                    "expected_worker_ids", []
-                )
-                if not expected_task_id:
-                    return ReconciliationOutcome.INDETERMINATE
-                allocations = current_state.get("allocations", [])
-                for alloc in allocations:
-                    if alloc.get("task_id") == expected_task_id:
-                        if alloc.get("status") == "in_progress":
-                            return ReconciliationOutcome.CONFIRMED_EXECUTED
-                        return ReconciliationOutcome.CONFIRMED_NOT_EXECUTED
-                return ReconciliationOutcome.CONFIRMED_NOT_EXECUTED
-
-        return LaborReconciliationStrategy()
-
-    if domain == "equipment" and runtime.mcp_client is not None:
-        try:
-            from maiw_skills.equipment.skills import EquipmentStatusSkill
-            from maiw_contracts.equipment import EquipmentStatusRequest
-        except ImportError:
-            return None
-
-        mcp_client = runtime.mcp_client
-
-        class EquipmentReconciliationStrategy:
-            async def read_current_state(self, intent):
-                skill = EquipmentStatusSkill(mcp_client)
-                req = EquipmentStatusRequest(
-                    asset_id=intent.target,
-                )
-                result = await skill.execute(req)
-                return result.model_dump()
-
-            def check_postcondition(self, intent, current_state):
-                expected_status = intent.expected_effect.get("expected_status")
-                expected_assignee = intent.expected_effect.get("expected_assignee")
-                asset_id = intent.target
-                if not expected_status or not asset_id:
-                    return ReconciliationOutcome.INDETERMINATE
-                equipment = current_state.get("equipment", [])
-                for asset in equipment:
-                    if asset.get("asset_id") == asset_id:
-                        actual_status = asset.get("status")
-                        if actual_status != expected_status:
-                            return ReconciliationOutcome.CONFIRMED_NOT_EXECUTED
-                        if (
-                            expected_assignee
-                            and asset.get("owner_user") != expected_assignee
-                        ):
-                            return ReconciliationOutcome.CONFIRMED_NOT_EXECUTED
-                        return ReconciliationOutcome.CONFIRMED_EXECUTED
-                return ReconciliationOutcome.INDETERMINATE
-
-        return EquipmentReconciliationStrategy()
-
-    if domain == "wave" and runtime.mcp_client is not None:
-        try:
-            from maiw_skills.wave.skills import WaveGetSkill
-            from maiw_contracts.wave import WaveGetRequest
-        except ImportError:
-            return None
-
-        mcp_client = runtime.mcp_client
-
-        class WaveReconciliationStrategy:
-            async def read_current_state(self, intent):
-                skill = WaveGetSkill(mcp_client)
-                req = WaveGetRequest(
-                    warehouse_id=intent.warehouse_id or "default",
-                    wave_id=intent.expected_effect.get("wave_id"),
-                    zone=intent.expected_effect.get("zone"),
-                )
-                result = await skill.execute(req)
-                return result.model_dump()
-
-            def check_postcondition(self, intent, current_state):
-                expected_priority = intent.expected_effect.get("expected_priority")
-                zone = intent.expected_effect.get("zone")
-                if not expected_priority:
-                    return ReconciliationOutcome.INDETERMINATE
-                tasks = current_state.get("tasks", [])
-                # Filter to tasks relevant to this intent
-                relevant = [
-                    t
-                    for t in tasks
-                    if (not zone or t.get("zone") == zone)
-                    and t.get("status") not in ("completed", "failed", "cancelled")
-                ]
-                if not relevant:
-                    return ReconciliationOutcome.INDETERMINATE
-                # All relevant tasks should have been reprioritized
-                matching = [
-                    t for t in relevant if t.get("priority") == expected_priority
-                ]
-                if matching:
-                    return ReconciliationOutcome.CONFIRMED_EXECUTED
-                return ReconciliationOutcome.CONFIRMED_NOT_EXECUTED
-
-        return WaveReconciliationStrategy()
-
-    return None
+    return build_reconciliation_strategy(domain, getattr(runtime, "mcp_client", None))
 
 
 # ── Counterfactual artifact ───────────────────────────────────────────────────

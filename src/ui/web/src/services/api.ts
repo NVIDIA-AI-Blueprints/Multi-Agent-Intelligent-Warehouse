@@ -341,6 +341,35 @@ export const chatAPI = {
   },
 };
 
+/**
+ * Human-readable message for a failed governed operational write
+ * (equipment assign / release / maintenance).
+ *
+ * v2.0.1 round 3: these routes require the operator write credential
+ * (X-Maiw-Operator-Token). The browser never holds it — an authenticated
+ * operator proxy in front of the UI adds it server-side. Without it the API
+ * answers 403 OPERATOR_WRITE_CREDENTIAL_REQUIRED (or 503 when writes are not
+ * configured / not offered by the deployment profile).
+ */
+export const describeOperationalWriteError = (err: any): string => {
+  const data = err?.response?.data ?? {};
+  const code: string | undefined = data?.code;
+  switch (code) {
+    case 'OPERATOR_WRITE_CREDENTIAL_REQUIRED':
+      return 'Operational writes require the operator write credential. Use an authenticated operator console (operator proxy) — the browser session alone cannot perform warehouse writes.';
+    case 'INVALID_OPERATOR_WRITE_CREDENTIAL':
+      return 'The operator write credential was rejected.';
+    case 'OPERATOR_WRITE_AUTH_NOT_CONFIGURED':
+      return 'Operational writes are disabled on this deployment (no operator write credential configured).';
+    case 'GOVERNED_WRITES_NOT_OFFERED':
+      return 'This deployment profile does not offer governed operational writes.';
+    case 'RECONCILIATION_REQUIRED':
+      return 'A previous write to this asset has an unknown outcome and must be reconciled before another write.';
+    default:
+      return data?.message || data?.detail || err?.message || 'Operational write failed';
+  }
+};
+
 export const equipmentAPI = {
   getAsset: async (asset_id: string): Promise<EquipmentAsset> => {
     const safeId = validatePathParam(asset_id, 'asset_id');
@@ -576,10 +605,10 @@ export interface CircuitStats {
 }
 
 export interface DomainHealth {
-  equipment: 'HEALTHY' | 'DEGRADED' | 'CIRCUIT OPEN';
-  labor: 'HEALTHY' | 'DEGRADED' | 'CIRCUIT OPEN';
-  wave: 'HEALTHY' | 'DEGRADED' | 'CIRCUIT OPEN';
-  inventory: 'HEALTHY' | 'DEGRADED' | 'CIRCUIT OPEN';
+  equipment: 'HEALTHY' | 'DEGRADED' | 'CIRCUIT OPEN' | 'NOT_CONFIGURED';
+  labor: 'HEALTHY' | 'DEGRADED' | 'CIRCUIT OPEN' | 'NOT_CONFIGURED';
+  wave: 'HEALTHY' | 'DEGRADED' | 'CIRCUIT OPEN' | 'NOT_CONFIGURED';
+  inventory: 'HEALTHY' | 'DEGRADED' | 'CIRCUIT OPEN' | 'NOT_CONFIGURED';
 }
 
 export interface CircuitStates {

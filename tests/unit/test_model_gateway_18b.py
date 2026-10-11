@@ -108,6 +108,26 @@ from maiw_models.evaluation.fixtures import (
 # ── Test helpers ──────────────────────────────────────────────────────────────
 
 
+# v2.0.1 round 2: physical model identity is enforced against the approved
+# deployment table.  No multimodal Nemotron model is approved for production,
+# so vision-routing tests inject a TEST deployment table that adds a
+# nano-omni entry.  Its generation must still be an approved generation
+# (DeploymentResolver refuses anything else) — the family is not widened.
+from maiw_models.deployment import (  # noqa: E402
+    APPROVED_DEPLOYMENTS as _APPROVED,
+    ApprovedDeployment as _ApprovedDeployment,
+    DeploymentResolver as _DeploymentResolver,
+)
+
+_TEST_RESOLVER = _DeploymentResolver(
+    _APPROVED
+    + (
+        _ApprovedDeployment("nano-omni", "test/nano-omni-model", "nemotron-3"),
+        _ApprovedDeployment("nano-omni", "test/nano-omni", "nemotron-3"),
+    )
+)
+
+
 def _make_registry(
     super_enabled: bool = True,
     nano_enabled: bool = False,
@@ -121,14 +141,14 @@ def _make_registry(
         "NEMOTRON_LIGHTNING_ENABLED": "true" if lightning_enabled else "false",
         "NEMOTRON_ULTRA_ENABLED": "true" if ultra_enabled else "false",
         "NEMOTRON_NANO_OMNI_ENABLED": "true" if nano_omni_enabled else "false",
-        "NEMOTRON_SUPER_MODEL": "test/super-model",
-        "NEMOTRON_NANO_MODEL": "test/nano-model",
-        "NEMOTRON_LIGHTNING_MODEL": "test/lightning-model",
-        "NEMOTRON_ULTRA_MODEL": "test/ultra-model",
+        "NEMOTRON_SUPER_MODEL": "nvidia/nemotron-3-super-120b-a12b",
+        "NEMOTRON_NANO_MODEL": "nvidia/nemotron-3-nano-30b-a3b",
+        "NEMOTRON_LIGHTNING_MODEL": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "NEMOTRON_ULTRA_MODEL": "nvidia/nemotron-3-ultra-550b-a55b",
         "NEMOTRON_NANO_OMNI_MODEL": "test/nano-omni-model",
     }
     with patch.dict(os.environ, env):
-        return ModelRegistry()
+        return ModelRegistry(resolver=_TEST_RESOLVER)
 
 
 def _all_enabled_registry() -> ModelRegistry:
@@ -141,13 +161,25 @@ def _all_enabled_registry() -> ModelRegistry:
     )
 
 
+def _echo_identity_response(**fields):
+    """
+    v2.0.1 round 3: a provider answer must carry the dispatched model identity
+    (the gateway fails closed otherwise) — the fake echoes ``model_id``.
+    """
+
+    async def _call(*, model_id, request, capability):
+        return MagicMock(provider_model=model_id, **fields)
+
+    return _call
+
+
 def _make_gateway(registry: ModelRegistry):
     mock_provider = MagicMock(spec=NIMProvider)
     mock_provider.call = AsyncMock(
-        return_value=MagicMock(
+        side_effect=_echo_identity_response(
             content="test response",
             usage={"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
-            model="test/super-model",
+            model="nvidia/nemotron-3-super-120b-a12b",
             finish_reason="stop",
         )
     )
@@ -162,7 +194,7 @@ def _make_gateway(registry: ModelRegistry):
 
 
 def _make_grader_result(
-    model_id: str = "test/super-model",
+    model_id: str = "nvidia/nemotron-3-super-120b-a12b",
     response: str = "test response",
     deployment_id: str = "nvidia_hosted",
 ) -> ModelEvaluationResult:
@@ -174,7 +206,7 @@ def _make_grader_result(
         latency_ms=200.0,
         routing_latency_ms=0.5,
         routing_strategy="rules",
-        candidate_models=["test/super-model"],
+        candidate_models=["nvidia/nemotron-3-super-120b-a12b"],
     )
 
 
@@ -352,7 +384,7 @@ class TestBehavioralEquivalence:
             risk_level=RiskLevel.HIGH,
         )
         decision = router.route(req)
-        assert decision.selected_model_id == "test/super-model"
+        assert decision.selected_model_id == "nvidia/nemotron-3-super-120b-a12b"
         assert decision.selected_role == "super"
         assert decision.requested_role == "super"
         assert decision.routing_rule == "high_reasoning"
@@ -649,7 +681,10 @@ class TestRiskLevelAuthority:
                 risk_level=RiskLevel.CRITICAL,
             )
         )
-        weak_ids = {"test/nano-model", "test/lightning-model"}
+        weak_ids = {
+            "nvidia/nemotron-3-nano-30b-a3b",
+            "nvidia/nemotron-3.5-lightning-30b-a3b",
+        }
         overlap = set(decision.candidate_models) & weak_ids
         assert (
             not overlap
@@ -753,7 +788,10 @@ class TestReasoningLevelAuthority:
                 risk_level=RiskLevel.LOW,
             )
         )
-        weak_ids = {"test/nano-model", "test/lightning-model"}
+        weak_ids = {
+            "nvidia/nemotron-3-nano-30b-a3b",
+            "nvidia/nemotron-3.5-lightning-30b-a3b",
+        }
         overlap = set(decision.candidate_models) & weak_ids
         assert (
             not overlap
@@ -971,7 +1009,7 @@ class TestRoutingStrategyProtocol:
 
         cap = _make_registry(super_enabled=True).get_by_role("super")
         candidate = ModelCandidate(
-            model_id="test/super-model",
+            model_id="nvidia/nemotron-3-super-120b-a12b",
             role="super",
             deployment_mode=DeploymentMode.NVIDIA_HOSTED,
             capability=cap,
@@ -983,9 +1021,9 @@ class TestRoutingStrategyProtocol:
         """RoutingContext.evaluation_model_override must be settable."""
         ctx = RoutingContext(
             deployment_mode=DeploymentMode.NVIDIA_HOSTED,
-            evaluation_model_override="test/super-model",
+            evaluation_model_override="nvidia/nemotron-3-super-120b-a12b",
         )
-        assert ctx.evaluation_model_override == "test/super-model"
+        assert ctx.evaluation_model_override == "nvidia/nemotron-3-super-120b-a12b"
 
     def test_routing_context_evaluation_override_none_by_default(self):
         """evaluation_model_override must default to None in production."""
@@ -1036,8 +1074,8 @@ class TestCandidateModelsSemantics:
                 risk_level=RiskLevel.LOW,
             )
         )
-        assert "test/nano-model" not in decision.candidate_models
-        assert "test/lightning-model" not in decision.candidate_models
+        assert "nvidia/nemotron-3-nano-30b-a3b" not in decision.candidate_models
+        assert "nvidia/nemotron-3.5-lightning-30b-a3b" not in decision.candidate_models
 
     def test_candidate_models_respects_risk_level(self):
         """CRITICAL risk reduces candidates to high-capability models only."""
@@ -1054,8 +1092,8 @@ class TestCandidateModelsSemantics:
             )
         )
         # Only super should be in candidates for CRITICAL risk with these enabled models
-        assert "test/lightning-model" not in decision.candidate_models
-        assert "test/nano-model" not in decision.candidate_models
+        assert "nvidia/nemotron-3.5-lightning-30b-a3b" not in decision.candidate_models
+        assert "nvidia/nemotron-3-nano-30b-a3b" not in decision.candidate_models
 
     def test_candidate_models_contains_selected(self):
         """The selected model must be in candidate_models when no fallback outside policy."""
@@ -1840,13 +1878,13 @@ class TestEvaluationEndToEnd:
         )
         result = ModelEvaluationResult(
             evaluation_input_id=case.case_id,
-            model_id="test/super-model",
+            model_id="nvidia/nemotron-3-super-120b-a12b",
             deployment_id="nvidia_hosted",
             response=response_text,
             latency_ms=350.0,
             routing_latency_ms=0.8,
             routing_strategy="rules",
-            candidate_models=["test/super-model"],
+            candidate_models=["nvidia/nemotron-3-super-120b-a12b"],
         )
         grader_results = run_graders(case, result)
         assert len(grader_results) == 6
@@ -1874,13 +1912,13 @@ class TestEvaluationEndToEnd:
         )
         result = ModelEvaluationResult(
             evaluation_input_id=case.case_id,
-            model_id="test/super-model",
+            model_id="nvidia/nemotron-3-super-120b-a12b",
             deployment_id="nvidia_hosted",
             response=response_text,
             latency_ms=200.0,
             routing_latency_ms=0.5,
             routing_strategy="rules",
-            candidate_models=["test/super-model"],
+            candidate_models=["nvidia/nemotron-3-super-120b-a12b"],
         )
         grader_results = run_graders(case, result)
         forbidden_result = next(

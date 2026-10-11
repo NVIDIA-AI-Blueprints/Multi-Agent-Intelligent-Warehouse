@@ -153,6 +153,7 @@ async def warehouse_labor_allocate(
     zone: str | None = None,
     priority: str = "medium",
     notes: str | None = None,
+    execution_id: str | None = None,
 ) -> str:
     provider = _get_provider()
     req = LaborAllocateRequest(
@@ -165,6 +166,7 @@ async def warehouse_labor_allocate(
         notes=notes,
         proposal_id=proposal_id,
         decision_id=decision_id,
+        execution_id=execution_id,
     )
     try:
         result = await provider.execute_labor_allocation(req)

@@ -18,6 +18,18 @@ import pytest
 
 # ── App fixture (no external deps) ────────────────────────────────────────────
 
+# v2.0.1 round 3: governed write routes require the operator write credential
+# and a profile that offers governed writes.
+_OPERATOR_TOKEN = "op-" + "a1" * 20
+_AUTH = {"X-Maiw-Operator-Token": _OPERATOR_TOKEN}
+
+
+@pytest.fixture(autouse=True)
+def _governed_write_env(monkeypatch):
+    monkeypatch.setenv("MAIW_DEPLOYMENT_PROFILE", "reference_governed")
+    monkeypatch.setenv("MAIW_OPERATOR_WRITE_TOKEN", _OPERATOR_TOKEN)
+    monkeypatch.delenv("MAIW_INFERENCE_INTERNAL_TOKEN", raising=False)
+
 
 def _make_runtime(*, with_agent: bool = True):
     rt = MagicMock()
@@ -92,26 +104,33 @@ def app_with_agent():
         async with _lifespan(app, with_agent=True):
             yield
 
-    with (
-        patch("maiw_api.app.lifespan", ls),
-        patch(
-            "src.api.services.security.rate_limiter.get_rate_limiter",
-            return_value=AsyncMock(check_rate_limit=AsyncMock()),
-        ),
-        patch("src.api.services.monitoring.metrics.record_request_metrics"),
-        patch("src.retrieval.structured.SQLRetriever.initialize", AsyncMock()),
-        patch(
-            "src.retrieval.structured.SQLRetriever.execute_query",
-            AsyncMock(return_value=[]),
-        ),
-    ):
-        import importlib
-        import maiw_api.app as m
+    import importlib
+    import maiw_api.app as m
 
-        importlib.reload(m)
-        # ASGITransport does not trigger ASGI lifespan events; set state directly.
-        m.app.state.runtime = _make_runtime(with_agent=True)
-        yield m.app
+    # reload() mutates the shared module in place; restore it afterwards so
+    # later tests do not inherit this app object / mocked middleware deps.
+    saved_namespace = dict(vars(m))
+    try:
+        with (
+            patch("maiw_api.app.lifespan", ls),
+            patch(
+                "src.api.services.security.rate_limiter.get_rate_limiter",
+                return_value=AsyncMock(check_rate_limit=AsyncMock()),
+            ),
+            patch("src.api.services.monitoring.metrics.record_request_metrics"),
+            patch("src.retrieval.structured.SQLRetriever.initialize", AsyncMock()),
+            patch(
+                "src.retrieval.structured.SQLRetriever.execute_query",
+                AsyncMock(return_value=[]),
+            ),
+        ):
+            importlib.reload(m)
+            # ASGITransport does not trigger ASGI lifespan events; set state directly.
+            m.app.state.runtime = _make_runtime(with_agent=True)
+            yield m.app
+    finally:
+        vars(m).clear()
+        vars(m).update(saved_namespace)
 
 
 @pytest.fixture()
@@ -121,26 +140,33 @@ def app_no_agent():
         async with _lifespan(app, with_agent=False):
             yield
 
-    with (
-        patch("maiw_api.app.lifespan", ls),
-        patch(
-            "src.api.services.security.rate_limiter.get_rate_limiter",
-            return_value=AsyncMock(check_rate_limit=AsyncMock()),
-        ),
-        patch("src.api.services.monitoring.metrics.record_request_metrics"),
-        patch("src.retrieval.structured.SQLRetriever.initialize", AsyncMock()),
-        patch(
-            "src.retrieval.structured.SQLRetriever.execute_query",
-            AsyncMock(return_value=[]),
-        ),
-    ):
-        import importlib
-        import maiw_api.app as m
+    import importlib
+    import maiw_api.app as m
 
-        importlib.reload(m)
-        # ASGITransport does not trigger ASGI lifespan events; set state directly.
-        m.app.state.runtime = _make_runtime(with_agent=False)
-        yield m.app
+    # reload() mutates the shared module in place; restore it afterwards so
+    # later tests do not inherit this app object / mocked middleware deps.
+    saved_namespace = dict(vars(m))
+    try:
+        with (
+            patch("maiw_api.app.lifespan", ls),
+            patch(
+                "src.api.services.security.rate_limiter.get_rate_limiter",
+                return_value=AsyncMock(check_rate_limit=AsyncMock()),
+            ),
+            patch("src.api.services.monitoring.metrics.record_request_metrics"),
+            patch("src.retrieval.structured.SQLRetriever.initialize", AsyncMock()),
+            patch(
+                "src.retrieval.structured.SQLRetriever.execute_query",
+                AsyncMock(return_value=[]),
+            ),
+        ):
+            importlib.reload(m)
+            # ASGITransport does not trigger ASGI lifespan events; set state directly.
+            m.app.state.runtime = _make_runtime(with_agent=False)
+            yield m.app
+    finally:
+        vars(m).clear()
+        vars(m).update(saved_namespace)
 
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
@@ -173,7 +199,9 @@ async def test_assign_equipment_returns_decision(app_with_agent):
     async with httpx.AsyncClient(
         transport=ASGITransport(app=app_with_agent), base_url="http://test"
     ) as client:
-        resp = await client.post("/api/v1/equipment/assign", json=payload)
+        resp = await client.post(
+            "/api/v1/equipment/assign", json=payload, headers=_AUTH
+        )
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "requires_human_approval"
@@ -190,7 +218,9 @@ async def test_release_equipment_approved(app_with_agent):
     async with httpx.AsyncClient(
         transport=ASGITransport(app=app_with_agent), base_url="http://test"
     ) as client:
-        resp = await client.post("/api/v1/equipment/release", json=payload)
+        resp = await client.post(
+            "/api/v1/equipment/release", json=payload, headers=_AUTH
+        )
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "approved"
@@ -207,7 +237,9 @@ async def test_write_endpoint_returns_503_without_agent(app_no_agent):
     async with httpx.AsyncClient(
         transport=ASGITransport(app=app_no_agent), base_url="http://test"
     ) as client:
-        resp = await client.post("/api/v1/equipment/assign", json=payload)
+        resp = await client.post(
+            "/api/v1/equipment/assign", json=payload, headers=_AUTH
+        )
     assert resp.status_code == 503
 
 
@@ -226,7 +258,9 @@ async def test_schedule_maintenance_returns_decision(app_with_agent):
     async with httpx.AsyncClient(
         transport=ASGITransport(app=app_with_agent), base_url="http://test"
     ) as client:
-        resp = await client.post("/api/v1/equipment/maintenance", json=payload)
+        resp = await client.post(
+            "/api/v1/equipment/maintenance", json=payload, headers=_AUTH
+        )
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "requires_human_approval"

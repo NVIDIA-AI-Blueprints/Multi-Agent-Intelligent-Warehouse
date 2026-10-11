@@ -56,8 +56,13 @@ from maiw_mcp.deadline import RequestDeadline, RequestDeadlineExceeded
 from maiw_mcp.errors import (
     BackendUnavailable,
     CapabilityNotFound,
+    MCPCircuitOpen,
+    MCPConnectFailed,
+    MCPConnectTimeout,
     MCPContractError,
+    MCPResponseLost,
     MCPTimeout,
+    MCPTimeoutAfterDispatch,
     MCPToolError,
     MCPUnavailable,
 )
@@ -150,6 +155,13 @@ class MAIWMCPClient:
             Tool result could not be parsed as JSON or was not a dict.
         MCPUnavailable
             Transport-level or protocol-level error.
+
+        v2.0.1 round 3 — every transport failure carries its dispatch phase:
+        ``MCPConnectFailed`` / ``MCPConnectTimeout`` / ``MCPCircuitOpen``
+        (``MCPNotDispatched``: ``tools/call`` provably never sent) or
+        ``MCPResponseLost`` / ``MCPTimeoutAfterDispatch``
+        (``MCPDispatchOutcomeUnknown``: sent, response lost — for a write the
+        outcome is UNKNOWN).  There is no retry here.
         """
         # Deadline guard — reject before any network call
         if deadline is not None:
@@ -189,7 +201,7 @@ class MAIWMCPClient:
         except CircuitOpen as exc:
             # Translate to MCPUnavailable so callers see a uniform error type.
             # CircuitOpen is also added to _raise_typed_http → 503 in demo.py.
-            raise MCPUnavailable(
+            raise MCPCircuitOpen(
                 f"Circuit OPEN for MCP domain {domain!r} — "
                 f"cooldown {exc.cooldown_remaining_s:.1f}s remaining"
             ) from exc
@@ -199,7 +211,11 @@ class MAIWMCPClient:
             raise
         except MCPUnavailable:
             raise
+        except MCPTimeout:
+            raise
         except TimeoutError as exc:
+            # Not reachable from _call_tool (it classifies its own timeouts);
+            # only a timeout before the call started lands here.
             latency_ms = (time.monotonic() - start) * 1000
             self._telemetry.record_failure(
                 capability=capability,
@@ -208,10 +224,12 @@ class MAIWMCPClient:
                 error=exc,
                 trace_id=trace_id,
             )
-            raise MCPTimeout(
+            raise MCPConnectTimeout(
                 f"Timeout after {effective_timeout:.1f}s calling {capability!r}"
             ) from exc
         except Exception as exc:
+            # _call_tool classifies every failure after it starts; anything
+            # else happened before a request could be sent.
             latency_ms = (time.monotonic() - start) * 1000
             self._telemetry.record_failure(
                 capability=capability,
@@ -220,7 +238,7 @@ class MAIWMCPClient:
                 error=exc,
                 trace_id=trace_id,
             )
-            raise MCPUnavailable(
+            raise MCPConnectFailed(
                 f"MCP invocation failed for {capability!r}: {type(exc).__name__}: {exc}"
             ) from exc
 
@@ -245,10 +263,54 @@ class MAIWMCPClient:
         # - initialize handshake
         # - tools/call request
         # - session teardown
-        async with Client(server_url, read_timeout_seconds=timeout_seconds) as client:
-            call_result: types.CallToolResult = await client.call_tool(
-                capability, payload
-            )
+        #
+        # v2.0.1 round 3 (NEW3-P1-02): the phase of a failure decides what it
+        # means.  "connect" (transport + handshake) → the tool request was never
+        # sent → MCPConnectFailed / MCPConnectTimeout (definitely not executed).
+        # "dispatched" (tools/call in flight) → the server may have applied the
+        # write and the response was lost → MCPResponseLost /
+        # MCPTimeoutAfterDispatch (outcome UNKNOWN; never "failed").
+        # Result received (call_result set) → a teardown error after the
+        # result arrived is logged and the result is returned (it must not be
+        # turned into a failure).
+        phase = "connect"
+        call_result: types.CallToolResult | None = None
+        try:
+            async with Client(
+                server_url, read_timeout_seconds=timeout_seconds
+            ) as client:
+                phase = "dispatched"
+                call_result = await client.call_tool(capability, payload)
+        except Exception as exc:  # noqa: BLE001 — classified by phase below
+            if call_result is not None:
+                logger.warning(
+                    "MCP session teardown failed after %r returned (%s: %s); "
+                    "using the received result",
+                    capability,
+                    type(exc).__name__,
+                    exc,
+                )
+            elif phase == "connect":
+                if _is_timeout(exc):
+                    raise MCPConnectTimeout(
+                        f"Timeout after {timeout_seconds:.1f}s connecting for "
+                        f"{capability!r}; tools/call was not sent"
+                    ) from exc
+                raise MCPConnectFailed(
+                    f"MCP connection failed for {capability!r} before tools/call "
+                    f"was sent: {type(exc).__name__}: {exc}"
+                ) from exc
+            else:
+                if _is_timeout(exc):
+                    raise MCPTimeoutAfterDispatch(
+                        f"Timeout after {timeout_seconds:.1f}s waiting for "
+                        f"{capability!r}; tools/call was dispatched — outcome unknown"
+                    ) from exc
+                raise MCPResponseLost(
+                    f"MCP response lost for {capability!r} after tools/call was "
+                    f"dispatched — outcome unknown: {type(exc).__name__}: {exc}"
+                ) from exc
+        assert call_result is not None
 
         if call_result.is_error:
             error_text = self._extract_text(call_result)
@@ -295,3 +357,21 @@ class MAIWMCPClient:
                 f"MCP tool result is not a JSON object; got {type(parsed).__name__}"
             )
         return parsed
+
+
+def _is_timeout(exc: BaseException) -> bool:
+    """True for a timeout anywhere in ``exc`` (incl. exception groups / causes)."""
+    seen: set[int] = set()
+    stack: list[BaseException] = [exc]
+    while stack:
+        cur = stack.pop()
+        if id(cur) in seen:
+            continue
+        seen.add(id(cur))
+        if isinstance(cur, TimeoutError) or "Timeout" in type(cur).__name__:
+            return True
+        stack.extend(getattr(cur, "exceptions", ()) or ())
+        for nxt in (cur.__cause__, cur.__context__):
+            if nxt is not None:
+                stack.append(nxt)
+    return False

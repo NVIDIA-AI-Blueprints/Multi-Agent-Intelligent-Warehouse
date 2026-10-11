@@ -211,6 +211,7 @@ async def warehouse_equipment_assign(
     task_id: str | None = None,
     duration_hours: float | None = None,
     notes: str | None = None,
+    execution_id: str | None = None,
 ) -> str:
     """
     Execute an approved equipment assignment write.
@@ -228,6 +229,7 @@ async def warehouse_equipment_assign(
             notes=notes,
             proposal_id=proposal_id,
             decision_id=decision_id,
+            execution_id=execution_id,
         )
     except Exception as exc:
         return json.dumps({"error": f"Invalid request: {exc}", "asset_id": asset_id})
@@ -256,6 +258,7 @@ async def warehouse_equipment_release(
     proposal_id: str,
     decision_id: str,
     notes: str | None = None,
+    execution_id: str | None = None,
 ) -> str:
     """
     Execute an approved equipment release write.
@@ -269,6 +272,7 @@ async def warehouse_equipment_release(
             notes=notes,
             proposal_id=proposal_id,
             decision_id=decision_id,
+            execution_id=execution_id,
         )
     except Exception as exc:
         return json.dumps({"error": f"Invalid request: {exc}", "asset_id": asset_id})
@@ -301,6 +305,7 @@ async def warehouse_equipment_schedule_maintenance(
     decision_id: str,
     estimated_duration_minutes: int = 60,
     priority: str = "medium",
+    execution_id: str | None = None,
 ) -> str:
     """
     Execute an approved maintenance schedule write.
@@ -318,6 +323,7 @@ async def warehouse_equipment_schedule_maintenance(
             priority=priority,
             proposal_id=proposal_id,
             decision_id=decision_id,
+            execution_id=execution_id,
         )
     except Exception as exc:
         return json.dumps({"error": f"Invalid request: {exc}", "asset_id": asset_id})

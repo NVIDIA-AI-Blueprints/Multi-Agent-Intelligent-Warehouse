@@ -1326,8 +1326,14 @@ class TestRegistryReclassification:
                 "is not in approved set"
             )
 
-    def test_R05_nano_omni_nemotron3_generation_eligible_when_enabled(self):
-        """R05: nano-omni with generation=nemotron-3 is eligible when enabled."""
+    def test_R05_nano_omni_generation_label_alone_is_not_eligible(self):
+        """R05 (v2.0.1 round 2): a generation LABEL is not sufficient.
+
+        Before round 2 a nano-omni capability labelled generation=nemotron-3
+        was eligible whatever its model ID.  Physical identity is now
+        enforced: an ID that is not an approved deployment for the role is
+        ineligible even with an approved generation label (NEW-P1-01).
+        """
         cap = _make_capability(
             "nvidia/nemotron-3-nano-omni-verified-future",
             role="nano-omni",
@@ -1342,8 +1348,8 @@ class TestRegistryReclassification:
         image_req = _base_request(modality=Modality.IMAGE)
         result = pf.filter(image_req, DeploymentMode.NVIDIA_HOSTED)
         assert (
-            len(result) == 1
-        ), "nano-omni with generation=nemotron-3 must be eligible for image requests"
+            result == []
+        ), "an unapproved physical model ID must be ineligible despite its label"
 
     def test_R05b_model_with_truly_unknown_generation_blocked(self):
         """R05b: A model with generation=unknown is blocked by PolicyFilter."""

@@ -1,25 +1,50 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 """
-Canonical MAIW FastAPI entrypoint.
+Canonical MAIW FastAPI entrypoint — the ONLY release composition root.
 
 Entrypoint:
     uvicorn maiw_api.app:app --host 0.0.0.0 --port 8001
 
-Router ownership:
+``src/api/app.py`` is a legacy development server and is not part of any
+release, deployment or qualification path.
+
+Router ownership and mutation policy (v2.0.1 — see maiw_api.route_policy and
+docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md for the full authority graph):
+
     Canonical (this package)
-        health       → maiw_api.routers.health
-        equipment    → maiw_api.routers.equipment     (canonical pipeline)
-        operations   → maiw_api.routers.operations    (SQL CRUD, bug-fixed)
-        safety       → maiw_api.routers.safety        (SQL CRUD)
-        mcp_status   → maiw_api.routers.mcp_status    (canonical MCP v2)
+        health        GET only (/live, /ready, /health, /version)
+        equipment     GET + governed POST (X-Maiw-Operator-Token required —
+                      round 3 NEW3-P1-01 — then agent proposal →
+                      DecisionEngine → EquipmentActionExecutor only when
+                      APPROVED; 503 in profiles without governed writes)
+        executions    operator-authenticated journal + reconciliation of
+                      UNKNOWN writes, every profile (round 3 NEW3-P1-02)
+        operations    GET only in the shipped app (SQL task writes unmounted)
+        safety        GET only in the shipped app (SQL incident writes unmounted)
+        mcp_status, runtime_status, world, model_lab, agent_tasks,
+        procedures    GET only
+        demo          simulation controls (MAIW_DEMO_MODE only) + governed
+                      approve/reject/reconcile
+        copilot       POST /turn — ACT goes through GovernedActionOrchestrator
+        inference     POST /api/v1/inference — bounded ModelGateway endpoint,
+                      fail-closed internal token, no governance below it
 
-    Keep temporarily (from src.api.routers)
-        auth, inventory, wms, iot, erp, scanning, attendance,
-        reasoning, migration, document, advanced_forecasting, training, chat
+    Legacy (src.api.routers) — mounted READ-ONLY unless listed
+        auth                       full (identity; own auth dependencies)
+        document                   read-only + POST /upload (bounded inference
+                                   via ModelGateway; document-workflow state)
+                                   + POST /approve|/reject (document-workflow
+                                   state only; no warehouse mutation)
+        inventory, wms, iot, erp, scanning, attendance, migration,
+        advanced_forecasting, training
+                                   GET/HEAD routes only
 
-    Removed (legacy custom MCP)
-        src.api.routers.mcp                           (replaced by mcp_status)
+    Not mounted in the shipped app (v2.0.1)
+        chat        legacy LLM agent → ToolDiscoveryService → direct SQL writes
+                    (audit P1-01); use POST /api/v1/copilot/turn
+        reasoning   legacy NIM client outside ModelGateway
+        src.api.routers.mcp (retired; replaced by mcp_status)
 """
 
 from __future__ import annotations
@@ -30,14 +55,16 @@ import os
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse
 
 from maiw_api.config import settings
 from maiw_api.lifespan import lifespan
+from maiw_api.write_auth import TypedHTTPError
 
 # ── Canonical routers ─────────────────────────────────────────────────────────
 from maiw_api.routers.health import router as health_router
 from maiw_api.routers.equipment import router as equipment_router
+from maiw_api.routers.executions import router as executions_router
 from maiw_api.routers.operations import router as operations_router
 from maiw_api.routers.safety import router as safety_router
 from maiw_api.routers.mcp_status import router as mcp_status_router
@@ -48,8 +75,14 @@ from maiw_api.routers.world import router as world_router
 
 from maiw_api.routers.model_lab import router as model_lab_router
 from maiw_api.routers.agent_tasks import router as agent_tasks_router
+from maiw_api.routers.procedures import router as procedures_router
+from maiw_api.route_policy import curated_view, read_only_view
 
-# ── Legacy routers (keep temporarily) ────────────────────────────────────────
+# Bounded sandbox inference endpoint (one implementation, shared with the
+# legacy dev server): POST /api/v1/inference → canonical ModelGateway.
+from src.api.routers.inference import router as inference_router
+
+# ── Legacy routers (mounted through route_policy views only) ─────────────────
 from src.api.routers.auth import router as auth_router
 from src.api.routers.inventory import router as inventory_router
 from src.api.routers.wms import router as wms_router
@@ -57,12 +90,10 @@ from src.api.routers.iot import router as iot_router
 from src.api.routers.erp import router as erp_router
 from src.api.routers.scanning import router as scanning_router
 from src.api.routers.attendance import router as attendance_router
-from src.api.routers.reasoning import router as reasoning_router
 from src.api.routers.migration import router as migration_router
 from src.api.routers.document import router as document_router
 from src.api.routers.advanced_forecasting import router as forecasting_router
 from src.api.routers.training import router as training_router
-from src.api.routers.chat import router as chat_router
 
 # ── Shared middleware / monitoring (from src, no migration needed) ─────────────
 from src.api.middleware.security_headers import SecurityHeadersMiddleware
@@ -106,6 +137,14 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     return await handle_validation_error(request, exc)
 
 
+@app.exception_handler(TypedHTTPError)
+async def typed_http_error_handler(request: Request, exc: TypedHTTPError):
+    # v2.0.1 round 3: typed, unsanitised errors (operator write auth denials,
+    # RECONCILIATION_REQUIRED) — the generic handler hides 5xx messages, which
+    # would hide OPERATOR_WRITE_AUTH_NOT_CONFIGURED.
+    return JSONResponse(status_code=exc.status_code, content=exc.as_body())
+
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     return await handle_http_exception(request, exc)
@@ -113,32 +152,6 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):
-    error_msg = str(exc)
-    # Preserve legacy chat-endpoint circular-reference guard
-    if "circular" in error_msg.lower() and request.url.path == "/api/v1/chat":
-        logger.error("Circular reference error in chat: %s", error_msg)
-        try:
-            return JSONResponse(
-                status_code=200,
-                content={
-                    "reply": (
-                        "I received your request, but there was an issue formatting "
-                        "the response. Please try again with a simpler question."
-                    ),
-                    "route": "error",
-                    "intent": "error",
-                    "session_id": "default",
-                    "confidence": 0.0,
-                    "error": "Response serialization failed",
-                    "error_type": "circular_reference",
-                },
-            )
-        except Exception:
-            return Response(
-                status_code=200,
-                content='{"reply":"Error processing request","route":"error","intent":"error","session_id":"default","confidence":0.0}',
-                media_type="application/json",
-            )
     return await handle_generic_exception(request, exc)
 
 
@@ -239,8 +252,11 @@ async def metrics_middleware(request: Request, call_next):
 # Canonical routers
 app.include_router(health_router)
 app.include_router(equipment_router)
-app.include_router(operations_router)
-app.include_router(safety_router)
+app.include_router(executions_router)
+# operations / safety: the SQL task/incident writes have no governed path, so
+# only their read routes ship (v2.0.1, audit P1-01 / §29).
+app.include_router(read_only_view(operations_router))
+app.include_router(read_only_view(safety_router))
 app.include_router(mcp_status_router)
 app.include_router(runtime_status_router)
 app.include_router(demo_router)
@@ -249,21 +265,46 @@ app.include_router(world_router)
 
 app.include_router(model_lab_router)
 app.include_router(agent_tasks_router)
+app.include_router(procedures_router)
 
-# Legacy (keep temporarily)
+# Bounded inference boundary (v2.0.1, audit P1-02)
+app.include_router(inference_router)
+
+# Legacy — identity management keeps its own auth dependencies.
 app.include_router(auth_router)
-app.include_router(inventory_router)
-app.include_router(wms_router)
-app.include_router(iot_router)
-app.include_router(erp_router)
-app.include_router(scanning_router)
-app.include_router(attendance_router)
-app.include_router(reasoning_router)
-app.include_router(migration_router)
-app.include_router(document_router)
-app.include_router(forecasting_router)
-app.include_router(training_router)
-app.include_router(chat_router)
+
+# Legacy — document workflow. Upload runs model inference only through
+# ModelGateway (audit P1-05); approve/reject record document-workflow state.
+# /search, /validate and /analytics returned fabricated data and are not shipped.
+app.include_router(
+    curated_view(
+        document_router,
+        allow_mutations={
+            ("POST", "/api/v1/document/upload"),
+            ("POST", "/api/v1/document/approve/{document_id}"),
+            ("POST", "/api/v1/document/reject/{document_id}"),
+        },
+    )
+)
+
+# Legacy — read-only. Every POST/PUT/PATCH/DELETE route of these routers
+# (inventory/WMS/IoT/ERP/scanner/attendance writes, DB migrate/rollback,
+# forecasting batch jobs, training subprocess start) is NOT mounted.
+for _legacy_router in (
+    inventory_router,
+    wms_router,
+    iot_router,
+    erp_router,
+    scanning_router,
+    attendance_router,
+    migration_router,
+    forecasting_router,
+    training_router,
+):
+    app.include_router(read_only_view(_legacy_router))
+
+# NOT mounted (v2.0.1): src.api.routers.chat (P1-01 ungoverned write path),
+# src.api.routers.reasoning (direct NIM client outside ModelGateway).
 
 
 @app.get("/")

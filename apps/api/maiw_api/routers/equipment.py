@@ -20,17 +20,33 @@ from __future__ import annotations
 
 import ast
 import logging
+import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from maiw_api.dependencies import get_runtime
+from maiw_api.write_auth import (
+    TypedHTTPError,
+    require_governed_writes_offered,
+    require_operator_write,
+)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["Equipment"])
+
+# v2.0.1 round 3 (NEW3-P1-01): every operational write route authenticates the
+# caller with the operator write credential BEFORE the body is read and before
+# any agent / DecisionEngine / executor / MCP call, then refuses in a profile
+# that does not offer governed writes.  Order matters: auth first.
+_WRITE_GUARDS = [
+    Depends(require_operator_write),
+    Depends(require_governed_writes_offered),
+]
 
 # Lazy-init: deferred import so importing this module does not require asyncpg.
 # asyncpg is only pulled in when the first request initialises the connection.
@@ -403,10 +419,116 @@ async def get_equipment_status(asset_id: str, runtime=Depends(get_runtime)):
 
 
 # ── Write endpoints (full pipeline: PROPOSE → DECIDE → EXECUTE) ───────────────
+#
+# v2.0.1 round 3 (NEW3-P1-02) — outcome semantics of the write routes:
+#
+#   200  status=executed|no_op|deferred|conflict|failed   definite outcome
+#   202  status=unknown, executed=null                     the MCP write may have
+#        been applied but its response was lost: NOT failed, never retried;
+#        reconcile with POST /api/v1/executions/{execution_id}/reconcile
+#   409  code=RECONCILIATION_REQUIRED                      an earlier write to the
+#        same asset is still unresolved (UNKNOWN / in flight) — refused BEFORE
+#        any proposal, decision or write
+#
+# Identity: ``X-Trace-Id`` (or a generated id) flows to the agent, the
+# DecisionEngine audit, the execution journal and the MCP payload with the
+# proposal_id / decision_id / execution_id; an optional ``Idempotency-Key``
+# becomes the proposal's idempotency key (a replay never writes twice).
 
 
-@router.post("/equipment/assign", response_model=Dict[str, Any])
-async def assign_equipment(request: AssignmentRequest, runtime=Depends(get_runtime)):
+def _unresolved_for_asset(runtime, asset_id: str):
+    """The unresolved execution blocking ``asset_id``, if any (canonical registry)."""
+    from maiw_execution import ExecutionRegistry
+
+    registry = getattr(runtime, "equipment_registry", None)
+    if not isinstance(registry, ExecutionRegistry):
+        return None
+    return registry.unresolved_for_target("warehouse.equipment.any", asset_id)
+
+
+def _reconciliation_required(asset_id: str, execution_id: str) -> HTTPException:
+    return TypedHTTPError(
+        409,
+        "RECONCILIATION_REQUIRED",
+        (
+            f"a previous write to {asset_id!r} has an unresolved outcome "
+            f"(execution_id={execution_id}); reconcile it before writing again"
+        ),
+        execution_id=execution_id,
+        reconcile=f"/api/v1/executions/{execution_id}/reconcile",
+    )
+
+
+def _trace_id(http_request: Request) -> str:
+    supplied = (http_request.headers.get("x-trace-id") or "").strip()
+    return supplied[:128] if supplied else str(uuid.uuid4())
+
+
+async def _execute_if_approved(
+    runtime, result: dict, proposal, decision, *, asset_id: str, trace_id: str,
+    idempotency_key: str | None,
+):
+    """
+    Run the executor for an APPROVED decision and shape the HTTP response.
+    Returns a dict (200) or a JSONResponse (202 for UNKNOWN).
+    """
+    if not (
+        result.get("status") == "approved"
+        and runtime.equipment_executor is not None
+        and proposal is not None
+        and decision is not None
+    ):
+        return result
+    if idempotency_key and getattr(proposal, "idempotency_key", None) is None:
+        try:
+            proposal.idempotency_key = idempotency_key
+        except Exception:  # noqa: BLE001 - immutable proposal object
+            pass
+    try:
+        exec_result = await runtime.equipment_executor.execute(
+            proposal, decision, trace_id=trace_id
+        )
+    except Exception as exc:
+        logger.warning(
+            "Execution refused after APPROVED %s for %s: %s",
+            result.get("action"),
+            result.get("proposal_id"),
+            exc,
+        )
+        result["execution_error"] = str(exc)
+        return result
+
+    error_code = getattr(exec_result, "error_code", None)
+    if error_code in ("RECONCILIATION_REQUIRED", "DUPLICATE_IN_FLIGHT"):
+        raise _reconciliation_required(asset_id, exec_result.execution_id)
+
+    outcome = exec_result.outcome.value
+    result["execution_id"] = exec_result.execution_id
+    result["status"] = outcome
+    result["trace_id"] = trace_id
+    if error_code:
+        result["error_code"] = error_code
+    if outcome == "unknown":
+        # Never report an ambiguous write as "not executed" (round 3).
+        result["executed"] = None
+        result["reconciliation_required"] = True
+        result["reconcile"] = (
+            f"/api/v1/executions/{exec_result.execution_id}/reconcile"
+        )
+        result["retried"] = False
+        return JSONResponse(status_code=202, content=result)
+    result["executed"] = exec_result.executed
+    return result
+
+
+@router.post(
+    "/equipment/assign", response_model=Dict[str, Any], dependencies=_WRITE_GUARDS
+)
+async def assign_equipment(
+    request: AssignmentRequest,
+    http_request: Request,
+    runtime=Depends(get_runtime),
+):
     """
     Propose an equipment assignment through the canonical pipeline.
 
@@ -418,15 +540,19 @@ async def assign_equipment(request: AssignmentRequest, runtime=Depends(get_runti
 
         {
             "status": "requires_human_approval" | "approved" | "rejected"
-                      | "requires_fresh_state" | "error",
+                      | "requires_fresh_state" | "executed" | "unknown" | ...,
             "action": "warehouse.equipment.assign",
             "proposal_id": "<uuid>",
             "decision_id": "<uuid>",
             "reason": "<explanation>",
-            "executed": false | true,
+            "executed": false | true | null (unknown),
         }
     """
     agent = _require_agent(runtime)
+    blocking = _unresolved_for_asset(runtime, request.asset_id)
+    if blocking is not None:
+        raise _reconciliation_required(request.asset_id, blocking.execution_id)
+    trace_id = _trace_id(http_request)
     try:
         result = await agent.propose_equipment_assignment(
             asset_id=request.asset_id,
@@ -438,6 +564,7 @@ async def assign_equipment(request: AssignmentRequest, runtime=Depends(get_runti
             ),
             notes=request.notes,
             warehouse_id=request.warehouse_id or "default",
+            trace_id=trace_id,
         )
         # Extract private execution objects (not JSON-serialisable — must be popped)
         _proposal = result.pop("_proposal", None)
@@ -450,27 +577,15 @@ async def assign_equipment(request: AssignmentRequest, runtime=Depends(get_runti
             )
 
         # Execute in apps/api service layer (MAIW authority boundary)
-        if (
-            result.get("status") == "approved"
-            and runtime.equipment_executor is not None
-            and _proposal is not None
-            and _decision is not None
-        ):
-            try:
-                exec_result = await runtime.equipment_executor.execute(
-                    _proposal, _decision, trace_id=result.get("trace_id")
-                )
-                result["executed"] = exec_result.executed
-                result["execution_id"] = exec_result.execution_id
-                result["status"] = exec_result.outcome.value
-            except Exception as exc:
-                logger.warning(
-                    "Execution failed after APPROVED assignment %s: %s",
-                    result.get("proposal_id"), exc,
-                )
-                result["execution_error"] = str(exc)
-
-        return result
+        return await _execute_if_approved(
+            runtime,
+            result,
+            _proposal,
+            _decision,
+            asset_id=request.asset_id,
+            trace_id=trace_id,
+            idempotency_key=http_request.headers.get("idempotency-key"),
+        )
     except HTTPException:
         raise
     except Exception as exc:
@@ -480,8 +595,14 @@ async def assign_equipment(request: AssignmentRequest, runtime=Depends(get_runti
         )
 
 
-@router.post("/equipment/release", response_model=Dict[str, Any])
-async def release_equipment(request: ReleaseRequest, runtime=Depends(get_runtime)):
+@router.post(
+    "/equipment/release", response_model=Dict[str, Any], dependencies=_WRITE_GUARDS
+)
+async def release_equipment(
+    request: ReleaseRequest,
+    http_request: Request,
+    runtime=Depends(get_runtime),
+):
     """
     Propose and (if approved) execute releasing equipment from its current assignment.
 
@@ -492,12 +613,17 @@ async def release_equipment(request: ReleaseRequest, runtime=Depends(get_runtime
     (apps/api service layer) — not inside the agent package.
     """
     agent = _require_agent(runtime)
+    blocking = _unresolved_for_asset(runtime, request.asset_id)
+    if blocking is not None:
+        raise _reconciliation_required(request.asset_id, blocking.execution_id)
+    trace_id = _trace_id(http_request)
     try:
         result = await agent.propose_equipment_release(
             asset_id=request.asset_id,
             released_by=request.released_by,
             notes=request.notes,
             warehouse_id=request.warehouse_id or "default",
+            trace_id=trace_id,
         )
         # Extract private execution objects (not JSON-serialisable — must be popped)
         _proposal = result.pop("_proposal", None)
@@ -510,27 +636,15 @@ async def release_equipment(request: ReleaseRequest, runtime=Depends(get_runtime
             )
 
         # Execute in apps/api service layer (MAIW authority boundary)
-        if (
-            result.get("status") == "approved"
-            and runtime.equipment_executor is not None
-            and _proposal is not None
-            and _decision is not None
-        ):
-            try:
-                exec_result = await runtime.equipment_executor.execute(
-                    _proposal, _decision, trace_id=result.get("trace_id")
-                )
-                result["executed"] = exec_result.executed
-                result["execution_id"] = exec_result.execution_id
-                result["status"] = exec_result.outcome.value
-            except Exception as exc:
-                logger.warning(
-                    "Execution failed after APPROVED release %s: %s",
-                    result.get("proposal_id"), exc,
-                )
-                result["execution_error"] = str(exc)
-
-        return result
+        return await _execute_if_approved(
+            runtime,
+            result,
+            _proposal,
+            _decision,
+            asset_id=request.asset_id,
+            trace_id=trace_id,
+            idempotency_key=http_request.headers.get("idempotency-key"),
+        )
     except HTTPException:
         raise
     except Exception as exc:
@@ -538,7 +652,9 @@ async def release_equipment(request: ReleaseRequest, runtime=Depends(get_runtime
         raise HTTPException(status_code=500, detail="Failed to release equipment")
 
 
-@router.post("/equipment/maintenance", response_model=Dict[str, Any])
+@router.post(
+    "/equipment/maintenance", response_model=Dict[str, Any], dependencies=_WRITE_GUARDS
+)
 async def schedule_maintenance(
     request: MaintenanceRequest, runtime=Depends(get_runtime)
 ):

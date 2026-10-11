@@ -77,3 +77,19 @@ async def lifespan(app: FastAPI):
         await close_nim_client()
     except Exception as exc:
         logger.warning("NIM client close error: %s", exc)
+
+    # v2.0.1: a stopped app must not leave process-level singletons behind.
+    # The ModelGateway singleton holds the NIM client closed above, and the
+    # runtime singleton holds the persistence objects; a subsequent startup in
+    # the same process (tests, embedded servers) must rebuild both from the
+    # environment rather than reuse closed/stale instances.
+    try:
+        from maiw_models import reset_model_gateway  # noqa: PLC0415
+
+        reset_model_gateway()
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning("ModelGateway reset error: %s", exc)
+    from maiw_api.bootstrap import reset_runtime  # noqa: PLC0415
+
+    reset_runtime()
+    app.state.runtime = None

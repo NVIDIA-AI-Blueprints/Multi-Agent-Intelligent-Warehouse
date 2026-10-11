@@ -151,13 +151,34 @@ async def handle_validation_error(
             message="Invalid request format. Please check your input and try again.",
         )
     
-    # In development, return detailed validation errors
+    # In development, return detailed validation errors. ``exc.errors()`` can
+    # carry raw exception objects in ``ctx`` (e.g. a ValueError raised by a
+    # model validator); serialising those verbatim turned a 422 into a 500
+    # (v2.0.0 audit P2-02). Only JSON-safe fields are returned.
     return create_error_response(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         message="Validation error",
         error_type="ValidationError",
-        details={"errors": exc.errors()},
+        details={"errors": _json_safe_validation_errors(exc.errors())},
     )
+
+
+def _json_safe_validation_errors(errors) -> list:
+    """Reduce pydantic error dicts to JSON-serialisable loc/msg/type entries."""
+    safe = []
+    for err in errors or []:
+        try:
+            loc = [str(part) for part in err.get("loc", ())]
+            safe.append(
+                {
+                    "loc": loc,
+                    "msg": str(err.get("msg", "")),
+                    "type": str(err.get("type", "")),
+                }
+            )
+        except Exception:  # pragma: no cover - defensive
+            safe.append({"loc": [], "msg": "invalid request", "type": "unknown"})
+    return safe
 
 
 async def handle_http_exception(request, exc: HTTPException) -> JSONResponse:

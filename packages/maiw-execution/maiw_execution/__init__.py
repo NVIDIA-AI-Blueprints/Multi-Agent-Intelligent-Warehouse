@@ -3,6 +3,7 @@
 """maiw-execution — shared execution boundary: BaseActionExecutor, typed errors, domain executors."""
 
 from .base import (
+    classify_write_failure,
     ActionConflict,
     ActionDecisionMismatch,
     ActionExecutionError,
@@ -24,7 +25,12 @@ from .reconciliation import (
     ReconciliationService,
     ReconciliationStrategy,
 )
-from .registry import ExecutionRecord, ExecutionRegistry
+from .registry import (
+    ExecutionJournalError,
+    ExecutionRecord,
+    ExecutionRegistry,
+    JsonFileExecutionRegistry,
+)
 from .wave import WaveActionExecutor
 
 __all__ = [
@@ -42,6 +48,9 @@ __all__ = [
     # Idempotency registry
     "ExecutionRecord",
     "ExecutionRegistry",
+    "JsonFileExecutionRegistry",
+    "ExecutionJournalError",
+    "classify_write_failure",
     # Result & protocol
     "ActionExecutionResult",
     "ActionExecutor",

@@ -35,19 +35,11 @@ _worktree_api = str(Path(__file__).resolve().parent.parent.parent / "apps" / "ap
 if _worktree_api not in sys.path:
     sys.path.insert(0, _worktree_api)
 
-# Reload maiw_api.routers to pick up the worktree version if it was already
-# cached pointing at the main-repo path.
-import importlib
-import maiw_api.routers
-
-if str(Path(maiw_api.routers.__file__).parent) != str(
-    Path(_worktree_api) / "maiw_api" / "routers"
-):
-    # Force reimport from worktree path
-    for mod_name in list(sys.modules.keys()):
-        if mod_name.startswith("maiw_api"):
-            del sys.modules[mod_name]
-    import maiw_api.routers  # noqa: F811
+# NOTE: no ``sys.modules`` purge of ``maiw_api.*`` here.  Deleting already
+# imported maiw_api modules mid-session re-executes them under the same names,
+# creating second identities of process-global singletons (e.g.
+# ``maiw_api.bootstrap._runtime``) and classes for every test collected
+# afterwards.  CI installs apps/api editable from this checkout.
 
 # ── Build a minimal test app ──────────────────────────────────────────────────
 from maiw_api.routers.model_lab import router as model_lab_router

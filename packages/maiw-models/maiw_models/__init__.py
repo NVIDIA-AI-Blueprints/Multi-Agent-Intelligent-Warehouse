@@ -15,9 +15,20 @@ from __future__ import annotations
 import logging
 import os
 
+from .deployment import (
+    APPROVED_DEPLOYMENTS,
+    APPROVED_MODEL_GENERATIONS,
+    ApprovedDeployment,
+    DeploymentResolver,
+    ResolvedDeployment,
+    default_resolver,
+)
 from .errors import (
     ModelConfigurationError,
     ModelGatewayError,
+    ModelIdentityMismatch,
+    ModelIdentityUnverifiable,
+    ModelPolicyViolation,
     ModelResponseError,
     ModelTimeout,
     ModelUnavailable,
@@ -85,6 +96,15 @@ async def get_model_gateway(nim_circuit=None) -> ModelGateway:
             "ModelGateway initialised (maiw_models). Enabled models: %s",
             [c.model_id for c in registry.all_enabled()],
         )
+        violations = registry.binding_violations()
+        if violations:
+            logger.error(
+                "ModelGateway: %d enabled role(s) bound to an unapproved physical "
+                "model — those roles fail closed (MODEL_POLICY_VIOLATION) and "
+                "/api/v1/ready reports NOT_READY: %s",
+                len(violations),
+                [(v["role"], v["model_id"], v["reason"]) for v in violations],
+            )
     return _gateway_instance
 
 
@@ -126,6 +146,16 @@ __all__ = [
     "ModelConfigurationError",
     "ModelResponseError",
     "StructuredOutputError",
+    "ModelPolicyViolation",
+    "ModelIdentityMismatch",
+    "ModelIdentityUnverifiable",
+    # v2.0.1 round 2: physical model identity
+    "APPROVED_DEPLOYMENTS",
+    "APPROVED_MODEL_GENERATIONS",
+    "ApprovedDeployment",
+    "DeploymentResolver",
+    "ResolvedDeployment",
+    "default_resolver",
     # Provider
     "NIMProvider",
     "NIMClient",

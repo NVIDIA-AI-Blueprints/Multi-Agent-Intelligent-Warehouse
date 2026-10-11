@@ -12,6 +12,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+LEGACY DEVELOPMENT SERVER — NOT A RELEASE, DEPLOYMENT OR QUALIFICATION PATH.
+
+The only MAIW release composition root is ``apps/api/maiw_api/app.py``
+(``uvicorn maiw_api.app:app``). This module still mounts legacy routers that
+the shipped app deliberately does not expose (e.g. ``/api/v1/chat``, whose
+legacy agent writes to the warehouse database without DecisionEngine /
+ActionExecutor governance, and the legacy CRUD write routes). Do not start it
+for a reference deployment, a smoke test or any qualification — see
+docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md (v2.0.0 audit P1-01/P1-02).
+"""
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
