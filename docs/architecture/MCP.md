@@ -219,7 +219,8 @@ MAIWMCPClient.invoke(capability, payload)
 |-----------|-----------|
 | Deadline already expired at call entry | `RequestDeadlineExceeded` |
 | Circuit breaker OPEN | `MCPUnavailable` |
-| `call_result.is_error == True` | `MCPToolError` |
+| `call_result.is_error == True` and `structuredContent.execution_disposition == "NOT_APPLIED"` (exact string) | `MCPToolNotApplied` (an `MCPToolError`; write → definite FAILED) |
+| `call_result.is_error == True` otherwise (no / malformed / unknown disposition; text is never trusted) | `MCPToolErrorOutcomeUnknown` (an `MCPToolError` and `MCPDispatchOutcomeUnknown`; write → UNKNOWN) — v2.0.1 round 4 |
 | Non-JSON or non-dict result | `MCPContractError` |
 | `TimeoutError` from SDK | `MCPTimeout` |
 | All other `Exception` | `MCPUnavailable` |

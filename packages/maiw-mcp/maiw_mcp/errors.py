@@ -67,7 +67,9 @@ class MCPNotDispatched(MAIWMCPError):
 
 
 class MCPDispatchOutcomeUnknown(MAIWMCPError):
-    """Marker: the tool request was (or may have been) sent; response lost."""
+    """Marker: the tool request was (or may have been) sent; the outcome is not
+    known (response lost, or — round 4 — the server answered with an error
+    that does not certify non-execution)."""
 
     dispatched = True
 
@@ -90,3 +92,56 @@ class MCPResponseLost(MCPUnavailable, MCPDispatchOutcomeUnknown):
 
 class MCPTimeoutAfterDispatch(MCPTimeout, MCPDispatchOutcomeUnknown):
     """No response within the read timeout after ``tools/call`` was dispatched."""
+
+
+# ── Server-reported tool errors (v2.0.1 round 4, NEW4-P1-01) ─────────────────
+#
+# MCP ``isError`` reports that a tool failed; it does NOT say the tool made no
+# side effects (a server can apply a mutation and fail afterwards).  Once
+# ``tools/call`` reached the server, only the explicit structured disposition
+# ``execution_disposition == "NOT_APPLIED"`` (see ``maiw_mcp.write_disposition``)
+# proves non-execution.  ``MAIWMCPClient`` raises exactly one of:
+#
+#   MCPToolNotApplied           isError + structuredContent certifies NOT_APPLIED
+#                               → the server rejected the request before any
+#                                 mutation (definite non-execution)
+#   MCPToolErrorOutcomeUnknown  isError without a valid NOT_APPLIED disposition
+#                               (absent / malformed / unknown) → for a write the
+#                               outcome is UNKNOWN
+#
+# Both subclass ``MCPToolError`` so read-path callers are unchanged.
+
+
+class MCPToolNotApplied(MCPToolError):
+    """The server certified (``execution_disposition = NOT_APPLIED``) that it
+    rejected the tool request before any mutation."""
+
+    dispatched = True
+    execution_disposition = "NOT_APPLIED"
+
+    def __init__(self, message: str, *, rejection_code: str | None = None) -> None:
+        super().__init__(message)
+        self.rejection_code = rejection_code
+
+
+class MCPToolErrorOutcomeUnknown(MCPToolError, MCPDispatchOutcomeUnknown):
+    """The server answered ``isError`` after ``tools/call`` was dispatched and
+    did not certify non-execution — the mutation may have been applied."""
+
+    def __init__(self, message: str, *, observed_disposition: str = "absent") -> None:
+        super().__init__(message)
+        self.observed_disposition = observed_disposition
+
+
+class WriteNotApplied(BackendUnavailable):
+    """
+    Raised by a warehouse backend / MCP provider ONLY on a code path that
+    provably performed no mutation (request validation, a precondition or
+    state check before any write statement).  The MCP server tools turn it into
+    the structured ``NOT_APPLIED`` tool error.  Never raise it after a write
+    may have been issued — raise any other exception (→ UNKNOWN) instead.
+    """
+
+    def __init__(self, message: str, *, rejection_code: str = "PRECONDITION_FAILED") -> None:
+        super().__init__(message)
+        self.rejection_code = rejection_code

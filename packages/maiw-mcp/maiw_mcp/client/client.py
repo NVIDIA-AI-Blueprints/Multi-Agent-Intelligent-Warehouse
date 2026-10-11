@@ -64,9 +64,12 @@ from maiw_mcp.errors import (
     MCPTimeout,
     MCPTimeoutAfterDispatch,
     MCPToolError,
+    MCPToolErrorOutcomeUnknown,
+    MCPToolNotApplied,
     MCPUnavailable,
 )
 from maiw_mcp.registry.registry import CapabilityRegistry
+from maiw_mcp.write_disposition import certifies_not_applied, describe_disposition
 from maiw_mcp.telemetry.telemetry import CapabilityTelemetry
 
 logger = logging.getLogger(__name__)
@@ -149,8 +152,14 @@ class MAIWMCPClient:
         MCPTimeout
             Server did not respond within the effective timeout (parent budget
             still existed at call time; the child operation simply ran long).
-        MCPToolError
-            Server returned ``is_error=True`` in the tool result.
+        MCPToolNotApplied
+            Server returned ``is_error=True`` AND certified, in
+            ``structuredContent.execution_disposition == "NOT_APPLIED"``, that
+            it rejected the request before any mutation (round 4).
+        MCPToolErrorOutcomeUnknown
+            Server returned ``is_error=True`` without that certification — the
+            tool may have mutated before failing; for a write the outcome is
+            UNKNOWN (round 4, NEW4-P1-01).  Both subclass ``MCPToolError``.
         MCPContractError
             Tool result could not be parsed as JSON or was not a dict.
         MCPUnavailable
@@ -313,8 +322,27 @@ class MAIWMCPClient:
         assert call_result is not None
 
         if call_result.is_error:
+            # v2.0.1 round 4 (NEW4-P1-01): tools/call reached the server, so an
+            # error result is NOT proof of non-execution.  Only the explicit
+            # structured disposition NOT_APPLIED is (maiw_mcp.write_disposition);
+            # text, isError alone, or a malformed / unknown disposition → the
+            # outcome is unknown.
             error_text = self._extract_text(call_result)
-            raise MCPToolError(f"{capability!r} returned error: {error_text}")
+            structured = call_result.structured_content
+            if certifies_not_applied(structured):
+                code = structured.get("rejection_code")
+                raise MCPToolNotApplied(
+                    f"{capability!r} rejected before any mutation "
+                    f"(execution_disposition=NOT_APPLIED): {error_text}",
+                    rejection_code=code if isinstance(code, str) else None,
+                )
+            observed = describe_disposition(structured)
+            raise MCPToolErrorOutcomeUnknown(
+                f"{capability!r} returned a tool error after tools/call was "
+                f"dispatched without a NOT_APPLIED disposition ({observed}) — "
+                f"outcome unknown: {error_text}",
+                observed_disposition=observed,
+            )
 
         return self._parse_result(call_result)
 

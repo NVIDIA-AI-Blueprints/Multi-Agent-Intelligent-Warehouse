@@ -48,6 +48,9 @@ from .errors import (
     MCPCircuitOpen,
     MCPResponseLost,
     MCPTimeoutAfterDispatch,
+    MCPToolNotApplied,
+    MCPToolErrorOutcomeUnknown,
+    WriteNotApplied,
 )
 from .deadline import RequestDeadline, RequestDeadlineExceeded
 from .circuit_breaker import CircuitBreaker, CircuitOpen, CircuitState
@@ -69,6 +72,9 @@ __all__ = [
     "MCPCircuitOpen",
     "MCPResponseLost",
     "MCPTimeoutAfterDispatch",
+    "MCPToolNotApplied",
+    "MCPToolErrorOutcomeUnknown",
+    "WriteNotApplied",
     "RequestDeadline",
     "RequestDeadlineExceeded",
     "CircuitBreaker",
