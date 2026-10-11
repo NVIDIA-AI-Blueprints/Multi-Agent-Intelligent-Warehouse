@@ -29,7 +29,7 @@ Machine-readable companion: `artifacts/audit/v2.0.1_remediation_round4.json`.
 | Repository | NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse |
 | PR / branch | #143 / `fix/v2.0.1-canonical-app-remediation` |
 | Starting head (audited by the fourth re-audit) | `6ad2cbf1b4b8233ce6ca8528692ebba8f97eb10c` |
-| Last code commit | `ff8ede17e3c270c52b1fa336e230989c2c23af1f`. All live proofs, both full suites and the order permutations ran at this SHA. |
+| Last code commit | `363cc803a9e01c9216a926373ac5cd3ef951f1b7` (style-only: two unused imports flagged by code quality). All live proofs, both full suites and the order permutations ran at `ff8ede17e3c270c52b1fa336e230989c2c23af1f`; the affected reliability / demo / round-4 suites were re-run at the style commit (553 passed). |
 | Final frozen head | The commit that adds this file, or the later artifact-update commit. Both are recorded in the PR and the final report. |
 | `main` at start | `944507ec914665c6682d39b95e8713355f486598` |
 | `v2.0.0` | Tag object `0c35a0e` → `816ace73c4561469978094eeedb2641f6db3c4fa`. Unchanged; there is no `v2.0.1` tag. |

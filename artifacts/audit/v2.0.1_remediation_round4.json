@@ -19,7 +19,7 @@
     "state": "OPEN",
     "modified": false
   },
-  "last_code_commit": "ff8ede17e3c270c52b1fa336e230989c2c23af1f",
+  "last_code_commit": "363cc803a9e01c9216a926373ac5cd3ef951f1b7",
   "final_frozen_head": "recorded in the PR #143 final report (the commit that adds this file or the later artifact-update commit)",
   "commits": [
     {
@@ -49,6 +49,14 @@
     {
       "sha": "ff8ede1",
       "subject": "fix(deps): pdfplumber 0.11.9 pulls pdfminer.six 20251230 (PYSEC-2026-1761)"
+    },
+    {
+      "sha": "b71dfd4",
+      "subject": "docs(audit): v2.0.1 remediation round 4 evidence, artifact and release-notes draft"
+    },
+    {
+      "sha": "363cc80",
+      "subject": "style: resolve PR #143 round-4 code-quality comments (unused imports)"
     }
   ],
   "p1_root_cause": "MAIWMCPClient raised a plain MCPToolError for every is_error result; classify_write_failure mapped it to FAILED/MCP_TOOL_ERROR/physical_mutation_occurred=False, so the target was unblocked, reconciliation refused and a retry wrote twice. The shipped Postgres adapter ran each logical write as non-transactional statements and turned any exception into is_error.",
@@ -436,5 +444,6 @@
   },
   "hosted_provider_test": "NOT RUN in round 4 (fifth audit requires an explicitly provided NVIDIA_API_KEY: read -s NVIDIA_API_KEY; export NVIDIA_API_KEY; auditor checks only test -n)",
   "ci": "recorded in the final report",
-  "ready_for_fifth_reaudit": true
+  "ready_for_fifth_reaudit": true,
+  "last_code_commit_note": "style-only (two unused imports in demo providers); all live proofs, both full suites and the order permutations ran at ff8ede1; reliability/demo/round-4 tests re-run at this commit: 553 passed"
 }
