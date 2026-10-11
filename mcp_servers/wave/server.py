@@ -142,6 +142,7 @@ async def warehouse_wave_reprioritize(
     wave_id: str | None = None,
     zone: str | None = None,
     reason: str = "",
+    execution_id: str | None = None,
 ) -> str:
     provider = _get_provider()
     req = WaveReprioritizeRequest(
@@ -152,6 +153,7 @@ async def warehouse_wave_reprioritize(
         reason=reason,
         proposal_id=proposal_id,
         decision_id=decision_id,
+        execution_id=execution_id,
     )
     try:
         result = await provider.execute_wave_reprioritize(req)

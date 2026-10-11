@@ -112,6 +112,7 @@ def main() -> None:
             "scheduled_by": "sandbox",
             "scheduled_for": "2026-12-01T09:00:00",
         },
+        "/api/v1/executions/unknown-exec/reconcile": {},
     }
     credential_variants = {
         "no_credential": {},

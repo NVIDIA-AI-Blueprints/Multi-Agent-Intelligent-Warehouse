@@ -28,6 +28,12 @@ Environment
     MAIW_PERSISTENCE_ROOT       durable state root       (default: /var/lib/maiw)
     MAIW_PROCEDURE_STATE_DIR    override procedures dir  (default: <root>/procedures)
     MAIW_GOVERNANCE_STATE_DIR   override governance dir  (default: <root>/governance)
+    MAIW_EXECUTION_STATE_DIR    override execution journal (default: <root>/executions)
+
+Execution journal (v2.0.1 round 3, NEW3-P1-02): ``build_execution_registry``
+returns a ``JsonFileExecutionRegistry`` under ``<executions>/<domain>`` in file
+mode, so an UNKNOWN write (and the block it places on its target) survives a
+crash / restart and can be reconciled outside demo mode.
 
 Package boundary
 ----------------
@@ -52,6 +58,7 @@ ENV_MODE = "MAIW_PERSISTENCE_MODE"
 ENV_ROOT = "MAIW_PERSISTENCE_ROOT"
 ENV_PROCEDURE_DIR = "MAIW_PROCEDURE_STATE_DIR"
 ENV_GOVERNANCE_DIR = "MAIW_GOVERNANCE_STATE_DIR"
+ENV_EXECUTION_DIR = "MAIW_EXECUTION_STATE_DIR"
 
 DEFAULT_ROOT = "/var/lib/maiw"
 MODE_FILE = "file"
@@ -73,6 +80,7 @@ class PersistenceConfig:
     root: Path | None
     procedures_dir: Path | None
     governance_dir: Path | None
+    executions_dir: Path | None = None
 
     @property
     def durable(self) -> bool:
@@ -87,16 +95,24 @@ class PersistenceConfig:
                 f"{ENV_MODE}={mode!r} is not one of {sorted(_VALID_MODES)}"
             )
         if mode == MODE_MEMORY:
-            return cls(mode=mode, root=None, procedures_dir=None, governance_dir=None)
+            return cls(
+                mode=mode,
+                root=None,
+                procedures_dir=None,
+                governance_dir=None,
+                executions_dir=None,
+            )
 
         root = Path(env.get(ENV_ROOT) or DEFAULT_ROOT)
         procedures = Path(env.get(ENV_PROCEDURE_DIR) or (root / "procedures"))
         governance = Path(env.get(ENV_GOVERNANCE_DIR) or (root / "governance"))
+        executions = Path(env.get(ENV_EXECUTION_DIR) or (root / "executions"))
         return cls(
             mode=mode,
             root=root,
             procedures_dir=procedures,
             governance_dir=governance,
+            executions_dir=executions,
         )
 
     def describe(self) -> dict[str, Any]:
@@ -107,6 +123,7 @@ class PersistenceConfig:
             "root": str(self.root) if self.root else None,
             "procedures_dir": str(self.procedures_dir) if self.procedures_dir else None,
             "governance_dir": str(self.governance_dir) if self.governance_dir else None,
+            "executions_dir": str(self.executions_dir) if self.executions_dir else None,
         }
 
 
@@ -155,6 +172,22 @@ def build_governance_inbox(config: PersistenceConfig) -> Any:
         return GovernanceInbox()
     assert config.governance_dir is not None
     return JsonFileGovernanceInbox(config.governance_dir)
+
+
+def build_execution_registry(domain: str, config: PersistenceConfig | None) -> Any:
+    """
+    The ExecutionRegistry for one write domain (v2.0.1 round 3).
+
+    File mode → ``JsonFileExecutionRegistry(<executions_dir>/<domain>)``
+    (durable; raises ``ExecutionJournalError`` on an unreadable record so the
+    executor is not built — fail closed).  Memory mode / no config → the
+    in-process ``ExecutionRegistry`` (development / test only).
+    """
+    from maiw_execution import ExecutionRegistry, JsonFileExecutionRegistry
+
+    if config is None or config.mode == MODE_MEMORY or config.executions_dir is None:
+        return ExecutionRegistry()
+    return JsonFileExecutionRegistry(config.executions_dir / domain)
 
 
 def build_persistence(environ: Mapping[str, str] | None = None) -> PersistenceRuntime:
@@ -287,6 +320,7 @@ __all__ = [
     "ENV_ROOT",
     "ENV_PROCEDURE_DIR",
     "ENV_GOVERNANCE_DIR",
+    "ENV_EXECUTION_DIR",
     "DEFAULT_ROOT",
     "MODE_FILE",
     "MODE_MEMORY",
@@ -295,6 +329,7 @@ __all__ = [
     "PersistenceRuntime",
     "build_procedure_state_store",
     "build_governance_inbox",
+    "build_execution_registry",
     "build_persistence",
     "probe_persistence",
 ]

@@ -157,6 +157,12 @@ EXPECTED_MUTATING_ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/api/v1/equipment/assign"): "governed",
     ("POST", "/api/v1/equipment/release"): "governed",
     ("POST", "/api/v1/equipment/maintenance"): "governed",
+    # v2.0.1 round 3: operator-authenticated reconciliation of UNKNOWN writes
+    # (authoritative MCP re-read; records the outcome, never writes/retries)
+    (
+        "POST",
+        "/api/v1/executions/{execution_id}/reconcile",
+    ): "governed-reconcile-read-only",
     ("POST", "/api/v1/demo/analyze"): "governed",
     ("POST", "/api/v1/demo/approve"): "governed",
     ("POST", "/api/v1/demo/reject"): "governed",

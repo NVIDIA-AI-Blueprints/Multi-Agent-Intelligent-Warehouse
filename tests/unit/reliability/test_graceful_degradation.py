@@ -267,6 +267,8 @@ async def test_ready_returns_200_when_one_domain_open(monkeypatch):
     """
     monkeypatch.setenv("MAIW_DEPLOYMENT_PROFILE", "reference_governed")
     monkeypatch.setenv("MAIW_REQUIRED_MCP_DOMAINS", "equipment")
+    # v2.0.1 round 3: the governed write path needs the operator credential.
+    monkeypatch.setenv("MAIW_OPERATOR_WRITE_TOKEN", "op-" + "c3" * 20)
     from maiw_mcp.circuit_registry import DomainCircuitRegistry
 
     clock = FakeClock()

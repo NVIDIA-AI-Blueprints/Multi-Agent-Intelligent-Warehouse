@@ -404,6 +404,16 @@ async def get_runtime() -> MAIWRuntime:
     except Exception as exc:  # pragma: no cover - defensive
         logger.error("MAIW bootstrap: profile resolution failed — %s", exc)
 
+    # Execution journal (round 3, NEW3-P1-02): durable in the reference
+    # profiles, so an UNKNOWN write and the block on its target survive a
+    # restart.  An unreadable journal raises → that executor is not built and
+    # readiness reports the governed write path failed (fail closed).
+    def _execution_registry(domain: str):
+        from maiw_api.persistence import build_execution_registry
+
+        config = getattr(runtime.persistence, "config", None)
+        return build_execution_registry(domain, config)
+
     # ── 6. Equipment execution skills + EquipmentActionExecutor ──────────────
     if (
         governed_writes
@@ -416,13 +426,13 @@ async def get_runtime() -> MAIWRuntime:
                 ExecuteEquipmentMaintenanceSkill,
                 ExecuteEquipmentReleaseSkill,
             )
-            from maiw_execution import EquipmentActionExecutor, ExecutionRegistry
+            from maiw_execution import EquipmentActionExecutor
 
             assign_skill = ExecuteEquipmentAssignmentSkill(runtime.mcp_client)
             release_skill = ExecuteEquipmentReleaseSkill(runtime.mcp_client)
             maintenance_skill = ExecuteEquipmentMaintenanceSkill(runtime.mcp_client)
 
-            runtime.equipment_registry = ExecutionRegistry()
+            runtime.equipment_registry = _execution_registry("equipment")
             runtime.equipment_executor = EquipmentActionExecutor(
                 assign_skill=assign_skill,
                 release_skill=release_skill,
@@ -446,10 +456,10 @@ async def get_runtime() -> MAIWRuntime:
     ):
         try:
             from maiw_skills.labor.skills import ExecuteLaborAllocationSkill
-            from maiw_execution import LaborActionExecutor, ExecutionRegistry
+            from maiw_execution import LaborActionExecutor
 
             allocate_skill = ExecuteLaborAllocationSkill(runtime.mcp_client)
-            runtime.labor_registry = ExecutionRegistry()
+            runtime.labor_registry = _execution_registry("labor")
             runtime.labor_executor = LaborActionExecutor(
                 allocate_skill=allocate_skill,
                 registry=runtime.labor_registry,
@@ -466,10 +476,10 @@ async def get_runtime() -> MAIWRuntime:
     ):
         try:
             from maiw_skills.wave.skills import ExecuteWaveReprioritizationSkill
-            from maiw_execution import WaveActionExecutor, ExecutionRegistry
+            from maiw_execution import WaveActionExecutor
 
             reprioritize_skill = ExecuteWaveReprioritizationSkill(runtime.mcp_client)
-            runtime.wave_registry = ExecutionRegistry()
+            runtime.wave_registry = _execution_registry("wave")
             runtime.wave_executor = WaveActionExecutor(
                 reprioritize_skill=reprioritize_skill,
                 registry=runtime.wave_registry,

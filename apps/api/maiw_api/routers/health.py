@@ -537,6 +537,23 @@ async def readiness_check(request: Request):
             if required_unusable:
                 gwp["unusable_mcp_domains"] = required_unusable
         gwp["operator_write_auth"] = write_auth.as_dict()
+        # Round 3 (NEW3-P1-02): unresolved (UNKNOWN / in-flight-at-crash)
+        # writes are reported, not critical — their targets are blocked until
+        # reconciled via POST /api/v1/executions/{id}/reconcile.
+        journal: dict = {}
+        for domain in ("equipment", "labor", "wave"):
+            registry = getattr(rt, f"{domain}_registry", None)
+            unresolved = getattr(registry, "unresolved", None)
+            if callable(unresolved):
+                try:
+                    pending = unresolved()
+                    journal[domain] = {
+                        "durable": hasattr(registry, "directory"),
+                        "unresolved": len(pending) if isinstance(pending, list) else 0,
+                    }
+                except Exception:  # noqa: BLE001 - non-canonical registry object
+                    pass
+        gwp["execution_journal"] = journal
         components["governed_write_path"] = gwp
     else:
         components["governed_write_path"] = {

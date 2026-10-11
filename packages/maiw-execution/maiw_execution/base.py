@@ -33,8 +33,30 @@ Execution outcomes (Phase 10E)
     NO_OP     — desired state already existed; no mutation required
     DEFERRED  — valid request, cannot execute now
     CONFLICT  — current warehouse state prevents this action
-    UNKNOWN   — mutation may have occurred; response was lost (AmbiguousWriteError)
+    UNKNOWN   — mutation may have occurred; response was lost (AmbiguousWriteError,
+                or — v2.0.1 round 3 — any real MCP transport failure AFTER
+                tools/call was dispatched: response lost, connection reset,
+                server crash, read timeout, unreadable result)
     FAILED    — no mutation occurred; provider rejected or was unreachable
+                (the request was provably never dispatched, or the server
+                answered with a tool error)
+
+Failure classification (v2.0.1 round 3, NEW3-P1-02) — ``classify_write_failure``:
+
+    AmbiguousWriteError                → UNKNOWN  (mutation known to have occurred)
+    MCPDispatchOutcomeUnknown          → UNKNOWN  (MCPResponseLost,
+                                                   MCPTimeoutAfterDispatch)
+    MCPTimeout (phase not recorded)    → UNKNOWN  (a timed-out call was in flight)
+    MCPContractError                   → UNKNOWN  (the server answered; the answer
+                                                   could not be read)
+    MCPNotDispatched                   → FAILED   (MCPConnectFailed,
+                                                   MCPConnectTimeout, MCPCircuitOpen)
+    MCPToolError                       → FAILED   (server-reported rejection)
+    CapabilityNotFound / deadline      → FAILED   (nothing was sent)
+    anything else                      → FAILED   (raised by non-transport code)
+
+An UNKNOWN result is never retried here; the registry blocks every further
+write to the same domain target until the UNKNOWN is reconciled.
 
 Identity chain
 --------------
@@ -59,6 +81,14 @@ from pydantic import BaseModel, Field, model_validator
 from maiw_decision.models import DecisionOutcome, DecisionResult
 from maiw_decision.proposal import ActionProposal
 from maiw_mcp.deadline import RequestDeadline, RequestDeadlineExceeded
+from maiw_mcp.errors import (
+    CapabilityNotFound,
+    MCPContractError,
+    MCPDispatchOutcomeUnknown,
+    MCPNotDispatched,
+    MCPTimeout,
+    MCPToolError,
+)
 
 from .outcome import AmbiguousWriteError, ExecutionOutcome
 from .reconciliation import ExecutionIntent
@@ -98,6 +128,34 @@ class ActionExecutionError(RuntimeError):
     BaseActionExecutor no longer raises this — backend failures are returned
     as ActionExecutionResult(outcome=FAILED) instead.
     """
+
+
+# ── Write-failure classification (v2.0.1 round 3, NEW3-P1-02) ─────────────────
+
+
+def classify_write_failure(
+    exc: BaseException,
+) -> tuple[ExecutionOutcome, str, bool | None]:
+    """
+    Map an exception raised by a domain write to ``(outcome, error_code,
+    physical_mutation_occurred)``.  See the module docstring for the table.
+    ``physical_mutation_occurred`` is ``None`` when it is genuinely unknown.
+    """
+    if isinstance(exc, AmbiguousWriteError):
+        return ExecutionOutcome.UNKNOWN, "AMBIGUOUS_WRITE", True
+    if isinstance(exc, MCPNotDispatched):
+        return ExecutionOutcome.FAILED, "MCP_NOT_DISPATCHED", False
+    if isinstance(exc, MCPDispatchOutcomeUnknown):
+        return ExecutionOutcome.UNKNOWN, "MCP_RESPONSE_LOST", None
+    if isinstance(exc, MCPTimeout):
+        return ExecutionOutcome.UNKNOWN, "MCP_TIMEOUT", None
+    if isinstance(exc, MCPContractError):
+        return ExecutionOutcome.UNKNOWN, "MCP_RESPONSE_UNREADABLE", None
+    if isinstance(exc, MCPToolError):
+        return ExecutionOutcome.FAILED, "MCP_TOOL_ERROR", False
+    if isinstance(exc, (CapabilityNotFound, RequestDeadlineExceeded)):
+        return ExecutionOutcome.FAILED, "NOT_DISPATCHED", False
+    return ExecutionOutcome.FAILED, "EXECUTION_FAILED", False
 
 
 # ── Canonical execution result ─────────────────────────────────────────────────
@@ -333,59 +391,51 @@ class BaseActionExecutor:
         ):
             # Guard-type exceptions re-raise — they indicate pre-write authorization failure
             raise
-        except AmbiguousWriteError as exc:
-            # Mutation occurred; response was lost — UNKNOWN, do NOT retry
-            if self._registry is not None:
-                self._registry.mark_unknown(execution_id)
-            result = ActionExecutionResult(
-                execution_id=execution_id,
-                outcome=ExecutionOutcome.UNKNOWN,
-                action=proposal.action,
-                proposal_id=proposal.proposal_id,
-                decision_id=decision.result_id,
-                started_at=started_at,
-                completed_at=datetime.now(timezone.utc),
-                executed_at=datetime.now(timezone.utc),
-                error_message=str(exc),
-                trace_id=trace_id,
-                physical_mutation_occurred=True,
-            )
-            if self._registry is not None:
-                self._registry.complete(execution_id, ExecutionOutcome.UNKNOWN, result)
-            logger.error(
-                "%s: UNKNOWN execution action=%s proposal_id=%s execution_id=%s — "
-                "mutation may have occurred; reconciliation required",
-                type(self).__name__,
-                proposal.action,
-                proposal.proposal_id,
-                execution_id,
-            )
-            return result
         except Exception as exc:
-            # Pre-mutation or unclassified backend failure — FAILED
+            outcome, error_code, mutation = classify_write_failure(exc)
+            if outcome == ExecutionOutcome.UNKNOWN:
+                # The write may have been applied; the response was lost.
+                # UNKNOWN — never FAILED, never retried here (round 3).
+                if self._registry is not None:
+                    self._registry.mark_unknown(execution_id)
             result = ActionExecutionResult(
                 execution_id=execution_id,
-                outcome=ExecutionOutcome.FAILED,
+                outcome=outcome,
                 action=proposal.action,
                 proposal_id=proposal.proposal_id,
                 decision_id=decision.result_id,
                 started_at=started_at,
                 completed_at=datetime.now(timezone.utc),
                 executed_at=datetime.now(timezone.utc),
+                error_code=error_code,
                 error_message=str(exc),
                 trace_id=trace_id,
-                physical_mutation_occurred=False,
+                physical_mutation_occurred=mutation,
             )
             if self._registry is not None:
-                self._registry.complete(execution_id, ExecutionOutcome.FAILED, result)
-            logger.error(
-                "%s: FAILED execution action=%s proposal_id=%s execution_id=%s: %s",
-                type(self).__name__,
-                proposal.action,
-                proposal.proposal_id,
-                execution_id,
-                exc,
-            )
+                self._registry.complete(execution_id, outcome, result)
+            if outcome == ExecutionOutcome.UNKNOWN:
+                logger.error(
+                    "%s: UNKNOWN execution action=%s proposal_id=%s execution_id=%s "
+                    "(%s) — mutation may have occurred; reconciliation required, "
+                    "no retry",
+                    type(self).__name__,
+                    proposal.action,
+                    proposal.proposal_id,
+                    execution_id,
+                    error_code,
+                )
+            else:
+                logger.error(
+                    "%s: FAILED execution action=%s proposal_id=%s execution_id=%s "
+                    "(%s): %s",
+                    type(self).__name__,
+                    proposal.action,
+                    proposal.proposal_id,
+                    execution_id,
+                    error_code,
+                    exc,
+                )
             return result
 
         completed_at = datetime.now(timezone.utc)
@@ -442,8 +492,50 @@ class BaseActionExecutor:
                 action=proposal.action,
                 proposal_id=proposal.proposal_id,
                 decision_id=decision.result_id,
+                error_code="DUPLICATE_IN_FLIGHT",
                 error_message="Duplicate detected for in-flight execution",
+                backend_response={"blocked_by_execution_id": existing.execution_id},
                 trace_id=trace_id,
+            )
+
+        if existing.outcome == ExecutionOutcome.UNKNOWN and (
+            existing.effective_status == "effectively_executed"
+        ):
+            # Round 3: the UNKNOWN was reconciled as executed — replay, no write.
+            return ActionExecutionResult(
+                execution_id=existing.execution_id,
+                outcome=ExecutionOutcome.NO_OP,
+                action=proposal.action,
+                proposal_id=proposal.proposal_id,
+                decision_id=decision.result_id,
+                backend_response={
+                    "replayed": True,
+                    "original_execution_id": existing.execution_id,
+                    "original_outcome": ExecutionOutcome.UNKNOWN.value,
+                    "effective_status": existing.effective_status,
+                },
+                trace_id=trace_id,
+            )
+
+        if existing.outcome == ExecutionOutcome.UNKNOWN and (
+            existing.effective_status == "effectively_not_executed"
+        ):
+            # Reconciled as NOT executed: this attempt does not write either;
+            # the caller re-proposes (new idempotency key) through governance.
+            return ActionExecutionResult(
+                execution_id=existing.execution_id,
+                outcome=ExecutionOutcome.FAILED,
+                action=proposal.action,
+                proposal_id=proposal.proposal_id,
+                decision_id=decision.result_id,
+                error_code="PRIOR_ATTEMPT_NOT_EXECUTED",
+                error_message=(
+                    "Prior attempt with this identity was reconciled as not "
+                    "executed; re-propose with a new idempotency key"
+                ),
+                backend_response={"original_execution_id": existing.execution_id},
+                trace_id=trace_id,
+                physical_mutation_occurred=False,
             )
 
         if existing.outcome == ExecutionOutcome.UNKNOWN:
@@ -460,7 +552,9 @@ class BaseActionExecutor:
                 action=proposal.action,
                 proposal_id=proposal.proposal_id,
                 decision_id=decision.result_id,
+                error_code="RECONCILIATION_REQUIRED",
                 error_message="Prior execution is UNKNOWN; reconciliation required",
+                backend_response={"blocked_by_execution_id": existing.execution_id},
                 trace_id=trace_id,
             )
 

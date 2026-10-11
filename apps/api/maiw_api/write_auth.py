@@ -65,13 +65,20 @@ PLACEHOLDER_VALUES = frozenset(
 )
 
 
-class OperatorWriteAuthError(HTTPException):
-    """Typed denial raised before any governed-write logic runs."""
+class TypedHTTPError(HTTPException):
+    """
+    HTTP error with a stable machine-readable ``code``.  The app renders it as
+    ``{"error": true, "code", "message", "status_code", **extra}`` (never
+    sanitised, so a 503 still says why).
+    """
 
-    def __init__(self, status_code: int, code: str, message: str) -> None:
+    def __init__(
+        self, status_code: int, code: str, message: str, **extra: object
+    ) -> None:
         super().__init__(status_code=status_code, detail=f"{code}: {message}")
         self.code = code
         self.message = message
+        self.extra = extra
 
     def as_body(self) -> dict:
         return {
@@ -79,7 +86,12 @@ class OperatorWriteAuthError(HTTPException):
             "code": self.code,
             "message": self.message,
             "status_code": self.status_code,
+            **self.extra,
         }
+
+
+class OperatorWriteAuthError(TypedHTTPError):
+    """Typed denial raised before any governed-write logic runs."""
 
 
 @dataclass(frozen=True)
@@ -177,6 +189,7 @@ async def require_governed_writes_offered() -> None:
 
 
 __all__ = [
+    "TypedHTTPError",
     "OPERATOR_WRITE_TOKEN_ENV",
     "OPERATOR_WRITE_HEADER",
     "MIN_TOKEN_LENGTH",

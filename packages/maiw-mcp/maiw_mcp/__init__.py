@@ -41,6 +41,13 @@ from .errors import (
     CapabilityNotFound,
     CapabilityPermissionDenied,
     BackendUnavailable,
+    MCPNotDispatched,
+    MCPDispatchOutcomeUnknown,
+    MCPConnectFailed,
+    MCPConnectTimeout,
+    MCPCircuitOpen,
+    MCPResponseLost,
+    MCPTimeoutAfterDispatch,
 )
 from .deadline import RequestDeadline, RequestDeadlineExceeded
 from .circuit_breaker import CircuitBreaker, CircuitOpen, CircuitState
@@ -55,6 +62,13 @@ __all__ = [
     "CapabilityNotFound",
     "CapabilityPermissionDenied",
     "BackendUnavailable",
+    "MCPNotDispatched",
+    "MCPDispatchOutcomeUnknown",
+    "MCPConnectFailed",
+    "MCPConnectTimeout",
+    "MCPCircuitOpen",
+    "MCPResponseLost",
+    "MCPTimeoutAfterDispatch",
     "RequestDeadline",
     "RequestDeadlineExceeded",
     "CircuitBreaker",

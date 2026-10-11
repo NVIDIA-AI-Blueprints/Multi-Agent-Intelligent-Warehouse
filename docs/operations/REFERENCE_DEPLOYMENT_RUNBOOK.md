@@ -50,6 +50,8 @@ HOST (single node)
 │   ├── POST /api/v1/inference  (auth-required: X-Maiw-Internal-Token)
 │   ├── POST /api/v1/equipment/{assign,release,maintenance}
 │   │     (operator write credential X-Maiw-Operator-Token; never the sandbox)
+│   ├── GET/POST /api/v1/executions[/{id}/reconcile] (operator credential;
+│   │     UNKNOWN-write journal + authoritative reconciliation, every profile)
 │   ├── GET  /api/v1/procedures (read-only view of the durable store)
 │   └── legacy /api/v1/chat — NOT mounted (v2.0.1)
 ├── Postgres/TimescaleDB (reference DB; scripts/setup/reference_db.sh)
@@ -70,6 +72,8 @@ Persistence root: $MAIW_PERSISTENCE_ROOT (e.g. /var/lib/maiw)
   procedures/   — JsonFileProcedureStateStore (one .json per procedure, atomic)
   governance/   — JsonFileGovernanceInbox (governance_inbox.jsonl, append-only:
                   "accepted" entries with payload + "applied" markers)
+  executions/   — JsonFileExecutionRegistry per write domain (one fsynced .json
+                  per execution_id, written BEFORE the MCP write is sent)
   runtime/      — maiw-api.instance (deployment identity), maiw-api.pid, API log,
                   rendered sandbox policy
 ```
@@ -721,6 +725,50 @@ Do not upgrade NemoClaw and OpenShell simultaneously.
 2. Readiness endpoint reflects degraded state for model gateway
 3. No unapproved fallback — failure stays failure (no silent fallback to Llama)
 4. When provider recovers, inference resumes automatically
+
+### Ambiguous operational writes (UNKNOWN) and reconciliation (v2.0.1 round 3)
+
+A governed write that was sent to the MCP server but whose response was lost
+(server crash, connection reset, read timeout, unreadable answer) is
+**UNKNOWN**, never "failed": the write may have been applied.
+
+| What the API returns | Meaning |
+|---|---|
+| `200 status=executed` (or `no_op` / `conflict` / `deferred`) | definite outcome |
+| `200 status=failed`, `error_code=MCP_NOT_DISPATCHED` | the request provably never left MAIW (connect / handshake failed, circuit open) — confirmed not executed |
+| `200 status=failed`, `error_code=MCP_TOOL_ERROR` | the MCP server answered with an error |
+| `202 status=unknown`, `executed=null`, `reconciliation_required=true` | sent, response lost — **do not retry** |
+| `409 code=RECONCILIATION_REQUIRED` | an earlier write to the same asset is still UNKNOWN / in flight; refused before any proposal, decision or write |
+
+Rules:
+
+- MAIW never retries a consequential write. While a write to an asset is
+  UNKNOWN, every further write to that asset is refused (409) — also after an
+  API restart: the execution journal (`$MAIW_PERSISTENCE_ROOT/executions/`) is
+  written before the MCP request is sent, and a record still in flight when
+  the process died is reloaded as UNKNOWN (`recovered_after_restart`).
+- The backend receives MAIW's identity chain (`proposal_id`, `decision_id`,
+  `execution_id`; `X-Trace-Id` / `Idempotency-Key` headers are honoured).
+- Reconcile (operator credential required; works in every profile, no demo
+  mode):
+
+```bash
+curl -s -H "X-Maiw-Operator-Token: $MAIW_OPERATOR_WRITE_TOKEN" \
+  http://127.0.0.1:$MAIW_API_PORT/api/v1/executions            # unresolved writes
+curl -s -X POST -H "X-Maiw-Operator-Token: $MAIW_OPERATOR_WRITE_TOKEN" \
+  http://127.0.0.1:$MAIW_API_PORT/api/v1/executions/<execution_id>/reconcile
+```
+
+  Reconciliation re-reads authoritative state through the MCP read path and
+  compares it with the intent recorded before the write: state matches the
+  intended transition → `confirmed_executed`; state unchanged from the
+  recorded pre-write state → `confirmed_not_executed`; read unavailable or
+  state changed to something else → `indeterminate` (the asset stays blocked;
+  investigate, then reconcile again). The original `unknown` outcome is kept;
+  nothing is re-executed and no new proposal or decision is created. After
+  `confirmed_not_executed`, submit a new request (it goes through governance
+  again).
+- `/api/v1/ready` reports `governed_write_path.execution_journal.<domain>.unresolved`.
 
 ### Governance-wait restart
 

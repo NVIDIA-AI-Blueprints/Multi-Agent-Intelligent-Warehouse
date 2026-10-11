@@ -56,6 +56,11 @@ class EquipmentActionExecutor(BaseActionExecutor):
         self._release_skill = release_skill
         self._maintenance_skill = maintenance_skill
         self._state_provider = state_provider
+        # v2.0.1 round 3: asset status observed by the pre-write state guard,
+        # keyed by proposal_id, recorded in the ExecutionIntent as
+        # ``pre_status`` so reconciliation can tell "unchanged" (not executed)
+        # from "changed to something else" (indeterminate).
+        self._observed_pre_status: dict[str, str] = {}
 
     def _build_intent(
         self,
@@ -83,6 +88,10 @@ class EquipmentActionExecutor(BaseActionExecutor):
                 "asset_id": asset_id,
                 "expected_status": "maintenance",
             }
+        observed = getattr(self, "_observed_pre_status", None) or {}
+        pre_status = observed.pop(proposal.proposal_id, None)
+        if pre_status is not None:
+            expected_effect["pre_status"] = pre_status
         return ExecutionIntent(
             capability=action,
             proposal_id=proposal.proposal_id,
@@ -114,7 +123,11 @@ class EquipmentActionExecutor(BaseActionExecutor):
             asset = next(
                 (a for a in state.equipment.assets if a.asset_id == asset_id), None
             )
+            observed = self.__dict__.setdefault("_observed_pre_status", {})
+            if asset is not None and isinstance(getattr(asset, "status", None), str):
+                observed[proposal.proposal_id] = asset.status
             if asset and asset.status in {"offline", "maintenance"}:
+                observed.pop(proposal.proposal_id, None)
                 raise ActionConflict(
                     f"Asset {asset_id!r} status drifted to {asset.status!r} since "
                     f"the decision snapshot; cannot execute safely"

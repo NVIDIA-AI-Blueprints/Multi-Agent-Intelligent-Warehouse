@@ -20,13 +20,28 @@ idempotency_key : Identity of the intended logical mutation. Caller-supplied via
                   ActionProposal.idempotency_key. Same key + same capability =
                   same logical operation; re-submission does not produce a second
                   physical mutation.
+
+Unresolved-target guard (v2.0.1 round 3, NEW3-P1-02)
+---------------------------------------------------
+A write whose outcome is UNKNOWN (or still in flight) may have changed its
+target.  Until it is reconciled to CONFIRMED_EXECUTED / CONFIRMED_NOT_EXECUTED,
+``begin()`` refuses every new write to the same domain target (e.g. equipment
+asset FL-01) — even under a new proposal, decision and execution_id — by
+returning the blocking record.  This is what stops an operator's identical
+retry from executing a second consequential write (third re-audit, §50).
+``JsonFileExecutionRegistry`` makes the records — and therefore the guard —
+survive a process crash / restart.
 """
 
 from __future__ import annotations
 
+import json
 import logging
-from dataclasses import dataclass, field
+import os
+import tempfile
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from .outcome import ExecutionOutcome
@@ -52,6 +67,29 @@ class ExecutionRecord:
     result: Any = None  # ActionExecutionResult once complete
     intent: ExecutionIntent | None = None  # Immutable snapshot captured at begin() time
     reconciliation: ReconciliationRecord | None = None  # Set by set_reconciliation()
+    # True when the record was found in flight after a restart and turned into
+    # UNKNOWN (the process died while the write may have been on the wire).
+    recovered_after_restart: bool = False
+
+    @property
+    def domain(self) -> str:
+        parts = self.capability.split(".")
+        return parts[1] if len(parts) >= 3 else self.capability
+
+    @property
+    def target(self) -> str | None:
+        return self.intent.target if self.intent is not None else None
+
+    @property
+    def unresolved(self) -> bool:
+        """In flight, or UNKNOWN without a definitive reconciliation."""
+        if self.outcome is None:
+            return True
+        if self.outcome == ExecutionOutcome.UNKNOWN:
+            return self.reconciliation is None or (
+                self.reconciliation.outcome == ReconciliationOutcome.INDETERMINATE
+            )
+        return False
 
     @property
     def effective_status(self) -> str:
@@ -157,6 +195,21 @@ class ExecutionRegistry:
                 )
                 return existing
 
+        # Unresolved-target guard (round 3): an UNKNOWN or in-flight write to
+        # the same domain target blocks this one until it is reconciled.
+        if intent is not None and intent.target:
+            blocking = self.unresolved_for_target(capability, intent.target)
+            if blocking is not None:
+                logger.warning(
+                    "ExecutionRegistry: write to %s target=%s refused — prior "
+                    "execution_id=%s is unresolved (%s); reconciliation required",
+                    capability,
+                    intent.target,
+                    blocking.execution_id,
+                    blocking.effective_status,
+                )
+                return blocking
+
         # Fresh start — register the record
         record = ExecutionRecord(
             execution_id=execution_id,
@@ -243,6 +296,29 @@ class ExecutionRegistry:
     def get_by_execution_id(self, execution_id: str) -> ExecutionRecord | None:
         return self._by_execution_id.get(execution_id)
 
+    def unresolved_for_target(
+        self, capability: str, target: str
+    ) -> ExecutionRecord | None:
+        """The oldest unresolved record for the same domain + target, if any."""
+        parts = capability.split(".")
+        domain = parts[1] if len(parts) >= 3 else capability
+        found = [
+            r
+            for r in self._by_execution_id.values()
+            if r.unresolved and r.domain == domain and r.target == target
+        ]
+        return min(found, key=lambda r: r.started_at) if found else None
+
+    def unresolved(self) -> list[ExecutionRecord]:
+        """Every in-flight or unreconciled UNKNOWN record (oldest first)."""
+        return sorted(
+            (r for r in self._by_execution_id.values() if r.unresolved),
+            key=lambda r: r.started_at,
+        )
+
+    def records(self) -> list[ExecutionRecord]:
+        return sorted(self._by_execution_id.values(), key=lambda r: r.started_at)
+
     def get_by_idempotency_key(
         self, idempotency_key: str, capability: str
     ) -> ExecutionRecord | None:
@@ -256,3 +332,200 @@ class ExecutionRegistry:
         """Clear all records. For test use only."""
         self._by_execution_id.clear()
         self._by_idempotency_key.clear()
+
+
+# ── Durable registry (v2.0.1 round 3, NEW3-P1-02) ─────────────────────────────
+
+
+class ExecutionJournalError(RuntimeError):
+    """The durable execution journal cannot be read; writes must not proceed."""
+
+
+def _dt(value: str | None) -> datetime | None:
+    return datetime.fromisoformat(value) if value else None
+
+
+def _record_to_dict(record: ExecutionRecord) -> dict[str, Any]:
+    result = record.result
+    if result is not None and hasattr(result, "model_dump"):
+        result = result.model_dump(mode="json")
+    rec = record.reconciliation
+    return {
+        "schema": 1,
+        "execution_id": record.execution_id,
+        "idempotency_key": record.idempotency_key,
+        "capability": record.capability,
+        "proposal_id": record.proposal_id,
+        "started_at": record.started_at.isoformat(),
+        "outcome": record.outcome.value if record.outcome is not None else None,
+        "completed_at": (
+            record.completed_at.isoformat() if record.completed_at else None
+        ),
+        "result": result,
+        "intent": asdict(record.intent) if record.intent is not None else None,
+        "reconciliation": (
+            {
+                "reconciliation_id": rec.reconciliation_id,
+                "outcome": rec.outcome.value,
+                "reconciled_at": rec.reconciled_at.isoformat(),
+                "evidence": rec.evidence,
+                "trace_id": rec.trace_id,
+                "error": rec.error,
+            }
+            if rec is not None
+            else None
+        ),
+        "recovered_after_restart": record.recovered_after_restart,
+    }
+
+
+def _record_from_dict(data: dict[str, Any]) -> ExecutionRecord:
+    result = data.get("result")
+    if isinstance(result, dict):
+        from .base import ActionExecutionResult  # local: base imports registry
+
+        result = ActionExecutionResult.model_validate(result)
+    rec = data.get("reconciliation")
+    return ExecutionRecord(
+        execution_id=data["execution_id"],
+        idempotency_key=data.get("idempotency_key"),
+        capability=data["capability"],
+        proposal_id=data["proposal_id"],
+        started_at=_dt(data["started_at"]),  # type: ignore[arg-type]
+        outcome=ExecutionOutcome(data["outcome"]) if data.get("outcome") else None,
+        completed_at=_dt(data.get("completed_at")),
+        result=result,
+        intent=ExecutionIntent(**data["intent"]) if data.get("intent") else None,
+        reconciliation=(
+            ReconciliationRecord(
+                reconciliation_id=rec["reconciliation_id"],
+                outcome=ReconciliationOutcome(rec["outcome"]),
+                reconciled_at=_dt(rec["reconciled_at"]),  # type: ignore[arg-type]
+                evidence=rec.get("evidence") or {},
+                trace_id=rec.get("trace_id"),
+                error=rec.get("error"),
+            )
+            if rec
+            else None
+        ),
+        recovered_after_restart=bool(data.get("recovered_after_restart")),
+    )
+
+
+class JsonFileExecutionRegistry(ExecutionRegistry):
+    """
+    ExecutionRegistry whose records are fsynced JSON files (one per
+    execution_id) under ``directory``.
+
+    * A record is written BEFORE the write is dispatched (``begin``) and
+      rewritten on every transition, so a crash at any point leaves evidence.
+    * On construction every record is loaded.  A record still in flight (no
+      outcome) means the process died while the write may have been on the
+      wire: it becomes UNKNOWN (``recovered_after_restart=True``) and keeps
+      blocking its target until reconciled.  Its execution_id, proposal_id,
+      decision_id and trace_id are unchanged.
+    * An unreadable record raises ``ExecutionJournalError`` (fail closed: the
+      executor is not built and readiness reports the governed write path
+      failed) — a write must never proceed without knowing what is unresolved.
+
+    Single node only (same as the procedure store).
+    """
+
+    def __init__(self, directory: str | Path) -> None:
+        super().__init__()
+        self._dir = Path(directory)
+        self._dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        self.recovered_in_flight: list[str] = []
+        for path in sorted(self._dir.glob("*.json")):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                record = _record_from_dict(data)
+            except Exception as exc:  # noqa: BLE001 — fail closed below
+                raise ExecutionJournalError(
+                    f"unreadable execution record {path}: {type(exc).__name__}: {exc}"
+                ) from exc
+            if record.outcome is None:
+                record.outcome = ExecutionOutcome.UNKNOWN
+                record.completed_at = datetime.now(timezone.utc)
+                record.recovered_after_restart = True
+                self.recovered_in_flight.append(record.execution_id)
+            self._by_execution_id[record.execution_id] = record
+            if record.idempotency_key is not None:
+                key = f"{record.capability}:{record.idempotency_key}"
+                self._by_idempotency_key[key] = record
+            if record.recovered_after_restart:
+                self._persist(record)
+        if self.recovered_in_flight:
+            logger.error(
+                "JsonFileExecutionRegistry(%s): %d write(s) were in flight when the "
+                "process stopped and are now UNKNOWN (reconciliation required): %s",
+                self._dir,
+                len(self.recovered_in_flight),
+                self.recovered_in_flight,
+            )
+
+    @property
+    def directory(self) -> Path:
+        return self._dir
+
+    # -- persistence -----------------------------------------------------------
+
+    def _persist(self, record: ExecutionRecord) -> None:
+        target = self._dir / f"{record.execution_id}.json"
+        payload = json.dumps(_record_to_dict(record), sort_keys=True, default=str)
+        fd, tmp = tempfile.mkstemp(dir=str(self._dir), prefix=".exec-", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(tmp, target)
+            dir_fd = os.open(str(self._dir), os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+        finally:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
+
+    # -- transitions (persisted) -----------------------------------------------
+
+    def begin(
+        self,
+        execution_id: str,
+        idempotency_key: str | None,
+        capability: str,
+        proposal_id: str,
+        intent: ExecutionIntent | None = None,
+    ) -> ExecutionRecord | None:
+        existing = super().begin(
+            execution_id, idempotency_key, capability, proposal_id, intent=intent
+        )
+        if existing is None:
+            # Persist BEFORE the caller dispatches the write.
+            self._persist(self._by_execution_id[execution_id])
+        return existing
+
+    def complete(self, execution_id: str, outcome: ExecutionOutcome, result: Any) -> None:
+        super().complete(execution_id, outcome, result)
+        record = self._by_execution_id.get(execution_id)
+        if record is not None:
+            self._persist(record)
+
+    def mark_unknown(self, execution_id: str) -> None:
+        super().mark_unknown(execution_id)
+        record = self._by_execution_id.get(execution_id)
+        if record is not None:
+            self._persist(record)
+
+    def set_reconciliation(self, execution_id: str, record: ReconciliationRecord) -> None:
+        super().set_reconciliation(execution_id, record)
+        existing = self._by_execution_id.get(execution_id)
+        if existing is not None:
+            self._persist(existing)
+
+    def reset(self) -> None:  # pragma: no cover - test helper parity
+        super().reset()
+        for path in self._dir.glob("*.json"):
+            path.unlink()

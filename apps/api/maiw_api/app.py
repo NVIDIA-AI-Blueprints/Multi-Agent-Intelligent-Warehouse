@@ -18,6 +18,8 @@ docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md for the full authority graph):
                       round 3 NEW3-P1-01 — then agent proposal →
                       DecisionEngine → EquipmentActionExecutor only when
                       APPROVED; 503 in profiles without governed writes)
+        executions    operator-authenticated journal + reconciliation of
+                      UNKNOWN writes, every profile (round 3 NEW3-P1-02)
         operations    GET only in the shipped app (SQL task writes unmounted)
         safety        GET only in the shipped app (SQL incident writes unmounted)
         mcp_status, runtime_status, world, model_lab, agent_tasks,
@@ -57,11 +59,12 @@ from fastapi.responses import JSONResponse
 
 from maiw_api.config import settings
 from maiw_api.lifespan import lifespan
-from maiw_api.write_auth import OperatorWriteAuthError
+from maiw_api.write_auth import TypedHTTPError
 
 # ── Canonical routers ─────────────────────────────────────────────────────────
 from maiw_api.routers.health import router as health_router
 from maiw_api.routers.equipment import router as equipment_router
+from maiw_api.routers.executions import router as executions_router
 from maiw_api.routers.operations import router as operations_router
 from maiw_api.routers.safety import router as safety_router
 from maiw_api.routers.mcp_status import router as mcp_status_router
@@ -134,10 +137,11 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     return await handle_validation_error(request, exc)
 
 
-@app.exception_handler(OperatorWriteAuthError)
-async def operator_write_auth_handler(request: Request, exc: OperatorWriteAuthError):
-    # v2.0.1 round 3: typed, unsanitised denial (the generic handler hides 5xx
-    # messages, which would hide OPERATOR_WRITE_AUTH_NOT_CONFIGURED).
+@app.exception_handler(TypedHTTPError)
+async def typed_http_error_handler(request: Request, exc: TypedHTTPError):
+    # v2.0.1 round 3: typed, unsanitised errors (operator write auth denials,
+    # RECONCILIATION_REQUIRED) — the generic handler hides 5xx messages, which
+    # would hide OPERATOR_WRITE_AUTH_NOT_CONFIGURED.
     return JSONResponse(status_code=exc.status_code, content=exc.as_body())
 
 
@@ -248,6 +252,7 @@ async def metrics_middleware(request: Request, call_next):
 # Canonical routers
 app.include_router(health_router)
 app.include_router(equipment_router)
+app.include_router(executions_router)
 # operations / safety: the SQL task/incident writes have no governed path, so
 # only their read routes ship (v2.0.1, audit P1-01 / §29).
 app.include_router(read_only_view(operations_router))
