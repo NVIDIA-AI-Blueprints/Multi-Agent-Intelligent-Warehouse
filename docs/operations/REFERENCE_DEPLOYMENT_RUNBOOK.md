@@ -325,6 +325,9 @@ bash scripts/setup/reference_gateway.sh stop     # managed only: stop ONLY the g
 | `managed` (default) | runs `openshell-gateway` 0.0.116 as this deployment's own gateway: name `MAIW_OPENSHELL_GATEWAY_NAME`, `127.0.0.1:MAIW_OPENSHELL_GATEWAY_PORT`, docker driver, its own sandbox namespace and docker network, its own Ed25519 gateway-JWT and sqlite state under `$MAIW_PERSISTENCE_ROOT/openshell-gateway/`. Requires `OPENSHELL_GATEWAY_ENDPOINT=http://127.0.0.1:<port>`. Refuses a port already in use. |
 | `external` | verifies a gateway someone else runs (for example a NemoClaw-managed one) and never starts, stops or reconfigures it; start it with the tool that owns it |
 
+Stopping the gateway stops its sandboxes; after a gateway restart recreate
+the sandbox (see "Host reboot / OpenShell gateway restart").
+
 The managed gateway listens on loopback only with TLS disabled and accepts
 unauthenticated local users (the single-node reference topology: anyone with
 a shell on the host can already drive Docker). On a shared multi-user host use
@@ -752,6 +755,26 @@ Do not upgrade NemoClaw and OpenShell simultaneously.
 2. JsonFileProcedureStateStore and JsonFileGovernanceInbox survive the crash (file-backed)
 3. Verify state count: `ls /var/lib/maiw/procedures/*.json | wc -l`
 4. Run smoke test: `bash scripts/smoke_test_reference_deployment.sh`
+
+### Host reboot / OpenShell gateway restart (v2.0.1 round 3)
+
+A stopped gateway takes its sandboxes down with it: after a reboot (or
+`reference_gateway.sh stop`) the sandbox is reported `Error` and cannot be
+`start`ed; recreate it. Verified on the qualification host:
+
+```bash
+bash scripts/setup/reference_gateway.sh start      # or verify an external gateway
+bash scripts/setup/reference_gateway.sh status
+bash scripts/setup/reference_sandbox.sh status     # not Ready → recreate:
+bash scripts/setup/reference_sandbox.sh delete
+bash scripts/setup/reference_sandbox.sh create
+bash scripts/setup/reference_db.sh status          # the DB container restarts with Docker
+bash scripts/start_reference_deployment.sh         # preflight checks gateway, sandbox, DB
+```
+
+Host state (procedures, governance, execution journal) is untouched; an
+UNKNOWN write recorded before the reboot is still blocking its asset and is
+reconciled as described above.
 
 ### OpenShell/sandbox crash
 
