@@ -425,6 +425,14 @@ async def test_p1_01_operational_writes_go_through_decision_engine(
         return fake
 
     monkeypatch.setattr(eat, "get_equipment_asset_tools", _factory)
+    # v2.0.1 round 3: governed writes need the governed profile and the
+    # operator write credential (tests/api/test_round3_write_auth.py).
+    import secrets
+
+    operator = secrets.token_hex(32)
+    monkeypatch.setenv("MAIW_DEPLOYMENT_PROFILE", "reference_governed")
+    monkeypatch.setenv("MAIW_OPERATOR_WRITE_TOKEN", operator)
+    auth = {"X-Maiw-Operator-Token": operator}
 
     proposal, decision = object(), object()
     executed: list = []
@@ -463,12 +471,15 @@ async def test_p1_01_operational_writes_go_through_decision_engine(
             r = await client.post(
                 "/api/v1/equipment/assign",
                 json={"asset_id": "FL-01", "assignee": "J-17"},
+                headers=auth,
             )
             assert r.status_code == 200, r.text
             assert executed == [], status
         rt.equipment_agent = _StubAgent("approved")
         r = await client.post(
-            "/api/v1/equipment/assign", json={"asset_id": "FL-01", "assignee": "J-17"}
+            "/api/v1/equipment/assign",
+            json={"asset_id": "FL-01", "assignee": "J-17"},
+            headers=auth,
         )
     assert r.status_code == 200
     assert executed == [(proposal, decision)]

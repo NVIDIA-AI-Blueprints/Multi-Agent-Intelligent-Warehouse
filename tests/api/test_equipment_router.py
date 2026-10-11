@@ -18,6 +18,18 @@ import pytest
 
 # ── App fixture (no external deps) ────────────────────────────────────────────
 
+# v2.0.1 round 3: governed write routes require the operator write credential
+# and a profile that offers governed writes.
+_OPERATOR_TOKEN = "op-" + "a1" * 20
+_AUTH = {"X-Maiw-Operator-Token": _OPERATOR_TOKEN}
+
+
+@pytest.fixture(autouse=True)
+def _governed_write_env(monkeypatch):
+    monkeypatch.setenv("MAIW_DEPLOYMENT_PROFILE", "reference_governed")
+    monkeypatch.setenv("MAIW_OPERATOR_WRITE_TOKEN", _OPERATOR_TOKEN)
+    monkeypatch.delenv("MAIW_INFERENCE_INTERNAL_TOKEN", raising=False)
+
 
 def _make_runtime(*, with_agent: bool = True):
     rt = MagicMock()
@@ -187,7 +199,9 @@ async def test_assign_equipment_returns_decision(app_with_agent):
     async with httpx.AsyncClient(
         transport=ASGITransport(app=app_with_agent), base_url="http://test"
     ) as client:
-        resp = await client.post("/api/v1/equipment/assign", json=payload)
+        resp = await client.post(
+            "/api/v1/equipment/assign", json=payload, headers=_AUTH
+        )
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "requires_human_approval"
@@ -204,7 +218,9 @@ async def test_release_equipment_approved(app_with_agent):
     async with httpx.AsyncClient(
         transport=ASGITransport(app=app_with_agent), base_url="http://test"
     ) as client:
-        resp = await client.post("/api/v1/equipment/release", json=payload)
+        resp = await client.post(
+            "/api/v1/equipment/release", json=payload, headers=_AUTH
+        )
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "approved"
@@ -221,7 +237,9 @@ async def test_write_endpoint_returns_503_without_agent(app_no_agent):
     async with httpx.AsyncClient(
         transport=ASGITransport(app=app_no_agent), base_url="http://test"
     ) as client:
-        resp = await client.post("/api/v1/equipment/assign", json=payload)
+        resp = await client.post(
+            "/api/v1/equipment/assign", json=payload, headers=_AUTH
+        )
     assert resp.status_code == 503
 
 
@@ -240,7 +258,9 @@ async def test_schedule_maintenance_returns_decision(app_with_agent):
     async with httpx.AsyncClient(
         transport=ASGITransport(app=app_with_agent), base_url="http://test"
     ) as client:
-        resp = await client.post("/api/v1/equipment/maintenance", json=payload)
+        resp = await client.post(
+            "/api/v1/equipment/maintenance", json=payload, headers=_AUTH
+        )
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "requires_human_approval"

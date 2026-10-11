@@ -24,6 +24,7 @@ the sandbox CLI is a fake ``openshell`` script in the test's tmp dir.
 from __future__ import annotations
 
 import json
+import secrets
 import socket
 import stat
 import threading
@@ -116,6 +117,9 @@ def mcp_servers():
 
 def _governed(monkeypatch, servers=None):
     monkeypatch.setenv("MAIW_DEPLOYMENT_PROFILE", "reference_governed")
+    # v2.0.1 round 3: the governed write path also needs the operator write
+    # credential (tests/api/test_round3_write_auth.py covers its absence).
+    monkeypatch.setenv("MAIW_OPERATOR_WRITE_TOKEN", secrets.token_hex(32))
     for domain, server in (servers or {}).items():
         monkeypatch.setenv(f"MAIW_MCP_SERVER_{domain.upper()}_URL", server.url)
 

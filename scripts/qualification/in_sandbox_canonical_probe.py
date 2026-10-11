@@ -12,6 +12,7 @@ Prints one JSON object describing what the sandbox can and cannot reach on
 the canonical shipped app (maiw_api.app:app).
 """
 
+import hashlib
 import json
 import os
 import sys
@@ -93,6 +94,43 @@ def main() -> None:
         "PUT", base + "/api/v1/inventory/items/X", {"quantity": 1}
     )[0]
     out["legacy_migrate"] = _http("POST", base + "/api/v1/migrations/migrate")[0]
+    # v2.0.1 round 3 (NEW3-P1-01): the sandbox must not be able to perform a
+    # governed operational write by ANY credential it holds.  Expected: the
+    # OpenShell L7 rule denies the request at the proxy (403), and the app
+    # would deny it anyway (403 no operator credential / 401 invalid).
+    write_bodies = {
+        "/api/v1/equipment/release": {
+            "asset_id": "FL-01",
+            "released_by": "sandbox",
+            "notes": "sandbox write attempt",
+        },
+        "/api/v1/equipment/assign": {"asset_id": "FL-02", "assignee": "sandbox"},
+        "/api/v1/equipment/maintenance": {
+            "asset_id": "FL-01",
+            "maintenance_type": "preventive",
+            "description": "sandbox write attempt",
+            "scheduled_by": "sandbox",
+            "scheduled_for": "2026-12-01T09:00:00",
+        },
+    }
+    credential_variants = {
+        "no_credential": {},
+        "inference_token_as_internal_header": {"X-Maiw-Internal-Token": token},
+        "inference_token_as_operator_header": {"X-Maiw-Operator-Token": token},
+        "inference_token_as_bearer": {"Authorization": "Bearer " + token},
+    }
+    writes = {}
+    for path, body in write_bodies.items():
+        writes[path] = {
+            name: _http("POST", base + path, body, headers, timeout=20)[0]
+            for name, headers in credential_variants.items()
+        }
+    out["operational_writes"] = writes
+    out["operational_writes_all_denied"] = all(
+        code in (401, 403, "BLOCKED")
+        for per_path in writes.values()
+        for code in per_path.values()
+    )
     out["direct_provider"] = _http(
         "GET", "https://integrate.api.nvidia.com/v1/models", timeout=10
     )[0]
@@ -103,7 +141,16 @@ def main() -> None:
     out["env_secret_names"] = sorted(
         n
         for n in os.environ
-        if any(s in n.upper() for s in ("KEY", "TOKEN", "SECRET", "PASS", "NVAPI"))
+        if any(
+            s in n.upper()
+            for s in ("KEY", "TOKEN", "SECRET", "PASS", "NVAPI", "OPERATOR", "CRED")
+        )
+    )
+    # Digests (never values) of every environment value, so the host can prove
+    # that no host secret (operator write token, provider key, DB password) is
+    # present in the sandbox without either side printing it.
+    out["env_value_digests"] = sorted(
+        {hashlib.sha256(v.encode()).hexdigest()[:24] for v in os.environ.values() if v}
     )
     try:
         import importlib.util
@@ -114,6 +161,16 @@ def main() -> None:
     except Exception:  # noqa: BLE001
         out["maiw_execution_importable"] = False
     print(json.dumps(out))
+    # Exit status is the verdict: inference allowed with identity verified,
+    # and no governed write reachable with any sandbox-held credential.
+    inf = out["inference_with_token"]
+    ok = (
+        inf["http"] == 200
+        and inf["identity_verified"] is True
+        and inf["approved_family"] is True
+        and out["operational_writes_all_denied"]
+    )
+    sys.exit(0 if ok else 1)
 
 
 if __name__ == "__main__":

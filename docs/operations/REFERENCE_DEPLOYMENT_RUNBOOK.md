@@ -48,6 +48,8 @@ HOST (single node)
 │   │     JsonFileProcedureStateStore  ($MAIW_PERSISTENCE_ROOT/procedures/)
 │   │     JsonFileGovernanceInbox      ($MAIW_PERSISTENCE_ROOT/governance/)
 │   ├── POST /api/v1/inference  (auth-required: X-Maiw-Internal-Token)
+│   ├── POST /api/v1/equipment/{assign,release,maintenance}
+│   │     (operator write credential X-Maiw-Operator-Token; never the sandbox)
 │   ├── GET  /api/v1/procedures (read-only view of the durable store)
 │   └── legacy /api/v1/chat — NOT mounted (v2.0.1)
 ├── Postgres/TimescaleDB (reference DB; scripts/setup/reference_db.sh)
@@ -59,7 +61,8 @@ HOST (single node)
 │       Hosted at: https://integrate.api.nvidia.com/v1  OR a local NIM
 └── NemoClaw/OpenShell sandbox MAIW_SANDBOX_NAME (MAIW_SANDBOX_MODE=required)
     ├── policy deploy/openshell/maiw-inference-only.policy.yaml.tmpl
-    │   (egress ONLY to <HOST_IP>:MAIW_API_PORT; no provider, no internet)
+    │   (egress ONLY `POST /api/v1/inference` on <HOST_IP>:MAIW_API_PORT —
+    │    OpenShell L7 REST rule; no provider, no internet)
     ├── SOP Engine / DeepAgentsRuntime / RuntimeCapabilityPolicy
     └── POST http://<HOST_IP>:MAIW_API_PORT/api/v1/inference
 
@@ -80,12 +83,37 @@ Persistence root: $MAIW_PERSISTENCE_ROOT (e.g. /var/lib/maiw)
 | Profile | Use | Governed writes | Required for READY |
 |---|---|---|---|
 | `reference` | the reference deployment (default outside demo mode) | **not offered** (`governed_write_path: not_offered`) | persistence, ModelGateway with every enabled role bound to an approved physical model, database, sandbox when `MAIW_SANDBOX_MODE=required` |
-| `reference_governed` | reference + governed operational writes | offered | everything in `reference` **plus** every required MCP write domain (default `equipment,labor,wave`, override `MAIW_REQUIRED_MCP_DOMAINS`) configured, reachable and not circuit-open, and its executor built |
+| `reference_governed` | reference + governed operational writes | offered (operator write credential required) | everything in `reference` **plus** every required MCP write domain (default `equipment,labor,wave`, override `MAIW_REQUIRED_MCP_DOMAINS`) configured, reachable and not circuit-open, its executor built, and `MAIW_OPERATOR_WRITE_TOKEN` usable |
 | `demo` | `MAIW_DEMO_MODE=true`, SimulationProviders (in-memory MCP) — not a reference deployment | simulation only | persistence, ModelGateway, all four in-memory MCP domains; no database |
 
 The reference profile is honest about what it cannot do: it never reports a
 governed write path as ready, and an unconfigured MCP domain is
-`NOT_CONFIGURED`, never `HEALTHY`.
+`NOT_CONFIGURED`, never `HEALTHY`. Since round 3 behaviour matches: in
+`reference` no ActionExecutor is built even when an MCP URL is set (MCP is
+read-only there) and the write routes answer `503 GOVERNED_WRITES_NOT_OFFERED`
+after authentication.
+
+### Operational write authentication (v2.0.1 round 3)
+
+| Route | Credential | Denied caller |
+|---|---|---|
+| `POST /api/v1/inference` | `X-Maiw-Internal-Token` = `MAIW_INFERENCE_INTERNAL_TOKEN` (the sandbox's only credential) | 401 |
+| `POST /api/v1/equipment/assign`, `/release`, `/maintenance` | `X-Maiw-Operator-Token` = `MAIW_OPERATOR_WRITE_TOKEN` (host operator only) | no header → 403 `OPERATOR_WRITE_CREDENTIAL_REQUIRED`; wrong value (incl. the inference token) → 401 `INVALID_OPERATOR_WRITE_CREDENTIAL`; not configured → 503 `OPERATOR_WRITE_AUTH_NOT_CONFIGURED` |
+
+Authentication is a route dependency: it is decided before the body is read
+and before any agent, DecisionEngine, ActionExecutor or MCP call. The
+DecisionEngine remains the *authority* decision after authentication; it is
+not a substitute for it. A JWT user session alone never authorises an
+operational write. The two tokens must differ (preflight and the app both
+refuse an operator token equal to the inference token).
+
+**UI.** The browser never holds the operator credential (never use a
+`REACT_APP_*` variable for it). The UI's equipment write actions work only
+behind an authenticated operator proxy that adds `X-Maiw-Operator-Token`
+server-side; for a localhost-only development console, the CRA dev server
+does this when `MAIW_UI_OPERATOR_WRITE_TOKEN` is set in *its* environment
+(`src/ui/web/src/setupProxy.js`). Without it the UI shows "Operational writes
+require the operator write credential".
 
 ---
 
@@ -198,6 +226,7 @@ the app reads only what the loader exported.
 | `MAIW_API_PORT` | API port — must be free; **no default is assumed** | `8001` |
 | `MAIW_DEPLOYMENT_PROFILE` | `reference` or `reference_governed` | `reference` |
 | `MAIW_INFERENCE_INTERNAL_TOKEN` | auth token for the inference boundary (fresh, >= 32 chars) | `python3 -c "import secrets; print(secrets.token_hex(32))"` |
+| `MAIW_OPERATOR_WRITE_TOKEN` | **`reference_governed` only** — operator write credential (fresh, >= 32 chars, different from the inference token; never given to the sandbox) | `python3 -c "import secrets; print(secrets.token_hex(32))"` |
 | `NVIDIA_API_KEY` | hosted NIM credential (host only) | `nvapi-...` |
 | `POSTGRES_PASSWORD`, `JWT_SECRET_KEY` | DB / auth secrets | |
 | `PGHOST`, `PGPORT`, `POSTGRES_USER`, `POSTGRES_DB` | the data-path database (readiness probes exactly these) | `127.0.0.1`, `5435` |
@@ -248,6 +277,7 @@ In the `reference` profile all four are optional; unset domains are reported
 | Secret | Who holds it | Process that needs it | Sandbox sees it | Restart on rotation |
 |---|---|---|---|---|
 | `MAIW_INFERENCE_INTERNAL_TOKEN` | MAIW operator | MAIW API + sandbox | YES (to authenticate to MAIW API; passed on stdin) | YES — API and sandbox must restart |
+| `MAIW_OPERATOR_WRITE_TOKEN` | MAIW operator | MAIW API; host operator tooling / operator proxy | **NO** — never; the sandbox probe proves it by digest comparison | YES — API must restart |
 | `NVIDIA_API_KEY` | MAIW operator | MAIW API (NIMProvider) | NO — never forwarded to sandbox | YES — API must restart |
 | `JWT_SECRET_KEY` | MAIW operator | MAIW API (auth signing) | NO | YES |
 | `POSTGRES_PASSWORD` | MAIW operator | MAIW API (DB layer), reference DB container | NO | YES |
@@ -255,7 +285,7 @@ In the `reference` profile all four are optional; unset domains are reported
 **Invariants**:
 - No secrets are committed to version control
 - No secrets appear in logs, script output, or health endpoints
-- No warehouse write credentials in sandbox
+- No warehouse write credentials in sandbox — the operator write token is never injected; `reference_sandbox.sh probe` fails if a digest of it (or of the provider key, DB password or JWT secret) is found in the sandbox environment
 - No NIM/provider credential in sandbox
 - `MAIW_INFERENCE_INTERNAL_TOKEN` is the only credential that flows to the sandbox
 
@@ -293,10 +323,24 @@ bash scripts/setup/reference_sandbox.sh delete   # only a sandbox this script cr
 ```
 
 The policy (`deploy/openshell/maiw-inference-only.policy.yaml.tmpl`) allows
-egress ONLY to the host IP and port in `MAIW_SANDBOX_MODEL_GATEWAY_ENDPOINT`
-— no provider, internet, metadata service, private NIMs or databases. No
+egress ONLY to the host IP and port in `MAIW_SANDBOX_MODEL_GATEWAY_ENDPOINT`,
+and on that host:port ONLY `POST /api/v1/inference` (OpenShell L7 `protocol:
+rest` rule; the API is plain HTTP, so the sandbox proxy inspects method and
+path — any other request on the port is denied by the proxy with 403). No
+provider, internet, metadata service, private NIMs or databases. No
 credential provider is attached; the probe receives the internal token on
 stdin.
+
+The network rule is one layer, not the authority boundary: the application
+still authenticates every request (inference token for inference; the
+separate operator write credential for every operational write), so a
+misconfigured policy does not open a write path.
+
+`probe` exits non-zero unless: inference with the token returns 200 with a
+verified approved model; every governed write route is denied for every
+credential the sandbox holds (none, the inference token in each header, the
+inference token as a bearer); and no host secret is present in the sandbox
+environment (digest comparison — values are never printed).
 
 ---
 
@@ -314,7 +358,9 @@ OpenShell 0.0.116 CLIs; **physical model bindings** — the same
 `ModelRegistry` + `DeploymentResolver` the gateway runs, on the
 `NEMOTRON_<ROLE>_MODEL` values it dispatches, plus a provider `/models`
 listing probe; API port free; persistence root creatable; auth token set,
-not the placeholder, >= 32 chars; dev override not active; sandbox mode
+not the placeholder, >= 32 chars; operator write credential usable and
+distinct from the inference token (`reference_governed`; must be valid if
+set in `reference`); `MAIW_DEMO_MODE` not enabled; dev override not active; sandbox mode
 required and the named sandbox Ready; database reachable with schema loaded;
 required MCP write domains reachable (`reference_governed`).
 
@@ -404,7 +450,12 @@ without / with wrong token; 422 for `model_id` and for an unknown `model`
 field; 200 with the token, then **physical model identity**: logical role,
 resolved physical model, generation, provider-reported model — the model must
 be the approved deployment for that role and the provider must report the
-same ID; legacy `POST /api/v1/chat` → 404; sandbox `MAIW_SANDBOX_NAME` Ready.
+same ID; legacy `POST /api/v1/chat` → 404; **operational write boundary** —
+`POST /api/v1/equipment/{assign,release,maintenance}` denied (401/403/503)
+with no credential, with the inference token and with the inference token
+sent as the operator header; in `reference_governed` the operator credential
+is accepted (authenticated empty body → 422, so nothing is proposed or
+written); sandbox `MAIW_SANDBOX_NAME` Ready.
 The token is passed to curl on stdin, never on the command line.
 
 ---
@@ -606,6 +657,7 @@ Do not upgrade NemoClaw and OpenShell simultaneously.
 
 1. **Physical model identity**: `.venv/bin/python scripts/lib/check_model_config.py` → every enabled role PASS
 2. **Auth enabled**: `curl http://127.0.0.1:$MAIW_API_PORT/api/v1/inference -X POST -d '{}'` → must return 401
+2b. **Write auth enabled**: `curl -X POST http://127.0.0.1:$MAIW_API_PORT/api/v1/equipment/release -H 'Content-Type: application/json' -d '{}'` → must return 403 (or 503 where writes are not configured / offered)
 3. **Sandbox deny-by-default**: check RuntimeCapabilityPolicy in `integrations/nemoclaw/sandbox_policy.py` — ALWAYS_DENIED_CAPABILITY_CLASSES = frozenset({'WRITE', 'EMERGENCY_WRITE'})
 4. **WRITE absent from sandbox**: `grep -r "WRITE\|EMERGENCY_WRITE" integrations/nemoclaw/sandbox_policy.py` → in ALWAYS_DENIED
 5. **Secrets not exposed**: `curl http://127.0.0.1:$MAIW_API_PORT/api/v1/health` → no tokens, API keys, or credentials in response
@@ -616,6 +668,7 @@ Do not upgrade NemoClaw and OpenShell simultaneously.
 - DO NOT set `MAIW_INFERENCE_ALLOW_UNAUTHENTICATED=true` in reference deployment
 - DO NOT set `MAIW_MOCK_INFERENCE=true` in reference deployment
 - DO NOT expose the inference endpoint without `X-Maiw-Internal-Token` enforcement
+- DO NOT give `MAIW_OPERATOR_WRITE_TOKEN` to the sandbox, put it in the UI bundle, or set it equal to the inference token
 - DO NOT configure Llama-family, Qwen, or any non-Nemotron-3/3.5 model
 - DO NOT delete `/var/lib/maiw/procedures/` or `/var/lib/maiw/governance/` during rollback
 - DO NOT deploy a new NemoClaw version without rerunning sandbox security qualification

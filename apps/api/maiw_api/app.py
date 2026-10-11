@@ -14,8 +14,10 @@ docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md for the full authority graph):
 
     Canonical (this package)
         health        GET only (/live, /ready, /health, /version)
-        equipment     GET + governed POST (agent proposal → DecisionEngine →
-                      EquipmentActionExecutor only when APPROVED)
+        equipment     GET + governed POST (X-Maiw-Operator-Token required —
+                      round 3 NEW3-P1-01 — then agent proposal →
+                      DecisionEngine → EquipmentActionExecutor only when
+                      APPROVED; 503 in profiles without governed writes)
         operations    GET only in the shipped app (SQL task writes unmounted)
         safety        GET only in the shipped app (SQL incident writes unmounted)
         mcp_status, runtime_status, world, model_lab, agent_tasks,
@@ -51,9 +53,11 @@ import os
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from maiw_api.config import settings
 from maiw_api.lifespan import lifespan
+from maiw_api.write_auth import OperatorWriteAuthError
 
 # ── Canonical routers ─────────────────────────────────────────────────────────
 from maiw_api.routers.health import router as health_router
@@ -128,6 +132,13 @@ app = FastAPI(
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     return await handle_validation_error(request, exc)
+
+
+@app.exception_handler(OperatorWriteAuthError)
+async def operator_write_auth_handler(request: Request, exc: OperatorWriteAuthError):
+    # v2.0.1 round 3: typed, unsanitised denial (the generic handler hides 5xx
+    # messages, which would hide OPERATOR_WRITE_AUTH_NOT_CONFIGURED).
+    return JSONResponse(status_code=exc.status_code, content=exc.as_body())
 
 
 @app.exception_handler(HTTPException)

@@ -27,6 +27,11 @@
 #                                      approved deployment for that role and the
 #                                      provider-reported ID must match it
 #   12. No legacy chat write path      POST /api/v1/chat → 404
+#   12b. Operational write boundary    equipment assign/release/maintenance
+#                                      denied (401/403/503) with no credential
+#                                      and with the inference token; in
+#                                      reference_governed the operator
+#                                      credential is accepted (empty body → 422)
 #   13. OpenShell sandbox Ready        (when MAIW_SANDBOX_MODE=required)
 #
 # Exit: 0 all pass; 1 failures; 2 refused (identity not verified).
@@ -157,6 +162,40 @@ echo "--- No legacy write path ---"
 CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 -X POST "${BASE_URL}/api/v1/chat" \
     -H "Content-Type: application/json" -d '{"message":"smoke: route must not exist"}' 2>/dev/null || echo "000")
 [[ "$CODE" == "404" ]] && _pass "Legacy POST /api/v1/chat not mounted (404)" || _fail "Legacy chat" "Expected 404 — got $CODE"
+
+# ── 12b: operational write boundary (v2.0.1 round 3, NEW3-P1-01) ─────────────
+# Governed write routes require the separate operator write credential. The
+# inference token (what the sandbox holds) must never authorise them. Nothing
+# here can mutate: denied requests stop at authentication, and the one
+# authenticated request carries an empty body (422 / 503, never a proposal).
+echo ""
+echo "--- Operational write boundary ---"
+_wpost() {  # $1=path $2=header-name-or-__none__ $3=value ; prints http code + typed code
+    local hdr=""
+    [[ "$2" != "__none__" ]] && hdr="header = \"$2: $3\""
+    printf '%s\n' "$hdr" | curl -s --max-time 30 -K - -w '\n%{http_code}' -X POST "${BASE_URL}$1" \
+        -H "Content-Type: application/json" -d '{}' 2>/dev/null || echo -e "\n000"
+}
+_wcode() { _wpost "$@" | tail -1; }
+for WPATH in /api/v1/equipment/assign /api/v1/equipment/release /api/v1/equipment/maintenance; do
+    C1=$(_wcode "$WPATH" "__none__" "")
+    C2=$(_wcode "$WPATH" "X-Maiw-Internal-Token" "${INFERENCE_TOKEN:-none}")
+    C3=$(_wcode "$WPATH" "X-Maiw-Operator-Token" "${INFERENCE_TOKEN:-none}")
+    if [[ "$C1" =~ ^(401|403|503)$ && "$C2" =~ ^(401|403|503)$ && "$C3" =~ ^(401|403|503)$ ]]; then
+        _pass "POST $WPATH denied without operator credential (none=$C1, inference-token=$C2, inference-token-as-operator=$C3)"
+    else
+        _fail "POST $WPATH" "Expected 401/403/503 for every non-operator caller — got none=$C1 inference=$C2 as-operator=$C3"
+    fi
+done
+if [[ "${MAIW_DEPLOYMENT_PROFILE:-reference}" == "reference_governed" ]]; then
+    if [[ -n "${MAIW_OPERATOR_WRITE_TOKEN:-}" ]]; then
+        C4=$(_wcode /api/v1/equipment/release "X-Maiw-Operator-Token" "$MAIW_OPERATOR_WRITE_TOKEN")
+        [[ "$C4" == "422" ]] && _pass "Operator credential accepted (empty body → 422, nothing proposed)" \
+            || _fail "Operator credential" "Expected 422 for an authenticated empty body — got $C4"
+    else
+        _fail "Operator credential" "profile reference_governed but MAIW_OPERATOR_WRITE_TOKEN is not set"
+    fi
+fi
 
 # ── 13: sandbox (only when required) ─────────────────────────────────────────
 echo ""

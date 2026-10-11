@@ -27,10 +27,23 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from maiw_api.dependencies import get_runtime
+from maiw_api.write_auth import (
+    require_governed_writes_offered,
+    require_operator_write,
+)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["Equipment"])
+
+# v2.0.1 round 3 (NEW3-P1-01): every operational write route authenticates the
+# caller with the operator write credential BEFORE the body is read and before
+# any agent / DecisionEngine / executor / MCP call, then refuses in a profile
+# that does not offer governed writes.  Order matters: auth first.
+_WRITE_GUARDS = [
+    Depends(require_operator_write),
+    Depends(require_governed_writes_offered),
+]
 
 # Lazy-init: deferred import so importing this module does not require asyncpg.
 # asyncpg is only pulled in when the first request initialises the connection.
@@ -405,7 +418,9 @@ async def get_equipment_status(asset_id: str, runtime=Depends(get_runtime)):
 # ── Write endpoints (full pipeline: PROPOSE → DECIDE → EXECUTE) ───────────────
 
 
-@router.post("/equipment/assign", response_model=Dict[str, Any])
+@router.post(
+    "/equipment/assign", response_model=Dict[str, Any], dependencies=_WRITE_GUARDS
+)
 async def assign_equipment(request: AssignmentRequest, runtime=Depends(get_runtime)):
     """
     Propose an equipment assignment through the canonical pipeline.
@@ -480,7 +495,9 @@ async def assign_equipment(request: AssignmentRequest, runtime=Depends(get_runti
         )
 
 
-@router.post("/equipment/release", response_model=Dict[str, Any])
+@router.post(
+    "/equipment/release", response_model=Dict[str, Any], dependencies=_WRITE_GUARDS
+)
 async def release_equipment(request: ReleaseRequest, runtime=Depends(get_runtime)):
     """
     Propose and (if approved) execute releasing equipment from its current assignment.
@@ -538,7 +555,9 @@ async def release_equipment(request: ReleaseRequest, runtime=Depends(get_runtime
         raise HTTPException(status_code=500, detail="Failed to release equipment")
 
 
-@router.post("/equipment/maintenance", response_model=Dict[str, Any])
+@router.post(
+    "/equipment/maintenance", response_model=Dict[str, Any], dependencies=_WRITE_GUARDS
+)
 async def schedule_maintenance(
     request: MaintenanceRequest, runtime=Depends(get_runtime)
 ):

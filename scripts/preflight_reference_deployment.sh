@@ -338,6 +338,38 @@ else
         "Set MAIW_INFERENCE_INTERNAL_TOKEN in .env — generate with: python3 -c \"import secrets; print(secrets.token_hex(32))\""
 fi
 
+# ── Check 11b: Operational write credential (v2.0.1 round 3, NEW3-P1-01) ─────
+# Governed operational writes require a SEPARATE operator credential
+# (X-Maiw-Operator-Token).  The same check the app runs (maiw_api.write_auth):
+# set, not the placeholder, >= 32 chars, and NOT equal to the sandbox inference
+# token.  Required when the profile offers governed writes.
+WRITE_AUTH=$("$MAIW_PYTHON" -c '
+from maiw_api.write_auth import operator_write_auth_status
+s = operator_write_auth_status()
+print("OK" if s.configured else "NO " + (s.reason or "not configured"))
+' 2>/dev/null || echo "NO maiw_api.write_auth not importable")
+if [[ "${MAIW_DEPLOYMENT_PROFILE:-}" == "reference_governed" ]]; then
+    if [[ "$WRITE_AUTH" == "OK" ]]; then
+        _pass "MAIW_OPERATOR_WRITE_TOKEN set (>= 32 chars, distinct from the inference token)"
+    else
+        _fail "MAIW_OPERATOR_WRITE_TOKEN" "a fresh random operator write token, distinct from MAIW_INFERENCE_INTERNAL_TOKEN" \
+            "${WRITE_AUTH#NO }" \
+            "Generate one: python3 -c \"import secrets; print(secrets.token_hex(32))\" (never give it to the sandbox)"
+    fi
+elif [[ -n "${MAIW_OPERATOR_WRITE_TOKEN:-}" && "$WRITE_AUTH" != "OK" ]]; then
+    _fail "MAIW_OPERATOR_WRITE_TOKEN" "unset, or a valid operator write token" "${WRITE_AUTH#NO }" \
+        "Remove it (profile ${MAIW_DEPLOYMENT_PROFILE:-reference} offers no governed writes) or fix it"
+else
+    _pass "Operator write credential not required (profile ${MAIW_DEPLOYMENT_PROFILE:-reference}: governed writes not offered)"
+fi
+DEMO_FLAG="${MAIW_DEMO_MODE:-false}"
+if [[ "${DEMO_FLAG,,}" == "true" || "$DEMO_FLAG" == "1" || "${DEMO_FLAG,,}" == "yes" ]]; then
+    _fail "MAIW_DEMO_MODE" "unset/false (reference deployment)" "$DEMO_FLAG" \
+        "Demo/simulation mode is not a reference deployment; remove MAIW_DEMO_MODE"
+else
+    _pass "MAIW_DEMO_MODE is not enabled (good)"
+fi
+
 # ── Check 12: Dev unauthenticated override NOT active ─────────────────────────
 ALLOW_UNAUTH="${MAIW_INFERENCE_ALLOW_UNAUTHENTICATED:-false}"
 if [[ "${ALLOW_UNAUTH,,}" == "true" ]] || [[ "$ALLOW_UNAUTH" == "1" ]] || [[ "${ALLOW_UNAUTH,,}" == "yes" ]]; then

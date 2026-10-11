@@ -22,8 +22,9 @@
 #   MAIW_INFERENCE_INTERNAL_TOKEN        passed to the probe on stdin only
 #
 # Policy: deploy/openshell/maiw-inference-only.policy.yaml.tmpl — deny-by-
-# default egress except the MAIW API host:port.  No credential provider is
-# attached.  The rendered policy is kept at
+# default egress; on the MAIW API host:port only `POST /api/v1/inference` (L7
+# REST rule, v2.0.1 round 3).  No credential provider is attached; the
+# operator write credential is never passed to the sandbox.  The rendered policy is kept at
 # $MAIW_PERSISTENCE_ROOT/runtime/sandbox-<name>.policy.yaml.
 # ---------------------------------------------------------------------------
 set -euo pipefail
@@ -98,7 +99,7 @@ case "$ACTION" in
             [[ "$(_phase)" == "Ready" ]] && break
             sleep 2
         done
-        echo "Sandbox '$NAME': $(_phase) (policy: egress only to $EP_HOST:$EP_PORT; no providers attached)"
+        echo "Sandbox '$NAME': $(_phase) (policy: egress only POST /api/v1/inference on $EP_HOST:$EP_PORT; no providers attached)"
         [[ "$(_phase)" == "Ready" ]]
         ;;
     status)
@@ -110,8 +111,37 @@ case "$ACTION" in
         maiw_require_vars MAIW_INFERENCE_INTERNAL_TOKEN
         openshell sandbox upload "$NAME" "$PROJECT_ROOT/scripts/qualification/in_sandbox_canonical_probe.py" /sandbox/ >/dev/null
         BASE="${MAIW_SANDBOX_MODEL_GATEWAY_ENDPOINT%/api/v1/inference}"
+        PROBE_OUT="$RUNTIME_DIR/sandbox-${NAME}.probe.json"
+        mkdir -p "$RUNTIME_DIR"
+        # The probe's exit status is its verdict (inference allowed with a
+        # verified approved model AND every governed write denied for every
+        # credential the sandbox holds — v2.0.1 round 3, NEW3-P1-01).
+        PROBE_RC=0
         printf '%s\n' "$MAIW_INFERENCE_INTERNAL_TOKEN" | \
-            openshell sandbox exec -n "$NAME" --no-tty -- python3 /sandbox/in_sandbox_canonical_probe.py "$BASE"
+            openshell sandbox exec -n "$NAME" --no-tty -- python3 /sandbox/in_sandbox_canonical_probe.py "$BASE" \
+            > "$PROBE_OUT" || PROBE_RC=$?
+        cat "$PROBE_OUT"
+        # Host secrets must not be present in the sandbox: compare digests of
+        # host secret values with the digests the probe reported (no value is
+        # ever printed or sent into the sandbox).
+        "$PY" - "$PROBE_OUT" <<'PYEOF' || PROBE_RC=1
+import hashlib, json, os, sys
+raw = open(sys.argv[1]).read().strip().splitlines()
+probe = json.loads(raw[-1]) if raw else {}
+digests = set(probe.get("env_value_digests", []))
+names = set(probe.get("env_secret_names", []))
+leaked = []
+for var in ("MAIW_OPERATOR_WRITE_TOKEN", "NVIDIA_API_KEY", "MAIW_NIM_API_KEY",
+            "POSTGRES_PASSWORD", "JWT_SECRET_KEY"):
+    value = os.environ.get(var)
+    if var in names or (value and hashlib.sha256(value.encode()).hexdigest()[:24] in digests):
+        leaked.append(var)
+denied = probe.get("operational_writes_all_denied") is True
+print(f"sandbox credential isolation: host secrets present in sandbox = {leaked or 'none'}")
+print(f"sandbox governed-write denial: {'all denied' if denied else 'NOT ALL DENIED'}")
+sys.exit(1 if (leaked or not denied) else 0)
+PYEOF
+        exit "$PROBE_RC"
         ;;
     delete)
         if [[ ! -f "$MARKER" ]]; then

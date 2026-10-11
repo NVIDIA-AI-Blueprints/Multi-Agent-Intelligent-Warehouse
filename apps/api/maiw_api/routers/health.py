@@ -520,6 +520,15 @@ async def readiness_check(request: Request):
             executor = getattr(rt, f"{domain}_executor", "n/a")
             if executor is None:
                 missing.append(f"{domain}_executor")
+        # Round 3 (NEW3-P1-01): the write routes refuse (503) without a usable
+        # operator write credential, so the path is not ready without one.
+        # Demo (simulation) reports it but does not depend on it.
+        from maiw_api.profile import DEMO
+        from maiw_api.write_auth import operator_write_auth_status
+
+        write_auth = operator_write_auth_status()
+        if not write_auth.configured and profile.name != DEMO:
+            missing.append("operator_write_auth")
         gwp: dict = {"status": "ready"}
         if missing or required_unusable:
             gwp = {"status": "failed"}
@@ -527,6 +536,7 @@ async def readiness_check(request: Request):
                 gwp["missing"] = missing
             if required_unusable:
                 gwp["unusable_mcp_domains"] = required_unusable
+        gwp["operator_write_auth"] = write_auth.as_dict()
         components["governed_write_path"] = gwp
     else:
         components["governed_write_path"] = {

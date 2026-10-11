@@ -383,8 +383,33 @@ async def get_runtime() -> MAIWRuntime:
                 "MAIW bootstrap: WarehouseStateProvider unavailable — %s", exc
             )
 
+    # ── 5b. Governed-write gate (v2.0.1 round 3, NEW3-P1-01) ─────────────────
+    # Write executors are built ONLY when the deployment profile offers governed
+    # writes (reference_governed, demo).  Before round 3 they were built whenever
+    # an MCP URL was set, so the plain ``reference`` profile executed writes
+    # while /api/v1/ready reported ``governed_write_path: not_offered``.  Read
+    # skills and the state provider above are unaffected.
+    governed_writes = False
+    try:
+        from maiw_api.profile import resolve_profile
+
+        _profile = resolve_profile()
+        governed_writes = bool(_profile.valid and _profile.governed_writes)
+        if not governed_writes:
+            logger.info(
+                "MAIW bootstrap: profile %r does not offer governed writes — "
+                "no ActionExecutor is built (MCP domains are read-only)",
+                _profile.name,
+            )
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.error("MAIW bootstrap: profile resolution failed — %s", exc)
+
     # ── 6. Equipment execution skills + EquipmentActionExecutor ──────────────
-    if runtime.mcp_client is not None and runtime.mcp_equipment_available:
+    if (
+        governed_writes
+        and runtime.mcp_client is not None
+        and runtime.mcp_equipment_available
+    ):
         try:
             from maiw_skills.equipment.skills import (
                 ExecuteEquipmentAssignmentSkill,
@@ -414,7 +439,11 @@ async def get_runtime() -> MAIWRuntime:
             )
 
     # ── 7. Labor execution skill + LaborActionExecutor ────────────────────────
-    if runtime.mcp_client is not None and runtime.mcp_labor_available:
+    if (
+        governed_writes
+        and runtime.mcp_client is not None
+        and runtime.mcp_labor_available
+    ):
         try:
             from maiw_skills.labor.skills import ExecuteLaborAllocationSkill
             from maiw_execution import LaborActionExecutor, ExecutionRegistry
@@ -430,7 +459,11 @@ async def get_runtime() -> MAIWRuntime:
             logger.warning("MAIW bootstrap: LaborActionExecutor unavailable — %s", exc)
 
     # ── 8. Wave execution skill + WaveActionExecutor ──────────────────────────
-    if runtime.mcp_client is not None and runtime.mcp_wave_available:
+    if (
+        governed_writes
+        and runtime.mcp_client is not None
+        and runtime.mcp_wave_available
+    ):
         try:
             from maiw_skills.wave.skills import ExecuteWaveReprioritizationSkill
             from maiw_execution import WaveActionExecutor, ExecutionRegistry
