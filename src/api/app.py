@@ -224,8 +224,13 @@ async def rate_limit_middleware(request: Request, call_next):
         # check_rate_limit raises HTTPException if limit exceeded, returns True if allowed
         await rate_limiter.check_rate_limit(request)
     except HTTPException as http_exc:
-        # Re-raise HTTP exceptions (429 Too Many Requests)
-        raise http_exc
+        # v2.0.1 round 4: answer the 429 here — an exception raised from an
+        # HTTP middleware bypasses FastAPI's handlers and becomes a 500.
+        return JSONResponse(
+            status_code=http_exc.status_code,
+            content={"detail": http_exc.detail},
+            headers=getattr(http_exc, "headers", None) or None,
+        )
     except Exception as e:
         logger.error(f"Rate limiting error: {e}", exc_info=True)
         # Fail open - allow request if rate limiter fails

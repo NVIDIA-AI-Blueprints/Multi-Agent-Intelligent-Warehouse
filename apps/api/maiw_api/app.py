@@ -197,8 +197,15 @@ async def rate_limit_middleware(request: Request, call_next):
         try:
             limiter = await get_rate_limiter()
             await limiter.check_rate_limit(request)
-        except HTTPException:
-            raise
+        except HTTPException as exc:
+            # v2.0.1 round 4 (P2-04): answer the limiter's 429 here.  An
+            # exception raised from an HTTP middleware bypasses FastAPI's
+            # exception handlers and would surface as a 500.
+            return JSONResponse(
+                status_code=exc.status_code,
+                content={"detail": exc.detail},
+                headers=getattr(exc, "headers", None) or None,
+            )
         except Exception as exc:
             logger.error("Rate limiting error: %s", exc)
     return await call_next(request)
