@@ -1,12 +1,16 @@
 # MAIW v2.0.1 — Release Notes (DRAFT — not tagged)
 
-**Status:** release candidate after remediation round 2, pending a THIRD
+**Status:** release candidate after remediation round 3, pending a FOURTH
 independent re-audit. Do not tag until that re-audit passes. `v2.0.0`
-(`816ace73…`) is unchanged. The second independent re-audit (PR #144) failed
-the round-1 candidate `785c420` with four new P1s; round 2 addresses them —
-see "Round 2" below, `docs/audits/MAIW_V2.0.1_REMEDIATION_ROUND2.md` and
-`artifacts/audit/v2.0.1_remediation_round2.json`. This is a draft, not a
-PASS claim.
+(`816ace73…`) is unchanged. The third independent re-audit (frozen candidate
+`86f3004`) confirmed the nine earlier P1s closed and found two new P1s
+(NEW3-P1-01, NEW3-P1-02) plus two release-critical gaps (N-1, N-2) and the
+missing gateway step (N-9); round 3 addresses them — see "Round 3" below,
+`docs/audits/MAIW_V2.0.1_REMEDIATION_ROUND3.md` and
+`artifacts/audit/v2.0.1_remediation_round3.json`. Earlier rounds:
+`docs/audits/MAIW_V2.0.1_REMEDIATION_ROUND2.md`,
+`docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md`. This is a draft, not a PASS
+claim.
 
 ## Why v2.0.1
 
@@ -20,6 +24,90 @@ gaps between those packages and **what the shipped application
 canonical app. Details and evidence:
 `docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md`,
 `artifacts/audit/v2.0.1_remediation.json`.
+
+## Round 3 (third re-audit: NEW3-P1-01, NEW3-P1-02, N-1, N-2, N-9)
+
+### Sandbox / operational-write authentication boundary (NEW3-P1-01)
+- Governed operational writes (`POST /api/v1/equipment/assign|release|maintenance`,
+  and the new `/api/v1/executions` routes) require a **separate operator write
+  credential** — `MAIW_OPERATOR_WRITE_TOKEN`, sent as `X-Maiw-Operator-Token`.
+  It is checked (constant time) as a route dependency, before the body is read
+  and before any agent, DecisionEngine, ActionExecutor or MCP call: no header →
+  403 `OPERATOR_WRITE_CREDENTIAL_REQUIRED`, wrong value (including the
+  sandbox's inference token) → 401 `INVALID_OPERATOR_WRITE_CREDENTIAL`, no usable
+  token configured (unset, short, placeholder, or equal to the inference
+  token) → 503 `OPERATOR_WRITE_AUTH_NOT_CONFIGURED`. A JWT user session alone
+  never authorises a write. The DecisionEngine stays the authority decision
+  after authentication.
+- The sandbox holds only the inference token. `reference_sandbox.sh probe`
+  fails unless every governed write is denied for every credential the sandbox
+  holds and no host secret (operator token, provider key, DB password, JWT
+  secret) is present in the sandbox environment (digest comparison).
+- The OpenShell policy now uses an L7 REST rule: on the API host:port the
+  sandbox may only send `POST /api/v1/inference` (was `access: full`). The
+  application-layer credential check remains the authority boundary even if
+  the policy is broadened (verified live with a deliberately broad policy).
+- Executors are built only when the profile offers governed writes; in
+  `reference` (even with an MCP URL set) the write routes answer 503
+  `GOVERNED_WRITES_NOT_OFFERED`, matching readiness `not_offered`.
+  `reference_governed` readiness requires the operator credential.
+- UI: the browser never holds the credential; write failures are shown. A
+  localhost-only development console may let the CRA dev proxy add it
+  server-side (`MAIW_UI_OPERATOR_WRITE_TOKEN`, opt-in).
+
+### Ambiguous MCP writes are UNKNOWN and reconciled in every profile (NEW3-P1-02)
+- The MCP client records the dispatch phase of every failure: connect /
+  handshake / open circuit → not dispatched (definite `failed`,
+  `error_code=MCP_NOT_DISPATCHED`); anything after `tools/call` was sent
+  (connection reset, server crash, read timeout, unreadable answer) →
+  **`unknown`**, never "failed". The equipment routes return `202
+  status=unknown executed=null reconciliation_required=true`.
+- No blind retry: while a write to an asset is unresolved, every further
+  write to it is refused with 409 `RECONCILIATION_REQUIRED` before any
+  proposal, decision or write — also across restarts: a durable execution
+  journal (`$MAIW_PERSISTENCE_ROOT/executions/`) is written before the MCP
+  request is sent, and a write in flight when the process died reloads as
+  UNKNOWN.
+- Reconciliation outside demo mode: `POST /api/v1/executions/{id}/reconcile`
+  (operator credential) re-reads authoritative state through the MCP read
+  path → `confirmed_executed` / `confirmed_not_executed` / `indeterminate`,
+  keeping the original execution, proposal, decision and trace identity.
+- The MCP write tools forward `execution_id` to the backend (it was null).
+
+### Provider identity fails closed (N-1)
+- A provider answer with no / empty / non-string `model` is discarded: 502
+  `MODEL_IDENTITY_UNVERIFIABLE`. A successful inference is always
+  `identity_verified=true`.
+
+### Routing-aware response cache (N-2)
+- The NIM response cache key covers the exact prompt (no timestamp / UUID /
+  date stripping), the dispatched physical model, the thinking mode and
+  budget, and the routing intent (reasoning level, risk level, modality,
+  role, generation). HIGH and LOW (and HIGH and MEDIUM) requests never share
+  an entry.
+
+### Reproducible OpenShell gateway (N-9)
+- `scripts/setup/reference_gateway.sh start|status|stop` starts (managed:
+  this deployment's own gateway on loopback with its own namespace, network,
+  JWT key and state) or verifies (external) the gateway, and the runbook's
+  clean-host procedure and reboot recovery use it.
+
+### Round 3 test baseline (last code commit `608222f`)
+- Python CORE CI: **2865 passed, 8 skipped, 0 failed** (two fresh runs; GitHub
+  CI identical), and 0 failures in 11 alternative orders (pairwise
+  permutations, reversed, ModelGateway / reliability / canonical / round-3
+  first, two seeded shuffles). 60 new round-3 tests.
+- UI: Jest 968/968, ESLint 0 errors, `tsc --noEmit` 0 errors, build OK
+  (without `CI=true`); npm audit 0 critical / 50 high (toolchain only; no
+  production-reachable high).
+- Live (epg-tme-smc-h100-02, remediation-owned gateway, sandbox, DB, MCP
+  backend): clean-shell runbook incl. the gateway step, full preflight 32/0
+  with no skip, smoke 17/17 before and after restart; sandbox writes denied
+  (proxy 403; app 403/401 with a deliberately broad policy; 0 DecisionEngine,
+  0 MCP writes); MCP lost response → UNKNOWN → 409 → reconcile
+  CONFIRMED_EXECUTED with exactly one write (also across `kill -9`); hosted
+  Super and Lightning identity verified from the sandbox. Details:
+  `docs/audits/MAIW_V2.0.1_REMEDIATION_ROUND3.md`.
 
 ## Round 2 (re-audit PR #144: NEW-P1-01..04, P2-01, P2-02)
 
@@ -80,8 +168,10 @@ canonical app. Details and evidence:
 - Python CORE CI: **2805 passed, 8 skipped, 0 failed** (two fresh runs), and
   0 failures in 11 alternative orders (reversed, ModelGateway/demo/canonical/
   reliability first, two seeded shuffles). 87 new round-2 tests.
-- UI: Jest 964/964, ESLint 0 errors, `tsc --noEmit` 0 errors, build OK;
-  npm audit 0 critical / 50 high (toolchain only).
+- UI: Jest 964/964, ESLint 0 errors, `tsc --noEmit` 0 errors, build OK
+  (without `CI=true`; with it react-scripts turns the lint warnings into
+  errors — CI does not run the build); npm audit 0 critical / 50 high
+  (toolchain only).
 - Live (epg-tme-smc-h100-02): clean-shell runbook reproduction; smoke 14/14
   before and after restart; Super, Lightning and in-sandbox inference with
   provider-reported model == resolved approved model. Host GPU driver
@@ -109,8 +199,9 @@ canonical app. Details and evidence:
 
 ### Inference endpoint (audit P1-02)
 - `POST /api/v1/inference` is served by the canonical app on the API port
-  (8001). There is no separate `:8020` server. Point
-  `MAIW_SANDBOX_MODEL_GATEWAY_ENDPOINT` at `http://<HOST_IP>:8001/api/v1/inference`.
+  (`MAIW_API_PORT`; no default is assumed since round 2). There is no separate
+  `:8020` server. Point `MAIW_SANDBOX_MODEL_GATEWAY_ENDPOINT` at
+  `http://<HOST_IP>:<MAIW_API_PORT>/api/v1/inference`.
 - Forbidden routing fields now return 422 (were 500); unknown fields are
   rejected with 422 (were silently ignored).
 
@@ -127,8 +218,9 @@ canonical app. Details and evidence:
 ### Readiness (audit P1-04)
 - `GET /api/v1/ready` returns 503 `NOT_READY` with `failed_components` when
   persistence, ModelGateway, the governed write path, MCP domains or (outside
-  demo mode) the database are unavailable. Provider and sandbox state are
-  reported but not critical. Liveness is unchanged.
+  demo mode) the database are unavailable. Provider state is reported but
+  not critical; since round 2 the sandbox is critical when
+  `MAIW_SANDBOX_MODE=required`. Liveness is unchanged.
 
 ### Document pipeline through ModelGateway (audit P1-05)
 - Every document model call goes through ModelGateway with an explicit
@@ -149,7 +241,30 @@ canonical app. Details and evidence:
   `npm audit fix` (critical 3 → 0, high 62 → 50; remaining highs are in the
   react-scripts build/test/dev-server toolchain).
 
+## Known limitations (v2.0.1 candidate)
+- `POST /api/v1/document/upload` and the legacy read routes are
+  unauthenticated, rate limiting does not enforce, and a chunked upload can
+  exceed the size limit; the API binds `MAIW_API_HOST` (`0.0.0.0` in
+  `.env.example`). Run the reference deployment on a trusted network only.
+- There is no HTTP route to start a procedure or submit governance;
+  `ProcedureHost.recover_accepted_governance` has no production caller.
+- `reference_governed` needs working MCP servers; the runbook does not ship a
+  launch command for them.
+- The managed OpenShell gateway is loopback-only with TLS off (single-node
+  reference); use an external mTLS gateway on shared multi-user hosts.
+- The execution journal and the unresolved-target guard are single-node.
+- The legacy `src/api/services/llm/nim_client.py` (not used by the canonical
+  ModelGateway path) keeps its old cache key.
+
 ## Upgrade notes
+- Round 3: profile `reference_governed` requires `MAIW_OPERATOR_WRITE_TOKEN`
+  (fresh, >= 32 chars, different from the inference token); callers of the
+  equipment write routes must send `X-Maiw-Operator-Token`. Clients must
+  handle `202 status=unknown` and `409 RECONCILIATION_REQUIRED`.
+- Round 3: set `OPENSHELL_GATEWAY_ENDPOINT` and the
+  `MAIW_OPENSHELL_GATEWAY_*` variables; run `reference_gateway.sh start`
+  before creating the sandbox. Recreate sandboxes created under the round-2
+  policy (`access: full`) so they get the L7 rule.
 - Clients of `/api/v1/chat`, `/api/v1/reasoning/*` or legacy write routes
   must move to the governed APIs; those routes return 404/405.
 - Sandbox endpoint moves from `:8020` to the API port.
