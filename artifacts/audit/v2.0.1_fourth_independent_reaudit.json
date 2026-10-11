@@ -1,0 +1,1870 @@
+{
+ "audit": "MAIW v2.0.1 fourth independent re-audit (final pre-merge audit of PR #143)",
+ "date_utc": "2026-10-11",
+ "verdict": "MAIW V2.0.1 FOURTH INDEPENDENT RE-AUDIT FAIL",
+ "verdict_basis": [
+  "NEW4-P1-01: a server-declared MCP tool error after the mutation was applied is classified as a definite failure (physical_mutation_occurred=false), the target is not blocked, reconciliation is refused, and an operator retry executes a second consequential write (2 backend writes, live)",
+  "Spec \u00a735 live Nemotron 3 Super / 3.5 Lightning identity proof NOT REPRODUCED: no hosted-provider credential was available to the auditor (credential discovery was refused by the host permission policy); the canonical path was proven end-to-end with an auditor-owned OpenAI-compatible provider only"
+ ],
+ "candidate": {
+  "repo": "NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse",
+  "pr": 143,
+  "branch": "fix/v2.0.1-canonical-app-remediation",
+  "head_sha": "6ad2cbf1b4b8233ce6ca8528692ebba8f97eb10c",
+  "base": "main @ 944507ec914665c6682d39b95e8713355f486598",
+  "sha_checks_utc": {
+   "start": "2026-10-11T06:0xZ",
+   "mid": "2026-10-11T06:18:50Z",
+   "end": "2026-10-11T15:58:03Z (re-checked again before push)"
+  },
+  "unchanged": true,
+  "commits": 32,
+  "changed_files": 125,
+  "mergeable": "MERGEABLE/CLEAN",
+  "ci": "Test & Quality (3.11,22) SUCCESS; CodeQL x2 SUCCESS; Security Scan SUCCESS; Trivy SUCCESS; Semantic Release SKIPPED (recorded as claim)",
+  "review_threads": {
+   "total": 7,
+   "unresolved": 0
+  },
+  "co_authored_by_trailers": 0
+ },
+ "historical_evidence": {
+  "v2.0.0": "tag 0c35a0e -> 816ace73c4561469978094eeedb2641f6db3c4fa (unchanged)",
+  "v2.0.1_tag": "absent",
+  "pr142": "OPEN @ 742fd2a",
+  "pr144": "OPEN @ 80947b0",
+  "pr145": "OPEN @ 6205fe6",
+  "modified": false
+ },
+ "host": {
+  "hostname": "epg-tme-smc-h100-02",
+  "gpus": "4 x NVIDIA H100 NVL",
+  "loaded_driver": "580.178.04",
+  "installed_driver": "580.178.04",
+  "kernel": "6.8.0-146-generic",
+  "healthy": true
+ },
+ "clean_room": {
+  "clone": "/home/nvidia/maiw-v201-fourth-reaudit (fresh git clone, detached at candidate)",
+  "runbook_worktree": "/home/nvidia/maiw-v201-fourth-reaudit-live (detached at candidate, removed at end)",
+  "python": "3.12.3 (host has no 3.11; CI uses 3.11)",
+  "node": "24.1.0 (CI uses 22)",
+  "stray_env_before_tests": false,
+  "package_paths": {
+   "maiw_api": "/home/nvidia/maiw-v201-fourth-reaudit/apps/api/maiw_api/__init__.py",
+   "maiw_models": "/home/nvidia/maiw-v201-fourth-reaudit/packages/maiw-models/maiw_models/__init__.py",
+   "maiw_agents": "/home/nvidia/maiw-v201-fourth-reaudit/packages/maiw-agents/maiw_agents/__init__.py",
+   "maiw_execution": "/home/nvidia/maiw-v201-fourth-reaudit/packages/maiw-execution/maiw_execution/__init__.py",
+   "maiw_decision": "/home/nvidia/maiw-v201-fourth-reaudit/packages/maiw-decision/maiw_decision/__init__.py",
+   "maiw_world": "/home/nvidia/maiw-v201-fourth-reaudit/packages/maiw-world/maiw_world/__init__.py",
+   "maiw_mcp": "/home/nvidia/maiw-v201-fourth-reaudit/packages/maiw-mcp/maiw_mcp/__init__.py",
+   "maiw_state": "/home/nvidia/maiw-v201-fourth-reaudit/packages/maiw-state/maiw_state/__init__.py",
+   "maiw_skills": "/home/nvidia/maiw-v201-fourth-reaudit/packages/maiw-skills/maiw_skills/__init__.py",
+   "maiw_contracts": "/home/nvidia/maiw-v201-fourth-reaudit/packages/maiw-contracts/maiw_contracts/__init__.py"
+  },
+  "runbook_venv_package_paths": "all 10 under /home/nvidia/maiw-v201-fourth-reaudit-live/ (runbook step 1 verbatim)"
+ },
+ "host_isolation": {
+  "preexisting_listeners": {
+   "22": "sshd",
+   "53": "systemd-resolved (127.0.0.53/54)",
+   "3000": "nemo-microservices-datastore-1 (restart loop, intermittent)",
+   "32768": "nemo-microservices-postgres-1",
+   "32769": "nemo-microservices-guardrails-1",
+   "8081": "nemoclaw-llama-cpp (container-internal)"
+  },
+  "not_listening_but_off_limits": [
+   8001,
+   8002,
+   8010,
+   8011,
+   8080,
+   8991,
+   5435
+  ],
+  "user_gateway_nemoclaw_8991": "down; never contacted (every openshell call used OPENSHELL_GATEWAY_ENDPOINT=http://127.0.0.1:18997 with a scratch HOME)",
+  "audit_owned_ports": {
+   "api_runbook_and_governed": 18951,
+   "probe_api_instances": [
+    18952,
+    18953
+   ],
+   "openshell_gateway": 18997,
+   "reference_db": 55482,
+   "test_db": 55481,
+   "mcp_equipment_live": 18961,
+   "mcp_labor": 18962,
+   "mcp_wave": 18963,
+   "mcp_equipment_direct_probe": 18964,
+   "shipped_adapter_mcp": 18965,
+   "fake_provider": 18971,
+   "closed_probe_ports": [
+    18947,
+    18948,
+    18949
+   ]
+  },
+  "watcher": "/proc/net/tcp{,6} polled every 20 ms for the whole audit (1561 log lines)",
+  "off_limits_contacts": 0,
+  "watcher_hits_classified": {
+   "ssh inbound to :22 from 10.221.33.63": "user session (pre-existing)",
+   "172.17.0.3:5432": "audit-owned reference DB",
+   "172.23.0.x": "audit-owned sandboxes <-> audit gateway/API",
+   "1 x TIME_WAIT 127.0.0.1:32770->127.0.0.1:50407 @06:16:28Z": "ephemeral-port false positive during pytest run 2 (nothing listens on 32770)"
+  },
+  "end_state": "listener set, container set and docker network set identical to the start inventory (3000 intermittent, pre-existing)"
+ },
+ "identities": {
+  "sandboxes": [
+   "maiw-v201-4th-a (L7 policy, runbook)",
+   "maiw-v201-4th-b (deliberately permissive access: full)"
+  ],
+  "db": "maiw-v201-4th-db (timescale 2.15.2-pg16, 127.0.0.1:55482); maiw-v201-4th-testpg (127.0.0.1:55481)",
+  "gateway": "maiw-v201-4th-gw (openshell-gateway 0.0.116, managed, 127.0.0.1:18997, network maiw-v201-4th-gw-net)"
+ },
+ "preflight": {
+  "result": "32 passed, 0 failed, no skip (reference); 34/0 (reference_governed); after gateway outage 30/2 (expected FAIL); after documented recovery 32/0",
+  "provider_probe_target": "auditor-owned OpenAI-compatible provider (MAIW_NIM_BASE_URL), not hosted NIM"
+ },
+ "runbook_clean_shell": {
+  "env": "env -i HOME=<scratch> PATH=~/.local/bin:/usr/bin:/bin",
+  "steps": {
+   "1 install (venv, requirements, 8 packages, agents+api)": 0,
+   "2 cp .env.example .env + edits": 0,
+   "validate_reference_runbook.sh": 0,
+   "3 gateway start/status": "0/0",
+   "4 db up": 0,
+   "5 sandbox create": 0,
+   "6 preflight/start/status/smoke(17/17)": "0/0/0/0",
+   "7 sandbox probe": 0,
+   "8 restart(preflight 32/0)/status/smoke(17/17)/stop": "0/0/0/0",
+   "status after stop": "1 (as designed)",
+   "gateway outage: stop/status/preflight": "0/1/1",
+   "recovery: gateway start/status, sandbox status(Error)/delete/create, db status, preflight 32/0": "0/0/1/0/0/0/0",
+   "9 teardown sandbox delete/db down/gateway stop": "0/0/0"
+  },
+  "deviation": "MAIW_NIM_BASE_URL pointed at an auditor-owned local OpenAI-compatible provider (documented 'local NIM' option) because no hosted NVIDIA_API_KEY was available",
+  "governed": "MAIW_ENV_FILE governed env: preflight 34/0, start, smoke 18/18, two kill -9 restarts via start_reference_deployment.sh, stop: all 0; MCP backends were auditor-launched (no documented launch command)"
+ },
+ "p1_closure": [
+  {
+   "p1": "P1-01 ungoverned chat write",
+   "origin": "PR #142",
+   "closed": true,
+   "evidence": "no /api/v1/chat route in the 146-pair inventory; smoke 404; L7 sandbox 403 (proxy), permissive sandbox 404; copilot ACT -> degraded, 0 DecisionEngine, 0 MCP writes"
+  },
+  {
+   "p1": "P1-02 inference endpoint missing",
+   "origin": "PR #142",
+   "closed": true,
+   "evidence": "smoke 401/401/422/422/200; in-sandbox 200 with identity_verified=true"
+  },
+  {
+   "p1": "P1-03 durable stores not wired",
+   "origin": "PR #142",
+   "closed": true,
+   "evidence": "canonical durability tests pass; execution journal survived 2 kill -9 restarts with identical ids"
+  },
+  {
+   "p1": "P1-04 false readiness",
+   "origin": "PR #142",
+   "closed": true,
+   "evidence": "14-row probe-instance matrix + live DB pause / persistence chmod 000 / MCP down / circuit open; /live always 200"
+  },
+  {
+   "p1": "P1-05 document ModelGateway bypass / mock APPROVE",
+   "origin": "PR #142",
+   "closed": true,
+   "evidence": "document LLM inference via model_gateway_adapter (typed failures, no synthetic APPROVE); canonical tests pass; OCR/embeddings outside ModelGateway recorded as P2 (N-12 class)"
+  },
+  {
+   "p1": "NEW-P1-01 physical model identity",
+   "origin": "PR #144",
+   "closed": true,
+   "evidence": "policy matrix: 9 unapproved/look-alike/cross-role bindings -> /ready 503 + 503 MODEL_POLICY_VIOLATION, 0 provider calls; provider substitution -> 502"
+  },
+  {
+   "p1": "NEW-P1-02 runbook not reproducible",
+   "origin": "PR #144",
+   "closed": true,
+   "evidence": "clean-shell runbook all steps exit as documented; preflight 32/0 no skip (local provider caveat)"
+  },
+  {
+   "p1": "NEW-P1-03 readiness ignored governed-write capability",
+   "origin": "PR #144",
+   "closed": true,
+   "evidence": "governed rows: token missing / equal to inference / MCP unreachable / MCP unset -> 503 governed_write_path"
+  },
+  {
+   "p1": "NEW-P1-04 test-order dependence",
+   "origin": "PR #144",
+   "closed": true,
+   "evidence": "2 full runs + 7 permutations/shuffles all 0 failures"
+  },
+  {
+   "p1": "NEW3-P1-01 sandbox reaches operational writes",
+   "origin": "PR #145",
+   "closed": true,
+   "evidence": "L7: 24/24 writes 403 at proxy + 12 path variants + CONNECT/pipelining denied; permissive policy: 24/24 401/403 at app; DecisionEngine 0, executor 0, MCP writes 0, state hash unchanged"
+  },
+  {
+   "p1": "NEW3-P1-02 ambiguous MCP write = FAILED, duplicated",
+   "origin": "PR #145",
+   "closed": true,
+   "evidence": "transport-level ambiguity closed: lost response 202 unknown, retry 409, reconcile INDETERMINATE/CONFIRMED_EXECUTED/CONFIRMED_NOT_EXECUTED, kill -9 and in-flight crash recovered, write count 1. The server-declared-error variant is open as NEW4-P1-01."
+  }
+ ],
+ "sandbox_auth_matrix": {
+  "l7_policy_reference": {
+   "inference_low": "200 lightning identity_verified",
+   "inference_high": "200 super identity_verified",
+   "inference_no_token": 401,
+   "GET_inference": 403,
+   "PUT_inference": 403,
+   "inference_trailing_slash": 403,
+   "GET_ready": 403,
+   "GET_equipment": 403,
+   "GET_executions": 403,
+   "legacy_chat": 403,
+   "document_upload": 403,
+   "copilot_turn": 403,
+   "demo_approve": 403,
+   "writes_24": "24 x 403 (proxy)",
+   "path_variants": {
+    "dotdot": 403,
+    "enc_dotdot": 403,
+    "enc_slash": 400,
+    "double_slash": 403,
+    "dot_seg": 403,
+    "upper": 403,
+    "trailing": 403,
+    "semicolon": 403,
+    "query_trick": 403,
+    "inference?/../../equipment/release": "422 (inference route, body rejected)",
+    "pct_e": 403,
+    "backslash": 403,
+    "X-HTTP-Method-Override": "200 (inference)"
+   },
+   "raw": {
+    "pipelined inference+release": "only inference answered; release never reached app",
+    "absolute_form": 403,
+    "http10": 403,
+    "CL.TE smuggle": 400,
+    "dup headers": 403,
+    "CONNECT tunnel then release": "200 Connection Established, then 403 + reset (L7 enforced inside tunnel)"
+   },
+   "egress": "all other host ports, loopback, internet refused/blocked"
+  },
+  "l7_policy_governed": {
+   "writes_24": "24 x 403 (proxy)",
+   "counters_delta": {
+    "decision_engine": 0,
+    "executor": 0,
+    "auth_refusals_at_app": 0,
+    "mcp_writes": 0,
+    "state_hash": "unchanged"
+   }
+  },
+  "permissive_policy_governed": {
+   "writes_24": "16 x 403 OPERATOR_WRITE_CREDENTIAL_REQUIRED, 8 x 401 INVALID_OPERATOR_WRITE_CREDENTIAL",
+   "GET_ready": 200,
+   "GET_equipment": "200 (P2-06)",
+   "copilot_turn": "200 ask (read-only)",
+   "counters_delta": {
+    "decision_engine": 0,
+    "executor": 0,
+    "auth_refusals_at_app": 35,
+    "mcp_writes": 0,
+    "state_hash": "unchanged"
+   },
+   "egress_other_ports": "refused"
+  },
+  "credential_inventory": {
+   "secret_named_env_vars": [],
+   "host_secret_value_digests_found": "none (operator token, inference token, DB passwords, JWT secret)",
+   "inference_token_delivery": "stdin only"
+  },
+  "host_bypass": "missing 403; wrong/inference/whitespace/prefix/suffix 401; inference as internal header/bearer/empty/underscore-header 403; dup wrong-then-valid 401; GET 404; PUT/PATCH/DELETE 405; path variants 404/405/307/401; valid operator -> 422 (auth passed, body invalid); DecisionEngine +0, MCP +0"
+ },
+ "mcp_ambiguity_matrix": [
+  {
+   "case": "pre-send (client, closed port)",
+   "result": "MCPConnectFailed -> FAILED MCP_NOT_DISPATCHED, mutation=false",
+   "backend_writes": 0
+  },
+  {
+   "case": "pre-send (API, MCP down)",
+   "result": "400 State assembly failed before tools/call; no DecisionEngine, no journal record",
+   "backend_writes": 0
+  },
+  {
+   "case": "lost response FL-02 (apply then crash)",
+   "result": "202 unknown executed=null MCP_RESPONSE_LOST reconciliation_required retried=false",
+   "backend_writes": 1
+  },
+  {
+   "case": "identical retry before reconcile",
+   "result": "409 RECONCILIATION_REQUIRED same execution_id; DecisionEngine +0",
+   "backend_writes": 1
+  },
+  {
+   "case": "reconcile, backend down",
+   "result": "INDETERMINATE, still blocked (409)",
+   "backend_writes": 1
+  },
+  {
+   "case": "reconcile, backend back",
+   "result": "CONFIRMED_EXECUTED, same proposal/decision/trace ids",
+   "backend_writes": 1
+  },
+  {
+   "case": "sent not applied FL-03",
+   "result": "202 unknown -> CONFIRMED_NOT_EXECUTED (pre_status assigned); new request executes once",
+   "backend_writes": "0 then 1"
+  },
+  {
+   "case": "kill -9 API after UNKNOWN FL-04",
+   "result": "journal survives, same ids, retry 409, reconcile CONFIRMED_EXECUTED",
+   "backend_writes": 1
+  },
+  {
+   "case": "in-flight kill -9 FL-05 (journal timing probe)",
+   "result": "on-disk record outcome=null during hang; restart -> unknown recovered_after_restart=true; 409; CONFIRMED_EXECUTED",
+   "backend_writes": 1
+  },
+  {
+   "case": "read timeout after dispatch (client)",
+   "result": "MCPTimeoutAfterDispatch -> UNKNOWN",
+   "backend_writes": 1
+  },
+  {
+   "case": "concurrent duplicate during in-flight write FL-01",
+   "result": "second request 409; first 202 unknown after 30 s read timeout; reconcile CONFIRMED_EXECUTED",
+   "backend_writes": 1
+  }
+ ],
+ "server_declared_error_semantics": {
+  "case_A_error_before_mutation": {
+   "asset": "FL-06",
+   "http": 200,
+   "status": "failed",
+   "error_code": "MCP_TOOL_ERROR",
+   "backend_mutation": false,
+   "ruling": "definite failure acceptable"
+  },
+  "case_B_mutation_then_error": {
+   "asset": "FL-07",
+   "http": 200,
+   "status": "failed",
+   "executed": false,
+   "error_code": "MCP_TOOL_ERROR",
+   "journal": "outcome=failed, physical_mutation_occurred=false, unresolved=false",
+   "backend_mutation": true,
+   "readiness_unresolved": 0,
+   "reconcile": "409 (UNKNOWN only)",
+   "operator_retry": "200 executed -> second backend write",
+   "backend_writes": 2,
+   "ruling": "UNSAFE -> NEW4-P1-01"
+  },
+  "code": [
+   "packages/maiw-execution/maiw_execution/base.py:154-155",
+   "packages/maiw-mcp/maiw_mcp/client/client.py:315-317",
+   "tests/api/test_round3_unknown_writes.py:525 pins MCPToolError -> ('failed', False)"
+  ],
+  "realism": "shipped Postgres adapter performs non-transactional two-step writes (src/api/agents/inventory/equipment_asset_tools.py:333/347 assign, 416/431 release), converts any exception to success=false (:447-453), and the adapter raises BackendUnavailable (mcp_servers/equipment/adapters/maiw_backend.py:257-263) -> MCP is_error"
+ },
+ "reconciliation_drift_matrix": [
+  {
+   "case": "A intended mutation + unrelated field drift (FL-08)",
+   "result": "CONFIRMED_EXECUTED",
+   "correct": true
+  },
+  {
+   "case": "B no mutation + unrelated field drift (FL-09)",
+   "result": "CONFIRMED_NOT_EXECUTED",
+   "correct": true
+  },
+  {
+   "case": "C another actor produced the intended state, MAIW write not applied (FL-10)",
+   "result": "CONFIRMED_EXECUTED",
+   "correct": "state-equivalent only; causality not established (P2)"
+  },
+  {
+   "case": "another actor -> different state (FL-11)",
+   "result": "INDETERMINATE, stays blocked",
+   "correct": true
+  },
+  {
+   "case": "write applied then reverted by another actor (FL-12)",
+   "result": "CONFIRMED_NOT_EXECUTED; resubmission wrote again (2 backend writes)",
+   "correct": "no (P2: state-based inference; execution_id forwarded but unused)"
+  }
+ ],
+ "postcondition_based": "equipment: CONFIRMED_EXECUTED requires the intended postcondition (status, and assignee for assign) -- not generic inequality; pre_status equality -> NOT_EXECUTED; any other state -> INDETERMINATE. Without a recorded pre_status a mismatch falls back to NOT_EXECUTED (reconciliation.py:73-77). labor/wave strategies are weaker but have no canonical HTTP write route in v2.0.1.",
+ "provider_identity_matrix": [
+  {
+   "case": "1 exact",
+   "provider_reports": "echo",
+   "reasoning": "high",
+   "http": 200,
+   "code": null,
+   "msg": "",
+   "identity_verified": true,
+   "model_id": "nvidia/nemotron-3-super-120b-a12b",
+   "provider_reported": "nvidia/nemotron-3-super-120b-a12b",
+   "provider_calls": 1,
+   "dispatched": [
+    "nvidia/nemotron-3-super-120b-a12b"
+   ],
+   "latency_ms": 39.2
+  },
+  {
+   "case": "2 mismatched (other string)",
+   "provider_reports": "fixed:nvidia/nemotron-3-super-120b-a12b-fp8",
+   "reasoning": "high",
+   "http": 502,
+   "code": "MODEL_IDENTITY_MISMATCH",
+   "msg": "MODEL_IDENTITY_MISMATCH: dispatched approved model 'nvidia/nemotron-3-super-120b-a12b' (ro",
+   "identity_verified": null,
+   "model_id": null,
+   "provider_reported": null,
+   "provider_calls": 1,
+   "dispatched": [
+    "nvidia/nemotron-3-super-120b-a12b"
+   ],
+   "latency_ms": 10.3
+  },
+  {
+   "case": "3 missing",
+   "provider_reports": "missing",
+   "reasoning": "high",
+   "http": 502,
+   "code": "MODEL_IDENTITY_UNVERIFIABLE",
+   "msg": "MODEL_IDENTITY_UNVERIFIABLE: dispatched approved model 'nvidia/nemotron-3-super-120b-a12b'",
+   "identity_verified": null,
+   "model_id": null,
+   "provider_reported": null,
+   "provider_calls": 1,
+   "dispatched": [
+    "nvidia/nemotron-3-super-120b-a12b"
+   ],
+   "latency_ms": 11.0
+  },
+  {
+   "case": "4 empty",
+   "provider_reports": "empty",
+   "reasoning": "high",
+   "http": 502,
+   "code": "MODEL_IDENTITY_UNVERIFIABLE",
+   "msg": "MODEL_IDENTITY_UNVERIFIABLE: dispatched approved model 'nvidia/nemotron-3-super-120b-a12b'",
+   "identity_verified": null,
+   "model_id": null,
+   "provider_reported": null,
+   "provider_calls": 1,
+   "dispatched": [
+    "nvidia/nemotron-3-super-120b-a12b"
+   ],
+   "latency_ms": 9.9
+  },
+  {
+   "case": "5 whitespace",
+   "provider_reports": "ws",
+   "reasoning": "high",
+   "http": 502,
+   "code": "MODEL_IDENTITY_UNVERIFIABLE",
+   "msg": "MODEL_IDENTITY_UNVERIFIABLE: dispatched approved model 'nvidia/nemotron-3-super-120b-a12b'",
+   "identity_verified": null,
+   "model_id": null,
+   "provider_reported": null,
+   "provider_calls": 1,
+   "dispatched": [
+    "nvidia/nemotron-3-super-120b-a12b"
+   ],
+   "latency_ms": 10.9
+  },
+  {
+   "case": "6a malformed null",
+   "provider_reports": "null",
+   "reasoning": "high",
+   "http": 502,
+   "code": "MODEL_IDENTITY_UNVERIFIABLE",
+   "msg": "MODEL_IDENTITY_UNVERIFIABLE: dispatched approved model 'nvidia/nemotron-3-super-120b-a12b'",
+   "identity_verified": null,
+   "model_id": null,
+   "provider_reported": null,
+   "provider_calls": 1,
+   "dispatched": [
+    "nvidia/nemotron-3-super-120b-a12b"
+   ],
+   "latency_ms": 9.9
+  },
+  {
+   "case": "6b malformed int",
+   "provider_reports": "int",
+   "reasoning": "high",
+   "http": 502,
+   "code": "MODEL_IDENTITY_UNVERIFIABLE",
+   "msg": "MODEL_IDENTITY_UNVERIFIABLE: dispatched approved model 'nvidia/nemotron-3-super-120b-a12b'",
+   "identity_verified": null,
+   "model_id": null,
+   "provider_reported": null,
+   "provider_calls": 1,
+   "dispatched": [
+    "nvidia/nemotron-3-super-120b-a12b"
+   ],
+   "latency_ms": 12.1
+  },
+  {
+   "case": "6c malformed list",
+   "provider_reports": "list",
+   "reasoning": "high",
+   "http": 502,
+   "code": "MODEL_IDENTITY_UNVERIFIABLE",
+   "msg": "MODEL_IDENTITY_UNVERIFIABLE: dispatched approved model 'nvidia/nemotron-3-super-120b-a12b'",
+   "identity_verified": null,
+   "model_id": null,
+   "provider_reported": null,
+   "provider_calls": 1,
+   "dispatched": [
+    "nvidia/nemotron-3-super-120b-a12b"
+   ],
+   "latency_ms": 9.1
+  },
+  {
+   "case": "6d malformed dict",
+   "provider_reports": "dict",
+   "reasoning": "high",
+   "http": 502,
+   "code": "MODEL_IDENTITY_UNVERIFIABLE",
+   "msg": "MODEL_IDENTITY_UNVERIFIABLE: dispatched approved model 'nvidia/nemotron-3-super-120b-a12b'",
+   "identity_verified": null,
+   "model_id": null,
+   "provider_reported": null,
+   "provider_calls": 1,
+   "dispatched": [
+    "nvidia/nemotron-3-super-120b-a12b"
+   ],
+   "latency_ms": 9.5
+  },
+  {
+   "case": "7 unicode look-alike",
+   "provider_reports": "unicode",
+   "reasoning": "high",
+   "http": 502,
+   "code": "MODEL_IDENTITY_MISMATCH",
+   "msg": "MODEL_IDENTITY_MISMATCH: dispatched approved model 'nvidia/nemotron-3-super-120b-a12b' (ro",
+   "identity_verified": null,
+   "model_id": null,
+   "provider_reported": null,
+   "provider_calls": 1,
+   "dispatched": [
+    "nvidia/nemotron-3-super-120b-a12b"
+   ],
+   "latency_ms": 8.5
+  },
+  {
+   "case": "8 case-different",
+   "provider_reports": "case",
+   "reasoning": "high",
+   "http": 502,
+   "code": "MODEL_IDENTITY_MISMATCH",
+   "msg": "MODEL_IDENTITY_MISMATCH: dispatched approved model 'nvidia/nemotron-3-super-120b-a12b' (ro",
+   "identity_verified": null,
+   "model_id": null,
+   "provider_reported": null,
+   "provider_calls": 1,
+   "dispatched": [
+    "nvidia/nemotron-3-super-120b-a12b"
+   ],
+   "latency_ms": 9.5
+  },
+  {
+   "case": "9 cross-role approved",
+   "provider_reports": "fixed:nvidia/nemotron-3.5-lightning-30b-a3b",
+   "reasoning": "high",
+   "http": 502,
+   "code": "MODEL_IDENTITY_MISMATCH",
+   "msg": "MODEL_IDENTITY_MISMATCH: dispatched approved model 'nvidia/nemotron-3-super-120b-a12b' (ro",
+   "identity_verified": null,
+   "model_id": null,
+   "provider_reported": null,
+   "provider_calls": 1,
+   "dispatched": [
+    "nvidia/nemotron-3-super-120b-a12b"
+   ],
+   "latency_ms": 8.6
+  },
+  {
+   "case": "9b cross-role approved (low->super)",
+   "provider_reports": "fixed:nvidia/nemotron-3-super-120b-a12b",
+   "reasoning": "low",
+   "http": 502,
+   "code": "MODEL_IDENTITY_MISMATCH",
+   "msg": "MODEL_IDENTITY_MISMATCH: dispatched approved model 'nvidia/nemotron-3.5-lightning-30b-a3b'",
+   "identity_verified": null,
+   "model_id": null,
+   "provider_reported": null,
+   "provider_calls": 1,
+   "dispatched": [
+    "nvidia/nemotron-3.5-lightning-30b-a3b"
+   ],
+   "latency_ms": 8.7
+  },
+  {
+   "case": "10 unknown model",
+   "provider_reports": "fixed:example-org/unknown-model-z",
+   "reasoning": "high",
+   "http": 502,
+   "code": "MODEL_IDENTITY_MISMATCH",
+   "msg": "MODEL_IDENTITY_MISMATCH: dispatched approved model 'nvidia/nemotron-3-super-120b-a12b' (ro",
+   "identity_verified": null,
+   "model_id": null,
+   "provider_reported": null,
+   "provider_calls": 1,
+   "dispatched": [
+    "nvidia/nemotron-3-super-120b-a12b"
+   ],
+   "latency_ms": 7.8
+  },
+  {
+   "case": "10b suffix look-alike",
+   "provider_reports": "suffix",
+   "reasoning": "low",
+   "http": 502,
+   "code": "MODEL_IDENTITY_MISMATCH",
+   "msg": "MODEL_IDENTITY_MISMATCH: dispatched approved model 'nvidia/nemotron-3.5-lightning-30b-a3b'",
+   "identity_verified": null,
+   "model_id": null,
+   "provider_reported": null,
+   "provider_calls": 1,
+   "dispatched": [
+    "nvidia/nemotron-3.5-lightning-30b-a3b"
+   ],
+   "latency_ms": 8.7
+  },
+  {
+   "case": "1b exact low",
+   "provider_reports": "echo",
+   "reasoning": "low",
+   "http": 200,
+   "code": null,
+   "msg": "",
+   "identity_verified": true,
+   "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+   "provider_reported": "nvidia/nemotron-3.5-lightning-30b-a3b",
+   "provider_calls": 1,
+   "dispatched": [
+    "nvidia/nemotron-3.5-lightning-30b-a3b"
+   ],
+   "latency_ms": 8.3
+  }
+ ],
+ "cache_matrix": [
+  {
+   "sequence": "HIGH,LOW,HIGH,LOW",
+   "steps": [
+    {
+     "reasoning": "high",
+     "http": 200,
+     "provider_calls": 1,
+     "dispatched": [
+      "nemotron-3-super-120b-a12b"
+     ],
+     "thinking": [
+      null
+     ],
+     "answered_by": "nemotron-3-super-120b-a12b",
+     "rule": "high_reasoning",
+     "content": "r from nvidia/nemotron-3-super-120b-a12b"
+    },
+    {
+     "reasoning": "low",
+     "http": 200,
+     "provider_calls": 1,
+     "dispatched": [
+      "nemotron-3.5-lightning-30b-a3b"
+     ],
+     "thinking": [
+      {
+       "enable_thinking": false
+      }
+     ],
+     "answered_by": "nemotron-3.5-lightning-30b-a3b",
+     "rule": "low_reasoning",
+     "content": "om nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+     "reasoning": "high",
+     "http": 200,
+     "provider_calls": 0,
+     "dispatched": [],
+     "thinking": [],
+     "answered_by": "nemotron-3-super-120b-a12b",
+     "rule": "high_reasoning",
+     "content": "r from nvidia/nemotron-3-super-120b-a12b"
+    },
+    {
+     "reasoning": "low",
+     "http": 200,
+     "provider_calls": 0,
+     "dispatched": [],
+     "thinking": [],
+     "answered_by": "nemotron-3.5-lightning-30b-a3b",
+     "rule": "low_reasoning",
+     "content": "om nvidia/nemotron-3.5-lightning-30b-a3b"
+    }
+   ]
+  },
+  {
+   "sequence": "LOW,HIGH,LOW,HIGH",
+   "steps": [
+    {
+     "reasoning": "low",
+     "http": 200,
+     "provider_calls": 1,
+     "dispatched": [
+      "nemotron-3.5-lightning-30b-a3b"
+     ],
+     "thinking": [
+      {
+       "enable_thinking": false
+      }
+     ],
+     "answered_by": "nemotron-3.5-lightning-30b-a3b",
+     "rule": "low_reasoning",
+     "content": "om nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+     "reasoning": "high",
+     "http": 200,
+     "provider_calls": 1,
+     "dispatched": [
+      "nemotron-3-super-120b-a12b"
+     ],
+     "thinking": [
+      null
+     ],
+     "answered_by": "nemotron-3-super-120b-a12b",
+     "rule": "high_reasoning",
+     "content": "r from nvidia/nemotron-3-super-120b-a12b"
+    },
+    {
+     "reasoning": "low",
+     "http": 200,
+     "provider_calls": 0,
+     "dispatched": [],
+     "thinking": [],
+     "answered_by": "nemotron-3.5-lightning-30b-a3b",
+     "rule": "low_reasoning",
+     "content": "om nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+     "reasoning": "high",
+     "http": 200,
+     "provider_calls": 0,
+     "dispatched": [],
+     "thinking": [],
+     "answered_by": "nemotron-3-super-120b-a12b",
+     "rule": "high_reasoning",
+     "content": "r from nvidia/nemotron-3-super-120b-a12b"
+    }
+   ]
+  },
+  {
+   "sequence": "HIGH,MEDIUM,MEDIUM,HIGH",
+   "steps": [
+    {
+     "reasoning": "high",
+     "http": 200,
+     "provider_calls": 1,
+     "dispatched": [
+      "nemotron-3-super-120b-a12b"
+     ],
+     "thinking": [
+      null
+     ],
+     "answered_by": "nemotron-3-super-120b-a12b",
+     "rule": "high_reasoning",
+     "content": "r from nvidia/nemotron-3-super-120b-a12b"
+    },
+    {
+     "reasoning": "medium",
+     "http": 200,
+     "provider_calls": 1,
+     "dispatched": [
+      "nemotron-3-super-120b-a12b"
+     ],
+     "thinking": [
+      {
+       "enable_thinking": false
+      }
+     ],
+     "answered_by": "nemotron-3-super-120b-a12b",
+     "rule": "medium_reasoning",
+     "content": "r from nvidia/nemotron-3-super-120b-a12b"
+    },
+    {
+     "reasoning": "medium",
+     "http": 200,
+     "provider_calls": 0,
+     "dispatched": [],
+     "thinking": [],
+     "answered_by": "nemotron-3-super-120b-a12b",
+     "rule": "medium_reasoning",
+     "content": "r from nvidia/nemotron-3-super-120b-a12b"
+    },
+    {
+     "reasoning": "high",
+     "http": 200,
+     "provider_calls": 0,
+     "dispatched": [],
+     "thinking": [],
+     "answered_by": "nemotron-3-super-120b-a12b",
+     "rule": "high_reasoning",
+     "content": "r from nvidia/nemotron-3-super-120b-a12b"
+    }
+   ]
+  },
+  {
+   "sequence": "MEDIUM,HIGH,LOW,MEDIUM",
+   "steps": [
+    {
+     "reasoning": "medium",
+     "http": 200,
+     "provider_calls": 1,
+     "dispatched": [
+      "nemotron-3-super-120b-a12b"
+     ],
+     "thinking": [
+      {
+       "enable_thinking": false
+      }
+     ],
+     "answered_by": "nemotron-3-super-120b-a12b",
+     "rule": "medium_reasoning",
+     "content": "r from nvidia/nemotron-3-super-120b-a12b"
+    },
+    {
+     "reasoning": "high",
+     "http": 200,
+     "provider_calls": 1,
+     "dispatched": [
+      "nemotron-3-super-120b-a12b"
+     ],
+     "thinking": [
+      null
+     ],
+     "answered_by": "nemotron-3-super-120b-a12b",
+     "rule": "high_reasoning",
+     "content": "r from nvidia/nemotron-3-super-120b-a12b"
+    },
+    {
+     "reasoning": "low",
+     "http": 200,
+     "provider_calls": 1,
+     "dispatched": [
+      "nemotron-3.5-lightning-30b-a3b"
+     ],
+     "thinking": [
+      {
+       "enable_thinking": false
+      }
+     ],
+     "answered_by": "nemotron-3.5-lightning-30b-a3b",
+     "rule": "low_reasoning",
+     "content": "om nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+     "reasoning": "medium",
+     "http": 200,
+     "provider_calls": 0,
+     "dispatched": [],
+     "thinking": [],
+     "answered_by": "nemotron-3-super-120b-a12b",
+     "rule": "medium_reasoning",
+     "content": "r from nvidia/nemotron-3-super-120b-a12b"
+    }
+   ]
+  },
+  {
+   "sequence": "LOW,MEDIUM,HIGH,LOW",
+   "steps": [
+    {
+     "reasoning": "low",
+     "http": 200,
+     "provider_calls": 1,
+     "dispatched": [
+      "nemotron-3.5-lightning-30b-a3b"
+     ],
+     "thinking": [
+      {
+       "enable_thinking": false
+      }
+     ],
+     "answered_by": "nemotron-3.5-lightning-30b-a3b",
+     "rule": "low_reasoning",
+     "content": "om nvidia/nemotron-3.5-lightning-30b-a3b"
+    },
+    {
+     "reasoning": "medium",
+     "http": 200,
+     "provider_calls": 1,
+     "dispatched": [
+      "nemotron-3-super-120b-a12b"
+     ],
+     "thinking": [
+      {
+       "enable_thinking": false
+      }
+     ],
+     "answered_by": "nemotron-3-super-120b-a12b",
+     "rule": "medium_reasoning",
+     "content": "r from nvidia/nemotron-3-super-120b-a12b"
+    },
+    {
+     "reasoning": "high",
+     "http": 200,
+     "provider_calls": 1,
+     "dispatched": [
+      "nemotron-3-super-120b-a12b"
+     ],
+     "thinking": [
+      null
+     ],
+     "answered_by": "nemotron-3-super-120b-a12b",
+     "rule": "high_reasoning",
+     "content": "r from nvidia/nemotron-3-super-120b-a12b"
+    },
+    {
+     "reasoning": "low",
+     "http": 200,
+     "provider_calls": 0,
+     "dispatched": [],
+     "thinking": [],
+     "answered_by": "nemotron-3.5-lightning-30b-a3b",
+     "rule": "low_reasoning",
+     "content": "om nvidia/nemotron-3.5-lightning-30b-a3b"
+    }
+   ]
+  },
+  {
+   "sequence": "timestamp-differing prompts (LOW,LOW)",
+   "provider_calls": [
+    1,
+    1
+   ]
+  },
+  {
+   "sequence": "same prompt: provider missing identity, then healthy",
+   "http": [
+    502,
+    502
+   ],
+   "provider_calls": [
+    1,
+    0
+   ],
+   "code2": "MODEL_IDENTITY_UNVERIFIABLE"
+  }
+ ],
+ "physical_model_policy": [
+  {
+   "case": "baseline",
+   "env": {},
+   "ready": 200,
+   "failed": [],
+   "binding_violations": null,
+   "inference_http": 200,
+   "code": null,
+   "model_id": "nvidia/nemotron-3-super-120b-a12b",
+   "provider_calls": 1,
+   "live": 200
+  },
+  {
+   "case": "env override arbitrary model",
+   "env": {
+    "NEMOTRON_SUPER_MODEL": "example-org/unapproved-model-x"
+   },
+   "ready": 503,
+   "failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "super",
+     "model_id": "example-org/unapproved-model-x",
+     "reason": "UNAPPROVED_MODEL_ID"
+    }
+   ],
+   "inference_http": 503,
+   "code": "MODEL_POLICY_VIOLATION",
+   "model_id": null,
+   "provider_calls": 0,
+   "live": 200
+  },
+  {
+   "case": "suffix look-alike",
+   "env": {
+    "NEMOTRON_SUPER_MODEL": "nvidia/nemotron-3-super-120b-a12b-v2"
+   },
+   "ready": 503,
+   "failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "super",
+     "model_id": "nvidia/nemotron-3-super-120b-a12b-v2",
+     "reason": "UNAPPROVED_MODEL_ID"
+    }
+   ],
+   "inference_http": 503,
+   "code": "MODEL_POLICY_VIOLATION",
+   "model_id": null,
+   "provider_calls": 0,
+   "live": 200
+  },
+  {
+   "case": "case variation",
+   "env": {
+    "NEMOTRON_SUPER_MODEL": "NVIDIA/Nemotron-3-Super-120B-A12B"
+   },
+   "ready": 503,
+   "failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "super",
+     "model_id": "NVIDIA/Nemotron-3-Super-120B-A12B",
+     "reason": "UNAPPROVED_MODEL_ID"
+    }
+   ],
+   "inference_http": 503,
+   "code": "MODEL_POLICY_VIOLATION",
+   "model_id": null,
+   "provider_calls": 0,
+   "live": 200
+  },
+  {
+   "case": "unicode hyphen",
+   "env": {
+    "NEMOTRON_SUPER_MODEL": "nvidia/nemotron\u20103-super-120b-a12b"
+   },
+   "ready": 503,
+   "failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "super",
+     "model_id": "nvidia/nemotron\u20103-super-120b-a12b",
+     "reason": "UNAPPROVED_MODEL_ID"
+    }
+   ],
+   "inference_http": 503,
+   "code": "MODEL_POLICY_VIOLATION",
+   "model_id": null,
+   "provider_calls": 0,
+   "live": 200
+  },
+  {
+   "case": "unknown id",
+   "env": {
+    "NEMOTRON_SUPER_MODEL": "totally-unknown/model-d"
+   },
+   "ready": 503,
+   "failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "super",
+     "model_id": "totally-unknown/model-d",
+     "reason": "UNAPPROVED_MODEL_ID"
+    }
+   ],
+   "inference_http": 503,
+   "code": "MODEL_POLICY_VIOLATION",
+   "model_id": null,
+   "provider_calls": 0,
+   "live": 200
+  },
+  {
+   "case": "cross-role mapping",
+   "env": {
+    "NEMOTRON_SUPER_MODEL": "nvidia/nemotron-3.5-lightning-30b-a3b"
+   },
+   "ready": 503,
+   "failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "super",
+     "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+     "reason": "ROLE_MISMATCH"
+    }
+   ],
+   "inference_http": 503,
+   "code": "MODEL_POLICY_VIOLATION",
+   "model_id": null,
+   "provider_calls": 0,
+   "live": 200
+  },
+  {
+   "case": "cross-role lightning<-super",
+   "env": {
+    "NEMOTRON_LIGHTNING_MODEL": "nvidia/nemotron-3-super-120b-a12b"
+   },
+   "ready": 503,
+   "failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "lightning",
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "reason": "ROLE_MISMATCH"
+    }
+   ],
+   "inference_http": 503,
+   "code": "MODEL_POLICY_VIOLATION",
+   "model_id": null,
+   "provider_calls": 0,
+   "live": 200
+  },
+  {
+   "case": "env override arbitrary model",
+   "env": {
+    "NEMOTRON_SUPER_MODEL": "example-org/unapproved-model-x"
+   },
+   "ready": 503,
+   "failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "super",
+     "model_id": "example-org/unapproved-model-x",
+     "reason": "UNAPPROVED_MODEL_ID"
+    }
+   ],
+   "inference_http": 503,
+   "code": "MODEL_POLICY_VIOLATION",
+   "model_id": null,
+   "provider_calls": 0,
+   "live": 200
+  },
+  {
+   "case": "suffix look-alike",
+   "env": {
+    "NEMOTRON_SUPER_MODEL": "nvidia/nemotron-3-super-120b-a12b-v2"
+   },
+   "ready": 503,
+   "failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "super",
+     "model_id": "nvidia/nemotron-3-super-120b-a12b-v2",
+     "reason": "UNAPPROVED_MODEL_ID"
+    }
+   ],
+   "inference_http": 503,
+   "code": "MODEL_POLICY_VIOLATION",
+   "model_id": null,
+   "provider_calls": 0,
+   "live": 200
+  },
+  {
+   "case": "case variation",
+   "env": {
+    "NEMOTRON_SUPER_MODEL": "NVIDIA/Nemotron-3-Super-120B-A12B"
+   },
+   "ready": 503,
+   "failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "super",
+     "model_id": "NVIDIA/Nemotron-3-Super-120B-A12B",
+     "reason": "UNAPPROVED_MODEL_ID"
+    }
+   ],
+   "inference_http": 503,
+   "code": "MODEL_POLICY_VIOLATION",
+   "model_id": null,
+   "provider_calls": 0,
+   "live": 200
+  },
+  {
+   "case": "unicode hyphen",
+   "env": {
+    "NEMOTRON_SUPER_MODEL": "nvidia/nemotron\u20103-super-120b-a12b"
+   },
+   "ready": 503,
+   "failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "super",
+     "model_id": "nvidia/nemotron\u20103-super-120b-a12b",
+     "reason": "UNAPPROVED_MODEL_ID"
+    }
+   ],
+   "inference_http": 503,
+   "code": "MODEL_POLICY_VIOLATION",
+   "model_id": null,
+   "provider_calls": 0,
+   "live": 200
+  },
+  {
+   "case": "unknown id",
+   "env": {
+    "NEMOTRON_SUPER_MODEL": "totally-unknown/model-d"
+   },
+   "ready": 503,
+   "failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "super",
+     "model_id": "totally-unknown/model-d",
+     "reason": "UNAPPROVED_MODEL_ID"
+    }
+   ],
+   "inference_http": 503,
+   "code": "MODEL_POLICY_VIOLATION",
+   "model_id": null,
+   "provider_calls": 0,
+   "live": 200
+  },
+  {
+   "case": "cross-role mapping",
+   "env": {
+    "NEMOTRON_SUPER_MODEL": "nvidia/nemotron-3.5-lightning-30b-a3b"
+   },
+   "ready": 503,
+   "failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "super",
+     "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+     "reason": "ROLE_MISMATCH"
+    }
+   ],
+   "inference_http": 503,
+   "code": "MODEL_POLICY_VIOLATION",
+   "model_id": null,
+   "provider_calls": 0,
+   "live": 200
+  },
+  {
+   "case": "cross-role lightning<-super",
+   "env": {
+    "NEMOTRON_LIGHTNING_MODEL": "nvidia/nemotron-3-super-120b-a12b"
+   },
+   "ready": 503,
+   "failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "lightning",
+     "model_id": "nvidia/nemotron-3-super-120b-a12b",
+     "reason": "ROLE_MISMATCH"
+    }
+   ],
+   "inference_http": 503,
+   "code": "MODEL_POLICY_VIOLATION",
+   "model_id": null,
+   "provider_calls": 0,
+   "live": 200
+  },
+  {
+   "case": "LLM_MODEL/MAIW_NIM_MODEL set",
+   "env": {
+    "LLM_MODEL": "meta/llama-3.1-8b-instruct",
+    "MAIW_NIM_MODEL": "meta/llama-3.1-8b-instruct"
+   },
+   "ready": 200,
+   "failed": [],
+   "binding_violations": null,
+   "inference_http": 200,
+   "code": null,
+   "model_id": "nvidia/nemotron-3-super-120b-a12b",
+   "provider_calls": 1,
+   "live": 200
+  },
+  {
+   "case": "ultra enabled unknown",
+   "env": {
+    "NEMOTRON_ULTRA_ENABLED": "true",
+    "NEMOTRON_ULTRA_MODEL": "totally-unknown/model-d"
+   },
+   "ready": 503,
+   "failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "ultra",
+     "model_id": "totally-unknown/model-d",
+     "reason": "UNAPPROVED_MODEL_ID"
+    }
+   ],
+   "inference_http": 200,
+   "code": null,
+   "model_id": "nvidia/nemotron-3-super-120b-a12b",
+   "provider_calls": 1,
+   "live": 200
+  },
+  {
+   "case": "provider substitution",
+   "env": {},
+   "ready": 200,
+   "failed": [],
+   "binding_violations": null,
+   "inference_http": 502,
+   "code": "MODEL_IDENTITY_MISMATCH",
+   "model_id": null,
+   "provider_calls": 1,
+   "live": 200
+  },
+  {
+   "case": "ultra enabled unknown (judge task)",
+   "env": {
+    "NEMOTRON_ULTRA_ENABLED": "true",
+    "NEMOTRON_ULTRA_MODEL": "totally-unknown/model-d"
+   },
+   "ready": 503,
+   "failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "ultra",
+     "model_id": "totally-unknown/model-d",
+     "reason": "UNAPPROVED_MODEL_ID"
+    }
+   ],
+   "inference_http": 503,
+   "code": "MODEL_POLICY_VIOLATION",
+   "model_id": null,
+   "provider_calls": 0,
+   "live": 200
+  }
+ ],
+ "readiness_matrix": [
+  {
+   "write": null,
+   "states": {
+    "profile": "ready",
+    "runtime": "ready",
+    "persistence": "ready",
+    "model_gateway": "ready",
+    "mcp_domains": "ready",
+    "governed_write_path": "not_offered",
+    "database": "ready",
+    "sandbox_runtime": "not_configured",
+    "model_provider": "ready"
+   },
+   "case": "reference baseline, sandbox disabled",
+   "ready": 200,
+   "failed": [],
+   "binding_violations": null,
+   "inference_http": 200,
+   "code": null,
+   "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+   "provider_calls": 1,
+   "live": 200
+  },
+  {
+   "write": null,
+   "states": {
+    "profile": "ready",
+    "runtime": "ready",
+    "persistence": "ready",
+    "model_gateway": "ready",
+    "mcp_domains": "ready",
+    "governed_write_path": "not_offered",
+    "database": "ready",
+    "sandbox_runtime": "ready",
+    "model_provider": "ready"
+   },
+   "case": "reference, required sandbox Ready",
+   "ready": 200,
+   "failed": [],
+   "binding_violations": null,
+   "inference_http": 200,
+   "code": null,
+   "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+   "provider_calls": 1,
+   "live": 200
+  },
+  {
+   "write": null,
+   "states": {
+    "profile": "ready",
+    "runtime": "ready",
+    "persistence": "ready",
+    "model_gateway": "ready",
+    "mcp_domains": "ready",
+    "governed_write_path": "not_offered",
+    "database": "ready",
+    "sandbox_runtime": "failed",
+    "model_provider": "ready"
+   },
+   "case": "reference, required sandbox absent",
+   "ready": 503,
+   "failed": [
+    "sandbox_runtime"
+   ],
+   "binding_violations": null,
+   "inference_http": 200,
+   "code": null,
+   "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+   "provider_calls": 1,
+   "live": 200
+  },
+  {
+   "write": null,
+   "states": {
+    "profile": "ready",
+    "runtime": "ready",
+    "persistence": "ready",
+    "model_gateway": "ready",
+    "mcp_domains": "ready",
+    "governed_write_path": "not_offered",
+    "database": "ready",
+    "sandbox_runtime": "degraded",
+    "model_provider": "ready"
+   },
+   "case": "reference, optional sandbox absent",
+   "ready": 200,
+   "failed": [],
+   "binding_violations": null,
+   "inference_http": 200,
+   "code": null,
+   "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+   "provider_calls": 1,
+   "live": 200
+  },
+  {
+   "write": [
+    503,
+    "GOVERNED_WRITES_NOT_OFFERED"
+   ],
+   "states": {
+    "profile": "ready",
+    "runtime": "ready",
+    "persistence": "ready",
+    "model_gateway": "ready",
+    "mcp_domains": "ready",
+    "governed_write_path": "not_offered",
+    "database": "ready",
+    "sandbox_runtime": "not_configured",
+    "model_provider": "ready"
+   },
+   "case": "reference + optional MCP URL, operator token set",
+   "ready": 200,
+   "failed": [],
+   "binding_violations": null,
+   "inference_http": 200,
+   "code": null,
+   "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+   "provider_calls": 1,
+   "live": 200
+  },
+  {
+   "write": [
+    422,
+    null
+   ],
+   "states": {
+    "profile": "ready",
+    "runtime": "ready",
+    "persistence": "ready",
+    "model_gateway": "ready",
+    "mcp_domains": "ready",
+    "governed_write_path": "ready",
+    "database": "ready",
+    "sandbox_runtime": "not_configured",
+    "model_provider": "ready"
+   },
+   "case": "reference_governed healthy",
+   "ready": 200,
+   "failed": [],
+   "binding_violations": null,
+   "inference_http": 200,
+   "code": null,
+   "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+   "provider_calls": 1,
+   "live": 200
+  },
+  {
+   "write": [
+    503,
+    "OPERATOR_WRITE_AUTH_NOT_CONFIGURED"
+   ],
+   "states": {
+    "profile": "ready",
+    "runtime": "ready",
+    "persistence": "ready",
+    "model_gateway": "ready",
+    "mcp_domains": "ready",
+    "governed_write_path": "failed",
+    "database": "ready",
+    "sandbox_runtime": "not_configured",
+    "model_provider": "ready"
+   },
+   "case": "reference_governed write token missing",
+   "ready": 503,
+   "failed": [
+    "governed_write_path"
+   ],
+   "binding_violations": null,
+   "inference_http": 200,
+   "code": null,
+   "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+   "provider_calls": 1,
+   "live": 200
+  },
+  {
+   "write": [
+    503,
+    "OPERATOR_WRITE_AUTH_NOT_CONFIGURED"
+   ],
+   "states": {
+    "profile": "ready",
+    "runtime": "ready",
+    "persistence": "ready",
+    "model_gateway": "ready",
+    "mcp_domains": "ready",
+    "governed_write_path": "failed",
+    "database": "ready",
+    "sandbox_runtime": "not_configured",
+    "model_provider": "ready"
+   },
+   "case": "reference_governed token == inference token",
+   "ready": 503,
+   "failed": [
+    "governed_write_path"
+   ],
+   "binding_violations": null,
+   "inference_http": 200,
+   "code": null,
+   "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+   "provider_calls": 1,
+   "live": 200
+  },
+  {
+   "write": [
+    422,
+    null
+   ],
+   "states": {
+    "profile": "ready",
+    "runtime": "ready",
+    "persistence": "ready",
+    "model_gateway": "ready",
+    "mcp_domains": "failed",
+    "governed_write_path": "failed",
+    "database": "ready",
+    "sandbox_runtime": "not_configured",
+    "model_provider": "ready"
+   },
+   "case": "reference_governed required MCP unreachable",
+   "ready": 503,
+   "failed": [
+    "governed_write_path",
+    "mcp_domains"
+   ],
+   "binding_violations": null,
+   "inference_http": 200,
+   "code": null,
+   "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+   "provider_calls": 1,
+   "live": 200
+  },
+  {
+   "write": [
+    422,
+    null
+   ],
+   "states": {
+    "profile": "ready",
+    "runtime": "ready",
+    "persistence": "ready",
+    "model_gateway": "ready",
+    "mcp_domains": "failed",
+    "governed_write_path": "failed",
+    "database": "ready",
+    "sandbox_runtime": "not_configured",
+    "model_provider": "ready"
+   },
+   "case": "reference_governed required MCP unset",
+   "ready": 503,
+   "failed": [
+    "governed_write_path",
+    "mcp_domains"
+   ],
+   "binding_violations": null,
+   "inference_http": 200,
+   "code": null,
+   "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+   "provider_calls": 1,
+   "live": 200
+  },
+  {
+   "write": null,
+   "states": {
+    "profile": "ready",
+    "runtime": "ready",
+    "persistence": "ready",
+    "model_gateway": "ready",
+    "mcp_domains": "ready",
+    "governed_write_path": "ready",
+    "database": "ready",
+    "sandbox_runtime": "not_configured",
+    "model_provider": "ready"
+   },
+   "case": "reference_governed, optional inventory MCP unset",
+   "ready": 200,
+   "failed": [],
+   "binding_violations": null,
+   "inference_http": 200,
+   "code": null,
+   "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+   "provider_calls": 1,
+   "live": 200
+  },
+  {
+   "write": null,
+   "states": {
+    "profile": "failed",
+    "runtime": "ready",
+    "persistence": "ready",
+    "model_gateway": "ready",
+    "mcp_domains": "ready",
+    "governed_write_path": "not_offered",
+    "database": "ready",
+    "sandbox_runtime": "not_configured",
+    "model_provider": "ready"
+   },
+   "case": "invalid profile",
+   "ready": 503,
+   "failed": [
+    "profile"
+   ],
+   "binding_violations": null,
+   "inference_http": 200,
+   "code": null,
+   "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+   "provider_calls": 1,
+   "live": 200
+  },
+  {
+   "write": null,
+   "states": {
+    "profile": "ready",
+    "runtime": "ready",
+    "persistence": "ready",
+    "model_gateway": "ready",
+    "mcp_domains": "ready",
+    "governed_write_path": "not_offered",
+    "database": "failed",
+    "sandbox_runtime": "not_configured",
+    "model_provider": "ready"
+   },
+   "case": "reference, DB unreachable",
+   "ready": 503,
+   "failed": [
+    "database"
+   ],
+   "binding_violations": null,
+   "inference_http": 200,
+   "code": null,
+   "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+   "provider_calls": 1,
+   "live": 200
+  },
+  {
+   "write": null,
+   "states": {
+    "profile": "ready",
+    "runtime": "ready",
+    "persistence": "ready",
+    "model_gateway": "ready",
+    "mcp_domains": "ready",
+    "governed_write_path": "not_offered",
+    "database": "ready",
+    "sandbox_runtime": "not_configured",
+    "model_provider": "ready"
+   },
+   "case": "reference, provider down",
+   "ready": 200,
+   "failed": [],
+   "binding_violations": null,
+   "inference_http": 503,
+   "code": "MODEL_UNAVAILABLE",
+   "model_id": null,
+   "provider_calls": 0,
+   "live": 200
+  }
+ ],
+ "live_nemotron": {
+  "super": "NOT REPRODUCED (no hosted credential available to the auditor)",
+  "lightning": "NOT REPRODUCED (same)",
+  "canonical_path_with_auditor_provider": "in-sandbox HIGH -> nvidia/nemotron-3-super-120b-a12b identity_verified=true (16-31 ms); LOW -> nvidia/nemotron-3.5-lightning-30b-a3b identity_verified=true (33-137 ms)"
+ },
+ "tests": {
+  "python_full": [
+   {
+    "run": 1,
+    "passed": 2865,
+    "skipped": 8,
+    "failed": 0,
+    "secs": 289.75
+   },
+   {
+    "run": 2,
+    "passed": 2865,
+    "skipped": 8,
+    "failed": 0,
+    "secs": 285.62
+   }
+  ],
+  "order": {
+   "ModelGateway->demo": "558 passed",
+   "demo->ModelGateway": "558 passed",
+   "canonical->reliability": "442 passed, 2 skipped",
+   "reliability->canonical": "442 passed, 2 skipped",
+   "reversed dirs": "2865/8/0",
+   "file shuffle seed 4401": "2865/8/0",
+   "file shuffle seed 5502": "2865/8/0",
+   "round-3 suites first": "2865/8/0"
+  },
+  "skips": [
+   "test_migration_system legacy",
+   "MAIWSkillAdapter unavailable",
+   "3 x opt-in MAIW_PHASE20B_NIM_URL",
+   "1 x OpenShell not on test PATH (by design: PATH excluded ~/.local/bin)",
+   "2 x opt-in MAIW_TEST_PG_DSN"
+  ],
+  "targeted_regressions": "governance recovery + ambiguous write + round-3 suites + canonical app: 120 passed, 2 skipped",
+  "ui": {
+   "jest": "968/968 (40 suites)",
+   "eslint": "0 errors, 1043 warnings",
+   "tsc": "0 errors",
+   "build": "success (without CI=true)"
+  },
+  "npm_audit": {
+   "critical": 0,
+   "high": 50,
+   "moderate": 34,
+   "low": 3,
+   "omit_dev_identical": true,
+   "highs": "jest/eslint/react-scripts/webpack-dev-server/svgo/tailwind/http-proxy-middleware toolchain",
+   "production_reachable": "react-router(-dom) moderate"
+  }
+ },
+ "security_tools": {
+  "pip_audit": "RUN (2.10.1, separate tool venv): 1 finding pdfminer-six 20251107 PYSEC-2026-1761 (fix 20251230)",
+  "trivy": "NOT AVAILABLE",
+  "gitleaks": "NOT AVAILABLE",
+  "secret_scan": "git grep over tracked tree at HEAD: no real credentials; .env.example nvapi-xxx placeholders; dev JWT fallback string in src/api/services/auth/jwt_handler.py:110 and docs/secrets.md:137 (P2-16)"
+ },
+ "new_findings": {
+  "P0": [],
+  "P1": [
+   {
+    "id": "NEW4-P1-01",
+    "title": "Server-declared MCP tool error after mutation classified as definite failure; target unblocked; retry duplicates the write",
+    "evidence": ".fourth-logs FL-07 sequence; base.py:154-155; client.py:315-317; executions.py:152-160; test pins it"
+   }
+  ],
+  "P2": [
+   {
+    "id": "NEW4-P2-01",
+    "title": "Idempotency-Key replay of a FAILED write answers status=no_op (success semantics) while nothing changed",
+    "evidence": "FL-06 live; base.py:561-590"
+   },
+   {
+    "id": "NEW4-P2-02",
+    "title": "Reconciliation infers causality from state (other-actor state -> CONFIRMED_EXECUTED; applied-then-reverted -> CONFIRMED_NOT_EXECUTED -> second write); forwarded execution_id unused",
+    "evidence": "FL-10, FL-12 live; reconciliation.py:50-77"
+   },
+   {
+    "id": "NEW4-P2-03",
+    "title": "Shipped equipment MCP server/adapter non-functional for reference_governed (default provider never initialised; get_status fails contract validation: metadata str vs dict); no labor/wave launch entry point",
+    "evidence": "shipped_equipment_mcp.log; server.py:108-121; maiw_backend.py:111"
+   },
+   {
+    "id": "NEW4-P2-04",
+    "title": "Provider responses are cached before identity verification: same prompt keeps failing 502 for the cache TTL after the provider is fixed (fail-closed friction)",
+    "evidence": "cache_matrix stale-failure row"
+   },
+   {
+    "id": "NEW4-P2-05",
+    "title": "Readiness reports CIRCUIT_OPEN after cooldown until traffic probes half-open",
+    "evidence": "live circuit test"
+   },
+   {
+    "id": "NEW4-P2-06",
+    "title": "pdfminer-six 20251107 PYSEC-2026-1761 (pickle CMap load; fix 20251230)",
+    "evidence": "pip-audit"
+   }
+  ]
+ },
+ "p2_rechecks": {
+  "P2-04 document auth/abuse": "unauthenticated upload confirmed; chunked 60 MB upload accepted past the 50 MB limit and persisted to disk despite a 500; rate limiter never enforces (check_rate_limit's except Exception swallows its own 429: 15/15 logins answered 401, 15/15 uploads 422, 15 'Rate limit check failed: 429' logs); declared oversize -> 500 wrapping 413. Ruling: P2 (availability/cost; L7 policy keeps it from the sandbox; not an integrity or authority bypass) -- strongest P2, fix before production exposure.",
+  "P2-06 legacy reads": "equipment assets/assignments (employee ids), inventory, workforce, runtime/mcp status readable without auth; no secrets in /health. Ruling: P2.",
+  "multimodal": "image/video/audio -> 503 MODEL_UNAVAILABLE; no crash",
+  "carried_unchanged": [
+   "P2-09",
+   "P2-10",
+   "P2-14",
+   "P2-15",
+   "P2-16",
+   "P2-18",
+   "P2-20",
+   "N-3",
+   "N-4 (MCP readiness is TCP reachability; observed)",
+   "N-5",
+   "N-6",
+   "N-7 (inference.py:323 '!=')",
+   "N-10",
+   "N-11 (.env.example 8001/5435 observed)",
+   "N-12 (+ document OCR/parse direct httpx to hosted endpoints)",
+   "R3-O1",
+   "R3-O2",
+   "R3-O4",
+   "R3-O6",
+   "N-9 remainder (governed MCP launch)"
+  ]
+ },
+ "cleanup": {
+  "sandboxes_deleted": [
+   "maiw-v201-4th-a",
+   "maiw-v201-4th-b"
+  ],
+  "gateway_stopped": "maiw-v201-4th-gw (network removed)",
+  "containers_removed": [
+   "maiw-v201-4th-db",
+   "maiw-v201-4th-testpg"
+  ],
+  "processes_stopped": "API instances, MCP backends, fake provider",
+  "env_files_removed": true,
+  "live_worktree_removed": true
+ },
+ "merge_recommendation": "Do not merge PR #143 at 6ad2cbf",
+ "release_gate_recommendation": "Not ready for the post-merge v2.0.1 release gate"
+}
