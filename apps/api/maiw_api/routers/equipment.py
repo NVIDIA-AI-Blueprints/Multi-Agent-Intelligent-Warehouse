@@ -423,9 +423,13 @@ async def get_equipment_status(asset_id: str, runtime=Depends(get_runtime)):
 # v2.0.1 round 3 (NEW3-P1-02) — outcome semantics of the write routes:
 #
 #   200  status=executed|no_op|deferred|conflict|failed   definite outcome
+#        (failed/conflict/deferred only when nothing was dispatched or the MCP
+#        server certified execution_disposition=NOT_APPLIED — round 4)
 #   202  status=unknown, executed=null                     the MCP write may have
-#        been applied but its response was lost: NOT failed, never retried;
-#        reconcile with POST /api/v1/executions/{execution_id}/reconcile
+#        been applied: response lost (round 3) or a server-reported error /
+#        non-success without NOT_APPLIED (round 4, NEW4-P1-01).  NOT failed,
+#        never retried; reconcile with
+#        POST /api/v1/executions/{execution_id}/reconcile
 #   409  code=RECONCILIATION_REQUIRED                      an earlier write to the
 #        same asset is still unresolved (UNKNOWN / in flight) — refused BEFORE
 #        any proposal, decision or write
@@ -508,6 +512,11 @@ async def _execute_if_approved(
     result["trace_id"] = trace_id
     if error_code:
         result["error_code"] = error_code
+    # Round 4 (NEW4-P1-01): how far the write got and what the server certified.
+    for field in ("dispatch_status", "server_disposition", "uncertainty_reason"):
+        value = getattr(exec_result, field, None)
+        if isinstance(value, str):
+            result[field] = value
     if outcome == "unknown":
         # Never report an ambiguous write as "not executed" (round 3).
         result["executed"] = None

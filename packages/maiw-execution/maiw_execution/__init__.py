@@ -14,6 +14,7 @@ from .base import (
     ActionUnsupported,
     BaseActionExecutor,
     NoOpActionExecutor,
+    WriteNotDispatched,
 )
 from .equipment import EquipmentActionExecutor
 from .labor import LaborActionExecutor
@@ -41,6 +42,7 @@ __all__ = [
     "ActionExpired",
     "ActionConflict",
     "ActionExecutionError",
+    "WriteNotDispatched",
     # Ambiguous write signal
     "AmbiguousWriteError",
     # Canonical outcome

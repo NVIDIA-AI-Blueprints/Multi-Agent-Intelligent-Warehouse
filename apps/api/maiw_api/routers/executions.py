@@ -92,6 +92,13 @@ def record_view(domain: str, record: Any) -> dict[str, Any]:
         "unresolved": record.unresolved,
         "recovered_after_restart": record.recovered_after_restart,
         "error_code": getattr(result, "error_code", None),
+        # round 4 (NEW4-P1-01) journal evidence
+        "dispatch_status": getattr(result, "dispatch_status", None),
+        "server_disposition": getattr(result, "server_disposition", None),
+        "uncertainty_reason": getattr(result, "uncertainty_reason", None),
+        "physical_mutation_occurred": getattr(
+            result, "physical_mutation_occurred", None
+        ),
         "started_at": record.started_at.isoformat(),
         "completed_at": (
             record.completed_at.isoformat() if record.completed_at else None

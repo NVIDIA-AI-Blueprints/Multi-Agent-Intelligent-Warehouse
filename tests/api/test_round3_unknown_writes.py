@@ -499,9 +499,21 @@ async def test_read_timeout_after_dispatch_is_unknown(backend):
 
 
 def test_failure_classification_table():
-    from maiw_execution import AmbiguousWriteError, classify_write_failure
+    """
+    Round 4 (fourth re-audit NEW4-P1-01) replaced the unsafe row that pinned
+    ``MCPToolError → failed / mutation False``: a server-reported tool error
+    after dispatch is NOT proof of non-execution.  Only a provable
+    non-dispatch or the explicit NOT_APPLIED certification is FAILED; the
+    fail-safe default for anything unclassified is UNKNOWN.
+    """
+    from maiw_execution import (
+        AmbiguousWriteError,
+        WriteNotDispatched,
+        classify_write_failure,
+    )
     from maiw_mcp.deadline import RequestDeadlineExceeded
     from maiw_mcp.errors import (
+        BackendUnavailable,
         CapabilityNotFound,
         MCPCircuitOpen,
         MCPConnectFailed,
@@ -511,6 +523,9 @@ def test_failure_classification_table():
         MCPTimeout,
         MCPTimeoutAfterDispatch,
         MCPToolError,
+        MCPToolErrorOutcomeUnknown,
+        MCPToolNotApplied,
+        WriteNotApplied,
     )
 
     table = {
@@ -522,10 +537,17 @@ def test_failure_classification_table():
         MCPConnectFailed("x"): ("failed", False),
         MCPConnectTimeout("x"): ("failed", False),
         MCPCircuitOpen("x"): ("failed", False),
-        MCPToolError("x"): ("failed", False),
+        # round 4: isError alone (bare, or without a NOT_APPLIED disposition)
+        MCPToolError("x"): ("unknown", None),
+        MCPToolErrorOutcomeUnknown("x"): ("unknown", None),
+        # round 4: the only server-side path to a definite failure
+        MCPToolNotApplied("x"): ("failed", False),
+        WriteNotApplied("x"): ("failed", False),
+        BackendUnavailable("x"): ("unknown", None),
+        WriteNotDispatched("x"): ("failed", False),
         CapabilityNotFound("x"): ("failed", False),
         RequestDeadlineExceeded(expired_by_ms=1.0): ("failed", False),
-        RuntimeError("x"): ("failed", False),
+        RuntimeError("x"): ("unknown", None),
     }
     for exc, (outcome, mutation) in table.items():
         got_outcome, _, got_mutation = classify_write_failure(exc)

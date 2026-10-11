@@ -10,7 +10,7 @@ from typing import Any
 from maiw_decision.models import DecisionResult
 from maiw_decision.proposal import ActionProposal
 
-from .base import BaseActionExecutor
+from .base import BaseActionExecutor, WriteNotDispatched
 from .outcome import ExecutionOutcome
 from .reconciliation import ExecutionIntent
 
@@ -81,18 +81,21 @@ class LaborActionExecutor(BaseActionExecutor):
         from maiw_contracts.labor import LaborAllocateRequest
 
         params = proposal.parameters
-        req = LaborAllocateRequest(
-            warehouse_id=params.get("warehouse_id", "default"),
-            task_id=params["task_id"],
-            task_type=params.get("task_type", "PICK"),
-            worker_ids=params.get("worker_ids", []),
-            zone=params.get("zone"),
-            priority=params.get("priority", "medium"),
-            notes=params.get("notes"),
-            proposal_id=proposal.proposal_id,
-            decision_id=decision.result_id,
-            execution_id=execution_id,
-        )
+        try:
+            req = LaborAllocateRequest(
+                warehouse_id=params.get("warehouse_id", "default"),
+                task_id=params["task_id"],
+                task_type=params.get("task_type", "PICK"),
+                worker_ids=params.get("worker_ids", []),
+                zone=params.get("zone"),
+                priority=params.get("priority", "medium"),
+                notes=params.get("notes"),
+                proposal_id=proposal.proposal_id,
+                decision_id=decision.result_id,
+                execution_id=execution_id,
+            )
+        except Exception as exc:  # noqa: BLE001 - nothing was sent
+            raise WriteNotDispatched(f"invalid write request: {exc}") from exc
         result = await self._allocate_skill.execute(req)
         resp = result.model_dump()
 
