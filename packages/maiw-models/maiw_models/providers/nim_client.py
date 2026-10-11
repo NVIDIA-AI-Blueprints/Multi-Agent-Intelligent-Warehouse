@@ -192,6 +192,11 @@ class EmbeddingResponse:
     model: str
 
 
+# v2.0.1 round 3: bump when the cache-key composition changes, so entries
+# built under an older key format can never be served.
+CACHE_KEY_VERSION = "v2.0.1-r3"
+
+
 class NIMClient:
     """
     NVIDIA NIM client for LLM and embedding operations.
@@ -275,61 +280,51 @@ class NIMClient:
             f"timeout={self.config.timeout}s"
         )
 
-    def _normalize_content_for_cache(self, content: str) -> str:
-        """Normalize content to improve cache hit rates by removing variable data."""
-        import re
-
-        # Remove timestamps (various formats)
-        content = re.sub(
-            r"\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}:\d{2}[.\d]*Z?", "", content
-        )
-        # Remove task IDs and similar patterns (e.g., TASK_PICK_20251207_121327)
-        content = re.sub(r"TASK_[A-Z_]+_\d{8}_\d{6}", "TASK_ID", content)
-        # Remove UUIDs
-        content = re.sub(
-            r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
-            "UUID",
-            content,
-            flags=re.IGNORECASE,
-        )
-        # Remove specific dates in various formats
-        content = re.sub(r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b", "DATE", content)
-        # Normalize whitespace
-        content = " ".join(content.split())
-        return content.strip()
-
     def _generate_cache_key(
         self,
-        messages: List[Dict[str, str]],
+        messages: List[Dict[str, Any]],
         temperature: float,
         max_tokens: int,
         top_p: float,
         frequency_penalty: float,
         presence_penalty: float,
         model: Optional[str] = None,
+        *,
+        enable_thinking: Optional[bool] = None,
+        reasoning_budget: Optional[int] = None,
+        cache_scope: Optional[Dict[str, Any]] = None,
     ) -> str:
-        """Generate a cache key from LLM request parameters."""
-        normalized_messages = []
-        for msg in messages:
-            content = msg.get("content", "").strip()
-            normalized_content = self._normalize_content_for_cache(content)
-            normalized_messages.append(
-                {"role": msg.get("role", "user"), "content": normalized_content}
-            )
+        """
+        Cache key over EVERYTHING that can change the answer (v2.0.1 round 3).
 
+        Third re-audit N-2: the key ignored ``enable_thinking`` /
+        ``reasoning_budget`` (a MEDIUM request was served HIGH's cached
+        thinking-mode answer) and stripped timestamps, UUIDs and dates from the
+        prompt (two different prompts shared one answer).  The key now covers:
+        the exact messages (no normalisation), every sampling parameter, the
+        dispatched physical model, the thinking mode and budget, and the
+        caller's routing intent (``cache_scope``: reasoning level, risk level,
+        modality, logical role, generation, deployment mode) plus a key-format
+        version.  Requests that differ in any of these never share an entry.
+        """
         cache_data = {
-            "messages": normalized_messages,
-            "temperature": round(temperature, 2),
+            "v": CACHE_KEY_VERSION,
+            "messages": [
+                {"role": m.get("role", "user"), "content": m.get("content")}
+                for m in messages
+            ],
+            "temperature": temperature,
             "max_tokens": max_tokens,
-            "top_p": round(top_p, 2),
-            "frequency_penalty": round(frequency_penalty, 2),
-            "presence_penalty": round(presence_penalty, 2),
+            "top_p": top_p,
+            "frequency_penalty": frequency_penalty,
+            "presence_penalty": presence_penalty,
             "model": model or self.config.llm_model,
+            "enable_thinking": enable_thinking,
+            "reasoning_budget": reasoning_budget,
+            "scope": cache_scope or {},
         }
-
-        cache_string = json.dumps(cache_data, sort_keys=True)
-        cache_key = hashlib.sha256(cache_string.encode()).hexdigest()
-        return cache_key
+        cache_string = json.dumps(cache_data, sort_keys=True, default=str)
+        return hashlib.sha256(cache_string.encode()).hexdigest()
 
     async def _get_cached_response(self, cache_key: str) -> Optional[LLMResponse]:
         """Get cached response if available and not expired."""
@@ -415,6 +410,7 @@ class NIMClient:
         enable_thinking: Optional[bool] = None,
         model_override: Optional[str] = None,
         deadline: Optional["RequestDeadline"] = None,
+        cache_scope: Optional[Dict[str, Any]] = None,
     ) -> LLMResponse:
         """
         Generate response using NVIDIA NIM LLM with retry logic.
@@ -452,8 +448,23 @@ class NIMClient:
         )
 
         effective_model = model_override or self.config.llm_model
+        resolved_enable_thinking = (
+            self.config.default_enable_thinking
+            if enable_thinking is None
+            else enable_thinking
+        )
+        is_nemotron = "nemotron" in effective_model.lower()
+        effective_budget: Optional[int] = None
+        if is_nemotron and resolved_enable_thinking:
+            effective_budget = (
+                self.config.default_reasoning_budget
+                if reasoning_budget is None
+                else reasoning_budget
+            )
 
-        # Check cache first (skip for streaming)
+        # Check cache first (skip for streaming).  Round 3: the key includes the
+        # thinking mode/budget and the caller's routing intent (cache_scope).
+        cache_key: Optional[str] = None
         if not stream and self.enable_cache:
             cache_key = self._generate_cache_key(
                 messages,
@@ -463,6 +474,9 @@ class NIMClient:
                 frequency_penalty,
                 presence_penalty,
                 model=effective_model,
+                enable_thinking=bool(resolved_enable_thinking),
+                reasoning_budget=effective_budget,
+                cache_scope=cache_scope,
             )
             cached_response = await self._get_cached_response(cache_key)
             if cached_response:
@@ -470,11 +484,6 @@ class NIMClient:
             else:
                 self._cache_stats["misses"] += 1
 
-        resolved_enable_thinking = (
-            self.config.default_enable_thinking
-            if enable_thinking is None
-            else enable_thinking
-        )
         request_messages = messages
         if "nemotron" in effective_model.lower() and not resolved_enable_thinking:
             request_messages = _ensure_no_think_system_prompt(messages)
@@ -496,14 +505,9 @@ class NIMClient:
         if not math.isclose(presence_penalty, 0.0, abs_tol=1e-09):
             payload["presence_penalty"] = presence_penalty
 
-        if "nemotron" in effective_model.lower():
+        if is_nemotron:
             if resolved_enable_thinking:
-                resolved_reasoning_budget = (
-                    self.config.default_reasoning_budget
-                    if reasoning_budget is None
-                    else reasoning_budget
-                )
-                payload["reasoning_budget"] = resolved_reasoning_budget
+                payload["reasoning_budget"] = effective_budget
             else:
                 payload["chat_template_kwargs"] = {"enable_thinking": False}
 
@@ -553,17 +557,8 @@ class NIMClient:
                     ),
                 )
 
-                # Cache the response (skip for streaming)
-                if not stream and self.enable_cache:
-                    cache_key = self._generate_cache_key(
-                        messages,
-                        temperature,
-                        max_tokens,
-                        top_p,
-                        frequency_penalty,
-                        presence_penalty,
-                        model=effective_model,
-                    )
+                # Cache the response (skip for streaming) under the same key
+                if cache_key is not None:
                     await self._cache_response(cache_key, llm_response)
 
                 return llm_response

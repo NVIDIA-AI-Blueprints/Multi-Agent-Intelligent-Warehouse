@@ -84,6 +84,21 @@ class NIMProvider:
                 reason="EMPTY_MODEL_ID",
             )
         enable_thinking = request.reasoning == ReasoningLevel.HIGH
+        # v2.0.1 round 3: the response cache is keyed on the routing intent as
+        # well as on the exact prompt, model and thinking mode — requests with a
+        # different reasoning level, risk level, modality, role or generation
+        # never share a cached answer (third re-audit N-2).
+        cache_scope = {
+            "reasoning": getattr(request.reasoning, "value", request.reasoning),
+            "risk_level": getattr(request.risk_level, "value", request.risk_level),
+            "modality": getattr(request.modality, "value", request.modality),
+            "deployment_mode": getattr(
+                request.deployment_mode, "value", request.deployment_mode
+            ),
+            "role": getattr(capability, "role", None),
+            "generation": getattr(capability, "generation", None),
+            "model_id": model_id,
+        }
         try:
             return await self._nim_client.generate_response(
                 messages=request.messages,
@@ -93,6 +108,7 @@ class NIMProvider:
                 enable_thinking=enable_thinking,
                 model_override=model_id,
                 deadline=request.deadline,
+                cache_scope=cache_scope,
             )
         except RequestDeadlineExceeded:
             raise  # parent deadline exhaustion — not a ModelTimeout

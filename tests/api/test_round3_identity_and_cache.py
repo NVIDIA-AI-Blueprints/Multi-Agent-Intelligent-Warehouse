@@ -182,3 +182,109 @@ async def test_nim_client_only_accepts_a_non_empty_string_identity():
         )
         assert out.provider_model == expected, value
     await client.close()
+
+
+# ── N-2: response cache isolation ────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "first,second",
+    [("high", "low"), ("low", "high")],
+)
+async def test_cache_high_and_low_never_share_an_entry(token, fake, first, second):
+    install_gateway(fake, enable_cache=True)
+    expected = {"high": SUPER, "low": LIGHTNING}
+    async with running_canonical_app() as (_, client):
+        r1 = await _infer(client, token, reasoning=first)
+        r2 = await _infer(client, token, reasoning=second)
+        # repeat both: now served from two DISTINCT cache entries
+        r3 = await _infer(client, token, reasoning=first)
+        r4 = await _infer(client, token, reasoning=second)
+    for r, level in ((r1, first), (r2, second), (r3, first), (r4, second)):
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["route"]["selected_model_id"] == expected[level]
+        assert body["route"]["identity_verified"] is True
+        # the answer was produced by the model this request was routed to
+        assert body["content"].startswith(f"answer-from {expected[level]}")
+    assert _calls(fake) == [expected[first], expected[second]]  # 2 entries, 2 calls
+
+
+async def test_cache_medium_never_reuses_high_thinking_answer(token, fake):
+    """Same prompt, same Super model, different thinking mode → two entries."""
+    install_gateway(fake, enable_cache=True)
+    async with running_canonical_app() as (_, client):
+        high = await _infer(client, token, reasoning="high")
+        medium = await _infer(client, token, reasoning="medium")
+    assert high.json()["content"] == f"answer-from {SUPER} thinking=budget"
+    assert medium.json()["content"] == f"answer-from {SUPER} thinking=off"
+    assert _calls(fake) == [SUPER, SUPER]
+
+
+async def test_cache_does_not_strip_timestamps_or_ids(token, fake):
+    install_gateway(fake, enable_cache=True)
+    async with running_canonical_app() as (_, client):
+        await _infer(client, token, content="state at 2026-10-11T03:00:00Z")
+        await _infer(client, token, content="state at 2026-10-11T04:00:00Z")
+        await _infer(client, token, content="task 1b4e28ba-2fa1-11d2-883f-0016d3cca427")
+        await _infer(client, token, content="task 6fa459ea-ee8a-3ca4-894e-db77e160355e")
+    assert len(_calls(fake)) == 4
+
+
+async def test_cache_still_serves_identical_requests(token, fake):
+    install_gateway(fake, enable_cache=True)
+    async with running_canonical_app() as (_, client):
+        a = await _infer(client, token, reasoning="low")
+        b = await _infer(client, token, reasoning="low")
+    assert a.json()["content"] == b.json()["content"]
+    assert _calls(fake) == [LIGHTNING]
+
+
+def test_cache_key_covers_every_routing_input():
+    from maiw_models.providers.nim_client import NIMClient, NIMConfig
+
+    client = NIMClient(
+        config=NIMConfig(llm_base_url="http://127.0.0.1:1/v1", llm_api_key="x"),
+        enable_cache=True,
+    )
+    msgs = [{"role": "user", "content": "x"}]
+    base = dict(
+        model=SUPER,
+        enable_thinking=True,
+        reasoning_budget=1024,
+        cache_scope={
+            "reasoning": "high",
+            "risk_level": "low",
+            "modality": "text",
+            "deployment_mode": "nvidia_hosted",
+            "role": "super",
+            "generation": "nemotron-3",
+            "model_id": SUPER,
+        },
+    )
+
+    def key(messages=msgs, **over):
+        kw = {**base, **over}
+        return client._generate_cache_key(messages, 0.1, 100, 1.0, 0.0, 0.0, **kw)
+
+    reference = key()
+    variants = [
+        key(model=LIGHTNING),
+        key(enable_thinking=False),
+        key(reasoning_budget=None),
+        key(messages=[{"role": "user", "content": "x 2026-10-11T03:00:00Z"}]),
+        key(messages=[{"role": "system", "content": "x"}]),
+    ]
+    for field, value in (
+        ("reasoning", "medium"),
+        ("risk_level", "high"),
+        ("modality", "image"),
+        ("role", "lightning"),
+        ("generation", "nemotron-3.5"),
+        ("model_id", LIGHTNING),
+        ("deployment_mode", "self_hosted"),
+    ):
+        variants.append(key(cache_scope={**base["cache_scope"], field: value}))
+    assert reference not in variants
+    assert len(set(variants)) == len(variants)
+    assert key() == reference  # deterministic

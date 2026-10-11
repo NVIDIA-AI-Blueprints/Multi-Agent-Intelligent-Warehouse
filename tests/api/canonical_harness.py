@@ -97,6 +97,13 @@ class FakeNIM:
                     self._send(500, {"error": "provider down"})
                     return
                 content = "" if outer.mode == "empty" else outer.content
+                if isinstance(body, dict):
+                    # Round 3 cache tests: "{model}" / "{thinking}" placeholders
+                    # make each answer identify what produced it.
+                    thinking = "budget" if "reasoning_budget" in body else "off"
+                    content = content.replace(
+                        "{model}", str(body.get("model"))
+                    ).replace("{thinking}", thinking)
                 payload = {
                     "id": "fake-1",
                     "object": "chat.completion",
@@ -185,7 +192,12 @@ def canonical_env(
     return token
 
 
-def install_gateway(fake: FakeNIM, *, api_key: str = "fake-test-key-not-real") -> Any:
+def install_gateway(
+    fake: FakeNIM,
+    *,
+    api_key: str = "fake-test-key-not-real",
+    enable_cache: bool = False,
+) -> Any:
     """
     Pre-build the process ModelGateway singleton exactly as
     ``maiw_models.get_model_gateway`` does, but with an NIMClient whose
@@ -203,7 +215,7 @@ def install_gateway(fake: FakeNIM, *, api_key: str = "fake-test-key-not-real") -
         config=nim_client.NIMConfig(
             llm_base_url=fake.base_url, llm_api_key=api_key, timeout=10
         ),
-        enable_cache=False,
+        enable_cache=enable_cache,
     )
     registry = maiw_models.ModelRegistry()
     gateway = maiw_models.ModelGateway(
