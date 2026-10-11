@@ -332,6 +332,22 @@ async def test_restart_after_unknown_keeps_identity_blocks_and_reconciles(
     assert len(backend.applied()) == 1
 
 
+async def test_idempotency_key_replay_never_writes_twice(governed, backend):
+    """§18: the same Idempotency-Key after a completed write replays it (no write)."""
+    auth, _ = governed
+    key = {"Idempotency-Key": "r3-idem-1"}
+    async with running_canonical_app() as (_, client):
+        first = await _release(client, auth, **key)
+        assert first.status_code == 200, first.text
+        assert first.json()["status"] == "executed"
+        second = await _release(client, auth, **key)
+    assert second.status_code == 200, second.text
+    body = second.json()
+    assert body["status"] == "no_op"
+    assert body["execution_id"] == first.json()["execution_id"]
+    assert len(backend.applied()) == 1
+
+
 def test_write_in_flight_at_crash_is_unknown_after_restart(tmp_path):
     """A record persisted at begin() with no outcome = the process died mid-write."""
     from maiw_execution import ExecutionIntent, JsonFileExecutionRegistry
