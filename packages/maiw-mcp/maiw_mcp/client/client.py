@@ -270,8 +270,9 @@ class MAIWMCPClient:
         # "dispatched" (tools/call in flight) → the server may have applied the
         # write and the response was lost → MCPResponseLost /
         # MCPTimeoutAfterDispatch (outcome UNKNOWN; never "failed").
-        # "received" → a teardown error after the result arrived is logged and
-        # the result is returned (it must not be turned into a failure).
+        # Result received (call_result set) → a teardown error after the
+        # result arrived is logged and the result is returned (it must not be
+        # turned into a failure).
         phase = "connect"
         call_result: types.CallToolResult | None = None
         try:
@@ -280,9 +281,8 @@ class MAIWMCPClient:
             ) as client:
                 phase = "dispatched"
                 call_result = await client.call_tool(capability, payload)
-                phase = "received"
         except Exception as exc:  # noqa: BLE001 — classified by phase below
-            if phase == "received" and call_result is not None:
+            if call_result is not None:
                 logger.warning(
                     "MCP session teardown failed after %r returned (%s: %s); "
                     "using the received result",
