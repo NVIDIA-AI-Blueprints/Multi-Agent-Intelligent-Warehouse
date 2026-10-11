@@ -1,0 +1,440 @@
+{
+  "schema": 1,
+  "round": 4,
+  "title": "MAIW v2.0.1 remediation round 4 \u2014 NEW4-P1-01 (server-reported MCP error after mutation)",
+  "repository": "NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse",
+  "pr": 143,
+  "branch": "fix/v2.0.1-canonical-app-remediation",
+  "starting_sha": "6ad2cbf1b4b8233ce6ca8528692ebba8f97eb10c",
+  "main_sha": "944507ec914665c6682d39b95e8713355f486598",
+  "v2_0_0": {
+    "tag_object": "0c35a0e9718c2a81e8c79fe297c46f690b5cb42a",
+    "commit": "816ace73c4561469978094eeedb2641f6db3c4fa",
+    "unchanged": true
+  },
+  "v2_0_1_tag": null,
+  "pr146": {
+    "branch": "audit/v2.0.1-fourth-independent-reaudit",
+    "head": "9120aa93a618e9e7da8f527208a9d458b81607a5",
+    "state": "OPEN",
+    "modified": false
+  },
+  "last_code_commit": "ff8ede17e3c270c52b1fa336e230989c2c23af1f",
+  "final_frozen_head": "recorded in the PR #143 final report (the commit that adds this file or the later artifact-update commit)",
+  "commits": [
+    {
+      "sha": "d38d99e",
+      "subject": "feat(mcp): typed NOT_APPLIED write disposition; tool errors after dispatch are outcome-unknown"
+    },
+    {
+      "sha": "5acb93b",
+      "subject": "fix(execution): a server-reported error after dispatch is UNKNOWN, never FAILED (NEW4-P1-01)"
+    },
+    {
+      "sha": "2a504c5",
+      "subject": "fix(mcp-servers): certify NOT_APPLIED only for pre-mutation rejections; real-MCP regression suite"
+    },
+    {
+      "sha": "de54e3b",
+      "subject": "fix(equipment): transactional PostgreSQL writes and a working shipped MCP adapter"
+    },
+    {
+      "sha": "9ba6a29",
+      "subject": "fix(security): the rate limiter enforces its limits with real 429s (re-audit P2-04)"
+    },
+    {
+      "sha": "7e5c7f1",
+      "subject": "fix(models): cache a provider response only after its identity matches the dispatched model (NEW4-P2-04)"
+    },
+    {
+      "sha": "ff8ede1",
+      "subject": "fix(deps): pdfplumber 0.11.9 pulls pdfminer.six 20251230 (PYSEC-2026-1761)"
+    }
+  ],
+  "p1_root_cause": "MAIWMCPClient raised a plain MCPToolError for every is_error result; classify_write_failure mapped it to FAILED/MCP_TOOL_ERROR/physical_mutation_occurred=False, so the target was unblocked, reconciliation refused and a retry wrote twice. The shipped Postgres adapter ran each logical write as non-transactional statements and turned any exception into is_error.",
+  "not_applied_contract": {
+    "module": "packages/maiw-mcp/maiw_mcp/write_disposition.py",
+    "carrier": "CallToolResult.structuredContent on an isError result",
+    "field": "execution_disposition",
+    "certifying_value": "NOT_APPLIED (exact str; str subclasses rejected)",
+    "other_fields": [
+      "rejection_code: INVALID_REQUEST|NOT_FOUND|PRECONDITION_FAILED",
+      "message"
+    ],
+    "never_certifies": [
+      "text content",
+      "isError alone",
+      "exception name",
+      "HTTP status",
+      "absent/null/non-string/other-case/padded/unknown value",
+      "wrong key",
+      "nested value"
+    ],
+    "server_paths": [
+      "equipment MCP write tools: request validation failure",
+      "providers raising maiw_mcp.errors.WriteNotApplied (equipment/labor/wave servers)",
+      "Postgres adapter: mutation_status=not_applied from precondition checks before any write statement",
+      "demo providers: not-found targets; conflict/deferred results"
+    ],
+    "non_error_results": "failed/conflict/deferred definite only with execution_disposition=NOT_APPLIED (new optional field on 5 write-result contracts)"
+  },
+  "client_classification": {
+    "connect/handshake/circuit": "MCPConnectFailed|MCPConnectTimeout|MCPCircuitOpen (MCPNotDispatched)",
+    "dispatched, transport lost": "MCPResponseLost|MCPTimeoutAfterDispatch (MCPDispatchOutcomeUnknown)",
+    "isError + NOT_APPLIED": "MCPToolNotApplied (MCPToolError)",
+    "isError otherwise": "MCPToolErrorOutcomeUnknown (MCPToolError + MCPDispatchOutcomeUnknown)",
+    "unparseable": "MCPContractError"
+  },
+  "execution_mapping": {
+    "AmbiguousWriteError": "UNKNOWN AMBIGUOUS_WRITE True",
+    "WriteNotDispatched": "FAILED NOT_DISPATCHED False",
+    "MCPNotDispatched": "FAILED MCP_NOT_DISPATCHED False",
+    "MCPToolNotApplied": "FAILED MCP_TOOL_NOT_APPLIED False",
+    "WriteNotApplied": "FAILED WRITE_NOT_APPLIED False",
+    "other MCPToolError": "UNKNOWN MCP_TOOL_ERROR None",
+    "MCPDispatchOutcomeUnknown/MCPTimeout": "UNKNOWN MCP_RESPONSE_LOST/MCP_TIMEOUT None",
+    "MCPContractError": "UNKNOWN MCP_RESPONSE_UNREADABLE None",
+    "CapabilityNotFound/deadline": "FAILED NOT_DISPATCHED False",
+    "anything else": "UNKNOWN EXECUTION_OUTCOME_UNKNOWN None",
+    "result failed/conflict/deferred w/o NOT_APPLIED": "UNKNOWN SERVER_FAILURE_UNCERTIFIED None",
+    "result success=false + executed/no_op": "UNKNOWN SERVER_RESULT_CONTRADICTORY None",
+    "result unknown": "UNKNOWN SERVER_REPORTED_UNKNOWN None",
+    "result failed/conflict/deferred + NOT_APPLIED": "same outcome, False"
+  },
+  "is_error_alone_can_produce_executed_false": false,
+  "journal_fields_added": [
+    "dispatch_status",
+    "server_disposition",
+    "uncertainty_reason"
+  ],
+  "idempotent_replay": {
+    "FAILED/CONFLICT/DEFERRED": "original outcome, replayed, no write (was no_op)",
+    "UNKNOWN unresolved": "RECONCILIATION_REQUIRED",
+    "UNKNOWN reconciled executed": "no_op",
+    "UNKNOWN reconciled not executed": "FAILED PRIOR_ATTEMPT_NOT_EXECUTED"
+  },
+  "db_transactions": {
+    "mechanism": "SQLRetriever.transaction(): pooled connection + asyncpg Connection.transaction()",
+    "operations": {
+      "assign": [
+        "INSERT equipment_assignments",
+        "UPDATE equipment_assets"
+      ],
+      "release": [
+        "UPDATE equipment_assignments",
+        "UPDATE equipment_assets"
+      ],
+      "emergency maintenance": [
+        "INSERT equipment_maintenance",
+        "UPDATE equipment_assets"
+      ]
+    },
+    "row_lock": "SELECT ... FOR UPDATE",
+    "evidence": {
+      "ci_fake_pool": "24 tests: failure of write statement 1 or 2 -> ROLLBACK, no COMMIT, tables == pre-state, connection reusable; success -> 1 BEGIN + 1 COMMIT; no write outside a transaction",
+      "real_postgres_optin": "3 tests: DB trigger raises in the 2nd statement for assign/release/emergency maintenance -> 1st statement rolled back, snapshot == pre-write; same pool commits a normal write fully",
+      "mutation_check": "pre-round-4 equipment_asset_tools.py fails 9 of these tests"
+    }
+  },
+  "findings": [
+    {
+      "id": "NEW4-P1-01",
+      "severity": "P1",
+      "status": "CLOSED"
+    },
+    {
+      "id": "NEW4-P2-01",
+      "severity": "P2",
+      "status": "FIXED",
+      "fix": "replay of a definite non-execution answers that outcome, not no_op"
+    },
+    {
+      "id": "NEW4-P2-03",
+      "severity": "P2",
+      "status": "FIXED (equipment); labor/wave PG launch entry point remains",
+      "fix": "adapter initialises EquipmentAssetTools in the serving loop; __main__ composes provider; JSONB metadata decoded to dict"
+    },
+    {
+      "id": "NEW4-P2-04",
+      "severity": "P2",
+      "status": "FIXED",
+      "fix": "NIMClient caches only identity-matching responses"
+    },
+    {
+      "id": "NEW4-P2-06",
+      "severity": "P2",
+      "status": "FIXED",
+      "fix": "pdfplumber 0.11.9 -> pdfminer.six 20251230"
+    },
+    {
+      "id": "P2-04 (rate limiter part)",
+      "severity": "P2",
+      "status": "FIXED",
+      "fix": "limiter re-raises its 429; middleware answers JSONResponse 429 + Retry-After"
+    }
+  ],
+  "live": {
+    "host": "epg-tme-smc-h100-02",
+    "code_sha": "ff8ede1",
+    "provider": "local controlled OpenAI-compatible fake (127.0.0.1:18989); hosted NOT RUN",
+    "security_matrix_48": [
+      {
+        "case": "sandbox inference allow",
+        "expected": "allowed",
+        "actual": "200 Lightning/Super identity_verified (L7 + permissive)"
+      },
+      {
+        "case": "sandbox write deny (L7)",
+        "expected": "denied",
+        "actual": "24/24 proxy 403; DecisionEngine/executor/MCP writes/state unchanged",
+        "backend_writes": 0
+      },
+      {
+        "case": "sandbox write deny (permissive policy)",
+        "expected": "denied by app auth",
+        "actual": "16x403 + 8x401; counters and state hash unchanged",
+        "backend_writes": 0
+      },
+      {
+        "case": "operator valid write governed (FL-01)",
+        "expected": "executed",
+        "actual": "200 executed",
+        "backend_writes": 1
+      },
+      {
+        "case": "generic server MCP error after dispatch (FL-02)",
+        "expected": "UNKNOWN",
+        "actual": "202 unknown executed=null MCP_TOOL_ERROR; journal unresolved; /ready unresolved 1",
+        "backend_writes": 1
+      },
+      {
+        "case": "explicit NOT_APPLIED rejection (FL-03)",
+        "expected": "failed / not executed",
+        "actual": "200 failed executed=false MCP_TOOL_NOT_APPLIED; unresolved false; reconcile 409",
+        "backend_writes": 0
+      },
+      {
+        "case": "lost transport response (FL-04)",
+        "expected": "UNKNOWN",
+        "actual": "202 unknown MCP_RESPONSE_LOST -> confirmed_executed",
+        "backend_writes": 1
+      },
+      {
+        "case": "retry while UNKNOWN (FL-02)",
+        "expected": "blocked",
+        "actual": "409 RECONCILIATION_REQUIRED",
+        "backend_writes": 1
+      },
+      {
+        "case": "reconcile landed write (FL-02)",
+        "expected": "CONFIRMED_EXECUTED",
+        "actual": "confirmed_executed",
+        "backend_writes": 1
+      },
+      {
+        "case": "reconcile non-landed write (FL-05)",
+        "expected": "CONFIRMED_NOT_EXECUTED",
+        "actual": "confirmed_not_executed",
+        "backend_writes": 0
+      },
+      {
+        "case": "reconcile unavailable backend (FL-06)",
+        "expected": "INDETERMINATE",
+        "actual": "indeterminate; retry 409; later confirmed_executed",
+        "backend_writes": 1
+      },
+      {
+        "case": "uncertified error, no mutation (FL-08)",
+        "expected": "UNKNOWN -> not executed",
+        "actual": "202 MCP_TOOL_ERROR -> confirmed_not_executed",
+        "backend_writes": 0
+      },
+      {
+        "case": "Idempotency-Key replay of NOT_APPLIED (FL-09)",
+        "expected": "not success",
+        "actual": "failed / failed, same execution",
+        "backend_writes": 0
+      },
+      {
+        "case": "kill -9 after server-error UNKNOWN (FL-10)",
+        "expected": "survives, blocked, reconciles",
+        "actual": "on-disk unknown/dispatched_server_error; restart; unresolved 1; retry 409; confirmed_executed",
+        "backend_writes": 1
+      }
+    ],
+    "total_backend_writes": 6,
+    "duplicate_writes": 0,
+    "deviation": "first kill -9 attempt (FL-07) was a no-op (PID cmdline check compared NUL-separated text); FL-07 reconciled without restart; kill -9 proof repeated on FL-10 with verified kill",
+    "shipped_equipment_mcp_31": {
+      "server": "python -m mcp_servers.equipment.server (PostgreSQL, reference DB)",
+      "ready": "200 READY",
+      "get_status": "contract-valid, metadata dict, 12 assets",
+      "http_release": "200 executed; DB updated",
+      "http_assign": "requires_human_approval",
+      "executor_assign": "executed",
+      "executor_emergency_maintenance": "executed; status maintenance; +1 maintenance row",
+      "pre_mutation_rejection": "failed MCP_TOOL_NOT_APPLIED; DB unchanged",
+      "ambiguous_db_error": "real 2nd-statement DB failure -> rollback -> 202 unknown MCP_TOOL_ERROR -> 409 -> confirmed_not_executed -> new request executed"
+    },
+    "preflight": {
+      "reference": "32/0 no skip",
+      "governed": "34/0",
+      "restart": "32/0",
+      "shipped_equipment_only": "32/0"
+    },
+    "runbook_exit_codes": {
+      "install": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "configure": 0,
+      "validate": 0,
+      "gateway_start_status": [
+        0,
+        0
+      ],
+      "db_up": 0,
+      "sandbox_create": 0,
+      "preflight_start_status_smoke": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "sandbox_probe": 0,
+      "restart_status_smoke_stop": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "status_after_stop": 1,
+      "governed_preflight_start_smoke_kill9restart_stop": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "teardown": [
+        0,
+        0,
+        0
+      ]
+    },
+    "smoke": {
+      "reference": "17/17 (before and after restart)",
+      "governed": "18/18"
+    },
+    "readiness_matrix": "14 rows identical to the fourth audit \u00a733 (required failures 503, optional explicit, /live 200 always)",
+    "provider_identity": "16/16 fail-closed or verified; 1 provider call each to the resolved approved ID",
+    "physical_model_policy": "7 override attacks + ultra judge -> /ready 503, inference 503 MODEL_POLICY_VIOLATION, 0 provider calls; LLM_MODEL/MAIW_NIM_MODEL ignored; provider substitution 502",
+    "cache": {
+      "isolation": "HIGH/LOW/MEDIUM sequences identical to audit (no cross hits)",
+      "poisoning": "missing identity then healthy same prompt: 502 then 200 with a fresh provider call (audit: 502, 502)"
+    }
+  },
+  "tests": {
+    "python": {
+      "full_run_1": "2990 passed, 13 skipped, 0 failed",
+      "full_run_2": "2990 passed, 13 skipped, 0 failed",
+      "baseline_6ad2cbf": "2865/8/0",
+      "new_tests": 130,
+      "new_tests_ci": 125,
+      "new_optin_pg": 5,
+      "replaced_unsafe": "test_failure_classification_table row MCPToolError->failed; reliability pre-mutation tests now use WriteNotApplied/MCPConnectFailed",
+      "order_permutations": {
+        "mg_then_demo": "558 passed",
+        "demo_then_mg": "558 passed",
+        "canonical_then_reliability": "443 passed, 2 skipped",
+        "reliability_then_canonical": "443 passed, 2 skipped",
+        "reversed_dirs": "2990/13/0",
+        "shuffle_4401": "2990/13/0",
+        "shuffle_5502": "2990/13/0",
+        "round4_first": "2990/13/0"
+      },
+      "optin_pg": "84 passed, 0 skipped (round-4 transaction + shipped MCP + canonical PG tests)"
+    },
+    "ui": {
+      "jest": "968/968 (40 suites)",
+      "eslint": "0 errors, 1043 warnings",
+      "tsc": "0 errors",
+      "build": "OK (compiled with warnings)"
+    },
+    "npm_audit": {
+      "critical": 0,
+      "high": 50,
+      "moderate": 34,
+      "low": 3,
+      "omit_dev_identical": true,
+      "high_classification": "build/test toolchain only",
+      "production_reachable": "react-router / react-router-dom moderate"
+    },
+    "pip_audit": {
+      "tool": "pip-audit 2.10.1 (separate venv)",
+      "environment": "no known vulnerabilities (161 pinned)",
+      "requirements": "no known vulnerabilities (132 resolved)",
+      "pdfminer_six": "20251230 (fixed)"
+    }
+  },
+  "prior_eleven_p1": {
+    "P1-01": "CLOSED",
+    "P1-02": "CLOSED",
+    "P1-03": "CLOSED",
+    "P1-04": "CLOSED",
+    "P1-05": "CLOSED",
+    "NEW-P1-01": "CLOSED",
+    "NEW-P1-02": "CLOSED",
+    "NEW-P1-03": "CLOSED",
+    "NEW-P1-04": "CLOSED",
+    "NEW3-P1-01": "CLOSED",
+    "NEW3-P1-02": "CLOSED"
+  },
+  "twelfth_p1": {
+    "NEW4-P1-01": "CLOSED"
+  },
+  "remaining_p2": [
+    "NEW4-P2-02 reconciliation infers causality from state; execution_id unused; labor/wave weaker; missing pre_status -> NOT_EXECUTED",
+    "NEW4-P2-05 CIRCUIT_OPEN shown until half-open probe",
+    "NEW4-P2-03 remainder: labor/wave no PG launch entry point",
+    "P2-04 remainder: unauthenticated document upload, chunked >50MB, oversize 500",
+    "P2-06 legacy unauthenticated reads",
+    "P2-09",
+    "P2-10",
+    "P2-14",
+    "P2-15",
+    "P2-16",
+    "P2-18",
+    "P2-20",
+    "N-3",
+    "N-4",
+    "N-5",
+    "N-6",
+    "N-7",
+    "N-10",
+    "N-11",
+    "N-12",
+    "R3-O1",
+    "R3-O2",
+    "R3-O4",
+    "R3-O6",
+    "N-9 remainder"
+  ],
+  "new_observations": [
+    "wave PG/WMS adapter reports success=True when individual task updates fail (no canonical route)",
+    "Postgres schedule_maintenance changes status only for emergency while reconciliation expects maintenance (demo-approval route only)"
+  ],
+  "p0": [],
+  "p1": [],
+  "host_safety": {
+    "watcher": "/proc/net/tcp poll 20ms; 0 off-limits hits; private hits only own DB containers and own gateway sandbox network",
+    "openshell": "every call OPENSHELL_GATEWAY_ENDPOINT=http://127.0.0.1:18987 + scratch HOME",
+    "credentials": "no hosted credential searched/read/used; fresh random tokens in 0600 files, never printed; MAIW_INFERENCE_ALLOW_UNAUTHENTICATED never set; operator token absent from sandbox",
+    "cleanup": "sandboxes maiw-v201-r4-a/-b deleted; gateway maiw-v201-r4-gw stopped, network removed; maiw-v201-r4-db removed; maiw-v201-r4-testpg removed at session end; processes stopped; live worktree and its .env removed"
+  },
+  "hosted_provider_test": "NOT RUN in round 4 (fifth audit requires an explicitly provided NVIDIA_API_KEY: read -s NVIDIA_API_KEY; export NVIDIA_API_KEY; auditor checks only test -n)",
+  "ci": "recorded in the final report",
+  "ready_for_fifth_reaudit": true
+}

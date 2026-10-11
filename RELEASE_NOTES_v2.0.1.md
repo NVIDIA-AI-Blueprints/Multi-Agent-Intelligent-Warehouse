@@ -1,16 +1,20 @@
 # MAIW v2.0.1 — Release Notes (DRAFT — not tagged)
 
-**Status:** release candidate after remediation round 3, pending a FOURTH
+**Status:** release candidate after remediation round 4, pending a FIFTH
 independent re-audit. Do not tag until that re-audit passes. `v2.0.0`
-(`816ace73…`) is unchanged. The third independent re-audit (frozen candidate
-`86f3004`) confirmed the nine earlier P1s closed and found two new P1s
-(NEW3-P1-01, NEW3-P1-02) plus two release-critical gaps (N-1, N-2) and the
-missing gateway step (N-9); round 3 addresses them — see "Round 3" below,
-`docs/audits/MAIW_V2.0.1_REMEDIATION_ROUND3.md` and
-`artifacts/audit/v2.0.1_remediation_round3.json`. Earlier rounds:
+(`816ace73…`) is unchanged. The fourth independent re-audit (PR #146, frozen
+candidate `6ad2cbf`) confirmed the eleven earlier P1s closed and found one new
+P1 (NEW4-P1-01: a server-reported MCP tool error after a mutation was
+classified as a definite failure, so a retry wrote twice); round 4 addresses
+it — see "Round 4" below, `docs/audits/MAIW_V2.0.1_REMEDIATION_ROUND4.md` and
+`artifacts/audit/v2.0.1_remediation_round4.json`. Earlier rounds:
+`docs/audits/MAIW_V2.0.1_REMEDIATION_ROUND3.md`,
 `docs/audits/MAIW_V2.0.1_REMEDIATION_ROUND2.md`,
 `docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md`. This is a draft, not a PASS
-claim.
+claim, and not a release qualification: the live hosted Nemotron 3 Super /
+3.5 Lightning identity proof is left to the fifth re-audit (it needs an
+explicitly provided hosted credential; round 4 used only a local controlled
+provider).
 
 ## Why v2.0.1
 
@@ -24,6 +28,76 @@ gaps between those packages and **what the shipped application
 canonical app. Details and evidence:
 `docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md`,
 `artifacts/audit/v2.0.1_remediation.json`.
+
+## Round 4 (fourth re-audit: NEW4-P1-01, NEW4-P2-01/03/04/06, P2-04)
+
+### A server-reported error after dispatch is UNKNOWN, never "failed" (NEW4-P1-01)
+- MCP `isError` says a tool failed, not that it made no change. A write whose
+  `tools/call` reached the server is now a definite failure only when the
+  server certifies, in `structuredContent`, `execution_disposition:
+  "NOT_APPLIED"` (exact string; contract in
+  `packages/maiw-mcp/maiw_mcp/write_disposition.py`). Text content, `isError`
+  alone and a missing / malformed / unknown disposition are never trusted →
+  `202 status=unknown executed=null error_code=MCP_TOOL_ERROR`, journal
+  unresolved, identical retry 409, reconciliation required.
+- The same rule applies to non-error results: `failed` / `conflict` /
+  `deferred` without `NOT_APPLIED` → UNKNOWN (`SERVER_FAILURE_UNCERTIFIED`);
+  `success=false` with a success outcome → UNKNOWN
+  (`SERVER_RESULT_CONTRADICTORY`); any unclassified exception → UNKNOWN.
+  Only provable non-dispatch and the explicit certification give `failed`
+  (`MCP_NOT_DISPATCHED`, `MCP_TOOL_NOT_APPLIED`, `NOT_DISPATCHED`).
+- The shipped equipment MCP server (and the labor / wave servers for provider
+  rejections) emit `NOT_APPLIED` only for request-validation and
+  precondition rejections taken before any write. Responses and the journal
+  carry `dispatch_status`, `server_disposition` and `uncertainty_reason`.
+- Replaying a definite failure with the same `Idempotency-Key` answers the
+  original `failed` again (it answered `no_op`), without writing.
+
+### Transactional equipment writes in the shipped PostgreSQL adapter
+- Assign (INSERT assignment + UPDATE asset), release (UPDATE assignment +
+  UPDATE asset) and emergency maintenance (INSERT maintenance + UPDATE asset)
+  each run in ONE asyncpg transaction with the asset row locked; a failure in
+  any statement rolls back all of them. Transactions remove partial writes;
+  an error or lost response after COMMIT is still UNKNOWN and reconciled.
+
+### Shipped equipment MCP server works for `reference_governed` (NEW4-P2-03)
+- Its PostgreSQL provider is composed at startup and initialised on first use
+  (it was never initialised); `get_status` decodes JSONB `metadata` to the
+  dict the contract requires (it returned the string `'{}'`). Launch command
+  in the runbook (`python -m mcp_servers.equipment.server`).
+
+### Rate limiting enforces (P2-04)
+- The limiter no longer swallows its own 429; the middleware answers it
+  (`429` + `Retry-After`) instead of letting it surface as 500. Internal
+  limiter failures still fail open.
+
+### Provider identity verified before caching (NEW4-P2-04)
+- A provider answer is cached only when its reported model equals the
+  dispatched model; identity failures are never cached, so a fixed provider
+  is called afresh. The routing-aware cache key is unchanged.
+
+### Dependency
+- `pdfplumber` 0.11.9 pulls `pdfminer.six` 20251230 (PYSEC-2026-1761,
+  NEW4-P2-06).
+
+### Round 4 test baseline (last code commit `ff8ede1`)
+- Python CORE CI: **2990 passed, 13 skipped, 0 failed** (two fresh runs),
+  0 failures in 8 alternative orders. +125 tests run in CI and +5 opt-in
+  PostgreSQL tests (`MAIW_TEST_PG_DSN`, passed against a disposable
+  TimescaleDB); 6 existing assertions that pinned "uncertified error =
+  failed" were replaced.
+- UI: Jest 968/968, ESLint 0 errors, `tsc --noEmit` 0 errors, build OK;
+  npm audit 0 critical / 50 high (toolchain only). pip-audit: no known
+  vulnerabilities.
+- Live (remediation-owned gateway, sandbox, DB, MCP backends, local
+  controlled provider): clean-shell runbook, preflight 32/0 (governed 34/0),
+  smoke 17/17 and 18/18; mutation-then-error → UNKNOWN → 409 →
+  CONFIRMED_EXECUTED with one backend write, also across `kill -9`; explicit
+  NOT_APPLIED → failed, 0 writes; shipped equipment MCP server + PostgreSQL
+  served get_status / release / assign / maintenance / NOT_APPLIED and a real
+  second-statement DB failure rolled back → UNKNOWN →
+  CONFIRMED_NOT_EXECUTED. Details:
+  `docs/audits/MAIW_V2.0.1_REMEDIATION_ROUND4.md`.
 
 ## Round 3 (third re-audit: NEW3-P1-01, NEW3-P1-02, N-1, N-2, N-9)
 
@@ -243,13 +317,17 @@ canonical app. Details and evidence:
 
 ## Known limitations (v2.0.1 candidate)
 - `POST /api/v1/document/upload` and the legacy read routes are
-  unauthenticated, rate limiting does not enforce, and a chunked upload can
-  exceed the size limit; the API binds `MAIW_API_HOST` (`0.0.0.0` in
-  `.env.example`). Run the reference deployment on a trusted network only.
+  unauthenticated and a chunked upload can exceed the size limit (rate
+  limiting enforces since round 4); the API binds `MAIW_API_HOST` (`0.0.0.0`
+  in `.env.example`). Run the reference deployment on a trusted network only.
 - There is no HTTP route to start a procedure or submit governance;
   `ProcedureHost.recover_accepted_governance` has no production caller.
-- `reference_governed` needs working MCP servers; the runbook does not ship a
-  launch command for them.
+- `reference_governed` needs working MCP servers; the runbook ships the
+  equipment server launch command (round 4); labor and wave have no shipped
+  PostgreSQL launch entry point (use `MAIW_REQUIRED_MCP_DOMAINS=equipment`).
+- Reconciliation infers execution from state (it cannot tell MAIW's write
+  from another actor's equivalent change); the labor / wave strategies are
+  weaker than equipment's (no canonical HTTP write route for them).
 - The managed OpenShell gateway is loopback-only with TLS off (single-node
   reference); use an external mTLS gateway on shared multi-user hosts.
 - The execution journal and the unresolved-target guard are single-node.
@@ -257,6 +335,12 @@ canonical app. Details and evidence:
   ModelGateway path) keeps its old cache key.
 
 ## Upgrade notes
+- Round 4: `error_code=MCP_TOOL_ERROR` now means `202 status=unknown`
+  (reconcile before writing again), no longer `200 status=failed`. A custom
+  MCP backend that wants a pre-mutation rejection to be a definite failure
+  must raise `maiw_mcp.errors.WriteNotApplied` (served as the typed
+  `NOT_APPLIED` error) or return `execution_disposition="NOT_APPLIED"` on a
+  non-success result; anything else after dispatch is UNKNOWN.
 - Round 3: profile `reference_governed` requires `MAIW_OPERATOR_WRITE_TOKEN`
   (fresh, >= 32 chars, different from the inference token); callers of the
   equipment write routes must send `X-Maiw-Operator-Token`. Clients must
