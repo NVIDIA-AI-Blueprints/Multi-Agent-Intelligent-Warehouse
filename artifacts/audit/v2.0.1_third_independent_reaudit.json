@@ -1,0 +1,3585 @@
+{
+ "document": "MAIW v2.0.1 third independent re-audit",
+ "report": "docs/audits/MAIW_V2.0.1_THIRD_INDEPENDENT_REAUDIT.md",
+ "repository": "NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse",
+ "pr": 143,
+ "branch": "fix/v2.0.1-canonical-app-remediation",
+ "candidate_sha": "86f30040c72f44ee64d52edf135ce61f72851bc2",
+ "candidate_sha_checks": {
+  "start": "86f30040c72f44ee64d52edf135ce61f72851bc2 (2026-10-10T15:5xZ)",
+  "mid": "86f30040c72f44ee64d52edf135ce61f72851bc2 (2026-10-10T23:34Z)",
+  "end": "86f30040c72f44ee64d52edf135ce61f72851bc2 (2026-10-11T01:46Z)",
+  "changed": false
+ },
+ "pr_metadata": {
+  "state": "OPEN",
+  "base": "main@944507ec914665c6682d39b95e8713355f486598",
+  "commits": 22,
+  "changed_files": 98,
+  "mergeable": "MERGEABLE/CLEAN",
+  "unresolved_review_threads": 0,
+  "ci_claim": "Test&Quality, CodeQL x2, Security Scan, Trivy pass; Semantic Release skipped"
+ },
+ "host": {
+  "name": "epg-tme-smc-h100-02",
+  "kernel": "6.8.0-146-generic",
+  "driver_loaded": "580.178.04",
+  "driver_installed": "580.178.04",
+  "nvidia_smi": "ok",
+  "gpus": [
+   "NVIDIA H100 NVL",
+   "NVIDIA H100 NVL",
+   "NVIDIA H100 NVL",
+   "NVIDIA H100 NVL"
+  ],
+  "preexisting_gpu_process": "llama-server (nemoclaw-llama-cpp, GPU0, not audit-owned)",
+  "healthy": true
+ },
+ "clean_room": {
+  "clone": "/home/nvidia/maiw-v201-third-reaudit",
+  "checkout": "detached at candidate SHA, clean",
+  "origin": "git@github.com:NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse.git",
+  "stray_env_before_tests": false,
+  "runbook_env": "created in clone root for runbook steps 2-15, then moved to .third-state/runbook.env (MAIW_ENV_FILE) and deleted at end",
+  "allow_unauthenticated_ever_set": false
+ },
+ "package_paths": {
+  "python": "/home/nvidia/maiw-v201-third-reaudit/.venv/bin/python 3.12.3",
+  "maiw_api": "/home/nvidia/maiw-v201-third-reaudit/apps/api/maiw_api/__init__.py",
+  "maiw_models": "/home/nvidia/maiw-v201-third-reaudit/packages/maiw-models/maiw_models/__init__.py",
+  "maiw_agents": "/home/nvidia/maiw-v201-third-reaudit/packages/maiw-agents/maiw_agents/__init__.py",
+  "maiw_world": "/home/nvidia/maiw-v201-third-reaudit/packages/maiw-world/maiw_world/__init__.py",
+  "maiw_decision": "/home/nvidia/maiw-v201-third-reaudit/packages/maiw-decision/maiw_decision/__init__.py",
+  "maiw_execution": "/home/nvidia/maiw-v201-third-reaudit/packages/maiw-execution/maiw_execution/__init__.py",
+  "maiw_mcp": "/home/nvidia/maiw-v201-third-reaudit/packages/maiw-mcp/maiw_mcp/__init__.py",
+  "maiw_state": "/home/nvidia/maiw-v201-third-reaudit/packages/maiw-state/maiw_state/__init__.py",
+  "maiw_skills": "/home/nvidia/maiw-v201-third-reaudit/packages/maiw-skills/maiw_skills/__init__.py",
+  "maiw_contracts": "/home/nvidia/maiw-v201-third-reaudit/packages/maiw-contracts/maiw_contracts/__init__.py",
+  "maiw_execution_note": "in canonical install list (ci-cd.yml and runbook); installed and verified",
+  "contamination": false
+ },
+ "preexisting_listeners": {
+  "snapshot_utc": "2026-10-10T16:45:35.334582Z",
+  "tcp": [
+   [
+    "0.0.0.0",
+    22
+   ],
+   [
+    "0.0.0.0",
+    3000
+   ],
+   [
+    "0.0.0.0",
+    32768
+   ],
+   [
+    "0.0.0.0",
+    32769
+   ],
+   [
+    "127.0.0.53",
+    53
+   ],
+   [
+    "127.0.0.54",
+    53
+   ],
+   [
+    "v6:00000000000000000000000000000000",
+    22
+   ],
+   [
+    "v6:00000000000000000000000000000000",
+    3000
+   ],
+   [
+    "v6:00000000000000000000000000000000",
+    32768
+   ],
+   [
+    "v6:00000000000000000000000000000000",
+    32769
+   ]
+  ],
+  "notes": {
+   "22,53": "system",
+   "3000": "unknown other-user listener, transient",
+   "32768": "nemo-microservices-postgres-1",
+   "32769": "nemo-microservices-guardrails-1",
+   "8000-8020,5435,8991": "no listener (containers exited / gateway down)"
+  },
+  "openshell_gateway_nemoclaw_8991": "down (not started by auditor)"
+ },
+ "audit_owned_ports": {
+  "api": 18930,
+  "probe_apps": [
+   18931,
+   18932,
+   18933
+  ],
+  "reference_db": 55441,
+  "test_db": 55442,
+  "openshell_gateway": 18991,
+  "fake_provider": 18901,
+  "mcp_recorders": [
+   18940,
+   18941,
+   18942,
+   18943
+  ],
+  "decoys": [
+   18950,
+   18930
+  ],
+  "closed_targets": [
+   18949,
+   1
+  ]
+ },
+ "external_service_contact": {
+  "guard": "connwatch.py /proc/net/tcp sampling 50ms on ports 3000,5435,8000-8020,8080-8082,8990,8991,32768-32770",
+  "hits": 0,
+  "preexisting_service_contacted": false,
+  "contamination_incident": false
+ },
+ "audit_environment_caveat": "Runbook prerequisite 'running OpenShell gateway' unavailable (host gateway down after reboot); audit-owned openshell-gateway 0.0.116 (docker driver, own namespace/network/JWT, TLS disabled on loopback) provisioned and removed. Sandbox policy enforcement is by the same openshell-sandbox supervisor.",
+ "sandbox": {
+  "name": "maiw-v201-third-a",
+  "id": "17a35f38-5e7f-49a2-9ab6-eb2ebbaf4651",
+  "created_by": "scripts/setup/reference_sandbox.sh create",
+  "policy": "egress only 10.185.115.61:18930 (access: full), python3 binaries",
+  "deleted": true
+ },
+ "db_identity": {
+  "reference": {
+   "container": "maiw-v201-third-db",
+   "id": "1b3c96a49df0c46312911d61d093551b399ab36682e33c63cb878b38173e8fe0",
+   "image": "timescale/timescaledb:2.15.2-pg16",
+   "bind": "127.0.0.1:55441",
+   "created_by": "scripts/setup/reference_db.sh up",
+   "removed": true
+  },
+  "test": {
+   "container": "maiw-v201-third-testpg",
+   "image": "postgres:16.1",
+   "bind": "127.0.0.1:55442",
+   "removed": true
+  }
+ },
+ "preflight": {
+  "full_no_skip": true,
+  "passed": 29,
+  "failed": 0,
+  "exit": 0,
+  "negatives": {
+   "NEMOTRON_SUPER_MODEL=example-org/unapproved-model-x": "FAIL UNAPPROVED_MODEL_ID rc=1",
+   "LLM_MODEL=meta/llama-3.1-70b-instruct": "FAIL rc=1",
+   "NEMOTRON_LIGHTNING_MODEL=<super id>": "FAIL ROLE_MISMATCH rc=1",
+   "sandbox absent (first pass)": "28/1 rc=1; start refused"
+  }
+ },
+ "runbook_reproduction": {
+  "clean_shell": "env -i HOME PATH LANG OPENSHELL_GATEWAY_ENDPOINT",
+  "steps": [
+   [
+    "install (runbook block)",
+    0
+   ],
+   [
+    "cp .env.example .env + edits",
+    0
+   ],
+   [
+    "validate_reference_runbook.sh",
+    0
+   ],
+   [
+    "reference_db.sh up",
+    0
+   ],
+   [
+    "reference_sandbox.sh create",
+    0
+   ],
+   [
+    "preflight",
+    0
+   ],
+   [
+    "start",
+    0
+   ],
+   [
+    "status",
+    0
+   ],
+   [
+    "smoke (14/14)",
+    0
+   ],
+   [
+    "reference_sandbox.sh probe",
+    0
+   ],
+   [
+    "restart",
+    0
+   ],
+   [
+    "status",
+    0
+   ],
+   [
+    "smoke (14/14)",
+    0
+   ],
+   [
+    "stop",
+    0
+   ],
+   [
+    "status after stop",
+    1
+   ],
+   [
+    "reference_sandbox.sh delete",
+    0
+   ],
+   [
+    "reference_db.sh down",
+    0
+   ]
+  ],
+  "result": "PASS (host gateway prerequisite provided by auditor)"
+ },
+ "nine_p1_closure": [
+  {
+   "finding": "P1-01 ungoverned chat write",
+   "origin": "PR #142",
+   "closed": true,
+   "residual": "governed equipment POSTs unauthenticated -> NEW3-P1-01"
+  },
+  {
+   "finding": "P1-02 inference endpoint",
+   "origin": "PR #142",
+   "closed": true,
+   "residual": "non-constant-time token compare (N-7)"
+  },
+  {
+   "finding": "P1-03 durable state",
+   "origin": "PR #142",
+   "closed": true,
+   "residual": "no HTTP start/resume (P2-10)"
+  },
+  {
+   "finding": "P1-04 readiness",
+   "origin": "PR #142",
+   "closed": true,
+   "residual": "TCP-only MCP reachability (N-4)"
+  },
+  {
+   "finding": "P1-05 document ModelGateway",
+   "origin": "PR #142",
+   "closed": true,
+   "residual": "P2-09 stubs"
+  },
+  {
+   "finding": "NEW-P1-01 physical model identity",
+   "origin": "PR #144",
+   "closed": true,
+   "residual": "omitted identity fail-open (N-1); cache (N-2)"
+  },
+  {
+   "finding": "NEW-P1-02 runbook reproducibility",
+   "origin": "PR #144",
+   "closed": true,
+   "residual": "gateway prerequisite undocumented (N-9)"
+  },
+  {
+   "finding": "NEW-P1-03 readiness",
+   "origin": "PR #144",
+   "closed": true,
+   "residual": "reference + optional MCP URL: not_offered but writes execute (part of NEW3-P1-01)"
+  },
+  {
+   "finding": "NEW-P1-04 test order",
+   "origin": "PR #144",
+   "closed": true,
+   "residual": null
+  }
+ ],
+ "physical_model_matrix": [
+  {
+   "case": "A",
+   "request": "high",
+   "desc": "approved role + approved physical ID (defaults)",
+   "env": {},
+   "reasoning": "high",
+   "provider_mode": "echo",
+   "ready_http": 200,
+   "ready_failed": [],
+   "binding_violations": null,
+   "http": 200,
+   "code": null,
+   "logical_role": "super",
+   "resolved_model": "nvidia/nemotron-3-super-120b-a12b",
+   "generation": "nemotron-3",
+   "response_model_reported": "nvidia/nemotron-3-super-120b-a12b",
+   "identity_verified": true,
+   "content_returned": true,
+   "provider_calls": 1,
+   "provider_received_models": [
+    "nvidia/nemotron-3-super-120b-a12b"
+   ],
+   "message": ""
+  },
+  {
+   "case": "A",
+   "request": "low",
+   "desc": "approved role + approved physical ID (defaults)",
+   "env": {},
+   "reasoning": "low",
+   "provider_mode": "echo",
+   "ready_http": 200,
+   "ready_failed": [],
+   "binding_violations": null,
+   "http": 200,
+   "code": null,
+   "logical_role": "lightning",
+   "resolved_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+   "generation": "nemotron-3.5",
+   "response_model_reported": "nvidia/nemotron-3.5-lightning-30b-a3b",
+   "identity_verified": true,
+   "content_returned": true,
+   "provider_calls": 1,
+   "provider_received_models": [
+    "nvidia/nemotron-3.5-lightning-30b-a3b"
+   ],
+   "message": ""
+  },
+  {
+   "case": "A",
+   "request": "medium",
+   "desc": "approved role + approved physical ID (defaults)",
+   "env": {},
+   "reasoning": "medium",
+   "provider_mode": "echo",
+   "ready_http": 200,
+   "ready_failed": [],
+   "binding_violations": null,
+   "http": 200,
+   "code": null,
+   "logical_role": "super",
+   "resolved_model": "nvidia/nemotron-3-super-120b-a12b",
+   "generation": "nemotron-3",
+   "response_model_reported": "nvidia/nemotron-3-super-120b-a12b",
+   "identity_verified": true,
+   "content_returned": true,
+   "provider_calls": 1,
+   "provider_received_models": [
+    "nvidia/nemotron-3-super-120b-a12b"
+   ],
+   "message": ""
+  },
+  {
+   "case": "A2",
+   "request": "high",
+   "desc": "LLM_MODEL / MAIW_NIM_MODEL set to unapproved IDs (not dispatched)",
+   "env": {
+    "LLM_MODEL": "meta/llama-3.1-70b-instruct",
+    "MAIW_NIM_MODEL": "example-org/unapproved-nim-model"
+   },
+   "reasoning": "high",
+   "provider_mode": "echo",
+   "ready_http": 200,
+   "ready_failed": [],
+   "binding_violations": null,
+   "http": 200,
+   "code": null,
+   "logical_role": "super",
+   "resolved_model": "nvidia/nemotron-3-super-120b-a12b",
+   "generation": "nemotron-3",
+   "response_model_reported": "nvidia/nemotron-3-super-120b-a12b",
+   "identity_verified": true,
+   "content_returned": true,
+   "provider_calls": 1,
+   "provider_received_models": [
+    "nvidia/nemotron-3-super-120b-a12b"
+   ],
+   "message": ""
+  },
+  {
+   "case": "A2",
+   "request": "low",
+   "desc": "LLM_MODEL / MAIW_NIM_MODEL set to unapproved IDs (not dispatched)",
+   "env": {
+    "LLM_MODEL": "meta/llama-3.1-70b-instruct",
+    "MAIW_NIM_MODEL": "example-org/unapproved-nim-model"
+   },
+   "reasoning": "low",
+   "provider_mode": "echo",
+   "ready_http": 200,
+   "ready_failed": [],
+   "binding_violations": null,
+   "http": 200,
+   "code": null,
+   "logical_role": "lightning",
+   "resolved_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+   "generation": "nemotron-3.5",
+   "response_model_reported": "nvidia/nemotron-3.5-lightning-30b-a3b",
+   "identity_verified": true,
+   "content_returned": true,
+   "provider_calls": 1,
+   "provider_received_models": [
+    "nvidia/nemotron-3.5-lightning-30b-a3b"
+   ],
+   "message": ""
+  },
+  {
+   "case": "B",
+   "request": "high",
+   "desc": "env override: approved role -> arbitrary model ID",
+   "env": {
+    "NEMOTRON_SUPER_MODEL": "example-org/unapproved-model-x"
+   },
+   "reasoning": "high",
+   "provider_mode": "echo",
+   "ready_http": 503,
+   "ready_failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "super",
+     "model_id": "example-org/unapproved-model-x",
+     "reason": "UNAPPROVED_MODEL_ID"
+    }
+   ],
+   "http": 503,
+   "code": "MODEL_POLICY_VIOLATION",
+   "logical_role": null,
+   "resolved_model": null,
+   "generation": null,
+   "response_model_reported": null,
+   "identity_verified": null,
+   "content_returned": false,
+   "provider_calls": 0,
+   "provider_received_models": [],
+   "message": "MODEL_POLICY_VIOLATION (UNAPPROVED_MODEL_ID): physical model 'example-org/unapproved-model-x' bound to role 'super' is not an approved MAIW deployment (approved for 'super': ['nvidia/nemotron-3-super-120b-a12b'])"
+  },
+  {
+   "case": "B",
+   "request": "medium",
+   "desc": "env override: approved role -> arbitrary model ID",
+   "env": {
+    "NEMOTRON_SUPER_MODEL": "example-org/unapproved-model-x"
+   },
+   "reasoning": "medium",
+   "provider_mode": "echo",
+   "ready_http": 503,
+   "ready_failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "super",
+     "model_id": "example-org/unapproved-model-x",
+     "reason": "UNAPPROVED_MODEL_ID"
+    }
+   ],
+   "http": 503,
+   "code": "MODEL_POLICY_VIOLATION",
+   "logical_role": null,
+   "resolved_model": null,
+   "generation": null,
+   "response_model_reported": null,
+   "identity_verified": null,
+   "content_returned": false,
+   "provider_calls": 0,
+   "provider_received_models": [],
+   "message": "MODEL_POLICY_VIOLATION (UNAPPROVED_MODEL_ID): physical model 'example-org/unapproved-model-x' bound to role 'super' is not an approved MAIW deployment (approved for 'super': ['nvidia/nemotron-3-super-120b-a12b'])"
+  },
+  {
+   "case": "B",
+   "request": "low",
+   "desc": "env override: approved role -> arbitrary model ID",
+   "env": {
+    "NEMOTRON_SUPER_MODEL": "example-org/unapproved-model-x"
+   },
+   "reasoning": "low",
+   "provider_mode": "echo",
+   "ready_http": 503,
+   "ready_failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "super",
+     "model_id": "example-org/unapproved-model-x",
+     "reason": "UNAPPROVED_MODEL_ID"
+    }
+   ],
+   "http": 200,
+   "code": null,
+   "logical_role": "lightning",
+   "resolved_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+   "generation": "nemotron-3.5",
+   "response_model_reported": "nvidia/nemotron-3.5-lightning-30b-a3b",
+   "identity_verified": true,
+   "content_returned": true,
+   "provider_calls": 1,
+   "provider_received_models": [
+    "nvidia/nemotron-3.5-lightning-30b-a3b"
+   ],
+   "message": ""
+  },
+  {
+   "case": "B2",
+   "request": "low",
+   "desc": "env override on lightning",
+   "env": {
+    "NEMOTRON_LIGHTNING_MODEL": "meta/llama-3.1-8b-instruct"
+   },
+   "reasoning": "low",
+   "provider_mode": "echo",
+   "ready_http": 503,
+   "ready_failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "lightning",
+     "model_id": "meta/llama-3.1-8b-instruct",
+     "reason": "UNAPPROVED_MODEL_ID"
+    }
+   ],
+   "http": 503,
+   "code": "MODEL_POLICY_VIOLATION",
+   "logical_role": null,
+   "resolved_model": null,
+   "generation": null,
+   "response_model_reported": null,
+   "identity_verified": null,
+   "content_returned": false,
+   "provider_calls": 0,
+   "provider_received_models": [],
+   "message": "MODEL_POLICY_VIOLATION (UNAPPROVED_MODEL_ID): physical model 'meta/llama-3.1-8b-instruct' bound to role 'lightning' is not an approved MAIW deployment (approved for 'lightning': ['nvidia/nemotron-3.5-lightning-30b-a3b'])"
+  },
+  {
+   "case": "B2",
+   "request": "high",
+   "desc": "env override on lightning",
+   "env": {
+    "NEMOTRON_LIGHTNING_MODEL": "meta/llama-3.1-8b-instruct"
+   },
+   "reasoning": "high",
+   "provider_mode": "echo",
+   "ready_http": 503,
+   "ready_failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "lightning",
+     "model_id": "meta/llama-3.1-8b-instruct",
+     "reason": "UNAPPROVED_MODEL_ID"
+    }
+   ],
+   "http": 200,
+   "code": null,
+   "logical_role": "super",
+   "resolved_model": "nvidia/nemotron-3-super-120b-a12b",
+   "generation": "nemotron-3",
+   "response_model_reported": "nvidia/nemotron-3-super-120b-a12b",
+   "identity_verified": true,
+   "content_returned": true,
+   "provider_calls": 1,
+   "provider_received_models": [
+    "nvidia/nemotron-3-super-120b-a12b"
+   ],
+   "message": ""
+  },
+  {
+   "case": "C1",
+   "request": "high",
+   "desc": "look-alike: suffix",
+   "env": {
+    "NEMOTRON_SUPER_MODEL": "nvidia/nemotron-3-super-120b-a12b-v2"
+   },
+   "reasoning": "high",
+   "provider_mode": "echo",
+   "ready_http": 503,
+   "ready_failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "super",
+     "model_id": "nvidia/nemotron-3-super-120b-a12b-v2",
+     "reason": "UNAPPROVED_MODEL_ID"
+    }
+   ],
+   "http": 503,
+   "code": "MODEL_POLICY_VIOLATION",
+   "logical_role": null,
+   "resolved_model": null,
+   "generation": null,
+   "response_model_reported": null,
+   "identity_verified": null,
+   "content_returned": false,
+   "provider_calls": 0,
+   "provider_received_models": [],
+   "message": "MODEL_POLICY_VIOLATION (UNAPPROVED_MODEL_ID): physical model 'nvidia/nemotron-3-super-120b-a12b-v2' bound to role 'super' is not an approved MAIW deployment (approved for 'super': ['nvidia/nemotron-3-super-120b-a12b'])"
+  },
+  {
+   "case": "C2",
+   "request": "high",
+   "desc": "look-alike: case",
+   "env": {
+    "NEMOTRON_SUPER_MODEL": "NVIDIA/nemotron-3-super-120b-a12b"
+   },
+   "reasoning": "high",
+   "provider_mode": "echo",
+   "ready_http": 503,
+   "ready_failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "super",
+     "model_id": "NVIDIA/nemotron-3-super-120b-a12b",
+     "reason": "UNAPPROVED_MODEL_ID"
+    }
+   ],
+   "http": 503,
+   "code": "MODEL_POLICY_VIOLATION",
+   "logical_role": null,
+   "resolved_model": null,
+   "generation": null,
+   "response_model_reported": null,
+   "identity_verified": null,
+   "content_returned": false,
+   "provider_calls": 0,
+   "provider_received_models": [],
+   "message": "MODEL_POLICY_VIOLATION (UNAPPROVED_MODEL_ID): physical model 'NVIDIA/nemotron-3-super-120b-a12b' bound to role 'super' is not an approved MAIW deployment (approved for 'super': ['nvidia/nemotron-3-super-120b-a12b'])"
+  },
+  {
+   "case": "C3",
+   "request": "high",
+   "desc": "look-alike: trailing space",
+   "env": {
+    "NEMOTRON_SUPER_MODEL": "nvidia/nemotron-3-super-120b-a12b "
+   },
+   "reasoning": "high",
+   "provider_mode": "echo",
+   "ready_http": 503,
+   "ready_failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "super",
+     "model_id": "nvidia/nemotron-3-super-120b-a12b ",
+     "reason": "UNAPPROVED_MODEL_ID"
+    }
+   ],
+   "http": 503,
+   "code": "MODEL_POLICY_VIOLATION",
+   "logical_role": null,
+   "resolved_model": null,
+   "generation": null,
+   "response_model_reported": null,
+   "identity_verified": null,
+   "content_returned": false,
+   "provider_calls": 0,
+   "provider_received_models": [],
+   "message": "MODEL_POLICY_VIOLATION (UNAPPROVED_MODEL_ID): physical model 'nvidia/nemotron-3-super-120b-a12b ' bound to role 'super' is not an approved MAIW deployment (approved for 'super': ['nvidia/nemotron-3-super-120b-a12b'])"
+  },
+  {
+   "case": "C4",
+   "request": "high",
+   "desc": "look-alike: unicode hyphen U+2010",
+   "env": {
+    "NEMOTRON_SUPER_MODEL": "nvidia/nemotron\u20103-super-120b-a12b"
+   },
+   "reasoning": "high",
+   "provider_mode": "echo",
+   "ready_http": 503,
+   "ready_failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "super",
+     "model_id": "nvidia/nemotron\u20103-super-120b-a12b",
+     "reason": "UNAPPROVED_MODEL_ID"
+    }
+   ],
+   "http": 503,
+   "code": "MODEL_POLICY_VIOLATION",
+   "logical_role": null,
+   "resolved_model": null,
+   "generation": null,
+   "response_model_reported": null,
+   "identity_verified": null,
+   "content_returned": false,
+   "provider_calls": 0,
+   "provider_received_models": [],
+   "message": "MODEL_POLICY_VIOLATION (UNAPPROVED_MODEL_ID): physical model 'nvidia/nemotron\u20103-super-120b-a12b' bound to role 'super' is not an approved MAIW deployment (approved for 'super': ['nvidia/nemotron-3-super-120b-a12b'])"
+  },
+  {
+   "case": "C5",
+   "request": "high",
+   "desc": "approved ID of a different role (super <- lightning ID)",
+   "env": {
+    "NEMOTRON_SUPER_MODEL": "nvidia/nemotron-3.5-lightning-30b-a3b"
+   },
+   "reasoning": "high",
+   "provider_mode": "echo",
+   "ready_http": 503,
+   "ready_failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "super",
+     "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+     "reason": "ROLE_MISMATCH"
+    }
+   ],
+   "http": 503,
+   "code": "MODEL_POLICY_VIOLATION",
+   "logical_role": null,
+   "resolved_model": null,
+   "generation": null,
+   "response_model_reported": null,
+   "identity_verified": null,
+   "content_returned": false,
+   "provider_calls": 0,
+   "provider_received_models": [],
+   "message": "MODEL_POLICY_VIOLATION (ROLE_MISMATCH): physical model 'nvidia/nemotron-3.5-lightning-30b-a3b' is approved for role 'lightning', not 'super'"
+  },
+  {
+   "case": "C5",
+   "request": "low",
+   "desc": "approved ID of a different role (super <- lightning ID)",
+   "env": {
+    "NEMOTRON_SUPER_MODEL": "nvidia/nemotron-3.5-lightning-30b-a3b"
+   },
+   "reasoning": "low",
+   "provider_mode": "echo",
+   "ready_http": 503,
+   "ready_failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "super",
+     "model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
+     "reason": "ROLE_MISMATCH"
+    }
+   ],
+   "http": 200,
+   "code": null,
+   "logical_role": "lightning",
+   "resolved_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+   "generation": "nemotron-3.5",
+   "response_model_reported": "nvidia/nemotron-3.5-lightning-30b-a3b",
+   "identity_verified": true,
+   "content_returned": true,
+   "provider_calls": 1,
+   "provider_received_models": [
+    "nvidia/nemotron-3.5-lightning-30b-a3b"
+   ],
+   "message": ""
+  },
+  {
+   "case": "C6",
+   "request": "medium",
+   "desc": "nano enabled with approved-sounding nano look-alike",
+   "env": {
+    "NEMOTRON_NANO_ENABLED": "true",
+    "NEMOTRON_NANO_MODEL": "nvidia/nemotron-3-nano-30b-a3b-instruct"
+   },
+   "reasoning": "medium",
+   "provider_mode": "echo",
+   "ready_http": 503,
+   "ready_failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "nano",
+     "model_id": "nvidia/nemotron-3-nano-30b-a3b-instruct",
+     "reason": "UNAPPROVED_MODEL_ID"
+    }
+   ],
+   "http": 503,
+   "code": "MODEL_POLICY_VIOLATION",
+   "logical_role": null,
+   "resolved_model": null,
+   "generation": null,
+   "response_model_reported": null,
+   "identity_verified": null,
+   "content_returned": false,
+   "provider_calls": 0,
+   "provider_received_models": [],
+   "message": "MODEL_POLICY_VIOLATION (UNAPPROVED_MODEL_ID): physical model 'nvidia/nemotron-3-nano-30b-a3b-instruct' bound to role 'nano' is not an approved MAIW deployment (approved for 'nano': ['nvidia/nemotron-3-nano-30b-a3b'])"
+  },
+  {
+   "case": "D",
+   "request": "high",
+   "desc": "unknown model ID (ultra enabled)",
+   "env": {
+    "NEMOTRON_ULTRA_ENABLED": "true",
+    "NEMOTRON_ULTRA_MODEL": "totally-unknown/model-d"
+   },
+   "reasoning": "high",
+   "provider_mode": "echo",
+   "ready_http": 503,
+   "ready_failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "ultra",
+     "model_id": "totally-unknown/model-d",
+     "reason": "UNAPPROVED_MODEL_ID"
+    }
+   ],
+   "http": 200,
+   "code": null,
+   "logical_role": "super",
+   "resolved_model": "nvidia/nemotron-3-super-120b-a12b",
+   "generation": "nemotron-3",
+   "response_model_reported": "nvidia/nemotron-3-super-120b-a12b",
+   "identity_verified": true,
+   "content_returned": true,
+   "provider_calls": 1,
+   "provider_received_models": [
+    "nvidia/nemotron-3-super-120b-a12b"
+   ],
+   "message": ""
+  },
+  {
+   "case": "D",
+   "request": "high-critical",
+   "desc": "unknown model ID (ultra enabled)",
+   "env": {
+    "NEMOTRON_ULTRA_ENABLED": "true",
+    "NEMOTRON_ULTRA_MODEL": "totally-unknown/model-d"
+   },
+   "reasoning": "high",
+   "provider_mode": "echo",
+   "ready_http": 503,
+   "ready_failed": [
+    "model_gateway"
+   ],
+   "binding_violations": [
+    {
+     "role": "ultra",
+     "model_id": "totally-unknown/model-d",
+     "reason": "UNAPPROVED_MODEL_ID"
+    }
+   ],
+   "http": 200,
+   "code": null,
+   "logical_role": "super",
+   "resolved_model": "nvidia/nemotron-3-super-120b-a12b",
+   "generation": "nemotron-3",
+   "response_model_reported": "nvidia/nemotron-3-super-120b-a12b",
+   "identity_verified": true,
+   "content_returned": true,
+   "provider_calls": 1,
+   "provider_received_models": [
+    "nvidia/nemotron-3-super-120b-a12b"
+   ],
+   "message": ""
+  },
+  {
+   "case": "E1",
+   "request": "high",
+   "desc": "provider reports a different (unapproved) model",
+   "env": {},
+   "reasoning": "high",
+   "provider_mode": "substitute:example-org/substituted-model-y",
+   "ready_http": 200,
+   "ready_failed": [],
+   "binding_violations": null,
+   "http": 502,
+   "code": "MODEL_IDENTITY_MISMATCH",
+   "logical_role": null,
+   "resolved_model": null,
+   "generation": null,
+   "response_model_reported": null,
+   "identity_verified": null,
+   "content_returned": false,
+   "provider_calls": 1,
+   "provider_received_models": [
+    "nvidia/nemotron-3-super-120b-a12b"
+   ],
+   "message": "MODEL_IDENTITY_MISMATCH: dispatched approved model 'nvidia/nemotron-3-super-120b-a12b' (role 'super') but the provider reported 'example-org/substituted-model-y'; response discarded"
+  },
+  {
+   "case": "E2",
+   "request": "high",
+   "desc": "provider reports another APPROVED model (lightning for super)",
+   "env": {},
+   "reasoning": "high",
+   "provider_mode": "substitute:nvidia/nemotron-3.5-lightning-30b-a3b",
+   "ready_http": 200,
+   "ready_failed": [],
+   "binding_violations": null,
+   "http": 502,
+   "code": "MODEL_IDENTITY_MISMATCH",
+   "logical_role": null,
+   "resolved_model": null,
+   "generation": null,
+   "response_model_reported": null,
+   "identity_verified": null,
+   "content_returned": false,
+   "provider_calls": 1,
+   "provider_received_models": [
+    "nvidia/nemotron-3-super-120b-a12b"
+   ],
+   "message": "MODEL_IDENTITY_MISMATCH: dispatched approved model 'nvidia/nemotron-3-super-120b-a12b' (role 'super') but the provider reported 'nvidia/nemotron-3.5-lightning-30b-a3b'; response discarded"
+  },
+  {
+   "case": "E3",
+   "request": "high",
+   "desc": "provider reports case-variant of the dispatched id",
+   "env": {},
+   "reasoning": "high",
+   "provider_mode": "substitute:NVIDIA/Nemotron-3-Super-120B-A12B",
+   "ready_http": 200,
+   "ready_failed": [],
+   "binding_violations": null,
+   "http": 502,
+   "code": "MODEL_IDENTITY_MISMATCH",
+   "logical_role": null,
+   "resolved_model": null,
+   "generation": null,
+   "response_model_reported": null,
+   "identity_verified": null,
+   "content_returned": false,
+   "provider_calls": 1,
+   "provider_received_models": [
+    "nvidia/nemotron-3-super-120b-a12b"
+   ],
+   "message": "MODEL_IDENTITY_MISMATCH: dispatched approved model 'nvidia/nemotron-3-super-120b-a12b' (role 'super') but the provider reported 'NVIDIA/Nemotron-3-Super-120B-A12B'; response discarded"
+  },
+  {
+   "case": "E4",
+   "request": "high",
+   "desc": "provider OMITS model identity",
+   "env": {},
+   "reasoning": "high",
+   "provider_mode": "omit",
+   "ready_http": 200,
+   "ready_failed": [],
+   "binding_violations": null,
+   "http": 200,
+   "code": null,
+   "logical_role": "super",
+   "resolved_model": "nvidia/nemotron-3-super-120b-a12b",
+   "generation": "nemotron-3",
+   "response_model_reported": null,
+   "identity_verified": false,
+   "content_returned": true,
+   "provider_calls": 1,
+   "provider_received_models": [
+    "nvidia/nemotron-3-super-120b-a12b"
+   ],
+   "message": ""
+  },
+  {
+   "case": "D2-unknown",
+   "http": 503,
+   "code": "MODEL_POLICY_VIOLATION",
+   "role": null,
+   "resolved": null,
+   "provider_calls": 0,
+   "received": [],
+   "message": "MODEL_POLICY_VIOLATION (UNAPPROVED_MODEL_ID): physical model 'totally-unknown/model-d' bound to role 'ultra' is not an approved MAIW deployment (approved for 'ultra': ['nvidia/nemotron-3-ultra-550b-a5"
+  },
+  {
+   "case": "D2-approved",
+   "http": 200,
+   "code": null,
+   "role": "ultra",
+   "resolved": "nvidia/nemotron-3-ultra-550b-a55b",
+   "provider_calls": 1,
+   "received": [
+    "nvidia/nemotron-3-ultra-550b-a55b"
+   ],
+   "message": ""
+  }
+ ],
+ "readiness_matrix": [
+  {
+   "row": "baseline reference (sandbox required, MCP optional unconfigured)",
+   "expect": 200,
+   "ready_http": 200,
+   "status": "READY",
+   "profile": "reference",
+   "failed": [],
+   "live_http": 200,
+   "mcp_states": {
+    "equipment": "NOT_CONFIGURED",
+    "labor": "NOT_CONFIGURED",
+    "wave": "NOT_CONFIGURED",
+    "inventory": "NOT_CONFIGURED"
+   },
+   "governed_write_path": "not_offered",
+   "sandbox": {
+    "status": "ready",
+    "phase": "Ready",
+    "critical": true,
+    "reason": null
+   },
+   "database": "ready",
+   "persistence": "ready",
+   "matches_expectation": true
+  },
+  {
+   "row": "persistence: governance/ chmod 000",
+   "expect": 503,
+   "ready_http": 503,
+   "status": "NOT_READY",
+   "profile": "reference",
+   "failed": [
+    "persistence"
+   ],
+   "live_http": 200,
+   "mcp_states": {
+    "equipment": "NOT_CONFIGURED",
+    "labor": "NOT_CONFIGURED",
+    "wave": "NOT_CONFIGURED",
+    "inventory": "NOT_CONFIGURED"
+   },
+   "governed_write_path": "not_offered",
+   "sandbox": {
+    "status": "ready",
+    "phase": "Ready",
+    "critical": true,
+    "reason": null
+   },
+   "database": "ready",
+   "persistence": "failed",
+   "matches_expectation": true
+  },
+  {
+   "row": "persistence restored",
+   "expect": 200,
+   "ready_http": 200,
+   "status": "READY",
+   "profile": "reference",
+   "failed": [],
+   "live_http": 200,
+   "mcp_states": {
+    "equipment": "NOT_CONFIGURED",
+    "labor": "NOT_CONFIGURED",
+    "wave": "NOT_CONFIGURED",
+    "inventory": "NOT_CONFIGURED"
+   },
+   "governed_write_path": "not_offered",
+   "sandbox": {
+    "status": "ready",
+    "phase": "Ready",
+    "critical": true,
+    "reason": null
+   },
+   "database": "ready",
+   "persistence": "ready",
+   "matches_expectation": true
+  },
+  {
+   "row": "database: reference DB container paused",
+   "expect": 503,
+   "ready_http": 503,
+   "status": "NOT_READY",
+   "profile": "reference",
+   "failed": [
+    "database"
+   ],
+   "live_http": 200,
+   "mcp_states": {
+    "equipment": "NOT_CONFIGURED",
+    "labor": "NOT_CONFIGURED",
+    "wave": "NOT_CONFIGURED",
+    "inventory": "NOT_CONFIGURED"
+   },
+   "governed_write_path": "not_offered",
+   "sandbox": {
+    "status": "ready",
+    "phase": "Ready",
+    "critical": true,
+    "reason": null
+   },
+   "database": "failed",
+   "persistence": "ready",
+   "matches_expectation": true
+  },
+  {
+   "row": "database restored",
+   "expect": 200,
+   "ready_http": 200,
+   "status": "READY",
+   "profile": "reference",
+   "failed": [],
+   "live_http": 200,
+   "mcp_states": {
+    "equipment": "NOT_CONFIGURED",
+    "labor": "NOT_CONFIGURED",
+    "wave": "NOT_CONFIGURED",
+    "inventory": "NOT_CONFIGURED"
+   },
+   "governed_write_path": "not_offered",
+   "sandbox": {
+    "status": "ready",
+    "phase": "Ready",
+    "critical": true,
+    "reason": null
+   },
+   "database": "ready",
+   "persistence": "ready",
+   "matches_expectation": true
+  },
+  {
+   "row": "required sandbox stopped",
+   "expect": 503,
+   "ready_http": 503,
+   "status": "NOT_READY",
+   "profile": "reference",
+   "failed": [
+    "sandbox_runtime"
+   ],
+   "live_http": 200,
+   "mcp_states": {
+    "equipment": "NOT_CONFIGURED",
+    "labor": "NOT_CONFIGURED",
+    "wave": "NOT_CONFIGURED",
+    "inventory": "NOT_CONFIGURED"
+   },
+   "governed_write_path": "not_offered",
+   "sandbox": {
+    "status": "failed",
+    "phase": "Stopped",
+    "critical": true,
+    "reason": "sandbox phase 'Stopped' (expected Ready)"
+   },
+   "database": "ready",
+   "persistence": "ready",
+   "matches_expectation": true
+  },
+  {
+   "row": "required sandbox started again",
+   "expect": 200,
+   "ready_http": 200,
+   "status": "READY",
+   "profile": "reference",
+   "failed": [],
+   "live_http": 200,
+   "mcp_states": {
+    "equipment": "NOT_CONFIGURED",
+    "labor": "NOT_CONFIGURED",
+    "wave": "NOT_CONFIGURED",
+    "inventory": "NOT_CONFIGURED"
+   },
+   "governed_write_path": "not_offered",
+   "sandbox": {
+    "status": "ready",
+    "phase": "Ready",
+    "critical": true,
+    "reason": null
+   },
+   "database": "ready",
+   "persistence": "ready",
+   "matches_expectation": true
+  },
+  {
+   "row": "reference_governed, all required MCP healthy",
+   "expect": 200,
+   "ready_http": 200,
+   "status": "READY",
+   "profile": "reference_governed",
+   "failed": [],
+   "live_http": 200,
+   "mcp_states": {
+    "equipment": "READY",
+    "labor": "READY",
+    "wave": "READY",
+    "inventory": "NOT_CONFIGURED"
+   },
+   "governed_write_path": "ready",
+   "sandbox": {
+    "status": "not_configured",
+    "phase": null,
+    "critical": false,
+    "reason": null
+   },
+   "database": "ready",
+   "persistence": "ready",
+   "matches_expectation": true
+  },
+  {
+   "row": "reference_governed, required MCP absent (none configured)",
+   "expect": 503,
+   "ready_http": 503,
+   "status": "NOT_READY",
+   "profile": "reference_governed",
+   "failed": [
+    "governed_write_path",
+    "mcp_domains"
+   ],
+   "live_http": 200,
+   "mcp_states": {
+    "equipment": "NOT_CONFIGURED",
+    "labor": "NOT_CONFIGURED",
+    "wave": "NOT_CONFIGURED",
+    "inventory": "NOT_CONFIGURED"
+   },
+   "governed_write_path": "failed",
+   "sandbox": {
+    "status": "not_configured",
+    "phase": null,
+    "critical": false,
+    "reason": null
+   },
+   "database": "ready",
+   "persistence": "ready",
+   "matches_expectation": true
+  },
+  {
+   "row": "reference_governed, required wave unreachable (closed port)",
+   "expect": 503,
+   "ready_http": 503,
+   "status": "NOT_READY",
+   "profile": "reference_governed",
+   "failed": [
+    "governed_write_path",
+    "mcp_domains"
+   ],
+   "live_http": 200,
+   "mcp_states": {
+    "equipment": "READY",
+    "labor": "READY",
+    "wave": "FAILED",
+    "inventory": "NOT_CONFIGURED"
+   },
+   "governed_write_path": "failed",
+   "sandbox": {
+    "status": "not_configured",
+    "phase": null,
+    "critical": false,
+    "reason": null
+   },
+   "database": "ready",
+   "persistence": "ready",
+   "matches_expectation": true
+  },
+  {
+   "row": "reference_governed, equipment -> non-MCP listener (before trips)",
+   "expect": 503,
+   "ready_http": 200,
+   "status": "READY",
+   "profile": "reference_governed",
+   "failed": [],
+   "live_http": 200,
+   "mcp_states": {
+    "equipment": "READY",
+    "labor": "READY",
+    "wave": "READY",
+    "inventory": "NOT_CONFIGURED"
+   },
+   "governed_write_path": "ready",
+   "sandbox": {
+    "status": "not_configured",
+    "phase": null,
+    "critical": false,
+    "reason": null
+   },
+   "database": "ready",
+   "persistence": "ready",
+   "matches_expectation": false
+  },
+  {
+   "row": "reference_governed, required equipment CIRCUIT_OPEN",
+   "expect": 503,
+   "ready_http": 503,
+   "status": "NOT_READY",
+   "profile": "reference_governed",
+   "failed": [
+    "governed_write_path",
+    "mcp_domains"
+   ],
+   "live_http": 200,
+   "mcp_states": {
+    "equipment": "CIRCUIT_OPEN",
+    "labor": "READY",
+    "wave": "READY",
+    "inventory": "NOT_CONFIGURED"
+   },
+   "governed_write_path": "failed",
+   "sandbox": {
+    "status": "not_configured",
+    "phase": null,
+    "critical": false,
+    "reason": null
+   },
+   "database": "ready",
+   "persistence": "ready",
+   "matches_expectation": true
+  },
+  {
+   "row": "reference_governed, required list overridden to labor only, labor healthy",
+   "expect": 200,
+   "ready_http": 200,
+   "status": "READY",
+   "profile": "reference_governed",
+   "failed": [],
+   "live_http": 200,
+   "mcp_states": {
+    "equipment": "NOT_CONFIGURED",
+    "labor": "READY",
+    "wave": "NOT_CONFIGURED",
+    "inventory": "NOT_CONFIGURED"
+   },
+   "governed_write_path": "ready",
+   "sandbox": {
+    "status": "not_configured",
+    "phase": null,
+    "critical": false,
+    "reason": null
+   },
+   "database": "ready",
+   "persistence": "ready",
+   "matches_expectation": true
+  },
+  {
+   "row": "reference, optional MCP circuit/unreachable (equipment closed port)",
+   "expect": 200,
+   "ready_http": 200,
+   "status": "READY",
+   "profile": "reference",
+   "failed": [],
+   "live_http": 200,
+   "mcp_states": {
+    "equipment": "FAILED",
+    "labor": "NOT_CONFIGURED",
+    "wave": "NOT_CONFIGURED",
+    "inventory": "NOT_CONFIGURED"
+   },
+   "governed_write_path": "not_offered",
+   "sandbox": {
+    "status": "not_configured",
+    "phase": null,
+    "critical": false,
+    "reason": null
+   },
+   "database": "ready",
+   "persistence": "ready",
+   "matches_expectation": true
+  },
+  {
+   "row": "optional sandbox (mode=optional) named but absent",
+   "expect": 200,
+   "ready_http": 200,
+   "status": "READY",
+   "profile": "reference",
+   "failed": [],
+   "live_http": 200,
+   "mcp_states": {
+    "equipment": "NOT_CONFIGURED",
+    "labor": "NOT_CONFIGURED",
+    "wave": "NOT_CONFIGURED",
+    "inventory": "NOT_CONFIGURED"
+   },
+   "governed_write_path": "not_offered",
+   "sandbox": {
+    "status": "degraded",
+    "phase": null,
+    "critical": false,
+    "reason": "sandbox 'maiw-v201-third-zz' not found"
+   },
+   "database": "ready",
+   "persistence": "ready",
+   "matches_expectation": true
+  },
+  {
+   "row": "required sandbox named but absent",
+   "expect": 503,
+   "ready_http": 503,
+   "status": "NOT_READY",
+   "profile": "reference",
+   "failed": [
+    "sandbox_runtime"
+   ],
+   "live_http": 200,
+   "mcp_states": {
+    "equipment": "NOT_CONFIGURED",
+    "labor": "NOT_CONFIGURED",
+    "wave": "NOT_CONFIGURED",
+    "inventory": "NOT_CONFIGURED"
+   },
+   "governed_write_path": "not_offered",
+   "sandbox": {
+    "status": "failed",
+    "phase": null,
+    "critical": true,
+    "reason": "sandbox 'maiw-v201-third-zz' not found"
+   },
+   "database": "ready",
+   "persistence": "ready",
+   "matches_expectation": true
+  },
+  {
+   "row": "required sandbox but MAIW_SANDBOX_NAME unset",
+   "expect": 503,
+   "ready_http": 503,
+   "status": "NOT_READY",
+   "profile": "reference",
+   "failed": [
+    "sandbox_runtime"
+   ],
+   "live_http": 200,
+   "mcp_states": {
+    "equipment": "NOT_CONFIGURED",
+    "labor": "NOT_CONFIGURED",
+    "wave": "NOT_CONFIGURED",
+    "inventory": "NOT_CONFIGURED"
+   },
+   "governed_write_path": "not_offered",
+   "sandbox": {
+    "status": "failed",
+    "phase": null,
+    "critical": true,
+    "reason": "MAIW_SANDBOX_MODE=required but MAIW_SANDBOX_NAME is not set"
+   },
+   "database": "ready",
+   "persistence": "ready",
+   "matches_expectation": true
+  },
+  {
+   "row": "invalid profile value",
+   "expect": 503,
+   "ready_http": 503,
+   "status": "NOT_READY",
+   "profile": "production",
+   "failed": [
+    "profile"
+   ],
+   "live_http": 200,
+   "mcp_states": {
+    "equipment": "NOT_CONFIGURED",
+    "labor": "NOT_CONFIGURED",
+    "wave": "NOT_CONFIGURED",
+    "inventory": "NOT_CONFIGURED"
+   },
+   "governed_write_path": "not_offered",
+   "sandbox": {
+    "status": "not_configured",
+    "phase": null,
+    "critical": false,
+    "reason": null
+   },
+   "database": "ready",
+   "persistence": "ready",
+   "matches_expectation": true
+  },
+  {
+   "row": "unapproved model binding",
+   "expect": 503,
+   "ready_http": 503,
+   "status": "NOT_READY",
+   "profile": "reference",
+   "failed": [
+    "model_gateway"
+   ],
+   "live_http": 200,
+   "mcp_states": {
+    "equipment": "NOT_CONFIGURED",
+    "labor": "NOT_CONFIGURED",
+    "wave": "NOT_CONFIGURED",
+    "inventory": "NOT_CONFIGURED"
+   },
+   "governed_write_path": "not_offered",
+   "sandbox": {
+    "status": "not_configured",
+    "phase": null,
+    "critical": false,
+    "reason": null
+   },
+   "database": "ready",
+   "persistence": "ready",
+   "matches_expectation": true
+  },
+  {
+   "row": "persistence root unwritable parent",
+   "expect": 503,
+   "ready_http": 503,
+   "status": "NOT_READY",
+   "profile": "reference",
+   "failed": [
+    "persistence"
+   ],
+   "live_http": 200,
+   "mcp_states": {
+    "equipment": "NOT_CONFIGURED",
+    "labor": "NOT_CONFIGURED",
+    "wave": "NOT_CONFIGURED",
+    "inventory": "NOT_CONFIGURED"
+   },
+   "governed_write_path": "not_offered",
+   "sandbox": {
+    "status": "not_configured",
+    "phase": null,
+    "critical": false,
+    "reason": null
+   },
+   "database": "ready",
+   "persistence": "failed",
+   "matches_expectation": true
+  }
+ ],
+ "test_order_matrix": {
+  "perm_mg_then_demo": "191 passed",
+  "perm_demo_then_mg": "191 passed",
+  "perm_canonical_then_reliability": "442 passed, 2 skipped",
+  "perm_reliability_then_canonical": "442 passed, 2 skipped",
+  "full_reversed": "2805/8/0",
+  "full_mg_first": "2805/8/0",
+  "full_reliability_first": "2805/8/0",
+  "full_canonical_first": "2805/8/0",
+  "shuffle_seed_7311": "2805/8/0",
+  "shuffle_seed_90210": "2805/8/0"
+ },
+ "full_test_counts": {
+  "run1": {
+   "passed": 2805,
+   "skipped": 8,
+   "failed": 0,
+   "secs": 224
+  },
+  "run2": {
+   "passed": 2805,
+   "skipped": 8,
+   "failed": 0,
+   "secs": 226
+  },
+  "opt_in_pg": "with MAIW_TEST_PG_DSN only: 1 pass/1 fail (stale test, N-3); with PGHOST/PGPORT/POSTGRES_PASSWORD: 2 pass",
+  "ui": {
+   "jest": "964/964",
+   "eslint_errors": 0,
+   "eslint_warnings": 1041,
+   "tsc_errors": 0,
+   "build": "OK (fails only with CI=true warnings-as-errors; not in CI)"
+  },
+  "npm_audit": {
+   "critical": 0,
+   "high": 50,
+   "moderate": 34,
+   "low": 3,
+   "omit_dev_identical": true,
+   "production_reachable_high": 0,
+   "production_reachable_moderate": "react-router open redirect GHSA-wrjc-x8rr-h8h6"
+  },
+  "security_tools": {
+   "pip-audit": "NOT AVAILABLE",
+   "trivy": "NOT AVAILABLE (CI claim only)",
+   "gitleaks": "NOT AVAILABLE (grep scan: no real secrets)"
+  }
+ },
+ "live_model_identities": {
+  "super": {
+   "http": 200,
+   "logical_role": "super",
+   "resolved_model": "nvidia/nemotron-3-super-120b-a12b",
+   "generation": "nemotron-3",
+   "provider_reported_model": "nvidia/nemotron-3-super-120b-a12b",
+   "identity_verified": true,
+   "server_latency_ms": 282.98180799902184,
+   "client_ms": 319.5
+  },
+  "lightning": {
+   "http": 200,
+   "logical_role": "lightning",
+   "resolved_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+   "generation": "nemotron-3.5",
+   "provider_reported_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+   "identity_verified": true,
+   "server_latency_ms": 255.91773800260853,
+   "client_ms": 269.3
+  },
+  "medium_fallback": {
+   "http": 200,
+   "logical_role": "super",
+   "resolved_model": "nvidia/nemotron-3-super-120b-a12b",
+   "provider_reported_model": "nvidia/nemotron-3-super-120b-a12b",
+   "identity_verified": true,
+   "fallback_used": true
+  },
+  "path": "sandbox maiw-v201-third-a -> http://10.185.115.61:18930/api/v1/inference (canonical maiw_api.app, script-started) -> hosted NIM"
+ },
+ "sandbox_isolation": {
+  "network": {
+   "provider_https": "BLOCKED",
+   "provider_http_chat": 403,
+   "internet_github": "BLOCKED",
+   "internet_ip_1111": "DENIED (ConnectionRefusedError)",
+   "metadata_169254": 403,
+   "localhost_provider_8000": "DENIED (ConnectionRefusedError)",
+   "localhost_api_port": "DENIED (ConnectionRefusedError)",
+   "host_audit_decoy_other_port": 403,
+   "host_audit_decoy_tcp": "DENIED (ConnectionRefusedError)",
+   "host_ref_db_55441_tcp": "DENIED (ConnectionRefusedError)",
+   "docker_bridge_gateway_18991": "DENIED (ConnectionRefusedError)",
+   "dns_resolve_provider": "DENIED (gaierror)"
+  },
+  "env_secretlike_names": [],
+  "env_value_prefixes": {
+   "nvapi-": false,
+   "ghp_": false,
+   "gho_": false,
+   "github_pat_": false,
+   "postgresql://": false,
+   "sk-": false
+  },
+  "filesystem": {
+   "/root/.ssh": "ABSENT",
+   "/home/nvidia": "ABSENT",
+   "/home/nvidia/.ssh": "ABSENT",
+   "/home/nvidia/.env": "ABSENT",
+   "/home/nvidia/.git-credentials": "ABSENT",
+   "/home/nvidia/maiw-v201-third-reaudit/.git/config": "ABSENT",
+   "/home/nvidia/maiw-v201-third-reaudit/.third-state": "ABSENT",
+   "/home/nvidia/maiw-v201-third-reaudit/.third-state/runbook.env": "ABSENT",
+   "/var/lib/maiw": "ABSENT",
+   "/var/run/docker.sock": "ABSENT",
+   "/run/docker.sock": "ABSENT",
+   "/etc/shadow": "DENIED (PermissionError)",
+   "/proc/1/environ": "DENIED (PermissionError)",
+   "/home/nvidia/.config/gh/hosts.yml": "ABSENT",
+   "/home/nvidia/.nemoclaw": "ABSENT",
+   "/home/nvidia/.local/state/nemoclaw": "ABSENT",
+   "write:/etc/maiw_probe": "DENIED (PermissionError)",
+   "write:/usr/maiw_probe": "DENIED (PermissionError)",
+   "write:/app/maiw_probe": "DENIED (FileNotFoundError)"
+  },
+  "importable": {
+   "maiw_execution": false,
+   "maiw_decision": false,
+   "maiw_mcp": false,
+   "maiw_api": false,
+   "integrations": false
+  },
+  "prompt_injection_structural": {
+   "inference_route": "denied (routing unchanged; 422 on model_id/base_url/deployment_mode/tool role)",
+   "direct_write_via_api_port": "NOT DENIED in reference_governed / reference+optional MCP (NEW3-P1-01)"
+  }
+ },
+ "governance_crash_matrix": [
+  {
+   "case": "A",
+   "step": "1start",
+   "rc": 0,
+   "out": {
+    "phase": "start",
+    "stores": [
+     "JsonFileProcedureStateStore",
+     "JsonFileGovernanceInbox"
+    ],
+    "state": {
+     "procedure_execution_id": "fc03b0b7-6c44-4eef-ba9c-2a5eaacb3582",
+     "agent_task_id": "task-third-reaudit",
+     "trace_id": "trace-v201-canonical-sop-a",
+     "sop_id": "operations_coordination.wave_risk_resolution_v2",
+     "sop_version": "2.0",
+     "status": "waiting_for_governance",
+     "waiting_for_governance": true,
+     "current_step_id": "submit",
+     "completed_step_ids": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend"
+     ],
+     "attempt_by_step": {
+      "establish_state": 2,
+      "diagnose": 1,
+      "gather_specialist_evidence": 1,
+      "generate_candidates": 1,
+      "compare": 1,
+      "recommend": 1,
+      "submit": 1
+     },
+     "loop_exhausted_step_ids": [],
+     "branch_history": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend"
+     ],
+     "evidence_count": 22,
+     "revision": 23,
+     "started_at": "2026-10-11T01:31:40.645826+00:00",
+     "last_updated_at": "2026-10-11T01:31:40.670172+00:00"
+    },
+    "executor_steps": [
+     "establish_state",
+     "establish_state",
+     "diagnose",
+     "gather_specialist_evidence",
+     "generate_candidates",
+     "compare",
+     "recommend",
+     "submit"
+    ],
+    "ledger": []
+   }
+  },
+  {
+   "case": "A",
+   "step": "2crash",
+   "rc": 137,
+   "out": null
+  },
+  {
+   "case": "A",
+   "step": "3inspect",
+   "rc": 0,
+   "out": {
+    "phase": "inspect",
+    "stores": [
+     "JsonFileProcedureStateStore",
+     "JsonFileGovernanceInbox"
+    ],
+    "state": {
+     "procedure_execution_id": "fc03b0b7-6c44-4eef-ba9c-2a5eaacb3582",
+     "agent_task_id": "task-third-reaudit",
+     "trace_id": "trace-v201-canonical-sop-a",
+     "sop_id": "operations_coordination.wave_risk_resolution_v2",
+     "sop_version": "2.0",
+     "status": "waiting_for_governance",
+     "waiting_for_governance": true,
+     "current_step_id": "submit",
+     "completed_step_ids": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend"
+     ],
+     "attempt_by_step": {
+      "establish_state": 2,
+      "diagnose": 1,
+      "gather_specialist_evidence": 1,
+      "generate_candidates": 1,
+      "compare": 1,
+      "recommend": 1,
+      "submit": 1
+     },
+     "loop_exhausted_step_ids": [],
+     "branch_history": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend"
+     ],
+     "evidence_count": 22,
+     "revision": 23,
+     "started_at": "2026-10-11T01:31:40.645826+00:00",
+     "last_updated_at": "2026-10-11T01:31:40.670172+00:00"
+    },
+    "unapplied": [],
+    "ready_http": 200,
+    "ready_unapplied_governance": 0,
+    "http_procedure": {
+     "status": 200,
+     "body": {
+      "procedure_execution_id": "fc03b0b7-6c44-4eef-ba9c-2a5eaacb3582",
+      "agent_task_id": "task-third-reaudit",
+      "trace_id": "trace-v201-canonical-sop-a",
+      "sop_id": "operations_coordination.wave_risk_resolution_v2",
+      "sop_version": "2.0",
+      "status": "waiting_for_governance",
+      "waiting_for_governance": true,
+      "current_step_id": "submit",
+      "completed_step_ids": [
+       "establish_state",
+       "diagnose",
+       "gather_specialist_evidence",
+       "generate_candidates",
+       "compare",
+       "recommend"
+      ],
+      "attempt_by_step": {
+       "establish_state": 2,
+       "diagnose": 1,
+       "gather_specialist_evidence": 1,
+       "generate_candidates": 1,
+       "compare": 1,
+       "recommend": 1,
+       "submit": 1
+      },
+      "loop_exhausted_step_ids": [],
+      "branch_history": [
+       "establish_state",
+       "diagnose",
+       "gather_specialist_evidence",
+       "generate_candidates",
+       "compare",
+       "recommend"
+      ],
+      "evidence_count": 22,
+      "revision": 23,
+      "started_at": "2026-10-11T01:31:40.645826+00:00",
+      "last_updated_at": "2026-10-11T01:31:40.670172+00:00"
+     }
+    },
+    "ledger": []
+   }
+  },
+  {
+   "case": "A",
+   "step": "4redeliver",
+   "rc": 0,
+   "out": {
+    "phase": "deliver",
+    "stores": [
+     "JsonFileProcedureStateStore",
+     "JsonFileGovernanceInbox"
+    ],
+    "applied": true,
+    "duplicate": false,
+    "state": {
+     "procedure_execution_id": "fc03b0b7-6c44-4eef-ba9c-2a5eaacb3582",
+     "agent_task_id": "task-third-reaudit",
+     "trace_id": "trace-v201-canonical-sop-a",
+     "sop_id": "operations_coordination.wave_risk_resolution_v2",
+     "sop_version": "2.0",
+     "status": "running",
+     "waiting_for_governance": false,
+     "current_step_id": "observe",
+     "completed_step_ids": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend",
+      "submit"
+     ],
+     "attempt_by_step": {
+      "establish_state": 2,
+      "diagnose": 1,
+      "gather_specialist_evidence": 1,
+      "generate_candidates": 1,
+      "compare": 1,
+      "recommend": 1,
+      "submit": 1
+     },
+     "loop_exhausted_step_ids": [],
+     "branch_history": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend",
+      "submit"
+     ],
+     "evidence_count": 23,
+     "revision": 24,
+     "started_at": "2026-10-11T01:31:40.645826+00:00",
+     "last_updated_at": "2026-10-11T01:31:49.955042+00:00"
+    },
+    "executor_steps_during_apply": [],
+    "ledger": [
+     "accepted",
+     "applied"
+    ]
+   }
+  },
+  {
+   "case": "A",
+   "step": "5redeliver_again",
+   "rc": 0,
+   "out": {
+    "phase": "deliver",
+    "stores": [
+     "JsonFileProcedureStateStore",
+     "JsonFileGovernanceInbox"
+    ],
+    "applied": false,
+    "duplicate": true,
+    "state": {
+     "procedure_execution_id": "fc03b0b7-6c44-4eef-ba9c-2a5eaacb3582",
+     "agent_task_id": "task-third-reaudit",
+     "trace_id": "trace-v201-canonical-sop-a",
+     "sop_id": "operations_coordination.wave_risk_resolution_v2",
+     "sop_version": "2.0",
+     "status": "running",
+     "waiting_for_governance": false,
+     "current_step_id": "observe",
+     "completed_step_ids": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend",
+      "submit"
+     ],
+     "attempt_by_step": {
+      "establish_state": 2,
+      "diagnose": 1,
+      "gather_specialist_evidence": 1,
+      "generate_candidates": 1,
+      "compare": 1,
+      "recommend": 1,
+      "submit": 1
+     },
+     "loop_exhausted_step_ids": [],
+     "branch_history": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend",
+      "submit"
+     ],
+     "evidence_count": 23,
+     "revision": 24,
+     "started_at": "2026-10-11T01:31:40.645826+00:00",
+     "last_updated_at": "2026-10-11T01:31:49.955042+00:00"
+    },
+    "executor_steps_during_apply": [],
+    "ledger": [
+     "accepted",
+     "applied"
+    ]
+   }
+  },
+  {
+   "case": "A",
+   "step": "6inspect",
+   "rc": 0,
+   "out": {
+    "phase": "inspect",
+    "stores": [
+     "JsonFileProcedureStateStore",
+     "JsonFileGovernanceInbox"
+    ],
+    "state": {
+     "procedure_execution_id": "fc03b0b7-6c44-4eef-ba9c-2a5eaacb3582",
+     "agent_task_id": "task-third-reaudit",
+     "trace_id": "trace-v201-canonical-sop-a",
+     "sop_id": "operations_coordination.wave_risk_resolution_v2",
+     "sop_version": "2.0",
+     "status": "running",
+     "waiting_for_governance": false,
+     "current_step_id": "observe",
+     "completed_step_ids": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend",
+      "submit"
+     ],
+     "attempt_by_step": {
+      "establish_state": 2,
+      "diagnose": 1,
+      "gather_specialist_evidence": 1,
+      "generate_candidates": 1,
+      "compare": 1,
+      "recommend": 1,
+      "submit": 1
+     },
+     "loop_exhausted_step_ids": [],
+     "branch_history": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend",
+      "submit"
+     ],
+     "evidence_count": 23,
+     "revision": 24,
+     "started_at": "2026-10-11T01:31:40.645826+00:00",
+     "last_updated_at": "2026-10-11T01:31:49.955042+00:00"
+    },
+    "unapplied": [],
+    "ready_http": 200,
+    "ready_unapplied_governance": 0,
+    "http_procedure": {
+     "status": 200,
+     "body": {
+      "procedure_execution_id": "fc03b0b7-6c44-4eef-ba9c-2a5eaacb3582",
+      "agent_task_id": "task-third-reaudit",
+      "trace_id": "trace-v201-canonical-sop-a",
+      "sop_id": "operations_coordination.wave_risk_resolution_v2",
+      "sop_version": "2.0",
+      "status": "running",
+      "waiting_for_governance": false,
+      "current_step_id": "observe",
+      "completed_step_ids": [
+       "establish_state",
+       "diagnose",
+       "gather_specialist_evidence",
+       "generate_candidates",
+       "compare",
+       "recommend",
+       "submit"
+      ],
+      "attempt_by_step": {
+       "establish_state": 2,
+       "diagnose": 1,
+       "gather_specialist_evidence": 1,
+       "generate_candidates": 1,
+       "compare": 1,
+       "recommend": 1,
+       "submit": 1
+      },
+      "loop_exhausted_step_ids": [],
+      "branch_history": [
+       "establish_state",
+       "diagnose",
+       "gather_specialist_evidence",
+       "generate_candidates",
+       "compare",
+       "recommend",
+       "submit"
+      ],
+      "evidence_count": 23,
+      "revision": 24,
+      "started_at": "2026-10-11T01:31:40.645826+00:00",
+      "last_updated_at": "2026-10-11T01:31:49.955042+00:00"
+     }
+    },
+    "ledger": [
+     "accepted",
+     "applied"
+    ]
+   }
+  },
+  {
+   "case": "B",
+   "step": "1start",
+   "rc": 0,
+   "out": {
+    "phase": "start",
+    "stores": [
+     "JsonFileProcedureStateStore",
+     "JsonFileGovernanceInbox"
+    ],
+    "state": {
+     "procedure_execution_id": "a72351c8-f845-455f-90b4-4c6a98258105",
+     "agent_task_id": "task-third-reaudit",
+     "trace_id": "trace-v201-canonical-sop-a",
+     "sop_id": "operations_coordination.wave_risk_resolution_v2",
+     "sop_version": "2.0",
+     "status": "waiting_for_governance",
+     "waiting_for_governance": true,
+     "current_step_id": "submit",
+     "completed_step_ids": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend"
+     ],
+     "attempt_by_step": {
+      "establish_state": 2,
+      "diagnose": 1,
+      "gather_specialist_evidence": 1,
+      "generate_candidates": 1,
+      "compare": 1,
+      "recommend": 1,
+      "submit": 1
+     },
+     "loop_exhausted_step_ids": [],
+     "branch_history": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend"
+     ],
+     "evidence_count": 22,
+     "revision": 23,
+     "started_at": "2026-10-11T01:31:58.312567+00:00",
+     "last_updated_at": "2026-10-11T01:31:58.331083+00:00"
+    },
+    "executor_steps": [
+     "establish_state",
+     "establish_state",
+     "diagnose",
+     "gather_specialist_evidence",
+     "generate_candidates",
+     "compare",
+     "recommend",
+     "submit"
+    ],
+    "ledger": []
+   }
+  },
+  {
+   "case": "B",
+   "step": "2crash",
+   "rc": 137,
+   "out": null
+  },
+  {
+   "case": "B",
+   "step": "3inspect",
+   "rc": 0,
+   "out": {
+    "phase": "inspect",
+    "stores": [
+     "JsonFileProcedureStateStore",
+     "JsonFileGovernanceInbox"
+    ],
+    "state": {
+     "procedure_execution_id": "a72351c8-f845-455f-90b4-4c6a98258105",
+     "agent_task_id": "task-third-reaudit",
+     "trace_id": "trace-v201-canonical-sop-a",
+     "sop_id": "operations_coordination.wave_risk_resolution_v2",
+     "sop_version": "2.0",
+     "status": "waiting_for_governance",
+     "waiting_for_governance": true,
+     "current_step_id": "submit",
+     "completed_step_ids": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend"
+     ],
+     "attempt_by_step": {
+      "establish_state": 2,
+      "diagnose": 1,
+      "gather_specialist_evidence": 1,
+      "generate_candidates": 1,
+      "compare": 1,
+      "recommend": 1,
+      "submit": 1
+     },
+     "loop_exhausted_step_ids": [],
+     "branch_history": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend"
+     ],
+     "evidence_count": 22,
+     "revision": 23,
+     "started_at": "2026-10-11T01:31:58.312567+00:00",
+     "last_updated_at": "2026-10-11T01:31:58.331083+00:00"
+    },
+    "unapplied": [
+     "a72351c8-f845-455f-90b4-4c6a98258105"
+    ],
+    "ready_http": 200,
+    "ready_unapplied_governance": 1,
+    "http_procedure": {
+     "status": 200,
+     "body": {
+      "procedure_execution_id": "a72351c8-f845-455f-90b4-4c6a98258105",
+      "agent_task_id": "task-third-reaudit",
+      "trace_id": "trace-v201-canonical-sop-a",
+      "sop_id": "operations_coordination.wave_risk_resolution_v2",
+      "sop_version": "2.0",
+      "status": "waiting_for_governance",
+      "waiting_for_governance": true,
+      "current_step_id": "submit",
+      "completed_step_ids": [
+       "establish_state",
+       "diagnose",
+       "gather_specialist_evidence",
+       "generate_candidates",
+       "compare",
+       "recommend"
+      ],
+      "attempt_by_step": {
+       "establish_state": 2,
+       "diagnose": 1,
+       "gather_specialist_evidence": 1,
+       "generate_candidates": 1,
+       "compare": 1,
+       "recommend": 1,
+       "submit": 1
+      },
+      "loop_exhausted_step_ids": [],
+      "branch_history": [
+       "establish_state",
+       "diagnose",
+       "gather_specialist_evidence",
+       "generate_candidates",
+       "compare",
+       "recommend"
+      ],
+      "evidence_count": 22,
+      "revision": 23,
+      "started_at": "2026-10-11T01:31:58.312567+00:00",
+      "last_updated_at": "2026-10-11T01:31:58.331083+00:00"
+     }
+    },
+    "ledger": [
+     "accepted"
+    ]
+   }
+  },
+  {
+   "case": "B",
+   "step": "4recover",
+   "rc": 0,
+   "out": {
+    "phase": "recover",
+    "stores": [
+     "JsonFileProcedureStateStore",
+     "JsonFileGovernanceInbox"
+    ],
+    "report": {
+     "resumed": [
+      "a72351c8-f845-455f-90b4-4c6a98258105"
+     ],
+     "already_applied": [],
+     "skipped": []
+    },
+    "inputs_for_calls": [
+     "a72351c8-f845-455f-90b4-4c6a98258105"
+    ],
+    "ledger": [
+     "accepted",
+     "applied"
+    ]
+   }
+  },
+  {
+   "case": "B",
+   "step": "5recover_again",
+   "rc": 0,
+   "out": {
+    "phase": "recover",
+    "stores": [
+     "JsonFileProcedureStateStore",
+     "JsonFileGovernanceInbox"
+    ],
+    "report": {
+     "resumed": [],
+     "already_applied": [],
+     "skipped": []
+    },
+    "inputs_for_calls": [],
+    "ledger": [
+     "accepted",
+     "applied"
+    ]
+   }
+  },
+  {
+   "case": "B",
+   "step": "6redeliver",
+   "rc": 0,
+   "out": {
+    "phase": "deliver",
+    "stores": [
+     "JsonFileProcedureStateStore",
+     "JsonFileGovernanceInbox"
+    ],
+    "applied": false,
+    "duplicate": true,
+    "state": {
+     "procedure_execution_id": "a72351c8-f845-455f-90b4-4c6a98258105",
+     "agent_task_id": "task-third-reaudit",
+     "trace_id": "trace-v201-canonical-sop-a",
+     "sop_id": "operations_coordination.wave_risk_resolution_v2",
+     "sop_version": "2.0",
+     "status": "running",
+     "waiting_for_governance": false,
+     "current_step_id": "observe",
+     "completed_step_ids": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend",
+      "submit"
+     ],
+     "attempt_by_step": {
+      "establish_state": 2,
+      "diagnose": 1,
+      "gather_specialist_evidence": 1,
+      "generate_candidates": 1,
+      "compare": 1,
+      "recommend": 1,
+      "submit": 1
+     },
+     "loop_exhausted_step_ids": [],
+     "branch_history": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend",
+      "submit"
+     ],
+     "evidence_count": 23,
+     "revision": 24,
+     "started_at": "2026-10-11T01:31:58.312567+00:00",
+     "last_updated_at": "2026-10-11T01:32:07.399444+00:00"
+    },
+    "executor_steps_during_apply": [],
+    "ledger": [
+     "accepted",
+     "applied"
+    ]
+   }
+  },
+  {
+   "case": "B",
+   "step": "7inspect",
+   "rc": 0,
+   "out": {
+    "phase": "inspect",
+    "stores": [
+     "JsonFileProcedureStateStore",
+     "JsonFileGovernanceInbox"
+    ],
+    "state": {
+     "procedure_execution_id": "a72351c8-f845-455f-90b4-4c6a98258105",
+     "agent_task_id": "task-third-reaudit",
+     "trace_id": "trace-v201-canonical-sop-a",
+     "sop_id": "operations_coordination.wave_risk_resolution_v2",
+     "sop_version": "2.0",
+     "status": "running",
+     "waiting_for_governance": false,
+     "current_step_id": "observe",
+     "completed_step_ids": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend",
+      "submit"
+     ],
+     "attempt_by_step": {
+      "establish_state": 2,
+      "diagnose": 1,
+      "gather_specialist_evidence": 1,
+      "generate_candidates": 1,
+      "compare": 1,
+      "recommend": 1,
+      "submit": 1
+     },
+     "loop_exhausted_step_ids": [],
+     "branch_history": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend",
+      "submit"
+     ],
+     "evidence_count": 23,
+     "revision": 24,
+     "started_at": "2026-10-11T01:31:58.312567+00:00",
+     "last_updated_at": "2026-10-11T01:32:07.399444+00:00"
+    },
+    "unapplied": [],
+    "ready_http": 200,
+    "ready_unapplied_governance": 0,
+    "http_procedure": {
+     "status": 200,
+     "body": {
+      "procedure_execution_id": "a72351c8-f845-455f-90b4-4c6a98258105",
+      "agent_task_id": "task-third-reaudit",
+      "trace_id": "trace-v201-canonical-sop-a",
+      "sop_id": "operations_coordination.wave_risk_resolution_v2",
+      "sop_version": "2.0",
+      "status": "running",
+      "waiting_for_governance": false,
+      "current_step_id": "observe",
+      "completed_step_ids": [
+       "establish_state",
+       "diagnose",
+       "gather_specialist_evidence",
+       "generate_candidates",
+       "compare",
+       "recommend",
+       "submit"
+      ],
+      "attempt_by_step": {
+       "establish_state": 2,
+       "diagnose": 1,
+       "gather_specialist_evidence": 1,
+       "generate_candidates": 1,
+       "compare": 1,
+       "recommend": 1,
+       "submit": 1
+      },
+      "loop_exhausted_step_ids": [],
+      "branch_history": [
+       "establish_state",
+       "diagnose",
+       "gather_specialist_evidence",
+       "generate_candidates",
+       "compare",
+       "recommend",
+       "submit"
+      ],
+      "evidence_count": 23,
+      "revision": 24,
+      "started_at": "2026-10-11T01:31:58.312567+00:00",
+      "last_updated_at": "2026-10-11T01:32:07.399444+00:00"
+     }
+    },
+    "ledger": [
+     "accepted",
+     "applied"
+    ]
+   }
+  },
+  {
+   "case": "C",
+   "step": "1start",
+   "rc": 0,
+   "out": {
+    "phase": "start",
+    "stores": [
+     "JsonFileProcedureStateStore",
+     "JsonFileGovernanceInbox"
+    ],
+    "state": {
+     "procedure_execution_id": "018e5300-302c-46d1-8561-5c6d336a54f3",
+     "agent_task_id": "task-third-reaudit",
+     "trace_id": "trace-v201-canonical-sop-a",
+     "sop_id": "operations_coordination.wave_risk_resolution_v2",
+     "sop_version": "2.0",
+     "status": "waiting_for_governance",
+     "waiting_for_governance": true,
+     "current_step_id": "submit",
+     "completed_step_ids": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend"
+     ],
+     "attempt_by_step": {
+      "establish_state": 2,
+      "diagnose": 1,
+      "gather_specialist_evidence": 1,
+      "generate_candidates": 1,
+      "compare": 1,
+      "recommend": 1,
+      "submit": 1
+     },
+     "loop_exhausted_step_ids": [],
+     "branch_history": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend"
+     ],
+     "evidence_count": 22,
+     "revision": 23,
+     "started_at": "2026-10-11T01:32:18.634951+00:00",
+     "last_updated_at": "2026-10-11T01:32:18.653769+00:00"
+    },
+    "executor_steps": [
+     "establish_state",
+     "establish_state",
+     "diagnose",
+     "gather_specialist_evidence",
+     "generate_candidates",
+     "compare",
+     "recommend",
+     "submit"
+    ],
+    "ledger": []
+   }
+  },
+  {
+   "case": "C",
+   "step": "2crash",
+   "rc": 137,
+   "out": null
+  },
+  {
+   "case": "C",
+   "step": "3inspect",
+   "rc": 0,
+   "out": {
+    "phase": "inspect",
+    "stores": [
+     "JsonFileProcedureStateStore",
+     "JsonFileGovernanceInbox"
+    ],
+    "state": {
+     "procedure_execution_id": "018e5300-302c-46d1-8561-5c6d336a54f3",
+     "agent_task_id": "task-third-reaudit",
+     "trace_id": "trace-v201-canonical-sop-a",
+     "sop_id": "operations_coordination.wave_risk_resolution_v2",
+     "sop_version": "2.0",
+     "status": "running",
+     "waiting_for_governance": false,
+     "current_step_id": "observe",
+     "completed_step_ids": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend",
+      "submit"
+     ],
+     "attempt_by_step": {
+      "establish_state": 2,
+      "diagnose": 1,
+      "gather_specialist_evidence": 1,
+      "generate_candidates": 1,
+      "compare": 1,
+      "recommend": 1,
+      "submit": 1
+     },
+     "loop_exhausted_step_ids": [],
+     "branch_history": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend",
+      "submit"
+     ],
+     "evidence_count": 23,
+     "revision": 24,
+     "started_at": "2026-10-11T01:32:18.634951+00:00",
+     "last_updated_at": "2026-10-11T01:32:21.175952+00:00"
+    },
+    "unapplied": [
+     "018e5300-302c-46d1-8561-5c6d336a54f3"
+    ],
+    "ready_http": 200,
+    "ready_unapplied_governance": 1,
+    "http_procedure": {
+     "status": 200,
+     "body": {
+      "procedure_execution_id": "018e5300-302c-46d1-8561-5c6d336a54f3",
+      "agent_task_id": "task-third-reaudit",
+      "trace_id": "trace-v201-canonical-sop-a",
+      "sop_id": "operations_coordination.wave_risk_resolution_v2",
+      "sop_version": "2.0",
+      "status": "running",
+      "waiting_for_governance": false,
+      "current_step_id": "observe",
+      "completed_step_ids": [
+       "establish_state",
+       "diagnose",
+       "gather_specialist_evidence",
+       "generate_candidates",
+       "compare",
+       "recommend",
+       "submit"
+      ],
+      "attempt_by_step": {
+       "establish_state": 2,
+       "diagnose": 1,
+       "gather_specialist_evidence": 1,
+       "generate_candidates": 1,
+       "compare": 1,
+       "recommend": 1,
+       "submit": 1
+      },
+      "loop_exhausted_step_ids": [],
+      "branch_history": [
+       "establish_state",
+       "diagnose",
+       "gather_specialist_evidence",
+       "generate_candidates",
+       "compare",
+       "recommend",
+       "submit"
+      ],
+      "evidence_count": 23,
+      "revision": 24,
+      "started_at": "2026-10-11T01:32:18.634951+00:00",
+      "last_updated_at": "2026-10-11T01:32:21.175952+00:00"
+     }
+    },
+    "ledger": [
+     "accepted"
+    ]
+   }
+  },
+  {
+   "case": "C",
+   "step": "4recover",
+   "rc": 0,
+   "out": {
+    "phase": "recover",
+    "stores": [
+     "JsonFileProcedureStateStore",
+     "JsonFileGovernanceInbox"
+    ],
+    "report": {
+     "resumed": [],
+     "already_applied": [
+      "018e5300-302c-46d1-8561-5c6d336a54f3"
+     ],
+     "skipped": []
+    },
+    "inputs_for_calls": [],
+    "ledger": [
+     "accepted",
+     "applied"
+    ]
+   }
+  },
+  {
+   "case": "C",
+   "step": "5inspect",
+   "rc": 0,
+   "out": {
+    "phase": "inspect",
+    "stores": [
+     "JsonFileProcedureStateStore",
+     "JsonFileGovernanceInbox"
+    ],
+    "state": {
+     "procedure_execution_id": "018e5300-302c-46d1-8561-5c6d336a54f3",
+     "agent_task_id": "task-third-reaudit",
+     "trace_id": "trace-v201-canonical-sop-a",
+     "sop_id": "operations_coordination.wave_risk_resolution_v2",
+     "sop_version": "2.0",
+     "status": "running",
+     "waiting_for_governance": false,
+     "current_step_id": "observe",
+     "completed_step_ids": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend",
+      "submit"
+     ],
+     "attempt_by_step": {
+      "establish_state": 2,
+      "diagnose": 1,
+      "gather_specialist_evidence": 1,
+      "generate_candidates": 1,
+      "compare": 1,
+      "recommend": 1,
+      "submit": 1
+     },
+     "loop_exhausted_step_ids": [],
+     "branch_history": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend",
+      "submit"
+     ],
+     "evidence_count": 23,
+     "revision": 24,
+     "started_at": "2026-10-11T01:32:18.634951+00:00",
+     "last_updated_at": "2026-10-11T01:32:21.175952+00:00"
+    },
+    "unapplied": [],
+    "ready_http": 200,
+    "ready_unapplied_governance": 0,
+    "http_procedure": {
+     "status": 200,
+     "body": {
+      "procedure_execution_id": "018e5300-302c-46d1-8561-5c6d336a54f3",
+      "agent_task_id": "task-third-reaudit",
+      "trace_id": "trace-v201-canonical-sop-a",
+      "sop_id": "operations_coordination.wave_risk_resolution_v2",
+      "sop_version": "2.0",
+      "status": "running",
+      "waiting_for_governance": false,
+      "current_step_id": "observe",
+      "completed_step_ids": [
+       "establish_state",
+       "diagnose",
+       "gather_specialist_evidence",
+       "generate_candidates",
+       "compare",
+       "recommend",
+       "submit"
+      ],
+      "attempt_by_step": {
+       "establish_state": 2,
+       "diagnose": 1,
+       "gather_specialist_evidence": 1,
+       "generate_candidates": 1,
+       "compare": 1,
+       "recommend": 1,
+       "submit": 1
+      },
+      "loop_exhausted_step_ids": [],
+      "branch_history": [
+       "establish_state",
+       "diagnose",
+       "gather_specialist_evidence",
+       "generate_candidates",
+       "compare",
+       "recommend",
+       "submit"
+      ],
+      "evidence_count": 23,
+      "revision": 24,
+      "started_at": "2026-10-11T01:32:18.634951+00:00",
+      "last_updated_at": "2026-10-11T01:32:21.175952+00:00"
+     }
+    },
+    "ledger": [
+     "accepted",
+     "applied"
+    ]
+   }
+  },
+  {
+   "case": "C",
+   "step": "6redeliver",
+   "rc": 0,
+   "out": {
+    "phase": "deliver",
+    "stores": [
+     "JsonFileProcedureStateStore",
+     "JsonFileGovernanceInbox"
+    ],
+    "applied": false,
+    "duplicate": true,
+    "state": {
+     "procedure_execution_id": "018e5300-302c-46d1-8561-5c6d336a54f3",
+     "agent_task_id": "task-third-reaudit",
+     "trace_id": "trace-v201-canonical-sop-a",
+     "sop_id": "operations_coordination.wave_risk_resolution_v2",
+     "sop_version": "2.0",
+     "status": "running",
+     "waiting_for_governance": false,
+     "current_step_id": "observe",
+     "completed_step_ids": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend",
+      "submit"
+     ],
+     "attempt_by_step": {
+      "establish_state": 2,
+      "diagnose": 1,
+      "gather_specialist_evidence": 1,
+      "generate_candidates": 1,
+      "compare": 1,
+      "recommend": 1,
+      "submit": 1
+     },
+     "loop_exhausted_step_ids": [],
+     "branch_history": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend",
+      "submit"
+     ],
+     "evidence_count": 23,
+     "revision": 24,
+     "started_at": "2026-10-11T01:32:18.634951+00:00",
+     "last_updated_at": "2026-10-11T01:32:21.175952+00:00"
+    },
+    "executor_steps_during_apply": [],
+    "ledger": [
+     "accepted",
+     "applied"
+    ]
+   }
+  },
+  {
+   "case": "D",
+   "step": "1start",
+   "rc": 0,
+   "out": {
+    "phase": "start",
+    "stores": [
+     "JsonFileProcedureStateStore",
+     "JsonFileGovernanceInbox"
+    ],
+    "state": {
+     "procedure_execution_id": "e8792377-694f-4321-8bf2-2a992562ae54",
+     "agent_task_id": "task-third-reaudit",
+     "trace_id": "trace-v201-canonical-sop-a",
+     "sop_id": "operations_coordination.wave_risk_resolution_v2",
+     "sop_version": "2.0",
+     "status": "waiting_for_governance",
+     "waiting_for_governance": true,
+     "current_step_id": "submit",
+     "completed_step_ids": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend"
+     ],
+     "attempt_by_step": {
+      "establish_state": 2,
+      "diagnose": 1,
+      "gather_specialist_evidence": 1,
+      "generate_candidates": 1,
+      "compare": 1,
+      "recommend": 1,
+      "submit": 1
+     },
+     "loop_exhausted_step_ids": [],
+     "branch_history": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend"
+     ],
+     "evidence_count": 22,
+     "revision": 23,
+     "started_at": "2026-10-11T01:32:34.564567+00:00",
+     "last_updated_at": "2026-10-11T01:32:34.583852+00:00"
+    },
+    "executor_steps": [
+     "establish_state",
+     "establish_state",
+     "diagnose",
+     "gather_specialist_evidence",
+     "generate_candidates",
+     "compare",
+     "recommend",
+     "submit"
+    ],
+    "ledger": []
+   }
+  },
+  {
+   "case": "D",
+   "step": "2deliver",
+   "rc": 0,
+   "out": {
+    "phase": "deliver",
+    "stores": [
+     "JsonFileProcedureStateStore",
+     "JsonFileGovernanceInbox"
+    ],
+    "applied": true,
+    "duplicate": false,
+    "state": {
+     "procedure_execution_id": "e8792377-694f-4321-8bf2-2a992562ae54",
+     "agent_task_id": "task-third-reaudit",
+     "trace_id": "trace-v201-canonical-sop-a",
+     "sop_id": "operations_coordination.wave_risk_resolution_v2",
+     "sop_version": "2.0",
+     "status": "running",
+     "waiting_for_governance": false,
+     "current_step_id": "observe",
+     "completed_step_ids": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend",
+      "submit"
+     ],
+     "attempt_by_step": {
+      "establish_state": 2,
+      "diagnose": 1,
+      "gather_specialist_evidence": 1,
+      "generate_candidates": 1,
+      "compare": 1,
+      "recommend": 1,
+      "submit": 1
+     },
+     "loop_exhausted_step_ids": [],
+     "branch_history": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend",
+      "submit"
+     ],
+     "evidence_count": 23,
+     "revision": 24,
+     "started_at": "2026-10-11T01:32:34.564567+00:00",
+     "last_updated_at": "2026-10-11T01:32:37.113909+00:00"
+    },
+    "executor_steps_during_apply": [],
+    "ledger": [
+     "accepted",
+     "applied"
+    ]
+   }
+  },
+  {
+   "case": "D",
+   "step": "3dup_same_rev",
+   "rc": 0,
+   "out": {
+    "phase": "deliver",
+    "stores": [
+     "JsonFileProcedureStateStore",
+     "JsonFileGovernanceInbox"
+    ],
+    "applied": false,
+    "duplicate": true,
+    "state": {
+     "procedure_execution_id": "e8792377-694f-4321-8bf2-2a992562ae54",
+     "agent_task_id": "task-third-reaudit",
+     "trace_id": "trace-v201-canonical-sop-a",
+     "sop_id": "operations_coordination.wave_risk_resolution_v2",
+     "sop_version": "2.0",
+     "status": "running",
+     "waiting_for_governance": false,
+     "current_step_id": "observe",
+     "completed_step_ids": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend",
+      "submit"
+     ],
+     "attempt_by_step": {
+      "establish_state": 2,
+      "diagnose": 1,
+      "gather_specialist_evidence": 1,
+      "generate_candidates": 1,
+      "compare": 1,
+      "recommend": 1,
+      "submit": 1
+     },
+     "loop_exhausted_step_ids": [],
+     "branch_history": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend",
+      "submit"
+     ],
+     "evidence_count": 23,
+     "revision": 24,
+     "started_at": "2026-10-11T01:32:34.564567+00:00",
+     "last_updated_at": "2026-10-11T01:32:37.113909+00:00"
+    },
+    "executor_steps_during_apply": [],
+    "ledger": [
+     "accepted",
+     "applied"
+    ]
+   }
+  },
+  {
+   "case": "D",
+   "step": "4inspect",
+   "rc": 0,
+   "out": {
+    "phase": "inspect",
+    "stores": [
+     "JsonFileProcedureStateStore",
+     "JsonFileGovernanceInbox"
+    ],
+    "state": {
+     "procedure_execution_id": "e8792377-694f-4321-8bf2-2a992562ae54",
+     "agent_task_id": "task-third-reaudit",
+     "trace_id": "trace-v201-canonical-sop-a",
+     "sop_id": "operations_coordination.wave_risk_resolution_v2",
+     "sop_version": "2.0",
+     "status": "running",
+     "waiting_for_governance": false,
+     "current_step_id": "observe",
+     "completed_step_ids": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend",
+      "submit"
+     ],
+     "attempt_by_step": {
+      "establish_state": 2,
+      "diagnose": 1,
+      "gather_specialist_evidence": 1,
+      "generate_candidates": 1,
+      "compare": 1,
+      "recommend": 1,
+      "submit": 1
+     },
+     "loop_exhausted_step_ids": [],
+     "branch_history": [
+      "establish_state",
+      "diagnose",
+      "gather_specialist_evidence",
+      "generate_candidates",
+      "compare",
+      "recommend",
+      "submit"
+     ],
+     "evidence_count": 23,
+     "revision": 24,
+     "started_at": "2026-10-11T01:32:34.564567+00:00",
+     "last_updated_at": "2026-10-11T01:32:37.113909+00:00"
+    },
+    "unapplied": [],
+    "ready_http": 200,
+    "ready_unapplied_governance": 0,
+    "http_procedure": {
+     "status": 200,
+     "body": {
+      "procedure_execution_id": "e8792377-694f-4321-8bf2-2a992562ae54",
+      "agent_task_id": "task-third-reaudit",
+      "trace_id": "trace-v201-canonical-sop-a",
+      "sop_id": "operations_coordination.wave_risk_resolution_v2",
+      "sop_version": "2.0",
+      "status": "running",
+      "waiting_for_governance": false,
+      "current_step_id": "observe",
+      "completed_step_ids": [
+       "establish_state",
+       "diagnose",
+       "gather_specialist_evidence",
+       "generate_candidates",
+       "compare",
+       "recommend",
+       "submit"
+      ],
+      "attempt_by_step": {
+       "establish_state": 2,
+       "diagnose": 1,
+       "gather_specialist_evidence": 1,
+       "generate_candidates": 1,
+       "compare": 1,
+       "recommend": 1,
+       "submit": 1
+      },
+      "loop_exhausted_step_ids": [],
+      "branch_history": [
+       "establish_state",
+       "diagnose",
+       "gather_specialist_evidence",
+       "generate_candidates",
+       "compare",
+       "recommend",
+       "submit"
+      ],
+      "evidence_count": 23,
+      "revision": 24,
+      "started_at": "2026-10-11T01:32:34.564567+00:00",
+      "last_updated_at": "2026-10-11T01:32:37.113909+00:00"
+     }
+    },
+    "ledger": [
+     "accepted",
+     "applied"
+    ]
+   }
+  }
+ ],
+ "unknown_execution_probe": {
+  "ready": 200,
+  "first_release": {
+   "http": 200,
+   "body": {
+    "status": "failed",
+    "action": "warehouse.equipment.release",
+    "proposal_id": "c9378818-de95-428c-8d52-b717570c7a9a",
+    "decision_id": "f52a1233-4049-4f5d-b687-ec71f6c34e0d",
+    "reason": "all checks passed",
+    "executed": false,
+    "snapshot_id": "a273905b-17b5-48a6-9e1e-440d14046186",
+    "trace_id": null,
+    "violations": [],
+    "execution_id": "f927a4a8-4a6d-477d-b964-5993d5fdcb95"
+   }
+  },
+  "writes_after_first": 1,
+  "writes_after_wait_no_new_request": 1,
+  "ready_after": 200,
+  "second_identical_release": {
+   "http": 200,
+   "body": {
+    "status": "executed",
+    "action": "warehouse.equipment.release",
+    "proposal_id": "eecb5373-0c10-4963-841c-438e6fc7c11a",
+    "decision_id": "66ebc106-543b-432d-a83f-fb578daa273a",
+    "reason": "all checks passed",
+    "executed": true,
+    "snapshot_id": "e1ec0b83-ccd3-4f2d-97a6-69de3f89c147",
+    "trace_id": null,
+    "violations": [],
+    "execution_id": "2de66342-8cf6-41fe-8f74-ebecfcbf768d"
+   }
+  },
+  "writes_after_second": 2,
+  "reconcile_endpoint": {
+   "http": 503,
+   "body": "{\"error\":true,\"message\":\"Demo mode not active: MAIW_DEMO_MODE is not enabled; demo endpoints are inactive\",\"status_code\":503,\"error_type\":\"HTTPException\"}"
+  },
+  "writes_after_app_restart": 2,
+  "write_log": [
+   {
+    "t": 1791682731.2587228,
+    "domain": "equipment",
+    "write": "execute_equipment_release",
+    "pid": 3943307,
+    "request": {
+     "asset_id": "FL-01",
+     "released_by": "audit",
+     "notes": "unknown-probe",
+     "proposal_id": "c9378818-de95-428c-8d52-b717570c7a9a",
+     "decision_id": "f52a1233-4049-4f5d-b687-ec71f6c34e0d",
+     "execution_id": null
+    }
+   },
+   {
+    "t": 1791682739.441933,
+    "domain": "equipment",
+    "write": "execute_equipment_release",
+    "pid": 3943964,
+    "request": {
+     "asset_id": "FL-01",
+     "released_by": "audit",
+     "notes": "operator retry",
+     "proposal_id": "eecb5373-0c10-4963-841c-438e6fc7c11a",
+     "decision_id": "66ebc106-543b-432d-a83f-fb578daa273a",
+     "execution_id": null
+    }
+   }
+  ]
+ },
+ "document_and_upload_probe": {
+  "default": {
+   "upload_unauth": {
+    "http": 200,
+    "body": "{\"document_id\":\"b8e05f12-b0a8-42dc-9de3-ebbb5f367724\",\"status\":\"uploaded\",\"message\":\"Document uploaded successfully and processing started\",\"estimated_processing_time\":60}"
+   },
+   "files_written": 1,
+   "model_calls_triggered": 0,
+   "doc_tables": "document_operations,document_search_metadata,documents",
+   "documents_rows_before_after": [
+    "0",
+    "1"
+   ],
+   "status_after": {
+    "http": 200,
+    "body": "{\"document_id\":\"b8e05f12-b0a8-42dc-9de3-ebbb5f367724\",\"status\":\"failed\",\"progress\":0.0,\"current_stage\":\"Preprocessing\",\"stages\":[{\"stage_name\":\"preprocessing\",\"status\":\"failed\",\"started_at\":\"2026-10-11T01:41:40.537671\",\"completed_at\":\"2026-10-11T01:41:40.619507\",\"processing_time_ms\":null,\"error_mess"
+   },
+   "chunked_60MB_no_content_length": {
+    "http": 500,
+    "body": "{\"error\":true,\"message\":\"Document validation failed\",\"status_code\":500,\"error_type\":\"HTTPException\"}",
+    "new_files": [
+     [
+      "0c319789-426f-42c8-85f3-507e096c4fdb_big.pdf",
+      62914753
+     ]
+    ]
+   },
+   "content_length_60MB": {
+    "http": 500,
+    "body": "{\"error\":true,\"message\":\"Request processing failed: 413: Request too large: 62915029 bytes (max 52428800)\",\"status_code\""
+   },
+   "rate_limit_150_gets": {
+    "200": 150
+   },
+   "rate_limit_30_uploads": {
+    "200": 30
+   },
+   "inference_modality_image": {
+    "http": 503,
+    "body": "{\"code\":\"MODEL_UNAVAILABLE\",\"message\":\"No enabled policy-eligible model available. Tried roles: ['nano-omni', 'super'] for task='audit_probe' modality=image risk=low reasoning=medium required_capabilities=set(). Enable at least one Nemotron",
+    "model_calls": 0
+   }
+  },
+  "nano_omni_configured": {
+   "upload_unauth": {
+    "http": 200,
+    "body": "{\"document_id\":\"f51981f9-034c-4829-92d5-6d1c57d5f35d\",\"status\":\"uploaded\",\"message\":\"Document uploaded successfully and processing started\",\"estimated_processing_time\":60}"
+   },
+   "files_written": 1,
+   "model_calls_triggered": 0,
+   "doc_tables": "document_operations,document_search_metadata,documents",
+   "documents_rows_before_after": [
+    "31",
+    "32"
+   ],
+   "status_after": {
+    "http": 200,
+    "body": "{\"document_id\":\"f51981f9-034c-4829-92d5-6d1c57d5f35d\",\"status\":\"failed\",\"progress\":0.0,\"current_stage\":\"Preprocessing\",\"stages\":[{\"stage_name\":\"preprocessing\",\"status\":\"failed\",\"started_at\":\"2026-10-11T01:41:56.970575\",\"completed_at\":\"2026-10-11T01:41:57.032771\",\"processing_time_ms\":null,\"error_mess"
+   },
+   "chunked_60MB_no_content_length": {
+    "http": 500,
+    "body": "{\"error\":true,\"message\":\"Document validation failed\",\"status_code\":500,\"error_type\":\"HTTPException\"}",
+    "new_files": [
+     [
+      "918d02e0-bff0-4989-ad68-636bea59f5f3_big.pdf",
+      62914753
+     ]
+    ]
+   },
+   "content_length_60MB": {
+    "http": 500,
+    "body": "{\"error\":true,\"message\":\"Request processing failed: 413: Request too large: 62915029 bytes (max 52428800)\",\"status_code\""
+   },
+   "rate_limit_150_gets": {
+    "200": 150
+   },
+   "rate_limit_30_uploads": {
+    "200": 30
+   },
+   "inference_modality_image": {
+    "http": 503,
+    "body": "{\"code\":\"MODEL_POLICY_VIOLATION\",\"message\":\"MODEL_POLICY_VIOLATION (UNAPPROVED_MODEL_ID): physical model 'nvidia/nemotron-3-nano-omni-30b-a3b' bound to role 'nano-omni' is not an approved MAIW deployment (approved for 'nano-omni': none)\",\"t",
+    "model_calls": 0
+   }
+  }
+ },
+ "response_cache_probe": {
+  "copilot_service_present": null,
+  "copilot_ask": {
+   "http": 200,
+   "provider_calls": 0,
+   "body_head": "{\"conversation_id\":\"c-ask\",\"turn_id\":\"17567a4b-55f0-4b7c-82b7-e7a57247f92c\",\"trace_id\":\"dd574372-d4d4-49ff-a738-faed8a750ecf\",\"intent\":\"ask\",\"status\":\"degraded\",\"answer\":\"I cannot determine the answer because warehouse state is unavailable "
+  },
+  "copilot_analyze": {
+   "http": 200,
+   "provider_calls": 0,
+   "body_head": "{\"conversation_id\":\"c-analyze\",\"turn_id\":\"a6cfd426-5961-4281-8539-b373917383ed\",\"trace_id\":\"3e824692-bc82-471f-9cb9-45212e38f50b\",\"intent\":\"ask\",\"status\":\"degraded\",\"answer\":\"I cannot determine the answer because warehouse state is unavaila"
+  },
+  "copilot_act": {
+   "http": 200,
+   "provider_calls": 0,
+   "body_head": "{\"conversation_id\":\"c-act\",\"turn_id\":\"0872934b-edbb-47f3-a5ff-37d01dbf9589\",\"trace_id\":\"04efc83b-8d41-444c-903d-b6785afdebed\",\"intent\":\"ask\",\"status\":\"degraded\",\"answer\":\"I cannot determine the answer because warehouse state is unavailable "
+  },
+  "cache_cross_reasoning": [
+   {
+    "reasoning": "high",
+    "http": 200,
+    "role": "super",
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "provider_calls": 1,
+    "provider_enable_thinking": [
+     null
+    ],
+    "provider_reasoning_budget": [
+     0
+    ],
+    "server_latency_ms": 6.512132997158915
+   },
+   {
+    "reasoning": "medium",
+    "http": 200,
+    "role": "super",
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "provider_calls": 0,
+    "provider_enable_thinking": [],
+    "provider_reasoning_budget": [],
+    "server_latency_ms": 0.7625919970450923
+   },
+   {
+    "reasoning": "low",
+    "http": 200,
+    "role": "lightning",
+    "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+    "provider_calls": 1,
+    "provider_enable_thinking": [
+     false
+    ],
+    "provider_reasoning_budget": [
+     null
+    ],
+    "server_latency_ms": 5.180022999411449
+   },
+   {
+    "reasoning": "high",
+    "http": 200,
+    "role": "super",
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "provider_calls": 0,
+    "provider_enable_thinking": [],
+    "provider_reasoning_budget": [],
+    "server_latency_ms": 0.623317995632533
+   },
+   {
+    "reasoning": "medium",
+    "http": 200,
+    "role": "super",
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "provider_calls": 0,
+    "provider_enable_thinking": [],
+    "provider_reasoning_budget": [],
+    "server_latency_ms": 0.7366740028373897
+   }
+  ],
+  "cache_timestamp_normalisation": {
+   "provider_calls_for_two_distinct_prompts": 1,
+   "http": [
+    200,
+    200
+   ]
+  }
+ },
+ "sandbox_governed_write_probe": {
+  "reference_governed": {
+   "release_FL-01": {
+    "http": 200,
+    "body": {
+     "status": "executed",
+     "action": "warehouse.equipment.release",
+     "proposal_id": "497fe910-d160-416e-ab8b-9e33295ae86e",
+     "decision_id": "2e6f5868-478f-4cc5-b91e-e4d62676cc99",
+     "reason": "all checks passed",
+     "executed": true,
+     "snapshot_id": "8baf3bde-40f3-45ce-9424-294204a00585",
+     "trace_id": null,
+     "violations": [],
+     "execution_id": "a9825471-7fcb-474a-a61a-3d191aa8e4db"
+    }
+   },
+   "assign_FL-02": {
+    "http": 200,
+    "body": {
+     "status": "requires_human_approval",
+     "action": "warehouse.equipment.assign",
+     "proposal_id": "2096ee7b-3d89-4636-bc93-b1cd9ebc8408",
+     "decision_id": "77b50355-5ae6-4003-83a9-d4848931576d",
+     "reason": "risk_level=medium with requires_approval=True requires human approval",
+     "executed": false,
+     "snapshot_id": "a90f0511-7b86-4b1c-a1e7-202dea349fd2",
+     "trace_id": null,
+     "violations": [
+      {
+       "rule": "approval.required",
+       "message": "risk_level=medium with requires_approval=True requires human approval",
+       "details": {
+        "risk_level": "medium",
+        "requires_approval": true
+       }
+      }
+     ]
+    }
+   },
+   "maintenance_FL-02": {
+    "http": 422,
+    "body": "{\"error\":true,\"message\":\"Validation error\",\"status_code\":422,\"error_type\":\"ValidationError\",\"details\":{\"errors\":[{\"loc\":[\"body\",\"scheduled_for\"],\"msg\":\"Field required\",\"type\":\"missing\"}]}}"
+   }
+  },
+  "reference_with_optional_mcp_url": {
+   "release_FL-01": {
+    "http": 200,
+    "body": {
+     "status": "executed",
+     "action": "warehouse.equipment.release",
+     "proposal_id": "87ffa219-34e4-4e4b-b981-b5af59d75991",
+     "decision_id": "81176063-381e-43c9-837a-736f1faa8add",
+     "reason": "all checks passed",
+     "executed": true,
+     "snapshot_id": "99cd95f4-0fe7-4589-a509-3cd777e1f994",
+     "trace_id": null,
+     "violations": [],
+     "execution_id": "2a00b8b6-799d-4b09-86a0-047e65f4fb9b"
+    }
+   },
+   "assign_FL-02": {
+    "http": 200,
+    "body": {
+     "status": "requires_human_approval",
+     "action": "warehouse.equipment.assign",
+     "proposal_id": "0a3feff0-4d6f-40b0-bc73-be92f9c532e7",
+     "decision_id": "99495ba3-a678-4be2-a36c-4fc689905631",
+     "reason": "risk_level=medium with requires_approval=True requires human approval",
+     "executed": false,
+     "snapshot_id": "9fed6a3b-b0b2-483a-b421-8409ad689317",
+     "trace_id": null,
+     "violations": [
+      {
+       "rule": "approval.required",
+       "message": "risk_level=medium with requires_approval=True requires human approval",
+       "details": {
+        "risk_level": "medium",
+        "requires_approval": true
+       }
+      }
+     ]
+    }
+   },
+   "maintenance_FL-02": {
+    "http": 422,
+    "body": "{\"error\":true,\"message\":\"Validation error\",\"status_code\":422,\"error_type\":\"ValidationError\",\"details\":{\"errors\":[{\"loc\":[\"body\",\"scheduled_for\"],\"msg\":\"Field required\",\"type\":\"missing\"}]}}"
+   }
+  }
+ },
+ "stop_script_decoys": [
+  "D1_status rc=1",
+  "D1_smoke rc=2",
+  "D1_restart rc=2",
+  "D1_stop rc=0",
+  "D1_preflight rc=1",
+  "D1_start rc=1",
+  "D1 decoy=alive decoy_requests=0",
+  "maiw-api.log",
+  "sandbox-maiw-v201-third-a.created",
+  "sandbox-maiw-v201-third-a.policy.yaml",
+  "D2_status rc=1",
+  "D2_smoke rc=2",
+  "D2_restart rc=2",
+  "D2_stop rc=3",
+  "D2 decoy=alive decoy_requests=0 instance_file_kept=yes",
+  "D3_status rc=1",
+  "D3_smoke rc=2",
+  "D3_stop rc=3",
+  "D3 impostor=alive impostor_requests=0",
+  "D4_smoke rc=2",
+  "D4_stop rc=0",
+  "D4 decoy=alive decoy_requests=0 instance_file_after_stop=cleared",
+  "DONE"
+ ],
+ "remaining_p2": {
+  "carried": [
+   "P2-03",
+   "P2-04",
+   "P2-06",
+   "P2-09",
+   "P2-10",
+   "P2-11 (largely addressed)",
+   "P2-14",
+   "P2-15",
+   "P2-16",
+   "P2-17",
+   "P2-18",
+   "P2-20"
+  ],
+  "verified_closed": [
+   "P2-01",
+   "P2-02",
+   "P2-07",
+   "P2-08 (moot: multimodal fails closed)",
+   "P2-13",
+   "P2-19"
+  ],
+  "escalated": {
+   "P2-05": "NEW3-P1-01"
+  },
+  "new": {
+   "N-1": "identity check fails open when provider omits model",
+   "N-2": "NIMClient cache ignores reasoning mode; strips timestamps/UUIDs/dates from prompts",
+   "N-3": "opt-in PG readiness test stale since round 2",
+   "N-4": "MCP readiness reachability is TCP-connect only",
+   "N-5": "react-router moderate (production)",
+   "N-6": "build fails with CI=true; CI does not build",
+   "N-7": "internal token compared non-constant-time",
+   "N-8": "oversize upload 413 surfaced as 500",
+   "N-9": "runbook lacks OpenShell gateway step; no MCP server launch doc for reference_governed",
+   "N-10": "cleanup_for_testing.sh kills by process name",
+   "N-11": ".env.example / code default ports 8001, 5435, host 0.0.0.0",
+   "N-12": "embedding_service outside approved table (loaded, not route-invoked); evaluate_with_model out-of-policy hatch"
+  },
+  "rulings": {
+   "document_auth_s52": "P2 (P1 if exposed beyond trusted network)",
+   "legacy_reads_s53": "P2",
+   "chunked_upload_rate_limit_s54": "P2 (62.9 MB written; 0/150 GETs and 0/30 uploads limited)",
+   "multimodal_s55": "acceptable explicit limitation; no crash",
+   "response_cache_s56": "P2"
+  }
+ },
+ "new_findings": {
+  "P0": [],
+  "P1": [
+   {
+    "id": "NEW3-P1-01",
+    "title": "Unauthenticated governed writes reachable from the sandbox and any network peer",
+    "evidence": [
+     ".third-logs/sbx_write.json",
+     ".third-logs/sbx_write_reference_profile.json",
+     ".third-logs/mcp/writes.jsonl",
+     "apps/api/maiw_api/routers/equipment.py:408-538",
+     "apps/api/maiw_api/bootstrap.py:386-410",
+     "deploy/openshell/maiw-inference-only.policy.yaml.tmpl:40"
+    ]
+   },
+   {
+    "id": "NEW3-P1-02",
+    "title": "Ambiguous write on real MCP transport reported FAILED; reconcile demo-only; retry duplicates",
+    "evidence": [
+     ".third-logs/unknown/result.json",
+     "packages/maiw-execution/maiw_execution/base.py:336-385",
+     "apps/api/maiw_api/routers/demo.py:1163-1186"
+    ]
+   }
+  ]
+ },
+ "historical_preservation": {
+  "pr142": "OPEN 742fd2a, FAIL verdict intact",
+  "pr144": "OPEN 80947b0, FAIL verdict intact",
+  "v2.0.0": "tag 0c35a0e -> 816ace7 unchanged",
+  "v2.0.1_tag": null
+ },
+ "cleanup": {
+  "sandbox_deleted": true,
+  "reference_db_removed": true,
+  "test_db_removed": true,
+  "audit_gateway_stopped": true,
+  "audit_network_removed": true,
+  "aux_processes_stopped": true,
+  "runbook_env_deleted": true,
+  "uploads_deleted": true,
+  "untouched": [
+   "maiw-qual-20c-b",
+   "nemoclaw-8991 gateway",
+   "nemoclaw-llama-cpp",
+   "nemo-microservices-*",
+   "wms-nim-*",
+   "cuopt",
+   "wosa-*",
+   "ports 5435, 8000-8020"
+  ]
+ },
+ "merge_recommendation": "Do not merge PR #143 as v2.0.1; fix NEW3-P1-01 and NEW3-P1-02 and re-audit.",
+ "final_verdict": "MAIW V2.0.1 THIRD INDEPENDENT RE-AUDIT FAIL"
+}
