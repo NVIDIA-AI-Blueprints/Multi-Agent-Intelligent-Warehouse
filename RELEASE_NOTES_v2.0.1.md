@@ -1,22 +1,35 @@
-# MAIW v2.0.1 — Release Notes (DRAFT — not tagged)
+# MAIW v2.0.1 — Release Notes
 
-**Status:** release candidate after the fifth independent re-audit and the
-final pre-merge cleanup. Not tagged; `v2.0.0` (`816ace73…`) is unchanged.
-The fifth re-audit (report prepared, not yet published) found no new P0 / P1
-and one fail-safe gap, NEW5-P2-01 (a contradictory `NOT_APPLIED` claim was
-trusted); the final pre-merge cleanup closes it — see "Final pre-merge
-cleanup" below and `docs/audits/MAIW_V2.0.1_FINAL_PREMERGE_GATE.md`. Earlier
-rounds: `docs/audits/MAIW_V2.0.1_REMEDIATION_ROUND4.md`,
+**Status:** released. Tag `v2.0.1` targets merged `main` commit
+`53a27e61c9d70529eb1e2c1d86280d184a0a3c59` (PR #143); GitHub Release
+"MAIW v2.0.1". `v2.0.0` (`816ace73…`) is unchanged. Open P0 = 0, P1 = 0.
+
+## Post-merge release gate (run on the exact tagged SHA)
+- Host: 4 x H100 NVL, NVIDIA driver 580.178.04 (loaded and installed module).
+- Reference deployment preflight: 32 passed, 0 failed, no skips.
+- Reference deployment smoke test: 17 passed, 0 failed.
+- Live hosted Nemotron 3 Super, HIGH reasoning, through the canonical
+  ModelGateway path (`POST /api/v1/inference`): HTTP 200, resolved and
+  provider-reported model `nvidia/nemotron-3-super-120b-a12b`, generation
+  `nemotron-3`, `identity_verified=true`.
+- Live hosted Nemotron 3.5 Lightning, LOW reasoning: HTTP 200, resolved and
+  provider-reported model `nvidia/nemotron-3.5-lightning-30b-a3b`, generation
+  `nemotron-3.5`, `identity_verified=true`.
+- CI on the merged SHA: CI/CD Pipeline (tests, typecheck, security scan) and
+  CodeQL passed. Trivy: non-regression against `main`; open Trivy findings are
+  inherited from the existing dependency tree (none introduced by v2.0.1,
+  none CRITICAL).
+
+The fifth independent re-audit found no new P0 / P1 and one fail-safe gap,
+NEW5-P2-01 (a contradictory `NOT_APPLIED` claim was trusted), closed by the
+final pre-merge cleanup — see "Final pre-merge cleanup" below and
+`docs/audits/MAIW_V2.0.1_FINAL_PREMERGE_GATE.md`. Earlier rounds:
+`docs/audits/MAIW_V2.0.1_REMEDIATION_ROUND4.md`,
 `docs/audits/MAIW_V2.0.1_REMEDIATION_ROUND3.md`,
 `docs/audits/MAIW_V2.0.1_REMEDIATION_ROUND2.md`,
-`docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md`. This is a draft, not a
-release qualification: the live hosted Nemotron 3 Super / Nemotron 3.5
-Lightning identity proof (`identity_verified=true` from the real hosted
-provider for HIGH → Super and LOW → Lightning) has not been reproduced on the
-exact candidate. It is a mandatory **post-merge / pre-tag** release gate,
-together with full CI, preflight and smoke on the merged `main` SHA, Trivy
-non-regression against `main`, and P0 = P1 = 0. Do not tag `v2.0.1` until
-that gate passes.
+`docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md`. The round-by-round test
+baselines further below are the counts recorded at each round, not a re-run
+of the release gate.
 
 ## Why v2.0.1
 
@@ -353,7 +366,7 @@ both policies) and the CI / review state of the frozen candidate.
   `npm audit fix` (critical 3 → 0, high 62 → 50; remaining highs are in the
   react-scripts build/test/dev-server toolchain).
 
-## Known limitations (v2.0.1 candidate)
+## Known limitations (v2.0.1)
 - `POST /api/v1/document/upload` and the legacy read routes are
   unauthenticated and a chunked upload can exceed the size limit (rate
   limiting enforces since round 4); the API binds `MAIW_API_HOST` (`0.0.0.0`
@@ -371,10 +384,9 @@ both policies) and the CI / review state of the frozen candidate.
 - The execution journal and the unresolved-target guard are single-node.
 - The legacy `src/api/services/llm/nim_client.py` (not used by the canonical
   ModelGateway path) keeps its old cache key.
-- Real hosted Nemotron 3 Super / Nemotron 3.5 Lightning identity
-  (`identity_verified=true`) has been proven only against a local controlled
-  provider on this candidate; the hosted proof is a mandatory post-merge /
-  pre-tag gate.
+- Install and qualify from a shell with `PYTHONPATH` unset: an inherited
+  `PYTHONPATH` pointing at another MAIW checkout makes imports resolve outside
+  the active venv (see the runbook's install section).
 
 ## Upgrade notes
 - Round 4: `error_code=MCP_TOOL_ERROR` now means `202 status=unknown`

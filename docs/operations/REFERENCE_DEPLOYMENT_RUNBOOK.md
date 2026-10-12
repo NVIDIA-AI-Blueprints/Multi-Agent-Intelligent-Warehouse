@@ -168,6 +168,9 @@ The complete, ordered command list (each step is detailed below). Run from
 the repository root.
 
 ```bash
+# 0. Start from a shell with no inherited PYTHONPATH (see note below)
+unset PYTHONPATH
+
 # 1. Install (venv mirrors CI)
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
@@ -218,6 +221,16 @@ bash scripts/setup/reference_gateway.sh stop
 `scripts/validate_reference_runbook.sh` checks that every script and file
 this procedure names exists and that `.env.example` documents every variable
 the scripts require.
+
+**Why `unset PYTHONPATH`:** MAIW installs and qualifies against packages from
+*this* checkout's `.venv`. An inherited `PYTHONPATH` (for example one pointing
+at another MAIW checkout or another venv's site-packages) is searched before
+the venv, so `pip` can treat dependencies such as `pydantic` as already
+installed and skip them, and `maiw_*` imports can resolve to the wrong tree.
+The v2.0.1 release gate hit exactly this: the first preflight failed until the
+shell's `PYTHONPATH` was unset and the venv rebuilt. Check with
+`.venv/bin/python -c "import maiw_api; print(maiw_api.__file__)"` — the path
+must be inside this checkout.
 
 ---
 
@@ -710,6 +723,7 @@ Do not upgrade NemoClaw and OpenShell simultaneously.
 | Startup timeout | Provider/DB not available | Check provider URL and NVIDIA_API_KEY | Fix connectivity; retry start |
 | Port already in use | another process owns MAIW_API_PORT | `ss -tlnp | grep :$MAIW_API_PORT` | choose a free MAIW_API_PORT (stop never kills by port) |
 | No procedure state after restart | Wrong MAIW_PERSISTENCE_ROOT | `ls /var/lib/maiw/procedures/` | Correct MAIW_PERSISTENCE_ROOT |
+| Preflight/start fails with `ModuleNotFoundError` (e.g. `pydantic`) or `maiw_*` imported from another path | inherited `PYTHONPATH` made `pip` skip dependencies or shadowed the venv | `echo "${PYTHONPATH:-unset}"`; `.venv/bin/python -c "import maiw_api; print(maiw_api.__file__)"` | `unset PYTHONPATH`, recreate `.venv`, rerun the install step |
 
 ---
 
