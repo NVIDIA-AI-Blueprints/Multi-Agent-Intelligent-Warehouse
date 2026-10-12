@@ -203,7 +203,7 @@ describe('DemoControlBar', () => {
   });
 
   it('inject button calls inject with correct event type', async () => {
-    (demoAPI.inject as jest.Mock).mockResolvedValue({ asset_id: 'AGV-01', status: 'offline' });
+    (demoAPI.inject as jest.Mock).mockResolvedValue({ asset_id: 'agv-000', status: 'offline' });
     const status = {
       active: true, paused: false,
       scenario: { name: 'healthy_baseline', display_name: 'Healthy Baseline', description: '', tags: [] },

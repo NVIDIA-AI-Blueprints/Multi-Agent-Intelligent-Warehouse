@@ -49,16 +49,18 @@ describe('FaultInjectionPanel', () => {
     expect(injectButtons.length).toBe(2);
   });
 
-  it('calls demoAPI.inject when INJECT clicked for F10', async () => {
+  it('calls demoAPI.inject when INJECT clicked for F10 — backend resolves the asset', async () => {
     wrap(true);
     const injectButtons = screen.getAllByText('INJECT');
     fireEvent.click(injectButtons[0]);
     await waitFor(() => {
       expect(demoAPI.inject).toHaveBeenCalledWith(
         'equipment_fault',
-        expect.objectContaining({ asset_id: 'AGV-01' }),
+        expect.objectContaining({ fault_code: 'E_STATE_DRIFT_SIM' }),
       );
     });
+    const payload = (demoAPI.inject as jest.Mock).mock.calls[0][1];
+    expect(payload).not.toHaveProperty('asset_id');
   });
 
   it('shows "Start a scenario" hint when scenario not active', () => {

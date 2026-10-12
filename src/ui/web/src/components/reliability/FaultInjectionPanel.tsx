@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Typography, Button } from '@mui/material';
 import { demoAPI, InjectEventType } from '../../services/demoAPI';
+import { describeInjectError, describeInjectTarget } from '../demo/injectFeedback';
 
 interface FaultProfile {
   id: string;
@@ -39,7 +40,8 @@ const PROFILES: FaultProfile[] = [
     desc: 'World state changed between assessment and execution',
     safetyBehavior: 'ActionConflict blocks write. Drift blocks: 1. Unauthorized writes: 0.',
     injectEventType: 'equipment_fault' as InjectEventType,
-    injectPayload: { asset_id: 'AGV-01', fault_code: 'E_STATE_DRIFT_SIM' },
+    // No asset_id: the backend resolves an eligible asset from the active world.
+    injectPayload: { equipment_type: 'agv', fault_code: 'E_STATE_DRIFT_SIM' },
   },
   {
     id: 'F12',
@@ -58,15 +60,20 @@ interface Props {
 export default function FaultInjectionPanel({ scenarioActive }: Props) {
   const [injecting, setInjecting] = useState<string | null>(null);
   const [lastInjected, setLastInjected] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
 
   async function handleInject(profile: FaultProfile) {
     if (!profile.injectEventType || !scenarioActive) return;
     setInjecting(profile.id);
+    setFeedback(null);
     try {
-      await demoAPI.inject(profile.injectEventType, profile.injectPayload ?? {});
+      const result = await demoAPI.inject(profile.injectEventType, profile.injectPayload ?? {});
       setLastInjected(profile.id);
+      const target = describeInjectTarget(result);
+      setFeedback({ ok: true, text: target ? `${profile.id} · ${target}` : `${profile.id} · injected` });
     } catch (e) {
       console.error('Fault inject failed', e);
+      setFeedback({ ok: false, text: `${profile.id} · ${describeInjectError(e)}` });
     } finally {
       setInjecting(null);
     }
@@ -135,6 +142,15 @@ export default function FaultInjectionPanel({ scenarioActive }: Props) {
           );
         })}
       </Box>
+
+      {feedback && (
+        <Typography
+          data-testid="fault-inject-feedback"
+          sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: feedback.ok ? '#3FB950' : '#F85149', mt: 0.5 }}
+        >
+          {feedback.text}
+        </Typography>
+      )}
 
       {!scenarioActive && (
         <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', mt: 0.5 }}>

@@ -13,6 +13,7 @@ import { Box, Typography, Select, MenuItem, CircularProgress } from '@mui/materi
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { demoAPI, ScenarioMeta, InjectEventType, DemoStatus, AnalysisResult } from '../../services/demoAPI';
 import { format } from 'date-fns';
+import { describeInjectError, describeInjectTarget } from './injectFeedback';
 
 // ── Scenario objectives — demo narrative, not duplicating YAML description ────
 
@@ -38,8 +39,9 @@ const INJECT_EVENTS: InjectDef[] = [
     type: 'equipment_fault',
     label: 'EQUIP FAULT',
     color: '#F85149',
-    buildPayload: (w) => ({
-      asset_id: w?.equipment?.available ? 'AGV-01' : 'AGV-01',
+    // No asset_id: the backend resolves an eligible asset from the active world.
+    buildPayload: () => ({
+      equipment_type: 'agv',
       fault_code: 'E_MOTOR_OVERTEMP',
       new_status: 'offline',
     }),
@@ -48,7 +50,7 @@ const INJECT_EVENTS: InjectDef[] = [
     type: 'equipment_restore',
     label: 'EQUIP RESTORE',
     color: '#3FB950',
-    buildPayload: () => ({ asset_id: 'AGV-01', new_status: 'available', battery_pct: 85 }),
+    buildPayload: () => ({ new_status: 'available', battery_pct: 85 }),
   },
   {
     type: 'worker_absence',
@@ -197,11 +199,12 @@ const DemoControlBar: React.FC<Props> = ({ status, onStatusChange, onAnalysisCom
     setBusy(`inject:${def.type}`);
     setInjectMsg(null);
     try {
-      await demoAPI.inject(def.type, def.buildPayload(status?.world ?? null));
-      setInjectMsg(`✓ ${def.label}`);
+      const result = await demoAPI.inject(def.type, def.buildPayload(status?.world ?? null));
+      const target = describeInjectTarget(result);
+      setInjectMsg(target ? `✓ ${def.label} · ${target}` : `✓ ${def.label}`);
       invalidate();
     } catch (e: any) {
-      setInjectMsg(`✕ ${e?.response?.data?.detail ?? e.message}`);
+      setInjectMsg(`✕ ${describeInjectError(e)}`);
     }
     finally { setBusy(null); }
   }, [status?.world, invalidate]);
