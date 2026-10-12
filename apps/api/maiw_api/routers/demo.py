@@ -157,8 +157,16 @@ async def inject_event(request: InjectRequest):
 
     Examples
     --------
-    Equipment fault:
-        {"event_type": "equipment_fault", "payload": {"asset_id": "AGV-01", "fault_code": "E_MOTOR_OVERTEMP"}}
+    Equipment fault (target resolved from the active world; see
+    ``DemoScenarioController.resolve_equipment_target``):
+        {"event_type": "equipment_fault", "payload": {"fault_code": "E_MOTOR_OVERTEMP"}}
+
+    Equipment fault on an explicit asset of the active world:
+        {"event_type": "equipment_fault", "payload": {"asset_id": "agv-000"}}
+
+    Equipment targeting errors (typed body ``{"error", "code", "message", ...}``):
+        404 ASSET_NOT_IN_ACTIVE_WORLD — explicit asset_id not in the active world
+        409 NO_ELIGIBLE_ASSET         — asset_id omitted and nothing is eligible
 
     Low stock:
         {"event_type": "low_stock", "payload": {"sku": "SKU-1001", "quantity_available": 50}}
@@ -166,11 +174,18 @@ async def inject_event(request: InjectRequest):
     Worker absence:
         {"event_type": "worker_absence", "payload": {"worker_id": "w-002"}}
     """
+    from maiw_api.demo.controller import InjectTargetError
+    from maiw_api.write_auth import TypedHTTPError
+
     ctrl = _get_controller()
     try:
         result = await ctrl.inject(request.event_type, request.payload)
     except RuntimeError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except InjectTargetError as exc:
+        raise TypedHTTPError(
+            exc.status_code, exc.code, exc.message, **exc.extra
+        ) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return {"ok": True, "event_type": request.event_type, "result": result}
