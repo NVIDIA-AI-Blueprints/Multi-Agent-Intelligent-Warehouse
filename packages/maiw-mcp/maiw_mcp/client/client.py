@@ -61,6 +61,7 @@ from maiw_mcp.errors import (
     MCPConnectTimeout,
     MCPContractError,
     MCPResponseLost,
+    MCPResultOutcomeUnknown,
     MCPTimeout,
     MCPTimeoutAfterDispatch,
     MCPToolError,
@@ -69,7 +70,12 @@ from maiw_mcp.errors import (
     MCPUnavailable,
 )
 from maiw_mcp.registry.registry import CapabilityRegistry
-from maiw_mcp.write_disposition import certifies_not_applied, describe_disposition
+from maiw_mcp.write_disposition import (
+    EXECUTION_DISPOSITION_FIELD,
+    certifies_not_applied,
+    certifies_not_applied_result,
+    describe_disposition,
+)
 from maiw_mcp.telemetry.telemetry import CapabilityTelemetry
 
 logger = logging.getLogger(__name__)
@@ -154,12 +160,18 @@ class MAIWMCPClient:
             still existed at call time; the child operation simply ran long).
         MCPToolNotApplied
             Server returned ``is_error=True`` AND certified, in
-            ``structuredContent.execution_disposition == "NOT_APPLIED"``, that
-            it rejected the request before any mutation (round 4).
+            ``structuredContent``, that it rejected the request before any
+            mutation: the strict canonical payload of
+            ``maiw_mcp.write_disposition.certifies_not_applied`` (round 4;
+            strict since the final pre-merge cleanup, NEW5-P2-01).
         MCPToolErrorOutcomeUnknown
             Server returned ``is_error=True`` without that certification — the
             tool may have mutated before failing; for a write the outcome is
             UNKNOWN (round 4, NEW4-P1-01).  Both subclass ``MCPToolError``.
+        MCPResultOutcomeUnknown
+            A NON-error result carries a non-null ``execution_disposition``
+            that is not a trusted NOT_APPLIED (``certifies_not_applied_result``)
+            — the result contradicts itself → UNKNOWN (NEW5-P2-01).
         MCPContractError
             Tool result could not be parsed as JSON or was not a dict.
         MCPUnavailable
@@ -330,11 +342,10 @@ class MAIWMCPClient:
             error_text = self._extract_text(call_result)
             structured = call_result.structured_content
             if certifies_not_applied(structured):
-                code = structured.get("rejection_code")
                 raise MCPToolNotApplied(
                     f"{capability!r} rejected before any mutation "
                     f"(execution_disposition=NOT_APPLIED): {error_text}",
-                    rejection_code=code if isinstance(code, str) else None,
+                    rejection_code=structured["rejection_code"],
                 )
             observed = describe_disposition(structured)
             raise MCPToolErrorOutcomeUnknown(
@@ -344,7 +355,23 @@ class MAIWMCPClient:
                 observed_disposition=observed,
             )
 
-        return self._parse_result(call_result)
+        parsed = self._parse_result(call_result)
+        # Final pre-merge (NEW5-P2-01): a non-error result that carries an
+        # execution disposition must be a fully consistent NOT_APPLIED
+        # certification; a contradicted, malformed or unknown one makes the
+        # whole result untrustworthy (it is checked HERE, on the raw result,
+        # because contract validation downstream drops unknown fields).
+        if parsed.get(EXECUTION_DISPOSITION_FIELD) is not None and (
+            not certifies_not_applied_result(parsed)
+        ):
+            observed = describe_disposition(parsed, error_result=False)
+            raise MCPResultOutcomeUnknown(
+                f"{capability!r} returned a result whose execution_disposition "
+                f"is not a trusted NOT_APPLIED certification ({observed}) — "
+                f"outcome unknown",
+                observed_disposition=observed,
+            )
+        return parsed
 
     def _extract_text(self, result: types.CallToolResult) -> str:
         for block in result.content:

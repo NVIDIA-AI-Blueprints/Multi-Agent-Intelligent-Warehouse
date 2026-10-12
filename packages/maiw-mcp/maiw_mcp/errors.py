@@ -106,8 +106,12 @@ class MCPTimeoutAfterDispatch(MCPTimeout, MCPDispatchOutcomeUnknown):
 #                               → the server rejected the request before any
 #                                 mutation (definite non-execution)
 #   MCPToolErrorOutcomeUnknown  isError without a valid NOT_APPLIED disposition
-#                               (absent / malformed / unknown) → for a write the
+#                               (absent / malformed / unknown, or a NOT_APPLIED
+#                               claim that fails the strict trust rules —
+#                               final pre-merge, NEW5-P2-01) → for a write the
 #                               outcome is UNKNOWN
+#   MCPResultOutcomeUnknown     a NON-error result whose execution_disposition is
+#                               not a trusted NOT_APPLIED → UNKNOWN
 #
 # Both subclass ``MCPToolError`` so read-path callers are unchanged.
 
@@ -129,6 +133,19 @@ class MCPToolErrorOutcomeUnknown(MCPToolError, MCPDispatchOutcomeUnknown):
     did not certify non-execution — the mutation may have been applied."""
 
     def __init__(self, message: str, *, observed_disposition: str = "absent") -> None:
+        super().__init__(message)
+        self.observed_disposition = observed_disposition
+
+
+class MCPResultOutcomeUnknown(MCPContractError, MCPDispatchOutcomeUnknown):
+    """v2.0.1 final pre-merge (NEW5-P2-01): a NON-error tool result carries an
+    ``execution_disposition`` that is not a trusted NOT_APPLIED certification
+    (e.g. ``NOT_APPLIED`` next to ``success=true``, an applied-mutation field,
+    a mutation reference / count, or an unknown field).  The result
+    contradicts itself, so for a write neither execution nor non-execution is
+    established → UNKNOWN."""
+
+    def __init__(self, message: str, *, observed_disposition: str) -> None:
         super().__init__(message)
         self.observed_disposition = observed_disposition
 

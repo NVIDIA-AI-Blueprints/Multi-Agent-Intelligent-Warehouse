@@ -50,6 +50,7 @@ from .errors import (
     MCPTimeoutAfterDispatch,
     MCPToolNotApplied,
     MCPToolErrorOutcomeUnknown,
+    MCPResultOutcomeUnknown,
     WriteNotApplied,
 )
 from .deadline import RequestDeadline, RequestDeadlineExceeded
@@ -73,6 +74,7 @@ __all__ = [
     "MCPResponseLost",
     "MCPTimeoutAfterDispatch",
     "MCPToolNotApplied",
+    "MCPResultOutcomeUnknown",
     "MCPToolErrorOutcomeUnknown",
     "WriteNotApplied",
     "RequestDeadline",

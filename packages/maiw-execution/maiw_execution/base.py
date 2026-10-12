@@ -50,11 +50,17 @@ Failure classification (rounds 3 + 4) — ``classify_write_failure``:
     MCPNotDispatched                   → FAILED   (MCPConnectFailed,
                                                    MCPConnectTimeout, MCPCircuitOpen)
     MCPToolNotApplied                  → FAILED   (server certified NOT_APPLIED in
-                                                   structuredContent)
+                                                   structuredContent — strict
+                                                   canonical payload only)
     WriteNotApplied                    → FAILED   (in-process provider certified
                                                    no mutation)
+    MCPResultOutcomeUnknown            → UNKNOWN  (non-error result with an
+                                                   untrusted / contradicted
+                                                   disposition — NEW5-P2-01)
     MCPToolError (any other, incl.     → UNKNOWN  (isError alone is NOT proof of
-      MCPToolErrorOutcomeUnknown)                  non-execution — round 4)
+      MCPToolErrorOutcomeUnknown)                  non-execution — round 4; a
+                                                   contradicted NOT_APPLIED claim
+                                                   is not a certification)
     MCPDispatchOutcomeUnknown          → UNKNOWN  (MCPResponseLost,
                                                    MCPTimeoutAfterDispatch)
     MCPTimeout (phase not recorded)    → UNKNOWN  (a timed-out call was in flight)
@@ -66,11 +72,16 @@ Failure classification (rounds 3 + 4) — ``classify_write_failure``:
                                                    is not proven)
 
 A non-error provider result reporting FAILED / CONFLICT / DEFERRED (or
-``success=false``) is likewise only a definite non-execution when it carries
-``execution_disposition = "NOT_APPLIED"``; otherwise it becomes UNKNOWN
-(``SERVER_FAILURE_UNCERTIFIED``).  A result with ``success=false`` and a
-success outcome (``executed`` / ``no_op``) is contradictory → UNKNOWN
-(``SERVER_RESULT_CONTRADICTORY``).
+``success=false``) is likewise only a definite non-execution when it is a
+trusted NOT_APPLIED certification
+(``maiw_mcp.write_disposition.certifies_not_applied_result``: exact
+disposition, ``success`` exactly false, a rejection outcome, no mutation
+reference / count, no unknown field); a non-success result without any
+disposition becomes UNKNOWN (``SERVER_FAILURE_UNCERTIFIED``).  A result with
+``success=false`` and a success outcome (``executed`` / ``no_op``), or with a
+non-null disposition that is not a trusted NOT_APPLIED (e.g. ``NOT_APPLIED``
+next to ``success=true``), is contradictory → UNKNOWN
+(``SERVER_RESULT_CONTRADICTORY``; final pre-merge, NEW5-P2-01).
 
 An UNKNOWN result is never retried here; the registry blocks every further
 write to the same domain target until the UNKNOWN is reconciled.
@@ -103,12 +114,17 @@ from maiw_mcp.errors import (
     MCPContractError,
     MCPDispatchOutcomeUnknown,
     MCPNotDispatched,
+    MCPResultOutcomeUnknown,
     MCPTimeout,
     MCPToolError,
     MCPToolNotApplied,
     WriteNotApplied,
 )
-from maiw_mcp.write_disposition import certifies_not_applied, describe_disposition
+from maiw_mcp.write_disposition import (
+    EXECUTION_DISPOSITION_FIELD,
+    certifies_not_applied_result,
+    describe_disposition,
+)
 
 from .outcome import AmbiguousWriteError, ExecutionOutcome
 from .reconciliation import ExecutionIntent
@@ -185,6 +201,8 @@ def classify_write_failure(
         return ExecutionOutcome.FAILED, "MCP_TOOL_NOT_APPLIED", False
     if isinstance(exc, WriteNotApplied):
         return ExecutionOutcome.FAILED, "WRITE_NOT_APPLIED", False
+    if isinstance(exc, MCPResultOutcomeUnknown):
+        return ExecutionOutcome.UNKNOWN, "SERVER_RESULT_CONTRADICTORY", None
     if isinstance(exc, MCPToolError):
         return ExecutionOutcome.UNKNOWN, "MCP_TOOL_ERROR", None
     if isinstance(exc, MCPDispatchOutcomeUnknown):
@@ -224,6 +242,8 @@ def _dispatch_status(exc: BaseException) -> str:
         return DISPATCH_NOT_DISPATCHED
     if isinstance(exc, (MCPToolNotApplied, WriteNotApplied)):
         return DISPATCH_REJECTED_BEFORE_MUTATION
+    if isinstance(exc, MCPResultOutcomeUnknown):
+        return DISPATCH_RESPONSE_RECEIVED
     if isinstance(exc, MCPToolError):
         return DISPATCH_SERVER_ERROR
     if isinstance(exc, (MCPDispatchOutcomeUnknown, MCPTimeout)):
@@ -262,8 +282,10 @@ _UNCERTAINTY_REASONS = {
     ),
     "SERVER_REPORTED_UNKNOWN": "server reported the outcome as unknown",
     "SERVER_RESULT_CONTRADICTORY": (
-        "server result says success=false with a success outcome; neither "
-        "execution nor non-execution is established"
+        "server result contradicts itself (success=false with a success "
+        "outcome, or an execution_disposition that is not a trusted "
+        "NOT_APPLIED certification); neither execution nor non-execution is "
+        "established"
     ),
 }
 
@@ -576,7 +598,8 @@ class BaseActionExecutor:
         # other non-success after dispatch may hide an applied mutation.
         error_code: str | None = None
         mutation: bool | None = None
-        disposition = describe_disposition(backend_resp)
+        disposition = describe_disposition(backend_resp, error_result=False)
+        certified = certifies_not_applied_result(backend_resp)
         if (
             isinstance(backend_resp, dict)
             and backend_resp.get("success") is False
@@ -595,8 +618,28 @@ class BaseActionExecutor:
             )
             outcome = ExecutionOutcome.UNKNOWN
             error_code = "SERVER_RESULT_CONTRADICTORY"
+        elif (
+            isinstance(backend_resp, dict)
+            and backend_resp.get(EXECUTION_DISPOSITION_FIELD) is not None
+            and not certified
+        ):
+            # Final pre-merge (NEW5-P2-01): a disposition that is present but
+            # not a fully consistent NOT_APPLIED certification (e.g. NOT_APPLIED
+            # with success=true, a mutation reference, or an unknown field)
+            # contradicts the rest of the result — never trusted either way.
+            logger.error(
+                "%s: contradictory provider result for action=%s execution_id=%s "
+                "(outcome=%s, disposition=%s) — treating as UNKNOWN",
+                type(self).__name__,
+                proposal.action,
+                execution_id,
+                outcome.value,
+                disposition,
+            )
+            outcome = ExecutionOutcome.UNKNOWN
+            error_code = "SERVER_RESULT_CONTRADICTORY"
         elif outcome in _NON_EXECUTION_OUTCOMES:
-            if certifies_not_applied(backend_resp):
+            if certified:
                 mutation = False
             else:
                 logger.error(
