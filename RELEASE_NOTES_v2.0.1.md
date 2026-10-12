@@ -1,20 +1,22 @@
 # MAIW v2.0.1 — Release Notes (DRAFT — not tagged)
 
-**Status:** release candidate after remediation round 4, pending a FIFTH
-independent re-audit. Do not tag until that re-audit passes. `v2.0.0`
-(`816ace73…`) is unchanged. The fourth independent re-audit (PR #146, frozen
-candidate `6ad2cbf`) confirmed the eleven earlier P1s closed and found one new
-P1 (NEW4-P1-01: a server-reported MCP tool error after a mutation was
-classified as a definite failure, so a retry wrote twice); round 4 addresses
-it — see "Round 4" below, `docs/audits/MAIW_V2.0.1_REMEDIATION_ROUND4.md` and
-`artifacts/audit/v2.0.1_remediation_round4.json`. Earlier rounds:
+**Status:** release candidate after the fifth independent re-audit and the
+final pre-merge cleanup. Not tagged; `v2.0.0` (`816ace73…`) is unchanged.
+The fifth re-audit (report prepared, not yet published) found no new P0 / P1
+and one fail-safe gap, NEW5-P2-01 (a contradictory `NOT_APPLIED` claim was
+trusted); the final pre-merge cleanup closes it — see "Final pre-merge
+cleanup" below and `docs/audits/MAIW_V2.0.1_FINAL_PREMERGE_GATE.md`. Earlier
+rounds: `docs/audits/MAIW_V2.0.1_REMEDIATION_ROUND4.md`,
 `docs/audits/MAIW_V2.0.1_REMEDIATION_ROUND3.md`,
 `docs/audits/MAIW_V2.0.1_REMEDIATION_ROUND2.md`,
-`docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md`. This is a draft, not a PASS
-claim, and not a release qualification: the live hosted Nemotron 3 Super /
-3.5 Lightning identity proof is left to the fifth re-audit (it needs an
-explicitly provided hosted credential; round 4 used only a local controlled
-provider).
+`docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md`. This is a draft, not a
+release qualification: the live hosted Nemotron 3 Super / Nemotron 3.5
+Lightning identity proof (`identity_verified=true` from the real hosted
+provider for HIGH → Super and LOW → Lightning) has not been reproduced on the
+exact candidate. It is a mandatory **post-merge / pre-tag** release gate,
+together with full CI, preflight and smoke on the merged `main` SHA, Trivy
+non-regression against `main`, and P0 = P1 = 0. Do not tag `v2.0.1` until
+that gate passes.
 
 ## Why v2.0.1
 
@@ -28,6 +30,42 @@ gaps between those packages and **what the shipped application
 canonical app. Details and evidence:
 `docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md`,
 `artifacts/audit/v2.0.1_remediation.json`.
+
+## Final pre-merge cleanup (fifth re-audit NEW5-P2-01)
+
+### A contradictory `NOT_APPLIED` claim is UNKNOWN, never "failed"
+- The fifth re-audit showed that the `NOT_APPLIED` claim alone was still
+  trusted: an `isError` result with `execution_disposition=NOT_APPLIED` next
+  to `outcome=executed`, `mutation_status=applied` and an unknown
+  `rejection_code`, and a non-error result with `success=true`,
+  `outcome=failed` and `NOT_APPLIED`, were both answered `200 failed`, and
+  the operator retry wrote a second time. No shipped server emits such a
+  payload; a non-conforming MCP server could.
+- `NOT_APPLIED` is now trusted only when the whole response is the canonical,
+  internally consistent rejection (`maiw_mcp.write_disposition`):
+  - error result: exactly `execution_disposition` (`"NOT_APPLIED"`),
+    `rejection_code` (`INVALID_REQUEST` / `NOT_FOUND` /
+    `PRECONDITION_FAILED`) and an optional string `message` — no other key;
+  - non-error write result: exact disposition, `success` exactly `false`,
+    `outcome` `failed` / `conflict` / `deferred`, a known `rejection_code`
+    if present, `assignment_id` / `maintenance_id` / `allocation_id` null,
+    `tasks_updated` 0, and no field outside the write-result contracts.
+- Anything else — executed / success flags, an applied outcome or mutation
+  status, affected-row or mutation counts, post-state, a missing / unknown /
+  malformed rejection code, or any unknown field — fails safe to UNKNOWN
+  (`202 status=unknown`, `MCP_TOOL_ERROR` or `SERVER_RESULT_CONTRADICTORY`):
+  journal unresolved, identical retry `409 RECONCILIATION_REQUIRED`, no
+  further MCP write, and reconciliation from an authoritative reread
+  (`confirmed_executed` / `confirmed_not_executed` / `indeterminate`).
+- A clean, explicit pre-mutation rejection is still a definite failure
+  (`MCP_TOOL_NOT_APPLIED`, or `conflict` / `deferred`). The shipped
+  equipment (PostgreSQL and mock), labor and wave MCP servers already emit
+  only canonical payloads; no server change was needed.
+
+### Final pre-merge test baseline
+See `docs/audits/MAIW_V2.0.1_FINAL_PREMERGE_GATE.md` for the exact counts
+(Python CORE CI twice, UI, opt-in PostgreSQL, live sandbox boundary with
+both policies) and the CI / review state of the frozen candidate.
 
 ## Round 4 (fourth re-audit: NEW4-P1-01, NEW4-P2-01/03/04/06, P2-04)
 
@@ -333,6 +371,10 @@ canonical app. Details and evidence:
 - The execution journal and the unresolved-target guard are single-node.
 - The legacy `src/api/services/llm/nim_client.py` (not used by the canonical
   ModelGateway path) keeps its old cache key.
+- Real hosted Nemotron 3 Super / Nemotron 3.5 Lightning identity
+  (`identity_verified=true`) has been proven only against a local controlled
+  provider on this candidate; the hosted proof is a mandatory post-merge /
+  pre-tag gate.
 
 ## Upgrade notes
 - Round 4: `error_code=MCP_TOOL_ERROR` now means `202 status=unknown`

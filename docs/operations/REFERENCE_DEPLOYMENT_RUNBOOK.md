@@ -818,7 +818,14 @@ A server certifies a pre-mutation rejection only with the typed
 `packages/maiw-mcp/maiw_mcp/write_disposition.py`; the shipped equipment MCP
 server emits it for request-validation and precondition rejections taken
 before any write statement).  Text content, `isError` alone, and a missing,
-malformed or unknown disposition are never trusted.
+malformed or unknown disposition are never trusted.  The certification is
+trusted only when the whole payload is consistent (final pre-merge cleanup,
+NEW5-P2-01): a known `rejection_code` and nothing that implies execution,
+mutation, success, affected rows or post-state, and no unknown field; a
+non-error `conflict` / `deferred` / `failed` result must also say
+`success: false` with no mutation reference or count.  A contradicted
+`NOT_APPLIED` claim is answered `202 status=unknown` (`MCP_TOOL_ERROR` or
+`SERVER_RESULT_CONTRADICTORY`) like any other uncertified failure.
 
 | What the API returns | Meaning |
 |---|---|
