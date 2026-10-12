@@ -292,9 +292,23 @@ Three sandbox modes, and the middle one is the point:
 
 **A sandbox authorises nothing.** Every capability check that runs unsandboxed still runs sandboxed, through the same `authorize_step`. The sandbox is a second wall behind the first. If `integrations/nemoclaw/` were deleted, capability enforcement, governance and procedure persistence would be unchanged.
 
-**Qualification status (FULL_END_TO_END_QUALIFIED):** NemoClaw v0.0.124 and OpenShell v0.0.116 are **installed and qualified** on epg-tme-smc-h100-02. The security boundary, gateway, sandbox image, and all MAIW security invariants are verified at code and container level. The approved Nemotron 3/3.5 model family policy is enforced by `PolicyFilter`. The `POST /api/v1/inference` HTTP inference endpoint (strict field allowlist) and `MAIWHTTPModelGatewayClient` sandbox transport client are live and qualified. Full end-to-end SOP sandbox run with approved Nemotron NIM is **qualified** — real OpenShell sandbox inference through the full chain verified. See `docs/audits/MAIW_NEMOCLAW_SECURITY_QUALIFICATION.md` and `artifacts/nemoclaw/` for the full qualification record.
+**Qualification status.** NemoClaw v0.0.124 and OpenShell v0.0.116 are installed on epg-tme-smc-h100-02 and the package-level security boundary (capability policy, sandbox isolation, approved Nemotron 3/3.5 policy in `PolicyFilter`, `MAIWHTTPModelGatewayClient`) was qualified for v2.0.0 — see `docs/audits/MAIW_NEMOCLAW_SECURITY_QUALIFICATION.md` and `artifacts/nemoclaw/`. The independent post-release audit of v2.0.0 (PR #142) then found that the *shipped application composition* did not match those claims (inference endpoint not mounted on `maiw_api.app:app`, an ungoverned legacy chat write path, durable stores not wired, readiness that failed open, a document path outside ModelGateway). **v2.0.1** remediates those gaps on the canonical app — see [What ships](#what-ships-v201) and `docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md` — and is pending an independent re-audit.
 
 See [docs/architecture/NEMOCLAW_OPENSHELL_INTEGRATION.md](docs/architecture/NEMOCLAW_OPENSHELL_INTEGRATION.md).
+
+### What ships (v2.0.1)
+
+The only release composition root is `apps/api/maiw_api/app.py` (`uvicorn maiw_api.app:app`, port 8001). `src/api/app.py` is a legacy development server and is never part of a deployment or qualification.
+
+| Surface | Behaviour in the shipped app |
+|---|---|
+| `POST /api/v1/inference` | Mounted on the API port. Internal token required (fail-closed 401/503); forbidden routing fields and unknown fields → 422; every call goes through the canonical ModelGateway → PolicyFilter (Nemotron 3 / 3.5 only). |
+| Operational writes | Only governed routes mutate: agent proposal → DecisionEngine → ActionExecutor (`/equipment/{assign,release,maintenance}`, `/copilot/turn`, `/demo/{analyze,approve,reject,reconcile}`). |
+| Legacy `/api/v1/chat`, `/api/v1/reasoning` | **Not mounted.** Use `POST /api/v1/copilot/turn`. |
+| Other legacy routers (inventory, WMS, IoT, ERP, scanning, attendance, migrations, forecasting, training) and operations/safety | Read-only (GET) in the shipped app. |
+| Procedure state | `JsonFileProcedureStateStore` + `JsonFileGovernanceInbox` under `MAIW_PERSISTENCE_ROOT` (default `/var/lib/maiw`), built once by the composition root; `GET /api/v1/procedures` is a read-only view. `MAIW_PERSISTENCE_MODE=memory` is an explicit development/test opt-in. |
+| `GET /api/v1/ready` | 503 `NOT_READY` with `failed_components` when persistence, ModelGateway, the governed write path, MCP domains or (outside demo mode) the database are unavailable. |
+| Document pipeline | Every model call goes through ModelGateway with an explicit modality. Vision steps need an approved multimodal Nemotron model; with none enabled, documents fail with a typed `MODEL_UNAVAILABLE` — never mock data, never a synthetic `APPROVE`. |
 
 ---
 
@@ -528,8 +542,8 @@ cp .env.example .env
 # 4. Generate Warehouse World (DataPack)
 python -m maiw_world dc47_demo --output data/worlds/
 
-# 5. Start backend
-MAIW_DEMO_MODE=true uvicorn maiw_api.app:app --reload --port 8000
+# 5. Start backend (development: in-memory procedure state, explicitly)
+MAIW_DEMO_MODE=true MAIW_PERSISTENCE_MODE=memory uvicorn maiw_api.app:app --reload --port 8000
 
 # 6. Start frontend
 cd src/ui/web && npm install && npm run dev
@@ -548,7 +562,7 @@ cd src/ui/web && npm install && npm run dev
 # 17. Open Model Gateway Lab at http://localhost:3000/models/lab
 ```
 
-> **Demo Mode** (`MAIW_DEMO_MODE=true`) does not require PostgreSQL, Redis, Milvus, or Kafka. Only `NVIDIA_API_KEY` is needed.
+> **Demo Mode** (`MAIW_DEMO_MODE=true`) does not require PostgreSQL, Redis, Milvus, or Kafka. Only `NVIDIA_API_KEY` is needed. For a durable local run set `MAIW_PERSISTENCE_ROOT` to a writable directory instead of `MAIW_PERSISTENCE_MODE=memory`; the reference deployment (`scripts/start_reference_deployment.sh`) is always file-backed.
 
 ---
 
@@ -679,7 +693,7 @@ Two warehouse worlds (same scenario, same seed) were advanced through the same d
 Reproduce with:
 
 ```bash
-MAIW_DEMO_MODE=true uvicorn maiw_api.app:app --port 8000
+MAIW_DEMO_MODE=true MAIW_PERSISTENCE_MODE=memory uvicorn maiw_api.app:app --port 8000
 python scripts/counterfactual_eval.py   # generates artifacts/demo/labor_wave_control_vs_maiw.*
 python scripts/trace_capture.py          # generates artifacts/demo/labor_constraint_wave_risk_trace.*
 ```
@@ -696,7 +710,7 @@ A frozen pre-NemoClaw performance baseline is preserved under `artifacts/baselin
 │  ├─ maiw-contracts/      # Domain value objects (equipment, labor, wave, inventory contracts)
 │  ├─ maiw-mcp/            # MCP client, capability registry, circuit breakers
 │  ├─ maiw-state/          # WarehouseState, domain state models
-│  ├─ maiw-decision/       # ActionProposal, DecisionEngine — APPROVED/REJECTED/DEFERRED
+│  ├─ maiw-decision/       # ActionProposal, DecisionEngine — APPROVED/REJECTED/REQUIRES_HUMAN_APPROVAL/REQUIRES_FRESH_STATE
 │  ├─ maiw-models/         # ModelGateway, NIM provider, PolicyFilter, ModelRouter
 │  ├─ maiw-skills/         # Inventory, Equipment, Labor, Wave skills
 │  ├─ maiw-execution/      # BaseActionExecutor (6-guard pattern), domain executors

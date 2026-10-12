@@ -248,6 +248,8 @@ class GovernanceInbox:
 
     def __init__(self) -> None:
         self._seen: set[tuple[str, str, int]] = set()
+        self._applied: set[tuple[str, str, int]] = set()
+        self._accepted: dict[tuple[str, str, int], SandboxGovernanceInput] = {}
 
     def accept(self, governance_input: SandboxGovernanceInput) -> bool:
         """Return True if newly accepted, False if already applied."""
@@ -260,10 +262,22 @@ class GovernanceInbox:
             )
             return False
         self._seen.add(key)
+        self._accepted[key] = governance_input
         return True
 
     def has_seen(self, governance_input: SandboxGovernanceInput) -> bool:
         return governance_input.idempotency_key in self._seen
+
+    def mark_applied(self, governance_input: SandboxGovernanceInput) -> None:
+        """Record that the accepted outcome's resume transition completed."""
+        self._applied.add(governance_input.idempotency_key)
+
+    def is_applied(self, governance_input: SandboxGovernanceInput) -> bool:
+        return governance_input.idempotency_key in self._applied
+
+    def accepted_unapplied(self) -> list[SandboxGovernanceInput]:
+        """Accepted outcomes whose resume was never marked applied."""
+        return [v for k, v in self._accepted.items() if k not in self._applied]
 
 
 class JsonFileGovernanceInbox:
@@ -288,6 +302,14 @@ class JsonFileGovernanceInbox:
     The file grows monotonically — entries are never removed. Keys are
     re-loaded into an in-memory set on construction, so lookup is O(1).
 
+    v2.0.1 round 2 (crash between accept and resume): an ``accepted`` entry
+    also carries the full ``governance_input`` payload, and a second
+    ``applied`` entry is appended once the resume transition has been
+    checkpointed.  On restart ``accepted_unapplied()`` returns every outcome
+    that was accepted but never applied, so ``ProcedureHost`` can replay the
+    resume exactly once.  Entries written before round 2 (no ``event`` field)
+    are treated as accepted *and* applied — they carry no payload to replay.
+
     The inbox directory is the same root as ``JsonFileProcedureStateStore``
     when the caller uses the shared persistence root; the two stores do not
     share files.
@@ -300,6 +322,8 @@ class JsonFileGovernanceInbox:
         self._dir.mkdir(parents=True, exist_ok=True)
         self._path = self._dir / self._FILENAME
         self._seen: set[tuple[str, str, int]] = set()
+        self._applied: set[tuple[str, str, int]] = set()
+        self._accepted: dict[tuple[str, str, int], dict] = {}
         self._load()
 
     def _load(self) -> None:
@@ -318,8 +342,19 @@ class JsonFileGovernanceInbox:
                         str(entry["proposal_id"]),
                         int(entry["expected_revision"]),
                     )
+                    event = entry.get("event")
+                    if event == "applied":
+                        self._applied.add(key)
+                        continue
                     self._seen.add(key)
-                except (KeyError, ValueError, json.JSONDecodeError) as exc:
+                    if event == "accepted" and isinstance(
+                        entry.get("governance_input"), dict
+                    ):
+                        self._accepted[key] = entry["governance_input"]
+                    else:
+                        # Pre-round-2 entry: no payload, cannot be replayed.
+                        self._applied.add(key)
+                except (KeyError, ValueError, TypeError, json.JSONDecodeError) as exc:
                     logger.warning(
                         "JsonFileGovernanceInbox: skipping malformed entry at "
                         "line %d in %s: %s",
@@ -328,18 +363,23 @@ class JsonFileGovernanceInbox:
                         exc,
                     )
 
-    def _persist(self, key: tuple[str, str, int]) -> None:
-        """Atomically append one key to the on-disk log."""
-        entry = (
-            json.dumps(
-                {
-                    "procedure_execution_id": key[0],
-                    "proposal_id": key[1],
-                    "expected_revision": key[2],
-                }
-            )
-            + "\n"
-        )
+    def _persist(
+        self,
+        key: tuple[str, str, int],
+        *,
+        event: str = "accepted",
+        payload: dict | None = None,
+    ) -> None:
+        """Atomically append one entry to the on-disk log."""
+        record: dict = {
+            "procedure_execution_id": key[0],
+            "proposal_id": key[1],
+            "expected_revision": key[2],
+            "event": event,
+        }
+        if payload is not None:
+            record["governance_input"] = payload
+        entry = json.dumps(record) + "\n"
         # Open in append mode then fsync so the entry survives a crash.
         # We do NOT use tempfile+replace for append-only logs — the file grows
         # monotonically and atomicity at the line level is sufficient.
@@ -358,12 +398,45 @@ class JsonFileGovernanceInbox:
                 *key,
             )
             return False
-        self._persist(key)
+        payload = governance_input.model_dump(mode="json")
+        self._persist(key, event="accepted", payload=payload)
         self._seen.add(key)
+        self._accepted[key] = payload
         return True
 
     def has_seen(self, governance_input: SandboxGovernanceInput) -> bool:
         return governance_input.idempotency_key in self._seen
+
+    def mark_applied(self, governance_input: SandboxGovernanceInput) -> None:
+        """
+        Durably record that the accepted outcome's resume transition has been
+        checkpointed.  Idempotent.
+        """
+        key = governance_input.idempotency_key
+        if key in self._applied:
+            return
+        self._persist(key, event="applied")
+        self._applied.add(key)
+
+    def is_applied(self, governance_input: SandboxGovernanceInput) -> bool:
+        return governance_input.idempotency_key in self._applied
+
+    def accepted_unapplied(self) -> list[SandboxGovernanceInput]:
+        """Accepted outcomes whose resume was never marked applied (replayable)."""
+        out: list[SandboxGovernanceInput] = []
+        for key, payload in self._accepted.items():
+            if key in self._applied:
+                continue
+            try:
+                out.append(SandboxGovernanceInput.model_validate(payload))
+            except Exception as exc:  # noqa: BLE001 - corrupt payload: report, skip
+                logger.error(
+                    "JsonFileGovernanceInbox: accepted entry %s cannot be "
+                    "replayed (%s)",
+                    key,
+                    exc,
+                )
+        return out
 
 
 def validate_governance_input(

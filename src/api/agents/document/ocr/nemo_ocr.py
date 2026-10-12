@@ -14,15 +14,19 @@
 # limitations under the License.
 
 """
-Stage 2: Intelligent OCR with NeMoRetriever-OCR-v1
-Fast, accurate text extraction from images with layout-aware OCR.
+Stage 2: OCR — text extraction from page images.
+
+v2.0.1 (audit P1-05): OCR is a vision inference and goes through the canonical
+ModelGateway with ``Modality.IMAGE``. PolicyFilter serves it only with an
+approved Nemotron 3 / 3.5 multimodal model; with none enabled the stage fails
+with ``DocumentInferenceUnavailable(MODEL_UNAVAILABLE)``. The v2.0.0 direct
+call to a non-Nemotron Llama vision model and its mock fallback are gone.
 """
 
 import asyncio
 import logging
 from typing import Dict, Any, List, Optional
 import os
-import httpx
 import base64
 import io
 from PIL import Image
@@ -43,30 +47,11 @@ class NeMoOCRService:
     """
 
     def __init__(self):
-        self.api_key = os.getenv("NEMO_OCR_API_KEY", "")
-        self.base_url = os.getenv("NEMO_OCR_URL", "https://integrate.api.nvidia.com/v1")
-        self.timeout = 60
+        self.timeout = int(os.getenv("DOCUMENT_OCR_TIMEOUT", "60"))
 
     async def initialize(self):
-        """Initialize the NeMo OCR service."""
-        try:
-            if not self.api_key:
-                logger.warning("NEMO_OCR_API_KEY not found, using mock implementation")
-                return
-
-            # Test API connection
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(
-                    f"{self.base_url}/models",
-                    headers={"Authorization": f"Bearer {self.api_key}"},
-                )
-                response.raise_for_status()
-
-            logger.info("NeMo OCR Service initialized successfully")
-
-        except Exception as e:
-            logger.error(f"Failed to initialize NeMo OCR Service: {e}")
-            logger.warning("Falling back to mock implementation")
+        """No provider probing: the ModelGateway owns provider connectivity."""
+        return None
 
     async def extract_text(
         self, images: List[Image.Image], layout_result: Dict[str, Any]
@@ -112,7 +97,10 @@ class NeMoOCRService:
                 "page_results": enhanced_results,
                 "confidence": overall_confidence,
                 "total_pages": len(images),
-                "model_used": "NeMoRetriever-OCR-v1",
+                "model_used": ",".join(
+                    sorted({r.get("model_used", "") for r in all_ocr_results if r.get("model_used")})
+                ),
+                "via": "maiw_models.ModelGateway",
                 "processing_timestamp": datetime.now().isoformat(),
                 "layout_enhanced": True,
             }
@@ -124,77 +112,58 @@ class NeMoOCRService:
     async def _extract_text_from_image(
         self, image: Image.Image, page_number: int
     ) -> Dict[str, Any]:
-        """Extract text from a single image."""
-        try:
-            if not self.api_key:
-                # Mock implementation for development
-                return await self._mock_ocr_extraction(image, page_number)
+        """Extract text from one page image via ModelGateway (Modality.IMAGE)."""
+        from maiw_models import Modality
+        from src.api.agents.document.model_gateway_adapter import (
+            generate_for_document,
+        )
 
-            # Convert image to base64
-            image_base64 = await self._image_to_base64(image)
-
-            # Call NeMo OCR API
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(
-                    f"{self.base_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": "meta/llama-3.2-11b-vision-instruct",
-                        "messages": [
-                            {
-                                "role": "user",
-                                "content": [
-                                    {
-                                        "type": "text",
-                                        "text": "Extract all text from this document image with high accuracy. Include bounding boxes and confidence scores for each text element.",
-                                    },
-                                    {
-                                        "type": "image_url",
-                                        "image_url": {
-                                            "url": f"data:image/png;base64,{image_base64}"
-                                        },
-                                    },
-                                ],
-                            }
-                        ],
-                        "max_tokens": 2000,
-                        "temperature": 0.1,
-                    },
-                )
-                response.raise_for_status()
-
-                result = response.json()
-
-                # Parse OCR results from chat completions response
-                content = result["choices"][0]["message"]["content"]
-
-                # Parse the extracted text and create proper structure
-                ocr_data = self._parse_ocr_result(
-                    {
-                        "text": content,
-                        "words": self._extract_words_from_text(content),
-                        "confidence_scores": (
-                            [0.9] * len(content.split()) if content else [0.9]
-                        ),
-                    },
-                    image.size,
-                )
-
-                return {
-                    "page_number": page_number,
-                    "text": ocr_data["text"],
-                    "words": ocr_data["words"],
-                    "confidence": ocr_data["confidence"],
-                    "image_dimensions": image.size,
+        image_base64 = await self._image_to_base64(image)
+        response = await generate_for_document(
+            stage="ocr_extraction",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                "Extract all text from this document image with "
+                                "high accuracy. Return the text only."
+                            ),
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{image_base64}"
+                            },
+                        },
+                    ],
                 }
-
-        except Exception as e:
-            logger.error(f"OCR extraction failed for page {page_number}: {e}")
-            # Fall back to mock implementation
-            return await self._mock_ocr_extraction(image, page_number)
+            ],
+            modality=Modality.IMAGE,
+            max_tokens=2000,
+            temperature=0.1,
+            timeout_s=self.timeout,
+        )
+        content = response.content
+        ocr_data = self._parse_ocr_result(
+            {
+                "text": content,
+                "words": self._extract_words_from_text(content),
+                # The model reports no per-word confidence; none is invented.
+                "confidence_scores": [],
+            },
+            image.size,
+        )
+        return {
+            "page_number": page_number,
+            "text": ocr_data["text"],
+            "words": ocr_data["words"],
+            "confidence": ocr_data["confidence"],
+            "image_dimensions": image.size,
+            "model_used": response.model_id,
+        }
 
     async def _image_to_base64(self, image: Image.Image) -> str:
         """Convert PIL Image to base64 string."""
@@ -341,54 +310,3 @@ class NeMoOCRService:
             enhanced_results.append(enhanced_result)
 
         return enhanced_results
-
-    async def _mock_ocr_extraction(
-        self, image: Image.Image, page_number: int
-    ) -> Dict[str, Any]:
-        """Mock OCR extraction for development."""
-        width, height = image.size
-
-        # Generate mock OCR data
-        mock_text = f"""
-        INVOICE #INV-2024-{page_number:03d}
-        
-        Vendor: ABC Supply Company
-        Address: 123 Warehouse St, City, State 12345
-        
-        Date: 2024-01-15
-        Due Date: 2024-02-15
-        
-        Item Description          Qty    Price    Total
-        Widget A                 10     125.00   1,250.00
-        Widget B                 5      75.00    375.00
-        
-        Subtotal:                1,625.00
-        Tax (8.5%):             138.13
-        Total:                   1,763.13
-        
-        Payment Terms: Net 30
-        """
-
-        # Generate mock word data
-        mock_words = [
-            {"text": "INVOICE", "bbox": [50, 50, 150, 80], "confidence": 0.95},
-            {
-                "text": f"#INV-2024-{page_number:03d}",
-                "bbox": [200, 50, 350, 80],
-                "confidence": 0.92,
-            },
-            {"text": "Vendor:", "bbox": [50, 120, 120, 150], "confidence": 0.88},
-            {"text": "ABC", "bbox": [130, 120, 180, 150], "confidence": 0.90},
-            {"text": "Supply", "bbox": [190, 120, 250, 150], "confidence": 0.89},
-            {"text": "Company", "bbox": [260, 120, 330, 150], "confidence": 0.87},
-            {"text": "Total:", "bbox": [400, 300, 450, 330], "confidence": 0.94},
-            {"text": "1,763.13", "bbox": [460, 300, 550, 330], "confidence": 0.96},
-        ]
-
-        return {
-            "page_number": page_number,
-            "text": mock_text.strip(),
-            "words": mock_words,
-            "confidence": 0.91,
-            "image_dimensions": image.size,
-        }

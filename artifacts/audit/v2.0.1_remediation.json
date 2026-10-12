@@ -1,0 +1,532 @@
+{
+  "schema": "maiw.audit.remediation/v1",
+  "title": "MAIW v2.0.1 remediation of the v2.0.0 independent post-release audit",
+  "date": "2026-10-07",
+  "repository": "NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse",
+  "source": {
+    "start_sha": "944507ec914665c6682d39b95e8713355f486598",
+    "start_ref": "nvidia/main",
+    "branch": "fix/v2.0.1-canonical-app-remediation",
+    "v2_0_0_tag": {
+      "tag_object": "0c35a0e9718c2a81e8c79fe297c46f690b5cb42a",
+      "commit": "816ace73c4561469978094eeedb2641f6db3c4fa",
+      "modified": false
+    },
+    "audit_pr": {
+      "number": 142,
+      "head": "742fd2a0505c63a4835741c66f2e911802202b81",
+      "modified": false,
+      "verdict_for_v2_0_0": "MAIW V2 INDEPENDENT POST-RELEASE AUDIT FAIL"
+    },
+    "canonical_entrypoint": "apps/api/maiw_api/app.py (uvicorn maiw_api.app:app)"
+  },
+  "findings": [
+    {
+      "id": "P1-01",
+      "title": "Legacy /api/v1/chat ungoverned warehouse write in shipped app",
+      "root_cause": "maiw_api.app mounted src.api.routers.chat and other legacy routers wholesale; chat planner's MCPEquipmentAgent -> ToolDiscoveryService -> EquipmentAssetTools.assign_equipment SQL with no DecisionEngine/approval/ActionExecutor, unauthenticated",
+      "fix": "chat and reasoning unmounted; legacy routers + operations/safety mounted read-only via maiw_api.route_policy; document curated",
+      "commit": "fb406d7",
+      "tests": [
+        "tests/api/test_canonical_shipped_app.py::test_p1_01_audit_chat_scenario_cannot_mutate",
+        "tests/api/test_canonical_shipped_app.py::test_p1_01_audit_chat_scenario_against_postgres",
+        "tests/api/test_canonical_shipped_app.py::test_p1_01_mutating_route_inventory_is_exactly_classified",
+        "tests/api/test_canonical_shipped_app.py::test_p1_01_import_graph_excludes_legacy_agent_tool_layer",
+        "tests/api/test_canonical_shipped_app.py::test_p1_01_legacy_write_routes_not_reachable",
+        "tests/api/test_canonical_shipped_app.py::test_p1_01_operational_writes_go_through_decision_engine"
+      ],
+      "live": {
+        "fl01_before": "available|-, 4 assignments",
+        "fl01_after": "available|-, 4 assignments",
+        "chat": [
+          404,
+          404
+        ],
+        "copilot": [
+          200,
+          200
+        ],
+        "reasoning": 404,
+        "inventory_put": 405,
+        "operations_post": 405,
+        "equipment_assign": "400 governed (no MCP state), nothing executed",
+        "from_sandbox": {
+          "chat": 404,
+          "inventory_write": 405,
+          "migrate": 404
+        }
+      },
+      "status": "CLOSED"
+    },
+    {
+      "id": "P1-02",
+      "title": "POST /api/v1/inference not mounted on canonical app",
+      "root_cause": "bounded inference router included only by legacy src/api/app.py",
+      "fix": "app.include_router(src.api.routers.inference) on maiw_api.app; InferenceRequest extra=forbid; validation errors JSON-safe (422 not 500)",
+      "commit": "60c4ad6",
+      "tests": [
+        "tests/api/test_canonical_shipped_app.py::test_p1_02_inference_route_is_mounted",
+        "tests/api/test_canonical_shipped_app.py::test_p1_02_inference_auth_rejects_bad_token",
+        "tests/api/test_canonical_shipped_app.py::test_p1_02_inference_auth_fail_closed_when_unconfigured",
+        "tests/api/test_canonical_shipped_app.py::test_p1_02_forbidden_routing_field_rejected_422",
+        "tests/api/test_canonical_shipped_app.py::test_p1_02_unknown_field_rejected_422",
+        "tests/api/test_canonical_shipped_app.py::test_p1_02_valid_inference_reaches_canonical_gateway"
+      ],
+      "live": {
+        "smoke": "13/13",
+        "in_sandbox": {
+          "with_token": {
+            "http": 200,
+            "model_id": "nvidia/nemotron-3-super-120b-a12b",
+            "generation": "nemotron-3",
+            "approved_family": true
+          },
+          "no_token": 401,
+          "wrong_token": 401,
+          "model_id_field": 422,
+          "unknown_field": 422,
+          "direct_provider": "BLOCKED",
+          "internet": "BLOCKED",
+          "metadata": 403,
+          "secret_env_names": [],
+          "maiw_execution_importable": false
+        },
+        "real_sandbox_suite": "51 passed"
+      },
+      "status": "CLOSED"
+    },
+    {
+      "id": "P1-03",
+      "title": "Durable ProcedureStateStore / GovernanceInbox not wired at runtime",
+      "root_cause": "no composition code constructed JsonFileProcedureStateStore/JsonFileGovernanceInbox or read MAIW_PERSISTENCE_ROOT",
+      "fix": "maiw_api.persistence factory (file-backed reference profile, explicit memory opt-in), maiw_api.procedure_host.ProcedureHost, bootstrap wiring, GET /api/v1/procedures, lifespan singleton reset",
+      "commit": "03d34c9",
+      "tests": [
+        "tests/api/test_canonical_shipped_app.py::test_p1_03_reference_profile_is_file_backed",
+        "tests/api/test_canonical_shipped_app.py::test_p1_03_persistence_root_is_consumed_by_runtime",
+        "tests/api/test_canonical_shipped_app.py::test_p1_03_restart_preserves_procedure_in_process",
+        "tests/api/test_canonical_shipped_app.py::test_p1_03_governance_replay_after_restart_is_dropped",
+        "tests/api/test_canonical_shipped_app.py::test_p1_03_restart_across_separate_processes"
+      ],
+      "live": {
+        "procedure_execution_id": "85c1aed7-008a-4620-914d-b27648965477",
+        "waiting_revision": 22,
+        "after_restart": "waiting_for_governance rev 22 (new API PID)",
+        "after_governance": "completed rev 28",
+        "after_second_restart_replay": {
+          "applied": false,
+          "duplicate": true,
+          "executor_calls": 0
+        },
+        "inbox_entries": 1
+      },
+      "status": "CLOSED"
+    },
+    {
+      "id": "P1-04",
+      "title": "/api/v1/ready READY with persistence/DB unavailable",
+      "root_cause": "readiness checked only in-process object presence and MCP circuit state",
+      "fix": "component readiness: runtime, persistence (fsynced probe), model_gateway, governed_write_path, mcp_domains, database; provider/sandbox reported non-critical; 503 NOT_READY + failed_components",
+      "commit": "60632ba",
+      "tests": [
+        "tests/api/test_canonical_shipped_app.py::test_p1_04_ready_fails_when_procedures_dir_deleted",
+        "tests/api/test_canonical_shipped_app.py::test_p1_04_ready_fails_when_governance_dir_deleted",
+        "tests/api/test_canonical_shipped_app.py::test_p1_04_ready_fails_when_persistence_unwritable",
+        "tests/api/test_canonical_shipped_app.py::test_p1_04_ready_fails_when_model_gateway_unavailable",
+        "tests/api/test_canonical_shipped_app.py::test_p1_04_ready_fails_when_database_unreachable",
+        "tests/api/test_canonical_shipped_app.py::test_p1_04_provider_down_does_not_fail_readiness"
+      ],
+      "live": {
+        "baseline": "200 READY",
+        "procedures_chmod_000": "503 [persistence]",
+        "governance_chmod_000": "503 [persistence]",
+        "procedures_removed": "503 [persistence]",
+        "db_paused": "503 [database]",
+        "db_unpaused": "200 READY",
+        "provider_down": "200 READY; inference 503 MODEL_UNAVAILABLE; nim_circuit open -> model_provider degraded (non-critical)",
+        "sandbox_stopped": "200 READY; smoke sandbox check FAIL",
+        "model_gateway_unavailable": "not injectable live; covered by test",
+        "liveness": "200 throughout"
+      },
+      "status": "CLOSED"
+    },
+    {
+      "id": "P1-05",
+      "title": "Document pipeline bypassed ModelGateway and mocked APPROVE",
+      "root_cause": "OCR/extraction/judge called providers directly (Llama vision, hard-coded model ids) and fell back to mock data and decision APPROVE on missing key/provider failure; action tools fabricated results",
+      "fix": "model_gateway_adapter (ModelRequest with modality -> ModelGateway -> PolicyFilter; typed DocumentInferenceUnavailable); IMAGE for OCR/vision, TEXT for extraction/judge; mocks and random generator removed; strict judge parsing; decision_kind=model_quality_classification; approved families not widened",
+      "commit": "6970d36",
+      "tests": [
+        "tests/api/test_canonical_shipped_app.py::test_p1_05_document_judge_uses_canonical_gateway",
+        "tests/api/test_canonical_shipped_app.py::test_p1_05_document_provider_failure_never_approve",
+        "tests/api/test_canonical_shipped_app.py::test_p1_05_document_missing_credential_never_approve",
+        "tests/api/test_canonical_shipped_app.py::test_p1_05_malformed_judge_reply_never_approve",
+        "tests/api/test_canonical_shipped_app.py::test_p1_05_document_vision_has_no_eligible_model",
+        "tests/api/test_canonical_shipped_app.py::test_p1_05_document_upload_end_to_end_fails_typed",
+        "tests/api/test_canonical_shipped_app.py::test_p1_05_document_path_has_no_direct_provider_calls"
+      ],
+      "live": {
+        "upload": "failed: ocr_extraction MODEL_UNAVAILABLE (modality=image); quality_score null; is_mock false; no APPROVE",
+        "judge_real_provider": "classification by nvidia/nemotron-3-super-120b-a12b (nemotron-3)",
+        "judge_bad_key": "MODEL_UNAVAILABLE",
+        "judge_no_key": "MODEL_UNAVAILABLE",
+        "judge_provider_down": "MODEL_UNAVAILABLE",
+        "ocr_vision": "MODEL_UNAVAILABLE",
+        "synthetic_approve_on_failure": false
+      },
+      "status": "CLOSED"
+    }
+  ],
+  "tests": {
+    "python_core_ci": [
+      {
+        "run": 1,
+        "passed": 2720,
+        "failed": 0,
+        "skipped": 5
+      },
+      {
+        "run": 2,
+        "passed": 2720,
+        "failed": 0,
+        "skipped": 5
+      }
+    ],
+    "python_baseline_v2_0_0": {
+      "passed": 2667,
+      "failed": 0,
+      "skipped": 3
+    },
+    "opt_in_postgres": {
+      "passed": 2
+    },
+    "real_sandbox_live": {
+      "passed": 51
+    },
+    "ui": {
+      "jest": "963 passed / 39 suites",
+      "eslint": "0 errors / 1041 warnings",
+      "tsc": "0 errors",
+      "build": "PASS"
+    }
+  },
+  "live_environment": {
+    "host": "epg-tme-smc-h100-02",
+    "nemoclaw": "0.0.124",
+    "openshell": "0.0.116",
+    "entrypoint": "uvicorn maiw_api.app:app via scripts/start_reference_deployment.sh",
+    "api_port": 18301,
+    "sandbox": {
+      "name": "maiw-v201-10071730",
+      "image": "ghcr.io/nvidia/openshell-community/sandboxes/base:latest",
+      "policy": "maiw_inference_only -> 10.185.115.61:18301",
+      "deleted": true
+    },
+    "postgres": {
+      "container": "maiw-v201-pg-20261007144829",
+      "removed": true
+    },
+    "provider": "NVIDIA hosted endpoint; approved roles super (nemotron-3) and lightning (nemotron-3.5); nano disabled (410 Gone)",
+    "untouched": [
+      "maiw-qual-20c-b",
+      "nemoclaw-llama-cpp",
+      "cuopt",
+      "wms-nim-*",
+      "nemo-microservices-*",
+      "wosa-timescaledb"
+    ]
+  },
+  "npm_audit": {
+    "before": {
+      "critical": 3,
+      "high": 62,
+      "moderate": 13,
+      "low": 5
+    },
+    "after": {
+      "critical": 0,
+      "high": 50,
+      "moderate": 34,
+      "low": 3
+    },
+    "reachable_production_critical": 0,
+    "reachable_production_high": 0,
+    "method": "npm audit fix without --force; full UI suite re-run",
+    "remaining_high": "react-scripts build/test/dev-server toolchain only (jest, eslint/typescript-eslint, webpack-dev-server, svgo, braces/micromatch); fix requires breaking react-scripts change"
+  },
+  "security_tools": {
+    "trivy": "NOT AVAILABLE locally (GitHub CI Security Scan job)",
+    "pip_audit": "NOT AVAILABLE",
+    "gitleaks": "NOT AVAILABLE",
+    "secret_regex_sweep": "RUN - 0 findings"
+  },
+  "counts": {
+    "P0": 0,
+    "P1": 0,
+    "P2": 17
+  },
+  "p2_remaining": [
+    "deadline_ms=1 not pre-expired",
+    "no DeploymentResolver / capabilities/read; no-op DeploymentMode",
+    "DEFERRED outcome named in some docs",
+    "mutable APPROVED_MODEL_GENERATIONS; role-label family check",
+    "rollback baseline predates tooling",
+    "50 high npm advisories in react-scripts toolchain",
+    "package dependency doc drift",
+    "2 broken doc references",
+    "Approval/Copilot stores in-memory",
+    "no HTTP route starts/resumes procedures; demo approve not linked to ProcedureHost",
+    "document vision unavailable without approved multimodal Nemotron",
+    "registry default nano model 410 on hosted endpoint",
+    "legacy reads and document upload unauthenticated",
+    "readiness reports persistence paths",
+    "combined Dockerfile lacks apps/api",
+    "dev server src/api/app.py still mounts legacy chat",
+    "DeploymentSecurity UI shows static constants"
+  ],
+  "commits": [
+    {
+      "sha": "fb406d7",
+      "subject": "fix(api): remove ungoverned legacy write paths from the shipped app (P1-01)"
+    },
+    {
+      "sha": "60c4ad6",
+      "subject": "fix(api): mount the bounded inference endpoint on maiw_api.app (P1-02)"
+    },
+    {
+      "sha": "03d34c9",
+      "subject": "fix(api): wire durable procedure state and governance inbox at runtime (P1-03)"
+    },
+    {
+      "sha": "60632ba",
+      "subject": "fix(api): compute readiness from real critical dependencies (P1-04)"
+    },
+    {
+      "sha": "6970d36",
+      "subject": "fix(document): route document inference through ModelGateway, no mock approval (P1-05)"
+    },
+    {
+      "sha": "de09f8f",
+      "subject": "test(api): canonical shipped-app regression suite for the five audit P1s"
+    },
+    {
+      "sha": "7b18a5d",
+      "subject": "docs(deploy): align scripts, runbook and README with the canonical app"
+    },
+    {
+      "sha": "0f643ef",
+      "subject": "chore(ui): fix tsc error, apply non-breaking npm audit fixes, typecheck in CI"
+    },
+    {
+      "sha": "95ac741",
+      "subject": "fix(deploy): make lifecycle scripts safe and correct on a shared host"
+    },
+    {
+      "sha": "b52b5a8",
+      "subject": "test(qualification): live canonical-app qualification harness"
+    }
+  ],
+  "files_changed": [
+    {
+      "status": "M",
+      "path": ".env.example"
+    },
+    {
+      "status": "M",
+      "path": ".github/workflows/ci-cd.yml"
+    },
+    {
+      "status": "M",
+      "path": "Dockerfile.backend"
+    },
+    {
+      "status": "M",
+      "path": "README.md"
+    },
+    {
+      "status": "M",
+      "path": "apps/api/maiw_api/app.py"
+    },
+    {
+      "status": "M",
+      "path": "apps/api/maiw_api/bootstrap.py"
+    },
+    {
+      "status": "M",
+      "path": "apps/api/maiw_api/lifespan.py"
+    },
+    {
+      "status": "A",
+      "path": "apps/api/maiw_api/persistence.py"
+    },
+    {
+      "status": "A",
+      "path": "apps/api/maiw_api/procedure_host.py"
+    },
+    {
+      "status": "A",
+      "path": "apps/api/maiw_api/route_policy.py"
+    },
+    {
+      "status": "M",
+      "path": "apps/api/maiw_api/routers/health.py"
+    },
+    {
+      "status": "A",
+      "path": "apps/api/maiw_api/routers/procedures.py"
+    },
+    {
+      "status": "M",
+      "path": "docs/architecture/DEPLOYMENT_ARCHITECTURE.md"
+    },
+    {
+      "status": "M",
+      "path": "docs/operations/REFERENCE_DEPLOYMENT_RUNBOOK.md"
+    },
+    {
+      "status": "M",
+      "path": "packages/maiw-agents/maiw_agents/sop_engine/state_store.py"
+    },
+    {
+      "status": "M",
+      "path": "scripts/preflight_reference_deployment.sh"
+    },
+    {
+      "status": "A",
+      "path": "scripts/qualification/in_sandbox_canonical_probe.py"
+    },
+    {
+      "status": "A",
+      "path": "scripts/qualification/live_canonical_proof_sop_a.py"
+    },
+    {
+      "status": "A",
+      "path": "scripts/qualification/live_document_failure_injection.py"
+    },
+    {
+      "status": "M",
+      "path": "scripts/qualify_reference_deployment.sh"
+    },
+    {
+      "status": "M",
+      "path": "scripts/restart_reference_deployment.sh"
+    },
+    {
+      "status": "M",
+      "path": "scripts/smoke_test_reference_deployment.sh"
+    },
+    {
+      "status": "M",
+      "path": "scripts/start_demo_mode.sh"
+    },
+    {
+      "status": "M",
+      "path": "scripts/start_reference_deployment.sh"
+    },
+    {
+      "status": "M",
+      "path": "scripts/start_server.sh"
+    },
+    {
+      "status": "M",
+      "path": "scripts/status_reference_deployment.sh"
+    },
+    {
+      "status": "M",
+      "path": "scripts/stop_reference_deployment.sh"
+    },
+    {
+      "status": "M",
+      "path": "src/api/agents/document/action_tools.py"
+    },
+    {
+      "status": "A",
+      "path": "src/api/agents/document/model_gateway_adapter.py"
+    },
+    {
+      "status": "M",
+      "path": "src/api/agents/document/ocr/nemo_ocr.py"
+    },
+    {
+      "status": "M",
+      "path": "src/api/agents/document/preprocessing/nemo_retriever.py"
+    },
+    {
+      "status": "M",
+      "path": "src/api/agents/document/processing/small_llm_processor.py"
+    },
+    {
+      "status": "M",
+      "path": "src/api/agents/document/validation/large_llm_judge.py"
+    },
+    {
+      "status": "M",
+      "path": "src/api/agents/inventory/equipment_asset_tools.py"
+    },
+    {
+      "status": "M",
+      "path": "src/api/app.py"
+    },
+    {
+      "status": "M",
+      "path": "src/api/routers/document.py"
+    },
+    {
+      "status": "M",
+      "path": "src/api/routers/inference.py"
+    },
+    {
+      "status": "M",
+      "path": "src/api/utils/error_handler.py"
+    },
+    {
+      "status": "M",
+      "path": "src/ui/web/package-lock.json"
+    },
+    {
+      "status": "M",
+      "path": "src/ui/web/src/__tests__/ux1e.test.tsx"
+    },
+    {
+      "status": "A",
+      "path": "tests/api/canonical_harness.py"
+    },
+    {
+      "status": "A",
+      "path": "tests/api/canonical_restart_probe.py"
+    },
+    {
+      "status": "A",
+      "path": "tests/api/test_canonical_shipped_app.py"
+    },
+    {
+      "status": "M",
+      "path": "tests/real_sandbox/conftest.py"
+    },
+    {
+      "status": "M",
+      "path": "tests/real_sandbox/test_phase_20c_live_sandbox.py"
+    },
+    {
+      "status": "M",
+      "path": "tests/unit/reliability/test_graceful_degradation.py"
+    },
+    {
+      "status": "M",
+      "path": "tests/unit/test_document_action_tools.py"
+    },
+    {
+      "status": "A",
+      "path": "RELEASE_NOTES_v2.0.1.md"
+    },
+    {
+      "status": "A",
+      "path": "docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md"
+    },
+    {
+      "status": "A",
+      "path": "artifacts/audit/v2.0.1_remediation.json"
+    }
+  ],
+  "verdict": "MAIW V2.0.1 REMEDIATION COMPLETE — READY FOR INDEPENDENT RE-AUDIT"
+}

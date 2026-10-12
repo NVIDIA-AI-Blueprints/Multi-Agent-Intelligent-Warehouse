@@ -135,17 +135,19 @@ class TestModelGatewayDeadlineGuard:
 
         env = {
             "NEMOTRON_SUPER_ENABLED": "true",
-            "NEMOTRON_SUPER_MODEL": "test/super-model",
+            "NEMOTRON_SUPER_MODEL": "nvidia/nemotron-3-super-120b-a12b",
         }
         with _patch.dict(os.environ, env):
             registry = ModelRegistry()
 
         mock_provider = MagicMock()
+        # Round 3: the answer carries the dispatched identity (fail-closed).
         mock_provider.call = AsyncMock(
             return_value=MagicMock(
                 content="ok",
                 usage={},
-                model="test/super-model",
+                model="nvidia/nemotron-3-super-120b-a12b",
+                provider_model="nvidia/nemotron-3-super-120b-a12b",
                 finish_reason="stop",
             )
         )

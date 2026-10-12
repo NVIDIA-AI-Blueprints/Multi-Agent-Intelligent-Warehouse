@@ -14,148 +14,86 @@
 # limitations under the License.
 
 """
-Stage 3: Small LLM Processing — Multimodal VL model for document understanding.
-Configure via NEMOTRON_OMNI_API_KEY / NEMOTRON_OMNI_URL (LLAMA_NANO_VL_* deprecated).
+Stage 3: Small LLM Processing — structured extraction from document text/images.
+
+v2.0.1 (audit P1-05): every model call goes through the canonical
+ModelGateway via ``model_gateway_adapter.generate_for_document``. This module
+holds no provider URL, API key or model id. Text extraction is requested with
+``Modality.TEXT`` (served by an approved Nemotron 3 / 3.5 text model); page
+images are requested with ``Modality.IMAGE`` and are served only if an approved
+multimodal Nemotron model is enabled in the registry — otherwise the stage
+fails with ``DocumentInferenceUnavailable(MODEL_UNAVAILABLE)``. There is no
+mock fallback.
 """
 
 import asyncio
 import logging
 from typing import Dict, Any, List, Optional
 import os
-import httpx
 import base64
 import io
 import json
 from PIL import Image
 from datetime import datetime
 from src.api.services.agent_config import load_agent_config, AgentConfig
+from src.api.agents.document.model_gateway_adapter import (
+    generate_for_document,
+    parse_json_object,
+    route_provenance,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class SmallLLMProcessor:
     """
-    Stage 3: Small LLM Processing — multimodal VL model for document understanding.
+    Stage 3: structured document extraction through the canonical ModelGateway.
 
-    Features:
-    - Native vision understanding (processes doc images directly)
-    - Specialized for invoice/receipt/BOL processing
-    - Single GPU deployment (cost-effective)
-    - Fast inference (~100-200ms)
-
-    Configure with NEMOTRON_OMNI_API_KEY / NEMOTRON_OMNI_URL.
-    LLAMA_NANO_VL_API_KEY / LLAMA_NANO_VL_URL are deprecated aliases.
+    Model selection is owned by the ModelGateway PolicyFilter (approved
+    Nemotron 3 / 3.5 families only). Provider or credential failure raises
+    ``DocumentInferenceUnavailable``; it never produces mock or canned data.
     """
 
-    MODEL_LABEL: str = os.getenv("NEMOTRON_OMNI_MODEL_LABEL", "Nemotron VL Processor")
-
     def __init__(self):
-        import warnings as _warnings
-        _new_key = os.getenv("NEMOTRON_OMNI_API_KEY")
-        _old_key = os.getenv("LLAMA_NANO_VL_API_KEY")
-        if _old_key and not _new_key:
-            _warnings.warn(
-                "LLAMA_NANO_VL_API_KEY is deprecated; use NEMOTRON_OMNI_API_KEY instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-        self.api_key = _new_key or _old_key or ""
-
-        _new_url = os.getenv("NEMOTRON_OMNI_URL")
-        _old_url = os.getenv("LLAMA_NANO_VL_URL")
-        if _old_url and not _new_url:
-            _warnings.warn(
-                "LLAMA_NANO_VL_URL is deprecated; use NEMOTRON_OMNI_URL instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-        self.base_url = _new_url or _old_url or "https://integrate.api.nvidia.com/v1"
-        self.timeout = 60
+        self.timeout = int(os.getenv("DOCUMENT_LLM_TIMEOUT", "60"))
         self.config: Optional[AgentConfig] = None  # Agent configuration
 
     async def initialize(self):
-        """Initialize the Small LLM Processor."""
-        try:
-            # Load agent configuration
-            self.config = load_agent_config("document")
-            logger.info(f"Loaded agent configuration: {self.config.name}")
-            
-            if not self.api_key:
-                logger.warning(
-                    "LLAMA_NANO_VL_API_KEY not found, using mock implementation"
-                )
-                return
-
-            # Test API connection
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(
-                    f"{self.base_url}/models",
-                    headers={"Authorization": f"Bearer {self.api_key}"},
-                )
-                response.raise_for_status()
-
-            logger.info("Small LLM Processor initialized successfully")
-
-        except Exception as e:
-            logger.error(f"Failed to initialize Small LLM Processor: {e}")
-            logger.warning("Falling back to mock implementation")
+        """Load the document agent configuration (no provider probing)."""
+        self.config = load_agent_config("document")
+        logger.info(f"Loaded agent configuration: {self.config.name}")
 
     async def process_document(
         self, images: List[Image.Image], ocr_text: str, document_type: str
     ) -> Dict[str, Any]:
         """
-        Process document using the configured multimodal VL model.
+        Extract structured data from a document through the ModelGateway.
 
-        Args:
-            images: List of PIL Images
-            ocr_text: Text extracted from OCR
-            document_type: Type of document (invoice, receipt, etc.)
-
-        Returns:
-            Structured data extracted from the document
+        OCR text present → TEXT request. No OCR text → IMAGE request with the
+        page images (approved multimodal model required). Any failure raises
+        ``DocumentInferenceUnavailable``; nothing is fabricated.
         """
-        try:
-            logger.info(f"Processing document with Small LLM (multimodal VL)")
+        logger.info("Processing document with ModelGateway (stage 3)")
 
-            # Try multimodal processing first, fallback to text-only if it fails
-            if not self.api_key:
-                # Mock implementation for development
-                result = await self._mock_llm_processing(document_type)
-            else:
-                try:
-                    # Try multimodal processing with vision-language model
-                    multimodal_input = await self._prepare_multimodal_input(
-                        images, ocr_text, document_type
-                    )
-                    result = await self._call_nano_vl_api(multimodal_input)
-                except Exception as multimodal_error:
-                    logger.warning(
-                        f"Multimodal processing failed, falling back to text-only: {multimodal_error}"
-                    )
-                    try:
-                        # Fallback to text-only processing
-                        result = await self._call_text_only_api(ocr_text, document_type)
-                    except Exception as text_error:
-                        logger.warning(
-                            f"Text-only processing also failed, using mock data: {text_error}"
-                        )
-                        # Final fallback to mock processing
-                        result = await self._mock_llm_processing(document_type)
+        if ocr_text and ocr_text.strip():
+            result = await self._call_text_only_api(ocr_text, document_type)
+        else:
+            multimodal_input = await self._prepare_multimodal_input(
+                images, ocr_text, document_type
+            )
+            result = await self._call_nano_vl_api(multimodal_input)
 
-            # Post-process results
-            structured_data = await self._post_process_results(result, document_type, ocr_text)
-
-            return {
-                "structured_data": structured_data,
-                "confidence": result.get("confidence", 0.8),
-                "model_used": self.MODEL_LABEL,
-                "processing_timestamp": datetime.now().isoformat(),
-                "multimodal_processed": False,  # Always text-only for now
-            }
-
-        except Exception as e:
-            logger.error(f"Small LLM processing failed: {e}")
-            raise
+        structured_data = await self._post_process_results(
+            result, document_type, ocr_text
+        )
+        return {
+            "structured_data": structured_data,
+            "confidence": result.get("confidence", 0.0),
+            "model_used": result.get("model_used", ""),
+            "model_route": result.get("model_route", {}),
+            "processing_timestamp": datetime.now().isoformat(),
+            "multimodal_processed": result.get("processing_method") == "multimodal",
+        }
 
     async def _prepare_multimodal_input(
         self, images: List[Image.Image], ocr_text: str, document_type: str
@@ -235,10 +173,8 @@ class SmallLLMProcessor:
     async def _call_text_only_api(
         self, ocr_text: str, document_type: str
     ) -> Dict[str, Any]:
-        """Call VL model API with text-only input."""
-        try:
-            # Create a text-only prompt for document processing
-            prompt = f"""
+        """Text extraction via ModelGateway (Modality.TEXT)."""
+        prompt = f"""
             Analyze the following {document_type} document text and extract structured data:
 
             Document Text:
@@ -254,118 +190,66 @@ class SmallLLMProcessor:
 
             Return only valid JSON without any additional text.
             """
+        from maiw_models import Modality
 
-            messages = [{"role": "user", "content": prompt}]
-
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(
-                    f"{self.base_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": "meta/llama-3.1-8b-instruct",  # Fallback model for text-only processing
-                        "messages": messages,
-                        "max_tokens": 2000,
-                        "temperature": 0.1,
-                    },
-                )
-                response.raise_for_status()
-
-                result = response.json()
-
-                # Extract response content from chat completions
-                content = result["choices"][0]["message"]["content"]
-
-                # Try to parse JSON response
-                try:
-                    parsed_content = json.loads(content)
-                    return {
-                        "structured_data": parsed_content,
-                        "confidence": 0.85,
-                        "raw_response": content,
-                        "processing_method": "text_only",
-                    }
-                except json.JSONDecodeError:
-                    # If JSON parsing fails, return the raw content
-                    return {
-                        "structured_data": {"raw_text": content},
-                        "confidence": 0.7,
-                        "raw_response": content,
-                        "processing_method": "text_only",
-                    }
-
-        except Exception as e:
-            logger.error(f"Text-only API call failed: {e}")
-            raise
+        response = await generate_for_document(
+            stage="llm_processing",
+            messages=[{"role": "user", "content": prompt}],
+            modality=Modality.TEXT,
+            timeout_s=self.timeout,
+        )
+        parsed = parse_json_object(response.content, stage="llm_processing")
+        return {
+            "structured_data": parsed,
+            "confidence": float(
+                parsed.get("quality_assessment", {}).get("overall_confidence", 0.0)
+                if isinstance(parsed.get("quality_assessment"), dict)
+                else 0.0
+            ),
+            "raw_response": response.content,
+            "processing_method": "text_only",
+            "model_used": response.model_id,
+            "model_route": await route_provenance(response),
+        }
 
     async def _call_nano_vl_api(
         self, multimodal_input: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Call VL model API with multimodal input (vision + text)."""
-        try:
-            # Prepare API request
-            messages = [
+        """Image extraction via ModelGateway (Modality.IMAGE)."""
+        from maiw_models import Modality
+
+        content: List[Dict[str, Any]] = [
+            {"type": "text", "text": multimodal_input["prompt"]}
+        ]
+        for image_data in multimodal_input["images"]:
+            content.append(
                 {
-                    "role": "user",
-                    "content": [{"type": "text", "text": multimodal_input["prompt"]}],
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/png;base64,{image_data['image']}"
+                    },
                 }
-            ]
-
-            # Add images to the message
-            for image_data in multimodal_input["images"]:
-                messages[0]["content"].append(
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/png;base64,{image_data['image']}"
-                        },
-                    }
-                )
-
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(
-                    f"{self.base_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": "meta/llama-3.2-11b-vision-instruct",
-                        "messages": messages,
-                        "max_tokens": 2000,
-                        "temperature": 0.1,
-                    },
-                )
-                response.raise_for_status()
-
-                result = response.json()
-
-                # Extract response content from chat completions
-                content = result["choices"][0]["message"]["content"]
-
-                # Try to parse JSON response
-                try:
-                    parsed_content = json.loads(content)
-                    return {
-                        "content": parsed_content,
-                        "confidence": parsed_content.get("quality_assessment", {}).get(
-                            "overall_confidence", 0.8
-                        ),
-                        "raw_response": content,
-                    }
-                except json.JSONDecodeError:
-                    # If JSON parsing fails, return raw content
-                    return {
-                        "content": {"raw_text": content},
-                        "confidence": 0.7,
-                        "raw_response": content,
-                    }
-
-        except Exception as e:
-            logger.error(f"Nano VL API call failed: {e}")
-            raise
+            )
+        response = await generate_for_document(
+            stage="llm_processing",
+            messages=[{"role": "user", "content": content}],
+            modality=Modality.IMAGE,
+            timeout_s=self.timeout,
+        )
+        parsed = parse_json_object(
+            response.content, stage="llm_processing", modality="image"
+        )
+        qa = parsed.get("quality_assessment", {})
+        return {
+            "content": parsed,
+            "confidence": float(
+                qa.get("overall_confidence", 0.0) if isinstance(qa, dict) else 0.0
+            ),
+            "raw_response": response.content,
+            "processing_method": "multimodal",
+            "model_used": response.model_id,
+            "model_route": await route_provenance(response),
+        }
 
     async def _post_process_results(
         self, result: Dict[str, Any], document_type: str, ocr_text: str = ""
@@ -403,18 +287,20 @@ class SmallLLMProcessor:
                 "document_type": document_type,
                 "extracted_fields": extracted_fields,
                 "line_items": content.get("line_items", []),
+                # Only what the model reported — no invented confidence.
                 "quality_assessment": content.get(
                     "quality_assessment",
                     {
-                        "overall_confidence": result.get("confidence", 0.8),
-                        "completeness": 0.8,
-                        "accuracy": 0.8,
+                        "overall_confidence": result.get("confidence", 0.0),
+                        "completeness": None,
+                        "accuracy": None,
                     },
                 ),
                 "processing_metadata": {
-                    "model_used": self.MODEL_LABEL,
+                    "model_used": result.get("model_used", ""),
+                    "model_route": result.get("model_route", {}),
                     "timestamp": datetime.now().isoformat(),
-                    "multimodal": result.get("multimodal_processed", False),
+                    "multimodal": result.get("processing_method") == "multimodal",
                 },
             }
 
@@ -438,15 +324,16 @@ class SmallLLMProcessor:
                 "extracted_fields": {},
                 "line_items": [],
                 "quality_assessment": {
-                    "overall_confidence": 0.5,
-                    "completeness": 0.5,
-                    "accuracy": 0.5,
+                    "overall_confidence": 0.0,
+                    "completeness": None,
+                    "accuracy": None,
                 },
                 "processing_metadata": {
-                    "model_used": self.MODEL_LABEL,
+                    "model_used": result.get("model_used", ""),
                     "timestamp": datetime.now().isoformat(),
                     "multimodal": False,
                     "error": str(e),
+                    "post_processing_failed": True,
                 },
             }
 
@@ -664,113 +551,3 @@ class SmallLLMProcessor:
             logger.error(f"Error parsing fields from text: {e}")
         
         return parsed_fields
-
-    async def _mock_llm_processing(self, document_type: str) -> Dict[str, Any]:
-        """Mock LLM processing for development."""
-
-        mock_data = {
-            "invoice": {
-                "extracted_fields": {
-                    "invoice_number": {
-                        "value": "INV-2024-001",
-                        "confidence": 0.95,
-                        "source": "both",
-                    },
-                    "vendor_name": {
-                        "value": "ABC Supply Company",
-                        "confidence": 0.92,
-                        "source": "both",
-                    },
-                    "vendor_address": {
-                        "value": "123 Warehouse St, City, State 12345",
-                        "confidence": 0.88,
-                        "source": "both",
-                    },
-                    "invoice_date": {
-                        "value": "2024-01-15",
-                        "confidence": 0.90,
-                        "source": "both",
-                    },
-                    "due_date": {
-                        "value": "2024-02-15",
-                        "confidence": 0.85,
-                        "source": "both",
-                    },
-                    "total_amount": {
-                        "value": "1763.13",
-                        "confidence": 0.94,
-                        "source": "both",
-                    },
-                    "payment_terms": {
-                        "value": "Net 30",
-                        "confidence": 0.80,
-                        "source": "ocr",
-                    },
-                },
-                "line_items": [
-                    {
-                        "description": "Widget A",
-                        "quantity": 10,
-                        "unit_price": 125.00,
-                        "total": 1250.00,
-                        "confidence": 0.92,
-                    },
-                    {
-                        "description": "Widget B",
-                        "quantity": 5,
-                        "unit_price": 75.00,
-                        "total": 375.00,
-                        "confidence": 0.88,
-                    },
-                ],
-                "quality_assessment": {
-                    "overall_confidence": 0.90,
-                    "completeness": 0.95,
-                    "accuracy": 0.88,
-                },
-            },
-            "receipt": {
-                "extracted_fields": {
-                    "receipt_number": {
-                        "value": "RCP-2024-001",
-                        "confidence": 0.93,
-                        "source": "both",
-                    },
-                    "merchant_name": {
-                        "value": "Warehouse Store",
-                        "confidence": 0.90,
-                        "source": "both",
-                    },
-                    "transaction_date": {
-                        "value": "2024-01-15",
-                        "confidence": 0.88,
-                        "source": "both",
-                    },
-                    "total_amount": {
-                        "value": "45.67",
-                        "confidence": 0.95,
-                        "source": "both",
-                    },
-                },
-                "line_items": [
-                    {
-                        "description": "Office Supplies",
-                        "quantity": 1,
-                        "unit_price": 45.67,
-                        "total": 45.67,
-                        "confidence": 0.90,
-                    }
-                ],
-                "quality_assessment": {
-                    "overall_confidence": 0.90,
-                    "completeness": 0.85,
-                    "accuracy": 0.92,
-                },
-            },
-        }
-
-        return {
-            "content": mock_data.get(document_type, mock_data["invoice"]),
-            "confidence": 0.90,
-            "raw_response": "Mock response for development",
-        }

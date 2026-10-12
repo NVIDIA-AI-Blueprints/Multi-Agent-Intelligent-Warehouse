@@ -43,7 +43,7 @@ from maiw_execution.base import NoOpActionExecutor
 from maiw_execution.outcome import AmbiguousWriteError
 from maiw_decision.proposal import ActionProposal
 from maiw_contracts.labor import LaborAllocateResult
-from maiw_mcp.errors import BackendUnavailable
+from maiw_mcp.errors import WriteNotApplied
 
 import uuid
 
@@ -195,11 +195,9 @@ class TestTraceIdOnAllPaths:
         assert result.trace_id == TRACE_ID
 
     def test_trace_id_on_failed_path(self):
-        """BackendUnavailable → FAILED; trace_id still present."""
+        """WriteNotApplied (certified pre-mutation rejection) → FAILED; trace_id still present."""
         skill = MagicMock()
-        skill.execute = AsyncMock(
-            side_effect=BackendUnavailable("provider unreachable")
-        )
+        skill.execute = AsyncMock(side_effect=WriteNotApplied("provider rejected"))
         executor = LaborActionExecutor(allocate_skill=skill)
         proposal = _labor_proposal()
         decision = _approved_decision(proposal.proposal_id)

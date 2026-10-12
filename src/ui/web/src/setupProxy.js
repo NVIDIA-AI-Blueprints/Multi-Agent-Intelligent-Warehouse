@@ -1,7 +1,26 @@
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
+// v2.0.1 round 3 (NEW3-P1-01): governed operational writes require the
+// operator write credential (X-Maiw-Operator-Token). The browser bundle NEVER
+// holds it (never use a REACT_APP_* variable for it). When this development
+// server is used as a trusted, localhost-only operator console, the operator
+// may set MAIW_UI_OPERATOR_WRITE_TOKEN in the environment of THIS Node process;
+// the proxy then adds the header server-side for the three equipment write
+// routes only. Anyone who can reach this dev server can then perform governed
+// writes — bind it to localhost (HOST=127.0.0.1) and put real operator
+// authentication in front of any shared deployment. Unset = the UI cannot
+// perform operational writes (the API answers 403 and the UI says so).
+const OPERATOR_WRITE_PATHS = new Set([
+  '/api/v1/equipment/assign',
+  '/api/v1/equipment/release',
+  '/api/v1/equipment/maintenance',
+]);
+
 module.exports = function(app) {
   console.log('Setting up proxy middleware...');
+  if (process.env.MAIW_UI_OPERATOR_WRITE_TOKEN) {
+    console.warn('MAIW_UI_OPERATOR_WRITE_TOKEN is set: this dev server will add the operator write credential to equipment write requests. Bind it to localhost only.');
+  }
   
   // Use pathRewrite to add /api prefix back when forwarding
   // Express strips /api when using app.use('/api', ...), so we need to restore it
@@ -33,6 +52,13 @@ module.exports = function(app) {
         res.status(500).json({ error: 'Proxy error: ' + err.message });
       },
       onProxyReq: function (proxyReq, req, res) {
+        // Never forward an operator credential supplied by the browser.
+        proxyReq.removeHeader('x-maiw-operator-token');
+        const operatorToken = process.env.MAIW_UI_OPERATOR_WRITE_TOKEN;
+        const targetPath = (proxyReq.path || '').split('?')[0];
+        if (operatorToken && req.method === 'POST' && OPERATOR_WRITE_PATHS.has(targetPath)) {
+          proxyReq.setHeader('X-Maiw-Operator-Token', operatorToken);
+        }
         console.log('Proxying request:', req.method, req.url, '->', proxyReq.path);
       },
       onProxyRes: function (proxyRes, req, res) {

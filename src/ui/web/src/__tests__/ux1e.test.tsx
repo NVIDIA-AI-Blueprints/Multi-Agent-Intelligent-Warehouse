@@ -518,7 +518,15 @@ describe('TC-5: ArtifactIdentity — all IDs present in full ACT turn', () => {
 // ── TC-6: UX-1G Approved model family (Step 20, 31) ─────────────────────────
 
 describe('TC-6: Approved model family policy in MODEL panel', () => {
-  function renderModelPanel(identity: Partial<typeof FULL_IDENTITY> = FULL_IDENTITY) {
+  // The panel accepts any approval state ('approved' | 'unapproved' | 'unknown'),
+  // not just the literal used by FULL_IDENTITY (fixes the v2.0.0 tsc error).
+  type ModelPanelIdentity = Partial<
+    Omit<typeof FULL_IDENTITY, 'model_approved_family'> & {
+      model_approved_family: 'approved' | 'unapproved' | 'unknown';
+    }
+  >;
+
+  function renderModelPanel(identity: ModelPanelIdentity = FULL_IDENTITY) {
     render(
       <DeveloperJourneyPanel
         activeStage="MODEL"

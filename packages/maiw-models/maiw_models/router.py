@@ -51,7 +51,7 @@ from __future__ import annotations
 import logging
 import time
 
-from .errors import ModelUnavailable
+from .errors import ModelPolicyViolation, ModelUnavailable
 from .models import (
     ModelCapability,
     ModelRequest,
@@ -229,6 +229,25 @@ class ModelRouter:
             cap = self._registry.get_enabled_by_role(role)
             if cap is None:
                 continue
+            # v2.0.1 round 2: an enabled role bound to an unapproved physical
+            # model ID is a hard policy violation — never a silent fallback to
+            # another role, and never a provider call.
+            violation = self._policy_filter.physical_identity_violation(role, cap)
+            if violation is not None:
+                reason, message = violation
+                logger.error(
+                    "ModelRouter: physical model policy violation role=%s model=%s "
+                    "reason=%s",
+                    role,
+                    cap.model_id,
+                    reason,
+                )
+                raise ModelPolicyViolation(
+                    f"MODEL_POLICY_VIOLATION ({reason}): {message}",
+                    model_id=cap.model_id,
+                    role=role,
+                    reason=reason,
+                )
             if not self._policy_filter.is_request_eligible(cap, request):
                 logger.debug(
                     "ModelRouter: fallback candidate role=%s rejected by PolicyFilter "

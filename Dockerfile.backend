@@ -54,6 +54,11 @@ COPY --from=backend-deps /usr/local/bin /usr/local/bin
 # Security: Explicitly copy only required source code to prevent sensitive data exposure
 # .dockerignore provides additional protection as a defense-in-depth measure
 COPY src/ ./src/
+# v2.0.1: the composition root imports the host side of the sandbox boundary
+# (integrations/nemoclaw: JsonFileGovernanceInbox, boundary validators) and the
+# ProcedureHost loads SOP definitions from agents/sops.
+COPY integrations/ ./integrations/
+COPY agents/ ./agents/
 COPY apps/ ./apps/
 # Copy guardrails configuration (required for NeMo Guardrails)
 COPY data/config/guardrails/ ./data/config/guardrails/

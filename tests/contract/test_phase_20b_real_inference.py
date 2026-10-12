@@ -54,14 +54,22 @@ for _pkg in ("packages/maiw-models", "packages/maiw-mcp", "packages/maiw-agents"
 
 # ── Local NIM endpoint ────────────────────────────────────────────────────────
 
-_LOCAL_NIM_BASE_URL = os.getenv("MAIW_PHASE20B_NIM_URL", "http://localhost:8002/v1")
+# v2.0.1 round 2: opt-in only.  There is no default URL — a default of
+# localhost:8002 meant every test run on a shared host probed (and, when it
+# answered, sent inference to) a NIM this test does not own.  Set
+# MAIW_PHASE20B_NIM_URL explicitly to a NIM serving the APPROVED Super model;
+# the Llama transport-smoke model can no longer be dispatched through
+# ModelGateway (physical model identity is enforced).
+_LOCAL_NIM_BASE_URL = os.getenv("MAIW_PHASE20B_NIM_URL", "")
 _LOCAL_NIM_MODEL_ID = os.getenv(
-    "MAIW_PHASE20B_NIM_MODEL", "nvidia/llama-3.1-nemotron-nano-8b-v1"
+    "MAIW_PHASE20B_NIM_MODEL", "nvidia/nemotron-3-super-120b-a12b"
 )
 
 
 def _nim_is_reachable() -> bool:
-    """Probe local NIM health endpoint without side effects."""
+    """Probe the explicitly configured local NIM (never a default port)."""
+    if not _LOCAL_NIM_BASE_URL:
+        return False
     try:
         import httpx
 
@@ -75,8 +83,8 @@ _NIM_REACHABLE = _nim_is_reachable()
 
 nim_required = pytest.mark.skipif(
     not _NIM_REACHABLE,
-    reason=f"Local NIM not reachable at {_LOCAL_NIM_BASE_URL}; "
-    "set MAIW_PHASE20B_NIM_URL to override",
+    reason="opt-in: set MAIW_PHASE20B_NIM_URL to a reachable NIM serving the "
+    "approved Super model",
 )
 
 # ── Gateway factory ───────────────────────────────────────────────────────────
@@ -112,9 +120,11 @@ def _make_real_gateway():
     # ModelRegistry reads env vars at instance creation (not class definition),
     # so we patch env vars before creating it.
     _prev = {}
+    # Round 2: roles keep their APPROVED physical bindings; only Super is
+    # enabled, so every request is dispatched as the approved Super model.
     for k, v in {
-        "NEMOTRON_LIGHTNING_MODEL": _LOCAL_NIM_MODEL_ID,
-        "NEMOTRON_NANO_MODEL": _LOCAL_NIM_MODEL_ID,
+        "NEMOTRON_LIGHTNING_ENABLED": "false",
+        "NEMOTRON_NANO_ENABLED": "false",
         "NEMOTRON_SUPER_MODEL": _LOCAL_NIM_MODEL_ID,
         "NEMOTRON_ULTRA_ENABLED": "false",
         "NEMOTRON_NANO_OMNI_ENABLED": "false",
@@ -753,8 +763,6 @@ async def test_step12_expired_deadline_raises_before_provider_call():
     saved = {}
     try:
         for k, v in {
-            "NEMOTRON_LIGHTNING_MODEL": _LOCAL_NIM_MODEL_ID,
-            "NEMOTRON_NANO_MODEL": _LOCAL_NIM_MODEL_ID,
             "NEMOTRON_SUPER_MODEL": _LOCAL_NIM_MODEL_ID,
             "NEMOTRON_ULTRA_ENABLED": "false",
             "NEMOTRON_NANO_OMNI_ENABLED": "false",

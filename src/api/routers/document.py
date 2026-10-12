@@ -50,7 +50,6 @@ from src.api.agents.document.models.document_models import (
     DocumentProcessingError,
     ProcessingStage,
 )
-from src.api.agents.document.mcp_document_agent import get_mcp_document_agent
 from src.api.agents.document.action_tools import DocumentActionTools
 from src.api.utils.log_utils import sanitize_log_data
 
@@ -198,7 +197,20 @@ async def _handle_stage_error(
         error: Exception that occurred
     """
     from src.api.utils.error_handler import sanitize_error_message
-    error_msg = sanitize_error_message(error, stage_name)
+    from src.api.agents.document.model_gateway_adapter import (
+        DocumentInferenceUnavailable,
+    )
+
+    if isinstance(error, DocumentInferenceUnavailable):
+        # Typed, non-secret failure code is always surfaced (v2.0.1, P1-05):
+        # the operator must see *why* no result exists, and it must never be
+        # mistaken for a quality decision.
+        error_msg = (
+            f"{stage_name} failed: {error.code} — model inference unavailable "
+            f"through ModelGateway (modality={error.modality})"
+        )
+    else:
+        error_msg = sanitize_error_message(error, stage_name)
     logger.error(f"{stage_name} failed for {_sanitize_log_data(document_id)}: {_sanitize_log_data(str(error))}")
     await tools._update_document_status(document_id, "failed", error_msg)
 
@@ -948,7 +960,15 @@ async def process_document_background(
     user_id: str,
     metadata: Dict[str, Any],
 ):
-    """Background task for document processing using NVIDIA NeMo pipeline."""
+    """
+    Background document processing.
+
+    v2.0.1 (audit P1-05): every model call in stages 2–4 goes through the
+    canonical ModelGateway (``model_gateway_adapter``). Stage 1 is local. A
+    stage whose inference cannot be served raises
+    ``DocumentInferenceUnavailable`` and the document is marked FAILED with
+    the typed code — no mock data, no synthetic approval.
+    """
     try:
         logger.info(
             f"🚀 Starting NVIDIA NeMo processing pipeline for document: {_sanitize_log_data(document_id)}"
@@ -1033,17 +1053,22 @@ async def process_document_background(
         except Exception as validation_error:
             logger.warning(
                 f"Validation stage failed for {_sanitize_log_data(document_id)}: {_sanitize_log_data(str(validation_error))}. "
-                f"Continuing with default validation result."
+                f"Routing to human review."
             )
-            # Create default validation result so routing can still proceed
+            # v2.0.1 (P1-05): a failed quality classification is never an
+            # approval. The document is routed to human review and the result
+            # is explicitly marked as *unavailable* (not a model decision).
             validation_result = {
                 "overall_score": 0.0,
                 "decision": "REVIEW_REQUIRED",
+                "decision_kind": "validation_unavailable",
+                "validation_status": "unavailable",
+                "failure_code": getattr(validation_error, "code", type(validation_error).__name__),
                 "quality": {"score": 0.0},
                 "accuracy": {"score": 0.0},
                 "compliance": {"score": 0.0},
                 "reasoning": {},
-                "issues_found": ["Validation stage failed or timed out"],
+                "issues_found": ["Validation unavailable — human review required"],
                 "confidence": 0.0,
             }
             # Mark validation stage as failed in database
@@ -1122,7 +1147,17 @@ async def process_document_background(
 
     except Exception as e:
         from src.api.utils.error_handler import sanitize_error_message
-        error_message = sanitize_error_message(e, "NVIDIA NeMo processing")
+        from src.api.agents.document.model_gateway_adapter import (
+            DocumentInferenceUnavailable,
+        )
+
+        if isinstance(e, DocumentInferenceUnavailable):
+            error_message = (
+                f"{e.stage} failed: {e.code} — model inference unavailable "
+                f"through ModelGateway (modality={e.modality})"
+            )
+        else:
+            error_message = sanitize_error_message(e, "NVIDIA NeMo processing")
         logger.error(
             f"NVIDIA NeMo processing failed for document {_sanitize_log_data(document_id)}: {_sanitize_log_data(str(e))}",
             exc_info=True,

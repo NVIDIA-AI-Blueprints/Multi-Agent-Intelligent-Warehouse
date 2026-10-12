@@ -77,10 +77,10 @@ def _make_registry(
         "NEMOTRON_LIGHTNING_ENABLED": "true" if lightning_enabled else "false",
         "NEMOTRON_ULTRA_ENABLED": "true" if ultra_enabled else "false",
         "NEMOTRON_NANO_OMNI_ENABLED": "true" if nano_omni_enabled else "false",
-        "NEMOTRON_SUPER_MODEL": "test/super-model",
-        "NEMOTRON_NANO_MODEL": "test/nano-model",
-        "NEMOTRON_LIGHTNING_MODEL": "test/lightning-model",
-        "NEMOTRON_ULTRA_MODEL": "test/ultra-model",
+        "NEMOTRON_SUPER_MODEL": "nvidia/nemotron-3-super-120b-a12b",
+        "NEMOTRON_NANO_MODEL": "nvidia/nemotron-3-nano-30b-a3b",
+        "NEMOTRON_LIGHTNING_MODEL": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "NEMOTRON_ULTRA_MODEL": "nvidia/nemotron-3-ultra-550b-a55b",
         "NEMOTRON_NANO_OMNI_MODEL": nano_omni_model,
     }
     with patch.dict(os.environ, env):

@@ -240,6 +240,14 @@ class EquipmentExecuteAssignResult(BaseModel):
     decision_id: str
     execution_id: str | None = None
     outcome: str = "executed"
+    execution_disposition: str | None = Field(
+        default=None,
+        description=(
+            "v2.0.1 round 4: 'NOT_APPLIED' when the provider certifies that a "
+            "non-success outcome performed no mutation; otherwise a non-success "
+            "outcome is treated as UNKNOWN by the executor"
+        ),
+    )
     source: str
     message: str | None = None
 
@@ -252,6 +260,14 @@ class EquipmentExecuteReleaseResult(BaseModel):
     decision_id: str
     execution_id: str | None = None
     outcome: str = "executed"
+    execution_disposition: str | None = Field(
+        default=None,
+        description=(
+            "v2.0.1 round 4: 'NOT_APPLIED' when the provider certifies that a "
+            "non-success outcome performed no mutation; otherwise a non-success "
+            "outcome is treated as UNKNOWN by the executor"
+        ),
+    )
     source: str
     message: str | None = None
 
@@ -265,6 +281,14 @@ class EquipmentExecuteMaintenanceResult(BaseModel):
     decision_id: str
     execution_id: str | None = None
     outcome: str = "executed"
+    execution_disposition: str | None = Field(
+        default=None,
+        description=(
+            "v2.0.1 round 4: 'NOT_APPLIED' when the provider certifies that a "
+            "non-success outcome performed no mutation; otherwise a non-success "
+            "outcome is treated as UNKNOWN by the executor"
+        ),
+    )
     source: str
     message: str | None = None
 

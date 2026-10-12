@@ -1,0 +1,1525 @@
+{
+  "schema": "maiw.remediation.v1",
+  "round": 3,
+  "title": "MAIW v2.0.1 remediation round 3",
+  "repository": "NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse",
+  "pr": 143,
+  "branch": "fix/v2.0.1-canonical-app-remediation",
+  "starting_sha": "86f30040c72f44ee64d52edf135ce61f72851bc2",
+  "main_sha": "944507ec914665c6682d39b95e8713355f486598",
+  "v2_0_0": {
+    "tag_object": "0c35a0e9718c2a81e8c79fe297c46f690b5cb42a",
+    "commit": "816ace73c4561469978094eeedb2641f6db3c4fa",
+    "unchanged": true
+  },
+  "v2_0_1_tag": null,
+  "prior_audits_unchanged": {
+    "pr142_head": "742fd2a",
+    "pr144_head": "80947b0",
+    "third_reaudit_branch": "audit/v2.0.1-third-independent-reaudit@6205fe6"
+  },
+  "final_frozen_head": "recorded in the PR #143 head after the final docs(audit) commit (see the final report)",
+  "last_code_commit": "608222fc07174355738ca202c18d8292eb6de120",
+  "commits": [
+    {
+      "sha": "869734c10eceda74bb7454aec47d15b3a5234cbe",
+      "subject": "fix(api): separate operator write credential; sandbox cannot reach governed writes (re-audit NEW3-P1-01)"
+    },
+    {
+      "sha": "935563a13f1737bd1e87740a7035621d16471837",
+      "subject": "fix(execution): ambiguous MCP writes are UNKNOWN, never retried, reconciled outside demo mode (re-audit NEW3-P1-02)"
+    },
+    {
+      "sha": "cdbe663b0b9f22c5c965148ed6f458f894d3ce32",
+      "subject": "fix(models): fail closed when the provider response has no verifiable model identity (re-audit N-1)"
+    },
+    {
+      "sha": "a432740ed30bb08da1142ace4cc3f80de42c0655",
+      "subject": "fix(models): routing-aware response cache key; no cross-reasoning or timestamp-stripped reuse (re-audit N-2)"
+    },
+    {
+      "sha": "753e3ea5353ffac83479cab3edc0044e40dad46b",
+      "subject": "feat(deploy): reproducible OpenShell gateway start/verify step (re-audit N-9)"
+    },
+    {
+      "sha": "14c285f3ed16b5186a9284d30d053c5afbc2e40c",
+      "subject": "test(ui): denied governed equipment writes are explained, never silent (re-audit NEW3-P1-01)"
+    },
+    {
+      "sha": "76241a37074da9bfc1a05718cc5facb6d8f6f36c",
+      "subject": "docs(deploy): host reboot / gateway restart recovery steps (re-audit N-9)"
+    },
+    {
+      "sha": "36b2351c8a012c1d97f16c6998c6480027a75def",
+      "subject": "test(execution): Idempotency-Key replay never writes twice (re-audit NEW3-P1-02 \u00a718)"
+    },
+    {
+      "sha": "608222fc07174355738ca202c18d8292eb6de120",
+      "subject": "style: resolve PR #143 round-3 code-quality comments"
+    }
+  ],
+  "findings": {
+    "NEW3-P1-01": {
+      "title": "sandbox can reach operational write routes",
+      "status": "CLOSED",
+      "fix": [
+        "operator write credential MAIW_OPERATOR_WRITE_TOKEN / X-Maiw-Operator-Token, route dependency before governance",
+        "OpenShell L7 rule: only POST /api/v1/inference on the API host:port",
+        "executors only in profiles that offer governed writes",
+        "sandbox probe: write denial + host-secret digest check; preflight + smoke checks"
+      ],
+      "tests": "tests/api/test_round3_write_auth.py (18)"
+    },
+    "NEW3-P1-02": {
+      "title": "ambiguous real MCP write misclassified / duplicated",
+      "status": "CLOSED",
+      "fix": [
+        "dispatch-phase MCP errors",
+        "classify_write_failure",
+        "JsonFileExecutionRegistry + unresolved-target guard (409)",
+        "POST /api/v1/executions/{id}/reconcile in every profile",
+        "execution_id forwarded to MCP tools"
+      ],
+      "tests": "tests/api/test_round3_unknown_writes.py (12)"
+    },
+    "N-1": {
+      "title": "missing provider model identity accepted",
+      "status": "CLOSED",
+      "fix": "ModelIdentityUnverifiable \u2192 502 MODEL_IDENTITY_UNVERIFIABLE",
+      "tests": "tests/api/test_round3_identity_and_cache.py"
+    },
+    "N-2": {
+      "title": "cache key ignores routing intent / strips timestamps",
+      "status": "CLOSED",
+      "fix": "exact prompt + model + thinking + routing scope + CACHE_KEY_VERSION",
+      "tests": "tests/api/test_round3_identity_and_cache.py"
+    },
+    "N-9": {
+      "title": "OpenShell gateway runbook gap",
+      "status": "CLOSED",
+      "fix": "scripts/setup/reference_gateway.sh + runbook steps + reboot recovery + preflight check",
+      "tests": "tests/unit/test_round3_gateway_script.py (9)"
+    }
+  },
+  "prior_nine_p1": {
+    "P1-01": "CLOSED",
+    "P1-02": "CLOSED",
+    "P1-03": "CLOSED",
+    "P1-04": "CLOSED",
+    "P1-05": "CLOSED",
+    "NEW-P1-01": "CLOSED",
+    "NEW-P1-02": "CLOSED",
+    "NEW-P1-03": "CLOSED",
+    "NEW-P1-04": "CLOSED"
+  },
+  "tests": {
+    "head_tested": "608222fc07174355738ca202c18d8292eb6de120",
+    "runs": [
+      {
+        "run": "full_run1",
+        "tests": 2873,
+        "passed": 2865,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 8,
+        "seconds": 284.721
+      },
+      {
+        "run": "full_run2",
+        "tests": 2873,
+        "passed": 2865,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 8,
+        "seconds": 276.436
+      },
+      {
+        "run": "perm_mg_then_demo",
+        "tests": 191,
+        "passed": 191,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 30.358
+      },
+      {
+        "run": "perm_demo_then_mg",
+        "tests": 191,
+        "passed": 191,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 30.012
+      },
+      {
+        "run": "perm_canonical_then_reliability",
+        "tests": 444,
+        "passed": 442,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 2,
+        "seconds": 81.662
+      },
+      {
+        "run": "perm_reliability_then_canonical",
+        "tests": 444,
+        "passed": 442,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 2,
+        "seconds": 82.857
+      },
+      {
+        "run": "full_reversed",
+        "tests": 2873,
+        "passed": 2865,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 8,
+        "seconds": 263.816
+      },
+      {
+        "run": "full_mg_first",
+        "tests": 2873,
+        "passed": 2865,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 8,
+        "seconds": 289.07
+      },
+      {
+        "run": "full_reliability_first",
+        "tests": 2873,
+        "passed": 2865,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 8,
+        "seconds": 278.631
+      },
+      {
+        "run": "full_canonical_first",
+        "tests": 2873,
+        "passed": 2865,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 8,
+        "seconds": 279.571
+      },
+      {
+        "run": "full_round3_first",
+        "tests": 2873,
+        "passed": 2865,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 8,
+        "seconds": 280.043
+      },
+      {
+        "run": "full_shuffle_seed_3301",
+        "tests": 2873,
+        "passed": 2865,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 8,
+        "seconds": 283.037
+      },
+      {
+        "run": "full_shuffle_seed_4417",
+        "tests": 2873,
+        "passed": 2865,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 8,
+        "seconds": 289.489
+      }
+    ],
+    "new_round3_python_tests": 60,
+    "skips": [
+      "legacy test_migration_system",
+      "MAIWSkillAdapter unavailable",
+      "3 x opt-in MAIW_PHASE20B_NIM_URL",
+      "OpenShell not on test PATH",
+      "2 x opt-in MAIW_TEST_PG_DSN"
+    ],
+    "ui": {
+      "jest": "968/968 (40 suites)",
+      "eslint_errors": 0,
+      "eslint_warnings": 1043,
+      "tsc_errors": 0,
+      "build": "OK (without CI=true)"
+    },
+    "npm_audit": {
+      "critical": 0,
+      "high": 50,
+      "moderate": 34,
+      "low": 3,
+      "omit_dev_identical": true,
+      "production_reachable_high": 0,
+      "production_reachable": "react-router / react-router-dom moderate"
+    }
+  },
+  "live": {
+    "host": "epg-tme-smc-h100-02",
+    "worktree": "/home/nvidia/maiw-v201-r3-live (detached 753e3ea for the clean-shell runbook; 608222f for the final governed rerun)",
+    "sandboxes": {
+      "maiw-v201-r3-a": "L7 policy (runbook)",
+      "maiw-v201-r3-b": "deliberately broad round-2 policy (app-layer proof); deleted"
+    },
+    "gateway": "maiw-v201-r3-gw (managed, 127.0.0.1:18993)",
+    "runbook_clean_shell": [
+      "01_venv                      rc=0      3s  python3 -m venv .venv",
+      "02_pip_requirements          rc=0     34s  .venv/bin/pip install -r requirements.txt",
+      "03_pip_packages              rc=0     32s  for p in maiw-mcp maiw-state maiw-decision maiw-models maiw-skills maiw-execution maiw-contracts maiw-world; do .venv/bin/pip install -e \"packages/$p\" || exit 1; done",
+      "04_pip_agents_api            rc=0     12s  .venv/bin/pip install -e \"packages/maiw-agents[deep-agents]\" -e apps/api",
+      "05_cp_env                    rc=0      0s  cp .env.example .env",
+      "06_edit_env (operator edits .env: names only listed above)",
+      "07_validate_runbook          rc=0      0s  bash scripts/validate_reference_runbook.sh",
+      "08_gateway_start             rc=0      1s  bash scripts/setup/reference_gateway.sh start",
+      "09_gateway_status            rc=0      0s  bash scripts/setup/reference_gateway.sh status",
+      "10_db_up                     rc=0     11s  bash scripts/setup/reference_db.sh up",
+      "11_sandbox_create            rc=0      4s  bash scripts/setup/reference_sandbox.sh create",
+      "12_preflight                 rc=0      6s  bash scripts/preflight_reference_deployment.sh",
+      "13_start                     rc=0     13s  bash scripts/start_reference_deployment.sh",
+      "14_status                    rc=0      1s  bash scripts/status_reference_deployment.sh",
+      "15_smoke                     rc=0      2s  bash scripts/smoke_test_reference_deployment.sh",
+      "16_sandbox_probe             rc=0      1s  bash scripts/setup/reference_sandbox.sh probe",
+      "17_restart                   rc=0     15s  bash scripts/restart_reference_deployment.sh",
+      "18_status                    rc=0      1s  bash scripts/status_reference_deployment.sh",
+      "19_smoke                     rc=0      1s  bash scripts/smoke_test_reference_deployment.sh",
+      "20_stop                      rc=0      1s  bash scripts/stop_reference_deployment.sh",
+      "21_status_after_stop         rc=1      0s  bash scripts/status_reference_deployment.sh",
+      "30_gateway_stop_simulated_outage rc=0     11s  bash scripts/setup/reference_gateway.sh stop",
+      "31_gateway_status_down       rc=1      0s  bash scripts/setup/reference_gateway.sh status",
+      "32_preflight_gateway_down    rc=1      6s  bash scripts/preflight_reference_deployment.sh",
+      "33_gateway_start_again       rc=0      8s  bash scripts/setup/reference_gateway.sh start",
+      "34_gateway_status            rc=0      1s  bash scripts/setup/reference_gateway.sh status",
+      "35_sandbox_status            rc=1      0s  bash scripts/setup/reference_sandbox.sh status",
+      "36_sandbox_delete_after_outage rc=0      0s  bash scripts/setup/reference_sandbox.sh delete",
+      "37_sandbox_recreate          rc=0      1s  bash scripts/setup/reference_sandbox.sh create",
+      "38_preflight_after_recovery  rc=0      9s  bash scripts/preflight_reference_deployment.sh",
+      "40_teardown_sandbox_delete   rc=0      0s  bash scripts/setup/reference_sandbox.sh delete",
+      "41_teardown_db_down          rc=0      1s  bash scripts/setup/reference_db.sh down",
+      "42_teardown_gateway_stop     rc=0      1s  bash scripts/setup/reference_gateway.sh stop"
+    ],
+    "governed_lifecycle": [
+      "g01_preflight                rc=0   bash scripts/preflight_reference_deployment.sh",
+      "g02_preflight_neg_no_write_token rc=1   MAIW_OPERATOR_WRITE_TOKEN= bash scripts/preflight_reference_deployment.sh",
+      "g03_preflight_neg_token_equals_inference rc=1   MAIW_OPERATOR_WRITE_TOKEN=$(cat /tmp/claude-1000/-home-nvidia-Multi-Agent-Intelligent-Warehouse/faf3fd20-38bb-4fba-b828-33b9b76eaa88/scratchpad/r3/secrets/inference_token) bash scripts/preflight_reference_deployment.sh",
+      "g04_start                    rc=0   bash scripts/start_reference_deployment.sh",
+      "g05_status                   rc=0   bash scripts/status_reference_deployment.sh",
+      "g06_smoke                    rc=0   bash scripts/smoke_test_reference_deployment.sh",
+      "g07_sandbox_probe            rc=0   bash scripts/setup/reference_sandbox.sh probe",
+      "g09_start_after_kill9        rc=0   bash scripts/start_reference_deployment.sh",
+      "g10_start_after_inflight_kill9 rc=0   bash scripts/start_reference_deployment.sh",
+      "g11_stop                     rc=0   bash scripts/stop_reference_deployment.sh",
+      "g12_start_for_bypass         rc=0   bash scripts/start_reference_deployment.sh",
+      "g13_stop                     rc=0   bash scripts/stop_reference_deployment.sh",
+      "f01_preflight_final          rc=0   bash scripts/preflight_reference_deployment.sh",
+      "f02_start_final              rc=0   bash scripts/start_reference_deployment.sh",
+      "f03_smoke_final              rc=0   bash scripts/smoke_test_reference_deployment.sh",
+      "f04_probe_final              rc=0   bash scripts/setup/reference_sandbox.sh probe",
+      "f05_start_after_kill9_final  rc=0   bash scripts/start_reference_deployment.sh",
+      "f06_stop_final               rc=0   bash scripts/stop_reference_deployment.sh"
+    ],
+    "sandbox_probe_reference": {
+      "inference": {
+        "http": 200,
+        "model_id": "nvidia/nemotron-3-super-120b-a12b",
+        "generation": "nemotron-3",
+        "approved_family": true,
+        "selected_role": "super",
+        "selected_model_id": "nvidia/nemotron-3-super-120b-a12b",
+        "provider_reported_model_id": "nvidia/nemotron-3-super-120b-a12b",
+        "identity_verified": true,
+        "trace_id": "v201-in-sandbox-trace",
+        "content_nonempty": true
+      },
+      "operational_writes": {
+        "/api/v1/equipment/release": {
+          "no_credential": 403,
+          "inference_token_as_internal_header": 403,
+          "inference_token_as_operator_header": 403,
+          "inference_token_as_bearer": 403
+        },
+        "/api/v1/equipment/assign": {
+          "no_credential": 403,
+          "inference_token_as_internal_header": 403,
+          "inference_token_as_operator_header": 403,
+          "inference_token_as_bearer": 403
+        },
+        "/api/v1/equipment/maintenance": {
+          "no_credential": 403,
+          "inference_token_as_internal_header": 403,
+          "inference_token_as_operator_header": 403,
+          "inference_token_as_bearer": 403
+        },
+        "/api/v1/executions/unknown-exec/reconcile": {
+          "no_credential": 403,
+          "inference_token_as_internal_header": 403,
+          "inference_token_as_operator_header": 403,
+          "inference_token_as_bearer": 403
+        }
+      },
+      "all_denied": true,
+      "env_secret_names": [],
+      "readiness_via_sandbox": 403
+    },
+    "sandbox_probe_broad_policy": {
+      "operational_writes": {
+        "/api/v1/equipment/release": {
+          "no_credential": 403,
+          "inference_token_as_internal_header": 403,
+          "inference_token_as_operator_header": 401,
+          "inference_token_as_bearer": 403
+        },
+        "/api/v1/equipment/assign": {
+          "no_credential": 403,
+          "inference_token_as_internal_header": 403,
+          "inference_token_as_operator_header": 401,
+          "inference_token_as_bearer": 403
+        },
+        "/api/v1/equipment/maintenance": {
+          "no_credential": 403,
+          "inference_token_as_internal_header": 403,
+          "inference_token_as_operator_header": 401,
+          "inference_token_as_bearer": 403
+        },
+        "/api/v1/executions/unknown-exec/reconcile": {
+          "no_credential": 403,
+          "inference_token_as_internal_header": 403,
+          "inference_token_as_operator_header": 401,
+          "inference_token_as_bearer": 403
+        }
+      },
+      "all_denied": true,
+      "readiness_via_sandbox": 200,
+      "app_refusals_logged": 16,
+      "decision_engine_invocations": 0,
+      "mcp_writes": 0
+    },
+    "sandbox_bypass_attempts": {
+      "POST /api/v1/equipment/release": 403,
+      "PUT /api/v1/equipment/release": 403,
+      "GET /api/v1/equipment/release": 403,
+      "POST /api/v1/inference/../equipment/release": 403,
+      "PUT /api/v1/inference/../equipment/release": 403,
+      "GET /api/v1/inference/../equipment/release": 403,
+      "POST /api/v1/inference/%2e%2e/equipment/release": 403,
+      "PUT /api/v1/inference/%2e%2e/equipment/release": 403,
+      "GET /api/v1/inference/%2e%2e/equipment/release": 403,
+      "POST /API/V1/EQUIPMENT/RELEASE": 403,
+      "PUT /API/V1/EQUIPMENT/RELEASE": 403,
+      "GET /API/V1/EQUIPMENT/RELEASE": 403,
+      "POST //api/v1/equipment/release": 403,
+      "PUT //api/v1/equipment/release": 403,
+      "GET //api/v1/equipment/release": 403,
+      "POST /api/v1/./equipment/release": 403,
+      "PUT /api/v1/./equipment/release": 403,
+      "GET /api/v1/./equipment/release": 403,
+      "POST /api/v1/equipment/release?x=/api/v1/inference": 403,
+      "PUT /api/v1/equipment/release?x=/api/v1/inference": 403,
+      "GET /api/v1/equipment/release?x=/api/v1/inference": 403,
+      "POST /api/v1/inference?/../../equipment/release": 422,
+      "PUT /api/v1/inference?/../../equipment/release": 403,
+      "GET /api/v1/inference?/../../equipment/release": 403,
+      "POST /api/v1/equipment%2Frelease": 400,
+      "PUT /api/v1/equipment%2Frelease": 400,
+      "GET /api/v1/equipment%2Frelease": 400,
+      "POST /api/v1/inference/": 403,
+      "PUT /api/v1/inference/": 403,
+      "GET /api/v1/inference/": 403,
+      "POST /api/v1/executions": 403,
+      "PUT /api/v1/executions": 403,
+      "GET /api/v1/executions": 403,
+      "_via_proxy": true
+    },
+    "sandbox_reasoning_levels": {
+      "high": {
+        "http": 200,
+        "role": "super",
+        "model": "nvidia/nemotron-3-super-120b-a12b",
+        "generation": "nemotron-3",
+        "reported": "nvidia/nemotron-3-super-120b-a12b",
+        "identity_verified": true,
+        "fallback_used": false,
+        "rule": "high_reasoning",
+        "client_ms": 815.4
+      },
+      "medium": {
+        "http": 200,
+        "role": "super",
+        "model": "nvidia/nemotron-3-super-120b-a12b",
+        "generation": "nemotron-3",
+        "reported": "nvidia/nemotron-3-super-120b-a12b",
+        "identity_verified": true,
+        "fallback_used": true,
+        "rule": "medium_reasoning",
+        "client_ms": 25.1
+      },
+      "low": {
+        "http": 200,
+        "role": "lightning",
+        "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "generation": "nemotron-3.5",
+        "reported": "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "identity_verified": true,
+        "fallback_used": false,
+        "rule": "low_reasoning",
+        "client_ms": 249.6
+      }
+    },
+    "security_boundary_matrix_host": {
+      "unauthenticated": {
+        "inference": 401,
+        "read_equipment": 200,
+        "read_ready": 200,
+        "write /api/v1/equipment/release": [
+          403,
+          "OPERATOR_WRITE_CREDENTIAL_REQUIRED"
+        ],
+        "write /api/v1/equipment/assign": [
+          403,
+          "OPERATOR_WRITE_CREDENTIAL_REQUIRED"
+        ],
+        "write /api/v1/equipment/maintenance": [
+          403,
+          "OPERATOR_WRITE_CREDENTIAL_REQUIRED"
+        ],
+        "write /api/v1/executions/none/reconcile": [
+          403,
+          "OPERATOR_WRITE_CREDENTIAL_REQUIRED"
+        ]
+      },
+      "inference_credential": {
+        "inference": 200,
+        "read_equipment": 200,
+        "read_ready": 200,
+        "write /api/v1/equipment/release": [
+          403,
+          "OPERATOR_WRITE_CREDENTIAL_REQUIRED"
+        ],
+        "write /api/v1/equipment/assign": [
+          403,
+          "OPERATOR_WRITE_CREDENTIAL_REQUIRED"
+        ],
+        "write /api/v1/equipment/maintenance": [
+          403,
+          "OPERATOR_WRITE_CREDENTIAL_REQUIRED"
+        ],
+        "write /api/v1/executions/none/reconcile": [
+          403,
+          "OPERATOR_WRITE_CREDENTIAL_REQUIRED"
+        ]
+      },
+      "inference_credential_as_operator": {
+        "inference": 401,
+        "read_equipment": 200,
+        "read_ready": 200,
+        "write /api/v1/equipment/release": [
+          401,
+          "INVALID_OPERATOR_WRITE_CREDENTIAL"
+        ],
+        "write /api/v1/equipment/assign": [
+          401,
+          "INVALID_OPERATOR_WRITE_CREDENTIAL"
+        ],
+        "write /api/v1/equipment/maintenance": [
+          401,
+          "INVALID_OPERATOR_WRITE_CREDENTIAL"
+        ],
+        "write /api/v1/executions/none/reconcile": [
+          401,
+          "INVALID_OPERATOR_WRITE_CREDENTIAL"
+        ]
+      },
+      "operator_credential": {
+        "inference": 401,
+        "read_equipment": 200,
+        "read_ready": 200,
+        "write /api/v1/equipment/assign": [
+          200,
+          "requires_human_approval"
+        ],
+        "decision_engine_invocations_added": 1,
+        "mcp_writes_added": 0
+      },
+      "after_denials": {
+        "decision_engine_invocations_added": 0,
+        "auth_refusals_logged_added": 12,
+        "mcp_writes_added": 0
+      }
+    },
+    "mcp_ambiguity": {
+      "lost_response": {
+        "release": {
+          "status": "unknown",
+          "executed": null,
+          "error_code": "MCP_RESPONSE_LOST",
+          "execution_id": "9fc0db71-b8e1-4964-9f1d-4d355cb11581",
+          "retried": false,
+          "trace_id": "r3-live-lost-response",
+          "http": 202
+        },
+        "duplicate_before_reconcile": {
+          "http": 409,
+          "code": "RECONCILIATION_REQUIRED",
+          "decision_engine_invocations_added": 0
+        },
+        "reconcile_backend_down": {
+          "http": 200,
+          "outcome": "indeterminate"
+        },
+        "reconcile_backend_up": {
+          "reconciliation_outcome": "confirmed_executed",
+          "outcome": "unknown",
+          "effective_status": "effectively_executed",
+          "proposal_id": "81069634-c8da-4b94-bf94-7d0805d40a4d",
+          "decision_id": "237a0c8b-ee35-4140-9fa9-1480fb97abe4",
+          "trace_id": "r3-live-lost-response",
+          "retried": false
+        },
+        "writes_applied": 1
+      },
+      "crash_restart_after_unknown": {
+        "release_http": 202,
+        "reconcile": "confirmed_executed",
+        "duplicate_after_restart": 409,
+        "writes_applied": 1
+      },
+      "in_flight_at_crash": {
+        "recovered_after_restart": true,
+        "reconcile": "confirmed_executed",
+        "duplicate_before_reconcile": 409,
+        "writes_applied": 1
+      },
+      "sent_not_applied": {
+        "release_http": 202,
+        "reconcile": "confirmed_not_executed",
+        "writes_applied": 0,
+        "new_request_after": "executed, 1 write"
+      },
+      "mcp_down_not_sent": {
+        "http": 400,
+        "writes_applied": 0
+      },
+      "final_head_rerun": {
+        "head": "608222f",
+        "release": "unknown",
+        "duplicate": 409,
+        "reconcile_after_api_kill9": "confirmed_executed",
+        "writes_applied": 1
+      }
+    },
+    "fake_provider_matrix": [
+      {
+        "case": "identity_match",
+        "config": {
+          "LLM_CACHE_ENABLED": "false"
+        },
+        "provider_mode": "echo",
+        "ready": 200,
+        "rows": [
+          {
+            "request": "high",
+            "http": 200,
+            "code": null,
+            "selected_model": "nvidia/nemotron-3-super-120b-a12b",
+            "provider_received": [
+              "nvidia/nemotron-3-super-120b-a12b"
+            ],
+            "provider_calls": 1,
+            "identity_verified": true,
+            "reported": "nvidia/nemotron-3-super-120b-a12b",
+            "content": "FAKE from=nvidia/nemotron-3-super-120b-a12b thinking=budget"
+          },
+          {
+            "request": "low",
+            "http": 200,
+            "code": null,
+            "selected_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "provider_received": [
+              "nvidia/nemotron-3.5-lightning-30b-a3b"
+            ],
+            "provider_calls": 1,
+            "identity_verified": true,
+            "reported": "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "content": "FAKE from=nvidia/nemotron-3.5-lightning-30b-a3b thinking=off"
+          }
+        ]
+      },
+      {
+        "case": "identity_mismatch_other_approved",
+        "config": {
+          "LLM_CACHE_ENABLED": "false"
+        },
+        "provider_mode": "substitute:nvidia/nemotron-3.5-lightning-30b-a3b",
+        "ready": 200,
+        "rows": [
+          {
+            "request": "high",
+            "http": 502,
+            "code": "MODEL_IDENTITY_MISMATCH",
+            "selected_model": null,
+            "provider_received": [
+              "nvidia/nemotron-3-super-120b-a12b"
+            ],
+            "provider_calls": 1,
+            "identity_verified": null,
+            "reported": null,
+            "content": ""
+          }
+        ]
+      },
+      {
+        "case": "identity_mismatch_unapproved",
+        "config": {
+          "LLM_CACHE_ENABLED": "false"
+        },
+        "provider_mode": "substitute:example-org/substituted-model-y",
+        "ready": 200,
+        "rows": [
+          {
+            "request": "high",
+            "http": 502,
+            "code": "MODEL_IDENTITY_MISMATCH",
+            "selected_model": null,
+            "provider_received": [
+              "nvidia/nemotron-3-super-120b-a12b"
+            ],
+            "provider_calls": 1,
+            "identity_verified": null,
+            "reported": null,
+            "content": ""
+          }
+        ]
+      },
+      {
+        "case": "identity_mismatch_case_variant",
+        "config": {
+          "LLM_CACHE_ENABLED": "false"
+        },
+        "provider_mode": "substitute:NVIDIA/NEMOTRON-3-SUPER-120B-A12B",
+        "ready": 200,
+        "rows": [
+          {
+            "request": "high",
+            "http": 502,
+            "code": "MODEL_IDENTITY_MISMATCH",
+            "selected_model": null,
+            "provider_received": [
+              "nvidia/nemotron-3-super-120b-a12b"
+            ],
+            "provider_calls": 1,
+            "identity_verified": null,
+            "reported": null,
+            "content": ""
+          }
+        ]
+      },
+      {
+        "case": "identity_missing",
+        "config": {
+          "LLM_CACHE_ENABLED": "false"
+        },
+        "provider_mode": "omit",
+        "ready": 200,
+        "rows": [
+          {
+            "request": "high",
+            "http": 502,
+            "code": "MODEL_IDENTITY_UNVERIFIABLE",
+            "selected_model": null,
+            "provider_received": [
+              "nvidia/nemotron-3-super-120b-a12b"
+            ],
+            "provider_calls": 1,
+            "identity_verified": null,
+            "reported": null,
+            "content": ""
+          }
+        ]
+      },
+      {
+        "case": "identity_malformed_empty",
+        "config": {
+          "LLM_CACHE_ENABLED": "false"
+        },
+        "provider_mode": "malformed:\"\"",
+        "ready": 200,
+        "rows": [
+          {
+            "request": "high",
+            "http": 502,
+            "code": "MODEL_IDENTITY_UNVERIFIABLE",
+            "selected_model": null,
+            "provider_received": [
+              "nvidia/nemotron-3-super-120b-a12b"
+            ],
+            "provider_calls": 1,
+            "identity_verified": null,
+            "reported": null,
+            "content": ""
+          }
+        ]
+      },
+      {
+        "case": "identity_malformed_whitespace",
+        "config": {
+          "LLM_CACHE_ENABLED": "false"
+        },
+        "provider_mode": "malformed:\"   \"",
+        "ready": 200,
+        "rows": [
+          {
+            "request": "high",
+            "http": 502,
+            "code": "MODEL_IDENTITY_UNVERIFIABLE",
+            "selected_model": null,
+            "provider_received": [
+              "nvidia/nemotron-3-super-120b-a12b"
+            ],
+            "provider_calls": 1,
+            "identity_verified": null,
+            "reported": null,
+            "content": ""
+          }
+        ]
+      },
+      {
+        "case": "identity_malformed_null",
+        "config": {
+          "LLM_CACHE_ENABLED": "false"
+        },
+        "provider_mode": "malformed:null",
+        "ready": 200,
+        "rows": [
+          {
+            "request": "high",
+            "http": 502,
+            "code": "MODEL_IDENTITY_UNVERIFIABLE",
+            "selected_model": null,
+            "provider_received": [
+              "nvidia/nemotron-3-super-120b-a12b"
+            ],
+            "provider_calls": 1,
+            "identity_verified": null,
+            "reported": null,
+            "content": ""
+          }
+        ]
+      },
+      {
+        "case": "identity_malformed_int",
+        "config": {
+          "LLM_CACHE_ENABLED": "false"
+        },
+        "provider_mode": "malformed:123",
+        "ready": 200,
+        "rows": [
+          {
+            "request": "high",
+            "http": 502,
+            "code": "MODEL_IDENTITY_UNVERIFIABLE",
+            "selected_model": null,
+            "provider_received": [
+              "nvidia/nemotron-3-super-120b-a12b"
+            ],
+            "provider_calls": 1,
+            "identity_verified": null,
+            "reported": null,
+            "content": ""
+          }
+        ]
+      },
+      {
+        "case": "identity_malformed_list",
+        "config": {
+          "LLM_CACHE_ENABLED": "false"
+        },
+        "provider_mode": "malformed:[\"x\"]",
+        "ready": 200,
+        "rows": [
+          {
+            "request": "high",
+            "http": 502,
+            "code": "MODEL_IDENTITY_UNVERIFIABLE",
+            "selected_model": null,
+            "provider_received": [
+              "nvidia/nemotron-3-super-120b-a12b"
+            ],
+            "provider_calls": 1,
+            "identity_verified": null,
+            "reported": null,
+            "content": ""
+          }
+        ]
+      },
+      {
+        "case": "identity_malformed_object",
+        "config": {
+          "LLM_CACHE_ENABLED": "false"
+        },
+        "provider_mode": "malformed:{\"id\": \"nvidia/nemotron-3-super-120b-a12b\"}",
+        "ready": 200,
+        "rows": [
+          {
+            "request": "high",
+            "http": 502,
+            "code": "MODEL_IDENTITY_UNVERIFIABLE",
+            "selected_model": null,
+            "provider_received": [
+              "nvidia/nemotron-3-super-120b-a12b"
+            ],
+            "provider_calls": 1,
+            "identity_verified": null,
+            "reported": null,
+            "content": ""
+          }
+        ]
+      },
+      {
+        "case": "r2_env_override_unapproved",
+        "config": {
+          "LLM_CACHE_ENABLED": "false",
+          "NEMOTRON_SUPER_MODEL": "example-org/unapproved-model-x"
+        },
+        "provider_mode": "echo",
+        "ready": 503,
+        "rows": [
+          {
+            "request": "high",
+            "http": 503,
+            "code": "MODEL_POLICY_VIOLATION",
+            "selected_model": null,
+            "provider_received": [],
+            "provider_calls": 0,
+            "identity_verified": null,
+            "reported": null,
+            "content": ""
+          }
+        ]
+      },
+      {
+        "case": "r2_lookalike_suffix",
+        "config": {
+          "LLM_CACHE_ENABLED": "false",
+          "NEMOTRON_SUPER_MODEL": "nvidia/nemotron-3-super-120b-a12b-v2"
+        },
+        "provider_mode": "echo",
+        "ready": 503,
+        "rows": [
+          {
+            "request": "high",
+            "http": 503,
+            "code": "MODEL_POLICY_VIOLATION",
+            "selected_model": null,
+            "provider_received": [],
+            "provider_calls": 0,
+            "identity_verified": null,
+            "reported": null,
+            "content": ""
+          }
+        ]
+      },
+      {
+        "case": "r2_lookalike_case",
+        "config": {
+          "LLM_CACHE_ENABLED": "false",
+          "NEMOTRON_SUPER_MODEL": "NVIDIA/NEMOTRON-3-SUPER-120B-A12B"
+        },
+        "provider_mode": "echo",
+        "ready": 503,
+        "rows": [
+          {
+            "request": "high",
+            "http": 503,
+            "code": "MODEL_POLICY_VIOLATION",
+            "selected_model": null,
+            "provider_received": [],
+            "provider_calls": 0,
+            "identity_verified": null,
+            "reported": null,
+            "content": ""
+          }
+        ]
+      },
+      {
+        "case": "r2_cross_role",
+        "config": {
+          "LLM_CACHE_ENABLED": "false",
+          "NEMOTRON_SUPER_MODEL": "nvidia/nemotron-3.5-lightning-30b-a3b"
+        },
+        "provider_mode": "echo",
+        "ready": 503,
+        "rows": [
+          {
+            "request": "high",
+            "http": 503,
+            "code": "MODEL_POLICY_VIOLATION",
+            "selected_model": null,
+            "provider_received": [],
+            "provider_calls": 0,
+            "identity_verified": null,
+            "reported": null,
+            "content": ""
+          }
+        ]
+      },
+      {
+        "case": "r2_unknown_model_ultra",
+        "config": {
+          "LLM_CACHE_ENABLED": "false",
+          "NEMOTRON_ULTRA_ENABLED": "true",
+          "NEMOTRON_ULTRA_MODEL": "totally-unknown/model-d"
+        },
+        "provider_mode": "echo",
+        "ready": 503,
+        "rows": [
+          {
+            "request": "high",
+            "http": 503,
+            "code": "MODEL_POLICY_VIOLATION",
+            "selected_model": null,
+            "provider_received": [],
+            "provider_calls": 0,
+            "identity_verified": null,
+            "reported": null,
+            "content": ""
+          }
+        ]
+      },
+      {
+        "case": "r2_llm_model_not_dispatched",
+        "config": {
+          "LLM_CACHE_ENABLED": "false",
+          "LLM_MODEL": "meta/llama-3.1-70b-instruct",
+          "MAIW_NIM_MODEL": "example-org/x"
+        },
+        "provider_mode": "echo",
+        "ready": 200,
+        "rows": [
+          {
+            "request": "high",
+            "http": 200,
+            "code": null,
+            "selected_model": "nvidia/nemotron-3-super-120b-a12b",
+            "provider_received": [
+              "nvidia/nemotron-3-super-120b-a12b"
+            ],
+            "provider_calls": 1,
+            "identity_verified": true,
+            "reported": "nvidia/nemotron-3-super-120b-a12b",
+            "content": "FAKE from=nvidia/nemotron-3-super-120b-a12b thinking=budget"
+          }
+        ]
+      },
+      {
+        "case": "cache_high_then_low",
+        "config": {
+          "LLM_CACHE_ENABLED": "true"
+        },
+        "provider_mode": "echo",
+        "ready": 200,
+        "rows": [
+          {
+            "request": "high",
+            "http": 200,
+            "code": null,
+            "selected_model": "nvidia/nemotron-3-super-120b-a12b",
+            "provider_received": [
+              "nvidia/nemotron-3-super-120b-a12b"
+            ],
+            "provider_calls": 1,
+            "identity_verified": true,
+            "reported": "nvidia/nemotron-3-super-120b-a12b",
+            "content": "FAKE from=nvidia/nemotron-3-super-120b-a12b thinking=budget"
+          },
+          {
+            "request": "low",
+            "http": 200,
+            "code": null,
+            "selected_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "provider_received": [
+              "nvidia/nemotron-3.5-lightning-30b-a3b"
+            ],
+            "provider_calls": 1,
+            "identity_verified": true,
+            "reported": "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "content": "FAKE from=nvidia/nemotron-3.5-lightning-30b-a3b thinking=off"
+          },
+          {
+            "request": "high",
+            "http": 200,
+            "code": null,
+            "selected_model": "nvidia/nemotron-3-super-120b-a12b",
+            "provider_received": [],
+            "provider_calls": 0,
+            "identity_verified": true,
+            "reported": "nvidia/nemotron-3-super-120b-a12b",
+            "content": "FAKE from=nvidia/nemotron-3-super-120b-a12b thinking=budget"
+          },
+          {
+            "request": "low",
+            "http": 200,
+            "code": null,
+            "selected_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "provider_received": [],
+            "provider_calls": 0,
+            "identity_verified": true,
+            "reported": "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "content": "FAKE from=nvidia/nemotron-3.5-lightning-30b-a3b thinking=off"
+          }
+        ]
+      },
+      {
+        "case": "cache_low_then_high",
+        "config": {
+          "LLM_CACHE_ENABLED": "true"
+        },
+        "provider_mode": "echo",
+        "ready": 200,
+        "rows": [
+          {
+            "request": "low",
+            "http": 200,
+            "code": null,
+            "selected_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "provider_received": [
+              "nvidia/nemotron-3.5-lightning-30b-a3b"
+            ],
+            "provider_calls": 1,
+            "identity_verified": true,
+            "reported": "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "content": "FAKE from=nvidia/nemotron-3.5-lightning-30b-a3b thinking=off"
+          },
+          {
+            "request": "high",
+            "http": 200,
+            "code": null,
+            "selected_model": "nvidia/nemotron-3-super-120b-a12b",
+            "provider_received": [
+              "nvidia/nemotron-3-super-120b-a12b"
+            ],
+            "provider_calls": 1,
+            "identity_verified": true,
+            "reported": "nvidia/nemotron-3-super-120b-a12b",
+            "content": "FAKE from=nvidia/nemotron-3-super-120b-a12b thinking=budget"
+          },
+          {
+            "request": "low",
+            "http": 200,
+            "code": null,
+            "selected_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "provider_received": [],
+            "provider_calls": 0,
+            "identity_verified": true,
+            "reported": "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "content": "FAKE from=nvidia/nemotron-3.5-lightning-30b-a3b thinking=off"
+          },
+          {
+            "request": "high",
+            "http": 200,
+            "code": null,
+            "selected_model": "nvidia/nemotron-3-super-120b-a12b",
+            "provider_received": [],
+            "provider_calls": 0,
+            "identity_verified": true,
+            "reported": "nvidia/nemotron-3-super-120b-a12b",
+            "content": "FAKE from=nvidia/nemotron-3-super-120b-a12b thinking=budget"
+          }
+        ]
+      },
+      {
+        "case": "cache_high_then_medium",
+        "config": {
+          "LLM_CACHE_ENABLED": "true"
+        },
+        "provider_mode": "echo",
+        "ready": 200,
+        "rows": [
+          {
+            "request": "high",
+            "http": 200,
+            "code": null,
+            "selected_model": "nvidia/nemotron-3-super-120b-a12b",
+            "provider_received": [
+              "nvidia/nemotron-3-super-120b-a12b"
+            ],
+            "provider_calls": 1,
+            "identity_verified": true,
+            "reported": "nvidia/nemotron-3-super-120b-a12b",
+            "content": "FAKE from=nvidia/nemotron-3-super-120b-a12b thinking=budget"
+          },
+          {
+            "request": "medium",
+            "http": 200,
+            "code": null,
+            "selected_model": "nvidia/nemotron-3-super-120b-a12b",
+            "provider_received": [
+              "nvidia/nemotron-3-super-120b-a12b"
+            ],
+            "provider_calls": 1,
+            "identity_verified": true,
+            "reported": "nvidia/nemotron-3-super-120b-a12b",
+            "content": "FAKE from=nvidia/nemotron-3-super-120b-a12b thinking=off"
+          },
+          {
+            "request": "medium",
+            "http": 200,
+            "code": null,
+            "selected_model": "nvidia/nemotron-3-super-120b-a12b",
+            "provider_received": [],
+            "provider_calls": 0,
+            "identity_verified": true,
+            "reported": "nvidia/nemotron-3-super-120b-a12b",
+            "content": "FAKE from=nvidia/nemotron-3-super-120b-a12b thinking=off"
+          }
+        ]
+      },
+      {
+        "case": "cache_timestamps_distinct",
+        "config": {
+          "LLM_CACHE_ENABLED": "true"
+        },
+        "provider_mode": "echo",
+        "ready": 200,
+        "rows": [
+          {
+            "request": "low at 2026-10-11T03:00:00Z",
+            "http": 200,
+            "code": null,
+            "selected_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "provider_received": [
+              "nvidia/nemotron-3.5-lightning-30b-a3b"
+            ],
+            "provider_calls": 1,
+            "identity_verified": true,
+            "reported": "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "content": "FAKE from=nvidia/nemotron-3.5-lightning-30b-a3b thinking=off"
+          },
+          {
+            "request": "low at 2026-10-11T04:00:00Z",
+            "http": 200,
+            "code": null,
+            "selected_model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "provider_received": [
+              "nvidia/nemotron-3.5-lightning-30b-a3b"
+            ],
+            "provider_calls": 1,
+            "identity_verified": true,
+            "reported": "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "content": "FAKE from=nvidia/nemotron-3.5-lightning-30b-a3b thinking=off"
+          }
+        ]
+      }
+    ],
+    "readiness_matrix": [
+      {
+        "row": "reference baseline (DB + required sandbox)",
+        "ready": 200,
+        "failed_components": [],
+        "governed_write_path": "not_offered",
+        "gwp_missing": null,
+        "mcp": {
+          "equipment": "NOT_CONFIGURED",
+          "labor": "NOT_CONFIGURED",
+          "wave": "NOT_CONFIGURED",
+          "inventory": "NOT_CONFIGURED"
+        },
+        "sandbox_runtime": "ready",
+        "live": 200
+      },
+      {
+        "row": "reference: DB container paused",
+        "ready": 503,
+        "failed_components": [
+          "database"
+        ],
+        "governed_write_path": "not_offered",
+        "gwp_missing": null,
+        "mcp": {
+          "equipment": "NOT_CONFIGURED",
+          "labor": "NOT_CONFIGURED",
+          "wave": "NOT_CONFIGURED",
+          "inventory": "NOT_CONFIGURED"
+        },
+        "sandbox_runtime": "ready",
+        "live": 200
+      },
+      {
+        "row": "reference: persistence governance/ chmod 000",
+        "ready": 503,
+        "failed_components": [
+          "persistence"
+        ],
+        "governed_write_path": "not_offered",
+        "gwp_missing": null,
+        "mcp": {
+          "equipment": "NOT_CONFIGURED",
+          "labor": "NOT_CONFIGURED",
+          "wave": "NOT_CONFIGURED",
+          "inventory": "NOT_CONFIGURED"
+        },
+        "sandbox_runtime": "ready",
+        "live": 200
+      },
+      {
+        "row": "reference: required sandbox stopped",
+        "ready": 503,
+        "failed_components": [
+          "sandbox_runtime"
+        ],
+        "governed_write_path": "not_offered",
+        "gwp_missing": null,
+        "mcp": {
+          "equipment": "NOT_CONFIGURED",
+          "labor": "NOT_CONFIGURED",
+          "wave": "NOT_CONFIGURED",
+          "inventory": "NOT_CONFIGURED"
+        },
+        "sandbox_runtime": "failed",
+        "live": 200
+      },
+      {
+        "row": "sandbox restarted",
+        "phase": "Ready"
+      },
+      {
+        "row": "reference + optional MCP URL (no executors)",
+        "ready": 200,
+        "failed_components": [],
+        "governed_write_path": "not_offered",
+        "gwp_missing": null,
+        "mcp": {
+          "equipment": "READY",
+          "labor": "NOT_CONFIGURED",
+          "wave": "NOT_CONFIGURED",
+          "inventory": "NOT_CONFIGURED"
+        },
+        "sandbox_runtime": "ready",
+        "live": 200,
+        "operator_write": [
+          503,
+          "GOVERNED_WRITES_NOT_OFFERED"
+        ]
+      },
+      {
+        "row": "reference_governed, MCP healthy, write token set",
+        "ready": 200,
+        "failed_components": [],
+        "governed_write_path": "ready",
+        "gwp_missing": null,
+        "mcp": {
+          "equipment": "READY",
+          "labor": "NOT_CONFIGURED",
+          "wave": "NOT_CONFIGURED",
+          "inventory": "NOT_CONFIGURED"
+        },
+        "sandbox_runtime": "ready",
+        "live": 200
+      },
+      {
+        "row": "reference_governed, write token missing",
+        "ready": 503,
+        "failed_components": [
+          "governed_write_path"
+        ],
+        "governed_write_path": "failed",
+        "gwp_missing": [
+          "operator_write_auth"
+        ],
+        "mcp": {
+          "equipment": "READY",
+          "labor": "NOT_CONFIGURED",
+          "wave": "NOT_CONFIGURED",
+          "inventory": "NOT_CONFIGURED"
+        },
+        "sandbox_runtime": "ready",
+        "live": 200,
+        "operator_write": [
+          503,
+          "OPERATOR_WRITE_AUTH_NOT_CONFIGURED"
+        ]
+      },
+      {
+        "row": "reference_governed, write token == inference token",
+        "ready": 503,
+        "failed_components": [
+          "governed_write_path"
+        ],
+        "governed_write_path": "failed",
+        "gwp_missing": [
+          "operator_write_auth"
+        ],
+        "mcp": {
+          "equipment": "READY",
+          "labor": "NOT_CONFIGURED",
+          "wave": "NOT_CONFIGURED",
+          "inventory": "NOT_CONFIGURED"
+        },
+        "sandbox_runtime": "ready",
+        "live": 200
+      },
+      {
+        "row": "reference_governed, required MCP unreachable",
+        "ready": 503,
+        "failed_components": [
+          "governed_write_path",
+          "mcp_domains"
+        ],
+        "governed_write_path": "failed",
+        "gwp_missing": null,
+        "mcp": {
+          "equipment": "FAILED",
+          "labor": "NOT_CONFIGURED",
+          "wave": "NOT_CONFIGURED",
+          "inventory": "NOT_CONFIGURED"
+        },
+        "sandbox_runtime": "ready",
+        "live": 200
+      },
+      {
+        "row": "reference_governed, required MCP unset",
+        "ready": 503,
+        "failed_components": [
+          "governed_write_path",
+          "mcp_domains"
+        ],
+        "governed_write_path": "failed",
+        "gwp_missing": [
+          "equipment_executor"
+        ],
+        "mcp": {
+          "equipment": "NOT_CONFIGURED",
+          "labor": "NOT_CONFIGURED",
+          "wave": "NOT_CONFIGURED",
+          "inventory": "NOT_CONFIGURED"
+        },
+        "sandbox_runtime": "ready",
+        "live": 200
+      },
+      {
+        "row": "unapproved model binding",
+        "ready": 503,
+        "failed_components": [
+          "model_gateway"
+        ],
+        "governed_write_path": "not_offered",
+        "gwp_missing": null,
+        "mcp": {
+          "equipment": "NOT_CONFIGURED",
+          "labor": "NOT_CONFIGURED",
+          "wave": "NOT_CONFIGURED",
+          "inventory": "NOT_CONFIGURED"
+        },
+        "sandbox_runtime": "ready",
+        "live": 200
+      },
+      {
+        "row": "invalid profile",
+        "ready": 503,
+        "failed_components": [
+          "profile"
+        ],
+        "governed_write_path": "not_offered",
+        "gwp_missing": null,
+        "mcp": {
+          "equipment": "NOT_CONFIGURED",
+          "labor": "NOT_CONFIGURED",
+          "wave": "NOT_CONFIGURED",
+          "inventory": "NOT_CONFIGURED"
+        },
+        "sandbox_runtime": "ready",
+        "live": 200
+      },
+      {
+        "row": "optional sandbox (mode optional) absent",
+        "ready": 200,
+        "failed_components": [],
+        "governed_write_path": "not_offered",
+        "gwp_missing": null,
+        "mcp": {
+          "equipment": "NOT_CONFIGURED",
+          "labor": "NOT_CONFIGURED",
+          "wave": "NOT_CONFIGURED",
+          "inventory": "NOT_CONFIGURED"
+        },
+        "sandbox_runtime": "degraded",
+        "live": 200
+      }
+    ]
+  },
+  "host_safety": {
+    "pre_existing_listeners": [
+      22,
+      53,
+      32768,
+      32769
+    ],
+    "remediation_ports": [
+      18931,
+      18932,
+      18935,
+      18940,
+      18901,
+      18992,
+      18993,
+      55462,
+      55463
+    ],
+    "contamination_incidents": 0,
+    "guard_hits_explained": [
+      "03:24:29Z loopback remote port 32776 = a CI test's own ephemeral server socket (no listener on 32776) \u2014 false positive",
+      "03:57:20Z 10.185.115.61 -> 140.82.112.4:22 = git push to github.com"
+    ],
+    "user_gateway_nemoclaw_8991": "never contacted",
+    "secrets_printed": false,
+    "allow_unauthenticated_set": false
+  },
+  "remaining_p2": [
+    "P2-04",
+    "P2-06",
+    "P2-09",
+    "P2-10",
+    "P2-14",
+    "P2-15",
+    "P2-16",
+    "P2-18",
+    "P2-20",
+    "N-3",
+    "N-4",
+    "N-5",
+    "N-6",
+    "N-7",
+    "N-10",
+    "N-11",
+    "N-12",
+    "N-9 (reference_governed MCP launch command)"
+  ],
+  "new_observations": [
+    "R3-O1 managed gateway loopback/TLS-off",
+    "R3-O2 journal single-node",
+    "R3-O3 MCPToolError treated as definite failure",
+    "R3-O4 demo routes unauthenticated (simulation only)",
+    "R3-O5 reconciliation pre_status comparison",
+    "R3-O6 legacy src nim_client cache key"
+  ],
+  "p0": [],
+  "p1": [],
+  "ci": {
+    "pre_docs_head": "608222fc07174355738ca202c18d8292eb6de120",
+    "run_id": 38110621347,
+    "conclusion": "success",
+    "jobs": {
+      "Test & Quality Checks (3.11, 22)": "pass (2865 passed, 8 skipped; Jest 968/968)",
+      "Analyze (python)": "pass",
+      "Analyze (javascript-typescript)": "pass",
+      "Security Scan": "pass",
+      "Trivy": "pass",
+      "Semantic Release": "skipped"
+    },
+    "unresolved_review_threads": 0,
+    "code_quality_threads_resolved": 2
+  },
+  "ready_for_fourth_reaudit": true
+}

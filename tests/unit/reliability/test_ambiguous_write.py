@@ -5,9 +5,13 @@ Phase 10E Batch 1 — Ambiguous write semantics (Sections 9 & 10).
 
 The highest-priority test in Phase 10E.
 
-Section 9: timeout/failure BEFORE mutation → outcome = FAILED
+Section 9: failure provably BEFORE mutation → outcome = FAILED
     provider physical_mutations = 0
     automatic_retry_count = 0
+    v2.0.1 round 4 (NEW4-P1-01): "provably" means the request was never
+    dispatched or the provider explicitly certified NOT_APPLIED
+    (``WriteNotApplied``).  A generic exception (``BackendUnavailable``,
+    ``RuntimeError`` …) says nothing about the phase → UNKNOWN.
 
 Section 10: mutation occurs, response lost → outcome = UNKNOWN
     NOT outcome = FAILED
@@ -34,7 +38,7 @@ from maiw_execution import (
 from maiw_execution.outcome import AmbiguousWriteError
 from maiw_decision.proposal import ActionProposal
 from maiw_contracts.labor import LaborAllocateResult
-from maiw_mcp.errors import BackendUnavailable
+from maiw_mcp.errors import BackendUnavailable, WriteNotApplied
 
 
 def _approved_decision(proposal_id: str) -> DecisionResult:
@@ -62,14 +66,17 @@ def _labor_proposal() -> ActionProposal:
 
 class TestPreMutationFailure:
     """
-    Provider raises BEFORE mutation (BackendUnavailable, network error).
+    Provider certifies the write was rejected BEFORE mutation (WriteNotApplied).
     Expected: outcome = FAILED, physical_mutation_occurred = False.
+
+    Round 4: an uncertified failure (BackendUnavailable / RuntimeError) is
+    UNKNOWN — the executor cannot know the phase it happened in.
     """
 
-    def test_backend_unavailable_before_mutation_produces_failed(self):
+    def test_certified_not_applied_produces_failed(self):
         skill = MagicMock()
         skill.execute = AsyncMock(
-            side_effect=BackendUnavailable("provider unreachable")
+            side_effect=WriteNotApplied("task not found", rejection_code="NOT_FOUND")
         )
         executor = LaborActionExecutor(allocate_skill=skill)
         proposal = _labor_proposal()
@@ -81,8 +88,25 @@ class TestPreMutationFailure:
         assert result.executed is False
         assert result.success is False
         assert result.physical_mutation_occurred is False
+        assert result.error_code == "WRITE_NOT_APPLIED"
+        assert result.server_disposition == "NOT_APPLIED"
 
-    def test_generic_exception_before_mutation_produces_failed(self):
+    def test_uncertified_backend_unavailable_is_unknown_not_failed(self):
+        """Round 4: a generic backend error may follow an applied mutation."""
+        skill = MagicMock()
+        skill.execute = AsyncMock(
+            side_effect=BackendUnavailable("provider unreachable")
+        )
+        executor = LaborActionExecutor(allocate_skill=skill)
+        proposal = _labor_proposal()
+        decision = _approved_decision(proposal.proposal_id)
+
+        result = asyncio.run(executor.execute(proposal, decision))
+
+        assert result.outcome == ExecutionOutcome.UNKNOWN
+        assert result.physical_mutation_occurred is None
+
+    def test_generic_exception_is_unknown_not_failed(self):
         skill = MagicMock()
         skill.execute = AsyncMock(side_effect=RuntimeError("DB connection lost"))
         executor = LaborActionExecutor(allocate_skill=skill)
@@ -91,14 +115,13 @@ class TestPreMutationFailure:
 
         result = asyncio.run(executor.execute(proposal, decision))
 
-        assert result.outcome == ExecutionOutcome.FAILED
+        assert result.outcome == ExecutionOutcome.UNKNOWN
+        assert result.error_code == "EXECUTION_OUTCOME_UNKNOWN"
 
     def test_failed_outcome_does_not_retry_automatically(self):
         """The executor calls the provider exactly once for a FAILED outcome."""
         skill = MagicMock()
-        skill.execute = AsyncMock(
-            side_effect=BackendUnavailable("provider unreachable")
-        )
+        skill.execute = AsyncMock(side_effect=WriteNotApplied("rejected"))
         executor = LaborActionExecutor(allocate_skill=skill)
         proposal = _labor_proposal()
         decision = _approved_decision(proposal.proposal_id)
@@ -110,7 +133,7 @@ class TestPreMutationFailure:
 
     def test_failed_is_distinguishable_from_unknown(self):
         skill = MagicMock()
-        skill.execute = AsyncMock(side_effect=BackendUnavailable("gone"))
+        skill.execute = AsyncMock(side_effect=WriteNotApplied("gone"))
         executor = LaborActionExecutor(allocate_skill=skill)
         proposal = _labor_proposal()
         decision = _approved_decision(proposal.proposal_id)

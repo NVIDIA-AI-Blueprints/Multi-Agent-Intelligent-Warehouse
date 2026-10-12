@@ -84,9 +84,7 @@ class TestSimulationInventoryProvider:
     def test_get_inventory_known_sku(self, world):
         provider = SimulationInventoryProvider(world)
         req = InventoryLookupRequest(sku="SKU-001")
-        result = asyncio.get_event_loop().run_until_complete(
-            provider.get_inventory(req)
-        )
+        result = asyncio.run(provider.get_inventory(req))
         assert result.sku == "SKU-001"
         assert result.total_available == 100
         assert result.warehouse_id == "DC-47"
@@ -97,23 +95,19 @@ class TestSimulationInventoryProvider:
         world.inventory["SKU-001"].quantity_available = 15
         provider = SimulationInventoryProvider(world)
         req = InventoryLookupRequest(sku="SKU-001")
-        result = asyncio.get_event_loop().run_until_complete(
-            provider.get_inventory(req)
-        )
+        result = asyncio.run(provider.get_inventory(req))
         assert result.is_low_stock
 
     def test_get_inventory_unknown_sku_raises(self, world):
         provider = SimulationInventoryProvider(world)
         req = InventoryLookupRequest(sku="SKU-MISSING")
         with pytest.raises(BackendUnavailable):
-            asyncio.get_event_loop().run_until_complete(provider.get_inventory(req))
+            asyncio.run(provider.get_inventory(req))
 
     def test_get_inventory_observed_at_matches_clock(self, world):
         provider = SimulationInventoryProvider(world)
         req = InventoryLookupRequest(sku="SKU-001")
-        result = asyncio.get_event_loop().run_until_complete(
-            provider.get_inventory(req)
-        )
+        result = asyncio.run(provider.get_inventory(req))
         assert result.observed_at == world.clock.now()
 
 
@@ -124,9 +118,7 @@ class TestSimulationEquipmentProvider:
     def test_get_equipment_status_all(self, world, bus):
         provider = SimulationEquipmentProvider(world, bus)
         req = EquipmentStatusRequest()
-        result = asyncio.get_event_loop().run_until_complete(
-            provider.get_equipment_status(req)
-        )
+        result = asyncio.run(provider.get_equipment_status(req))
         assert result.total_count == 1
         assert result.equipment[0].asset_id == "AGV-01"
         assert result.source == "simulation"
@@ -134,25 +126,19 @@ class TestSimulationEquipmentProvider:
     def test_get_equipment_status_filter_by_id(self, world, bus):
         provider = SimulationEquipmentProvider(world, bus)
         req = EquipmentStatusRequest(asset_id="AGV-01")
-        result = asyncio.get_event_loop().run_until_complete(
-            provider.get_equipment_status(req)
-        )
+        result = asyncio.run(provider.get_equipment_status(req))
         assert result.total_count == 1
 
     def test_get_equipment_status_unknown_id_raises(self, world, bus):
         provider = SimulationEquipmentProvider(world, bus)
         req = EquipmentStatusRequest(asset_id="MISSING")
         with pytest.raises(BackendUnavailable):
-            asyncio.get_event_loop().run_until_complete(
-                provider.get_equipment_status(req)
-            )
+            asyncio.run(provider.get_equipment_status(req))
 
     def test_get_equipment_metadata_has_battery(self, world, bus):
         provider = SimulationEquipmentProvider(world, bus)
         req = EquipmentStatusRequest(asset_id="AGV-01")
-        result = asyncio.get_event_loop().run_until_complete(
-            provider.get_equipment_status(req)
-        )
+        result = asyncio.run(provider.get_equipment_status(req))
         assert result.equipment[0].metadata["battery_pct"] == 85.0
 
     def test_execute_equipment_assignment_mutates_world(self, world, bus):
@@ -181,9 +167,7 @@ class TestSimulationEquipmentProvider:
             decision_id="dec-1",
         )
         with pytest.raises(BackendUnavailable):
-            asyncio.get_event_loop().run_until_complete(
-                provider.execute_equipment_assignment(req)
-            )
+            asyncio.run(provider.execute_equipment_assignment(req))
 
 
 # ── SimulationLaborProvider ───────────────────────────────────────────────────
@@ -193,9 +177,7 @@ class TestSimulationLaborProvider:
     def test_get_labor_capacity(self, world, bus):
         provider = SimulationLaborProvider(world, bus)
         req = LaborCapacityRequest()
-        result = asyncio.get_event_loop().run_until_complete(
-            provider.get_labor_capacity(req)
-        )
+        result = asyncio.run(provider.get_labor_capacity(req))
         assert result.total_workers == 1
         assert result.available_workers == 1
         assert result.source == "simulation"
@@ -203,9 +185,7 @@ class TestSimulationLaborProvider:
     def test_get_labor_capacity_zone_filter(self, world, bus):
         provider = SimulationLaborProvider(world, bus)
         req = LaborCapacityRequest(zone="B2")
-        result = asyncio.get_event_loop().run_until_complete(
-            provider.get_labor_capacity(req)
-        )
+        result = asyncio.run(provider.get_labor_capacity(req))
         assert result.total_workers == 0
 
     def test_execute_labor_allocation_mutates_world(self, world, bus):
@@ -236,9 +216,7 @@ class TestSimulationWaveProvider:
     def test_get_wave_risk_with_unassigned_pending(self, world, bus):
         provider = SimulationWaveProvider(world, bus)
         req = WaveRiskRequest()
-        result = asyncio.get_event_loop().run_until_complete(
-            provider.get_wave_risk(req)
-        )
+        result = asyncio.run(provider.get_wave_risk(req))
         assert result.otif_at_risk
         assert result.at_risk_task_count == 1
         assert result.risk_level in ("low", "medium", "high", "critical")
@@ -247,9 +225,7 @@ class TestSimulationWaveProvider:
         world.tasks["t-001"].assigned_to = "w-001"
         provider = SimulationWaveProvider(world, bus)
         req = WaveRiskRequest()
-        result = asyncio.get_event_loop().run_until_complete(
-            provider.get_wave_risk(req)
-        )
+        result = asyncio.run(provider.get_wave_risk(req))
         assert not result.otif_at_risk
         assert result.risk_level == "none"
 
@@ -274,7 +250,5 @@ class TestSimulationWaveProvider:
         world.tasks["t-001"].task_type = "CYCLE_COUNT"  # not in _WAVE_TYPES
         provider = SimulationWaveProvider(world, bus)
         req = WaveRiskRequest()
-        result = asyncio.get_event_loop().run_until_complete(
-            provider.get_wave_risk(req)
-        )
+        result = asyncio.run(provider.get_wave_risk(req))
         assert result.total_task_count == 0

@@ -34,9 +34,11 @@ for _pkg in ("packages/maiw-models", "packages/maiw-mcp", "packages/maiw-agents"
 
 # ── Endpoint / token configuration ───────────────────────────────────────────
 
+# v2.0.1: the inference endpoint is served by the canonical shipped app
+# (maiw_api.app:app) on the MAIW API port; there is no separate :8020 server.
 MAIW_INFERENCE_ENDPOINT = os.getenv(
     "MAIW_QUAL_INFERENCE_ENDPOINT",
-    "http://localhost:8020/api/v1/inference",
+    "http://localhost:8001/api/v1/inference",
 )
 MAIW_INFERENCE_TOKEN = os.getenv("MAIW_INFERENCE_INTERNAL_TOKEN", "")
 SANDBOX_NAME = os.getenv("MAIW_QUAL_SANDBOX_NAME", "maiw-qual-20c-b")

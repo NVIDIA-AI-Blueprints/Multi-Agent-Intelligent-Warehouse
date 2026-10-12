@@ -29,7 +29,6 @@ from __future__ import annotations
 import ast
 import importlib
 import inspect
-import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -493,64 +492,58 @@ def test_maiw_valid_transitions_are_enforced():
 # ── Invariant 13: MAIW_AGENT_RUNTIME=deterministic → MAIWDeterministicRuntime ─
 
 
-def test_get_runtime_default_is_deterministic():
+def test_get_runtime_default_is_deterministic(monkeypatch):
     """get_runtime() with no args returns MAIWDeterministicRuntime."""
     from maiw_agents.runtime.deep_agents_runtime import get_runtime
     from maiw_agents.runtime import MAIWDeterministicRuntime
 
     # Unset env var to test default
-    os.environ.pop("MAIW_AGENT_RUNTIME", None)
+    monkeypatch.delenv("MAIW_AGENT_RUNTIME", raising=False)
     rt = get_runtime()
     assert isinstance(
         rt, MAIWDeterministicRuntime
     ), f"Default runtime should be MAIWDeterministicRuntime, got {type(rt).__name__}"
 
 
-def test_get_runtime_env_deterministic():
+def test_get_runtime_env_deterministic(monkeypatch):
     """MAIW_AGENT_RUNTIME=deterministic → MAIWDeterministicRuntime."""
     from maiw_agents.runtime.deep_agents_runtime import get_runtime
     from maiw_agents.runtime import MAIWDeterministicRuntime
 
-    os.environ["MAIW_AGENT_RUNTIME"] = "deterministic"
-    try:
-        rt = get_runtime()
-        assert isinstance(rt, MAIWDeterministicRuntime)
-    finally:
-        os.environ.pop("MAIW_AGENT_RUNTIME", None)
+    monkeypatch.setenv("MAIW_AGENT_RUNTIME", "deterministic")
+    rt = get_runtime()
+    assert isinstance(rt, MAIWDeterministicRuntime)
 
 
 # ── Invariant 14: MAIW_AGENT_RUNTIME=deep_agents → DeepAgentsRuntime ──────────
 
 
-def test_get_runtime_env_deep_agents():
+def test_get_runtime_env_deep_agents(monkeypatch):
     """MAIW_AGENT_RUNTIME=deep_agents → DeepAgentsRuntime."""
     from maiw_agents.runtime.deep_agents_runtime import get_runtime, DeepAgentsRuntime
 
-    os.environ["MAIW_AGENT_RUNTIME"] = "deep_agents"
-    try:
-        rt = get_runtime()
-        assert isinstance(
-            rt, DeepAgentsRuntime
-        ), f"Expected DeepAgentsRuntime, got {type(rt).__name__}"
-    finally:
-        os.environ.pop("MAIW_AGENT_RUNTIME", None)
+    monkeypatch.setenv("MAIW_AGENT_RUNTIME", "deep_agents")
+    rt = get_runtime()
+    assert isinstance(
+        rt, DeepAgentsRuntime
+    ), f"Expected DeepAgentsRuntime, got {type(rt).__name__}"
 
 
-def test_get_runtime_explicit_deep_agents():
+def test_get_runtime_explicit_deep_agents(monkeypatch):
     """get_runtime('deep_agents') returns DeepAgentsRuntime."""
     from maiw_agents.runtime.deep_agents_runtime import get_runtime, DeepAgentsRuntime
 
-    os.environ.pop("MAIW_AGENT_RUNTIME", None)
+    monkeypatch.delenv("MAIW_AGENT_RUNTIME", raising=False)
     rt = get_runtime("deep_agents")
     assert isinstance(rt, DeepAgentsRuntime)
 
 
-def test_get_runtime_explicit_deterministic():
+def test_get_runtime_explicit_deterministic(monkeypatch):
     """get_runtime('deterministic') returns MAIWDeterministicRuntime."""
     from maiw_agents.runtime.deep_agents_runtime import get_runtime
     from maiw_agents.runtime import MAIWDeterministicRuntime
 
-    os.environ.pop("MAIW_AGENT_RUNTIME", None)
+    monkeypatch.delenv("MAIW_AGENT_RUNTIME", raising=False)
     rt = get_runtime("deterministic")
     assert isinstance(rt, MAIWDeterministicRuntime)
 
@@ -703,7 +696,7 @@ def test_sop_definition_runtime_profile_defaults_to_strict():
     ), f"Expected runtime_profile='strict', got {sop.runtime_profile!r}"
 
 
-def test_get_runtime_with_adaptive_sop_returns_deep_agents():
+def test_get_runtime_with_adaptive_sop_returns_deep_agents(monkeypatch):
     """get_runtime(sop=<adaptive profile>) returns DeepAgentsRuntime."""
     from maiw_agents.runtime.deep_agents_runtime import get_runtime, DeepAgentsRuntime
     from maiw_agents.contracts.sop import SOPDefinition, SOPStep
@@ -722,14 +715,14 @@ def test_get_runtime_with_adaptive_sop_returns_deep_agents():
         escalation=[],
         required_context=[],
     )
-    os.environ.pop("MAIW_AGENT_RUNTIME", None)
+    monkeypatch.delenv("MAIW_AGENT_RUNTIME", raising=False)
     rt = get_runtime(sop=sop)
     assert isinstance(
         rt, DeepAgentsRuntime
     ), f"Expected DeepAgentsRuntime for adaptive profile, got {type(rt).__name__}"
 
 
-def test_get_runtime_with_strict_sop_returns_deterministic():
+def test_get_runtime_with_strict_sop_returns_deterministic(monkeypatch):
     """get_runtime(sop=<strict profile>) returns MAIWDeterministicRuntime."""
     from maiw_agents.runtime.deep_agents_runtime import get_runtime
     from maiw_agents.runtime import MAIWDeterministicRuntime
@@ -749,14 +742,14 @@ def test_get_runtime_with_strict_sop_returns_deterministic():
         escalation=[],
         required_context=[],
     )
-    os.environ.pop("MAIW_AGENT_RUNTIME", None)
+    monkeypatch.delenv("MAIW_AGENT_RUNTIME", raising=False)
     rt = get_runtime(sop=sop)
     assert isinstance(
         rt, MAIWDeterministicRuntime
     ), f"Expected MAIWDeterministicRuntime for strict profile, got {type(rt).__name__}"
 
 
-def test_get_runtime_config_overrides_sop_profile():
+def test_get_runtime_config_overrides_sop_profile(monkeypatch):
     """get_runtime(config='deterministic', sop=<adaptive>) respects explicit config, not SOP."""
     from maiw_agents.runtime.deep_agents_runtime import get_runtime
     from maiw_agents.runtime import MAIWDeterministicRuntime
@@ -776,7 +769,7 @@ def test_get_runtime_config_overrides_sop_profile():
         escalation=[],
         required_context=[],
     )
-    os.environ.pop("MAIW_AGENT_RUNTIME", None)
+    monkeypatch.delenv("MAIW_AGENT_RUNTIME", raising=False)
     # Explicit config='deterministic' should win over sop.runtime_profile='adaptive'
     rt = get_runtime(config="deterministic", sop=sop)
     assert isinstance(rt, MAIWDeterministicRuntime), (

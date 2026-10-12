@@ -219,7 +219,9 @@ MAIWMCPClient.invoke(capability, payload)
 |-----------|-----------|
 | Deadline already expired at call entry | `RequestDeadlineExceeded` |
 | Circuit breaker OPEN | `MCPUnavailable` |
-| `call_result.is_error == True` | `MCPToolError` |
+| `call_result.is_error == True` and `structuredContent` is exactly the canonical rejection: `execution_disposition == "NOT_APPLIED"` (exact string), `rejection_code` in `INVALID_REQUEST` / `NOT_FOUND` / `PRECONDITION_FAILED`, optional string `message`, **no other key** (`certifies_not_applied`) | `MCPToolNotApplied` (an `MCPToolError`; write → definite FAILED) |
+| `call_result.is_error == True` otherwise (no / malformed / unknown disposition, or a NOT_APPLIED claim with a missing / unknown `rejection_code` or any other field such as `outcome`, `success`, `executed`, `mutation_status`, `rows_affected`, `post_state`; text is never trusted) | `MCPToolErrorOutcomeUnknown` (an `MCPToolError` and `MCPDispatchOutcomeUnknown`; write → UNKNOWN) — v2.0.1 round 4; strict since the final pre-merge cleanup (NEW5-P2-01) |
+| Non-error result with a non-null `execution_disposition` that is not a trusted NOT_APPLIED write result (`certifies_not_applied_result`: exact disposition, `success` exactly `false`, `outcome` `failed` / `conflict` / `deferred`, known `rejection_code` if any, null mutation references, `tasks_updated` 0, no field outside the write-result contracts) | `MCPResultOutcomeUnknown` (an `MCPContractError` and `MCPDispatchOutcomeUnknown`; write → UNKNOWN `SERVER_RESULT_CONTRADICTORY`) — NEW5-P2-01 |
 | Non-JSON or non-dict result | `MCPContractError` |
 | `TimeoutError` from SDK | `MCPTimeout` |
 | All other `Exception` | `MCPUnavailable` |

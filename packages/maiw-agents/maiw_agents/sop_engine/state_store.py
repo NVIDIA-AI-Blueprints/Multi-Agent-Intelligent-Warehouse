@@ -304,6 +304,15 @@ class JsonFileProcedureStateStore:
         async with self._lock:
             self._path(procedure_execution_id).unlink(missing_ok=True)
 
+    async def list_ids(self) -> list[str]:
+        """
+        Every procedure id currently held on disk (introspection / restart
+        recovery). Mirrors ``InMemoryProcedureStateStore.list_ids``. Temp files
+        from an interrupted save are not procedures and are never listed.
+        """
+        async with self._lock:
+            return sorted(p.stem for p in self._dir.glob("*.json") if p.is_file())
+
 
 __all__ = [
     "ProcedureStateStore",

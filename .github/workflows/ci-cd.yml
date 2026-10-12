@@ -81,6 +81,11 @@ jobs:
       run: |
         cd src/ui/web
         npm run lint
+
+    - name: Run TypeScript typecheck
+      run: |
+        cd src/ui/web
+        npx tsc --noEmit
     
     - name: Run Python tests
       env:

@@ -50,3 +50,76 @@ class ModelResponseError(ModelGatewayError):
 
 class StructuredOutputError(ModelGatewayError):
     """Raised when structured output parsing fails after the model responded."""
+
+
+class ModelPolicyViolation(ModelGatewayError):
+    """
+    Raised BEFORE provider dispatch when the physical model bound to the
+    selected role is not an approved MAIW deployment (v2.0.1 round 2).
+
+    ``reason`` is machine-readable: ``UNAPPROVED_MODEL_ID`` (the physical model
+    ID is not in the approved deployment table), ``ROLE_MISMATCH`` (the ID is
+    approved, but for a different role), ``UNAPPROVED_GENERATION`` or
+    ``EMPTY_MODEL_ID``.  No provider call is ever made when this is raised.
+    """
+
+    code = "MODEL_POLICY_VIOLATION"
+
+    def __init__(
+        self,
+        message: str,
+        model_id: str | None = None,
+        role: str | None = None,
+        reason: str = "UNAPPROVED_MODEL_ID",
+    ) -> None:
+        super().__init__(message, model_id)
+        self.role = role
+        self.reason = reason
+
+
+class ModelIdentityMismatch(ModelGatewayError):
+    """
+    Raised AFTER the provider answered when the model identity the provider
+    reports differs from the approved physical model that was dispatched.
+
+    The response is discarded — it is never returned as an approved result and
+    never relabelled with the requested model ID.
+    """
+
+    code = "MODEL_IDENTITY_MISMATCH"
+
+    def __init__(
+        self,
+        message: str,
+        model_id: str | None = None,
+        reported_model_id: str | None = None,
+        role: str | None = None,
+    ) -> None:
+        super().__init__(message, model_id)
+        self.reported_model_id = reported_model_id
+        self.role = role
+
+
+class ModelIdentityUnverifiable(ModelGatewayError):
+    """
+    Raised AFTER the provider answered when its response carries no usable
+    model identity — the ``model`` field is missing, empty / whitespace, or not
+    a string (v2.0.1 round 3; third re-audit N-1).
+
+    Fail closed: an answer whose physical model cannot be verified against the
+    approved deployment that was dispatched is discarded, exactly like a
+    mismatch.  ``reason`` is ``MISSING`` or ``MALFORMED``.
+    """
+
+    code = "MODEL_IDENTITY_UNVERIFIABLE"
+
+    def __init__(
+        self,
+        message: str,
+        model_id: str | None = None,
+        role: str | None = None,
+        reason: str = "MISSING",
+    ) -> None:
+        super().__init__(message, model_id)
+        self.role = role
+        self.reason = reason

@@ -136,7 +136,23 @@ class SQLRetriever:
         finally:
             if connection:
                 await self._pool.release(connection)
-    
+
+    @asynccontextmanager
+    async def transaction(self):
+        """
+        One pooled connection inside ONE database transaction (asyncpg's own
+        ``Connection.transaction()``: BEGIN on entry, COMMIT when the block
+        exits normally, ROLLBACK when it raises).
+
+        v2.0.1 round 4: every multi-statement logical write (e.g. an equipment
+        assignment = INSERT assignment + UPDATE asset) runs all its statements
+        on the yielded connection, so either all of them commit or none do.
+        The connection goes back to the pool only after COMMIT / ROLLBACK.
+        """
+        async with self.get_connection() as conn:
+            async with conn.transaction():
+                yield conn
+
     async def execute_query(
         self, 
         query: str, 

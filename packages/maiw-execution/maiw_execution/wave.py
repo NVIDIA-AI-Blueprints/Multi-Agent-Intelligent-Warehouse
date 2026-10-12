@@ -10,7 +10,7 @@ from typing import Any
 from maiw_decision.models import DecisionResult
 from maiw_decision.proposal import ActionProposal
 
-from .base import BaseActionExecutor
+from .base import BaseActionExecutor, WriteNotDispatched
 from .outcome import ExecutionOutcome
 from .reconciliation import ExecutionIntent
 
@@ -75,16 +75,19 @@ class WaveActionExecutor(BaseActionExecutor):
         from maiw_contracts.wave import WaveReprioritizeRequest
 
         params = proposal.parameters
-        req = WaveReprioritizeRequest(
-            warehouse_id=params.get("warehouse_id", "default"),
-            wave_id=params.get("wave_id"),
-            zone=params.get("zone"),
-            new_priority=params.get("new_priority", "high"),
-            reason=proposal.reason,
-            proposal_id=proposal.proposal_id,
-            decision_id=decision.result_id,
-            execution_id=execution_id,
-        )
+        try:
+            req = WaveReprioritizeRequest(
+                warehouse_id=params.get("warehouse_id", "default"),
+                wave_id=params.get("wave_id"),
+                zone=params.get("zone"),
+                new_priority=params.get("new_priority", "high"),
+                reason=proposal.reason,
+                proposal_id=proposal.proposal_id,
+                decision_id=decision.result_id,
+                execution_id=execution_id,
+            )
+        except Exception as exc:  # noqa: BLE001 - nothing was sent
+            raise WriteNotDispatched(f"invalid write request: {exc}") from exc
         result = await self._reprioritize_skill.execute(req)
         resp = result.model_dump()
 

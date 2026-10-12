@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "title": "MAIW v2.0.1 final pre-merge gate — NEW5-P2-01 (contradictory NOT_APPLIED)",
+  "repository": "NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse",
+  "pr": 143,
+  "branch": "fix/v2.0.1-canonical-app-remediation",
+  "starting_sha": "42b290f561ca4b7d9dea7cb12bd14c872de6e71d",
+  "main_sha": "944507ec914665c6682d39b95e8713355f486598",
+  "v2_0_0": {
+    "tag_object": "0c35a0e9718c2a81e8c79fe297c46f690b5cb42a",
+    "commit": "816ace73c4561469978094eeedb2641f6db3c4fa",
+    "unchanged": true
+  },
+  "v2_0_1_tag": null,
+  "historical_audit_prs_unchanged": {
+    "142": "742fd2a0505c63a4835741c66f2e911802202b81",
+    "144": "80947b056aa39d545f55afeebc6d38b52be78e81",
+    "145": "6205fe6b5ca6e922ce002af6f57ca3f497f2714a",
+    "146": "9120aa93a618e9e7da8f527208a9d458b81607a5"
+  },
+  "commits": [
+    {"sha": "64422a84ea25da7ae5ae57274cae2d25d7934dc1", "subject": "fix(execution): trust NOT_APPLIED only when the whole result is consistent"},
+    {"sha": "5d4d60b9e998e0251defb4048833f830f3041634", "subject": "test: contradictory NOT_APPLIED is UNKNOWN, clean NOT_APPLIED stays definite"},
+    {"sha": "8c9460d99e27ae638613c6b65088b27eb832e5a1", "subject": "docs: strict NOT_APPLIED trust rules; hosted proof is a pre-tag gate"}
+  ],
+  "last_code_commit": "5d4d60b9e998e0251defb4048833f830f3041634",
+  "final_frozen_head": "the commit that adds this file (reported in the PR #143 hand-off)",
+  "finding_closed": "NEW5-P2-01",
+  "trusted_not_applied": {
+    "error_result": [
+      "structuredContent is an object",
+      "execution_disposition is exactly the str 'NOT_APPLIED'",
+      "rejection_code present, str, in {INVALID_REQUEST, NOT_FOUND, PRECONDITION_FAILED}",
+      "message, if present, is a str",
+      "no other key"
+    ],
+    "non_error_result": [
+      "object with execution_disposition exactly 'NOT_APPLIED'",
+      "success present and exactly False",
+      "outcome exactly failed | conflict | deferred",
+      "rejection_code, if present, a str in the known set",
+      "assignment_id / maintenance_id / allocation_id null; tasks_updated the int 0",
+      "echo fields str-or-null; worker_ids a list of str",
+      "no key outside the write-result contract set"
+    ],
+    "otherwise": "UNKNOWN: MCP_TOOL_ERROR (error result) or SERVER_RESULT_CONTRADICTORY (non-error result)"
+  },
+  "cases": {
+    "A_executed_true": "UNKNOWN, retry 409, 1 write, confirmed_executed (error and non-error)",
+    "B_mutation_count_or_reference": "UNKNOWN, retry 409, 1 write, confirmed_executed",
+    "C_success_or_applied_outcome_or_post_state": "UNKNOWN, retry 409, 1 write, confirmed_executed (incl. both fifth-audit payloads)",
+    "D_malformed_rejection_metadata_or_unknown_field": "UNKNOWN, retry 409, 1 write, confirmed_executed",
+    "no_write_variant": "UNKNOWN, 409, 0 writes, confirmed_not_executed, new request writes once",
+    "reread_down": "indeterminate, still 409, then confirmed_executed",
+    "restart": "UNKNOWN survives API restart, 409, confirmed_executed",
+    "E_clean_rejection": "200 failed MCP_TOOL_NOT_APPLIED / 200 conflict, 0 writes, not blocked",
+    "negative_control_on_42b290f": "18/18 A-D integration variants fail, 2/2 E pass"
+  },
+  "new_tests": {
+    "tests/api/test_final_contradictory_not_applied.py": 26,
+    "tests/unit/test_final_not_applied_strict.py": 73
+  },
+  "targeted_suites": {
+    "real_mcp_s8": "214 passed",
+    "postgres_opt_in_s9": "29 passed (transactions + PG MCP); 82 passed (canonical app + transactions, PG* env)",
+    "shipped_pg_server_genuine_rejections": "5/5 MCPToolNotApplied (2 PRECONDITION_FAILED, 3 NOT_FOUND), DB unchanged, 0 writes",
+    "identity_cache_s11": "253 passed",
+    "readiness_s12": "20 passed",
+    "operator_auth_rate_limit": "27 passed"
+  },
+  "live_sandbox_boundary": {
+    "restricted_l7": {"inference": "200 low->lightning, medium->super, high->super, identity_verified=true", "writes": "16 x 403 at proxy"},
+    "permissive": {"inference": "200 low->lightning, medium->super, high->super, identity_verified=true", "writes": "12 x 403 + 4 x 401 from app auth"},
+    "counters": "DecisionEngine 0->0, executor 0->0, journal 0->0, MCP writes 0->0, state hash c51785fa94b2483f unchanged",
+    "positive_control": "operator contradictory write: DecisionEngine 0->1, MCP writes 0->1, 202 unknown, retry 409, reconcile confirmed_executed",
+    "preflight": "32/0",
+    "smoke": "PASSED"
+  },
+  "readiness_live": {"healthy": 200, "db_down": "503 database", "required_mcp_down": "503 governed_write_path, mcp_domains", "live": "200 throughout"},
+  "order_matrix": {"mg_then_demo": "558 passed", "demo_then_mg": "558 passed", "canonical_then_reliability": "622 passed, 4 skipped", "reliability_then_canonical": "622 passed, 4 skipped"},
+  "python_core_ci": {"run_1_5d4d60b": "3089 passed, 13 skipped, 0 failed", "run_2_8c9460d": "3089 passed, 13 skipped, 0 failed", "black_check_tests": "clean"},
+  "ui": {"jest": "40 suites, 968/968", "eslint": "0 errors (1043 warnings)", "tsc": "0 errors", "build": "OK (compiled with warnings)"},
+  "pip_audit": {"tool": "pip-audit 2.10.1 (separate venv)", "environment": "no known vulnerabilities (161 pinned)", "requirements": "no known vulnerabilities"},
+  "trivy": {
+    "status": "TRIVY NON-REGRESSION PASS — INHERITED FINDINGS (fifth re-audit same-session pinned comparison, Trivy 0.75.0)",
+    "main_944507ec": "3 critical / 67 high",
+    "candidate_42b290f": "0 critical / 12 high",
+    "candidate_only": "3 medium",
+    "this_cleanup_changes": "Python and Markdown only; no lockfile, requirements.txt or package.json change"
+  },
+  "new_p0": [],
+  "new_p1": [],
+  "hosted_super_lightning": "real hosted Super/Lightning proof deferred to post-merge/pre-tag release gate"
+}

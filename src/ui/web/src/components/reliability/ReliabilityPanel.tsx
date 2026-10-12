@@ -2,12 +2,13 @@ import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { RuntimeStatus } from '../../services/api';
 
-type DomainStatus = 'HEALTHY' | 'DEGRADED' | 'CIRCUIT OPEN' | undefined;
+type DomainStatus = 'HEALTHY' | 'DEGRADED' | 'CIRCUIT OPEN' | 'NOT_CONFIGURED' | undefined;
 
 const STATUS_COLOR: Record<string, string> = {
   HEALTHY: '#3FB950',
   DEGRADED: '#D29922',
   'CIRCUIT OPEN': '#F85149',
+  NOT_CONFIGURED: '#484F58',
 };
 
 function StatusDot({ status }: { status: string | undefined }) {

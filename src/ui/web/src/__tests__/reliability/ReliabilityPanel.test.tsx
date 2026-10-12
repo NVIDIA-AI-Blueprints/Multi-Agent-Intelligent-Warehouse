@@ -108,4 +108,19 @@ describe('ReliabilityPanel', () => {
     wrap(degraded);
     expect(screen.getByText(/7 failures/i)).toBeInTheDocument();
   });
+
+  it('shows NOT_CONFIGURED for a domain with no MCP server (v2.0.1 round 2)', () => {
+    const unconfigured: RuntimeStatus = {
+      ...healthy,
+      wave_mcp_configured: false,
+      domain_health: {
+        equipment: 'HEALTHY',
+        labor: 'HEALTHY',
+        wave: 'NOT_CONFIGURED',
+        inventory: 'HEALTHY',
+      },
+    };
+    wrap(unconfigured);
+    expect(screen.getByText('NOT_CONFIGURED')).toBeInTheDocument();
+  });
 });

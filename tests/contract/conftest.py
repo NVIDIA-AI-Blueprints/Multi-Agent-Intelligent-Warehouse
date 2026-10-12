@@ -33,9 +33,10 @@ for _p in reversed(_LOCAL_PACKAGES):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-# Force reimport of maiw_models from local source if already imported
-# from the venv.  This is necessary when the full test suite has already
-# imported the installed package before this conftest runs.
-for _mod in list(sys.modules.keys()):
-    if _mod.startswith(("maiw_models", "maiw_mcp", "maiw_agents", "nemoclaw")):
-        del sys.modules[_mod]
+# NOTE: this conftest deliberately does NOT purge ``maiw_*`` entries from
+# ``sys.modules``.  CI installs every maiw-* package editable from this
+# checkout (``pip install -e packages/...``), so an already-imported module is
+# already the local source.  Purging forced a second import of the same files
+# under the same names, giving two distinct class objects (e.g. two
+# ``SOPStep`` classes) whenever another directory's tests had been collected
+# first — pydantic then rejected instances of the "old" class (NEW-P1-04).

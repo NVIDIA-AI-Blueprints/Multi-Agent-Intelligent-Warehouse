@@ -33,8 +33,58 @@ Execution outcomes (Phase 10E)
     NO_OP     — desired state already existed; no mutation required
     DEFERRED  — valid request, cannot execute now
     CONFLICT  — current warehouse state prevents this action
-    UNKNOWN   — mutation may have occurred; response was lost (AmbiguousWriteError)
-    FAILED    — no mutation occurred; provider rejected or was unreachable
+    UNKNOWN   — mutation may have occurred and MAIW cannot tell: AmbiguousWriteError;
+                any MCP transport failure AFTER tools/call was dispatched
+                (round 3); and — round 4, NEW4-P1-01 — any server-reported
+                error or non-success result after dispatch that does not carry
+                the explicit ``execution_disposition = NOT_APPLIED``
+    FAILED    — no mutation occurred: the request was provably never
+                dispatched, or the server explicitly certified NOT_APPLIED
+                (rejected before any mutation)
+
+Failure classification (rounds 3 + 4) — ``classify_write_failure``:
+
+    AmbiguousWriteError                → UNKNOWN  (mutation known to have occurred)
+    WriteNotDispatched                 → FAILED   (request could not be built;
+                                                   nothing was sent)
+    MCPNotDispatched                   → FAILED   (MCPConnectFailed,
+                                                   MCPConnectTimeout, MCPCircuitOpen)
+    MCPToolNotApplied                  → FAILED   (server certified NOT_APPLIED in
+                                                   structuredContent — strict
+                                                   canonical payload only)
+    WriteNotApplied                    → FAILED   (in-process provider certified
+                                                   no mutation)
+    MCPResultOutcomeUnknown            → UNKNOWN  (non-error result with an
+                                                   untrusted / contradicted
+                                                   disposition — NEW5-P2-01)
+    MCPToolError (any other, incl.     → UNKNOWN  (isError alone is NOT proof of
+      MCPToolErrorOutcomeUnknown)                  non-execution — round 4; a
+                                                   contradicted NOT_APPLIED claim
+                                                   is not a certification)
+    MCPDispatchOutcomeUnknown          → UNKNOWN  (MCPResponseLost,
+                                                   MCPTimeoutAfterDispatch)
+    MCPTimeout (phase not recorded)    → UNKNOWN  (a timed-out call was in flight)
+    MCPContractError                   → UNKNOWN  (the server answered; the answer
+                                                   could not be read)
+    CapabilityNotFound / deadline      → FAILED   (nothing was sent)
+    anything else                      → UNKNOWN  (fail safe — round 4: the phase
+                                                   is not known, so non-execution
+                                                   is not proven)
+
+A non-error provider result reporting FAILED / CONFLICT / DEFERRED (or
+``success=false``) is likewise only a definite non-execution when it is a
+trusted NOT_APPLIED certification
+(``maiw_mcp.write_disposition.certifies_not_applied_result``: exact
+disposition, ``success`` exactly false, a rejection outcome, no mutation
+reference / count, no unknown field); a non-success result without any
+disposition becomes UNKNOWN (``SERVER_FAILURE_UNCERTIFIED``).  A result with
+``success=false`` and a success outcome (``executed`` / ``no_op``), or with a
+non-null disposition that is not a trusted NOT_APPLIED (e.g. ``NOT_APPLIED``
+next to ``success=true``), is contradictory → UNKNOWN
+(``SERVER_RESULT_CONTRADICTORY``; final pre-merge, NEW5-P2-01).
+
+An UNKNOWN result is never retried here; the registry blocks every further
+write to the same domain target until the UNKNOWN is reconciled.
 
 Identity chain
 --------------
@@ -59,6 +109,22 @@ from pydantic import BaseModel, Field, model_validator
 from maiw_decision.models import DecisionOutcome, DecisionResult
 from maiw_decision.proposal import ActionProposal
 from maiw_mcp.deadline import RequestDeadline, RequestDeadlineExceeded
+from maiw_mcp.errors import (
+    CapabilityNotFound,
+    MCPContractError,
+    MCPDispatchOutcomeUnknown,
+    MCPNotDispatched,
+    MCPResultOutcomeUnknown,
+    MCPTimeout,
+    MCPToolError,
+    MCPToolNotApplied,
+    WriteNotApplied,
+)
+from maiw_mcp.write_disposition import (
+    EXECUTION_DISPOSITION_FIELD,
+    certifies_not_applied_result,
+    describe_disposition,
+)
 
 from .outcome import AmbiguousWriteError, ExecutionOutcome
 from .reconciliation import ExecutionIntent
@@ -100,6 +166,135 @@ class ActionExecutionError(RuntimeError):
     """
 
 
+class WriteNotDispatched(RuntimeError):
+    """
+    Raised by a domain executor when the write request could not even be
+    built (invalid parameters) — nothing was sent, so the outcome is a
+    definite FAILED.  Round 4: every other unclassified exception is UNKNOWN.
+    """
+
+
+# ── Write-failure classification (v2.0.1 round 3, NEW3-P1-02) ─────────────────
+
+
+def classify_write_failure(
+    exc: BaseException,
+) -> tuple[ExecutionOutcome, str, bool | None]:
+    """
+    Map an exception raised by a domain write to ``(outcome, error_code,
+    physical_mutation_occurred)``.  See the module docstring for the table.
+    ``physical_mutation_occurred`` is ``None`` when it is genuinely unknown.
+
+    Round 4 (NEW4-P1-01): only a provable non-dispatch or an explicit
+    ``NOT_APPLIED`` certification yields FAILED; the order of the checks
+    matters (``MCPToolErrorOutcomeUnknown`` is both an ``MCPToolError`` and an
+    ``MCPDispatchOutcomeUnknown``; ``WriteNotApplied`` is a
+    ``BackendUnavailable``).
+    """
+    if isinstance(exc, AmbiguousWriteError):
+        return ExecutionOutcome.UNKNOWN, "AMBIGUOUS_WRITE", True
+    if isinstance(exc, WriteNotDispatched):
+        return ExecutionOutcome.FAILED, "NOT_DISPATCHED", False
+    if isinstance(exc, MCPNotDispatched):
+        return ExecutionOutcome.FAILED, "MCP_NOT_DISPATCHED", False
+    if isinstance(exc, MCPToolNotApplied):
+        return ExecutionOutcome.FAILED, "MCP_TOOL_NOT_APPLIED", False
+    if isinstance(exc, WriteNotApplied):
+        return ExecutionOutcome.FAILED, "WRITE_NOT_APPLIED", False
+    if isinstance(exc, MCPResultOutcomeUnknown):
+        return ExecutionOutcome.UNKNOWN, "SERVER_RESULT_CONTRADICTORY", None
+    if isinstance(exc, MCPToolError):
+        return ExecutionOutcome.UNKNOWN, "MCP_TOOL_ERROR", None
+    if isinstance(exc, MCPDispatchOutcomeUnknown):
+        return ExecutionOutcome.UNKNOWN, "MCP_RESPONSE_LOST", None
+    if isinstance(exc, MCPTimeout):
+        return ExecutionOutcome.UNKNOWN, "MCP_TIMEOUT", None
+    if isinstance(exc, MCPContractError):
+        return ExecutionOutcome.UNKNOWN, "MCP_RESPONSE_UNREADABLE", None
+    if isinstance(exc, (CapabilityNotFound, RequestDeadlineExceeded)):
+        return ExecutionOutcome.FAILED, "NOT_DISPATCHED", False
+    return ExecutionOutcome.UNKNOWN, "EXECUTION_OUTCOME_UNKNOWN", None
+
+
+# Journal vocabulary for ``ActionExecutionResult.dispatch_status`` (round 4).
+DISPATCH_NOT_DISPATCHED = "not_dispatched"
+DISPATCH_REJECTED_BEFORE_MUTATION = "rejected_before_mutation"
+DISPATCH_SERVER_ERROR = "dispatched_server_error"
+DISPATCH_NO_RESPONSE = "dispatched_no_response"
+DISPATCH_UNREADABLE_RESPONSE = "dispatched_unreadable_response"
+DISPATCH_MUTATION_KNOWN = "dispatched_mutation_known"
+DISPATCH_RESPONSE_RECEIVED = "dispatched_response_received"
+DISPATCH_UNKNOWN = "unknown"
+
+
+def _dispatch_status(exc: BaseException) -> str:
+    if isinstance(exc, AmbiguousWriteError):
+        return DISPATCH_MUTATION_KNOWN
+    if isinstance(
+        exc,
+        (
+            WriteNotDispatched,
+            MCPNotDispatched,
+            CapabilityNotFound,
+            RequestDeadlineExceeded,
+        ),
+    ):
+        return DISPATCH_NOT_DISPATCHED
+    if isinstance(exc, (MCPToolNotApplied, WriteNotApplied)):
+        return DISPATCH_REJECTED_BEFORE_MUTATION
+    if isinstance(exc, MCPResultOutcomeUnknown):
+        return DISPATCH_RESPONSE_RECEIVED
+    if isinstance(exc, MCPToolError):
+        return DISPATCH_SERVER_ERROR
+    if isinstance(exc, (MCPDispatchOutcomeUnknown, MCPTimeout)):
+        return DISPATCH_NO_RESPONSE
+    if isinstance(exc, MCPContractError):
+        return DISPATCH_UNREADABLE_RESPONSE
+    return DISPATCH_UNKNOWN
+
+
+def _server_disposition(exc: BaseException) -> str | None:
+    if isinstance(exc, (MCPToolNotApplied, WriteNotApplied)):
+        return "NOT_APPLIED"
+    observed = getattr(exc, "observed_disposition", None)
+    if isinstance(observed, str):
+        return observed
+    if isinstance(exc, MCPToolError):
+        return "absent"
+    return None
+
+
+_UNCERTAINTY_REASONS = {
+    "AMBIGUOUS_WRITE": "provider reported the mutation occurred but the response was lost",
+    "MCP_TOOL_ERROR": (
+        "server returned a tool error after tools/call was dispatched without "
+        "certifying NOT_APPLIED; the mutation may have been applied"
+    ),
+    "MCP_RESPONSE_LOST": "tools/call was dispatched and no usable response arrived",
+    "MCP_TIMEOUT": "a dispatched call timed out",
+    "MCP_RESPONSE_UNREADABLE": "the server answered but the answer could not be read",
+    "EXECUTION_OUTCOME_UNKNOWN": (
+        "unclassified failure during the write; non-execution is not proven"
+    ),
+    "SERVER_FAILURE_UNCERTIFIED": (
+        "server reported a non-success outcome without certifying NOT_APPLIED; "
+        "the mutation may have been applied"
+    ),
+    "SERVER_REPORTED_UNKNOWN": "server reported the outcome as unknown",
+    "SERVER_RESULT_CONTRADICTORY": (
+        "server result contradicts itself (success=false with a success "
+        "outcome, or an execution_disposition that is not a trusted "
+        "NOT_APPLIED certification); neither execution nor non-execution is "
+        "established"
+    ),
+}
+
+
+_NON_EXECUTION_OUTCOMES = frozenset(
+    {ExecutionOutcome.FAILED, ExecutionOutcome.CONFLICT, ExecutionOutcome.DEFERRED}
+)
+
+
 # ── Canonical execution result ─────────────────────────────────────────────────
 
 
@@ -133,6 +328,13 @@ class ActionExecutionResult(BaseModel):
 
     # Mutation evidence for reliability testing (not a production business field)
     physical_mutation_occurred: bool | None = None
+
+    # Round 4 (NEW4-P1-01) journal evidence: how far the write got, what the
+    # server certified (``NOT_APPLIED`` / absent / malformed …) and, for an
+    # UNKNOWN, why non-execution is not proven.
+    dispatch_status: str | None = None
+    server_disposition: str | None = None
+    uncertainty_reason: str | None = None
 
     @model_validator(mode="after")
     def _derive_compat_from_outcome(self) -> "ActionExecutionResult":
@@ -333,62 +535,130 @@ class BaseActionExecutor:
         ):
             # Guard-type exceptions re-raise — they indicate pre-write authorization failure
             raise
-        except AmbiguousWriteError as exc:
-            # Mutation occurred; response was lost — UNKNOWN, do NOT retry
-            if self._registry is not None:
-                self._registry.mark_unknown(execution_id)
-            result = ActionExecutionResult(
-                execution_id=execution_id,
-                outcome=ExecutionOutcome.UNKNOWN,
-                action=proposal.action,
-                proposal_id=proposal.proposal_id,
-                decision_id=decision.result_id,
-                started_at=started_at,
-                completed_at=datetime.now(timezone.utc),
-                executed_at=datetime.now(timezone.utc),
-                error_message=str(exc),
-                trace_id=trace_id,
-                physical_mutation_occurred=True,
-            )
-            if self._registry is not None:
-                self._registry.complete(execution_id, ExecutionOutcome.UNKNOWN, result)
-            logger.error(
-                "%s: UNKNOWN execution action=%s proposal_id=%s execution_id=%s — "
-                "mutation may have occurred; reconciliation required",
-                type(self).__name__,
-                proposal.action,
-                proposal.proposal_id,
-                execution_id,
-            )
-            return result
         except Exception as exc:
-            # Pre-mutation or unclassified backend failure — FAILED
+            outcome, error_code, mutation = classify_write_failure(exc)
+            dispatch_status = _dispatch_status(exc)
+            if outcome == ExecutionOutcome.UNKNOWN:
+                # The write may have been applied; the response was lost.
+                # UNKNOWN — never FAILED, never retried here (round 3).
+                if self._registry is not None:
+                    self._registry.mark_unknown(execution_id)
             result = ActionExecutionResult(
                 execution_id=execution_id,
-                outcome=ExecutionOutcome.FAILED,
+                outcome=outcome,
                 action=proposal.action,
                 proposal_id=proposal.proposal_id,
                 decision_id=decision.result_id,
                 started_at=started_at,
                 completed_at=datetime.now(timezone.utc),
                 executed_at=datetime.now(timezone.utc),
+                error_code=error_code,
                 error_message=str(exc),
                 trace_id=trace_id,
-                physical_mutation_occurred=False,
+                physical_mutation_occurred=mutation,
+                dispatch_status=dispatch_status,
+                server_disposition=_server_disposition(exc),
+                uncertainty_reason=(
+                    _UNCERTAINTY_REASONS.get(error_code)
+                    if outcome == ExecutionOutcome.UNKNOWN
+                    else None
+                ),
             )
             if self._registry is not None:
-                self._registry.complete(execution_id, ExecutionOutcome.FAILED, result)
-            logger.error(
-                "%s: FAILED execution action=%s proposal_id=%s execution_id=%s: %s",
-                type(self).__name__,
-                proposal.action,
-                proposal.proposal_id,
-                execution_id,
-                exc,
-            )
+                self._registry.complete(execution_id, outcome, result)
+            if outcome == ExecutionOutcome.UNKNOWN:
+                logger.error(
+                    "%s: UNKNOWN execution action=%s proposal_id=%s execution_id=%s "
+                    "(%s) — mutation may have occurred; reconciliation required, "
+                    "no retry",
+                    type(self).__name__,
+                    proposal.action,
+                    proposal.proposal_id,
+                    execution_id,
+                    error_code,
+                )
+            else:
+                logger.error(
+                    "%s: FAILED execution action=%s proposal_id=%s execution_id=%s "
+                    "(%s): %s",
+                    type(self).__name__,
+                    proposal.action,
+                    proposal.proposal_id,
+                    execution_id,
+                    error_code,
+                    exc,
+                )
             return result
 
         completed_at = datetime.now(timezone.utc)
+
+        # Round 4 (NEW4-P1-01): the server answered with a result.  A result
+        # that claims non-execution (FAILED / CONFLICT / DEFERRED) is only
+        # trusted when it carries the explicit NOT_APPLIED disposition; any
+        # other non-success after dispatch may hide an applied mutation.
+        error_code: str | None = None
+        mutation: bool | None = None
+        disposition = describe_disposition(backend_resp, error_result=False)
+        certified = certifies_not_applied_result(backend_resp)
+        if (
+            isinstance(backend_resp, dict)
+            and backend_resp.get("success") is False
+            and outcome in (ExecutionOutcome.EXECUTED, ExecutionOutcome.NO_OP)
+        ):
+            # ``success: false`` with a success outcome (e.g. the contract's
+            # default ``outcome="executed"`` left on a failure result) is
+            # contradictory: neither success nor non-execution is established.
+            logger.error(
+                "%s: contradictory provider result for action=%s execution_id=%s "
+                "(success=false, outcome=%s) — treating as UNKNOWN",
+                type(self).__name__,
+                proposal.action,
+                execution_id,
+                outcome.value,
+            )
+            outcome = ExecutionOutcome.UNKNOWN
+            error_code = "SERVER_RESULT_CONTRADICTORY"
+        elif (
+            isinstance(backend_resp, dict)
+            and backend_resp.get(EXECUTION_DISPOSITION_FIELD) is not None
+            and not certified
+        ):
+            # Final pre-merge (NEW5-P2-01): a disposition that is present but
+            # not a fully consistent NOT_APPLIED certification (e.g. NOT_APPLIED
+            # with success=true, a mutation reference, or an unknown field)
+            # contradicts the rest of the result — never trusted either way.
+            logger.error(
+                "%s: contradictory provider result for action=%s execution_id=%s "
+                "(outcome=%s, disposition=%s) — treating as UNKNOWN",
+                type(self).__name__,
+                proposal.action,
+                execution_id,
+                outcome.value,
+                disposition,
+            )
+            outcome = ExecutionOutcome.UNKNOWN
+            error_code = "SERVER_RESULT_CONTRADICTORY"
+        elif outcome in _NON_EXECUTION_OUTCOMES:
+            if certified:
+                mutation = False
+            else:
+                logger.error(
+                    "%s: provider reported %s for action=%s execution_id=%s "
+                    "without execution_disposition=NOT_APPLIED (%s) — "
+                    "treating as UNKNOWN",
+                    type(self).__name__,
+                    outcome.value,
+                    proposal.action,
+                    execution_id,
+                    disposition,
+                )
+                outcome = ExecutionOutcome.UNKNOWN
+                error_code = "SERVER_FAILURE_UNCERTIFIED"
+        elif outcome == ExecutionOutcome.UNKNOWN:
+            error_code = "SERVER_REPORTED_UNKNOWN"
+        else:
+            mutation = outcome == ExecutionOutcome.EXECUTED
+
         logger.info(
             "%s: %s action=%s proposal_id=%s execution_id=%s",
             type(self).__name__,
@@ -410,7 +680,17 @@ class BaseActionExecutor:
             completed_at=completed_at,
             executed_at=completed_at,
             trace_id=trace_id,
-            physical_mutation_occurred=(outcome == ExecutionOutcome.EXECUTED),
+            error_code=error_code,
+            physical_mutation_occurred=mutation,
+            dispatch_status=DISPATCH_RESPONSE_RECEIVED,
+            server_disposition=(
+                disposition if outcome != ExecutionOutcome.EXECUTED else None
+            ),
+            uncertainty_reason=(
+                _UNCERTAINTY_REASONS.get(error_code or "")
+                if outcome == ExecutionOutcome.UNKNOWN
+                else None
+            ),
         )
 
         if self._registry is not None:
@@ -442,8 +722,50 @@ class BaseActionExecutor:
                 action=proposal.action,
                 proposal_id=proposal.proposal_id,
                 decision_id=decision.result_id,
+                error_code="DUPLICATE_IN_FLIGHT",
                 error_message="Duplicate detected for in-flight execution",
+                backend_response={"blocked_by_execution_id": existing.execution_id},
                 trace_id=trace_id,
+            )
+
+        if existing.outcome == ExecutionOutcome.UNKNOWN and (
+            existing.effective_status == "effectively_executed"
+        ):
+            # Round 3: the UNKNOWN was reconciled as executed — replay, no write.
+            return ActionExecutionResult(
+                execution_id=existing.execution_id,
+                outcome=ExecutionOutcome.NO_OP,
+                action=proposal.action,
+                proposal_id=proposal.proposal_id,
+                decision_id=decision.result_id,
+                backend_response={
+                    "replayed": True,
+                    "original_execution_id": existing.execution_id,
+                    "original_outcome": ExecutionOutcome.UNKNOWN.value,
+                    "effective_status": existing.effective_status,
+                },
+                trace_id=trace_id,
+            )
+
+        if existing.outcome == ExecutionOutcome.UNKNOWN and (
+            existing.effective_status == "effectively_not_executed"
+        ):
+            # Reconciled as NOT executed: this attempt does not write either;
+            # the caller re-proposes (new idempotency key) through governance.
+            return ActionExecutionResult(
+                execution_id=existing.execution_id,
+                outcome=ExecutionOutcome.FAILED,
+                action=proposal.action,
+                proposal_id=proposal.proposal_id,
+                decision_id=decision.result_id,
+                error_code="PRIOR_ATTEMPT_NOT_EXECUTED",
+                error_message=(
+                    "Prior attempt with this identity was reconciled as not "
+                    "executed; re-propose with a new idempotency key"
+                ),
+                backend_response={"original_execution_id": existing.execution_id},
+                trace_id=trace_id,
+                physical_mutation_occurred=False,
             )
 
         if existing.outcome == ExecutionOutcome.UNKNOWN:
@@ -460,8 +782,39 @@ class BaseActionExecutor:
                 action=proposal.action,
                 proposal_id=proposal.proposal_id,
                 decision_id=decision.result_id,
+                error_code="RECONCILIATION_REQUIRED",
                 error_message="Prior execution is UNKNOWN; reconciliation required",
+                backend_response={"blocked_by_execution_id": existing.execution_id},
                 trace_id=trace_id,
+            )
+
+        if existing.outcome in _NON_EXECUTION_OUTCOMES:
+            # Round 4 (fourth re-audit NEW4-P2-01): a replay of a definite
+            # non-execution must not answer success semantics (``no_op``).  It
+            # answers the original outcome again — still without writing; a
+            # new attempt needs a new idempotency key (re-proposal).
+            prior = existing.result
+            return ActionExecutionResult(
+                execution_id=existing.execution_id,
+                outcome=existing.outcome,
+                action=proposal.action,
+                proposal_id=proposal.proposal_id,
+                decision_id=decision.result_id,
+                error_code=(
+                    getattr(prior, "error_code", None) or "IDEMPOTENT_REPLAY"
+                ),
+                error_message=(
+                    "Idempotent replay of a prior attempt that did not execute; "
+                    "nothing was written. Re-propose with a new idempotency key."
+                ),
+                backend_response={
+                    "replayed": True,
+                    "original_execution_id": existing.execution_id,
+                    "original_outcome": existing.outcome.value,
+                },
+                trace_id=trace_id,
+                physical_mutation_occurred=False,
+                dispatch_status=DISPATCH_NOT_DISPATCHED,
             )
 
         # Prior attempt completed — return NO_OP pointing to original result.

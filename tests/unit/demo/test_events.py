@@ -30,7 +30,7 @@ class TestScenarioEvent:
 
 class TestScenarioEventBus:
     def _run(self, coro):
-        return asyncio.get_event_loop().run_until_complete(coro)
+        return asyncio.run(coro)
 
     def test_subscribe_returns_queue(self):
         bus = ScenarioEventBus()

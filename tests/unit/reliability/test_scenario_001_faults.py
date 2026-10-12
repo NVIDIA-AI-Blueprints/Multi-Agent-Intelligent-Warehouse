@@ -302,8 +302,12 @@ async def test_f05_mcp_write_before_mutation_outcome_failed():
     from maiw_execution.registry import ExecutionRegistry
 
     async def fail_before_mutation(proposal, decision, execution_id):
-        # Simulates: MCP connection refused / rejected BEFORE write sent
-        raise RuntimeError("MCP write rejected: provider refused connection")
+        # Simulates: MCP connection refused BEFORE write sent.  Round 4: only a
+        # provably-not-dispatched failure (or a NOT_APPLIED certification) is
+        # FAILED; a generic RuntimeError is UNKNOWN.
+        from maiw_mcp.errors import MCPConnectFailed
+
+        raise MCPConnectFailed("MCP write rejected: provider refused connection")
 
     proposal = make_test_proposal()
     decision = make_approved_decision(proposal.proposal_id)

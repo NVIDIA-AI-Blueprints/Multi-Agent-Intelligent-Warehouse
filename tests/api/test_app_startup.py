@@ -47,25 +47,35 @@ async def _noop_lifespan(app: FastAPI):
 @pytest.fixture()
 def test_app():
     """MAIW app with a no-op lifespan and mocked middleware deps."""
-    with (
-        patch("maiw_api.app.lifespan", _noop_lifespan),
-        patch(
-            "src.api.services.security.rate_limiter.get_rate_limiter",
-            return_value=AsyncMock(check_rate_limit=AsyncMock()),
-        ),
-        patch(
-            "src.api.services.monitoring.metrics.record_request_metrics",
-        ),
-    ):
-        import importlib
-        import maiw_api.app as app_module
+    import importlib
+    import maiw_api.app as app_module
 
-        importlib.reload(app_module)
-        app = app_module.app
-        # ASGITransport does not run the ASGI lifespan events, so set state
-        # directly so that get_runtime(request) can find it.
-        app.state.runtime = _make_mock_runtime()
-        return app
+    # ``importlib.reload`` re-executes maiw_api.app IN PLACE: without a
+    # restore, the shared module would keep this reload's ``app`` object and
+    # the mocked ``get_rate_limiter`` / ``record_request_metrics`` for every
+    # later test (e.g. the canonical shipped-app suite imports
+    # ``maiw_api.app.app`` at run time).  Snapshot and restore the namespace.
+    saved_namespace = dict(vars(app_module))
+    try:
+        with (
+            patch("maiw_api.app.lifespan", _noop_lifespan),
+            patch(
+                "src.api.services.security.rate_limiter.get_rate_limiter",
+                return_value=AsyncMock(check_rate_limit=AsyncMock()),
+            ),
+            patch(
+                "src.api.services.monitoring.metrics.record_request_metrics",
+            ),
+        ):
+            importlib.reload(app_module)
+            app = app_module.app
+            # ASGITransport does not run the ASGI lifespan events, so set state
+            # directly so that get_runtime(request) can find it.
+            app.state.runtime = _make_mock_runtime()
+        yield app
+    finally:
+        vars(app_module).clear()
+        vars(app_module).update(saved_namespace)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

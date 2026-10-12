@@ -14,25 +14,57 @@
 # limitations under the License.
 
 """
-Stage 5: Large LLM Judge & Validator with Nemotron 3 Super 120B
-Comprehensive evaluation framework for document quality and accuracy.
+Stage 4/5: Large LLM Judge — document quality classification.
+
+v2.0.1 (audit P1-05):
+  * Every call goes through the canonical ModelGateway
+    (``model_gateway_adapter.generate_for_document``, ``Modality.TEXT``,
+    ``ReasoningLevel.HIGH``); PolicyFilter selects an approved Nemotron 3 / 3.5
+    model. No provider URL, API key or model id lives here.
+  * There is no mock evaluation. Missing credentials, provider failure,
+    no eligible model, or a malformed reply raise
+    ``DocumentInferenceUnavailable`` — a failure can never become ``APPROVE``.
+
+Decision semantics: ``JudgeEvaluation.decision`` (APPROVE / REJECT /
+REVIEW_REQUIRED) is the *model's document-quality classification*
+(``decision_kind = "model_quality_classification"``). It is NOT a MAIW
+governance decision: it does not pass through DecisionEngine, creates no
+ApprovalRecord, and authorises no warehouse action. Document-workflow approval
+is a separate, human action (``POST /api/v1/document/approve/{id}``).
 """
 
 import asyncio
 import logging
 from typing import Dict, Any, List, Optional
 import os
-import httpx
 import json
 from datetime import datetime
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+from src.api.agents.document.model_gateway_adapter import (
+    MALFORMED_RESPONSE,
+    DocumentInferenceUnavailable,
+    generate_for_document,
+    parse_json_object,
+    route_provenance,
+)
 
 logger = logging.getLogger(__name__)
+
+#: The only values a judge classification may take.
+VALID_JUDGE_DECISIONS = frozenset({"APPROVE", "REJECT", "REVIEW_REQUIRED"})
+
+#: What ``JudgeEvaluation.decision`` means (see module docstring).
+JUDGE_DECISION_KIND = "model_quality_classification"
 
 
 @dataclass
 class JudgeEvaluation:
-    """Represents a judge evaluation result."""
+    """
+    A model's quality classification of extracted document data.
+
+    ``decision`` is a model classification, not a governance approval.
+    """
 
     overall_score: float
     decision: str
@@ -43,11 +75,14 @@ class JudgeEvaluation:
     issues_found: List[str]
     confidence: float
     reasoning: str
+    decision_kind: str = JUDGE_DECISION_KIND
+    judge_model: str = ""
+    model_route: Dict[str, Any] = field(default_factory=dict)
 
 
 class LargeLLMJudge:
     """
-    Stage 5: Large LLM Judge using Nemotron 3 Super 120B NIM.
+    Large LLM Judge — routed through the canonical ModelGateway.
 
     Evaluation Framework:
     1. Completeness Check (Score: 1-5)
@@ -57,20 +92,14 @@ class LargeLLMJudge:
     """
 
     def __init__(self):
-        # Use NVIDIA_API_KEY - same as main LLM service (NVIDIA public cloud)
-        self.api_key = os.getenv("NVIDIA_API_KEY", "")
-        # Use LLM_NIM_URL - NVIDIA public cloud (integrate.api.nvidia.com)
-        self.base_url = os.getenv("LLM_NIM_URL", "https://integrate.api.nvidia.com/v1")
-        # Use LLM_MODEL from .env (Nemotron 3 Super on NVIDIA public cloud)
-        self.model = os.getenv("LLM_MODEL", "nvidia/nemotron-3-super-120b-a12b")
-        # Large models need more time for complex evaluation prompts.
-        # Reads NEMOTRON_SUPER_TIMEOUT; falls back to deprecated LLAMA_70B_TIMEOUT.
-        _timeout_str = (
-            os.getenv("NEMOTRON_SUPER_TIMEOUT")
-            or os.getenv("LLAMA_70B_TIMEOUT")  # deprecated — use NEMOTRON_SUPER_TIMEOUT
+        # Bound on the whole judge call. NEMOTRON_SUPER_TIMEOUT is kept for
+        # operator compatibility; it no longer selects or addresses a model.
+        _timeout_str = os.getenv("NEMOTRON_SUPER_TIMEOUT") or os.getenv(
+            "LLAMA_70B_TIMEOUT"
         )
         if os.getenv("LLAMA_70B_TIMEOUT") and not os.getenv("NEMOTRON_SUPER_TIMEOUT"):
             import warnings
+
             warnings.warn(
                 "LLAMA_70B_TIMEOUT is deprecated; use NEMOTRON_SUPER_TIMEOUT instead.",
                 DeprecationWarning,
@@ -79,25 +108,8 @@ class LargeLLMJudge:
         self.timeout = int(_timeout_str or "120")
 
     async def initialize(self):
-        """Initialize the Large LLM Judge."""
-        try:
-            if not self.api_key:
-                logger.warning("NVIDIA_API_KEY not found, using mock implementation")
-                return
-
-            # Test API connection
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(
-                    f"{self.base_url}/models",
-                    headers={"Authorization": f"Bearer {self.api_key}"},
-                )
-                response.raise_for_status()
-
-            logger.info("Large LLM Judge initialized successfully")
-
-        except Exception as e:
-            logger.error(f"Failed to initialize Large LLM Judge: {e}")
-            logger.warning("Falling back to mock implementation")
+        """No provider probing: the ModelGateway owns provider connectivity."""
+        return None
 
     async def evaluate_document(
         self,
@@ -106,44 +118,25 @@ class LargeLLMJudge:
         document_type: str,
     ) -> JudgeEvaluation:
         """
-        Evaluate document using comprehensive judge framework.
+        Classify extracted document data through the ModelGateway.
 
-        Args:
-            structured_data: Structured data from Small LLM processing
-            entities: Extracted entities
-            document_type: Type of document
-
-        Returns:
-            Complete judge evaluation with scores and reasoning
+        Raises ``DocumentInferenceUnavailable`` on any inference failure or a
+        reply that is not a valid classification. Never returns a fabricated
+        evaluation.
         """
-        try:
-            logger.info(f"Evaluating {document_type} document with Large LLM Judge")
-
-            # Prepare evaluation prompt
-            evaluation_prompt = self._create_evaluation_prompt(
-                structured_data, entities, document_type
-            )
-
-            # Call Large LLM for evaluation
-            if not self.api_key:
-                # Mock implementation for development
-                evaluation_result = await self._mock_judge_evaluation(document_type)
-            else:
-                evaluation_result = await self._call_judge_api(evaluation_prompt)
-
-            # Parse and structure the evaluation
-            judge_evaluation = self._parse_judge_result(
-                evaluation_result, document_type
-            )
-
-            logger.info(
-                f"Judge evaluation completed with overall score: {judge_evaluation.overall_score}"
-            )
-            return judge_evaluation
-
-        except Exception as e:
-            logger.error(f"Document evaluation failed: {e}")
-            raise
+        logger.info(f"Evaluating {document_type} document with Large LLM Judge")
+        evaluation_prompt = self._create_evaluation_prompt(
+            structured_data, entities, document_type
+        )
+        evaluation_result = await self._call_judge_api(evaluation_prompt)
+        judge_evaluation = self._parse_judge_result(evaluation_result, document_type)
+        logger.info(
+            "Judge classification: decision=%s score=%s model=%s",
+            judge_evaluation.decision,
+            judge_evaluation.overall_score,
+            judge_evaluation.judge_model,
+        )
+        return judge_evaluation
 
     def _create_evaluation_prompt(
         self,
@@ -223,244 +216,73 @@ class LargeLLMJudge:
         return prompt
 
     async def _call_judge_api(self, prompt: str) -> Dict[str, Any]:
-        """Call Nemotron 3 Super 120B API for evaluation."""
-        try:
-            messages = [{"role": "user", "content": prompt}]
-            
-            logger.info(f"Calling Large LLM Judge API with timeout: {self.timeout}s")
+        """One TEXT inference through the canonical ModelGateway."""
+        from maiw_models import Modality, ReasoningLevel
 
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(
-                    f"{self.base_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": self.model,
-                        "messages": messages,
-                        "max_tokens": 2000,
-                        "temperature": 0.1,
-                    },
-                )
-                response.raise_for_status()
-
-                result = response.json()
-                # Extract response content from chat completions
-                content = result["choices"][0]["message"]["content"]
-
-                # Try to parse JSON response
-                try:
-                    parsed_content = json.loads(content)
-                    return {
-                        "content": parsed_content,
-                        "confidence": parsed_content.get("confidence", 0.8),
-                        "raw_response": content,
-                    }
-                except json.JSONDecodeError:
-                    # If JSON parsing fails, return raw content
-                    return {
-                        "content": {"raw_text": content},
-                        "confidence": 0.7,
-                        "raw_response": content,
-                    }
-
-        except httpx.TimeoutException as e:
-            logger.error(f"Judge API call timed out after {self.timeout}s: {e}")
-            raise TimeoutError(f"Large LLM Judge evaluation timed out after {self.timeout} seconds. The model may need more time for complex documents. Consider increasing LLAMA_70B_TIMEOUT environment variable.")
-        except Exception as e:
-            logger.error(f"Judge API call failed: {e}")
-            raise
+        response = await generate_for_document(
+            stage="validation",
+            messages=[{"role": "user", "content": prompt}],
+            modality=Modality.TEXT,
+            reasoning=ReasoningLevel.HIGH,
+            timeout_s=self.timeout,
+        )
+        parsed = parse_json_object(response.content, stage="validation")
+        return {
+            "content": parsed,
+            "raw_response": response.content,
+            "model_used": response.model_id,
+            "model_route": await route_provenance(response),
+        }
 
     def _parse_judge_result(
         self, result: Dict[str, Any], document_type: str
     ) -> JudgeEvaluation:
-        """Parse judge API result into structured evaluation."""
-        try:
-            content = result["content"]
-
-            # Handle both structured and raw responses
-            if "raw_text" in content:
-                # Parse raw text response
-                return self._parse_raw_judge_response(
-                    content["raw_text"], document_type
-                )
-
-            # Use structured response
-            return JudgeEvaluation(
-                overall_score=content.get("overall_score", 0.0),
-                decision=content.get("decision", "REVIEW_REQUIRED"),
-                completeness=content.get("completeness", {"score": 0, "reasoning": ""}),
-                accuracy=content.get("accuracy", {"score": 0, "reasoning": ""}),
-                compliance=content.get("compliance", {"score": 0, "reasoning": ""}),
-                quality=content.get("quality", {"score": 0, "reasoning": ""}),
-                issues_found=content.get("issues_found", []),
-                confidence=content.get("confidence", 0.0),
-                reasoning=content.get("reasoning", ""),
+        """
+        Validate the judge reply. A missing or unknown ``decision`` or a
+        non-numeric score is a MALFORMED_RESPONSE — never guessed, never
+        defaulted to APPROVE.
+        """
+        content = result.get("content")
+        if not isinstance(content, dict):
+            raise DocumentInferenceUnavailable(
+                MALFORMED_RESPONSE,
+                "judge reply is not an object",
+                stage="validation",
+                modality="text",
             )
-
-        except Exception as e:
-            logger.error(f"Failed to parse judge result: {e}")
-            return self._create_fallback_evaluation(document_type)
-
-    def _parse_raw_judge_response(
-        self, raw_text: str, document_type: str
-    ) -> JudgeEvaluation:
-        """Parse raw text response from judge."""
-        # Simple parsing logic for raw text
-        # In a real implementation, this would use more sophisticated NLP
-
-        # Extract overall score
-        import re
-
-        score_match = re.search(r"overall[_\s]score[:\s]*(\d+\.?\d*)", raw_text.lower())
-        overall_score = float(score_match.group(1)) if score_match else 3.0
-
-        # Extract decision
-        if "approve" in raw_text.lower():
-            decision = "APPROVE"
-        elif "reject" in raw_text.lower():
-            decision = "REJECT"
-        else:
-            decision = "REVIEW_REQUIRED"
-
-        # Extract confidence
-        confidence_match = re.search(r"confidence[:\s]*(\d+\.?\d*)", raw_text.lower())
-        confidence = float(confidence_match.group(1)) if confidence_match else 0.8
+        decision = str(content.get("decision", "")).strip().upper()
+        if decision not in VALID_JUDGE_DECISIONS:
+            raise DocumentInferenceUnavailable(
+                MALFORMED_RESPONSE,
+                f"judge decision {content.get('decision')!r} is not one of "
+                f"{sorted(VALID_JUDGE_DECISIONS)}",
+                stage="validation",
+                modality="text",
+            )
+        try:
+            overall_score = float(content["overall_score"])
+            confidence = float(content.get("confidence", 0.0))
+        except (KeyError, TypeError, ValueError) as exc:
+            raise DocumentInferenceUnavailable(
+                MALFORMED_RESPONSE,
+                f"judge reply missing numeric overall_score/confidence: {exc}",
+                stage="validation",
+                modality="text",
+            ) from exc
 
         return JudgeEvaluation(
             overall_score=overall_score,
             decision=decision,
-            completeness={"score": overall_score, "reasoning": "Parsed from raw text"},
-            accuracy={"score": overall_score, "reasoning": "Parsed from raw text"},
-            compliance={"score": overall_score, "reasoning": "Parsed from raw text"},
-            quality={"score": overall_score, "reasoning": "Parsed from raw text"},
-            issues_found=[],
+            completeness=content.get("completeness", {"score": 0, "reasoning": ""}),
+            accuracy=content.get("accuracy", {"score": 0, "reasoning": ""}),
+            compliance=content.get("compliance", {"score": 0, "reasoning": ""}),
+            quality=content.get("quality", {"score": 0, "reasoning": ""}),
+            issues_found=list(content.get("issues_found", []) or []),
             confidence=confidence,
-            reasoning=raw_text[:200] + "..." if len(raw_text) > 200 else raw_text,
+            reasoning=str(content.get("reasoning", "")),
+            judge_model=str(result.get("model_used", "")),
+            model_route=dict(result.get("model_route", {}) or {}),
         )
-
-    def _create_fallback_evaluation(self, document_type: str) -> JudgeEvaluation:
-        """Create fallback evaluation when parsing fails."""
-        return JudgeEvaluation(
-            overall_score=3.0,
-            decision="REVIEW_REQUIRED",
-            completeness={"score": 3.0, "reasoning": "Fallback evaluation"},
-            accuracy={"score": 3.0, "reasoning": "Fallback evaluation"},
-            compliance={"score": 3.0, "reasoning": "Fallback evaluation"},
-            quality={"score": 3.0, "reasoning": "Fallback evaluation"},
-            issues_found=["Evaluation parsing failed"],
-            confidence=0.5,
-            reasoning="Fallback evaluation due to parsing error",
-        )
-
-    async def _mock_judge_evaluation(self, document_type: str) -> Dict[str, Any]:
-        """Mock judge evaluation for development."""
-
-        mock_evaluations = {
-            "invoice": {
-                "overall_score": 4.2,
-                "decision": "APPROVE",
-                "completeness": {
-                    "score": 5,
-                    "reasoning": "All required invoice fields are present and complete",
-                    "missing_fields": [],
-                    "issues": [],
-                },
-                "accuracy": {
-                    "score": 4,
-                    "reasoning": "Most calculations are correct, minor discrepancy in line 3",
-                    "calculation_errors": [],
-                    "data_type_issues": [],
-                },
-                "compliance": {
-                    "score": 4,
-                    "reasoning": "Business logic is mostly compliant, vendor code format needs verification",
-                    "compliance_issues": [],
-                    "recommendations": ["Verify vendor code format"],
-                },
-                "quality": {
-                    "score": 4,
-                    "reasoning": "High confidence extractions, OCR quality is good",
-                    "confidence_assessment": "high",
-                    "anomalies": [],
-                },
-                "issues_found": [],
-                "confidence": 0.92,
-                "reasoning": "Overall high-quality invoice with minor issues that can be easily resolved",
-            },
-            "receipt": {
-                "overall_score": 3.8,
-                "decision": "REVIEW_REQUIRED",
-                "completeness": {
-                    "score": 4,
-                    "reasoning": "Most fields present, missing transaction time",
-                    "missing_fields": ["transaction_time"],
-                    "issues": [],
-                },
-                "accuracy": {
-                    "score": 4,
-                    "reasoning": "Calculations are accurate",
-                    "calculation_errors": [],
-                    "data_type_issues": [],
-                },
-                "compliance": {
-                    "score": 3,
-                    "reasoning": "Some business logic issues with item categorization",
-                    "compliance_issues": ["Item categorization unclear"],
-                    "recommendations": ["Clarify item categories"],
-                },
-                "quality": {
-                    "score": 4,
-                    "reasoning": "Good OCR quality and confidence",
-                    "confidence_assessment": "high",
-                    "anomalies": [],
-                },
-                "issues_found": [
-                    "Missing transaction time",
-                    "Item categorization unclear",
-                ],
-                "confidence": 0.85,
-                "reasoning": "Good quality receipt with some missing information",
-            },
-            "bol": {
-                "overall_score": 4.5,
-                "decision": "APPROVE",
-                "completeness": {
-                    "score": 5,
-                    "reasoning": "All BOL fields are complete and accurate",
-                    "missing_fields": [],
-                    "issues": [],
-                },
-                "accuracy": {
-                    "score": 5,
-                    "reasoning": "All calculations and data types are correct",
-                    "calculation_errors": [],
-                    "data_type_issues": [],
-                },
-                "compliance": {
-                    "score": 4,
-                    "reasoning": "Compliant with shipping regulations",
-                    "compliance_issues": [],
-                    "recommendations": [],
-                },
-                "quality": {
-                    "score": 4,
-                    "reasoning": "Excellent OCR quality and high confidence",
-                    "confidence_assessment": "very_high",
-                    "anomalies": [],
-                },
-                "issues_found": [],
-                "confidence": 0.95,
-                "reasoning": "Excellent quality BOL with no issues found",
-            },
-        }
-
-        return {
-            "content": mock_evaluations.get(document_type, mock_evaluations["invoice"]),
-            "confidence": 0.9,
-            "raw_response": "Mock judge evaluation for development",
-        }
 
     def calculate_decision_threshold(self, overall_score: float) -> str:
         """Calculate decision based on overall score."""

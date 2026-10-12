@@ -10,7 +10,12 @@ from typing import Any, Optional
 from maiw_decision.models import DecisionResult
 from maiw_decision.proposal import ActionProposal
 
-from .base import ActionConflict, ActionUnsupported, BaseActionExecutor
+from .base import (
+    ActionConflict,
+    ActionUnsupported,
+    BaseActionExecutor,
+    WriteNotDispatched,
+)
 from .outcome import ExecutionOutcome
 from .reconciliation import ExecutionIntent
 
@@ -56,6 +61,11 @@ class EquipmentActionExecutor(BaseActionExecutor):
         self._release_skill = release_skill
         self._maintenance_skill = maintenance_skill
         self._state_provider = state_provider
+        # v2.0.1 round 3: asset status observed by the pre-write state guard,
+        # keyed by proposal_id, recorded in the ExecutionIntent as
+        # ``pre_status`` so reconciliation can tell "unchanged" (not executed)
+        # from "changed to something else" (indeterminate).
+        self._observed_pre_status: dict[str, str] = {}
 
     def _build_intent(
         self,
@@ -83,6 +93,10 @@ class EquipmentActionExecutor(BaseActionExecutor):
                 "asset_id": asset_id,
                 "expected_status": "maintenance",
             }
+        observed = getattr(self, "_observed_pre_status", None) or {}
+        pre_status = observed.pop(proposal.proposal_id, None)
+        if pre_status is not None:
+            expected_effect["pre_status"] = pre_status
         return ExecutionIntent(
             capability=action,
             proposal_id=proposal.proposal_id,
@@ -114,7 +128,11 @@ class EquipmentActionExecutor(BaseActionExecutor):
             asset = next(
                 (a for a in state.equipment.assets if a.asset_id == asset_id), None
             )
+            observed = self.__dict__.setdefault("_observed_pre_status", {})
+            if asset is not None and isinstance(getattr(asset, "status", None), str):
+                observed[proposal.proposal_id] = asset.status
             if asset and asset.status in {"offline", "maintenance"}:
+                observed.pop(proposal.proposal_id, None)
                 raise ActionConflict(
                     f"Asset {asset_id!r} status drifted to {asset.status!r} since "
                     f"the decision snapshot; cannot execute safely"
@@ -149,17 +167,20 @@ class EquipmentActionExecutor(BaseActionExecutor):
             )
         from maiw_contracts.equipment import EquipmentExecuteAssignRequest
 
-        req = EquipmentExecuteAssignRequest(
-            asset_id=proposal.parameters["asset_id"],
-            assignee=proposal.parameters["assignee"],
-            assignment_type=proposal.parameters.get("assignment_type", "task"),
-            task_id=proposal.parameters.get("task_id"),
-            duration_hours=proposal.parameters.get("duration_hours"),
-            notes=proposal.parameters.get("notes"),
-            proposal_id=proposal.proposal_id,
-            decision_id=decision.result_id,
-            execution_id=execution_id,
-        )
+        try:
+            req = EquipmentExecuteAssignRequest(
+                asset_id=proposal.parameters["asset_id"],
+                assignee=proposal.parameters["assignee"],
+                assignment_type=proposal.parameters.get("assignment_type", "task"),
+                task_id=proposal.parameters.get("task_id"),
+                duration_hours=proposal.parameters.get("duration_hours"),
+                notes=proposal.parameters.get("notes"),
+                proposal_id=proposal.proposal_id,
+                decision_id=decision.result_id,
+                execution_id=execution_id,
+            )
+        except Exception as exc:  # noqa: BLE001 - nothing was sent
+            raise WriteNotDispatched(f"invalid write request: {exc}") from exc
         result = await self._assign_skill.execute(req)
         return result.model_dump()
 
@@ -172,14 +193,17 @@ class EquipmentActionExecutor(BaseActionExecutor):
             )
         from maiw_contracts.equipment import EquipmentExecuteReleaseRequest
 
-        req = EquipmentExecuteReleaseRequest(
-            asset_id=proposal.parameters["asset_id"],
-            released_by=proposal.parameters.get("released_by", "unknown"),
-            notes=proposal.parameters.get("notes"),
-            proposal_id=proposal.proposal_id,
-            decision_id=decision.result_id,
-            execution_id=execution_id,
-        )
+        try:
+            req = EquipmentExecuteReleaseRequest(
+                asset_id=proposal.parameters["asset_id"],
+                released_by=proposal.parameters.get("released_by", "unknown"),
+                notes=proposal.parameters.get("notes"),
+                proposal_id=proposal.proposal_id,
+                decision_id=decision.result_id,
+                execution_id=execution_id,
+            )
+        except Exception as exc:  # noqa: BLE001 - nothing was sent
+            raise WriteNotDispatched(f"invalid write request: {exc}") from exc
         result = await self._release_skill.execute(req)
         return result.model_dump()
 
@@ -192,20 +216,23 @@ class EquipmentActionExecutor(BaseActionExecutor):
             )
         from maiw_contracts.equipment import EquipmentExecuteMaintenanceRequest
 
-        req = EquipmentExecuteMaintenanceRequest(
-            asset_id=proposal.parameters["asset_id"],
-            maintenance_type=proposal.parameters.get("maintenance_type", "preventive"),
-            description=proposal.parameters.get("description", ""),
-            scheduled_by=proposal.parameters.get("scheduled_by", "unknown"),
-            scheduled_for=proposal.parameters.get("scheduled_for", ""),
-            estimated_duration_minutes=proposal.parameters.get(
-                "estimated_duration_minutes", 60
-            ),
-            priority=proposal.parameters.get("priority", "medium"),
-            proposal_id=proposal.proposal_id,
-            decision_id=decision.result_id,
-            execution_id=execution_id,
-        )
+        try:
+            req = EquipmentExecuteMaintenanceRequest(
+                asset_id=proposal.parameters["asset_id"],
+                maintenance_type=proposal.parameters.get("maintenance_type", "preventive"),
+                description=proposal.parameters.get("description", ""),
+                scheduled_by=proposal.parameters.get("scheduled_by", "unknown"),
+                scheduled_for=proposal.parameters.get("scheduled_for", ""),
+                estimated_duration_minutes=proposal.parameters.get(
+                    "estimated_duration_minutes", 60
+                ),
+                priority=proposal.parameters.get("priority", "medium"),
+                proposal_id=proposal.proposal_id,
+                decision_id=decision.result_id,
+                execution_id=execution_id,
+            )
+        except Exception as exc:  # noqa: BLE001 - nothing was sent
+            raise WriteNotDispatched(f"invalid write request: {exc}") from exc
         result = await self._maintenance_skill.execute(req)
         return result.model_dump()
 

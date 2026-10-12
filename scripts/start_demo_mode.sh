@@ -105,6 +105,12 @@ echo ""
 
 # ── Start API ────────────────────────────────────────────────────────────────
 
+# Development server: unless a durable root is configured, use the explicit
+# in-memory persistence profile (procedure state is lost on restart). The
+# reference deployment (scripts/start_reference_deployment.sh) is file-backed.
+if [[ -z "${MAIW_PERSISTENCE_ROOT:-}" ]]; then
+    export MAIW_PERSISTENCE_MODE="${MAIW_PERSISTENCE_MODE:-memory}"
+fi
 cd "${REPO_ROOT}"
 MAIW_DEMO_MODE=true exec "${VENV}" -m uvicorn maiw_api.app:app \
     --host 0.0.0.0 \

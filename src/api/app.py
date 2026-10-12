@@ -12,6 +12,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+LEGACY DEVELOPMENT SERVER — NOT A RELEASE, DEPLOYMENT OR QUALIFICATION PATH.
+
+The only MAIW release composition root is ``apps/api/maiw_api/app.py``
+(``uvicorn maiw_api.app:app``). This module still mounts legacy routers that
+the shipped app deliberately does not expose (e.g. ``/api/v1/chat``, whose
+legacy agent writes to the warehouse database without DecisionEngine /
+ActionExecutor governance, and the legacy CRUD write routes). Do not start it
+for a reference deployment, a smoke test or any qualification — see
+docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md (v2.0.0 audit P1-01/P1-02).
+"""
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -213,8 +224,13 @@ async def rate_limit_middleware(request: Request, call_next):
         # check_rate_limit raises HTTPException if limit exceeded, returns True if allowed
         await rate_limiter.check_rate_limit(request)
     except HTTPException as http_exc:
-        # Re-raise HTTP exceptions (429 Too Many Requests)
-        raise http_exc
+        # v2.0.1 round 4: answer the 429 here — an exception raised from an
+        # HTTP middleware bypasses FastAPI's handlers and becomes a 500.
+        return JSONResponse(
+            status_code=http_exc.status_code,
+            content={"detail": http_exc.detail},
+            headers=getattr(http_exc, "headers", None) or None,
+        )
     except Exception as e:
         logger.error(f"Rate limiting error: {e}", exc_info=True)
         # Fail open - allow request if rate limiter fails

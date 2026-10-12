@@ -1,0 +1,58 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# OpenShell sandbox policy for the MAIW v2 reference deployment
+# (v2.0.1 round 2, NEW-P1-02 §21).  Rendered by
+# scripts/setup/reference_sandbox.sh, which substitutes __MAIW_API_HOST_IP__ and
+# __MAIW_API_PORT__ from MAIW_SANDBOX_MODEL_GATEWAY_ENDPOINT.
+#
+# Network: deny-by-default; the ONLY allowed egress is the canonical MAIW API
+# host:port, and on it ONLY the request `POST /api/v1/inference` (v2.0.1
+# round 3, NEW3-P1-01).  No provider (integrate.api.nvidia.com), no internet,
+# no metadata service, no host-private NIMs, no databases.
+#
+# Layered enforcement — the network rule is NOT the only boundary:
+#   1. OpenShell L7 REST rule (below): the sandbox proxy inspects the plain-HTTP
+#      request and allows only method POST on path /api/v1/inference; every
+#      other method/path on the same host:port is denied by the proxy (403).
+#      Round 2 used `access: full`, which allowed EVERY path on the API port —
+#      including the governed equipment write routes (third re-audit finding).
+#   2. Application layer (the path-level authority boundary even if this
+#      policy is misconfigured): /api/v1/inference requires the sandbox's
+#      inference token; every operational write route requires the separate
+#      operator write credential (X-Maiw-Operator-Token), which is never
+#      injected into the sandbox.
+# Credentials: none — the sandbox holds only the internal inference token,
+# passed on stdin by the operator, never a provider key or the write token.
+version: 1
+filesystem_policy:
+  include_workdir: true
+  read_only:
+  - /usr
+  - /lib
+  - /proc
+  - /dev/urandom
+  - /app
+  - /etc
+  - /var/log
+  read_write:
+  - /sandbox
+  - /tmp
+  - /dev/null
+landlock:
+  compatibility: best_effort
+network_policies:
+  maiw_inference_only:
+    name: maiw_inference_only
+    endpoints:
+    - host: '__MAIW_API_HOST_IP__'
+      port: __MAIW_API_PORT__
+      protocol: rest
+      enforcement: enforce
+      rules:
+      - allow:
+          method: POST
+          path: /api/v1/inference
+    binaries:
+    - path: /usr/bin/python3
+    - path: /usr/local/bin/python3

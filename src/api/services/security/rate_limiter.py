@@ -162,10 +162,15 @@ class RateLimiter:
                 return await self._check_memory_rate_limit(
                     key, requests_allowed, window_seconds
                 )
-                
+
+        except HTTPException:
+            # v2.0.1 round 4 (fourth re-audit P2-04): the limiter's OWN 429 must
+            # propagate; it was swallowed by the fail-open handler below, so
+            # the limit was never enforced.
+            raise
         except Exception as e:
             logger.error(f"Rate limit check failed: {e}")
-            # On error, allow the request (fail open)
+            # On an internal limiter error, allow the request (fail open)
             return True
 
     async def _check_redis_rate_limit(
@@ -241,10 +246,8 @@ class RateLimiter:
                 ]
                 entry["last_cleanup"] = current_time
                 
-                # Remove empty entries
-                if not entry["requests"]:
-                    del self.in_memory_store[key]
-                    return True
+                # (An emptied entry is kept: the current request is counted
+                # below — returning early here let it through uncounted.)
             
             # Remove old requests outside window
             entry["requests"] = [

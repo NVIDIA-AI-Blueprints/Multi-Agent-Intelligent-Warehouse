@@ -23,10 +23,8 @@ Covers:
 
 from __future__ import annotations
 
-import os
 import time
 import importlib
-import sys
 import pytest
 
 # ---------------------------------------------------------------------------
@@ -34,21 +32,18 @@ import pytest
 # ---------------------------------------------------------------------------
 
 
-def test_config_defaults():
+def test_config_defaults(monkeypatch):
     """Four timeout env vars have sensible defaults without any env set."""
-    # Remove any previously cached module so env changes take effect
-    for mod in list(sys.modules.keys()):
-        if "maiw_api.config" in mod:
-            del sys.modules[mod]
-
-    # Ensure env vars not set
+    # Settings reads os.environ at attribute-access time, so no module purge
+    # is needed (purging maiw_api.config created a second Settings class
+    # identity for later tests).  monkeypatch restores the env afterwards.
     for key in (
         "MAIW_ANALYZE_TIMEOUT_SECONDS",
         "MAIW_EXECUTION_TIMEOUT_SECONDS",
         "MAIW_RECONCILIATION_TIMEOUT_SECONDS",
         "MAIW_STARTUP_TIMEOUT_SECONDS",
     ):
-        os.environ.pop(key, None)
+        monkeypatch.delenv(key, raising=False)
 
     from maiw_api.config import Settings
 

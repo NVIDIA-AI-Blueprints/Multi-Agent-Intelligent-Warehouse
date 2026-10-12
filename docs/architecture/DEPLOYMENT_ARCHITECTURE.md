@@ -14,7 +14,8 @@ HOST (single node — epg-tme-smc-h100-02, 4×H100 NVL)
 │   ├── ModelGateway ──→ PolicyFilter (nemotron-3 / nemotron-3.5 ONLY)
 │   │                ──→ ModelRouter ──→ NIMProvider ──→ NIM endpoint
 │   ├── POST /api/v1/inference  (auth-required: X-Maiw-Internal-Token)
-│   ├── DecisionEngine + GovernanceInbox (JsonFileGovernanceInbox, restart-safe)
+│   ├── DecisionEngine → ActionExecutor (governed writes)
+│   ├── ProcedureHost: SOP Engine + JsonFileGovernanceInbox (restart-safe, v2.0.1)
 │   ├── ActionExecutor (write path — host only, never sandbox)
 │   ├── SOP Engine (ProcedureStateStore: JsonFileProcedureStateStore)
 │   └── MCP domain clients (Inventory/Equipment/Labor/Wave)
@@ -27,7 +28,7 @@ HOST (single node — epg-tme-smc-h100-02, 4×H100 NVL)
 └── NemoClaw/OpenShell sandbox runtime
     ├── SandboxedAgentRuntime + SOP Engine (agent-side)
     ├── RuntimeCapabilityPolicy (deny-by-default; WRITE always denied)
-    ├── MAIWHTTPModelGatewayClient → POST http://<HOST_IP>:8020/api/v1/inference
+    ├── MAIWHTTPModelGatewayClient → POST http://<HOST_IP>:8001/api/v1/inference  (canonical app, v2.0.1)
     └── NEVER holds: NIM credentials, warehouse write credentials, ApprovalStore
 
 Persistence root: /var/lib/maiw/

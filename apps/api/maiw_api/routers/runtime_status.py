@@ -51,6 +51,11 @@ async def runtime_status(request: Request):
     if rt.circuit_registry is not None:
         domain_circuit_stats = rt.circuit_registry.all_stats()
         domain_operational_status = rt.circuit_registry.operational_status()
+    # v2.0.1 round 2 (NEW-P1-03): a domain with no configured MCP server is
+    # NOT_CONFIGURED — never HEALTHY just because its (idle) breaker is closed.
+    for _domain in list(domain_operational_status):
+        if getattr(rt, f"mcp_{_domain}_available", None) is False:
+            domain_operational_status[_domain] = "NOT_CONFIGURED"
 
     # Overall MAIW operational status — HEALTHY if all domains healthy and NIM not OPEN
     nim_label = (
@@ -59,7 +64,8 @@ async def runtime_status(request: Request):
         else ("CIRCUIT OPEN" if nim_circuit_state == "open" else "DEGRADED")
     )
     overall_degraded = nim_label != "HEALTHY" or any(
-        v != "HEALTHY" for v in domain_operational_status.values()
+        v not in ("HEALTHY", "NOT_CONFIGURED")
+        for v in domain_operational_status.values()
     )
     maiw_operational_status = "DEGRADED" if overall_degraded else "HEALTHY"
 
@@ -79,7 +85,8 @@ async def runtime_status(request: Request):
         "equipment_mcp_configured": rt.mcp_equipment_available,
         "labor_mcp_configured": rt.mcp_labor_available,
         "wave_mcp_configured": rt.mcp_wave_available,
-        # MCP domain operational status (HEALTHY / DEGRADED / CIRCUIT OPEN)
+        # MCP domain operational status
+        # (HEALTHY / DEGRADED / CIRCUIT OPEN / NOT_CONFIGURED)
         "domain_health": domain_operational_status,
         # Canonical agents
         "equipment_agent_available": rt.equipment_agent is not None,

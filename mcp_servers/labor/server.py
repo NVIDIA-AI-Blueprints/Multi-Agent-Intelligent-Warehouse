@@ -44,7 +44,8 @@ from maiw_contracts.labor import (
     LaborAllocationRequest,
     LaborCapacityRequest,
 )
-from maiw_mcp.errors import BackendUnavailable
+from maiw_mcp.errors import BackendUnavailable, WriteNotApplied
+from maiw_mcp.write_disposition import not_applied_result
 
 logger = logging.getLogger(__name__)
 
@@ -153,6 +154,7 @@ async def warehouse_labor_allocate(
     zone: str | None = None,
     priority: str = "medium",
     notes: str | None = None,
+    execution_id: str | None = None,
 ) -> str:
     provider = _get_provider()
     req = LaborAllocateRequest(
@@ -165,9 +167,13 @@ async def warehouse_labor_allocate(
         notes=notes,
         proposal_id=proposal_id,
         decision_id=decision_id,
+        execution_id=execution_id,
     )
     try:
         result = await provider.execute_labor_allocation(req)
+    except WriteNotApplied as exc:
+        # v2.0.1 round 4: the provider certified no mutation → typed NOT_APPLIED
+        return not_applied_result(str(exc), exc.rejection_code)
     except Exception as exc:
         raise BackendUnavailable(f"Labor allocation write failed: {exc}") from exc
     return json.dumps(result.model_dump())
