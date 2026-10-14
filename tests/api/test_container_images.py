@@ -105,3 +105,11 @@ def test_compose_backend_healthcheck_does_not_need_curl():
     assert "urllib.request" in healthcheck.group(1)
     frontend = compose.split("\n  frontend:\n", 1)[1].split("\n  # Nginx", 1)[0]
     assert '"3001:8080"' in frontend
+
+
+def test_backend_image_ships_demo_evaluation_artifact():
+    # GET /api/v1/demo/counterfactual/result reads this committed file; without
+    # it the UI's "Control vs MAIW" panel shows "No evaluation data".
+    text = (REPO_ROOT / "Dockerfile.backend").read_text()
+    assert "COPY artifacts/demo/ ./artifacts/demo/" in text
+    assert (REPO_ROOT / "artifacts/demo/labor_wave_control_vs_maiw.json").is_file()
