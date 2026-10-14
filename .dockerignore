@@ -171,6 +171,8 @@ Jenkinsfile
 deploy/
 monitoring/
 nginx.conf
+# ...except the frontend image's nginx server block (Dockerfile.frontend)
+!deploy/docker/frontend-nginx.conf.template
 
 # Scripts (not needed in runtime, only source code)
 scripts/

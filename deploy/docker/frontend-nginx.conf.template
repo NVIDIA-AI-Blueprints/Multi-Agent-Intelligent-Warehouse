@@ -1,0 +1,77 @@
+# MAIW frontend (production image, Dockerfile.frontend) — nginx server block.
+#
+# Rendered at container start by the nginx image's envsubst step into
+# /etc/nginx/conf.d/default.conf. Variables:
+#   MAIW_API_UPSTREAM       backend base URL, scheme://host:port, no path
+#                           (image default http://backend:8001 = compose service)
+#   NGINX_LOCAL_RESOLVERS   set by the image entrypoint from /etc/resolv.conf so
+#                           the backend name is re-resolved (backend restarts)
+#
+# Security: this proxy never adds the governed-write operator credential
+# (X-Maiw-Operator-Token) and strips it if a browser sends one. Governed
+# equipment writes from this UI therefore get 403 from the API by design; see
+# src/ui/web/src/setupProxy.js and the MAIW_OPERATOR_WRITE_TOKEN docs.
+
+server {
+    listen       8080;
+    listen       [::]:8080;
+    server_name  _;
+
+    server_tokens off;
+    root  /usr/share/nginx/html;
+    index index.html;
+
+    # Matches the API's MAX_UPLOAD_SIZE default (50 MB document uploads).
+    client_max_body_size 50m;
+
+    # Static responses get their headers in the locations below; /api responses
+    # keep the API's own security headers (no duplicates added here).
+
+    resolver ${NGINX_LOCAL_RESOLVERS} valid=10s ipv6=off;
+
+    # API reverse proxy (replaces the dev server's setupProxy.js /api -> backend).
+    location /api/ {
+        set $maiw_api_upstream ${MAIW_API_UPSTREAM};
+        proxy_pass $maiw_api_upstream;
+
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        # Like the dev server's changeOrigin: Host is the upstream's own name.
+        proxy_set_header Host $proxy_host;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # Never forward an operator credential supplied by the browser.
+        proxy_set_header X-Maiw-Operator-Token "";
+
+        # Server-sent events (/api/v1/events/stream) and long reasoning calls.
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+    }
+
+    # Container health endpoint (does not depend on the backend).
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    # Fingerprinted build assets.
+    location /static/ {
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        try_files $uri =404;
+    }
+
+    # Single-page app: client-side routes fall back to index.html.
+    location / {
+        add_header Cache-Control "no-cache" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        try_files $uri $uri/ /index.html;
+    }
+}
