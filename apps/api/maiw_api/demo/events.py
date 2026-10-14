@@ -76,10 +76,15 @@ class ScenarioEvent:
     worker_id: str | None = None
     sim_time_seconds: int | None = None
     ts: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
+    # Reliability / reconciliation events only (RECONCILIATION_REQUIRED,
+    # CONFIRMED_*, INDETERMINATE): the execution they refer to.  Serialized
+    # only when set, so every other event keeps its existing payload shape.
+    execution_id: str | None = None
+    domain: str | None = None
 
     def to_sse_dict(self) -> dict:
         """Serialize to a dict suitable for JSON SSE payload."""
-        return {
+        out = {
             "id": f"{self.ts.isoformat()}-{self.category}",
             "ts": self.ts.isoformat(),
             "category": self.category,
@@ -90,6 +95,11 @@ class ScenarioEvent:
             "worker_id": self.worker_id,
             "sim_time_seconds": self.sim_time_seconds,
         }
+        if self.execution_id is not None:
+            out["execution_id"] = self.execution_id
+        if self.domain is not None:
+            out["domain"] = self.domain
+        return out
 
 
 # ── Bus ───────────────────────────────────────────────────────────────────────

@@ -28,7 +28,7 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from maiw_api.config import settings
@@ -51,6 +51,28 @@ def _get_controller():
             status_code=503,
             detail=f"Demo mode not active: {exc}",
         ) from exc
+
+
+def _active_warehouse_id(ctrl: Any) -> str:
+    """
+    The warehouse the ACTIVE demo world represents — the single authoritative
+    warehouse binding for the demo governance routes.
+
+    /demo/analyze assembles state for it, every proposal it builds carries it
+    in ``parameters.warehouse_id``, the approval record is bound to it, and
+    /demo/approve re-reads state for it.  ``authorize_with_approval`` rejects a
+    proposal whose warehouse differs from its approval's
+    (``approval.warehouse_mismatch``), so all of them must agree.
+
+    DataPack world → ``DC-47`` (the canonical DataPack warehouse); the YAML
+    fallback world reports its own ``WAREHOUSE_ID``.
+    """
+    warehouse_id = getattr(getattr(ctrl, "world", None), "WAREHOUSE_ID", None)
+    if not isinstance(warehouse_id, str) or not warehouse_id:
+        raise HTTPException(
+            status_code=503, detail="Active demo world has no warehouse id"
+        )
+    return warehouse_id
 
 
 # ── Pydantic models ────────────────────────────────────────────────────────────
@@ -362,7 +384,7 @@ async def analyze_disruption():
         from maiw_state import StateRequirements, WarehouseStateSnapshot
 
         requirements = StateRequirements(equipment=True, labor=True, waves=True)
-        warehouse_id = ctrl.world.WAREHOUSE_ID if ctrl.world else "default"
+        warehouse_id = _active_warehouse_id(ctrl)
         state = await runtime.state_provider.get_state(
             warehouse_id,
             requirements,
@@ -478,6 +500,7 @@ async def analyze_disruption():
             index=i,
             ctrl=ctrl,
             execution_timeout_seconds=settings.execution_timeout_seconds,
+            warehouse_id=warehouse_id,
         )
         proposal_results.append(proposal_result)
 
@@ -585,13 +608,26 @@ async def _build_and_execute_proposal(
     index: int,
     ctrl: Any,
     execution_timeout_seconds: float = 30.0,
+    warehouse_id: str | None = None,
 ) -> dict[str, Any]:
-    """Translate one RecommendedAction into a proposal + decision + optional execution."""
+    """
+    Translate one RecommendedAction into a proposal + decision + optional execution.
+
+    ``warehouse_id`` is the active world's warehouse (see
+    ``_active_warehouse_id``); the proposal and, when human approval is
+    required, the approval record are both bound to it.  Defaults to the
+    snapshot's warehouse, which analyze assembled for that same id.
+    """
     from maiw_decision.models import DecisionOutcome, DecisionRequest
+
+    if warehouse_id is None:
+        warehouse_id = snapshot.warehouse_id
 
     # Select proposal skill based on capability
     try:
-        proposal = await _build_proposal(rec, trace_id, runtime)
+        proposal = await _build_proposal(
+            rec, trace_id, runtime, warehouse_id=warehouse_id
+        )
     except Exception as exc:
         lifecycle.append(
             {
@@ -650,11 +686,8 @@ async def _build_and_execute_proposal(
     if result.outcome != DecisionOutcome.APPROVED:
         # Store in pending approvals if human approval is needed
         if result.outcome == DecisionOutcome.REQUIRES_HUMAN_APPROVAL:
-            _warehouse_id = (
-                ctrl.world.WAREHOUSE_ID
-                if hasattr(ctrl.world, "WAREHOUSE_ID")
-                else "DC-47"
-            )
+            # Same warehouse the proposal was built for — never a fallback
+            # literal (approval.warehouse_mismatch would block /demo/approve).
             ctrl.add_pending_approval(
                 proposal_id=proposal.proposal_id,
                 decision_id=result.result_id,
@@ -670,7 +703,7 @@ async def _build_and_execute_proposal(
                     if hasattr(proposal.risk_level, "value")
                     else str(proposal.risk_level)
                 ),
-                warehouse_id=_warehouse_id,
+                warehouse_id=warehouse_id,
                 proposal_data=proposal.model_dump(mode="json"),
             )
         return {
@@ -713,11 +746,7 @@ async def _build_and_execute_proposal(
         # never convert it to a generic 500/504.  The caller can reconcile it.
         from maiw_execution.outcome import ExecutionOutcome as _EO  # noqa: PLC0415
 
-        outcome_label = (
-            exec_result.outcome.value
-            if hasattr(exec_result, "outcome") and exec_result.outcome is not None
-            else ("executed" if exec_result.success else "failed")
-        )
+        outcome_label = _outcome_label(exec_result)
         lifecycle.append(
             {
                 "phase": "EXECUTE",
@@ -729,6 +758,20 @@ async def _build_and_execute_proposal(
                 "trace_id": trace_id,
             }
         )
+        unknown = outcome_label == _EO.UNKNOWN.value
+        if unknown and _error_code(exec_result) not in _BLOCKED_ERROR_CODES:
+            await _publish_reconciliation_required(
+                ctrl,
+                execution_id=exec_result.execution_id,
+                domain=str(rec.domain),
+                capability=rec.capability,
+                target=_proposal_target(proposal, rec),
+                proposal_id=proposal.proposal_id,
+                decision_id=result.result_id,
+                approval_id=None,
+                trace_id=trace_id,
+                error_code=_error_code(exec_result),
+            )
         return {
             "status": outcome_label,
             "capability": rec.capability,
@@ -737,6 +780,9 @@ async def _build_and_execute_proposal(
             "execution_id": exec_result.execution_id,
             "success": exec_result.success,
             "outcome": outcome_label,
+            # Never report an ambiguous write as executed or as not executed.
+            "executed": None if unknown else bool(exec_result.executed),
+            "reconciliation_required": unknown,
         }
     except Exception as exc:
         lifecycle.append(
@@ -816,8 +862,15 @@ def _resolve_labor_allocation_target(rec: Any) -> tuple[str, list[str]]:
     return task.task_id, [worker.worker_id]
 
 
-async def _build_proposal(rec: Any, trace_id: str, runtime: Any) -> Any:
-    """Translate a RecommendedAction into an ActionProposal using the correct skill."""
+async def _build_proposal(
+    rec: Any, trace_id: str, runtime: Any, *, warehouse_id: str
+) -> Any:
+    """
+    Translate a RecommendedAction into an ActionProposal using the correct skill.
+
+    Every proposal is bound to ``warehouse_id`` (the active world's warehouse —
+    the one its approval record is bound to).
+    """
     cap = rec.capability
 
     if cap == "warehouse.equipment.assign":
@@ -834,7 +887,7 @@ async def _build_proposal(rec: Any, trace_id: str, runtime: Any) -> Any:
             reason=rec.rationale,
             requested_by="operations-agent",
         )
-        return await skill.execute(req, trace_id=trace_id)
+        return await skill.execute(req, trace_id=trace_id, warehouse_id=warehouse_id)
 
     if cap == "warehouse.equipment.release":
         from maiw_decision.proposal import ActionProposal
@@ -844,6 +897,7 @@ async def _build_proposal(rec: Any, trace_id: str, runtime: Any) -> Any:
             released_by="operations-agent",
             reason=rec.rationale,
             requested_by="operations-agent",
+            warehouse_id=warehouse_id,
             trace_id=trace_id,
         )
 
@@ -858,6 +912,7 @@ async def _build_proposal(rec: Any, trace_id: str, runtime: Any) -> Any:
             priority=rec.priority,
             reason=rec.rationale,
             requested_by="operations-agent",
+            warehouse_id=warehouse_id,
             trace_id=trace_id,
         )
 
@@ -876,6 +931,7 @@ async def _build_proposal(rec: Any, trace_id: str, runtime: Any) -> Any:
             priority=rec.priority,
             reason=rec.rationale,
             requested_by="operations-agent",
+            warehouse_id=warehouse_id,
             trace_id=trace_id,
         )
 
@@ -897,6 +953,7 @@ async def _build_proposal(rec: Any, trace_id: str, runtime: Any) -> Any:
             new_priority=rec.priority,
             reason=rec.rationale,
             requested_by="operations-agent",
+            warehouse_id=warehouse_id,
             trace_id=trace_id,
         )
 
@@ -912,6 +969,138 @@ def _get_executor(domain: str, runtime: Any) -> Any:
     if domain == "wave":
         return runtime.wave_executor
     return None
+
+
+# ── Execution outcome reporting ──────────────────────────────────────────────
+#
+# The demo governance routes report execution outcomes exactly like the
+# canonical write routes (routers/equipment.py ``_execute_if_approved``):
+#
+#   status/outcome  the canonical ExecutionOutcome value
+#                   executed | no_op | deferred | conflict | unknown | failed
+#   executed        true / false — or null when the outcome is UNKNOWN (the
+#                   write may have landed; never reported as executed NOR as
+#                   not executed)
+#   reconciliation_required  true only for UNKNOWN; the operator reconciles
+#                   (POST /api/v1/demo/reconcile) — nothing is retried
+#
+# A write refused because an earlier write to the same target is still
+# unresolved (executor error_code RECONCILIATION_REQUIRED / DUPLICATE_IN_FLIGHT)
+# is answered 409 RECONCILIATION_REQUIRED — nothing was dispatched.
+
+# Executor error codes meaning "refused before any write: the target has an
+# unresolved (UNKNOWN / in-flight) execution".  The UNKNOWN they carry is the
+# EARLIER execution's, not a new ambiguous write.
+_BLOCKED_ERROR_CODES = frozenset({"RECONCILIATION_REQUIRED", "DUPLICATE_IN_FLIGHT"})
+
+_DEMO_RECONCILE_PATH = "/api/v1/demo/reconcile"
+
+# ReconciliationOutcome value → SSE category the Reliability UI listens for.
+_RECONCILIATION_EVENT_CATEGORY = {
+    "confirmed_executed": "CONFIRMED_EXECUTED",
+    "confirmed_not_executed": "CONFIRMED_NOT_EXECUTED",
+    "indeterminate": "INDETERMINATE",
+}
+
+
+def _outcome_label(exec_result: Any) -> str:
+    outcome = getattr(exec_result, "outcome", None)
+    value = getattr(outcome, "value", outcome)
+    if isinstance(value, str) and value:
+        return value
+    return "executed" if getattr(exec_result, "success", False) else "failed"
+
+
+def _error_code(exec_result: Any) -> str | None:
+    code = getattr(exec_result, "error_code", None)
+    return code if isinstance(code, str) and code else None
+
+
+def _proposal_target(proposal: Any, rec_or_pending: Any = None) -> str | None:
+    """The domain target of a proposal (asset_id / task_id / zone / wave_id)."""
+    params = getattr(proposal, "parameters", None)
+    if isinstance(params, dict):
+        for key in ("asset_id", "task_id", "zone", "wave_id"):
+            value = params.get(key)
+            if isinstance(value, str) and value:
+                return value
+    if isinstance(rec_or_pending, dict):
+        target = rec_or_pending.get("target")
+    else:
+        target = getattr(rec_or_pending, "target", None)
+    return target if isinstance(target, str) and target else None
+
+
+def _reconcile_hint(execution_id: str, domain: str) -> dict[str, Any]:
+    return {
+        "method": "POST",
+        "path": _DEMO_RECONCILE_PATH,
+        "body": {"execution_id": execution_id, "domain": domain},
+    }
+
+
+async def _publish_reconciliation_required(
+    ctrl: Any,
+    *,
+    execution_id: str,
+    domain: str,
+    capability: str,
+    target: str | None,
+    proposal_id: str | None,
+    decision_id: str | None,
+    approval_id: str | None,
+    trace_id: str | None,
+    error_code: str | None,
+) -> bool:
+    """
+    Publish RECONCILIATION_REQUIRED for an UNKNOWN execution — exactly once
+    per execution_id.  Returns True when the event was published.
+
+    The Reliability panel enables RECONCILE NOW from this event: it reads
+    ``execution_id`` / ``domain`` from the top-level SSE fields and from the
+    JSON ``detail``.  Publishing never changes the reported outcome — a bus
+    failure is logged, not raised.
+    """
+    from maiw_api.demo.events import ScenarioEvent
+
+    try:
+        if ctrl.claim_reconciliation_required(execution_id) is not True:
+            return False
+        detail = {
+            "execution_id": execution_id,
+            "domain": domain,
+            "capability": capability,
+            "target": target,
+            "proposal_id": proposal_id,
+            "decision_id": decision_id,
+            "approval_id": approval_id,
+            "trace_id": trace_id,
+            "outcome": "unknown",
+            "executed": None,
+            "error_code": error_code,
+            "retried": False,
+            "reconcile": _reconcile_hint(execution_id, domain),
+        }
+        await ctrl.bus.publish(
+            ScenarioEvent(
+                category="RECONCILIATION_REQUIRED",
+                message=f"reconciliation_required:{capability}",
+                detail=json.dumps(detail, sort_keys=True),
+                asset_id=target if domain == "equipment" else None,
+                task_id=target if domain == "labor" else None,
+                sim_time_seconds=ctrl.world.clock.elapsed_seconds,
+                execution_id=execution_id,
+                domain=domain,
+            )
+        )
+        return True
+    except Exception as exc:  # noqa: BLE001 — observability must not mask outcome
+        logger.warning(
+            "RECONCILIATION_REQUIRED publish failed for execution_id=%s: %s",
+            execution_id,
+            exc,
+        )
+        return False
 
 
 # ── Approval governance ───────────────────────────────────────────────────────
@@ -1000,7 +1189,7 @@ async def approve_proposal(request: ApproveRequest):
 
     try:
         fresh_state = await runtime.state_provider.get_state(
-            ctrl.world.WAREHOUSE_ID if hasattr(ctrl.world, "WAREHOUSE_ID") else "DC-47",
+            _active_warehouse_id(ctrl),
             StateRequirements(equipment=True, labor=True, waves=True),
             trace_id=trace_id,
         )
@@ -1064,19 +1253,62 @@ async def approve_proposal(request: ApproveRequest):
     except Exception as exc:
         return {"ok": False, "status": "execution_error", "reason": str(exc)}
 
-    # Consume the approval after execution — APPROVED → CONSUMED (single-use guarantee closes)
+    # Consume the approval after the execution attempt — APPROVED → CONSUMED
+    # (single-use guarantee closes, whatever the outcome).
     ctrl.approval_store.consume(approval_id)
-    ctrl.record_approval_outcome(request.pending_id, "executed")
+
+    outcome = _outcome_label(exec_result)
+    error_code = _error_code(exec_result)
+    domain = pending["domain"]
+    target = _proposal_target(proposal, pending)
+
+    if error_code in _BLOCKED_ERROR_CODES:
+        # Refused before any write: an earlier write to this target is still
+        # unresolved.  Not a new ambiguous write — no event, no retry.
+        from maiw_api.write_auth import TypedHTTPError
+
+        ctrl.record_approval_outcome(request.pending_id, "blocked")
+        blocking_id = exec_result.execution_id
+        raise TypedHTTPError(
+            409,
+            "RECONCILIATION_REQUIRED",
+            (
+                f"a previous write to {target!r} has an unresolved outcome "
+                f"(execution_id={blocking_id}); reconcile it before writing again"
+            ),
+            execution_id=blocking_id,
+            domain=domain,
+            reconcile=_reconcile_hint(blocking_id, domain),
+        )
+
+    ctrl.record_approval_outcome(request.pending_id, outcome)
+    unknown = outcome == "unknown"
 
     # Publish EXECUTE SSE
     await bus.publish(
         ScenarioEvent(
             category="EXECUTE",
             message=f"execute:{pending['capability']}",
-            detail=f"success={exec_result.success} exec_id={exec_result.execution_id}",
+            detail=(
+                f"outcome={outcome} success={exec_result.success} "
+                f"exec_id={exec_result.execution_id}"
+            ),
             sim_time_seconds=sim_t,
         )
     )
+    if unknown:
+        await _publish_reconciliation_required(
+            ctrl,
+            execution_id=exec_result.execution_id,
+            domain=domain,
+            capability=pending["capability"],
+            target=target,
+            proposal_id=proposal.proposal_id,
+            decision_id=pending["decision_id"],
+            approval_id=approval_id,
+            trace_id=trace_id,
+            error_code=error_code,
+        )
 
     # Compute and publish fresh KPI
     kpi = DemoKPIEngine(ctrl.world, ctrl._last_analyze_wall_time).compute()
@@ -1087,11 +1319,6 @@ async def approve_proposal(request: ApproveRequest):
     await bus.publish_kpi(kpi_dict, sim_t)
 
     # Store LiveExecutionRecord for WORLD LIVE projection
-    _outcome_str = (
-        exec_result.outcome.value
-        if hasattr(exec_result.outcome, "value")
-        else str(exec_result.outcome)
-    )
     _kpi_delta: dict = {}
     for _k in _pre_kpi_dict:
         if _k in kpi_dict:
@@ -1105,9 +1332,9 @@ async def approve_proposal(request: ApproveRequest):
         "trace_id": trace_id,
         "capability": pending["capability"],
         "target": pending.get("target", ""),
-        "domain": pending["domain"],
-        "outcome": _outcome_str,
-        "execution_confirmed": exec_result.executed if hasattr(exec_result, "executed") else exec_result.success,
+        "domain": domain,
+        "outcome": outcome,
+        "execution_confirmed": None if unknown else bool(exec_result.executed),
         "pre_kpi": _pre_kpi_dict,
         "post_kpi": kpi_dict,
         "kpi_delta": _kpi_delta,
@@ -1115,16 +1342,36 @@ async def approve_proposal(request: ApproveRequest):
         "pending_id": request.pending_id,
     })
 
-    return {
-        "ok": True,
-        "status": "executed",
+    # Same outcome semantics as the canonical write routes: ``status`` is the
+    # real ExecutionOutcome; UNKNOWN is 202 with executed=null — never a
+    # success, never a failure, never retried.
+    body: dict[str, Any] = {
+        "ok": bool(exec_result.success),
+        "status": outcome,
+        "outcome": outcome,
+        "executed": None if unknown else bool(exec_result.executed),
+        "success": bool(exec_result.success),
+        "reconciliation_required": unknown,
         "capability": pending["capability"],
+        "domain": domain,
+        "target": target,
         "proposal_id": proposal.proposal_id,
         "original_decision_id": pending["decision_id"],
         "approval_id": approval_id,
         "execution_id": exec_result.execution_id,
-        "success": exec_result.success,
+        "trace_id": trace_id,
     }
+    if error_code:
+        body["error_code"] = error_code
+    for field_name in ("dispatch_status", "server_disposition", "uncertainty_reason"):
+        value = getattr(exec_result, field_name, None)
+        if isinstance(value, str):
+            body[field_name] = value
+    if unknown:
+        body["retried"] = False
+        body["reconcile"] = _reconcile_hint(exec_result.execution_id, domain)
+        return JSONResponse(status_code=202, content=body)
+    return body
 
 
 @router.post("/demo/reject")
@@ -1267,6 +1514,35 @@ async def reconcile_execution(request: ReconcileRequest):
             sim_time_seconds=sim_t,
         )
     )
+    # Outcome event the Reliability UI resolves on (CONFIRMED_EXECUTED /
+    # CONFIRMED_NOT_EXECUTED / INDETERMINATE), carrying the same ids as the
+    # RECONCILIATION_REQUIRED event it answers.
+    outcome_value = reconciliation_record.outcome.value
+    outcome_category = _RECONCILIATION_EVENT_CATEGORY.get(outcome_value)
+    if outcome_category is not None:
+        target = rec.intent.target if rec.intent else None
+        await ctrl.bus.publish(
+            ScenarioEvent(
+                category=outcome_category,
+                message=f"reconciliation.{outcome_value}",
+                detail=json.dumps(
+                    {
+                        "execution_id": request.execution_id,
+                        "domain": request.domain,
+                        "target": target,
+                        "reconciliation_id": reconciliation_record.reconciliation_id,
+                        "reconciliation_outcome": outcome_value,
+                        "effective_status": rec.effective_status,
+                        "trace_id": trace_id,
+                    },
+                    sort_keys=True,
+                ),
+                asset_id=target if request.domain == "equipment" else None,
+                sim_time_seconds=sim_t,
+                execution_id=request.execution_id,
+                domain=request.domain,
+            )
+        )
 
     return {
         "ok": True,
