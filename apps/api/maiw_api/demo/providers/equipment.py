@@ -119,6 +119,41 @@ class SimulationEquipmentProvider:
         # Reliability testing instrumentation (not production business fields)
         self._mutation_count: int = 0
         self._post_mutation_fault: Exception | None = None
+        # When set, the post-mutation fault fires only for a write to this
+        # asset (demo F06 arms it for the injected target); None = any asset.
+        self._post_mutation_fault_asset_id: str | None = None
+
+    # ── Fault injection (demo reliability scenarios) ────────────────────────────
+
+    def arm_ambiguous_write(self, asset_id: str) -> None:
+        """
+        Demo F06: the next committed write to ``asset_id`` raises
+        ``AmbiguousWriteError`` AFTER the mutation (response lost), so the
+        executor records UNKNOWN and the target stays blocked until reconciled.
+        One-shot; writes to other assets are unaffected.
+        """
+        from maiw_execution.outcome import AmbiguousWriteError
+
+        self._post_mutation_fault = AmbiguousWriteError(
+            f"[SIM] F06 ambiguous write: mutation committed on {asset_id!r}, "
+            "response lost"
+        )
+        self._post_mutation_fault_asset_id = asset_id
+
+    def disarm_post_mutation_fault(self) -> None:
+        self._post_mutation_fault = None
+        self._post_mutation_fault_asset_id = None
+
+    def _take_post_mutation_fault(self, asset_id: str) -> Exception | None:
+        """Consume the armed fault if it applies to a write on ``asset_id``."""
+        fault = self._post_mutation_fault
+        if fault is None:
+            return None
+        scope = self._post_mutation_fault_asset_id
+        if scope is not None and scope != asset_id:
+            return None
+        self.disarm_post_mutation_fault()
+        return fault
 
     # ── Read methods ────────────────────────────────────────────────────────────
 
@@ -240,9 +275,8 @@ class SimulationEquipmentProvider:
         )
 
         # Fault injection: raise AFTER mutation to simulate ambiguous write
-        if self._post_mutation_fault is not None:
-            fault = self._post_mutation_fault
-            self._post_mutation_fault = None
+        fault = self._take_post_mutation_fault(request.asset_id)
+        if fault is not None:
             raise fault
 
         return EquipmentExecuteAssignResult(
@@ -295,9 +329,8 @@ class SimulationEquipmentProvider:
             )
         )
 
-        if self._post_mutation_fault is not None:
-            fault = self._post_mutation_fault
-            self._post_mutation_fault = None
+        fault = self._take_post_mutation_fault(request.asset_id)
+        if fault is not None:
             raise fault
 
         return EquipmentExecuteReleaseResult(
@@ -351,9 +384,8 @@ class SimulationEquipmentProvider:
             )
         )
 
-        if self._post_mutation_fault is not None:
-            fault = self._post_mutation_fault
-            self._post_mutation_fault = None
+        fault = self._take_post_mutation_fault(request.asset_id)
+        if fault is not None:
             raise fault
 
         return EquipmentExecuteMaintenanceResult(

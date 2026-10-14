@@ -8,7 +8,10 @@
  *   equipment_fault, equipment_restore, low_stock, worker_absence,
  *   worker_return, task_deadline, wave_delay
  *
- * F06/F10 use equipment_fault as proxy (backend fault injection logic handles ambiguous write).
+ * F06/F10 use equipment_fault as proxy. No asset_id is sent: the backend resolves
+ * an eligible asset from the ACTIVE demo world and returns it ("Targeted …").
+ * F06 sets simulate_ambiguous_write: the backend arms a one-shot lost-response
+ * fault on that asset's next committed write (UNKNOWN → no retry → reconcile).
  * F12/F01 have no direct inject — operator notes walk through manual steps.
  */
 
@@ -16,6 +19,7 @@ import React, { useState } from 'react';
 import { Box, Typography, CircularProgress } from '@mui/material';
 import { demoAPI } from '../../../services/demoAPI';
 import { SSEEvent, parseEventDetail } from '../../../hooks/useDemoSSE';
+import { describeInjectError, describeInjectTarget } from '../injectFeedback';
 
 interface Props {
   scenarioId: string | null;
@@ -25,7 +29,8 @@ interface Props {
 interface InjectionConfig {
   label: string;
   description: string;
-  action: () => Promise<void>;
+  /** Resolves to the inject result whose target is shown to the operator. */
+  action: () => Promise<any>;
   color?: string;
   testId: string;
 }
@@ -100,10 +105,11 @@ export default function FaultInjectionPanel({ scenarioId, sseEvents }: Props) {
     setInjectLoading(true);
     setLastResult(null);
     try {
-      await fn();
-      setLastResult(`${label} → injected`);
+      const result = await fn();
+      const target = describeInjectTarget(result);
+      setLastResult(target ? `${label} → injected · ${target}` : `${label} → injected`);
     } catch (e: any) {
-      setLastResult(`Error: ${e?.response?.data?.detail ?? e?.message ?? 'unknown'}`);
+      setLastResult(`Error: ${describeInjectError(e)}`);
     } finally {
       setInjectLoading(false);
     }
@@ -128,7 +134,7 @@ export default function FaultInjectionPanel({ scenarioId, sseEvents }: Props) {
       {
         label: 'INJECT FAULT',
         description: 'Trigger equipment fault → drives ambiguous write path',
-        action: () => demoAPI.inject('equipment_fault', { asset_id: 'AGV-01', simulate_ambiguous_write: true }),
+        action: () => demoAPI.inject('equipment_fault', { equipment_type: 'agv', simulate_ambiguous_write: true }),
         color: '#D29922',
         testId: 'inject-fault-F06',
       },
@@ -155,8 +161,9 @@ export default function FaultInjectionPanel({ scenarioId, sseEvents }: Props) {
         label: 'INJECT STATE DRIFT',
         description: 'Inject equipment fault then restore → state changes during proposal window',
         action: async () => {
-          await demoAPI.inject('equipment_fault', { asset_id: 'AGV-01' });
-          await demoAPI.inject('equipment_restore', { asset_id: 'AGV-01' });
+          const fault = await demoAPI.inject('equipment_fault', { equipment_type: 'agv' });
+          // Restore the SAME asset the backend resolved for the fault.
+          return demoAPI.inject('equipment_restore', { asset_id: fault?.asset_id });
         },
         color: '#D29922',
         testId: 'inject-fault-F10',

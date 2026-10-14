@@ -50,6 +50,28 @@ _DISRUPTION_EVENT_TYPES = frozenset(
     {"equipment_fault", "worker_absence", "low_stock", "wave_delay"}
 )
 
+# Manual equipment injections whose target is resolved from the ACTIVE world.
+_EQUIPMENT_TARGETED_EVENT_TYPES = frozenset({"equipment_fault", "equipment_restore"})
+
+
+class InjectTargetError(ValueError):
+    """
+    A manual injection cannot be applied to the active world.  Carries a stable
+    machine-readable ``code`` and the HTTP status the demo router maps it to.
+
+        NO_ELIGIBLE_ASSET          (409) — asset_id omitted, nothing eligible
+        ASSET_NOT_IN_ACTIVE_WORLD  (404) — explicit asset_id not in active world
+    """
+
+    def __init__(
+        self, status_code: int, code: str, message: str, **extra: Any
+    ) -> None:
+        super().__init__(f"{code}: {message}")
+        self.status_code = status_code
+        self.code = code
+        self.message = message
+        self.extra = extra
+
 
 # ── Scenario definition ───────────────────────────────────────────────────────
 
@@ -260,6 +282,8 @@ class DemoScenarioController:
         if not _used_datapack:
             # Legacy path: seed DemoWarehouseWorld from the scenario YAML initial_state
             self.world.seed(defn.initial_state, rng_seed=defn.rng_seed)
+            # Providers survive on this path; drop any armed F06 fault.
+            self.providers.equipment.disarm_post_mutation_fault()
 
         self._snapshot = self.world.snapshot()
         self._scenario = defn
@@ -303,6 +327,7 @@ class DemoScenarioController:
         if self._snapshot is None and self.world._scenario_world is None:
             raise RuntimeError("No snapshot available — call start() first")
         self.world.reset(self._snapshot)
+        self.providers.equipment.disarm_post_mutation_fault()
         self._paused = False
         self._next_event_idx = 0
         self._kpi_history = []
@@ -383,11 +408,27 @@ class DemoScenarioController:
         worker_return           — set worker status to active
         task_deadline           — add/update deadline on a task
         wave_delay              — set all pending tasks to low priority + add deadline
+
+        For equipment_fault / equipment_restore ``asset_id`` is optional: when
+        omitted the target is resolved from the ACTIVE world (DataPack or YAML)
+        by ``resolve_equipment_target``.  The result always carries the
+        ``asset_id`` actually used.
         """
         if not self.active:
             raise RuntimeError("No active scenario")
 
+        resolution: str | None = None
+        if event_type in _EQUIPMENT_TARGETED_EVENT_TYPES:
+            explicit = _requested_asset_id(payload) is not None
+            resolution = "explicit" if explicit else "resolved"
+            payload = {
+                **payload,
+                "asset_id": self.resolve_equipment_target(event_type, payload),
+            }
+
         result = await self._apply_event(event_type, payload)
+        if resolution is not None:
+            result["target_resolution"] = resolution
         self._last_inject_wall_time = datetime.now(tz=timezone.utc)
 
         # Record first disruption time (excluding tick/metadata events)
@@ -402,6 +443,71 @@ class DemoScenarioController:
             sim_time_seconds=self.world.clock.elapsed_seconds,
         )
         return result
+
+    def resolve_equipment_target(self, event_type: str, payload: dict[str, Any]) -> str:
+        """
+        Return the asset_id an equipment_fault / equipment_restore applies to.
+
+        Explicit ``asset_id`` → used as-is if it exists in the active world,
+        otherwise ``ASSET_NOT_IN_ACTIVE_WORLD`` (404).
+
+        Omitted ``asset_id`` → deterministic resolution (same world → same
+        target), lowest ``asset_id`` in plain string order among:
+
+            equipment_fault    status == "available"
+            equipment_restore  status not in ("available", "assigned"),
+                               preferring assets with a fault_code
+
+        An optional ``equipment_type`` hint (e.g. "agv") is a preference, not a
+        filter: matching assets rank first, others remain eligible.  Nothing
+        eligible → ``NO_ELIGIBLE_ASSET`` (409).
+        """
+        world_source = "datapack" if self.world._scenario_world is not None else "yaml"
+        requested = _requested_asset_id(payload)
+        if requested is not None:
+            if requested not in self.world.equipment:
+                raise InjectTargetError(
+                    404,
+                    "ASSET_NOT_IN_ACTIVE_WORLD",
+                    f"asset {requested!r} is not in the active demo world "
+                    f"(scenario={self.scenario_name!r}, source={world_source}); "
+                    "omit asset_id to target an eligible asset",
+                    asset_id=requested,
+                    world_source=world_source,
+                )
+            return requested
+
+        hint = str(payload.get("equipment_type") or "").strip().lower()
+        restore = event_type == "equipment_restore"
+        if restore:
+            rule = "status not in ('available', 'assigned')"
+            eligible = [
+                a
+                for a in self.world.equipment.values()
+                if a.status not in ("available", "assigned")
+            ]
+        else:
+            rule = "status == 'available'"
+            eligible = [
+                a for a in self.world.equipment.values() if a.status == "available"
+            ]
+
+        def rank(a: Any) -> tuple:
+            # False sorts first: faulted (restore only), then hint match, then id.
+            type_miss = bool(hint) and (a.equipment_type or "").lower() != hint
+            faulted_first = (a.fault_code is None,) if restore else ()
+            return (*faulted_first, type_miss, a.asset_id)
+
+        if not eligible:
+            raise InjectTargetError(
+                409,
+                "NO_ELIGIBLE_ASSET",
+                f"no equipment asset eligible for {event_type} in the active demo "
+                f"world (scenario={self.scenario_name!r}, source={world_source}, "
+                f"rule: {rule})",
+                world_source=world_source,
+            )
+        return min(eligible, key=rank).asset_id
 
     # ── pending approvals ─────────────────────────────────────────────────────
 
@@ -609,6 +715,18 @@ class DemoScenarioController:
             asset = self.world.equipment.get(asset_id)
             if asset is None:
                 raise ValueError(f"Asset '{asset_id}' not found")
+            if payload.get("simulate_ambiguous_write"):
+                # F06: the injected fault is in the WRITE path, not the asset.
+                # The next committed write to THIS asset loses its response →
+                # executor UNKNOWN → no retry → reconcile.  The asset stays
+                # operational: an offline asset is refused by the executor's
+                # drift guard, so no write could ever reach the provider.
+                self.providers.equipment.arm_ambiguous_write(asset_id)
+                return {
+                    "asset_id": asset_id,
+                    "status": asset.status,
+                    "ambiguous_write_armed": True,
+                }
             asset.status = payload.get("new_status", "offline")
             asset.fault_code = payload.get("fault_code") or payload.get("fault")
             if "battery_pct" in payload:
@@ -673,6 +791,15 @@ class DemoScenarioController:
             return {"tasks_affected": len(tasks), "zone": zone}
 
         raise ValueError(f"Unknown event type: '{event_type}'")
+
+
+def _requested_asset_id(payload: dict[str, Any]) -> str | None:
+    """The explicitly requested asset_id, or None when omitted / blank."""
+    value = payload.get("asset_id")
+    if value is None:
+        return None
+    value = str(value).strip()
+    return value or None
 
 
 # ── Process singleton ─────────────────────────────────────────────────────────
