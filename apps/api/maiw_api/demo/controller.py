@@ -185,7 +185,8 @@ class DemoScenarioController:
         self._pending_approvals: list[dict] = []
         self._approval_store: InMemoryApprovalStore = InMemoryApprovalStore()
         # Terminal outcomes for pending_ids that have left the queue.
-        # Keys: pending_id → 'executed' | 'rejected' | 'expired'
+        # Keys: pending_id → 'rejected' | 'expired' | 'blocked' | the execution
+        # outcome ('executed' | 'no_op' | 'unknown' | 'failed' | ...)
         # Cleared on start() and reset() so stale entries cannot bleed across runs.
         self._pending_approval_outcomes: dict[str, str] = {}
         # Monotonically-incrementing run identity, reset on start() and reset().
@@ -196,6 +197,11 @@ class DemoScenarioController:
         # Structure: {execution_id, trace_id, outcome, pre_kpi, post_kpi, kpi_delta}
         # None when no execution has completed since last start/reset.
         self._last_execution_record: dict[str, Any] | None = None
+        # execution_ids for which RECONCILIATION_REQUIRED has been published.
+        # Execution ids are process-unique UUIDs and the execution journal
+        # outlives scenario restarts, so this is never cleared: the event is
+        # published exactly once per UNKNOWN execution.
+        self._reconciliation_required_published: set[str] = set()
 
     # ── Properties ───────────────────────────────────────────────────────────
 
@@ -581,11 +587,25 @@ class DemoScenarioController:
     def record_approval_outcome(self, pending_id: str, outcome: str) -> None:
         """Track the terminal outcome of a pending_id for observe_outcome queries.
 
-        outcome: 'executed' | 'rejected' | 'expired'
+        outcome: 'rejected' | 'expired' | 'blocked' (refused before any write:
+        an earlier write to the target is unresolved) | the canonical execution
+        outcome ('executed' | 'no_op' | 'unknown' | 'failed' | 'conflict' |
+        'deferred').  Only 'executed' means the mutation is confirmed.
         Called by the demo router after the approval lifecycle completes.
         Cleared on start() and reset() so stale entries never bleed across runs.
         """
         self._pending_approval_outcomes[pending_id] = outcome
+
+    def claim_reconciliation_required(self, execution_id: str) -> bool:
+        """True the first time ``execution_id`` is claimed, False afterwards.
+
+        Guards the RECONCILIATION_REQUIRED SSE event so it is published exactly
+        once per UNKNOWN execution, whichever demo route observed it.
+        """
+        if not execution_id or execution_id in self._reconciliation_required_published:
+            return False
+        self._reconciliation_required_published.add(execution_id)
+        return True
 
     def set_execution_record(self, record: dict[str, Any]) -> None:
         """Phase 17D: store the last completed execution record for LIVE inspection.

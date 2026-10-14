@@ -33,9 +33,57 @@ import { PRE_EXECUTION_NOTICE } from '../../../constants/authorityStates';
 type ActionStatus = 'approving' | 'rejecting';
 
 interface CardResult {
-  outcome: 'approved' | 'rejected' | 'consumed' | 'error';
+  /** 'unknown' = approved and dispatched, but the execution outcome is UNKNOWN
+   *  (the write may have landed). Never shown as success; reconcile it. */
+  outcome: 'approved' | 'unknown' | 'rejected' | 'consumed' | 'error';
   message: string;
   ok: boolean;
+}
+
+/**
+ * Map a /demo/approve response to the card result. ``status`` is the canonical
+ * execution outcome (executed | no_op | deferred | conflict | unknown | failed)
+ * or a governance status (approved_no_executor, rejected, ...). Only
+ * executed / no_op / approved_no_executor count as success; UNKNOWN is its
+ * own state (executed=null, reconciliation_required) and is never reported
+ * as executed.
+ */
+export function approveResultFor(r: any): CardResult {
+  const execId = r?.execution_id ?? '?';
+  const status: string | undefined = r?.status;
+  if (status === 'unknown' || r?.reconciliation_required === true) {
+    return {
+      outcome: 'unknown',
+      ok: false,
+      message:
+        `Outcome UNKNOWN — exec_id: ${execId}. The write may have been applied; ` +
+        'automatic retry suppressed. Reconcile before acting on this target again.',
+    };
+  }
+  switch (status) {
+    case 'executed':
+      return { outcome: 'approved', ok: true, message: `Executed — exec_id: ${execId}` };
+    case 'no_op':
+      return { outcome: 'approved', ok: true, message: `No change needed (no_op) — exec_id: ${execId}` };
+    case 'approved_no_executor':
+      return { outcome: 'approved', ok: true, message: 'Approved — no executor available' };
+    case 'failed':
+    case 'conflict':
+    case 'deferred':
+      return {
+        outcome: 'error',
+        ok: false,
+        message: `Not executed (${status}) — exec_id: ${execId}${r?.error_code ? ` · ${r.error_code}` : ''}`,
+      };
+    case 'CAPACITY_UNAVAILABLE':
+      return { outcome: 'error', ok: false, message: `Capacity unavailable: ${r?.reason ?? ''}` };
+    default:
+      return {
+        outcome: r?.ok ? 'approved' : 'error',
+        ok: !!r?.ok,
+        message: status ?? 'Unknown status',
+      };
+  }
 }
 
 // ── Freshness tag (inline, smaller variant for card) ──────────────────────────
@@ -66,12 +114,14 @@ function FreshnessTag({ seconds }: { seconds: number | null | undefined }) {
 function ResultBadge({ result }: { result: CardResult }) {
   const COLOR: Record<CardResult['outcome'], string> = {
     approved: '#3FB950',
+    unknown:  '#D29922',
     rejected: '#6E7681',
     consumed: '#D29922',
     error:    '#F85149',
   };
   const LABEL: Record<CardResult['outcome'], string> = {
     approved: 'APPROVED',
+    unknown:  'UNKNOWN — RECONCILE',
     rejected: 'REJECTED',
     consumed: 'CONSUMED',
     error:    'ERROR',
@@ -261,7 +311,7 @@ function ApprovalCard({
                 component="button"
                 data-testid="return-to-copilot-button"
                 onClick={() => onReturnToCopilot({
-                  decision: result.outcome === 'approved' ? 'APPROVED' : 'REJECTED',
+                  decision: result.outcome === 'approved' || result.outcome === 'unknown' ? 'APPROVED' : 'REJECTED',
                   execution: result.message,
                   action: capability,
                 })}
@@ -397,18 +447,14 @@ export default function ApproveStage({
     setStatuses(s => ({ ...s, [pending_id]: 'approving' }));
     try {
       const r = await demoAPI.approvePending(pending_id, 'operator');
-      const outcome: CardResult['outcome'] = r.ok ? 'approved' : 'error';
-      const message =
-        r.status === 'executed'           ? `Executed — exec_id: ${r.execution_id ?? '?'}` :
-        r.status === 'approved_no_executor'? 'Approved — no executor available' :
-        r.status === 'CAPACITY_UNAVAILABLE'? `Capacity unavailable: ${r.reason ?? ''}` :
-        r.status ?? 'Unknown status';
-      setResults(res => ({ ...res, [pending_id]: { outcome, message, ok: r.ok } }));
+      const cardResult = approveResultFor(r);
+      setResults(res => ({ ...res, [pending_id]: cardResult }));
       await queryClient.invalidateQueries({ queryKey: ['demo-status'] });
     } catch (e: any) {
       const status = e?.response?.status;
       const consumed = status === 404;
       const expired  = status === 410;
+      const blocked  = status === 409 && e?.response?.data?.code === 'RECONCILIATION_REQUIRED';
       setResults(res => ({
         ...res,
         [pending_id]: {
@@ -417,6 +463,8 @@ export default function ApproveStage({
             ? 'Approval TTL elapsed — operator must resubmit the governed action'
             : consumed
             ? 'Approval already consumed by another session'
+            : blocked
+            ? `Not executed — an earlier write to this target is UNKNOWN (exec_id: ${e.response.data.execution_id ?? '?'}); reconcile it first`
             : (e?.message ?? 'Request failed'),
           ok: false,
         },
