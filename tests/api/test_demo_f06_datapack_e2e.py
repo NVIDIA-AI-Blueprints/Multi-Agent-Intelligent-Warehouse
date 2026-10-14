@@ -160,7 +160,10 @@ async def test_f06_resolves_datapack_asset_unknown_no_retry_reconciles(demo_app_
         # ── governed write on the resolved asset: analyze → queue → approve ───
         pending_id = await _queue_assign(app, target)
         r = await client.post("/api/v1/demo/approve", json={"pending_id": pending_id})
-        assert r.status_code == 200, r.text
+        assert r.status_code == 202, r.text  # UNKNOWN — never a false success
+        assert r.json()["status"] == "unknown"
+        assert r.json()["executed"] is None
+        assert r.json()["reconciliation_required"] is True
         exec_id = r.json()["execution_id"]
         assert provider._mutation_count == 1  # the mutation DID land
         assert ctrl.world.equipment[target].status == "assigned"
