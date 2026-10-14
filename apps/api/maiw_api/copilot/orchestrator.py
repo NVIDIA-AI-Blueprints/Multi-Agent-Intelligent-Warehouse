@@ -372,7 +372,7 @@ class GovernedActionOrchestrator:
                 reason=req.rationale,
                 requested_by="copilot-operator",
             )
-            return await skill.execute(r, trace_id=trace_id)
+            return await skill.execute(r, trace_id=trace_id, warehouse_id=warehouse_id)
 
         if cap == "warehouse.equipment.release":
             from maiw_decision.proposal import ActionProposal
@@ -382,6 +382,7 @@ class GovernedActionOrchestrator:
                 released_by="copilot-operator",
                 reason=req.rationale,
                 requested_by="copilot-operator",
+                warehouse_id=warehouse_id,
                 trace_id=trace_id,
             )
 
@@ -396,6 +397,7 @@ class GovernedActionOrchestrator:
                 priority=req.priority,
                 reason=req.rationale,
                 requested_by="copilot-operator",
+                warehouse_id=warehouse_id,
                 trace_id=trace_id,
             )
 

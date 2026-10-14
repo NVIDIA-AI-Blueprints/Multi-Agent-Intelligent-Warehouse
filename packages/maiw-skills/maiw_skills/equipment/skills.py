@@ -172,9 +172,16 @@ class EquipmentAssignmentSkill:
         request: EquipmentAssignmentRequest,
         *,
         trace_id: str | None = None,
+        warehouse_id: str = "default",
     ) -> ActionProposal:
         """
         Build an assignment ActionProposal locally.
+
+        ``warehouse_id`` binds the proposal to a warehouse (same keyword as the
+        labor / wave proposal skills).  Callers that queue the proposal for
+        human approval must pass the warehouse the approval is bound to,
+        otherwise ``authorize_with_approval`` rejects it with
+        ``approval.warehouse_mismatch``.
 
         Returns
         -------
@@ -190,6 +197,7 @@ class EquipmentAssignmentSkill:
             notes=request.notes,
             reason=request.reason,
             requested_by=request.requested_by,
+            warehouse_id=warehouse_id,
             trace_id=trace_id,
         )
 
