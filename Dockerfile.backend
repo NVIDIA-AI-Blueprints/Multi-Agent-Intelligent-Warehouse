@@ -1,28 +1,48 @@
-# Backend-only Dockerfile for Development
-# This Dockerfile builds only the backend (no frontend build)
-# Use this for docker-compose.dev.yaml where frontend runs separately
+# Backend (MAIW API) image — published as bpf-maiw-backend.
+# Also used by deploy/compose/docker-compose.dev.yaml (service: backend).
+#
+# Security hardening (NSPECT-NJMX-9GQU):
+#   - Python 3.13 on Debian 13 (trixie), pinned by tag + digest.
+#   - Runtime stage runs `apt-get upgrade` so Debian security fixes published
+#     after the base image was built are applied at build time.
+#   - Runtime stage installs no extra OS packages: no curl (healthcheck uses
+#     Python), no git (.git is excluded from the build context, so git could
+#     never resolve a version here; the version service already falls back to
+#     the VERSION build arg), no poppler-utils (pdf2image is not in
+#     requirements.docker.txt, so nothing in this image can call poppler).
+#   - No build tooling (gcc/g++, pip, setuptools, wheel) is shipped in the
+#     runtime stage.
+#
+# Rebuild periodically (and re-scan): `apt-get upgrade` only picks up fixes
+# that exist in the Debian archive at build time.
+
+ARG PYTHON_IMAGE=python:3.13.16-slim-trixie@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f
 
 # =============================================================================
 # Backend Dependencies Stage
 # =============================================================================
-FROM python:3.11-slim AS backend-deps
+FROM ${PYTHON_IMAGE} AS backend-deps
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# Compilers only for any dependency that has to build from source; this stage
+# is not shipped.
+RUN apt-get update && apt-get install -y --no-install-recommends \
     g++ \
     gcc \
-    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies
 COPY requirements.docker.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
 
-# Install local MAIW packages
+# Install local MAIW packages (maiw-contracts and maiw-world are imported by the
+# demo providers, SOP predicates and the Copilot graph in maiw_api.bootstrap)
 COPY packages/ ./packages/
 RUN pip install --no-cache-dir \
+    packages/maiw-contracts \
+    packages/maiw-world \
     packages/maiw-mcp \
     packages/maiw-state \
     packages/maiw-decision \
@@ -34,20 +54,19 @@ RUN pip install --no-cache-dir \
 # =============================================================================
 # Final Runtime Stage
 # =============================================================================
-FROM python:3.11-slim AS final
+FROM ${PYTHON_IMAGE} AS final
 
 # Set working directory
 WORKDIR /app
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-    curl \
-    git \
-    poppler-utils \
+# Apply all available Debian security updates; no additional OS packages.
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Python dependencies from backend-deps stage
-COPY --from=backend-deps /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=backend-deps /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=backend-deps /usr/local/bin /usr/local/bin
 
 # Copy application code (explicitly copy only necessary directories)
@@ -60,11 +79,22 @@ COPY src/ ./src/
 COPY integrations/ ./integrations/
 COPY agents/ ./agents/
 COPY apps/ ./apps/
+# Demo profile: the in-memory MCP domain servers (mcp_servers/) and the
+# canonical DC-47 warehouse DataPack (data/worlds/) are loaded by
+# maiw_api.bootstrap; without them /api/v1/ready stays 503 in the demo profile.
+COPY mcp_servers/ ./mcp_servers/
+COPY data/worlds/ ./data/worlds/
 # Copy guardrails configuration (required for NeMo Guardrails)
 COPY data/config/guardrails/ ./data/config/guardrails/
 
-# Install the canonical API package
-RUN pip install --no-cache-dir -e apps/api
+# Install the canonical API package (editable: maiw_api resolves agents/,
+# integrations/ and data/ relative to /app). The setuptools build backend is
+# fetched into pip's isolated build environment and is not left in the image.
+# pip itself is then removed: nothing installs packages at runtime, and pip's
+# vendored copies of urllib3 / msgpack / pkg_resources (setuptools) would
+# otherwise be reported by image scanners.
+RUN pip install --no-cache-dir -e apps/api \
+    && python -m pip uninstall -y pip
 
 # Build arguments for version injection
 ARG VERSION=0.0.0
@@ -85,13 +115,12 @@ RUN groupadd -r appuser && \
     chown -R appuser:appuser /app
 USER appuser
 
-# Health check
+# Health check (stdlib only — the image ships no curl/wget)
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8001/api/v1/health || exit 1
+    CMD ["python", "-c", "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8001/api/v1/health', timeout=25).status == 200 else 1)"]
 
 # Expose port
 EXPOSE 8001
 
 # Start command
 CMD ["uvicorn", "maiw_api.app:app", "--host", "0.0.0.0", "--port", "8001"]
-

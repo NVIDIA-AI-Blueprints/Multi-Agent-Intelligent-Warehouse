@@ -1,23 +1,64 @@
-# Frontend Development Dockerfile
-# Runs React development server with hot reload
+# Frontend (MAIW web UI) production image — published as bpf-maiw-frontend.
+# Also used by deploy/compose/docker-compose.dev.yaml (service: frontend).
+#
+# Multi-stage build (NSPECT-NJMX-9GQU):
+#   1. build   — Node 22 (Alpine) runs `npm ci` + `npm run build` (CRA/craco).
+#   2. runtime — non-root nginx (nginx-unprivileged, Alpine) serves the static
+#                build with SPA fallback and reverse-proxies /api to the backend.
+# The runtime image contains no Node.js, no npm and no node_modules
+# (dev or prod): only the compiled static bundle.
+#
+# Runtime configuration:
+#   MAIW_API_UPSTREAM  backend base URL (default http://backend:8001, the
+#                      compose service). Scheme://host:port, no trailing path.
+# Listens on 8080 (unprivileged). Compose publishes it as 3001.
+#
+# The hot-reload development server is not containerised: run it from a
+# checkout with `cd src/ui/web && npm start` (port 3001, proxies /api via
+# src/setupProxy.js).
+#
+# The operator write credential is never baked into the bundle or nginx: UI
+# governed writes get 403 from the API by design (see setupProxy.js).
 
-FROM node:20.19.0-alpine
+ARG NODE_IMAGE=node:22.23.3-alpine3.24@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402
+ARG NGINX_IMAGE=nginxinc/nginx-unprivileged:1.30.5-alpine3.24@sha256:56b8272e43a0525f67aed68d1e0794a712d10e3e45a563e118e9a77c817e6f86
+
+# =============================================================================
+# Build stage (not shipped)
+# =============================================================================
+FROM ${NODE_IMAGE} AS build
 
 WORKDIR /app
 
 # Copy package files (include .npmrc so npm ci matches lockfile; legacy-peer-deps)
-COPY src/ui/web/package*.json ./
-COPY src/ui/web/.npmrc ./
+COPY src/ui/web/package.json src/ui/web/package-lock.json src/ui/web/.npmrc ./
 
-# Install dependencies
-RUN npm ci
+# Full install: the CRA/craco toolchain lives in devDependencies.
+RUN npm ci --no-audit --no-fund
 
-# Copy frontend source
+# Copy frontend source and build the static bundle (no source maps shipped)
 COPY src/ui/web/ ./
+ENV GENERATE_SOURCEMAP=false
+RUN npm run build
 
-# Expose port
-EXPOSE 3001
+# =============================================================================
+# Runtime stage
+# =============================================================================
+FROM ${NGINX_IMAGE} AS runtime
 
-# Start development server
-CMD ["npm", "start"]
+# Apply all available Alpine security updates.
+USER root
+RUN apk upgrade --no-cache
+USER 101
 
+# nginx server block, rendered from env at container start
+COPY deploy/docker/frontend-nginx.conf.template /etc/nginx/templates/default.conf.template
+COPY --from=build /app/build /usr/share/nginx/html
+
+ENV MAIW_API_UPSTREAM=http://backend:8001 \
+    NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD wget -q -O /dev/null http://127.0.0.1:8080/healthz || exit 1
