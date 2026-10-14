@@ -84,6 +84,9 @@ COPY apps/ ./apps/
 # maiw_api.bootstrap; without them /api/v1/ready stays 503 in the demo profile.
 COPY mcp_servers/ ./mcp_servers/
 COPY data/worlds/ ./data/worlds/
+# Committed demo evaluation served by GET /api/v1/demo/counterfactual/result
+# (the UI's "Control vs MAIW" panel).
+COPY artifacts/demo/ ./artifacts/demo/
 # Copy guardrails configuration (required for NeMo Guardrails)
 COPY data/config/guardrails/ ./data/config/guardrails/
 

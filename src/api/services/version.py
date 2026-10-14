@@ -45,7 +45,12 @@ class VersionService:
         """Initialize the version service."""
         self.version = self._get_version()
         self.git_sha = self._get_git_sha()
-        self.build_time = datetime.utcnow().isoformat()
+        env_build_time = os.getenv("BUILD_TIME", "").strip()
+        self.build_time = (
+            env_build_time
+            if env_build_time and env_build_time != "unknown"
+            else datetime.utcnow().isoformat()
+        )
         self.build_info = self._get_build_info()
 
     def _get_version(self) -> str:
@@ -100,6 +105,10 @@ class VersionService:
             FileNotFoundError,
         ) as e:
             logger.warning(f"Could not get git SHA: {e}")
+            # Container images have no git; Dockerfile.backend bakes GIT_SHA in.
+            env_sha = os.getenv("GIT_SHA", "").strip()
+            if env_sha and env_sha != "unknown":
+                return env_sha[:8]
             return "unknown"
 
     def _get_commit_count(self) -> int:
