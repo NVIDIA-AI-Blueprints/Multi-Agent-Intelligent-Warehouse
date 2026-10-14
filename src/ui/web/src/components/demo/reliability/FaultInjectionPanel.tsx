@@ -13,6 +13,14 @@
  * F06 sets simulate_ambiguous_write: the backend arms a one-shot lost-response
  * fault on that asset's next committed write (UNKNOWN → no retry → reconcile).
  * F12/F01 have no direct inject — operator notes walk through manual steps.
+ *
+ * RECONCILE NOW enables when the backend publishes RECONCILIATION_REQUIRED for
+ * a governed execution that ended UNKNOWN (SSE: top-level execution_id/domain
+ * plus a JSON detail with the same ids). It calls POST /demo/reconcile and
+ * renders the authoritative outcome: CONFIRMED_EXECUTED /
+ * CONFIRMED_NOT_EXECUTED / INDETERMINATE. A CONFIRMED_* outcome (from the
+ * response or the matching SSE event) resolves that execution; INDETERMINATE
+ * keeps it open so the operator can reconcile again.
  */
 
 import React, { useState } from 'react';
@@ -20,6 +28,7 @@ import { Box, Typography, CircularProgress } from '@mui/material';
 import { demoAPI } from '../../../services/demoAPI';
 import { SSEEvent, parseEventDetail } from '../../../hooks/useDemoSSE';
 import { describeInjectError, describeInjectTarget } from '../injectFeedback';
+import type { ReconcileResult } from '../../../services/demoAPI';
 
 interface Props {
   scenarioId: string | null;
@@ -89,16 +98,54 @@ function ActionButton({
   );
 }
 
+/** SSE categories that definitively resolve an UNKNOWN execution. */
+const RESOLVED_CATEGORIES = new Set(['CONFIRMED_EXECUTED', 'CONFIRMED_NOT_EXECUTED']);
+
+const OUTCOME_LABEL: Record<string, string> = {
+  confirmed_executed: 'CONFIRMED_EXECUTED',
+  confirmed_not_executed: 'CONFIRMED_NOT_EXECUTED',
+  indeterminate: 'INDETERMINATE',
+};
+
+const OUTCOME_COLOR: Record<string, string> = {
+  confirmed_executed: '#3FB950',
+  confirmed_not_executed: '#F85149',
+  indeterminate: '#F0883E',
+};
+
+function eventExecutionId(ev: SSEEvent): string | null {
+  const d = parseEventDetail(ev);
+  const id = d?.execution_id ?? ev.execution_id;
+  return typeof id === 'string' && id ? id : null;
+}
+
 export default function FaultInjectionPanel({ scenarioId, sseEvents }: Props) {
   const [injectLoading, setInjectLoading] = useState(false);
   const [reconcileLoading, setReconcileLoading] = useState(false);
   const [lastResult, setLastResult] = useState<string | null>(null);
+  const [reconcileResult, setReconcileResult] = useState<ReconcileResult | null>(null);
 
-  // Find an UNKNOWN execution pending reconciliation from SSE
-  const unknownEvent = sseEvents.find(e => e.category === 'RECONCILIATION_REQUIRED');
+  // Executions already resolved: CONFIRMED_* SSE events or a local CONFIRMED_* result.
+  const resolvedIds = new Set<string>();
+  for (const ev of sseEvents) {
+    if (!RESOLVED_CATEGORIES.has(ev.category)) continue;
+    const id = eventExecutionId(ev);
+    if (id) resolvedIds.add(id);
+  }
+  if (reconcileResult && reconcileResult.reconciliation_outcome !== 'indeterminate') {
+    resolvedIds.add(reconcileResult.execution_id);
+  }
+
+  // Newest UNKNOWN execution still pending reconciliation (events are newest-first).
+  const unknownEvent = sseEvents.find(e => {
+    if (e.category !== 'RECONCILIATION_REQUIRED') return false;
+    const id = eventExecutionId(e);
+    return id !== null && !resolvedIds.has(id);
+  });
   const unknownDetail = unknownEvent ? parseEventDetail(unknownEvent) : null;
-  const executionId = unknownDetail?.execution_id ?? unknownEvent?.execution_id ?? null;
+  const executionId = unknownEvent ? eventExecutionId(unknownEvent) : null;
   const domain = unknownDetail?.domain ?? unknownEvent?.domain ?? 'equipment';
+  const unknownTarget = unknownDetail?.target ?? unknownEvent?.asset_id ?? null;
 
   const handleInject = async (fn: () => Promise<any>, label: string) => {
     if (injectLoading) return;
@@ -120,10 +167,10 @@ export default function FaultInjectionPanel({ scenarioId, sseEvents }: Props) {
     setReconcileLoading(true);
     setLastResult(null);
     try {
-      await demoAPI.reconcile(executionId, domain);
-      setLastResult(`Reconcile dispatched for ${executionId}`);
+      const result = await demoAPI.reconcile(executionId, domain);
+      setReconcileResult(result);
     } catch (e: any) {
-      setLastResult(`Reconcile error: ${e?.response?.data?.detail ?? e?.message ?? 'unknown'}`);
+      setLastResult(`Reconcile error: ${describeInjectError(e)}`);
     } finally {
       setReconcileLoading(false);
     }
@@ -220,7 +267,7 @@ export default function FaultInjectionPanel({ scenarioId, sseEvents }: Props) {
           <ActionButton
             label="RECONCILE NOW"
             description={canReconcile
-              ? `Resolve UNKNOWN for execution ${executionId}`
+              ? `Resolve UNKNOWN for execution ${executionId}${unknownTarget ? ` (${unknownTarget})` : ''}`
               : 'Waiting for RECONCILIATION_REQUIRED event...'}
             onClick={handleReconcile}
             disabled={!canReconcile}
@@ -233,6 +280,31 @@ export default function FaultInjectionPanel({ scenarioId, sseEvents }: Props) {
         <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#484F58' }}>
           Select a scenario to see fault controls.
         </Typography>
+      )}
+
+      {reconcileResult && (
+        <Box
+          data-testid="reconcile-result"
+          data-outcome={reconcileResult.reconciliation_outcome}
+          sx={{ mt: 0.5 }}
+        >
+          <Typography sx={{
+            fontFamily: 'monospace', fontSize: '0.65rem', fontWeight: 700,
+            color: OUTCOME_COLOR[reconcileResult.reconciliation_outcome] ?? '#C9D1D9',
+            letterSpacing: '0.06em',
+          }}>
+            {OUTCOME_LABEL[reconcileResult.reconciliation_outcome]
+              ?? reconcileResult.reconciliation_outcome.toUpperCase()}
+          </Typography>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#8B949E' }}>
+            {`execution ${reconcileResult.execution_id} · effective status ${reconcileResult.effective_status}`}
+          </Typography>
+          {reconcileResult.reconciliation_outcome === 'indeterminate' && (
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#F0883E' }}>
+              Manual review required — the target stays blocked.
+            </Typography>
+          )}
+        </Box>
       )}
 
       {lastResult && (
