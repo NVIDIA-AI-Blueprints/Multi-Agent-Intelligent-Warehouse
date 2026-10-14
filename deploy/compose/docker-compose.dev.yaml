@@ -117,33 +117,29 @@ services:
       - kafka
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/api/v1/health"]
+      # The backend image ships no curl; use the Python stdlib.
+      test: ["CMD", "python", "-c", "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8001/api/v1/health', timeout=10).status == 200 else 1)"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
 
-  # Frontend Service (React Development Server)
+  # Frontend Service (production build served by non-root nginx; see
+  # Dockerfile.frontend). nginx listens on 8080 in the container and proxies
+  # /api to MAIW_API_UPSTREAM. For hot reload, run `npm start` in src/ui/web
+  # on the host instead.
   frontend:
     build:
       context: ../..
       dockerfile: Dockerfile.frontend
     container_name: wosa-frontend
     ports:
-      - "3001:3001"
+      - "3001:8080"
     environment:
-      - REACT_APP_API_URL=http://localhost:8001
-      - PORT=3001
-      - HOST=0.0.0.0
-      - CHOKIDAR_USEPOLLING=true
-    volumes:
-      - ../../src/ui/web:/app
-      - /app/node_modules
+      - MAIW_API_UPSTREAM=http://backend:8001
     depends_on:
       - backend
     restart: unless-stopped
-    stdin_open: true
-    tty: true
 
   # Nginx Reverse Proxy
   nginx:
