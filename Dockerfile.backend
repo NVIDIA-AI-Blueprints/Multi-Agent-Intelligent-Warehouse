@@ -37,9 +37,12 @@ COPY requirements.docker.txt ./requirements.txt
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
-# Install local MAIW packages
+# Install local MAIW packages (maiw-contracts and maiw-world are imported by the
+# demo providers, SOP predicates and the Copilot graph in maiw_api.bootstrap)
 COPY packages/ ./packages/
 RUN pip install --no-cache-dir \
+    packages/maiw-contracts \
+    packages/maiw-world \
     packages/maiw-mcp \
     packages/maiw-state \
     packages/maiw-decision \
@@ -76,6 +79,11 @@ COPY src/ ./src/
 COPY integrations/ ./integrations/
 COPY agents/ ./agents/
 COPY apps/ ./apps/
+# Demo profile: the in-memory MCP domain servers (mcp_servers/) and the
+# canonical DC-47 warehouse DataPack (data/worlds/) are loaded by
+# maiw_api.bootstrap; without them /api/v1/ready stays 503 in the demo profile.
+COPY mcp_servers/ ./mcp_servers/
+COPY data/worlds/ ./data/worlds/
 # Copy guardrails configuration (required for NeMo Guardrails)
 COPY data/config/guardrails/ ./data/config/guardrails/
 
