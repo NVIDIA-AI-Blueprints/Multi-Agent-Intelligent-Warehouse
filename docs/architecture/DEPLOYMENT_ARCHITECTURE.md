@@ -102,16 +102,22 @@ External:
 
 | Field | Value |
 |---|---|
-| Dockerfile | `Dockerfile.backend` |
+| Dockerfile | `Dockerfile.backend` (published as `bpf-maiw-backend`) |
+| Base image | `python:3.13.x-slim-trixie` (Debian 13), pinned by digest |
 | Entrypoint | `uvicorn maiw_api.app:app --host 0.0.0.0 --port 8001` |
 | Port | `8001` |
-| Healthcheck | `GET /api/v1/health` |
+| Healthcheck | `GET /api/v1/health` (Python stdlib; the image ships no curl) |
 | Liveness | `GET /api/v1/live` |
 | Readiness | `GET /api/v1/ready` |
+| User | `appuser` (non-root) |
 
-Packages installed in the image: `maiw-mcp`, `maiw-state`, `maiw-decision`,
-`maiw-models`, `maiw-skills`, `maiw-execution`, `maiw-agents` (editable install
-of `apps/api`).
+Packages installed in the image: `maiw-contracts`, `maiw-world`, `maiw-mcp`,
+`maiw-state`, `maiw-decision`, `maiw-models`, `maiw-skills`, `maiw-execution`,
+`maiw-agents` (editable install of `apps/api`). The image also carries
+`mcp_servers/` and the canonical `data/worlds/` DataPack for the demo profile.
+The runtime stage applies `apt-get upgrade` and installs no extra OS packages
+(no curl, git, poppler-utils) and no pip/setuptools/wheel. PDF page rendering
+(`pdf2image` + poppler) is not part of this image.
 
 The API is the **only service that external clients call**. MCP domain servers
 are internal infrastructure — they are not exposed through the ingress.
@@ -139,10 +145,20 @@ scalable. See [Stateless MCP Invariant](#stateless-mcp-invariant).
 
 | Field | Value |
 |---|---|
-| Dockerfile | `Dockerfile.frontend` |
-| Entrypoint | `npm start` |
-| Port | `3001` |
-| API dependency | `REACT_APP_API_URL=http://localhost:8001` |
+| Dockerfile | `Dockerfile.frontend` (published as `bpf-maiw-frontend`) |
+| Build stage | `node:22.x-alpine` — `npm ci` + `npm run build` (not shipped) |
+| Runtime image | `nginxinc/nginx-unprivileged:1.30.x-alpine` (non-root, no Node.js/npm) |
+| Container port | `8080` (compose publishes `3001:8080`) |
+| API dependency | nginx proxies `/api/` to `MAIW_API_UPSTREAM` (default `http://backend:8001`) |
+| Healthcheck | `GET /healthz` |
+
+The image serves the static production build with SPA fallback (deep links
+return `index.html`). It never holds or adds the operator write credential
+(`X-Maiw-Operator-Token`) and strips it from browser requests, so governed
+equipment writes from this UI are refused by the API (`403`, or `503` when no
+operator credential is configured) — by design. The hot-reload development
+server (`npm start` in `src/ui/web`, port 3001, `src/setupProxy.js`) is run
+from a checkout, not from this image.
 
 ### Infrastructure Services
 
