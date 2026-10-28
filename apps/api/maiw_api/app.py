@@ -99,7 +99,12 @@ from src.api.routers.training import router as training_router
 # ── Shared middleware / monitoring (from src, no migration needed) ─────────────
 from src.api.middleware.security_headers import SecurityHeadersMiddleware
 from src.api.services.monitoring.metrics import record_request_metrics
-from src.api.services.security.rate_limiter import get_rate_limiter
+from src.api.services.security.rate_limiter import (
+    FAIL_CLOSED,
+    RateLimiterUnavailable,
+    get_rate_limiter,
+    resolve_fail_mode,
+)
 from src.api.utils.error_handler import (
     handle_generic_exception,
     handle_http_exception,
@@ -194,12 +199,19 @@ _RATE_LIMIT_SKIP = frozenset(
 )
 
 
+def _rate_limiter_unavailable(exc: RateLimiterUnavailable) -> JSONResponse:
+    return JSONResponse(status_code=exc.status_code, content=exc.as_body())
+
+
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     if request.url.path not in _RATE_LIMIT_SKIP:
         try:
             limiter = await get_rate_limiter()
             await limiter.check_rate_limit(request)
+        except RateLimiterUnavailable as exc:
+            # RATE_LIMIT_FAIL_MODE=closed and the limiter could not decide.
+            return _rate_limiter_unavailable(exc)
         except HTTPException as exc:
             # v2.0.1 round 4 (P2-04): answer the limiter's 429 here.  An
             # exception raised from an HTTP middleware bypasses FastAPI's
@@ -210,7 +222,10 @@ async def rate_limit_middleware(request: Request, call_next):
                 headers=getattr(exc, "headers", None) or None,
             )
         except Exception as exc:
+            # The limiter could not even be obtained: same fail-mode policy.
             logger.error("Rate limiting error: %s", exc)
+            if resolve_fail_mode() == FAIL_CLOSED:
+                return _rate_limiter_unavailable(RateLimiterUnavailable())
     return await call_next(request)
 
 
