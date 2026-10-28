@@ -126,7 +126,9 @@ app = FastAPI(
     version=settings.app_version,
     description=settings.app_description,
     lifespan=lifespan,
-    max_request_size=_MAX_REQUEST_SIZE,
+    # No ``max_request_size`` here: FastAPI never had that parameter (it was
+    # silently swallowed by ``**extra`` up to 0.143 and is a TypeError since
+    # 0.162).  Body size is checked by request_size_middleware below.
 )
 
 # ── Exception handlers ────────────────────────────────────────────────────────

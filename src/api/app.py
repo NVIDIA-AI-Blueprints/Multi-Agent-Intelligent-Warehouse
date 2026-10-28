@@ -139,8 +139,8 @@ app = FastAPI(
     title="Warehouse Operational Assistant",
     version="0.1.0",
     lifespan=lifespan,
-    # Request size limits
-    max_request_size=MAX_REQUEST_SIZE,
+    # FastAPI has no ``max_request_size`` parameter (ignored up to 0.143, a
+    # TypeError since 0.162); request_size_middleware below checks sizes.
 )
 
 # Add exception handlers for secure error handling
