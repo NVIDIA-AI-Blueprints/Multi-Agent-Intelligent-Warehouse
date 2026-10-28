@@ -32,6 +32,8 @@ from maiw_contracts.labor import (
     LaborWorkerInfo,
 )
 
+from maiw_mcp.errors import BackendUnavailable, WriteNotApplied
+
 logger = logging.getLogger(__name__)
 
 
@@ -115,33 +117,35 @@ class MAIWLaborAdapter:
     async def execute_labor_allocation(
         self, request: LaborAllocateRequest
     ) -> LaborAllocateResult:
+        if not request.worker_ids:
+            # assign_task() treats a missing worker as "leave queued" and
+            # reports success — never let that pass as an allocation.
+            raise WriteNotApplied(
+                "worker_ids is empty", rejection_code="INVALID_REQUEST"
+            )
         tools = await self._get_tools()
         allocation_id = str(uuid.uuid4())
         try:
-            await tools.assign_task(
+            result = await tools.assign_task(
                 task_id=request.task_id,
-                worker_id=request.worker_ids[0] if request.worker_ids else "",
+                worker_id=request.worker_ids[0],
                 assignment_type="manual",
             )
-            return LaborAllocateResult(
-                success=True,
-                allocation_id=allocation_id,
-                task_id=request.task_id,
-                worker_ids=request.worker_ids,
-                proposal_id=request.proposal_id,
-                decision_id=request.decision_id,
-                source="maiw-backend",
-                message=f"Allocated {len(request.worker_ids)} worker(s) to {request.task_id}",
-            )
         except Exception as exc:
-            logger.error("Labor allocation write failed: %s", exc)
-            return LaborAllocateResult(
-                success=False,
-                allocation_id=None,
-                task_id=request.task_id,
-                worker_ids=request.worker_ids,
-                proposal_id=request.proposal_id,
-                decision_id=request.decision_id,
-                source="maiw-backend",
-                message=str(exc),
-            )
+            raise BackendUnavailable(f"Labor allocation write failed: {exc}") from exc
+        if not (result or {}).get("success"):
+            error = (result or {}).get("error") or "WMS work-queue update failed"
+            if "No WMS connections available" in error:
+                # Returned before any WMS call: certified no mutation.
+                raise WriteNotApplied(error, rejection_code="PRECONDITION_FAILED")
+            raise BackendUnavailable(error)
+        return LaborAllocateResult(
+            success=True,
+            allocation_id=allocation_id,
+            task_id=request.task_id,
+            worker_ids=request.worker_ids,
+            proposal_id=request.proposal_id,
+            decision_id=request.decision_id,
+            source="maiw-backend",
+            message=f"Allocated {len(request.worker_ids)} worker(s) to {request.task_id}",
+        )
