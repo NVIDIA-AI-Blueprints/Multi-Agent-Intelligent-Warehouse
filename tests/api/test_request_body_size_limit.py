@@ -52,7 +52,7 @@ class _ChunkedBody:
 def _small_app():
     """A tiny app behind the middleware; records what its handlers consumed."""
     app = FastAPI()
-    seen = {"persisted": 0, "completed": 0, "calls": 0}
+    seen = {"persisted": 0, "completed": 0, "calls": 0, "swallowed": 0}
 
     @app.post("/echo")
     async def echo(request: Request):
@@ -75,7 +75,7 @@ def _small_app():
         try:
             await request.body()
         except Exception:
-            pass
+            seen["swallowed"] += 1  # deliberately ignored; recorded for the test
         return {"ok": True}
 
     @app.post("/api/v1/document/upload")
@@ -173,6 +173,7 @@ async def test_handler_that_swallows_the_error_still_answers_413():
         resp = await client.post("/swallow", content=_ChunkedBody(REQUEST_LIMIT * 5))
     _assert_413(resp)
     assert seen["calls"] == 1
+    assert seen["swallowed"] == 1
 
 
 # ── Under-limit requests still work ───────────────────────────────────────────
@@ -305,6 +306,11 @@ async def test_shipped_app_rejects_declared_oversize_post(canonical):
     _assert_413(resp)
 
 
+def _no_document_tools():
+    """Dependency override: the upload handler must never run in this test."""
+    return None
+
+
 async def test_shipped_upload_path_allows_bodies_between_the_limits(canonical):
     """An 11 MB chunked multipart upload is over the request limit but under
     the upload limit: it is parsed (422 for the missing form field) — not 413.
@@ -332,7 +338,7 @@ async def test_shipped_upload_path_allows_bodies_between_the_limits(canonical):
         yield tail
 
     async with running_canonical_app() as (app, client):
-        app.dependency_overrides[get_document_tools] = lambda: object()
+        app.dependency_overrides[get_document_tools] = _no_document_tools
         try:
             resp = await client.post(
                 "/api/v1/document/upload",
