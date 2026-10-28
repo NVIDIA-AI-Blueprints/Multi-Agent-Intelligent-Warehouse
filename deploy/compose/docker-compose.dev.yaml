@@ -114,6 +114,15 @@ services:
       - MILVUS_PORT=19530
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - ENVIRONMENT=development
+      # MCP domain servers (below).  Governed writes stay off unless the
+      # deployment opts in: MAIW_DEPLOYMENT_PROFILE=reference_governed plus a
+      # MAIW_OPERATOR_WRITE_TOKEN (>= 32 chars) in deploy/compose/.env.
+      - MAIW_MCP_SERVER_INVENTORY_URL=http://mcp-inventory:8765/mcp
+      - MAIW_MCP_SERVER_EQUIPMENT_URL=http://mcp-equipment:8766/mcp
+      - MAIW_MCP_SERVER_LABOR_URL=http://mcp-labor:8767/mcp
+      - MAIW_MCP_SERVER_WAVE_URL=http://mcp-wave:8768/mcp
+      - MAIW_DEPLOYMENT_PROFILE=${MAIW_DEPLOYMENT_PROFILE:-reference}
+      - MAIW_OPERATOR_WRITE_TOKEN=${MAIW_OPERATOR_WRITE_TOKEN:-}
     volumes:
       # Durable procedure + governance state (MAIW_PERSISTENCE_ROOT default).
       - maiw_state:/var/lib/maiw
@@ -122,6 +131,10 @@ services:
       - redis
       - milvus
       - kafka
+      - mcp-inventory
+      - mcp-equipment
+      - mcp-labor
+      - mcp-wave
     restart: unless-stopped
     healthcheck:
       # The backend image ships no curl; use the Python stdlib.
@@ -178,6 +191,8 @@ services:
       - MAIW_MCP_INVENTORY_HOST=0.0.0.0
       - DB_HOST=timescaledb
       - DB_PORT=5432
+      - PGHOST=timescaledb
+      - PGPORT=5432
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
@@ -206,6 +221,8 @@ services:
       - MAIW_MCP_EQUIPMENT_HOST=0.0.0.0
       - DB_HOST=timescaledb
       - DB_PORT=5432
+      - PGHOST=timescaledb
+      - PGPORT=5432
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
@@ -228,6 +245,8 @@ services:
       - MAIW_MCP_LABOR_HOST=0.0.0.0
       - DB_HOST=timescaledb
       - DB_PORT=5432
+      - PGHOST=timescaledb
+      - PGPORT=5432
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
@@ -250,6 +269,8 @@ services:
       - MAIW_MCP_WAVE_HOST=0.0.0.0
       - DB_HOST=timescaledb
       - DB_PORT=5432
+      - PGHOST=timescaledb
+      - PGPORT=5432
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
