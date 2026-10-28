@@ -116,6 +116,38 @@ def probe(host: str, port: int, timeout: float) -> tuple[str, list[str]]:
     return server, names
 
 
+def call_tool(
+    host: str, port: int, name: str, arguments: dict, timeout: float = 30.0
+) -> tuple[bool, Any]:
+    """
+    ``tools/call`` one tool; return ``(is_error, payload)`` where ``payload``
+    is the tool's JSON text result decoded (or the raw text if not JSON).
+    """
+    ctype, _, body = _post(
+        f"http://{host}:{port}/mcp",
+        {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {"name": name, "arguments": arguments},
+        },
+        {"MCP-Protocol-Version": PROTOCOL_VERSION},
+        timeout,
+    )
+    result = parse_jsonrpc(ctype, body, 3).get("result") or {}
+    texts = [
+        c.get("text", "")
+        for c in result.get("content") or []
+        if c.get("type") == "text"
+    ]
+    text = "\n".join(texts)
+    try:
+        payload: Any = json.loads(text)
+    except ValueError:
+        payload = result.get("structuredContent") or text
+    return bool(result.get("isError")), payload
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[1])
     parser.add_argument("--host", default="localhost")
