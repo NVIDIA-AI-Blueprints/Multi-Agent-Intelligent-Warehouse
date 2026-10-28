@@ -35,6 +35,62 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# What to do when the limiter itself fails (e.g. Redis goes away mid-flight):
+#   open   — log and allow the request (default; availability first)
+#   closed — reject the request with 503 RATE_LIMITER_UNAVAILABLE
+# The limiter's own 429 is unaffected by this setting.
+RATE_LIMIT_FAIL_MODE_ENV = "RATE_LIMIT_FAIL_MODE"
+FAIL_OPEN = "open"
+FAIL_CLOSED = "closed"
+_FAIL_MODES = frozenset({FAIL_OPEN, FAIL_CLOSED})
+
+
+def resolve_fail_mode() -> str:
+    """Read ``RATE_LIMIT_FAIL_MODE``; an unset or invalid value means ``open``."""
+    raw = os.getenv(RATE_LIMIT_FAIL_MODE_ENV, "").split("#")[0].strip().lower()
+    if not raw:
+        return FAIL_OPEN
+    if raw not in _FAIL_MODES:
+        logger.warning(
+            "Invalid %s=%r (expected 'open' or 'closed'); using 'open'",
+            RATE_LIMIT_FAIL_MODE_ENV,
+            raw,
+        )
+        return FAIL_OPEN
+    return raw
+
+
+class RateLimiterUnavailable(HTTPException):
+    """503 returned in ``closed`` fail mode when the limiter cannot decide."""
+
+    code = "RATE_LIMITER_UNAVAILABLE"
+    message = "Rate limiter unavailable; request rejected (RATE_LIMIT_FAIL_MODE=closed)"
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"{self.code}: {self.message}",
+        )
+
+    def as_body(self) -> Dict[str, Any]:
+        return {
+            "error": True,
+            "code": self.code,
+            "message": self.message,
+            "status_code": self.status_code,
+        }
+
+
+def on_limiter_error(context: str, exc: Exception, fail_mode: str) -> bool:
+    """
+    Apply the fail mode to an internal limiter error: log it, then allow the
+    request (``open``) or raise :class:`RateLimiterUnavailable` (``closed``).
+    """
+    logger.error("%s failed (fail mode: %s): %s", context, fail_mode, exc)
+    if fail_mode == FAIL_CLOSED:
+        raise RateLimiterUnavailable() from exc
+    return True
+
 
 class RateLimiter:
     """
@@ -47,6 +103,7 @@ class RateLimiter:
         self.redis_client: Optional[redis.Redis] = None
         self.redis_available = False
         self.in_memory_store: Dict[str, Dict[str, Any]] = {}
+        self.fail_mode = resolve_fail_mode()
         
         # Rate limit configurations (requests per window)
         self.limits = {
@@ -141,7 +198,9 @@ class RateLimiter:
             True if request is allowed, False if rate limited
             
         Raises:
-            HTTPException: If rate limit is exceeded
+            HTTPException: 429 if the rate limit is exceeded;
+                RateLimiterUnavailable (503) on an internal limiter error
+                when RATE_LIMIT_FAIL_MODE=closed
         """
         try:
             client_id = self._get_client_identifier(request)
@@ -166,12 +225,12 @@ class RateLimiter:
         except HTTPException:
             # v2.0.1 round 4 (fourth re-audit P2-04): the limiter's OWN 429 must
             # propagate; it was swallowed by the fail-open handler below, so
-            # the limit was never enforced.
+            # the limit was never enforced.  (Also re-raises the closed-mode
+            # RateLimiterUnavailable from the backend checks.)
             raise
         except Exception as e:
-            logger.error(f"Rate limit check failed: {e}")
-            # On an internal limiter error, allow the request (fail open)
-            return True
+            # Internal limiter error: allow (open) or 503 (closed).
+            return on_limiter_error("Rate limit check", e, self.fail_mode)
 
     async def _check_redis_rate_limit(
         self, key: str, requests_allowed: int, window_seconds: int
@@ -217,8 +276,7 @@ class RateLimiter:
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"Redis rate limit check failed: {e}")
-            return True  # Fail open
+            return on_limiter_error("Redis rate limit check", e, self.fail_mode)
 
     async def _check_memory_rate_limit(
         self, key: str, requests_allowed: int, window_seconds: int
@@ -272,8 +330,7 @@ class RateLimiter:
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"Memory rate limit check failed: {e}")
-            return True  # Fail open
+            return on_limiter_error("Memory rate limit check", e, self.fail_mode)
 
 
 # Global rate limiter instance
