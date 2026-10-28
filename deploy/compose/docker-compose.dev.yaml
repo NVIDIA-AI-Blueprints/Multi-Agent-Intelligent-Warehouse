@@ -104,12 +104,19 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - DB_HOST=timescaledb
       - DB_PORT=5432
+      # The SQL data path and /api/v1/ready connect via PGHOST/PGPORT
+      # (default localhost:5435, which is not reachable inside the container).
+      - PGHOST=timescaledb
+      - PGPORT=5432
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - MILVUS_HOST=milvus
       - MILVUS_PORT=19530
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - ENVIRONMENT=development
+    volumes:
+      # Durable procedure + governance state (MAIW_PERSISTENCE_ROOT default).
+      - maiw_state:/var/lib/maiw
     depends_on:
       - timescaledb
       - redis
@@ -287,5 +294,6 @@ services:
       start_period: 180s
 volumes:
   kafka_data:
+  maiw_state:
   nim_cache:
   nim_models:

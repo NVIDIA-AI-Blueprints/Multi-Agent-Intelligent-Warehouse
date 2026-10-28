@@ -112,10 +112,14 @@ ENV DOCKER_IMAGE=warehouse-assistant:$VERSION
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
-# Create non-root user for security
+# Create non-root user for security.  /var/lib/maiw is the default
+# MAIW_PERSISTENCE_ROOT (procedure + governance state); it must exist and be
+# owned by appuser, or file persistence fails with EACCES and /api/v1/ready
+# reports NOT_READY.  Mount a volume here to keep state across restarts.
 RUN groupadd -r appuser && \
     useradd -r -g appuser appuser && \
-    chown -R appuser:appuser /app
+    mkdir -p /var/lib/maiw && \
+    chown -R appuser:appuser /app /var/lib/maiw
 USER appuser
 
 # Health check (stdlib only — the image ships no curl/wget)
