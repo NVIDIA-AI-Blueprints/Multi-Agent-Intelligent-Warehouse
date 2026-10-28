@@ -304,6 +304,14 @@ The labor and wave MCP servers have no shipped PostgreSQL launch entry point
 in v2.0.1; an equipment-only governed deployment sets
 `MAIW_REQUIRED_MCP_DOMAINS=equipment`.
 
+### Request limits and rate limiting (optional)
+
+| Variable | Default | Notes |
+|---|---|---|
+| `MAX_REQUEST_SIZE` | `10485760` (10 MB) | maximum request body in bytes for every path except uploads. Counted on the bytes actually received, so chunked/streamed bodies without `Content-Length` are cut off too; over the limit → `413` JSON (`"status_code": 413`). A declared `Content-Length` over the limit is rejected before the body is read. |
+| `MAX_UPLOAD_SIZE` | `52428800` (50 MB) | same, for paths containing `/upload` (e.g. `POST /api/v1/document/upload`) |
+| `RATE_LIMIT_FAIL_MODE` | `open` | what the rate limiter does when it fails internally (e.g. Redis becomes unreachable): `open` logs and allows the request; `closed` rejects it with `503` `{"code": "RATE_LIMITER_UNAVAILABLE"}`. Any other value logs a warning and uses `open`. The limiter's own `429` (limit exceeded, with `Retry-After`) applies in both modes; skip-listed health paths are never limited. |
+
 ### Development-Only (NEVER set in reference deployment)
 
 | Variable | Description |
