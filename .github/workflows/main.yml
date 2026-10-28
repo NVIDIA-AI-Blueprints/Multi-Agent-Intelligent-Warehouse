@@ -392,6 +392,24 @@ jobs:
           echo "Testing /api/v1/health/simple..."
           curl -fsS http://localhost:8001/api/v1/health/simple | python3 -m json.tool
 
+          # Readiness gate: /api/v1/live only proves the process is up.
+          # /api/v1/ready returns 200 only when every critical component
+          # (persistence, database, model gateway, ...) is ready, else 503.
+          echo "Waiting for /api/v1/ready (critical components)..."
+          ready_code=000
+          for attempt in $(seq 1 30); do
+            ready_code=$(curl -s -o /tmp/maiw_ready.json -w '%{http_code}' http://localhost:8001/api/v1/ready || true)
+            [ "$ready_code" = "200" ] && break
+            echo "Attempt $attempt/30: /api/v1/ready -> HTTP $ready_code"
+            sleep 2
+          done
+          python3 -m json.tool /tmp/maiw_ready.json || cat /tmp/maiw_ready.json || true
+          if [ "$ready_code" != "200" ]; then
+            echo "❌ /api/v1/ready returned HTTP $ready_code (see failed_components above)"
+            docker logs --tail 80 wosa-backend 2>&1 || true
+            exit 1
+          fi
+
           echo "✅ All health checks passed!"
 
       - name: "Verify: API access points"
@@ -412,8 +430,12 @@ jobs:
 
           echo "✅ Access point verification completed!"
 
+      # A real pytest failure fails the job.  When the internal NGC test image
+      # is unavailable (no key / no org access) the step is skipped, but the
+      # skip is reported as E2E=NOT_RUN in the job summary, annotations and
+      # the result mail rather than passing silently.
       - name: "Post-deploy: Run MAIW pytest (pytest -m maiw)"
-        continue-on-error: true
+        id: maiw_pytest
         env:
           TEST_DOCKER_PULL_KEY: ${{ secrets.TEST_DOCKER_PULL_KEY }}
         run: |
@@ -434,7 +456,9 @@ jobs:
 
           echo "Authenticating to nvcr.io for blueprint-github-test image pull..."
           if [ -z "${TEST_DOCKER_PULL_KEY}" ]; then
-            echo "⚠️ TEST_DOCKER_PULL_KEY not set — skipping MAIW pytest (requires internal NGC access)"
+            echo "::warning title=MAIW pytest NOT RUN::TEST_DOCKER_PULL_KEY not set (requires internal NGC access)"
+            echo "E2E=NOT_RUN" >> "$GITHUB_OUTPUT"
+            echo "### ⚠️ MAIW pytest NOT RUN — TEST_DOCKER_PULL_KEY not set" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           echo "${TEST_DOCKER_PULL_KEY}" | docker login nvcr.io -u '$oauthtoken' --password-stdin
@@ -442,7 +466,9 @@ jobs:
           echo "Pulling blueprint-github-test image for pytest..."
           TEST_IMAGE="nvcr.io/rw983xdqtcdp/auto_test_team/blueprint-github-test-image:latest"
           if ! docker pull "${TEST_IMAGE}"; then
-            echo "⚠️ Could not pull ${TEST_IMAGE} — skipping MAIW pytest (requires internal NGC org access)"
+            echo "::warning title=MAIW pytest NOT RUN::could not pull ${TEST_IMAGE} (requires internal NGC org access)"
+            echo "E2E=NOT_RUN" >> "$GITHUB_OUTPUT"
+            echo "### ⚠️ MAIW pytest NOT RUN — could not pull the internal test image" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
@@ -463,8 +489,12 @@ jobs:
 
           if [ "$PYTEST_EXIT" -eq 0 ]; then
             echo "✅ MAIW pytest completed"
+            echo "E2E=PASSED" >> "$GITHUB_OUTPUT"
+            echo "### ✅ MAIW pytest passed" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "❌ MAIW pytest failed (exit code: ${PYTEST_EXIT})"
+            echo "E2E=FAILED" >> "$GITHUB_OUTPUT"
+            echo "### ❌ MAIW pytest failed (exit code ${PYTEST_EXIT})" >> "$GITHUB_STEP_SUMMARY"
           fi
           exit "$PYTEST_EXIT"
 
@@ -490,7 +520,14 @@ jobs:
         id: set_result
         if: always()  
         run: |
-          echo "RESULT=$(if [ ${{ job.status }} == 'success' ]; then echo 'PASS'; else echo 'FAIL'; fi)" >> $GITHUB_OUTPUT
+          if [ "${{ job.status }}" != "success" ]; then
+            RESULT=FAIL
+          elif [ "${{ steps.maiw_pytest.outputs.E2E }}" = "PASSED" ]; then
+            RESULT=PASS
+          else
+            RESULT="PASS (deployment and readiness only; MAIW pytest NOT RUN)"
+          fi
+          echo "RESULT=${RESULT}" >> $GITHUB_OUTPUT
    
       - name: Send mail
         uses: dawidd6/action-send-mail@6e71c855c9a091d80a519621b9fd3e8d252ca40c
@@ -509,7 +546,8 @@ jobs:
             <p>Hello,</p>
             
             <p>The workflow for repository: <strong>${{ github.repository }}</strong> has completed.<br>
-            <strong>Result:</strong> ${{ steps.set_result.outputs.RESULT }}</p>
+            <strong>Result:</strong> ${{ steps.set_result.outputs.RESULT }}<br>
+            <strong>MAIW pytest:</strong> ${{ steps.maiw_pytest.outputs.E2E || 'NOT_RUN' }}</p>
             
             <p>You can review the details on GitHub:<br>
             <a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}">${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}</a></p>
