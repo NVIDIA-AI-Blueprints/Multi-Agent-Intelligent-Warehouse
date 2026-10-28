@@ -35,12 +35,25 @@ RUN pip install --no-cache-dir \
     packages/maiw-models \
     packages/maiw-state
 
-# Install DB / async drivers needed by adapters
-RUN pip install --no-cache-dir asyncpg python-dotenv
+# Third-party packages the domain backends import (versions as in
+# requirements.docker.txt).  src.retrieval eagerly imports its vector and
+# hybrid retrievers (numpy, pymilvus, tiktoken, redis) and the WMS / ERP /
+# scanning integrations use aiohttp.  The equipment server builds its
+# PostgreSQL provider at startup, so a missing one crash-loops the container.
+RUN pip install --no-cache-dir \
+    asyncpg \
+    python-dotenv \
+    "numpy>=1.24.0" \
+    "pymilvus>=2.3.0" \
+    "tiktoken>=0.7.0" \
+    "redis>=4.0.0" \
+    "aiohttp>=3.13.3"
 
 # Copy only the code paths the MCP servers need
 COPY src/retrieval ./src/retrieval
 COPY src/api/agents ./src/api/agents
+COPY src/api/services ./src/api/services
+COPY src/adapters ./src/adapters
 COPY mcp_servers/__init__.py ./mcp_servers/__init__.py
 COPY mcp_servers/${MCP_DOMAIN} ./mcp_servers/${MCP_DOMAIN}
 

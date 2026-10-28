@@ -14,6 +14,7 @@ from __future__ import annotations
 import ast
 import importlib.util
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -57,6 +58,86 @@ def test_mcp_image_installs_every_maiw_package_servers_import_at_startup():
     for package in installed:
         dirname = package.replace("_", "-")
         assert f"COPY packages/{dirname} ./packages/{dirname}" in dockerfile
+
+
+def _module_file(module: str) -> Path | None:
+    base = REPO_ROOT.joinpath(*module.split("."))
+    for candidate in (base.with_suffix(".py"), base / "__init__.py"):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _repo_imports(path: Path) -> set[str]:
+    """Every ``src.*`` / ``mcp_servers.*`` module a file imports, at any depth."""
+    package = path.relative_to(REPO_ROOT).parts[:-1]
+    found = set()
+    for node in ast.walk(ast.parse(path.read_text())):
+        if isinstance(node, ast.Import):
+            names = [a.name for a in node.names]
+        elif isinstance(node, ast.ImportFrom):
+            if node.level:
+                base = list(package[: len(package) - node.level + 1])
+                prefix = ".".join(base + ([node.module] if node.module else []))
+            else:
+                prefix = node.module or ""
+            names = [prefix] + [f"{prefix}.{a.name}" for a in node.names]
+        else:
+            continue
+        for name in names:
+            if name.split(".")[0] in ("src", "mcp_servers"):
+                parts = name.split(".")
+                found |= {".".join(parts[:i]) for i in range(2, len(parts) + 1)}
+    return found
+
+
+def test_mcp_image_copies_all_repo_code_the_servers_reach():
+    # The adapters import repo code lazily on first use (and equipment builds
+    # its provider at startup), so follow every src.* import transitively.
+    dockerfile = (REPO_ROOT / "Dockerfile.mcp").read_text()
+    copied = [
+        m.group(1).replace("${MCP_DOMAIN}", "{domain}")
+        for m in re.finditer(r"^COPY (src/\S+|mcp_servers/\S+) ", dockerfile, re.M)
+    ]
+    for domain in DOMAINS:
+        roots = [c.format(domain=domain) for c in copied]
+        seen: set[Path] = set()
+        queue = sorted((REPO_ROOT / "mcp_servers" / domain).rglob("*.py"))
+        while queue:
+            path = queue.pop()
+            if path in seen:
+                continue
+            seen.add(path)
+            rel = path.relative_to(REPO_ROOT).as_posix()
+            assert any(
+                rel == r or rel.startswith(r.rstrip("/") + "/") for r in roots
+            ), f"{domain}: {rel} is imported but not copied into the image"
+            for module in _repo_imports(path):
+                target = _module_file(module)
+                if target is not None:
+                    queue.append(target)
+
+
+def test_every_mcp_server_has_a_launch_entry_point():
+    # Dockerfile.mcp runs ``python -m mcp_servers.<domain>.server``; a module
+    # without a __main__ block imports, exits 0 and restart-loops.
+    compose = (REPO_ROOT / "deploy/compose/docker-compose.dev.yaml").read_text()
+    for domain in DOMAINS:
+        source = (REPO_ROOT / "mcp_servers" / domain / "server.py").read_text()
+        mains = [
+            node
+            for node in ast.parse(source).body
+            if isinstance(node, ast.If)
+            and "__main__" in ast.unparse(node.test)
+            and "__name__" in ast.unparse(node.test)
+        ]
+        assert len(mains) == 1, f"{domain}/server.py has no __main__ entry point"
+        block = ast.unparse(mains[0])
+        assert "mcp_server.run('streamable-http'" in block
+        env = f"MAIW_MCP_{domain.upper()}_PORT"
+        default = re.search(rf"{env}', '(\d+)'", block)
+        assert default, f"{domain}: entry point does not read {env}"
+        assert f"{env}={default.group(1)}" in compose
 
 
 def test_deploy_workflow_probes_all_mcp_containers():
