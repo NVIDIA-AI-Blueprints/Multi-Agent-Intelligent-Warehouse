@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from typing import Any
 
 from mcp.server import MCPServer
@@ -164,3 +165,20 @@ async def warehouse_wave_reprioritize(
     except Exception as exc:
         raise BackendUnavailable(f"Wave reprioritization write failed: {exc}") from exc
     return json.dumps(result.model_dump())
+
+
+# ── Entry point ───────────────────────────────────────────────────────────────
+
+if __name__ == "__main__":
+    # Dockerfile.mcp runs ``python -m mcp_servers.wave.server``; without this
+    # block the module only imported, exited 0 and the container restart-looped.
+    transport = os.getenv("MAIW_MCP_TRANSPORT", "stdio")
+    port = int(os.getenv("MAIW_MCP_WAVE_PORT", "8768"))
+    host = os.getenv("MAIW_MCP_WAVE_HOST", "0.0.0.0")
+
+    if transport == "streamable-http":
+        mcp_server.run("streamable-http", host=host, port=port, stateless_http=True)
+    elif transport == "sse":
+        mcp_server.run("sse", host=host, port=port)
+    else:
+        mcp_server.run("stdio")

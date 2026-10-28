@@ -18,21 +18,42 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# Install shared packages first (cacheable layer)
+# Install shared packages first (cacheable layer).  Every maiw_* package the
+# servers import at startup must be here: maiw_contracts (all domains) and
+# maiw_decision (equipment) moved out of maiw-mcp in #94, and without them
+# every server exits with ModuleNotFoundError.  Guarded by
+# tests/api/test_mcp_image.py.
+COPY packages/maiw-contracts ./packages/maiw-contracts
+COPY packages/maiw-decision ./packages/maiw-decision
 COPY packages/maiw-mcp ./packages/maiw-mcp
 COPY packages/maiw-models ./packages/maiw-models
 COPY packages/maiw-state ./packages/maiw-state
 RUN pip install --no-cache-dir \
+    packages/maiw-contracts \
+    packages/maiw-decision \
     packages/maiw-mcp \
     packages/maiw-models \
     packages/maiw-state
 
-# Install DB / async drivers needed by adapters
-RUN pip install --no-cache-dir asyncpg python-dotenv
+# Third-party packages the domain backends import (versions as in
+# requirements.docker.txt).  src.retrieval eagerly imports its vector and
+# hybrid retrievers (numpy, pymilvus, tiktoken, redis) and the WMS / ERP /
+# scanning integrations use aiohttp.  The equipment server builds its
+# PostgreSQL provider at startup, so a missing one crash-loops the container.
+RUN pip install --no-cache-dir \
+    asyncpg \
+    python-dotenv \
+    "numpy>=1.24.0" \
+    "pymilvus>=2.3.0" \
+    "tiktoken>=0.7.0" \
+    "redis>=4.0.0" \
+    "aiohttp>=3.13.3"
 
 # Copy only the code paths the MCP servers need
 COPY src/retrieval ./src/retrieval
 COPY src/api/agents ./src/api/agents
+COPY src/api/services ./src/api/services
+COPY src/adapters ./src/adapters
 COPY mcp_servers/__init__.py ./mcp_servers/__init__.py
 COPY mcp_servers/${MCP_DOMAIN} ./mcp_servers/${MCP_DOMAIN}
 
