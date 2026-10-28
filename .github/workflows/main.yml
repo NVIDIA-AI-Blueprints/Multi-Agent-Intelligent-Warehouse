@@ -412,6 +412,31 @@ jobs:
 
           echo "✅ All health checks passed!"
 
+      # The four MCP domain servers (Dockerfile.mcp) must stay up and answer
+      # MCP initialize + tools/list.  The backend's /api/v1/ready does not
+      # cover them under the reference profile, where no MCP domain is required.
+      - name: "Verify: MCP domain servers"
+        run: |
+          failed=0
+          for c in wosa-mcp-inventory wosa-mcp-equipment wosa-mcp-labor wosa-mcp-wave; do
+            state=$(docker inspect -f '{{.State.Status}} restarts={{.RestartCount}}' "$c" 2>/dev/null || echo "missing")
+            echo "$c: $state"
+            if [ "$state" != "running restarts=0" ]; then
+              echo "❌ $c is not running cleanly; last log lines:"
+              docker logs --tail 30 "$c" 2>&1 || true
+              failed=1
+            fi
+          done
+          [ "$failed" -eq 0 ] || exit 1
+
+          python3 scripts/testing/probe_mcp_servers.py || {
+            for c in wosa-mcp-inventory wosa-mcp-equipment wosa-mcp-labor wosa-mcp-wave; do
+              echo "--- $c"; docker logs --tail 30 "$c" 2>&1 || true
+            done
+            exit 1
+          }
+          echo "✅ All MCP domain servers answered"
+
       - name: "Verify: API access points"
         run: |
           echo "Verifying all API access points per DEPLOYMENT.md..."
