@@ -59,6 +59,7 @@ from fastapi.responses import JSONResponse
 
 from maiw_api.config import settings
 from maiw_api.lifespan import lifespan
+from maiw_api.request_size import RequestBodySizeLimitMiddleware
 from maiw_api.write_auth import TypedHTTPError
 
 # ── Canonical routers ─────────────────────────────────────────────────────────
@@ -128,7 +129,7 @@ app = FastAPI(
     lifespan=lifespan,
     # No ``max_request_size`` here: FastAPI never had that parameter (it was
     # silently swallowed by ``**extra`` up to 0.143 and is a TypeError since
-    # 0.162).  Body size is checked by request_size_middleware below.
+    # 0.162).  Body size is enforced by RequestBodySizeLimitMiddleware below.
 )
 
 # ── Exception handlers ────────────────────────────────────────────────────────
@@ -213,28 +214,15 @@ async def rate_limit_middleware(request: Request, call_next):
     return await call_next(request)
 
 
-@app.middleware("http")
-async def request_size_middleware(request: Request, call_next):
-    content_length = request.headers.get("content-length")
-    if content_length:
-        try:
-            size = int(content_length)
-            max_size = (
-                _MAX_UPLOAD_SIZE
-                if (
-                    "/document/upload" in request.url.path
-                    or "/upload" in request.url.path
-                )
-                else _MAX_REQUEST_SIZE
-            )
-            if size > max_size:
-                raise HTTPException(
-                    status_code=413,
-                    detail=f"Request too large: {size} bytes (max {max_size})",
-                )
-        except ValueError:
-            pass
-    return await call_next(request)
+# Request body size: a pure ASGI middleware that counts the bytes actually
+# received (chunked/streamed bodies included) and answers 413 itself — see
+# maiw_api.request_size.  Registered here to keep its place in the stack
+# (inside metrics, outside the rate limiter).
+app.add_middleware(
+    RequestBodySizeLimitMiddleware,
+    max_request_size=_MAX_REQUEST_SIZE,
+    max_upload_size=_MAX_UPLOAD_SIZE,
+)
 
 
 @app.middleware("http")
