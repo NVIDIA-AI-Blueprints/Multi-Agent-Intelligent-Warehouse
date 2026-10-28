@@ -18,11 +18,19 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# Install shared packages first (cacheable layer)
+# Install shared packages first (cacheable layer).  Every maiw_* package the
+# servers import at startup must be here: maiw_contracts (all domains) and
+# maiw_decision (equipment) moved out of maiw-mcp in #94, and without them
+# every server exits with ModuleNotFoundError.  Guarded by
+# tests/api/test_mcp_image.py.
+COPY packages/maiw-contracts ./packages/maiw-contracts
+COPY packages/maiw-decision ./packages/maiw-decision
 COPY packages/maiw-mcp ./packages/maiw-mcp
 COPY packages/maiw-models ./packages/maiw-models
 COPY packages/maiw-state ./packages/maiw-state
 RUN pip install --no-cache-dir \
+    packages/maiw-contracts \
+    packages/maiw-decision \
     packages/maiw-mcp \
     packages/maiw-models \
     packages/maiw-state
