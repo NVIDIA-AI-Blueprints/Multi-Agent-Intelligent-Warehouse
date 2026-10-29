@@ -15,9 +15,9 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 
 import pytest
-
 from maiw_contracts.labor import (
     LaborAllocateRequest,
+    LaborAllocateResult,
     LaborAllocationRequest,
     LaborCapacityRequest,
 )
@@ -27,6 +27,7 @@ from maiw_contracts.wave import (
     WaveRiskRequest,
 )
 from maiw_mcp.errors import BackendUnavailable, WriteNotApplied
+
 from mcp_servers.labor.adapters.maiw_backend import MAIWLaborAdapter
 from mcp_servers.labor.adapters.postgres_backend import PostgresLaborProvider
 from mcp_servers.wave.adapters.maiw_backend import MAIWWaveAdapter
@@ -170,6 +171,19 @@ async def test_labor_allocate_writes_assignee_and_allocation_record():
     record = json.loads(params[1])["last_allocation"]
     assert record["allocation_id"] == result.allocation_id
     assert record["execution_id"] == "e-1" and record["proposal_id"] == "p-1"
+    assert "priority" not in json.loads(params[1])
+
+
+async def test_labor_allocate_overwrites_priority_only_when_requested():
+    sql = FakeSQL(
+        {"FROM tasks WHERE id": [task(7)], "FROM users": [{"username": "op1"}]}
+    )
+    request = LaborAllocateRequest(
+        **allocate().model_dump(exclude={"priority"}), priority="high"
+    )
+    await PostgresLaborProvider(sql).execute_labor_allocation(request)
+    [(_, _, params)] = sql.writes
+    assert json.loads(params[1])["priority"] == "high"
 
 
 @pytest.mark.parametrize(
@@ -401,3 +415,84 @@ def test_servers_default_to_postgres_and_allow_wms(domain, monkeypatch):
     monkeypatch.setenv(server.BACKEND_ENV, "oracle")
     with pytest.raises(ValueError):
         server._build_default_provider()
+
+
+# ── Allocation must not reset the task's priority (deployment smoke finding) ──
+
+
+class _RecordingProvider:
+    def __init__(self):
+        self.requests = []
+
+    async def execute_labor_allocation(self, request):
+        self.requests.append(request)
+        return LaborAllocateResult(
+            success=True, task_id=request.task_id, worker_ids=["op1"], **GOV
+        )
+
+
+@pytest.mark.parametrize("priority, expected", [(None, set()), ("high", {"priority"})])
+async def test_labor_tool_forwards_priority_only_when_given(
+    monkeypatch, priority, expected
+):
+    from mcp_servers.labor import server
+
+    provider = _RecordingProvider()
+    monkeypatch.setattr(server, "_provider", provider)
+    kwargs = {"priority": priority} if priority else {}
+    await server.warehouse_labor_allocate(
+        warehouse_id="default",
+        task_id="7",
+        task_type="pick",
+        worker_ids=["op1"],
+        **GOV,
+        **kwargs,
+    )
+    [request] = provider.requests
+    assert request.model_fields_set & {"priority"} == expected
+
+
+@pytest.mark.parametrize("priority, sent", [(None, False), ("high", True)])
+async def test_labor_skill_omits_default_priority_from_mcp_payload(priority, sent):
+    from maiw_skills.labor.skills import ExecuteLaborAllocationSkill
+
+    class Client:
+        payload = None
+
+        async def invoke(self, name, payload):
+            Client.payload = payload
+            return {"success": True, "task_id": "7", "worker_ids": ["op1"], **GOV}
+
+    request = allocate()
+    if priority:
+        request = LaborAllocateRequest(
+            **allocate().model_dump(exclude={"priority"}), priority=priority
+        )
+    await ExecuteLaborAllocationSkill(Client()).execute(request)
+    assert ("priority" in Client.payload) is sent
+
+
+@pytest.mark.parametrize(
+    "params, expected", [({}, set()), ({"priority": "high"}, {"priority"})]
+)
+async def test_labor_executor_forwards_priority_only_from_proposal(params, expected):
+    from types import SimpleNamespace
+
+    from src.api.agents.operations.labor_executor import LaborActionExecutor
+
+    seen = []
+
+    class Skill:
+        async def execute(self, request):
+            seen.append(request)
+            return LaborAllocateResult(
+                success=True, task_id=request.task_id, worker_ids=["op1"], **GOV
+            )
+
+    proposal = SimpleNamespace(
+        parameters={"task_id": "7", "worker_ids": ["op1"], **params},
+        proposal_id="p-1",
+    )
+    executor = LaborActionExecutor(allocate_skill=Skill())
+    await executor._do_allocate(proposal, SimpleNamespace(result_id="d-1"))
+    assert seen[0].model_fields_set & {"priority"} == expected

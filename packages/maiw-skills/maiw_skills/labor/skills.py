@@ -134,6 +134,9 @@ class ExecuteLaborAllocationSkill:
         request: LaborAllocateRequest,
     ) -> LaborAllocateResult:
         payload = request.model_dump(exclude_none=True)
+        if "priority" not in request.model_fields_set:
+            # The contract default must not overwrite the task's own priority.
+            payload.pop("priority", None)
         raw = await self._client.invoke(LABOR_ALLOCATE_METADATA.name, payload)
         try:
             return LaborAllocateResult.model_validate(raw)

@@ -56,9 +56,11 @@ class SmokeFailure(AssertionError):
     pass
 
 
-def check(condition: bool, message: str) -> None:
+def check(condition: bool, message: str, observed: Any = None) -> None:
     if not condition:
-        raise SmokeFailure(message)
+        raise SmokeFailure(
+            message if observed is None else f"{message} — observed {observed!r}"
+        )
     print(f"  ✅ {message}")
 
 
@@ -267,6 +269,7 @@ async def mcp_tools(args: argparse.Namespace) -> None:
             wave.get("total_tasks") == 2
             and {t["priority"] for t in wave["tasks"]} == {"low"},
             "wave.get returns both fixture tasks at priority low",
+            {t["task_id"]: t["priority"] for t in wave.get("tasks", [])},
         )
         risk = _ok(args, "wave", "warehouse.wave.get_risk", wave_id=ids["wave"])
         check(

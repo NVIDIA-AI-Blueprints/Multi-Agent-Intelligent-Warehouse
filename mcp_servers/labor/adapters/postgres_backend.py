@@ -253,7 +253,9 @@ class PostgresLaborProvider:
                     "execution_id": request.execution_id,
                 }
                 update = {"assigned_workers": workers, "last_allocation": record}
-                if request.priority:
+                # ``priority`` defaults to "medium" in the contract; only an
+                # explicitly requested priority may overwrite the task's own.
+                if "priority" in request.model_fields_set:
                     update["priority"] = request.priority
                 if request.notes:
                     update["allocation_notes"] = request.notes

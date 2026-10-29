@@ -169,19 +169,21 @@ async def warehouse_labor_allocate(
     proposal_id: str,
     decision_id: str,
     zone: str | None = None,
-    priority: str = "medium",
+    priority: str | None = None,
     notes: str | None = None,
     execution_id: str | None = None,
 ) -> str:
     provider = _get_provider()
+    # Omitted priority stays unset so the provider keeps the task's own.
+    explicit = {"priority": priority} if priority is not None else {}
     req = LaborAllocateRequest(
         warehouse_id=warehouse_id,
         task_id=task_id,
         task_type=task_type,
         worker_ids=worker_ids,
         zone=zone,
-        priority=priority,
         notes=notes,
+        **explicit,
         proposal_id=proposal_id,
         decision_id=decision_id,
         execution_id=execution_id,

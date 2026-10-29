@@ -140,14 +140,17 @@ class LaborActionExecutor:
         from maiw_contracts.labor import LaborAllocateRequest
 
         params = proposal.parameters
+        # Forward priority only when the proposal sets one; otherwise the
+        # allocation keeps the task's existing priority.
+        explicit = {"priority": params["priority"]} if params.get("priority") else {}
         req = LaborAllocateRequest(
             warehouse_id=params.get("warehouse_id", "default"),
             task_id=params["task_id"],
             task_type=params.get("task_type", "PICK"),
             worker_ids=params.get("worker_ids", []),
             zone=params.get("zone"),
-            priority=params.get("priority", "medium"),
             notes=params.get("notes"),
+            **explicit,
             proposal_id=proposal.proposal_id,
             decision_id=decision.result_id,
         )
