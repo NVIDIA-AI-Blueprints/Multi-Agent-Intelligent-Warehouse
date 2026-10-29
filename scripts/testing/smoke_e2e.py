@@ -313,11 +313,15 @@ async def mcp_tools(args: argparse.Namespace) -> None:
 def _api(
     args, method: str, path: str, body: dict | None = None, headers: dict | None = None
 ):
+    # Under reference_governed the executions API is operator-only too, so
+    # every call carries the operator token (never printed).
+    token = os.environ.get("MAIW_OPERATOR_WRITE_TOKEN", "")
+    auth = {"X-Maiw-Operator-Token": token} if token else {}
     request = urllib.request.Request(
         f"{args.api}{path}",
         data=json.dumps(body).encode() if body is not None else None,
         method=method,
-        headers={"Content-Type": "application/json", **(headers or {})},
+        headers={"Content-Type": "application/json", **auth, **(headers or {})},
     )
     try:
         with urllib.request.urlopen(request, timeout=60) as response:
@@ -393,8 +397,11 @@ async def durability_create(args: argparse.Namespace) -> None:
     execution_id = body["execution_id"]
     status, record = _api(args, "GET", f"/api/v1/executions/{execution_id}")
     check(
-        status == 200 and record.get("execution_id") == execution_id,
+        status == 200
+        and isinstance(record, dict)
+        and record.get("execution_id") == execution_id,
         "GET /api/v1/executions/{id} serves the new record",
+        None if status == 200 else f"HTTP {status}: {str(record)[:200]}",
     )
     check(
         record.get("domain") == "equipment"
