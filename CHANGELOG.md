@@ -1,3 +1,35 @@
+## [2.1.0] — Unreleased (draft, not tagged)
+
+Candidate: `main` `b8b0a13`. Changes since [v2.0.1](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/releases/tag/v2.0.1). Full notes: [RELEASE_NOTES_v2.1.0.md](RELEASE_NOTES_v2.1.0.md).
+
+### Features
+
+* PostgreSQL labor and wave MCP providers. They are the default and the Compose reference backend; the WMS adapters remain available with `MAIW_MCP_LABOR_BACKEND` / `MAIW_MCP_WAVE_BACKEND=wms` ([#156](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/156))
+* The deployment workflow now blocks on public end-to-end checks: MCP tool calls in all four domains (reads, plus writes in equipment, labor and wave, each verified in the DB), and execution-record durability across a backend restart ([#156](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/156))
+* Configurable rate-limiter fail mode, `RATE_LIMIT_FAIL_MODE=open|closed` (default `open`) ([#153](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/153))
+
+### Bug Fixes
+
+* labor: an allocation no longer resets the task's priority to `medium` ([#156](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/156))
+* mcp: the WMS labor and wave adapters report `NOT_APPLIED` instead of false success ([#156](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/156))
+* mcp: the MCP domain containers crashed at startup; all four now start, and the deployment workflow probes them ([#155](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/155))
+* deploy: the Compose backend has durable state (`maiw_state` volume) and database access, and the deployment gates on `/api/v1/ready`. The internal NGC pytest step reports NOT_RUN instead of passing silently ([#154](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/154))
+* api: fixed the startup crash on FastAPI 0.162; the request-size limit is now enforced on chunked/streamed bodies ([#153](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/153))
+* demo: the F06 ambiguous-write flow works end to end, and `/demo/approve` reports the real outcome ([#152](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/152))
+* demo: fault-injection targets resolve from the active DataPack world ([#148](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/148))
+* deploy: replaced the unavailable MinIO image with a pinned `pgsty/minio` ([#150](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/150))
+* image: the backend image ships the demo evaluation artifact, and `/version` reports the build `GIT_SHA` ([#151](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/151))
+* security: hardened the backend and frontend images (NSPECT-NJMX-9GQU) ([#149](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/149))
+
+### Documentation
+
+* aligned the v2.0.1 notes and setup guidance ([#147](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/147))
+
+### Verification
+
+* On `b8b0a13`: CORE CI 3219 passed / 13 skipped; Jest 991/991; CodeQL and Security Scan passed; the Compose deployment test passed, including both end-to-end steps.
+* The internal NGC MAIW pytest suite did **not** run: the test image could not be pulled without internal NGC access.
+
 ## [1.0.0](https://github.com/T-DevH/warehouse-operational-assistant/compare/v0.1.0...v1.0.0) (2025-11-16)
 
 ### Features
