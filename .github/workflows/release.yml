@@ -1,53 +1,53 @@
-name: Release
+name: Release preview
+
+# Releases are cut by a maintainer, never by CI. This workflow only
+# previews what semantic-release would compute (next version and
+# generated notes) from the conventional commits since the last tag.
+# It always runs with --dry-run: it creates no tag, no GitHub release
+# and no commit. See docs/operations/RELEASING.md for the procedure.
 
 on:
   workflow_dispatch:
-    inputs:
-      version_type:
-        description: 'Version bump type'
-        required: true
-        default: 'patch'
-        type: choice
-        options:
-        - patch
-        - minor
-        - major
-        - prerelease
+
+concurrency:
+  group: release-preview
+  cancel-in-progress: false
 
 jobs:
-  release:
-    name: Create Release
+  preview:
+    name: Release preview (dry run)
     runs-on: ubuntu-latest
-    
+    if: github.ref == 'refs/heads/main'
+    # semantic-release checks push access even in dry-run mode; nothing
+    # is pushed because --dry-run skips the prepare and publish steps.
+    permissions:
+      contents: write
+      issues: read
+      pull-requests: read
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
         token: ${{ secrets.GITHUB_TOKEN }}
-    
+
+    # semantic-release requires Node ^22.14.0 (see semantic-release docs/support/node-version.md)
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '22'
         cache: 'npm'
         cache-dependency-path: package-lock.json
-    
+
     - name: Install dependencies
       run: npm ci
-    
-    - name: Configure Git
-      run: |
-        git config --global user.name "github-actions[bot]"
-        git config --global user.email "github-actions[bot]@users.noreply.github.com"
-    
-    - name: Create release
-      run: |
-        if [ "${{ github.event.inputs.version_type }}" = "prerelease" ]; then
-          npx semantic-release --no-ci --dry-run
-        else
-          npx semantic-release --no-ci
-        fi
+      env:
+        HUSKY: '0'
+
+    - name: Preview release (dry run)
+      run: >-
+        npx semantic-release --dry-run --no-ci
+        --repository-url "${{ github.server_url }}/${{ github.repository }}.git"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
