@@ -25,6 +25,8 @@ from maiw_contracts.wave import (
     WaveTaskInfo,
 )
 
+from maiw_mcp.errors import WriteNotApplied
+
 logger = logging.getLogger(__name__)
 
 
@@ -129,29 +131,11 @@ class MAIWWaveAdapter:
     async def execute_wave_reprioritize(
         self, request: WaveReprioritizeRequest
     ) -> WaveReprioritizeResult:
-        wms = await self._get_wms()
-        wave_result = await self.get_wave(
-            WaveGetRequest(
-                warehouse_id=request.warehouse_id,
-                wave_id=request.wave_id,
-                zone=request.zone,
-            )
-        )
-        updated = 0
-        for task in wave_result.tasks:
-            try:
-                await wms.update_task_status(task.task_id, status=task.status)
-                updated += 1
-            except Exception as exc:
-                logger.warning("Failed to update task %s: %s", task.task_id, exc)
-
-        return WaveReprioritizeResult(
-            success=True,
-            tasks_updated=updated,
-            wave_id=request.wave_id,
-            new_priority=request.new_priority,
-            proposal_id=request.proposal_id,
-            decision_id=request.decision_id,
-            source="maiw-wms",
-            message=f"Reprioritized {updated} task(s) to '{request.new_priority}'",
+        # The WMS integration exposes no task-priority update; this method used
+        # to re-send each task's current status and report success.  Refuse
+        # before any WMS call so the outcome is a certified NOT_APPLIED.
+        raise WriteNotApplied(
+            "The WMS wave backend cannot set task priority "
+            "(use MAIW_MCP_WAVE_BACKEND=postgres)",
+            rejection_code="PRECONDITION_FAILED",
         )

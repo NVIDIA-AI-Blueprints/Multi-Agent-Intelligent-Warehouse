@@ -73,10 +73,26 @@ def _get_provider() -> Any:
     return _provider
 
 
+BACKEND_ENV = "MAIW_MCP_WAVE_BACKEND"
+
+
 def _build_default_provider() -> Any:
-    from mcp_servers.wave.adapters.maiw_backend import MAIWWaveAdapter
-    logger.info("WaveMCPServer: using MAIWWaveAdapter (WMS backend)")
-    return MAIWWaveAdapter()
+    """
+    ``postgres`` (default): the MAIW warehouse database (``tasks`` / ``users``).
+    ``wms``: the external-WMS integration, which needs a connected WMS.
+    """
+    backend = os.getenv(BACKEND_ENV, "postgres").strip().lower()
+    if backend == "wms":
+        from mcp_servers.wave.adapters.maiw_backend import MAIWWaveAdapter
+
+        logger.info("WaveMCPServer: using MAIWWaveAdapter (WMS backend)")
+        return MAIWWaveAdapter()
+    if backend != "postgres":
+        raise ValueError(f"{BACKEND_ENV}={backend!r} is not one of postgres, wms")
+    from mcp_servers.wave.adapters.postgres_backend import PostgresWaveProvider
+
+    logger.info("WaveMCPServer: using PostgresWaveProvider (PostgreSQL backend)")
+    return PostgresWaveProvider()
 
 
 # ── Tools ─────────────────────────────────────────────────────────────────────

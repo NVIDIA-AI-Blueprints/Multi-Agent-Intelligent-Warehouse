@@ -92,6 +92,14 @@ jobs:
           echo "NVIDIA_API_KEY=${NVIDIA_API_KEY}" >> deploy/compose/.env
           echo "LLM_NIM_URL=https://integrate.api.nvidia.com/v1" >> deploy/compose/.env
 
+          # Governed writes for the e2e smoke / durability steps: the backend
+          # executes approved writes through the MCP containers and journals
+          # them.  The operator write token is random per run and masked.
+          sed -i 's/^MAIW_DEPLOYMENT_PROFILE=.*/MAIW_DEPLOYMENT_PROFILE=reference_governed/' deploy/compose/.env
+          OPERATOR_TOKEN=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+          echo "::add-mask::${OPERATOR_TOKEN}"
+          echo "MAIW_OPERATOR_WRITE_TOKEN=${OPERATOR_TOKEN}" >> deploy/compose/.env
+
           echo "✅ .env file configured at deploy/compose/.env"
 
           # scripts/setup/dev_up.sh sources and edits .env in the repository root (cwd), not deploy/compose/.env
@@ -436,6 +444,60 @@ jobs:
             exit 1
           }
           echo "✅ All MCP domain servers answered"
+
+      # Public end-to-end smoke (no internal images): disposable fixture rows,
+      # a read tool in every domain, a write tool in equipment/labor/wave, and
+      # each outcome checked in the tool result, the database and a read-back.
+      - name: "E2E: MCP tool calls"
+        run: |
+          source env/bin/activate
+          set -a && source deploy/compose/.env && set +a
+          python scripts/testing/smoke_e2e.py mcp-tools || {
+            for c in wosa-mcp-inventory wosa-mcp-equipment wosa-mcp-labor wosa-mcp-wave; do
+              echo "--- $c"; docker logs --tail 40 "$c" 2>&1 || true
+            done
+            exit 1
+          }
+
+      # Durability: create an execution record through the app (governed
+      # equipment release), restart the backend, read the same record back.
+      - name: "E2E: durability across backend restart"
+        run: |
+          source env/bin/activate
+          set -a && source deploy/compose/.env && set +a
+          STATE="${RUNNER_TEMP}/maiw_durability_record.json"
+          python scripts/testing/smoke_e2e.py durability-create --state-file "$STATE" || {
+            docker logs --tail 80 wosa-backend 2>&1 || true
+            exit 1
+          }
+
+          before=$(docker inspect -f '{{.State.StartedAt}}' wosa-backend)
+          docker restart wosa-backend
+          after=$(docker inspect -f '{{.State.StartedAt}}' wosa-backend)
+          echo "wosa-backend StartedAt: $before -> $after"
+          if [ "$before" = "$after" ]; then
+            echo "❌ wosa-backend did not restart"
+            exit 1
+          fi
+
+          ready_code=000
+          for attempt in $(seq 1 45); do
+            ready_code=$(curl -s -o /tmp/maiw_ready_restart.json -w '%{http_code}' http://localhost:8001/api/v1/ready || true)
+            [ "$ready_code" = "200" ] && break
+            sleep 2
+          done
+          if [ "$ready_code" != "200" ]; then
+            echo "❌ /api/v1/ready returned HTTP $ready_code after restart"
+            cat /tmp/maiw_ready_restart.json || true
+            docker logs --tail 80 wosa-backend 2>&1 || true
+            exit 1
+          fi
+          echo "✅ backend READY after restart"
+
+          python scripts/testing/smoke_e2e.py durability-verify --state-file "$STATE" || {
+            docker logs --tail 80 wosa-backend 2>&1 || true
+            exit 1
+          }
 
       - name: "Verify: API access points"
         run: |

@@ -82,10 +82,26 @@ def _get_provider() -> Any:
     return _provider
 
 
+BACKEND_ENV = "MAIW_MCP_LABOR_BACKEND"
+
+
 def _build_default_provider() -> Any:
-    from mcp_servers.labor.adapters.maiw_backend import MAIWLaborAdapter
-    logger.info("LaborMCPServer: using MAIWLaborAdapter (PostgreSQL/WMS backend)")
-    return MAIWLaborAdapter()
+    """
+    ``postgres`` (default): the MAIW warehouse database (``tasks`` / ``users``).
+    ``wms``: the external-WMS integration, which needs a connected WMS.
+    """
+    backend = os.getenv(BACKEND_ENV, "postgres").strip().lower()
+    if backend == "wms":
+        from mcp_servers.labor.adapters.maiw_backend import MAIWLaborAdapter
+
+        logger.info("LaborMCPServer: using MAIWLaborAdapter (WMS backend)")
+        return MAIWLaborAdapter()
+    if backend != "postgres":
+        raise ValueError(f"{BACKEND_ENV}={backend!r} is not one of postgres, wms")
+    from mcp_servers.labor.adapters.postgres_backend import PostgresLaborProvider
+
+    logger.info("LaborMCPServer: using PostgresLaborProvider (PostgreSQL backend)")
+    return PostgresLaborProvider()
 
 
 # ── Tools ─────────────────────────────────────────────────────────────────────
@@ -153,19 +169,21 @@ async def warehouse_labor_allocate(
     proposal_id: str,
     decision_id: str,
     zone: str | None = None,
-    priority: str = "medium",
+    priority: str | None = None,
     notes: str | None = None,
     execution_id: str | None = None,
 ) -> str:
     provider = _get_provider()
+    # Omitted priority stays unset so the provider keeps the task's own.
+    explicit = {"priority": priority} if priority is not None else {}
     req = LaborAllocateRequest(
         warehouse_id=warehouse_id,
         task_id=task_id,
         task_type=task_type,
         worker_ids=worker_ids,
         zone=zone,
-        priority=priority,
         notes=notes,
+        **explicit,
         proposal_id=proposal_id,
         decision_id=decision_id,
         execution_id=execution_id,

@@ -182,6 +182,7 @@ LABOR_ALLOCATE_METADATA = CapabilityMetadata(
         "Execute an approved labor allocation write. "
         "Assigns one or more workers to a task in a zone. "
         "Must be called only with a bound APPROVED DecisionResult (proposal_id + decision_id). "
-        "Writes to the work queue table via WMS integration."
+        "Writes the task assignment to the MAIW tasks table (PostgreSQL "
+        "backend) or, with MAIW_MCP_LABOR_BACKEND=wms, the WMS work queue."
     ),
 )
