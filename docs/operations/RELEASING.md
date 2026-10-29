@@ -36,11 +36,16 @@ NOT RUN in the release notes; do not omit it.
 ## 4. Finalize the notes
 
 Release notes live in `RELEASE_NOTES_vX.Y.Z.md` with a matching
-`CHANGELOG.md` entry. Before tagging, remove the draft markers and name the
-commit being tagged, which is the merge commit of the notes PR, not the
-earlier validated code commit. Merge the notes PR.
+`CHANGELOG.md` entry. In the notes, identify the validated code commit (the
+candidate from step 1) and the gate results. Remove the draft markers once
+publication is approved. The notes do not name the tagged commit: its SHA
+is not known until the notes PR merges.
 
-## 5. Tag and publish
+## 5. Merge the notes, verify, tag and publish
+
+Merge the notes PR. Then verify the resulting `main` commit: its post-merge
+runs are green, and its diff from the validated code commit contains only
+release notes, changelog and other non-code changes. Tag that commit:
 
 ```bash
 git tag -a vX.Y.Z <commit> -m "MAIW vX.Y.Z"
