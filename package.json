@@ -18,7 +18,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/T-DevH/Multi-Agent-Intelligent-Warehouse.git"
+    "url": "git+https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse.git"
   },
   "keywords": [],
   "author": "",
@@ -30,9 +30,9 @@
   },
   "type": "commonjs",
   "bugs": {
-    "url": "https://github.com/T-DevH/Multi-Agent-Intelligent-Warehouse/issues"
+    "url": "https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/issues"
   },
-  "homepage": "https://github.com/T-DevH/Multi-Agent-Intelligent-Warehouse#readme",
+  "homepage": "https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse#readme",
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
