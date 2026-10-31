@@ -39,6 +39,7 @@ Validated code commit: `main` `c19f75f`. Changes since [v2.0.1](https://github.c
 ### Documentation
 
 * README quickstart and getting-started notebook verified from a clean checkout: `requirements.txt` install, API on 8001, `npm start` on 3001, `maiw_world generate` ([#162](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/162))
+* audited every current doc against the code for v2.1.0: model routing, failing commands and routes, API reference, runbook, security docs, notebooks ([#165](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/165))
 * finalized v2.1.0 notes ([#161](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/161))
 * v2.1.0 changelog and release notes ([#157](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/157))
 * aligned the v2.0.1 notes and setup guidance ([#147](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/147))
