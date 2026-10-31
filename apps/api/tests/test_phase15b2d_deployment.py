@@ -191,13 +191,16 @@ class TestRegistryReadiness:
         assert nano is not None
         assert nano.enabled is False
 
-    def test_super_enabled_by_default(self):
+    def test_super_disabled_ultra_enabled_by_default(self):
+        # v2.1.0: hosted Nemotron 3 Super retired 2026-10-19; Ultra serves HIGH.
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("NEMOTRON_SUPER_ENABLED", None)
+            os.environ.pop("NEMOTRON_ULTRA_ENABLED", None)
             reg = ModelRegistry()
-        super_cap = reg.get_enabled_by_role("super")
-        assert super_cap is not None
-        assert super_cap.enabled is True
+        assert reg.get_enabled_by_role("super") is None
+        ultra_cap = reg.get_enabled_by_role("ultra")
+        assert ultra_cap is not None
+        assert ultra_cap.enabled is True
 
     def test_nano_opt_in_via_env(self):
         with patch.dict(os.environ, {"NEMOTRON_NANO_ENABLED": "true"}):
@@ -206,9 +209,11 @@ class TestRegistryReadiness:
         assert nano is not None
         assert nano.enabled is True
 
-    def test_medium_reasoning_falls_back_to_super_when_nano_disabled(self):
+    def test_medium_reasoning_falls_back_to_lightning_when_nano_disabled(self):
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("NEMOTRON_NANO_ENABLED", None)
+            os.environ.pop("NEMOTRON_SUPER_ENABLED", None)
+            os.environ.pop("NEMOTRON_LIGHTNING_ENABLED", None)
             reg = ModelRegistry()
         router = ModelRouter(reg)
         req = ModelRequest(
@@ -216,17 +221,19 @@ class TestRegistryReadiness:
             reasoning=ReasoningLevel.MEDIUM,
         )
         decision = router.route(req)
-        assert decision.selected_role == "super"
+        assert decision.selected_role == "lightning"
         assert decision.fallback_from == "nano"
 
     def test_all_enabled_returns_only_enabled_models(self):
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("NEMOTRON_NANO_ENABLED", None)
+            os.environ.pop("NEMOTRON_SUPER_ENABLED", None)
             reg = ModelRegistry()
         enabled = reg.all_enabled()
         roles = [c.role for c in enabled]
         assert "nano" not in roles
-        assert "super" in roles
+        assert "super" not in roles
+        assert "ultra" in roles
 
 
 # ── D. Cache key correctness ──────────────────────────────────────────────────
