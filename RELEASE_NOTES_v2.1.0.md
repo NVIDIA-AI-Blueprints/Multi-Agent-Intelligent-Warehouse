@@ -1,7 +1,7 @@
 # MAIW v2.1.0 — Release Notes
 
 **Status:** not yet tagged or published. **Validated code commit:** `main`
-`e7890690e5ca3c4e38ea61fb05ab3e89644fa9c6` (PR #160). Commits after it on
+`c19f75f3a3a753d90687e8a6e7c7b0b1358d9ffe` (PR #162). Commits after it on
 `main` change only release documentation. The latest published release is
 still `v2.0.1` (`53a27e61…`).
 
@@ -26,6 +26,10 @@ governed stack. Since v2.0.1:
   Ultra. Super is disabled by default and can be re-enabled for a self-hosted
   Super NIM. Preflight now verifies that each enabled model is actually
   served, not only listed.
+- **Localhost by default (#162):** every published Compose port and the UI
+  development server bind `127.0.0.1`. Before, Compose exposed the database,
+  Redis, MinIO, the API and the MCP servers on every host interface. The README
+  quickstart now works from a clean checkout.
 - **Release timing is manual (#158):** merging to `main` no longer publishes
   a release.
 - The **labor and wave MCP servers have a PostgreSQL backend**, which is now
@@ -40,17 +44,17 @@ governed stack. Since v2.0.1:
   - a labor allocation bug that reset task priority;
   - hardened container images, and the demo F06 ambiguous-write flow.
 
-## Verification on the validated code commit (`e789069`)
+## Verification on the validated code commit (`c19f75f`)
 
 ### CI and the Compose deployment test
 
 | Check | Result |
 |---|---|
-| CI/CD Pipeline ([run 41179931562](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/actions/runs/41179931562)): CORE CI pytest (Python 3.11) | **3245 passed, 13 skipped, 0 failed** |
+| CI/CD Pipeline ([run 41238507435](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/actions/runs/41238507435)): CORE CI pytest (Python 3.11) | **3258 passed, 13 skipped, 0 failed** |
 | CI/CD Pipeline: UI Jest | **991/991** (42 suites) |
 | CI/CD Pipeline: Security Scan | passed |
-| CodeQL | passed |
-| Deployment test ([run 41179931606](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/actions/runs/41179931606)), Compose, profile `reference_governed` | passed, every gating step green |
+| CodeQL | passed ([run 41238506439](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/actions/runs/41238506439)) |
+| Deployment test ([run 41238507342](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/actions/runs/41238507342)), Compose, profile `reference_governed`, ports bound to `127.0.0.1`, UI dev server through `setupProxy.js` | passed, every gating step green; `docker ps` shows every published port on `127.0.0.1` |
 | ↳ Verify: API health checks (gates on `/api/v1/ready`) | passed |
 | ↳ Verify: MCP domain servers (4 containers running, restarts 0, `initialize` + `tools/list`) | passed, 13 tools |
 | ↳ **E2E: MCP tool calls** | passed |
@@ -59,7 +63,7 @@ governed stack. Since v2.0.1:
 
 ### Reference-host release gate (2026-10-31)
 
-Run on the qualification host against `e789069`, following
+Run on the qualification host against `e789069` (#160), following
 `docs/operations/REFERENCE_DEPLOYMENT_RUNBOOK.md`, with live hosted models on
 `integrate.api.nvidia.com`. The API key was entered at a hidden prompt and was
 not written to `.env`, files or logs.
@@ -78,11 +82,17 @@ The first gate run, on `3a63397` (#159), stopped at the in-sandbox probe:
 hosted Ultra rejected the `reasoning_budget` field that MAIW sent with HIGH
 requests. #160 fixed that, and the gate above passed in full.
 
+The gate was not rerun on `c19f75f`. The only change after `e789069` that is
+not documentation is #162. It changes the Compose files, the UI development
+server (`package.json`, `craco.config.js`, `setupProxy.js`) and tests, and no
+Python under `apps/`, `packages/`, `src/` or `scripts/`. The reference
+deployment runs none of the files #162 changed.
+
 ### Internal NGC suite
 
 **The internal NGC pytest suite still could not run.** The deployment
 workflow's MAIW pytest step needs the internal NGC test image
-(`nvcr.io/…/blueprint-github-test-image`). On `e789069` the pull was denied
+(`nvcr.io/…/blueprint-github-test-image`). On `c19f75f` the pull was denied
 (`requires internal NGC org access`). The step reports this as a warning, as
 `E2E=NOT_RUN` in the job summary, and as "MAIW pytest NOT RUN" in the result
 mail; it no longer passes silently (#154). Running that suite needs
@@ -168,6 +178,42 @@ NVIDIA retired the hosted Super endpoint on 2026-10-19. The model catalogue
   `chat_template_kwargs.enable_thinking` explicitly (`true` for HIGH, `false`
   otherwise) and send `reasoning_budget` only when a budget above 0 is
   configured.
+
+### Default network exposure and first run (#162)
+An external audit of `dd1b40c` found that the default Compose deployment
+published every port on all host interfaces, and that the README quickstart
+did not work.
+- **Compose binds `127.0.0.1`.** Docker publishes a port on every host
+  interface unless the mapping names a host IP. All Compose files now bind
+  every published port to `127.0.0.1`.
+  - The datastores, the four MCP domain servers and the local NIM have no
+    override. The MCP write tools trust the decision IDs their caller sends,
+    so only the backend, over the Compose network, may reach them.
+  - nginx (3000), the frontend (3001) and the API (8001) follow
+    `MAIW_PUBLISH_ADDRESS` (default `127.0.0.1`). Widen it only behind your own
+    authentication and TLS; governed API writes still need
+    `MAIW_OPERATOR_WRITE_TOKEN`.
+- **UI development server binds `127.0.0.1`.** `npm start` was hard-coded to
+  `HOST=0.0.0.0`; `HOST` and `PORT` are now overridable.
+- **The development server's `/api` proxy now runs `src/setupProxy.js`.**
+  Before, craco removed the hook that loads it and installed its own proxy,
+  and `setupProxy.js` used http-proxy-middleware 2.x handler options that 3.x
+  ignores. So a browser-supplied `X-Maiw-Operator-Token` was forwarded and
+  `MAIW_UI_OPERATOR_WRITE_TOKEN` was never applied. Now the browser header is
+  stripped, the configured token is added on the three equipment write routes
+  only, and `MAIW_API_PROXY_TARGET` overrides the API target.
+- **README quickstart, verified from a clean clone:**
+  - install `requirements.txt` before the editable packages (the backend
+    imports `src/api`, which needs it);
+  - API on port 8001, the UI proxy's target (was 8000);
+  - `npm start` on port 3001 (`npm run dev` does not exist);
+  - `python -m maiw_world generate` (the DataPack is committed, so this is
+    optional);
+  - removed the references to `deploy/brev/` and Helm, which do not exist.
+  - The getting-started notebook had the same port and command errors.
+- **DEPLOYMENT.md** no longer advises binding `0.0.0.0`; it describes SSH
+  tunnelling and deliberate, authenticated publishing.
+- `tests/api/test_default_network_exposure.py` (13 tests) pins all of this.
 
 ### Release process (#158)
 - `ci-cd.yml` no longer runs semantic-release on every push to `main`, so a
@@ -357,6 +403,17 @@ and reports `NOT_RUN` when the internal image is unavailable.
     Super).
   - `LLM_REASONING_BUDGET`: leave it at 0 with hosted Ultra. A value above 0
     is sent as `reasoning_budget`, which hosted Ultra rejects.
+- **Compose ports are localhost-only (#162).** Clients on other machines can
+  no longer reach the database, Redis, MinIO, Kafka, Milvus, the MCP servers,
+  the API or the UI directly. Use an SSH tunnel
+  (`ssh -L 3001:127.0.0.1:3001 -L 8001:127.0.0.1:8001 <host>`), or set
+  `MAIW_PUBLISH_ADDRESS=0.0.0.0` in `deploy/compose/.env` to publish nginx,
+  the frontend and the API behind your own authentication and TLS. There is
+  deliberately no setting to publish the datastores or MCP servers.
+- **UI development server (#162):** `npm start` listens on `127.0.0.1`; set
+  `HOST=0.0.0.0` to change that. With `MAIW_UI_OPERATOR_WRITE_TOKEN` set, it
+  now actually adds the operator credential to equipment writes, so anyone who
+  can reach the server can perform them.
 - **Releases are manual (#158):** merging to `main` no longer creates a tag
   or GitHub Release. See `docs/operations/RELEASING.md`.
 - **Rebuild all images.** `Dockerfile.backend` (persistence root, Python
@@ -405,6 +462,22 @@ and reports `NOT_RUN` when the internal image is unavailable.
   - The internal NGC MAIW pytest suite has not run (see above).
   - The Compose deployment test runs without `NVIDIA_API_KEY`, so it makes no
     live model calls. Live models were verified on the reference host only.
+- **MCP write boundary has no server-side authorization.** The MCP write
+  tools trust the `proposal_id` / `decision_id` their caller sends and do not
+  verify the approval themselves; the API's DecisionEngine and
+  ActionExecutor enforce it before calling them. #162 keeps the MCP ports on
+  `127.0.0.1` and the Compose network. Do not expose MCP servers to untrusted
+  networks: a remote MCP deployment needs authentication at the MCP server
+  (the client-side `MCPAuthConfig` bearer header has no server-side check).
+- **Inventory MCP container reports `unhealthy` in Compose.** Its Compose
+  healthcheck (since #77) curls `/health`, which the MCP server does not
+  serve. The server works: the deployment test's MCP probe gets its 2 tools.
+  The deployment workflow gates on running with 0 restarts plus the MCP
+  probe, not on Docker health.
+- **Quickstart dependency warning:** `requirements.txt` pins
+  `uvicorn==0.30.1`, while `mcp` 2.3 needs `uvicorn>=0.31.1`. Installing
+  `requirements.txt` prints a resolver conflict; the editable-package install
+  that follows upgrades uvicorn and `pip check` is clean.
 - **Hosted endpoints are not a production SLA.** build.nvidia.com endpoints
   can be retired, as Super was. For production, self-host the models as NGC
   NIMs.
@@ -461,5 +534,7 @@ and reports `NOT_RUN` when the internal image is unavailable.
 | #159 | `3a63397` | fix(models): hosted Nemotron 3 Super is retired; default HIGH/CRITICAL to Ultra, MEDIUM to Lightning |
 | #160 | `e789069` | fix(models): don't send reasoning_budget unless configured; hosted Ultra rejects it |
 | #157 | `88b73ae` | docs(release): draft v2.1.0 changelog and release notes (documentation only) |
+| #161 | `dd1b40c` | docs(release): finalize v2.1.0 notes (documentation only) |
+| #162 | `c19f75f` | fix(deploy): bind Compose ports and the UI dev server to localhost; make the quickstart work from a clean checkout |
 
-Full diff of the validated code: [`v2.0.1...e789069`](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/compare/v2.0.1...e7890690e5ca3c4e38ea61fb05ab3e89644fa9c6)
+Full diff of the validated code: [`v2.0.1...c19f75f`](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/compare/v2.0.1...c19f75f3a3a753d90687e8a6e7c7b0b1358d9ffe)
