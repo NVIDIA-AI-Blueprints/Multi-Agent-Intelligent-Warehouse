@@ -106,7 +106,7 @@ async def test_cache_stays_isolated_by_reasoning_level_after_a_failure(token, fa
         "medium": 1,
         "low": 1,
     }
-    assert seen["high"] == {f"answer-from {SUPER} thinking=budget"}
+    assert seen["high"] == {f"answer-from {SUPER} thinking=on"}
     assert seen["medium"] == {f"answer-from {SUPER} thinking=off"}
     assert seen["low"] == {f"answer-from {LIGHTNING} thinking=off"}
     # 1 failed HIGH + 1 call per level; the repeats were cache hits

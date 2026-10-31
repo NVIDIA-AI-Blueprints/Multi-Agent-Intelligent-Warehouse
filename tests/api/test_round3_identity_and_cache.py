@@ -219,7 +219,7 @@ async def test_cache_medium_never_reuses_high_thinking_answer(token, fake):
     async with running_canonical_app() as (_, client):
         high = await _infer(client, token, reasoning="high")
         medium = await _infer(client, token, reasoning="medium")
-    assert high.json()["content"] == f"answer-from {SUPER} thinking=budget"
+    assert high.json()["content"] == f"answer-from {SUPER} thinking=on"
     assert medium.json()["content"] == f"answer-from {SUPER} thinking=off"
     assert _calls(fake) == [SUPER, SUPER]
 
