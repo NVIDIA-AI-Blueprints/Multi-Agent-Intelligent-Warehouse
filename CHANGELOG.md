@@ -1,4 +1,4 @@
-## [2.1.0] — Unreleased (not tagged)
+## [2.1.0](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/compare/v2.0.1...v2.1.0) (2026-10-31)
 
 Validated code commit: `main` `c19f75f`. Changes since [v2.0.1](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/releases/tag/v2.0.1). Full notes: [RELEASE_NOTES_v2.1.0.md](RELEASE_NOTES_v2.1.0.md).
 
