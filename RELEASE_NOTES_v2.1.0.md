@@ -1,9 +1,10 @@
 # MAIW v2.1.0 — Release Notes
 
-**Status:** not yet tagged or published. **Validated code commit:** `main`
-`c19f75f3a3a753d90687e8a6e7c7b0b1358d9ffe` (PR #162). Commits after it on
-`main` change only release documentation. The latest published release is
-still `v2.0.1` (`53a27e61…`).
+**Status:** released 2026-10-31. **Validated code commit:** `main`
+`c19f75f3a3a753d90687e8a6e7c7b0b1358d9ffe` (PR #162). Tag `v2.1.0` is on the
+`main` commit that merged these final notes; it differs from the validated
+code commit only in `CHANGELOG.md` and `RELEASE_NOTES_v2.1.0.md`. Previous
+release: `v2.0.1` (`53a27e61…`).
 
 > **v2.0.1 users: MEDIUM and HIGH reasoning fail on hosted endpoints.**
 > NVIDIA retired the hosted Nemotron 3 Super endpoint
