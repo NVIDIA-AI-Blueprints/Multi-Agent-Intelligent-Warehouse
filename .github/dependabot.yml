@@ -30,7 +30,7 @@ updates:
 
   # Node.js dependencies - Frontend UI
   - package-ecosystem: "npm"
-    directory: "/ui/web"
+    directory: "/src/ui/web"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -99,23 +99,3 @@ updates:
       - "dependencies"
       - "github-actions"
       - "ci-cd"
-
-  # Helm Charts - Kubernetes deployments
-  - package-ecosystem: "helm"
-    directory: "/helm"
-    schedule:
-      interval: "monthly"
-      day: "monday"
-      time: "09:00"
-    open-pull-requests-limit: 5
-    reviewers:
-      - "T-DevH"
-    assignees:
-      - "T-DevH"
-    commit-message:
-      prefix: "chore"
-      include: "scope"
-    labels:
-      - "dependencies"
-      - "helm"
-      - "kubernetes"
