@@ -91,7 +91,10 @@ def test_readme_quickstart_commands_and_ports_match_the_code():
     for script in re.findall(r"npm (?:run )?(\w[\w:-]*)", quickstart):
         if script not in {"install", "ci"}:
             assert script in scripts, f"README runs `npm {script}`, not in package.json"
-    api_ports = {int(p) for p in re.findall(r"uvicorn maiw_api\.app:app[^\n]*--port (\d+)", quickstart)}
+    api_ports = {
+        int(p)
+        for p in re.findall(r"uvicorn maiw_api\.app:app[^\n]*--port (\d+)", quickstart)
+    }
     assert api_ports == {_proxy_default_port()}
     ui_ports = {int(p) for p in re.findall(r"http://localhost:(\d+)", quickstart)}
     assert ui_ports == {3001}
@@ -107,8 +110,13 @@ def test_notebook_targets_the_documented_ports():
     assert "npm run dev" not in text
     api = _proxy_default_port()
     assert set(map(int, re.findall(r"--port (\d+)", text))) == {api}
-    assert set(map(int, re.findall(r'API_BASE = "http://localhost:(\d+)"', text))) == {api}
-    assert set(map(int, re.findall(r"http://localhost:(\d+)/?(?!api)", text))) <= {3001, api}
+    assert set(map(int, re.findall(r'API_BASE = "http://localhost:(\d+)"', text))) == {
+        api
+    }
+    assert set(map(int, re.findall(r"http://localhost:(\d+)/?(?!api)", text))) <= {
+        3001,
+        api,
+    }
 
 
 def test_readme_quickstart_installs_requirements_before_packages():
