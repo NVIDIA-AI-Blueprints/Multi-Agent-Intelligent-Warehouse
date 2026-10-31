@@ -110,9 +110,11 @@ def test_notebook_targets_the_documented_ports():
     assert "npm run dev" not in text
     api = _proxy_default_port()
     assert set(map(int, re.findall(r"--port (\d+)", text))) == {api}
-    assert set(map(int, re.findall(r'API_BASE = "http://localhost:(\d+)"', text))) == {
-        api
-    }
+    api_base = re.findall(
+        r'API_BASE = (?:os\.environ\.get\("MAIW_API_BASE", )?"http://localhost:(\d+)"',
+        text,
+    )
+    assert set(map(int, api_base)) == {api}
     assert set(map(int, re.findall(r"http://localhost:(\d+)/?(?!api)", text))) <= {
         3001,
         api,
