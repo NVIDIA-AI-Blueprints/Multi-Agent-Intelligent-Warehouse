@@ -31,7 +31,7 @@ A comprehensive Redis caching system that provides intelligent caching for SQL r
 ## 📁 Architecture
 
 ```
-inventory_retriever/caching/
+src/retrieval/caching/
 ├── redis_cache_service.py      # Core Redis caching service
 ├── cache_manager.py            # Cache management and policies
 ├── cache_integration.py        # Integration with query processors
@@ -56,7 +56,7 @@ inventory_retriever/caching/
 ### Cache Configuration
 
 ```python
-from inventory_retriever.caching import CacheConfig, CachePolicy
+from src.retrieval.caching import CacheConfig, CachePolicy, ManagerCachePolicy, EvictionStrategy
 
 # Redis cache configuration
 cache_config = CacheConfig(
@@ -69,7 +69,7 @@ cache_config = CacheConfig(
 )
 
 # Cache manager policy
-manager_policy = CachePolicy(
+manager_policy = ManagerCachePolicy(
     max_size=1000,             # Maximum entries
     max_memory_mb=100,         # Memory limit in MB
     default_ttl=300,           # Default TTL
@@ -86,7 +86,7 @@ manager_policy = CachePolicy(
 
 ```python
 import asyncio
-from inventory_retriever.caching import get_cache_service, CacheType
+from src.retrieval.caching import get_cache_service, CacheType
 
 async def basic_caching_example():
     # Get cache service
@@ -110,7 +110,7 @@ asyncio.run(basic_caching_example())
 ### Cache Integration with Query Processing
 
 ```python
-from inventory_retriever.caching import get_cached_query_processor
+from src.retrieval.caching import get_cached_query_processor
 
 async def cached_query_processing():
     # Get cached query processor
@@ -131,7 +131,7 @@ async def cached_query_processing():
 ### Cache Warming
 
 ```python
-from inventory_retriever.caching import CacheWarmingRule, CacheType
+from src.retrieval.caching import CacheWarmingRule, CacheType
 
 async def setup_cache_warming():
     # Get cache manager
@@ -164,7 +164,7 @@ async def setup_cache_warming():
 ### Monitoring and Health Checks
 
 ```python
-from inventory_retriever.caching import get_cache_monitoring_service
+from src.retrieval.caching.cache_monitoring import get_cache_monitoring_service
 
 async def monitoring_example():
     # Get monitoring service
@@ -247,7 +247,7 @@ cache_service = RedisCacheService(
 ### Cache Integration Configuration
 
 ```python
-from inventory_retriever.caching import CacheIntegrationConfig
+from src.retrieval.caching import CacheIntegrationConfig
 
 # Configure cache integration
 config = CacheIntegrationConfig(
@@ -269,7 +269,7 @@ config = CacheIntegrationConfig(
 Run the comprehensive cache system test:
 
 ```bash
-python test_caching_demo.py
+python tests/unit/test_caching_demo.py
 ```
 
 This will test:

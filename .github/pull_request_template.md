@@ -22,7 +22,7 @@ Fixes #(issue number)
 - [ ] Integration tests pass
 - [ ] Manual testing completed
 - [ ] Docker build successful
-- [ ] Helm chart validation passed
+- [ ] Docker Compose stack / reference deployment smoke test passed (if deployment changed)
 
 ## Screenshots (if applicable)
 Add screenshots to help explain your changes.

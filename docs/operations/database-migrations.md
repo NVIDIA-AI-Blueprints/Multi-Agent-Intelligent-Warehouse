@@ -156,26 +156,14 @@ python src/api/cli/migrate.py info
 
 ### API Endpoints
 
-The migration system exposes REST API endpoints:
+The v2 API (`maiw_api.app:app`) mounts the migration router read-only: only
+the GET endpoints below are served. Running or rolling back migrations
+(`POST /api/v1/migrations/migrate`, `POST /api/v1/migrations/rollback/{version}`)
+is not available over HTTP; use the CLI above.
 
 ```http
 # Get migration status
 GET /api/v1/migrations/status
-
-# Run migrations
-POST /api/v1/migrations/migrate
-Content-Type: application/json
-{
-  "target_version": "002",
-  "dry_run": false
-}
-
-# Rollback migration
-POST /api/v1/migrations/rollback/002
-Content-Type: application/json
-{
-  "dry_run": false
-}
 
 # Get migration history
 GET /api/v1/migrations/history
@@ -238,18 +226,18 @@ success = await migrator.rollback_migration("002", dry_run=False)
 ### Environment Variables
 
 ```bash
-# Database connection
+# Database connection (src/api/services/database.py)
+# Either a full URL:
+# DATABASE_URL=postgresql://warehouse:<password>@localhost:5435/warehouse
+# or the individual settings (POSTGRES_PASSWORD is required):
+POSTGRES_USER=warehouse
+POSTGRES_PASSWORD=changeme
+POSTGRES_DB=warehouse
 DB_HOST=localhost
 DB_PORT=5435
-DB_NAME=warehouse_assistant
-DB_USER=warehouse_user
-DB_PASSWORD=warehouse_pass
-DB_SSL_MODE=prefer
-
-# Migration settings
-MIGRATION_LOG_LEVEL=INFO
-BACKUP_LOCATION=./backups
 ```
+
+Verbose logging: pass `--verbose` to the CLI (e.g. `python src/api/cli/migrate.py --verbose status`).
 
 ### Migration Settings
 
@@ -306,7 +294,7 @@ settings:
 
 ### Debugging
 
-1. **Enable Debug Logging**: Set `MIGRATION_LOG_LEVEL=DEBUG`
+1. **Enable Debug Logging**: Run the CLI with `--verbose`
 2. **Dry Run Mode**: Use dry run mode to test migrations
 3. **Check Status**: Use status command to verify current state
 4. **Review Logs**: Check application and database logs

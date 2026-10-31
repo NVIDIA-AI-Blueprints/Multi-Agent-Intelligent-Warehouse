@@ -1,5 +1,7 @@
 # MCP Integration Test Results
 
+> **Historical record (2025-01, pre-MAIW v2).** Point-in-time results for the legacy MCP integration tests; not the current test status.
+
 **Date:** 2025-01-XX  
 **Status:** ✅ **API Fixes Complete - 41 Tests Passing**
 

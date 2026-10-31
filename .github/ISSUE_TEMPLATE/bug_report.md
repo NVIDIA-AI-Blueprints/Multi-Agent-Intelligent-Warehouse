@@ -27,7 +27,6 @@ If applicable, add screenshots to help explain your problem.
  - Browser [e.g. chrome, safari]
  - Version [e.g. 22]
  - Docker Version [e.g. 20.10.7]
- - Kubernetes Version [e.g. 1.21.0]
 
 **Logs**
 ```

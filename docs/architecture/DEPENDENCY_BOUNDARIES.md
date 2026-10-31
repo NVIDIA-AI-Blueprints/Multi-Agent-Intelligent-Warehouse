@@ -15,7 +15,7 @@ deployment implications.
 | Layer | Package | MCP SDK | Purpose |
 |-------|---------|---------|---------|
 | MAIW API / agents | `maiw-mcp` | `>=2.0.0,<3` | Warehouse agent MCP infrastructure |
-| MAIW MCP servers | `mcp_servers/inventory`, `mcp_servers/equipment` | `>=2.0.0,<3` | MCP tool servers |
+| MAIW MCP servers | `mcp_servers/inventory`, `mcp_servers/equipment`, `mcp_servers/labor`, `mcp_servers/wave` | `>=2.0.0,<3` | MCP tool servers |
 | Data Designer Engine | `data-designer-engine 0.5.6` | `>=1.26.0,<2` | Synthetic training-data generation |
 
 ### MAIW Core (`pyproject.toml`)
@@ -81,8 +81,9 @@ In all production and staging deployments, the two subsystems run in
 
 ```
 ┌──────────────────────────────────────────────┐
-│  MAIW API Container                           │
-│  python:3.11 — mcp==2.x installed            │
+│  MAIW API + MCP server containers             │
+│  python:3.13 (API) / 3.11 (MCP servers)       │
+│  mcp==2.x installed                           │
 │  data-designer-engine: NOT present            │
 │                                               │
 │  src/api/  mcp_servers/  packages/maiw-mcp/  │
@@ -108,10 +109,14 @@ virtual environment for MAIW development:
 
 ```bash
 # MAIW dev environment
-cd /home/nvidia/Multi-Agent-Intelligent-Warehouse
-python -m venv .venv
+# from the root of your Multi-Agent-Intelligent-Warehouse checkout
+python3 -m venv .venv
 source .venv/bin/activate
-pip install -e packages/maiw-mcp/ -e .
+pip install -r requirements.txt
+pip install -e packages/maiw-contracts -e packages/maiw-mcp -e packages/maiw-state \
+    -e packages/maiw-models -e packages/maiw-skills -e packages/maiw-decision \
+    -e packages/maiw-execution -e packages/maiw-agents -e packages/maiw-world \
+    -e apps/api
 
 # nvidia-wms-workshop (data generation — separate venv)
 cd /home/nvidia/nvidia-wms-workshop
@@ -128,7 +133,9 @@ additional capabilities when available:
 | Package | Environment Variable | Capability |
 |---------|---------------------|------------|
 | `maiw-mcp` | `MAIW_MCP_SERVER_INVENTORY_URL` | Inventory lookup via MCP |
-| `maiw-mcp` | `MAIW_MCP_SERVER_EQUIPMENT_URL` | Equipment status via MCP |
+| `maiw-mcp` | `MAIW_MCP_SERVER_EQUIPMENT_URL` | Equipment status / governed equipment writes via MCP |
+| `maiw-mcp` | `MAIW_MCP_SERVER_LABOR_URL` | Labor capacity / allocation via MCP |
+| `maiw-mcp` | `MAIW_MCP_SERVER_WAVE_URL` | Wave status / reprioritization via MCP |
 | (future) `opentelemetry-sdk` | `MAIW_OTEL_ENDPOINT` | Distributed tracing |
 
 ---

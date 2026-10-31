@@ -1,5 +1,7 @@
 # ADR-001: Database Migration System
 
+> **Dated record (accepted 2025-09-12).** Describes the decision at that date; file lists and checklists are not maintained.
+
 ## Status
 
 **Accepted** - 2025-09-12

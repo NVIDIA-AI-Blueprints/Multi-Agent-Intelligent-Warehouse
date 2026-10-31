@@ -1,5 +1,7 @@
 # Repository Health Report
 
+> **Historical document** — dated snapshot (2026-01-20, v0.1.0-632); service status, counts and verdicts below are not current. See the project [README](../README.md) and [docs/security/VULNERABILITY_MITIGATIONS.md](security/VULNERABILITY_MITIGATIONS.md) for current information.
+
 **Generated:** 2026-01-20  
 **Version:** v0.1.0-632-g41c64ca  
 **Uptime:** 4 days 1h 27m 26s

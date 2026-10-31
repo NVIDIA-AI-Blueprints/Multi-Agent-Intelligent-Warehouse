@@ -2,35 +2,17 @@
 
 This document lists all third-party software packages used in this project, including their versions, licenses, authors, and sources.
 
-**Generated:** Automatically from dependency files
+> **Dated snapshot** — generated on 2025-12-20 and not regenerated since (the generator script is no longer in the repository). Versions are the minimum versions declared at that time, with only the aiohttp floor and the PyMuPDF removal corrected since; the authoritative dependency lists are `requirements.txt`, `requirements.docker.txt`, `pyproject.toml`, `packages/*/pyproject.toml`, `apps/api/pyproject.toml`, the root `package.json` and `src/ui/web/package.json`.
+
 **Last Updated:** 2025-12-20
-**Generation Script:** `scripts/tools/generate_software_inventory.py`
 
-## How to Regenerate
-
-To regenerate this inventory with the latest package information:
-
-```bash
-# Activate virtual environment
-source env/bin/activate
-
-# Run the generation script
-python scripts/tools/generate_software_inventory.py
-```
-
-The script automatically:
-- Parses `requirements.txt`, `requirements.docker.txt`, and `scripts/requirements_synthetic_data.txt`
-- Parses `pyproject.toml` for Python dependencies and dev dependencies
-- Parses root `package.json` for Node.js dev dependencies (tooling)
-- Parses `src/ui/web/package.json` for frontend dependencies (React, Material-UI, etc.)
-- Queries PyPI and npm registries for package metadata
-- Removes duplicates and formats the data into this table
+The snapshot was built from `requirements.txt`, `requirements.docker.txt`, `scripts/requirements_synthetic_data.txt`, `pyproject.toml`, the root `package.json` and `src/ui/web/package.json`, with metadata from the PyPI and npm registries.
 
 ## Python Packages (PyPI)
 
 | Package Name | Version | License | License URL | Author | Source | Distribution Method | Download Location |
 |--------------|---------|---------|-------------|--------|--------|---------------------|-------------------|
-| aiohttp | 3.8.0 | Apache 2 | https://github.com/aio-libs/aiohttp | N/A | PyPI | pip | https://pypi.org/project/aiohttp/ |
+| aiohttp | 3.13.3 | Apache 2 | https://github.com/aio-libs/aiohttp | N/A | PyPI | pip | https://pypi.org/project/aiohttp/ |
 | asyncpg | 0.29.0 | Apache License, Version 2.0 | https://pypi.org/project/asyncpg/ | MagicStack Inc <hello@magic.io> | PyPI | pip | https://pypi.org/project/asyncpg/ |
 | bacpypes3 | 0.0.100 | MIT | https://github.com/JoelBender/bacpypes3 | Joel Bender <joel@carrickbender.com> | PyPI | pip | https://pypi.org/project/bacpypes3/ |
 | bcrypt | 4.0.0 | Apache License, Version 2.0 | https://github.com/pyca/bcrypt/ | The Python Cryptographic Authority developers <cryptography-dev@python.org> | PyPI | pip | https://pypi.org/project/bcrypt/ |
@@ -61,7 +43,6 @@ The script automatically:
 | PyJWT | 2.8.0 | MIT | https://github.com/jpadilla/pyjwt | Jose Padilla <hello@jpadilla.com> | PyPI | pip | https://pypi.org/project/PyJWT/ |
 | pymilvus | 2.3.0 | Apache Software License | https://pypi.org/project/pymilvus/ | Milvus Team <milvus-team@zilliz.com> | PyPI | pip | https://pypi.org/project/pymilvus/ |
 | pymodbus | 3.0.0 | BSD-3-Clause | https://github.com/riptideio/pymodbus/ | attr: pymodbus.__author__ | PyPI | pip | https://pypi.org/project/pymodbus/ |
-| PyMuPDF | 1.23.0 | GNU AFFERO GPL 3.0 | https://pypi.org/project/PyMuPDF/ | Artifex <support@artifex.com> | PyPI | pip | https://pypi.org/project/PyMuPDF/ |
 | pyserial | 3.5 | BSD | https://github.com/pyserial/pyserial | Chris Liechti <cliechti@gmx.net> | PyPI | pip | https://pypi.org/project/pyserial/ |
 | pytest | 7.4.0 | MIT | https://docs.pytest.org/en/latest/ | Holger Krekel, Bruno Oliveira, Ronny Pfannschmidt, Floris Bruynooghe, Brianna Laugher, Florian Bruhin and others | PyPI | pip | https://pypi.org/project/pytest/ |
 | pytest-asyncio | 0.21.0 | Apache 2.0 | https://github.com/pytest-dev/pytest-asyncio | Tin Tvrtković <tinchester@gmail.com> <tinchester@gmail.com> | PyPI | pip | https://pypi.org/project/pytest-asyncio/ |
@@ -154,7 +135,6 @@ The script automatically:
 | Eclipse Public License v2.0 / Eclipse Distribution License v1.0 | 1 |
 | new BSD | 1 |
 | HPND | 1 |
-| GNU AFFERO GPL 3.0 | 1 |
 | LICENSE.md | 1 |
 | Apache 2.0 | 1 |
 | ISC | 1 |

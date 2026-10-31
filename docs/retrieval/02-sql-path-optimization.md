@@ -89,6 +89,11 @@ def route_query(query, context):
 
 ## Implementation
 
+The snippets in this section and the YAML under **Configuration** are illustrative
+pseudocode. The implementation is `SQLQueryRouter`
+(`src/retrieval/structured/sql_query_router.py`) and `SQLRetriever`
+(`src/retrieval/structured/sql_retriever.py`); there is no `sql_path` YAML config file.
+
 ### SQL Query Processor
 
 ```python

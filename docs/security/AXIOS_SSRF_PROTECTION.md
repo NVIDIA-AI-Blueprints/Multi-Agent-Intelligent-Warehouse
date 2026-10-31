@@ -44,9 +44,9 @@ Upgraded Axios from `^1.6.0` to `^1.8.3` in `src/ui/web/package.json`.
 
 ### 2. Disable Absolute URLs
 
-**Status**: ✅ Implemented
+**Status**: ⚠️ Partially implemented
 
-Set `allowAbsoluteUrls: false` in all `axios.create()` configurations:
+`allowAbsoluteUrls: false` is set in the `axios.create()` configurations of `src/ui/web/src/services/api.ts`, `demoAPI.ts` and `worldAPI.ts`. It is **not yet** set in `agentTaskAPI.ts`, `forecastingAPI.ts` or `trainingAPI.ts` (`inventoryAPI.ts` uses the global `axios` instance, not `axios.create()`):
 
 ```typescript
 // src/ui/web/src/services/api.ts
@@ -106,9 +106,9 @@ function validatePathParam(param: string, paramName: string = 'parameter'): stri
 
 ### 4. Relative URLs Only
 
-**Status**: ✅ Implemented
+**Status**: ⚠️ Partially implemented
 
-All API base URLs are enforced to be relative paths:
+The relative-URL guard below is applied in `src/ui/web/src/services/api.ts` only (`demoAPI.ts`, `worldAPI.ts` and `agentTaskAPI.ts` use a hard-coded relative base). `inventoryAPI.ts`, `forecastingAPI.ts` and `trainingAPI.ts` read `REACT_APP_API_URL` **without** this guard:
 
 ```typescript
 // Force relative path - never use absolute URLs
@@ -212,7 +212,7 @@ Monitor for:
 
 - **2025-01-XX**: Initial implementation
   - Upgraded Axios to 1.8.3
-  - Added `allowAbsoluteUrls: false` to all Axios instances
+  - Added `allowAbsoluteUrls: false` to the Axios instances in `api.ts` (later also `demoAPI.ts`, `worldAPI.ts`; not yet `agentTaskAPI.ts`, `forecastingAPI.ts`, `trainingAPI.ts`)
   - Implemented `validatePathParam()` helper
   - Applied validation to all user-controlled path parameters
 

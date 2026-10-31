@@ -1,5 +1,7 @@
 # ADR-002: NVIDIA NIMs Integration
 
+> **Dated record (accepted 2025-09-12) — superseded by [MODEL_GATEWAY.md](../MODEL_GATEWAY.md).** The models, URLs and environment variables below are historical; current model roles, defaults and configuration are in MODEL_GATEWAY.md.
+
 ## Status
 
 **Accepted** - 2025-09-12

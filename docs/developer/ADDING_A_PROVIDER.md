@@ -26,10 +26,12 @@ async def call(
 
 Where:
 - `model_id` — the resolved model ID string (e.g. `"my-org/my-model-7b"`)
-- `request` — `maiw_models.models.ModelRequest` (prompt, system, parameters)
+- `request` — `maiw_models.models.ModelRequest` (`messages`, `temperature`, `max_tokens`, …)
 - `capability` — `maiw_models.models.ModelCapability` (role, reasoning level)
 - return — `maiw_models.providers.nim_client.LLMResponse`
-  (`.content: str`, `.model: str`, `.finish_reason: str`, `.usage`)
+  (`.content: str`, `.usage: dict`, `.model: str`, `.finish_reason: str`,
+  `.provider_model` — the model ID the endpoint reported; the gateway discards
+  any response whose `provider_model` is missing or differs from `model_id`)
 
 Raise `ModelTimeout` for deadline/timeout failures, `ModelUnavailable` for
 service-down conditions, and `ModelResponseError` for malformed responses.
@@ -65,11 +67,11 @@ class MyProvider:
         try:
             async with httpx.AsyncClient() as client:
                 resp = await client.post(
-                    f"{self._base_url}/v1/completions",
+                    f"{self._base_url}/v1/chat/completions",
                     headers={"Authorization": f"Bearer {self._api_key}"},
                     json={
                         "model": model_id,
-                        "prompt": request.prompt,
+                        "messages": request.messages,
                         "max_tokens": request.max_tokens or 2000,
                     },
                     timeout=60.0,
@@ -87,9 +89,11 @@ class MyProvider:
             raise ModelResponseError(f"Unexpected response shape: {data}") from exc
 
         return LLMResponse(
-            content=choice["text"],
+            content=choice["message"]["content"],
+            usage=data.get("usage", {}),
             model=model_id,
             finish_reason=choice.get("finish_reason", "stop"),
+            provider_model=data.get("model"),
         )
 ```
 
@@ -97,26 +101,28 @@ class MyProvider:
 
 ## Step 2 — Register a model role (optional)
 
-If your provider serves a new model that fits an existing role (`lightning`,
-`nano`, `super`, `ultra`), set the role override in `.env`:
+The `ModelRouter` in `maiw_models.router` picks a role (`lightning`, `nano`,
+`super`, `ultra`) and the gateway passes that role's resolved `model_id` to
+your provider — you don't need to change the router. Enable the roles your
+provider serves with `NEMOTRON_<ROLE>_ENABLED=true|false`.
 
-```bash
-MAIW_MODEL_SUPER=my-org/my-model-7b
-```
+`NEMOTRON_<ROLE>_MODEL` (e.g. `NEMOTRON_SUPER_MODEL`) can only select a model
+ID listed for that role in `APPROVED_DEPLOYMENTS`
+(`packages/maiw-models/maiw_models/deployment.py`); any other ID fails closed
+with `ModelPolicyViolation` before the provider is called. Adding a new model
+is a reviewed code change to that table, and only Nemotron 3 / 3.5
+generations are accepted.
 
-The `ModelRouter` in `maiw_models.router` picks models by role. The gateway
-passes the resolved `model_id` to your provider — you don't need to change
-the router.
-
-If the new model needs a new role, add it to `ModelRole` in
-`packages/maiw-models/maiw_models/models.py` and add routing logic to
-`ModelRouter.resolve()`.
+Role selection lives in `ModelRouter._select_role()` and `_FALLBACK_CHAIN`
+(`maiw_models/router.py`); role capabilities live in
+`maiw_models/registry.py`.
 
 ---
 
 ## Step 3 — Wire into bootstrap
 
-In `apps/api/maiw_api/bootstrap.py`, replace or supplement the NIM provider:
+`get_model_gateway()` always builds the NIM provider, so construct the gateway
+directly with your provider in `apps/api/maiw_api/bootstrap.py`:
 
 ```python
 from maiw_models.providers.my_provider import MyProvider
@@ -125,7 +131,15 @@ my_provider = MyProvider(
     base_url=os.getenv("MY_PROVIDER_URL", "http://localhost:11434"),
     api_key=os.getenv("MY_PROVIDER_API_KEY", ""),
 )
-model_gateway = get_model_gateway(provider=my_provider, nim_circuit=nim_circuit)
+from maiw_models import ModelGateway, ModelRegistry, ModelRouter
+
+registry = ModelRegistry()
+runtime.model_gateway = ModelGateway(
+    provider=my_provider,
+    registry=registry,
+    router=ModelRouter(registry),
+    nim_circuit=runtime.nim_circuit,
+)
 ```
 
 ---

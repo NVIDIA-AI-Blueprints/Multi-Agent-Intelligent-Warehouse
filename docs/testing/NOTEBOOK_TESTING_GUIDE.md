@@ -1,6 +1,6 @@
 # Notebook Testing Guide
 
-This guide explains how to test the `complete_setup_guide.ipynb` notebook to ensure it works correctly for new users.
+This guide explains how to test the **legacy** `notebooks/setup/complete_setup_guide.ipynb` notebook (pre-Phase 14 path: PostgreSQL, Redis, Milvus, Kafka). For MAIW v2 the current notebooks are `notebooks/MAIW_v2_Getting_Started.ipynb` and `notebooks/setup/maiw_v2_setup.ipynb`, which need no external databases.
 
 ## Testing Approach
 
@@ -41,7 +41,7 @@ Test specific cells or functions without full setup:
 
 ```bash
 # In your current project directory
-cd /home/tarik-devh/Projects/warehouseassistant/warehouse-operational-assistant
+cd Multi-Agent-Intelligent-Warehouse   # your existing checkout
 
 # Start Jupyter
 source env/bin/activate

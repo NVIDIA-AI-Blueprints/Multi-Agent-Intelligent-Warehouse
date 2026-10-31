@@ -139,16 +139,20 @@ decision. Release is `LOW` risk and does not.
 | Assess, recommend | `EquipmentAssetOperationsAgent` (maiw-agents) |
 | Sequence, validate, halt | `SOPEngine` (maiw-agents) |
 | Authorize | `DecisionEngine` + human (maiw-decision) |
-| **Execute the mutation** | `apps/api/maiw_api/routers/equipment.py` |
+| **Execute the mutation** | `apps/api` (host side), e.g. `apps/api/maiw_api/routers/equipment.py` |
 
-The only two places in the system that invoke the equipment ActionExecutor:
+In the equipment write routes the executor is invoked in exactly one place,
+`_execute_if_approved()` (`apps/api/maiw_api/routers/equipment.py:471`), which calls
+`runtime.equipment_executor.execute(proposal, decision, trace_id=...)` only when
+`result["status"] == "approved"`. It is used by:
 
-- `assign_equipment()` — `apps/api/maiw_api/routers/equipment.py:460`
-- `release_equipment()` — `apps/api/maiw_api/routers/equipment.py:520`
+- `assign_equipment()` — `apps/api/maiw_api/routers/equipment.py:536`
+- `release_equipment()` — `apps/api/maiw_api/routers/equipment.py:610`
 
-Both call `runtime.equipment_executor.execute(proposal, decision, trace_id=...)`
-and both are gated on `result["status"] == "approved"`.
-`schedule_maintenance()` never executes at all.
+`schedule_maintenance()` (`:667`) never executes at all. The governed demo and
+Copilot paths (`apps/api/maiw_api/routers/demo.py`, `apps/api/maiw_api/copilot/orchestrator.py`)
+also reach the same domain executor, and only after an approved decision — all of
+them in `apps/api`, none in `maiw-agents`.
 
 Nothing under `packages/maiw-agents/` imports `maiw_execution` or references
 `ActionExecutor` in executable code. This is enforced by an AST-based static

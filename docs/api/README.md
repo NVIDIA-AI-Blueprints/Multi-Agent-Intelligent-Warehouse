@@ -2,679 +2,244 @@
 
 ## Overview
 
-The Multi-Agent-Intelligent-Warehouse provides a comprehensive REST API for warehouse operations management. The API is built with FastAPI and provides OpenAPI/Swagger documentation.
+The MAIW API is a FastAPI application. The only release composition root is
+`apps/api/maiw_api/app.py`, started with:
 
-**Current Status**: All core endpoints are working and tested. Recent fixes have resolved critical issues with equipment assignments and chat interface. MCP framework is now fully integrated with dynamic tool discovery and execution. MCP Testing UI is available via navigation menu.
-
-## MCP Integration Status
-
-###  MCP Framework Fully Integrated
-- **MCP Planner Graph**: Complete workflow orchestration with MCP-enhanced intent classification
-- **MCP Agents**: Equipment, Operations, and Safety agents with dynamic tool discovery
-- **Tool Discovery**: Real-time tool registration and discovery across all agent types
-- **Tool Execution**: Intelligent planning and execution of MCP tools
-- **Cross-Agent Integration**: Seamless communication and tool sharing between agents
-- **End-to-End Workflow**: Complete query processing pipeline with MCP tool results
-
-### MCP Components
-- `src/api/graphs/mcp_integrated_planner_graph.py` - MCP-enabled planner graph
-- `src/api/agents/*/mcp_*_agent.py` - MCP-enabled specialized agents
-- `src/api/services/mcp/` - Complete MCP framework implementation
-- Dynamic tool discovery, binding, routing, and validation services
-
-## Base URL
-
-- **Development**: `http://localhost:8001`
-- **Production**: `https://api.warehouse-assistant.com`
-
-## Recent Fixes & Updates
-
-###  Equipment Assignments Endpoint Fixed
-- **Endpoint**: `GET /api/v1/equipment/assignments`
-- **Status**:  **Working** - No more 404 errors
-- **Test Endpoint**: `GET /api/v1/equipment/assignments/test`
-- **Response**: Returns proper JSON with equipment assignments
-
-###  Chat Interface Fixed
-- **Component**: ChatInterfaceNew.tsx
-- **Issue**: "event is undefined" runtime error
-- **Status**:  **Fixed** - Removed unused event parameter
-- **Impact**: Chat interface now works without runtime errors
-
-###  MessageBubble Component Fixed
-- **Component**: MessageBubble.tsx
-- **Issue**: Missing opening brace syntax error
-- **Status**:  **Fixed** - Component compiles successfully
-- **Impact**: UI renders properly without blocking errors
-
-## Authentication
-
-Most API endpoints require authentication using JWT tokens. Include the token in the Authorization header:
-
-```http
-Authorization: Bearer <your-jwt-token>
+```bash
+uvicorn maiw_api.app:app --port 8001
 ```
 
-**Note:** Some endpoints are public and do not require authentication (e.g., `/api/v1/auth/users/public`).
-
-### Authentication Endpoints
-
-#### GET /api/v1/auth/users/public
-Get list of users for dropdown selection (public endpoint, no authentication required).
-
-**Response:**
-```json
-[
-  {
-    "id": 1,
-    "username": "admin",
-    "full_name": "System Administrator",
-    "role": "admin"
-  },
-  {
-    "id": 2,
-    "username": "operator1",
-    "full_name": "John Doe",
-    "role": "operator"
-  }
-]
-```
-
-**Note:** Only returns active users with basic information (id, username, full_name, role).
-
-#### GET /api/v1/auth/users
-Get all users (admin only, requires authentication).
-
-**Response:**
-```json
-[
-  {
-    "id": 1,
-    "username": "admin",
-    "email": "admin@example.com",
-    "full_name": "System Administrator",
-    "role": "admin",
-    "status": "active",
-    "created_at": "2024-01-01T00:00:00Z",
-    "updated_at": "2024-01-01T00:00:00Z",
-    "last_login": "2024-01-15T10:30:00Z"
-  }
-]
-```
-
-## API Endpoints
-
-### Health & Status
-
-#### GET /api/v1/health
-Get system health status.
-
-**Response:**
-```json
-{
-  "status": "healthy",
-  "version": "0.1.0",
-  "timestamp": "2024-01-01T00:00:00Z",
-  "services": {
-    "database": "healthy",
-    "vector_db": "healthy",
-    "redis": "healthy"
-  }
-}
-```
-
-#### GET /api/v1/ready
-Get system readiness status.
-
-**Response:**
-```json
-{
-  "status": "ready",
-  "version": "0.1.0",
-  "timestamp": "2024-01-01T00:00:00Z"
-}
-```
-
-### Chat & AI
-
-#### POST /api/v1/chat
-Send a message to the AI assistant.
-
-**Request:**
-```json
-{
-  "message": "What equipment is available for maintenance?",
-  "session_id": "optional-session-id",
-  "context": {
-    "user_role": "maintenance_technician",
-    "location": "warehouse_a"
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "response": "Based on the current inventory, the following equipment is available for maintenance...",
-  "session_id": "session-123",
-  "agent_used": "equipment_agent",
-  "confidence": 0.95,
-  "sources": [
-    {
-      "type": "equipment_data",
-      "title": "Equipment Status Report",
-      "url": "/api/v1/equipment/status"
-    }
-  ],
-  "reasoning": {
-    "type": "analytical",
-    "steps": [
-      "Analyzed current equipment status",
-      "Checked maintenance schedules",
-      "Identified available equipment"
-    ]
-  }
-}
-```
-
-### Equipment Management
-
-#### GET /api/v1/equipment
-Get list of equipment.
-
-**Query Parameters:**
-- `status` (optional): Filter by equipment status
-- `type` (optional): Filter by equipment type
-- `location` (optional): Filter by location
-- `limit` (optional): Number of results (default: 50)
-- `offset` (optional): Pagination offset (default: 0)
-
-**Response:**
-```json
-{
-  "equipment": [
-    {
-      "id": "equip-123",
-      "name": "Forklift A1",
-      "type": "forklift",
-      "status": "operational",
-      "location": "Zone A",
-      "last_maintenance": "2024-01-01T00:00:00Z",
-      "next_maintenance": "2024-02-01T00:00:00Z"
-    }
-  ],
-  "total": 1,
-  "limit": 50,
-  "offset": 0
-}
-```
-
-#### GET /api/v1/equipment/assignments
-Get equipment assignments.
-
-**Query Parameters:**
-- `asset_id` (optional): Filter by specific equipment asset
-- `assignee` (optional): Filter by assignee
-- `active_only` (optional): Show only active assignments (default: true)
-
-**Response:**
-```json
-[
-  {
-    "id": 8,
-    "asset_id": "AGV-01",
-    "task_id": "TASK-003",
-    "assignee": "operator2",
-    "assignment_type": "task",
-    "assigned_at": "2025-09-14T16:33:47.064012+00:00",
-    "released_at": null,
-    "notes": null
-  }
-]
-```
-
-#### GET /api/v1/equipment/{equipment_id}
-Get specific equipment details.
-
-**Response:**
-```json
-{
-  "id": "equip-123",
-  "name": "Forklift A1",
-  "type": "forklift",
-  "status": "operational",
-  "location": "Zone A",
-  "specifications": {
-    "capacity": "5000kg",
-    "fuel_type": "electric",
-    "battery_level": 85
-  },
-  "maintenance_history": [
-    {
-      "date": "2024-01-01T00:00:00Z",
-      "type": "routine",
-      "description": "Monthly inspection",
-      "technician": "John Doe"
-    }
-  ]
-}
-```
-
-#### POST /api/v1/equipment/{equipment_id}/maintenance
-Schedule maintenance for equipment.
-
-**Request:**
-```json
-{
-  "type": "routine",
-  "scheduled_date": "2024-02-01T09:00:00Z",
-  "description": "Monthly inspection",
-  "technician": "John Doe",
-  "priority": "medium"
-}
-```
-
-**Response:**
-```json
-{
-  "maintenance_id": "maint-123",
-  "status": "scheduled",
-  "scheduled_date": "2024-02-01T09:00:00Z",
-  "estimated_duration": "2 hours"
-}
-```
-
-### Operations Management
-
-#### GET /api/v1/operations
-Get list of operations.
-
-**Query Parameters:**
-- `status` (optional): Filter by operation status
-- `type` (optional): Filter by operation type
-- `assigned_to` (optional): Filter by assigned person
-- `date_from` (optional): Filter by start date
-- `date_to` (optional): Filter by end date
-
-**Response:**
-```json
-{
-  "operations": [
-    {
-      "id": "op-123",
-      "name": "Inventory Count - Zone A",
-      "type": "cycle_count",
-      "status": "in_progress",
-      "assigned_to": "Jane Smith",
-      "scheduled_start": "2024-01-01T09:00:00Z",
-      "scheduled_end": "2024-01-01T17:00:00Z",
-      "priority": "high"
-    }
-  ],
-  "total": 1
-}
-```
-
-#### POST /api/v1/operations
-Create a new operation.
-
-**Request:**
-```json
-{
-  "name": "Inventory Count - Zone B",
-  "type": "cycle_count",
-  "assigned_to": "Jane Smith",
-  "scheduled_start": "2024-01-02T09:00:00Z",
-  "scheduled_end": "2024-01-02T17:00:00Z",
-  "priority": "medium",
-  "description": "Monthly inventory count for Zone B"
-}
-```
-
-**Response:**
-```json
-{
-  "operation_id": "op-124",
-  "status": "created",
-  "scheduled_start": "2024-01-02T09:00:00Z"
-}
-```
-
-### Safety Management
-
-#### GET /api/v1/safety/incidents
-Get list of safety incidents.
-
-**Query Parameters:**
-- `severity` (optional): Filter by severity level
-- `status` (optional): Filter by incident status
-- `date_from` (optional): Filter by incident date
-- `date_to` (optional): Filter by incident date
-
-**Response:**
-```json
-{
-  "incidents": [
-    {
-      "id": "inc-123",
-      "type": "near_miss",
-      "severity": "medium",
-      "status": "investigating",
-      "description": "Forklift operator narrowly avoided collision",
-      "location": "Zone A - Aisle 3",
-      "reported_by": "John Doe",
-      "occurred_at": "2024-01-01T14:30:00Z",
-      "reported_at": "2024-01-01T14:35:00Z"
-    }
-  ],
-  "total": 1
-}
-```
-
-#### POST /api/v1/safety/incidents
-Report a new safety incident.
-
-**Request:**
-```json
-{
-  "type": "injury",
-  "severity": "high",
-  "description": "Employee injured while operating forklift",
-  "location": "Zone A - Aisle 3",
-  "occurred_at": "2024-01-01T14:30:00Z",
-  "injured_person": "Jane Smith",
-  "witnesses": ["John Doe", "Bob Wilson"]
-}
-```
-
-**Response:**
-```json
-{
-  "incident_id": "inc-124",
-  "status": "reported",
-  "assigned_to": "Safety Team",
-  "priority": "urgent"
-}
-```
-
-### Inventory Management
-
-#### GET /api/v1/inventory/items
-Get list of inventory items.
-
-**Query Parameters:**
-- `category` (optional): Filter by item category
-- `location` (optional): Filter by location
-- `status` (optional): Filter by item status
-- `search` (optional): Search by item name or code
-
-**Response:**
-```json
-{
-  "items": [
-    {
-      "id": "item-123",
-      "code": "WIDGET-001",
-      "name": "Widget Type A",
-      "category": "electronics",
-      "quantity": 150,
-      "location": "Zone A - Shelf 1",
-      "status": "active",
-      "last_counted": "2024-01-01T00:00:00Z"
-    }
-  ],
-  "total": 1
-}
-```
-
-#### GET /api/v1/inventory/items/{item_id}/movements
-Get movement history for an item.
-
-**Response:**
-```json
-{
-  "item_id": "item-123",
-  "movements": [
-    {
-      "id": "mov-123",
-      "type": "inbound",
-      "quantity": 50,
-      "quantity_before": 100,
-      "quantity_after": 150,
-      "reference": "PO-2024-001",
-      "timestamp": "2024-01-01T10:00:00Z",
-      "operator": "John Doe"
-    }
-  ],
-  "total": 1
-}
-```
-
-### Migration Management
-
-#### GET /api/v1/migrations/status
-Get database migration status.
-
-**Response:**
-```json
-{
-  "status": "ok",
-  "version": "0.1.0",
-  "applied_count": 3,
-  "pending_count": 0,
-  "total_count": 3,
-  "applied_migrations": [
-    {
-      "version": "001",
-      "description": "Initial schema",
-      "applied_at": "2024-01-01T00:00:00Z",
-      "execution_time_ms": 1500
-    }
-  ],
-  "pending_migrations": []
-}
-```
-
-#### POST /api/v1/migrations/migrate
-Run database migrations.
-
-**Request:**
-```json
-{
-  "target_version": "003",
-  "dry_run": false
-}
-```
-
-**Response:**
-```json
-{
-  "status": "ok",
-  "message": "Migrations completed successfully",
-  "dry_run": false,
-  "target_version": "003"
-}
-```
-
-### Monitoring & Metrics
-
-#### GET /api/v1/metrics
-Get Prometheus metrics.
-
-**Response:**
-```
-# HELP http_requests_total Total number of HTTP requests
-# TYPE http_requests_total counter
-http_requests_total{method="GET",endpoint="/api/v1/health"} 100
-
-# HELP http_request_duration_seconds HTTP request duration in seconds
-# TYPE http_request_duration_seconds histogram
-http_request_duration_seconds_bucket{method="GET",endpoint="/api/v1/health",le="0.1"} 95
-```
-
-## Error Responses
-
-All endpoints may return the following error responses:
-
-### 400 Bad Request
-```json
-{
-  "error": "validation_error",
-  "message": "Invalid request parameters",
-  "details": {
-    "field": "scheduled_date",
-    "issue": "Invalid date format"
-  }
-}
-```
-
-### 401 Unauthorized
-```json
-{
-  "error": "authentication_error",
-  "message": "Invalid or missing authentication token"
-}
-```
-
-### 403 Forbidden
-```json
-{
-  "error": "authorization_error",
-  "message": "Insufficient permissions for this operation"
-}
-```
-
-### 404 Not Found
-```json
-{
-  "error": "not_found",
-  "message": "Resource not found",
-  "resource": "equipment",
-  "id": "equip-123"
-}
-```
-
-### 500 Internal Server Error
-```json
-{
-  "error": "internal_error",
-  "message": "An internal server error occurred",
-  "request_id": "req-123"
-}
-```
-
-## Rate Limiting
-
-API requests are rate limited to prevent abuse:
-
-- **Authenticated users**: 1000 requests per hour
-- **Unauthenticated users**: 100 requests per hour
-
-Rate limit headers are included in responses:
-
-```http
-X-RateLimit-Limit: 1000
-X-RateLimit-Remaining: 999
-X-RateLimit-Reset: 1640995200
-```
-
-## Pagination
-
-List endpoints support pagination using `limit` and `offset` parameters:
-
-- `limit`: Number of items per page (default: 50, max: 100)
-- `offset`: Number of items to skip (default: 0)
-
-Pagination metadata is included in responses:
-
-```json
-{
-  "data": [...],
-  "pagination": {
-    "total": 1000,
-    "limit": 50,
-    "offset": 0,
-    "has_next": true,
-    "has_prev": false
-  }
-}
-```
-
-## WebSocket Endpoints
-
-### /ws/chat
-Real-time chat connection for live AI assistance.
-
-**Connection:**
-```javascript
-const ws = new WebSocket('ws://localhost:8001/ws/chat?token=<jwt-token>');
-```
-
-**Message Format:**
-```json
-{
-  "type": "message",
-  "content": "What equipment needs maintenance?",
-  "session_id": "session-123"
-}
-```
-
-**Response Format:**
-```json
-{
-  "type": "response",
-  "content": "Based on the current status...",
-  "agent_used": "equipment_agent",
-  "timestamp": "2024-01-01T00:00:00Z"
-}
-```
-
-## SDKs and Client Libraries
-
-### Python
-```python
-from warehouse_assistant import WarehouseAssistant
-
-client = WarehouseAssistant(
-    base_url="http://localhost:8001",
-    api_key="your-api-key"
-)
-
-# Send a chat message
-response = client.chat.send_message(
-    message="What equipment is available?",
-    session_id="session-123"
-)
-```
-
-### JavaScript
-```javascript
-import { WarehouseAssistant } from '@warehouse-assistant/client';
-
-const client = new WarehouseAssistant({
-  baseUrl: 'http://localhost:8001',
-  apiKey: 'your-api-key'
-});
-
-// Send a chat message
-const response = await client.chat.sendMessage({
-  message: 'What equipment is available?',
-  sessionId: 'session-123'
-});
-```
-
-## OpenAPI Specification
-
-The complete OpenAPI specification is available at:
+(`src/api/app.py` is a legacy development server and is never deployed.)
+
+The live OpenAPI description is the authoritative reference for request and
+response schemas. This page lists what the release app mounts and the rules that
+are not visible from the schema alone.
 
 - **Swagger UI**: `http://localhost:8001/docs`
 - **ReDoc**: `http://localhost:8001/redoc`
 - **OpenAPI JSON**: `http://localhost:8001/openapi.json`
 
+## Base URL
+
+- **Local development**: `http://localhost:8001` (the UI dev server on
+  `http://localhost:3001` proxies `/api` to it)
+
+## Authentication
+
+There are three separate credentials. They are different authority domains and
+none of them substitutes for another.
+
+| Credential | Header | Authorises |
+|---|---|---|
+| User session (JWT) | `Authorization: Bearer <jwt>` | Identity endpoints under `/api/v1/auth/*` |
+| Operator write token (`MAIW_OPERATOR_WRITE_TOKEN`, ≥ 32 chars) | `X-Maiw-Operator-Token` | Operational writes: the governed equipment write routes and `/api/v1/executions/*` |
+| Inference internal token (`MAIW_INFERENCE_INTERNAL_TOKEN`) | `X-Maiw-Internal-Token` | Only `POST /api/v1/inference` (the sandbox inference boundary) |
+
+A JWT alone never authorises an operational write.
+
+### Operator write credential
+
+Every governed equipment write route runs two checks before the request body is
+read and before any agent, `DecisionEngine`, `ActionExecutor` or MCP call
+(`apps/api/maiw_api/write_auth.py`):
+
+1. `require_operator_write` — the `X-Maiw-Operator-Token` header:
+
+   | Condition | Status | `code` |
+   |---|---|---|
+   | Server has no usable token (unset, < 32 chars, the `.env.example` placeholder, or equal to `MAIW_INFERENCE_INTERNAL_TOKEN`) | 503 | `OPERATOR_WRITE_AUTH_NOT_CONFIGURED` |
+   | Header missing | 403 | `OPERATOR_WRITE_CREDENTIAL_REQUIRED` |
+   | Header does not match | 401 | `INVALID_OPERATOR_WRITE_CREDENTIAL` |
+
+2. `require_governed_writes_offered` — the active deployment profile must offer
+   governed writes (`demo`, or `MAIW_DEPLOYMENT_PROFILE=reference_governed`).
+   Otherwise: 503 `GOVERNED_WRITES_NOT_OFFERED`. The default `reference` profile
+   does not offer governed writes.
+
+These denials return a typed body:
+
+```json
+{
+  "error": true,
+  "code": "OPERATOR_WRITE_CREDENTIAL_REQUIRED",
+  "message": "operational writes require the X-Maiw-Operator-Token credential; ...",
+  "status_code": 403
+}
+```
+
+The production UI image never holds the operator token and strips the header
+from browser requests, so governed writes from that UI are refused by design.
+
+### Identity endpoints
+
+`/api/v1/auth/*` (from `src/api/routers/auth.py`) is mounted in full, including
+`POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, `GET /api/v1/auth/me`,
+`GET /api/v1/auth/users` (admin) and the public
+`GET /api/v1/auth/users/public` (active users' `id`, `username`, `full_name`,
+`role`, for login dropdowns).
+
+## Endpoints mounted by the release app
+
+### Health and status
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/v1/live` | Liveness — process alive |
+| GET | `/api/v1/ready` | Readiness for the active deployment profile (503 `NOT_READY` otherwise) |
+| GET | `/api/v1/health` | Comprehensive status; `degraded`, not non-2xx, when optional services are down |
+| GET | `/api/v1/health/simple` | Lightweight DB check |
+| GET | `/api/v1/version`, `/api/v1/version/detailed` | Build / version information |
+| GET | `/api/v1/runtime/status` | MAIW runtime component availability |
+| GET | `/api/v1/mcp/status`, `/api/v1/mcp/capabilities` | MCP domain status and registered capabilities |
+
+### Copilot
+
+`POST /api/v1/copilot/turn` — one operator turn (ASK / ANALYZE / ACT /
+OBSERVE_OUTCOME; intent is classified server-side). Returns 503 unless the
+Copilot service is available (`MAIW_DEMO_MODE=true`).
+
+Request (`CopilotTurnRequest`):
+
+```json
+{
+  "conversation_id": null,
+  "message": "What is the current wave risk?",
+  "warehouse_id": "DC-47",
+  "scenario_name": ""
+}
+```
+
+`message` is required (1–2000 chars); omit `conversation_id` to start a new
+conversation. The response (`CopilotTurnResponse`) always carries
+`conversation_id`, `turn_id`, `trace_id`, `intent` and `status`, plus
+intent-specific fields (for example `answer`, `evidence`, and the model routing
+provenance `model_id`, `requested_role`, `selected_role`, `fallback_from`). See
+`/openapi.json` for the full schema.
+
+### Equipment
+
+Reads:
+
+| Method | Path |
+|---|---|
+| GET | `/api/v1/equipment` |
+| GET | `/api/v1/equipment/assignments` |
+| GET | `/api/v1/equipment/maintenance/schedule` |
+| GET | `/api/v1/equipment/{asset_id}` |
+| GET | `/api/v1/equipment/{asset_id}/telemetry` |
+| GET | `/api/v1/equipment/{asset_id}/status` |
+
+Governed writes (operator write credential + governed profile required, see
+above). Each one builds an `ActionProposal` and evaluates it with
+`DecisionEngine`; nothing executes unless the decision is `approved`:
+
+| Method | Path | Body (`apps/api/maiw_api/routers/equipment.py`) | Executes? |
+|---|---|---|---|
+| POST | `/api/v1/equipment/assign` | `AssignmentRequest`: `asset_id`, `assignee`, `assignment_type` (default `"task"`), optional `task_id`, `duration_hours`, `notes`, `warehouse_id` | Only if approved (assignment is MEDIUM risk, so normally `requires_human_approval`) |
+| POST | `/api/v1/equipment/release` | `ReleaseRequest`: `asset_id`, `released_by`, optional `notes`, `warehouse_id` | If approved (release is LOW risk) |
+| POST | `/api/v1/equipment/maintenance` | `MaintenanceRequest`: `asset_id`, `maintenance_type`, `description`, `scheduled_by`, `scheduled_for`, `estimated_duration_minutes` (default 60), `priority` (default `"medium"`), optional `warehouse_id` | Never — proposal only |
+
+Response (assign / release):
+
+```json
+{
+  "status": "requires_human_approval",
+  "action": "warehouse.equipment.assign",
+  "proposal_id": "<uuid>",
+  "decision_id": "<uuid>",
+  "reason": "<explanation>",
+  "executed": false
+}
+```
+
+`status` is the decision outcome (`requires_human_approval`, `rejected`,
+`requires_fresh_state`, …) or, after an approved decision, the execution outcome
+(`executed`, `no_op`, `deferred`, `conflict`, `failed` with HTTP 200, or `unknown`).
+Optional headers: `X-Trace-Id` (propagated end to end) and `Idempotency-Key` (a
+replay never writes twice). An ambiguous write (`unknown`, `executed: null`)
+returns HTTP 202 and is never retried automatically: a further write to the same
+asset is refused with 409 `RECONCILIATION_REQUIRED` until it is reconciled
+through `/api/v1/executions/{execution_id}/reconcile`.
+
+### Executions
+
+All routes require the operator write credential.
+
+| Method | Path |
+|---|---|
+| GET | `/api/v1/executions` |
+| GET | `/api/v1/executions/{execution_id}` |
+| POST | `/api/v1/executions/{execution_id}/reconcile` |
+
+### Operations and safety (read-only)
+
+Only the read routes are mounted; the SQL task / incident writes have no governed
+path and are not shipped.
+
+| Method | Path |
+|---|---|
+| GET | `/api/v1/operations/tasks`, `/api/v1/operations/tasks/{task_id}` |
+| GET | `/api/v1/operations/workforce` |
+| GET | `/api/v1/safety/incidents`, `/api/v1/safety/incidents/{incident_id}` |
+| GET | `/api/v1/safety/policies`, `/api/v1/safety/policies/{policy_id}` |
+
+### World, agents, procedures, Model Lab
+
+All read-only:
+
+- `/api/v1/world/*` — Warehouse World explorer (see
+  [WAREHOUSE_WORLD.md](../architecture/WAREHOUSE_WORLD.md#world-api))
+- `/api/v1/agent-tasks`, `/api/v1/agent-tasks/{task_id}`, `/api/v1/agent-tasks/{task_id}/sop`
+- `/api/v1/procedures`, `/api/v1/procedures/{procedure_id}`
+- `/api/v1/model-lab/runs`, `/api/v1/model-lab/runs/{run_id}`, `/api/v1/model-lab/runs/{run_id}/cases`,
+  `/api/v1/model-lab/runs/{run_id}/cases/{case_id}`, `/api/v1/model-lab/model-status`
+
+### Demo
+
+`/api/v1/demo/*` (scenarios, `analyze`, `approve`, `reject`, `reconcile`,
+`counterfactual/result`) and `/api/v1/events/stream` drive the demo UI
+(`MAIW_DEMO_MODE=true`). See `/openapi.json` for the exact routes.
+
+### Sandbox inference
+
+`POST /api/v1/inference` — the bounded inference boundary for sandboxed
+runtimes. Requires `X-Maiw-Internal-Token` (503 if
+`MAIW_INFERENCE_INTERNAL_TOKEN` is not configured). The body accepts only a
+strict field allowlist (`task`, `messages`, `reasoning`, `risk_level`, `modality`,
+`deadline_ms` and trace / task / procedure identifiers); unknown fields
+such as a model or provider override are rejected with 422. The host-side
+`ModelGateway` selects the model. See
+[MODEL_GATEWAY.md](../architecture/MODEL_GATEWAY.md).
+
+### Legacy routers (read-only)
+
+From `src/api/routers/`, mounted with only their GET routes: `/api/v1/inventory/*`,
+`/api/v1/wms/*`, `/api/v1/iot/*`, `/api/v1/erp/*`, `/api/v1/scanning/*`,
+`/api/v1/attendance/*`, `/api/v1/migrations/*`, `/api/v1/forecasting/*`,
+`/api/v1/training/*`.
+
+`/api/v1/document/*` is mounted read-only except `POST /api/v1/document/upload`,
+`POST /api/v1/document/approve/{document_id}` and
+`POST /api/v1/document/reject/{document_id}`; `/search`, `/validate` and
+`/analytics` are not shipped.
+
+### Not mounted
+
+`/api/v1/chat`, `/api/v1/reasoning`, every POST/PUT/PATCH/DELETE of the legacy
+routers above other than the three document routes (including
+`POST /api/v1/migrations/migrate`), and `/api/v1/metrics`
+(served only by the legacy `src/api/app.py`). There is no WebSocket endpoint.
+
+## Rate limiting
+
+Requests are rate limited per client (`src/api/services/security/rate_limiter.py`;
+Redis-backed, with an in-memory fallback). Defaults: 100 requests/minute, with
+tighter limits on `POST /api/v1/auth/login` (5/min) and
+`POST /api/v1/document/upload` (10/min). A limited request receives HTTP 429 with
+a `Retry-After` header. `RATE_LIMIT_FAIL_MODE` controls what happens when the
+limiter itself fails. `/api/v1/health`, `/api/v1/health/simple`, `/docs` and
+`/openapi.json` are exempt.
+
 ## Support
 
-For API support and questions:
-
-- **Documentation**: [https://docs.warehouse-assistant.com](https://docs.warehouse-assistant.com)
 - **Issues**: [https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/issues](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/issues)
-- **Email**: support@warehouse-assistant.com

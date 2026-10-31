@@ -30,10 +30,10 @@ A pre-authentication denial of service vulnerability exists in React Server Comp
 ### ✅ Not Affected - Project Does Not Use React Server Components
 
 #### 1. React Version
-- **Project Version**: React 18.3.1
-- **Package.json Specification**: `"react": "^18.2.0"`
+- **Project Version**: React 19.2.5 (`src/ui/web/package-lock.json`)
+- **Package.json Specification**: `"react": "^19.2.3"`
 - **Vulnerability Scope**: Only affects React Server Components 19.0.0-19.2.1
-- **Status**: ✅ **NOT VULNERABLE** - Using React 18.x, not React 19.x
+- **Status**: ✅ **NOT VULNERABLE** - React 19.2.5 is newer than the affected range (patched in 19.2.3), and the vulnerable `react-server-dom-*` packages are not installed
 
 #### 2. Application Architecture
 - **Type**: Standard React client-side application
@@ -61,7 +61,7 @@ A pre-authentication denial of service vulnerability exists in React Server Comp
 # Check React version
 $ npm list react
 Multi-Agent-Intelligent-Warehouse-ui@1.0.0
-└── react@18.3.1  ✅ (NOT React 19.x)
+└── react@19.2.5  ✅ (newer than affected 19.0.0-19.2.1)
 
 # Check for React Server Components packages
 $ npm list react-server-dom-parcel react-server-dom-turbopack react-server-dom-webpack
@@ -80,8 +80,8 @@ $ cat src/index.tsx
 ```
 
 #### Architecture Verification
-- **Frontend**: `src/ui/web/` - React 18 client-side application
-- **Backend**: `src/api/` - FastAPI (Python) service
+- **Frontend**: `src/ui/web/` - React 19 client-side application
+- **Backend**: `apps/api/maiw_api/` - FastAPI (Python) service
 - **No React Server Components**: Confirmed by codebase analysis
 
 ---
@@ -92,7 +92,7 @@ $ cat src/index.tsx
 
 **Mark as FALSE POSITIVE** or **NOT APPLICABLE** with the following justification:
 
-1. **Wrong React Version**: Project uses React 18.3.1, not React 19.x
+1. **Patched React Version**: Project uses React 19.2.5, outside the affected range 19.0.0-19.2.1
 2. **No React Server Components**: Application does not use React Server Components architecture
 3. **Vulnerable Packages Not Installed**: None of the vulnerable packages are present
 4. **Different Architecture**: Client-side React with separate FastAPI backend
@@ -104,13 +104,13 @@ Vulnerability: React Server Components DoS (React 19.0.0-19.2.1)
 Status: FALSE POSITIVE - NOT APPLICABLE
 
 Justification:
-1. Project uses React 18.3.1, not React 19.x (vulnerability only affects React 19.0.0-19.2.1)
+1. Project uses React 19.2.5, outside the affected range (vulnerability only affects React 19.0.0-19.2.1)
 2. Project does not use React Server Components (standard client-side React application)
 3. Vulnerable packages (react-server-dom-parcel, react-server-dom-turbopack, react-server-dom-webpack) are NOT INSTALLED
-4. Application architecture: Client-side React 18 + separate FastAPI backend (no server-side React rendering)
+4. Application architecture: Client-side React 19 + separate FastAPI backend (no server-side React rendering)
 
 Evidence:
-- React version: 18.3.1 (package.json: "^18.2.0")
+- React version: 19.2.5 (package.json: "^19.2.3")
 - Build tool: Create React App (react-scripts@5.0.1)
 - No Server Components packages installed
 - No "use server" directives in codebase
@@ -133,7 +133,7 @@ Risk Level: NONE - Vulnerability does not affect this application
 
 The React Server Components DoS vulnerability (React 19.0.0-19.2.1) **does not affect** this application because:
 
-1. ✅ We use React 18.3.1, not React 19.x
+1. ✅ We use React 19.2.5, outside the affected range 19.0.0-19.2.1
 2. ✅ We do not use React Server Components
 3. ✅ We do not have any of the vulnerable packages installed
 4. ✅ Our architecture is client-side React with a separate FastAPI backend

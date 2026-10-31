@@ -1,5 +1,7 @@
 # MAIW Developer Journey — Unified Provenance Navigation
 
+> **Historical record (UX-1E, 2026-09-20).** Describes the feature as delivered; test counts, file lists and deferred items are point-in-time and may not match the current code.
+
 **UX-1E** adds a **JOURNEY tab** to `ExpertOverlay` that lets a developer
 reconstruct one MAIW operational decision from exact warehouse context all
 the way to measured outcome, using only the UI and exact artifact cross-links,

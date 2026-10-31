@@ -52,17 +52,16 @@ initial_state:
       zone: "A1"
       current_task_id: null
 
-  waves:
-    - wave_id: "wave-001"
-      priority: "high"
+  tasks:
+    - task_id: "task-001"
+      task_type: "PICK"
+      zone: "A1"
       status: "pending"
-      carrier_cutoff_minutes: 60
-      tasks_total: 10
-      tasks_completed: 0
-      assigned_workers: []
-      assigned_equipment: []
+      assigned_to: null
+      priority: "high"
+      deadline: "2026-08-23T09:30:00+00:00"
 
-timed_events: []   # optional: list of events that fire at simulation_time_seconds
+timed_events: []   # optional: list of events that fire at offset_seconds
 ```
 
 ### Adding timed events
@@ -72,31 +71,37 @@ for simulating progressive failures:
 
 ```yaml
 timed_events:
-  - simulation_time_seconds: 300   # 5 min in
-    event_type: equipment_fault
-    target_id: AGV-01
+  - offset_seconds: 300   # 5 min in
+    type: equipment_fault
     payload:
-      status: offline
+      asset_id: AGV-01
+      new_status: offline
       fault_code: E_MOTOR_OVERTEMP
 
-  - simulation_time_seconds: 600   # 10 min in
-    event_type: worker_absence
-    target_id: w-001
+  - offset_seconds: 600   # 10 min in
+    type: worker_absence
     payload:
-      status: on_leave
+      worker_id: w-001
+      new_status: on_leave
 ```
 
-Supported `event_type` values: `equipment_fault`, `worker_absence`,
-`wave_priority_change`, `inventory_adjustment`.
+Supported `type` values (`DemoScenarioController.inject` in
+`apps/api/maiw_api/demo/controller.py`): `equipment_fault`,
+`equipment_restore`, `low_stock`, `worker_absence`, `worker_return`,
+`task_deadline`, `wave_delay`.
+
+Scenario names listed in `SCENARIO_OVERLAYS`
+(`apps/api/maiw_api/demo/world_loader.py`) start from the DataPack world; any
+other scenario is seeded from its YAML `initial_state`.
 
 ---
 
 ## Step 2 — Verify it loads
 
-Start the demo API and check the scenarios list:
+Start the demo API (see the README Quickstart) and check the scenarios list:
 
 ```bash
-./scripts/start_demo_mode.sh &
+MAIW_DEMO_MODE=true MAIW_PERSISTENCE_MODE=memory uvicorn maiw_api.app:app --port 8001 &
 curl http://localhost:8001/api/v1/demo/scenarios | python3 -m json.tool
 ```
 
@@ -109,15 +114,13 @@ Your new scenario should appear in the list with its `name` and `display_name`.
 Run `my_new_scenario` through the full pipeline manually:
 
 ```bash
-curl -X POST http://localhost:8001/api/v1/demo/start \
-     -H "Content-Type: application/json" \
-     -d '{"scenario": "my_new_scenario"}'
+curl -X POST http://localhost:8001/api/v1/demo/scenario/my_new_scenario/start
 
 curl -X POST http://localhost:8001/api/v1/demo/analyze
 ```
 
-Or use the Command Center UI: select your scenario from the Demo Control Bar
-and click START.
+Or use the UI at http://localhost:3001/demo (OPERATIONS): select your
+scenario and click START.
 
 ---
 

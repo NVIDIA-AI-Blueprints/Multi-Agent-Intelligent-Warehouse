@@ -1,8 +1,8 @@
 # MAIW v2 Reference Deployment Runbook
 
 **Phase**: 20C-C — Deployment Operationalization; v2.0.1 canonical-app remediation (round 2)
-**Status**: v2.0.1 release candidate — awaiting independent re-audit
-**Last updated**: 2026-10-10
+**Status**: current for v2.1.0
+**Last updated**: 2026-10-31
 
 > **v2.0.1 change.** Everything in this runbook targets ONE process: the
 > canonical shipped app `maiw_api.app:app`. It serves `POST /api/v1/inference`
@@ -129,7 +129,7 @@ require the operator write credential".
 - **No Kubernetes manifests** — see `docs/architecture/DEPLOYMENT_ARCHITECTURE.md` for conceptual target.
 - **No NeMo Relay** — out of scope for v2 reference deployment.
 - **Provider dependency** — if the NIM endpoint is unreachable, inference fails per request (typed 503); governance and procedure state are preserved.
-- **Nano disabled** — the hosted endpoint retired `nvidia/nemotron-3-nano-30b-a3b` (HTTP 410, 2026-09-01). MEDIUM reasoning is served by Super (`fallback_used=true`). Enable Nano only with a working deployment of that exact ID.
+- **Nano disabled** — the hosted endpoint retired `nvidia/nemotron-3-nano-30b-a3b` (HTTP 410, 2026-09-01). MEDIUM reasoning is served by Lightning (`fallback_used=true`). Enable Nano only with a working deployment of that exact ID.
 - **No approved multimodal model** — IMAGE/vision requests fail closed.
 - **Governed writes need working MCP servers** — the `reference` profile does not offer them; `reference_governed` refuses READY until they are configured and reachable.
 
@@ -310,9 +310,20 @@ MAIW_MCP_EQUIPMENT_PORT=8766 .venv/bin/python -m mcp_servers.equipment.server
 # → MAIW_MCP_SERVER_EQUIPMENT_URL=http://127.0.0.1:8766/mcp
 ```
 
-The labor and wave MCP servers have no shipped PostgreSQL launch entry point
-in v2.0.1; an equipment-only governed deployment sets
-`MAIW_REQUIRED_MCP_DOMAINS=equipment`.
+The labor and wave MCP servers also ship a PostgreSQL backend (the default;
+`MAIW_MCP_LABOR_BACKEND` / `MAIW_MCP_WAVE_BACKEND`) reading the same database
+variables:
+
+```bash
+MAIW_MCP_TRANSPORT=streamable-http MAIW_MCP_LABOR_HOST=127.0.0.1 \
+MAIW_MCP_LABOR_PORT=8767 .venv/bin/python -m mcp_servers.labor.server
+# → MAIW_MCP_SERVER_LABOR_URL=http://127.0.0.1:8767/mcp
+MAIW_MCP_TRANSPORT=streamable-http MAIW_MCP_WAVE_HOST=127.0.0.1 \
+MAIW_MCP_WAVE_PORT=8768 .venv/bin/python -m mcp_servers.wave.server
+# → MAIW_MCP_SERVER_WAVE_URL=http://127.0.0.1:8768/mcp
+```
+
+An equipment-only governed deployment sets `MAIW_REQUIRED_MCP_DOMAINS=equipment`.
 
 ### Request limits and rate limiting (optional)
 
@@ -624,6 +635,7 @@ BACKUP_DIR="/backup/maiw/$(date +%Y%m%dT%H%M%S)"
 mkdir -p "$BACKUP_DIR"
 cp -r /var/lib/maiw/procedures "$BACKUP_DIR/"
 cp -r /var/lib/maiw/governance "$BACKUP_DIR/"
+cp -r /var/lib/maiw/executions "$BACKUP_DIR/"   # UNKNOWN-write execution journal
 echo "Backup at: $BACKUP_DIR"
 
 bash scripts/start_reference_deployment.sh
@@ -645,13 +657,16 @@ bash scripts/stop_reference_deployment.sh
 # 2. Validate backup directory
 ls -la /backup/maiw/<timestamp>/procedures/
 ls -la /backup/maiw/<timestamp>/governance/
+ls -la /backup/maiw/<timestamp>/executions/
 
 # 3. Restore from backup
 cp -r /backup/maiw/<timestamp>/procedures/. /var/lib/maiw/procedures/
 cp -r /backup/maiw/<timestamp>/governance/. /var/lib/maiw/governance/
+mkdir -p /var/lib/maiw/executions
+cp -r /backup/maiw/<timestamp>/executions/. /var/lib/maiw/executions/
 
 # 4. Validate file permissions
-chmod 700 /var/lib/maiw/procedures /var/lib/maiw/governance
+chmod 700 /var/lib/maiw/procedures /var/lib/maiw/governance /var/lib/maiw/executions
 
 # 5. Restart and verify readiness
 bash scripts/start_reference_deployment.sh
@@ -670,11 +685,11 @@ reinterpretation).
 
 ## Rollback
 
-**Rollback baseline** (recorded at qualification):
-- MAIW SHA: `1745a2c2d7d90041c2603acfb8291df71855278f`
+**Rollback baseline** (v2.1.0 validated code commit):
+- MAIW SHA: `c19f75f3a3a753d90687e8a6e7c7b0b1358d9ffe`
 - NemoClaw: 0.0.124
 - OpenShell: 0.0.116
-- Model: `nvidia/nemotron-3-super-120b-a12b` (gen=nemotron-3)
+- Models: Lightning `nvidia/nemotron-3.5-lightning-30b-a3b` (gen=nemotron-3.5) + Ultra `nvidia/nemotron-3-ultra-550b-a55b` (gen=nemotron-3)
 
 **Rollback procedure**:
 ```bash
@@ -990,7 +1005,7 @@ After=network.target
 Type=simple
 EnvironmentFile=/opt/maiw/.env
 WorkingDirectory=/opt/maiw
-ExecStart=/opt/maiw/env/bin/python -m uvicorn maiw_api.app:app \
+ExecStart=/opt/maiw/.venv/bin/python -m uvicorn maiw_api.app:app \
     --host 0.0.0.0 --port 8001 --no-access-log
 Restart=on-failure
 RestartSec=5

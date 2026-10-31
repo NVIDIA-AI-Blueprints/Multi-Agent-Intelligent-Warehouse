@@ -1,5 +1,7 @@
 # Unit Test Results Report
 
+> **Historical record (2025-01, pre-MAIW v2).** Point-in-time results for the legacy unit test scripts; not the current test status. Run `./scripts/testing/run_core_ci.sh` for the supported suite.
+
 **Date:** 2025-01-XX  
 **Status:** ✅ **Significantly Improved - 66 Passing, 7 Failing, 8 Errors, 3 Collection Errors**
 

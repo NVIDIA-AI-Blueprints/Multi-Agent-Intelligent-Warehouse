@@ -140,7 +140,7 @@ Test the complete flow in a controlled environment:
 docker run -it --rm \
   -v $(pwd):/workspace \
   -w /workspace \
-  python:3.9 \
+  python:3.11 \
   bash -c "pip install jupyter nbconvert && \
            jupyter nbconvert --to notebook --execute \
            notebooks/setup/complete_setup_guide.ipynb"
@@ -252,7 +252,7 @@ jupyter nbconvert --to python notebooks/setup/complete_setup_guide.ipynb --stdou
 ## Common Issues to Test
 
 1. **Missing Dependencies**
-   - Test with Python < 3.9
+   - Test with Python < 3.11
    - Test with Node.js < 18.17.0
    - Test with missing Docker
 
@@ -305,7 +305,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: '3.11'
       - name: Install dependencies
         run: |
           pip install jupyter nbconvert pytest

@@ -1,28 +1,30 @@
-# Sonar on the T-DevH mirror
+# SonarQube / SonarCloud status
 
 ## What runs today
 
-| Integration | Trigger | Status on T-DevH |
-|-------------|---------|------------------|
-| `.github/workflows/sonarqube.yml` | Manual only | Fork-safe notice job (no NVIDIA reusable workflow) |
-| **SonarCloud GitHub App** | Every push to `main` | Fails if no SonarCloud project exists for this repo |
+| Integration | Trigger | Status |
+|-------------|---------|--------|
+| `.github/workflows/sonarqube.yml` | Manual only (`workflow_dispatch`) | Notice job only — prints that SonarQube is not wired and runs **no** analysis |
+| **SonarCloud GitHub App** | Every push, if the app is installed on the repository | Fails unless a SonarCloud project exists for that repository |
 
-## Why SonarCloud checks fail
+No workflow in `.github/workflows/` runs SonarQube or SonarCloud analysis, so CI produces no Sonar results for this repository. `sonarqube.yml` does not call the NVIDIA `sonarqube-workflows` reusable workflow.
 
-The **SonarCloud Code Analysis** check is posted by the [SonarCloud GitHub App](https://github.com/apps/sonarqubecloud), not by `sonarqube.yml`. The project key inferred for this repository (`T-DevH_Multi-Agent-Intelligent-Warehouse`) is not set up on SonarCloud for the T-DevH organization, so automatic analysis fails (often after ~14 minutes) with "SonarQube Cloud analysis failed".
+`sonar-project.properties` (sources `src`, tests `tests`, Python and frontend coverage paths) is kept for a future analysis job; it does not define `sonar.organization` / `sonar.projectKey`.
 
-`sonar-project.properties` in this repo targets NVIDIA upstream SonarQube settings and does not define `sonar.organization` / `sonar.projectKey` for T-DevH.
+## Why SonarCloud checks fail on forks and mirrors
 
-## Recommended for this fork (disable)
+The **SonarCloud Code Analysis** check is posted by the [SonarCloud GitHub App](https://github.com/apps/sonarqubecloud), not by `sonarqube.yml`. If the app is installed on a fork or mirror (for example `T-DevH/Multi-Agent-Intelligent-Warehouse`) but no SonarCloud project exists for it, automatic analysis fails (often after ~14 minutes) with "SonarQube Cloud analysis failed".
 
-1. Open **GitHub** → **T-DevH/Multi-Agent-Intelligent-Warehouse** → **Settings** → **Integrations** → **GitHub Apps** → **SonarCloud** → **Configure**.
+### Disable
+
+1. Open **GitHub** → the repository → **Settings** → **Integrations** → **GitHub Apps** → **SonarCloud** → **Configure**.
 2. Remove access to this repository (or uninstall the app for this repo only).
 
 No workflow change can disable the app; it must be turned off in GitHub or SonarCloud.
 
-## If you want SonarCloud on T-DevH (enable)
+### Enable
 
-1. Create an organization and project on [SonarCloud](https://sonarcloud.io) for `T-DevH/Multi-Agent-Intelligent-Warehouse`.
+1. Create an organization and project on [SonarCloud](https://sonarcloud.io) for the repository.
 2. Add to `sonar-project.properties`:
 
    ```properties
@@ -32,4 +34,6 @@ No workflow change can disable the app; it must be turned off in GitHub or Sonar
 
 3. Ensure the SonarCloud GitHub App is installed on the repo and automatic analysis (or CI-based analysis) is configured in SonarCloud.
 
-NVIDIA internal SonarQube (TEGRASW / `sonarqube-workflows`) remains upstream-only.
+## Restoring SonarQube analysis in CI
+
+To get Sonar results from CI again, `sonarqube.yml` (or another workflow) must call a scanner — for example the NVIDIA-AI-Blueprints `sonarqube-workflows` reusable workflow (TEGRASW; not callable from forks such as T-DevH). No such job exists today.

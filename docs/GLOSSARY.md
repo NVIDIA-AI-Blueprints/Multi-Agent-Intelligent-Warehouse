@@ -52,7 +52,7 @@
   Does NOT adapt, select tools, or delegate.
 
 **DeepAgentsRuntime**
-: Adaptive runtime backed by `deepagents==0.7.15`. Uses ReAct-style reasoning.
+: Adaptive runtime backed by `deepagents>=0.7.15,<0.8.0` (`maiw-agents[deep-agents]` extra). Uses ReAct-style reasoning.
   MAIW supplies system prompt, tools, subagent specs. Deep Agents provides the runtime loop.
 
 **Skill**
@@ -124,7 +124,7 @@
   ```
 
 **DecisionEngine**
-: Synchronous, deterministic evaluator. Takes `DecisionRequest` → `APPROVED / REJECTED / DEFERRED`.
+: Synchronous, deterministic evaluator. Takes `DecisionRequest` → `APPROVED / REJECTED / REQUIRES_HUMAN_APPROVAL / REQUIRES_FRESH_STATE`.
   Never LLM-evaluated. Policy rules are Python, not prompts.
 
 **ApprovalStore**
@@ -147,13 +147,15 @@
   hold direct provider clients.
 
 **PolicyFilter**
-: Hard eligibility gate before routing. Checks risk level, reasoning level, deployment mode.
+: Hard eligibility gate before routing. Checks enabled state, approved model generation
+  (Nemotron 3 / 3.5) and physical model ID, deployment mode, modality, risk level, reasoning
+  level and required capabilities.
 
 **ModelRouter**
 : Deterministic rule-based model selector. Risk + reasoning level → model role → deployment.
 
 **DeploymentMode**
-: LOCAL_NIM | HOSTED | LOCAL_FALLBACK. Selected by env config, not by agents.
+: NVIDIA_HOSTED (default) | LOCAL_NIM | OPENAI_COMPATIBLE | ENTERPRISE. Selected by env config, not by agents.
 
 **ModelGateway Evaluation Lab**
 : Read-only developer tool at `/models/lab`. Inspects pre-computed evaluation artifacts.

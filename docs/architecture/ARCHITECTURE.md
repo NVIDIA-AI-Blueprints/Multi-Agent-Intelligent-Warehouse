@@ -39,7 +39,7 @@ MAIW Agent Runtime
     ↓
   DecisionEngine
   (synchronous, deterministic, no I/O)
-    → APPROVED / REJECTED / DEFERRED
+    → APPROVED / REJECTED / REQUIRES_HUMAN_APPROVAL / REQUIRES_FRESH_STATE
     ↓
   Human Approval
   (explicit, expirable, single-use)
@@ -96,7 +96,7 @@ Observe → Reason → Recommend → Govern → Approve → Execute → Observe 
 | Observe | `WarehouseStateProvider` | Assembles `WarehouseState` from all domains via MCP read capabilities |
 | Reason | `AgentRuntime` + `ModelGateway` | SOP-driven reasoning; model selected by `PolicyFilter` + `ModelRouter` |
 | Recommend | Agent → `RecommendedAction` | Semantic intent — not MCP parameters, not write commands |
-| Govern | `DecisionEngine` | Deterministic policy evaluation → `APPROVED / REJECTED / DEFERRED` |
+| Govern | `DecisionEngine` | Deterministic policy evaluation → `APPROVED / REJECTED / REQUIRES_HUMAN_APPROVAL / REQUIRES_FRESH_STATE` |
 | Approve | `ApprovalStore` | Human approval — explicit, expirable, single-use, proposal-bound |
 | Execute | `ActionExecutor` | 6-guard write path → MCP write capability |
 | Observe Outcome | Reconciliation + `OBSERVE_OUTCOME` | `CONFIRMED_EXECUTED / CONFIRMED_NOT_EXECUTED / INDETERMINATE` |
@@ -107,26 +107,34 @@ Observe → Reason → Recommend → Govern → Approve → Execute → Observe 
 
 Packages have strictly one-way dependencies. Nothing canonical imports from `src.*`.
 
+Edges below are the actual `maiw_*` imports in each package (excluding tests):
+
 ```
 maiw-contracts    (no dependencies)
-maiw-mcp          (→ maiw-contracts)
-maiw-models       (→ maiw-contracts)
-maiw-state        (→ maiw-contracts, maiw-mcp)
-maiw-skills       (→ maiw-state, maiw-mcp, maiw-models)
-maiw-decision     (→ maiw-contracts, maiw-skills, maiw-state)
-maiw-execution    (→ maiw-decision, maiw-skills, maiw-mcp)
-maiw-world        (→ maiw-state)
-maiw-agents       (→ maiw-execution, maiw-skills, maiw-state, maiw-models)
+maiw-world        (no dependencies)
+maiw-mcp          (no runtime dependencies; maiw_mcp.testing → maiw-contracts)
+maiw-models       (→ maiw-mcp)
+maiw-state        (→ maiw-mcp, maiw-contracts)
+maiw-decision     (→ maiw-state)
+maiw-skills       (→ maiw-mcp, maiw-contracts, maiw-decision)
+maiw-execution    (→ maiw-decision, maiw-state, maiw-mcp, maiw-contracts)
+maiw-agents       (→ maiw-decision, maiw-state, maiw-models, maiw-contracts)
 apps/api          (→ all canonical packages)
 ```
 
-`maiw-execution` does not import `maiw-agents`. Cycle prevention is enforced by the test suite.
+The `pyproject.toml` declarations are narrower than the imports: no package declares
+`maiw-contracts`; `maiw-skills` declares only `maiw-mcp`; `maiw-agents` declares
+`maiw-decision`, `maiw-mcp`, `maiw-state` (it imports `maiw-models` and `maiw-contracts`,
+not `maiw-mcp`). Install all packages together (README Quickstart).
+
+`maiw-agents` does not import `maiw-execution` or `maiw-skills`, and `maiw-execution`
+does not import `maiw-agents`. Cycle prevention is enforced by the test suite.
 
 ---
 
 ## Known Modernization Boundary
 
-MAIW v2 uses the `packages/` layout as the target modular architecture, but portions of the live runtime still reside under `src/` and are actively imported by `apps/api/maiw_api/`. In particular, `apps/api/maiw_api/app.py` imports routers, middleware, and services directly from `src.api.*` (e.g., `src.api.routers`, `src.api.middleware.security_headers`, `src.api.services.monitoring`, `src.api.services.security`). Additionally, some ModelGateway-related runtime code has not yet been fully migrated from `src/api/services/model_gateway/` into `packages/maiw-models/` — both directories contain parallel implementations.
+MAIW v2 uses the `packages/` layout as the target modular architecture, but portions of the live runtime still reside under `src/` and are actively imported by `apps/api/maiw_api/`. In particular, `apps/api/maiw_api/app.py` imports routers, middleware, and services directly from `src.api.*` (e.g., `src.api.routers`, `src.api.middleware.security_headers`, `src.api.services.monitoring`, `src.api.services.security`). Additionally, `src/api/services/model_gateway/` still exists as deprecated re-export shims of `maiw_models` (the implementation lives in `packages/maiw-models/`) so that old import paths keep working.
 
 These paths are **not dead legacy code** and must not be removed without an explicit migration that preserves all ModelGateway invariants (single inference boundary, PolicyFilter, ModelRouter, Deployment Resolver, routing provenance).
 
@@ -156,7 +164,7 @@ The architectural source of truth remains the current MAIW v2 contracts, ownersh
 | [MODEL_GATEWAY.md](MODEL_GATEWAY.md) | PolicyFilter, ModelRouter, Deployment Resolver, Nemotron roles |
 | [MCP.md](MCP.md) | Official MCP SDK, Streamable HTTP, capability registry |
 | [WAREHOUSE_WORLD.md](WAREHOUSE_WORLD.md) | BASE/SCENARIO/LIVE, OperationalContextSnapshot |
-| [DECISION_ENGINE.md](DECISION_ENGINE.md) | Constraint rules, APPROVED/REJECTED/DEFERRED |
+| [DECISION_ENGINE.md](DECISION_ENGINE.md) | Constraint rules, APPROVED/REJECTED/REQUIRES_HUMAN_APPROVAL/REQUIRES_FRESH_STATE |
 | [CAPABILITY_MATRIX.md](CAPABILITY_MATRIX.md) | All 13 capabilities, read/write classification |
 | [RUNTIME_EXECUTION_FLOW.md](RUNTIME_EXECUTION_FLOW.md) | Full pipeline sequence diagrams |
 | [DEPENDENCY_BOUNDARIES.md](DEPENDENCY_BOUNDARIES.md) | Package boundary enforcement |

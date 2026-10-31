@@ -11,7 +11,7 @@ This guide explains how to set up NVIDIA RAPIDS cuML for GPU-accelerated demand 
 - **CUDA 11.2+ or 12.0+** installed
 
 ### Software Requirements
-- **Python 3.9-3.11** (RAPIDS supports these versions)
+- **Python 3.11** for the MAIW virtual environment (MAIW requires Python >= 3.11; the RAPIDS 24.02 conda/container examples below use Python 3.10 and run the forecasting script standalone)
 - **NVIDIA GPU drivers** (latest recommended)
 - **CUDA Toolkit** (11.2+ or 12.0+)
 
@@ -23,7 +23,7 @@ This is the easiest method for development environments:
 
 ```bash
 # Activate your virtual environment
-source env/bin/activate
+source .venv/bin/activate
 
 # Run the installation script
 ./scripts/setup/install_rapids.sh
@@ -69,13 +69,10 @@ pip install asyncpg psycopg2-binary redis
 
 ### Method 3: Docker (Recommended for Isolation)
 
-Use the provided Docker Compose configuration:
+Build the image from `Dockerfile.rapids` at the repository root and run it. (`deploy/compose/docker-compose.rapids.yml` is not currently usable: its build context and command path are wrong.)
 
 ```bash
-# Build and run RAPIDS container
-docker-compose -f deploy/compose/docker-compose.rapids.yml up -d
-
-# Or build manually
+# Build and run RAPIDS container (from the repository root)
 docker build -f Dockerfile.rapids -t warehouse-rapids .
 docker run --gpus all -it warehouse-rapids
 ```
@@ -127,30 +124,17 @@ from scripts.forecasting.rapids_gpu_forecasting import RAPIDSForecastingAgent
 # Initialize agent (will use GPU if RAPIDS is available)
 agent = RAPIDSForecastingAgent()
 
-# Run forecasting
-await agent.initialize_connection()
-forecast = await agent.run_batch_forecast(skus=['SKU001', 'SKU002'])
+# Run forecasting for all SKUs (connects to the database itself)
+forecast = await agent.run_batch_forecast()
 ```
 
-### Via API
+### Via API / UI
 
-The forecasting API endpoints automatically use GPU acceleration when RAPIDS is available:
+Training is **not exposed by the release API**: `apps/api/maiw_api/app.py` mounts only the GET routes of the legacy training and forecasting routers, so `POST /api/v1/training/start` (and the Forecasting page's "Start Training" button, which calls it) returns 404/405. Run the forecasting script directly instead:
 
 ```bash
-# Start the API server
-./scripts/start_server.sh
-
-# Trigger GPU-accelerated training
-curl -X POST http://localhost:8001/api/v1/training/start \
-  -H "Content-Type: application/json" \
-  -d '{"training_type": "advanced"}'
+python scripts/forecasting/rapids_gpu_forecasting.py
 ```
-
-### Via UI
-
-1. Navigate to the Forecasting page: `http://localhost:3001/forecasting`
-2. Click "Start Training" with "Advanced" mode selected
-3. The system will automatically use GPU acceleration if RAPIDS is available
 
 ## Performance Benefits
 
@@ -171,7 +155,7 @@ GPU acceleration provides significant performance improvements:
 
 ## Troubleshooting
 
-### Issue: "RAPIDS cuML not available - falling back to CPU"
+### Issue: "RAPIDS cuML not available - checking for XGBoost GPU support..."
 
 **Causes:**
 1. RAPIDS not installed
@@ -197,7 +181,7 @@ nvcc --version
 - Multiple processes using GPU
 
 **Solutions:**
-1. Reduce batch size in configuration
+1. Reduce `lookback_days`, `n_estimators` or `max_depth` in configuration
 2. Process SKUs in smaller batches
 3. Use CPU fallback for very large datasets
 4. Free GPU memory: `python -c "import cupy; cupy.get_default_memory_pool().free_all_blocks()"`
@@ -233,27 +217,28 @@ pip install --extra-index-url=https://pypi.nvidia.com cudf-cu12 cuml-cu12
 
 ### Environment Variables
 
-Set these in your `.env` file:
+GPU use is detected automatically (RAPIDS cuML, else XGBoost CUDA, else CPU); there is no `USE_GPU` switch. To pick a GPU:
 
 ```bash
-# Enable GPU acceleration
-USE_GPU=true
-
-# GPU memory fraction (0.0-1.0)
-GPU_MEMORY_FRACTION=0.8
-
 # CUDA device ID
 CUDA_VISIBLE_DEVICES=0
 ```
 
 ### Code Configuration
 
+`RAPIDSForecastingAgent(config)` **replaces** the defaults, so pass every key (defaults from `_get_default_config()` in `scripts/forecasting/rapids_gpu_forecasting.py`):
+
 ```python
-# In rapids_gpu_forecasting.py
 config = {
-    "use_gpu": True,  # Enable GPU acceleration
-    "gpu_memory_fraction": 0.8,  # Use 80% of GPU memory
-    "batch_size": 1000,  # Process 1000 rows at a time
+    "lookback_days": 180,
+    "forecast_days": 30,
+    "test_size": 0.2,
+    "random_state": 42,
+    "n_estimators": 100,
+    "max_depth": 10,
+    "min_samples_split": 5,
+    "min_samples_leaf": 2,
+    "max_features": "sqrt",
 }
 ```
 

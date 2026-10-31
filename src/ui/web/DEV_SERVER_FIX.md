@@ -39,7 +39,7 @@ These errors typically occur when:
 
 If you must use the production build, you can disable source maps:
 
-1. **Update `.env.local`:**
+1. **Create or update `src/ui/web/.env.local`** (not tracked in the repository):
    ```bash
    GENERATE_SOURCEMAP=false
    ```
@@ -51,7 +51,7 @@ If you must use the production build, you can disable source maps:
 
 ### Option 3: Fix WebSocket Configuration
 
-The `.env.local` file is already configured with:
+The repository ships no `.env.local`; create `src/ui/web/.env.local` with:
 ```
 WDS_SOCKET_HOST=localhost
 WDS_SOCKET_PORT=3001

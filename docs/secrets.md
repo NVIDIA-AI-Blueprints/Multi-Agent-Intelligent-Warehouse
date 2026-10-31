@@ -47,22 +47,23 @@ Create a `.env` file with production values:
 ```bash
 # Database
 DATABASE_URL=postgresql://username:password@host:port/database
-REDIS_URL=redis://username:password@host:port
+POSTGRES_PASSWORD=your-db-password
+REDIS_PASSWORD=your-redis-password
 
-# JWT
+# JWT (HS256, 30-minute access tokens are fixed in code)
 JWT_SECRET_KEY=your-super-secret-jwt-key-here
-JWT_ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
 
 # NVIDIA NIMs
-NIM_LLM_URL=your-nim-llm-url
-NIM_EMBEDDINGS_URL=your-nim-embeddings-url
-NIM_API_KEY=your-nim-api-key
+NVIDIA_API_KEY=your-nvidia-api-key
+LLM_NIM_URL=https://integrate.api.nvidia.com/v1
+EMBEDDING_NIM_URL=https://integrate.api.nvidia.com/v1
 
-# External Services
-WMS_API_KEY=your-wms-api-key
-ERP_API_KEY=your-erp-api-key
+# MAIW API credentials (each >= 32 chars; must differ from each other)
+MAIW_INFERENCE_INTERNAL_TOKEN=your-inference-token   # the only credential given to the sandbox
+MAIW_OPERATOR_WRITE_TOKEN=your-operator-write-token  # reference_governed only; never given to the sandbox
 ```
+
+See the "Secrets" table in [operations/REFERENCE_DEPLOYMENT_RUNBOOK.md](operations/REFERENCE_DEPLOYMENT_RUNBOOK.md) for who holds each secret and what to restart on rotation.
 
 ## Security Best Practices
 

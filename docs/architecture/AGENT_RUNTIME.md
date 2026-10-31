@@ -52,8 +52,8 @@ runtime_profile: adaptive  # → DeepAgentsRuntime (LLM-adaptive)
 
 Selection priority (highest wins):
 1. Explicit `config` argument to `get_runtime(config=...)`
-2. `MAIW_AGENT_RUNTIME` environment variable
-3. `sop.runtime_profile` field in SOPDefinition
+2. `sop.runtime_profile` field in SOPDefinition (when a SOP is supplied)
+3. `MAIW_AGENT_RUNTIME` environment variable — only when neither a config nor a SOP is supplied
 4. Default: `"deterministic"`
 
 ---
@@ -71,7 +71,7 @@ Selection priority (highest wins):
 
 - **Purpose:** Adaptive reasoning within SOP envelope
 - **Use for:** Complex root-cause investigation, cross-domain exception analysis, specialist delegation
-- **Dependencies:** `deepagents==0.7.15` (LangChain/LangGraph)
+- **Dependencies:** `deepagents>=0.7.15,<0.8.0` via the `maiw-agents[deep-agents]` extra (LangChain/LangGraph)
 - **Model:** `MAIWModelGatewayChat` → MAIW ModelGateway (hard invariant — no direct providers)
 - **Key property:** Adaptive — selects tools and subagents dynamically within SOP bounds
 
@@ -277,6 +277,8 @@ OpenShell sandbox `maiw-qual-20c-b` through `POST /api/v1/inference` to
 `nvidia/nemotron-3-super-120b-a12b` (gen=nemotron-3) confirmed on epg-tme-smc-h100-02.
 51 `@real_sandbox` tests pass. Auth fail-closed (401 without token). All forbidden fields
 return 422. SSRF blocks (localhost, direct NIM, arbitrary internet) confirmed from sandbox.
+*(Dated qualification record. Super has been disabled by default since v2.1.0 — hosted
+endpoint retired 2026-10-19.)*
 
 See [NEMOCLAW_OPENSHELL_INTEGRATION.md](NEMOCLAW_OPENSHELL_INTEGRATION.md) for
 the ownership matrix, threat model, and current qualification status.

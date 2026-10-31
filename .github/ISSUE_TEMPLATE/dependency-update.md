@@ -12,7 +12,7 @@ assignees: ['T-DevH']
 - **Package Name**: 
 - **Current Version**: 
 - **Target Version**: 
-- **Package Manager**: [pip/npm/docker/github-actions/helm]
+- **Package Manager**: [pip/npm/docker/github-actions]
 - **Directory**: 
 
 ### Update Type

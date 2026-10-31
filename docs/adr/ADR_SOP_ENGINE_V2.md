@@ -7,6 +7,13 @@
 **Related document:** docs/architecture/SOP_ENGINE_V2_DESIGN.md
 **Implemented on:** branch `feat/sop-engine-v2-foundation`
 
+> **Dated record (2026-09-26).** The status below describes the foundation at that date.
+> Since then Proof SOPs B (`agents/sops/equipment/equipment_failure_recovery.v1.yaml`) and
+> C (`agents/sops/inventory/picking_inventory_exception.v1.yaml`), bounded loops and
+> file-backed procedure persistence (`JsonFileProcedureStateStore`) have been implemented;
+> MODEL_JUDGE, OTEL spans and Blueprint extraction remain deferred. See
+> [SOP_ENGINE_V2_DESIGN.md](../architecture/SOP_ENGINE_V2_DESIGN.md) for current status.
+
 Option B is implemented as a foundation. `packages/maiw-agents/maiw_agents/sop_engine/`
 exists; both runtimes implement `SOPStepExecutor`; all three v1 SOPs run unmodified;
 Proof SOP A (`agents/sops/operations_coordination/wave_risk_resolution.v2.yaml`) ships

@@ -14,6 +14,11 @@
 The V2 foundation has been implemented within `packages/maiw-agents` per ADR Option B.
 Sections below retain their original audit language; this table records what is now real.
 
+> **Dated record.** Sections 1–59 are the 2026-09-26 audit at `e33ed699` and are kept
+> unchanged; line numbers and "current" statements in them describe that commit. The
+> status table above and the later sections (V1 Procedure Migration, Proof SOPs B/C,
+> Domain-Owned State Predicates, Production Hardening) describe the implementation.
+
 | Section | Topic | Status |
 |---------|-------|--------|
 | 5 | Canonical SOP source of truth | **IMPLEMENTED** — unchanged: YAML authoring, Pydantic runtime |
@@ -23,10 +28,10 @@ Sections below retain their original audit language; this table records what is 
 | 14 | Validator authority rule | **IMPLEMENTED** — enforced structurally, asserted by `test_security_boundary.py` |
 | 15 | MODEL_JUDGE appropriateness | **DEFERRED** — not implemented; `ValidatorRegistry.get()` raises for unsupported types |
 | 16 | Step execution state machine | **IMPLEMENTED** — `contracts/step_result.py::StepStatus` |
-| 17 | Procedure execution state | **IMPLEMENTED** — `contracts/procedure_state.py` (in-memory; see Section 54) |
+| 17 | Procedure execution state | **IMPLEMENTED** — `contracts/procedure_state.py` (persisted via `ProcedureStateStore`; see Production Hardening) |
 | 18 | Identity model | **IMPLEMENTED** — `procedure_execution_id` (UUID4) distinct from and linked to task/trace ids |
 | 19 | Branching semantics | **PARTIAL** — `condition` and `on_failure_step_id` honoured; declarative `StepBranch` model **DEFERRED** |
-| 20 | Loop semantics | **DEFERRED** — bounded only by the engine's `max_transitions` guard |
+| 20 | Loop semantics | **IMPLEMENTED** — bounded single-step loops via `LoopPolicy` (`contracts/sop_v2.py`); see Proof SOP C |
 | 21 | Retry semantics | **IMPLEMENTED** — `RetryPolicy`, per-step budget, backoff, no blind write retry |
 | 22 | Timeout semantics | **IMPLEMENTED** — `SOPStep.timeout_seconds`, enforced via `asyncio.wait_for` |
 | 23 | Escalation semantics | **IMPLEMENTED** — `EscalationReasonCode` typed enum |
@@ -43,9 +48,9 @@ Sections below retain their original audit language; this table records what is 
 | 34 | Post-write completion (hard invariant) | **IMPLEMENTED** — `test_governance_resume_post_write.py` |
 | 35–38 | Strategy / facility configurability | **DEFERRED** — out of scope for the foundation |
 | 39 | Human-readable SOP corpus | **DEFERRED** |
-| 40 | Three proof SOPs | **PARTIAL** — Proof SOP A shipped (`wave_risk_resolution.v2.yaml`); B and C **DEFERRED** |
+| 40 | Three proof SOPs | **IMPLEMENTED** — A (`wave_risk_resolution.v2.yaml`), B (`equipment_failure_recovery.v1.yaml`), C (`picking_inventory_exception.v1.yaml`) |
 | 41–43 | Versioning and change control | **PARTIAL** — v2 SOP carries a distinct id and version; formal change control **DEFERRED** |
-| 44 | Testing strategy | **IMPLEMENTED** — 196 tests in `packages/maiw-agents/tests/`, wired into CORE CI |
+| 44 | Testing strategy | **IMPLEMENTED** — `packages/maiw-agents/tests/`, wired into CORE CI |
 | 45 | Cross-runtime equivalence | **IMPLEMENTED** — `test_cross_runtime_equivalence.py` |
 | 46 | OTEL / trace model | **DEFERRED** — evidence and trace_id provenance carried; spans not instrumented |
 | 47 | NeMo Relay fit | **DEFERRED** |
@@ -53,7 +58,7 @@ Sections below retain their original audit language; this table records what is 
 | 51 | Security | **IMPLEMENTED** — no eval, predicates registered in code, boundary tests |
 | 52, 58 | Failure mode analysis | **IMPLEMENTED** — timeout, executor exception, unknown step, runaway all contained |
 | 53 | Idempotency | **PARTIAL** — attempts are counted and validators are pure; executor idempotency is the runtime's responsibility |
-| 54 | Persistence requirements | **DEFERRED** — `ProcedureExecutionState` is in-memory and serialisable; no backend |
+| 54 | Persistence requirements | **IMPLEMENTED (single node)** — `InMemoryProcedureStateStore` / `JsonFileProcedureStateStore`; database-backed and multi-replica stores deferred (see Production Hardening) |
 | 55 | Performance assessment | **PARTIAL** — deterministic validators are sub-millisecond; step-at-a-time model latency not yet measured |
 | 56 | Operator / developer UX | **DEFERRED** |
 
@@ -61,10 +66,10 @@ Two known deviations from the original design text:
 
 1. **Step advancement.** `SOPStep.next_step_id` documents "if None, proceed to the next
    step in the sequence", but neither the pre-V2 deterministic runtime nor the V2 engine
-   does this — `None` terminates the procedure. All three v1 SOPs declare no
-   `next_step_id`, so they traverse exactly one step, before and after V2. This behaviour
-   is preserved deliberately (no regression); the v2 proof SOP chains steps explicitly.
-   Changing it would alter production agent traversal and is out of scope here.
+   does this — `None` terminates the procedure. At the foundation, the three v1 SOPs
+   declared no `next_step_id` and so traversed exactly one step. **Resolved** by the
+   [V1 Procedure Migration](#v1-procedure-migration): every v1 SOP now declares an
+   explicit `next_step_id` chain, and the field description was corrected.
 2. **`EXECUTION_AMBIGUITY_UNRESOLVED`** (Section 34) is implemented as
    `EscalationReasonCode.EXECUTION_INDETERMINATE`.
 
@@ -2205,7 +2210,17 @@ packages/maiw-agents/
     │   ├── agent.py        AgentDefinition, GovernanceBoundary, TerminationPolicy, AgentTrigger
     │   ├── definitions.py  Canonical instances: OCA, Labor, Wave, Equipment, Safety
     │   ├── registry.py     CapabilityClass, SkillRegistryEntry, SKILL_REGISTRY
-    │   └── delegation.py   AgentDelegationRequest, AgentDelegationResult
+    │   ├── delegation.py   AgentDelegationRequest, AgentDelegationResult
+    │   ├── sop_v2.py       StepCompletionSpec, RetryPolicy, LoopPolicy, EvidenceRequirement, ValidatorType
+    │   ├── step_result.py  StepStatus, StepResult, EvidenceRef, ValidationResult
+    │   ├── procedure_state.py  ProcedureExecutionState
+    │   └── capability_policy.py  RuntimeCapabilityPolicy, build_capability_policy, authorize_*
+    ├── sop_engine/
+    │   ├── engine.py       SOPEngine
+    │   ├── executor.py     SOPStepExecutor
+    │   ├── validators.py   ValidatorRegistry, state predicate registry
+    │   └── state_store.py  ProcedureStateStore, InMemoryProcedureStateStore, JsonFileProcedureStateStore
+    ├── domain_predicates.py  register_all_domain_predicates()
     ├── runtime/
     │   ├── deterministic.py      MAIWDeterministicRuntime (Phase 18H.8), handle_delegation()
     │   ├── deep_agents_runtime.py DeepAgentsRuntime (Phase 19A), get_runtime() factory
@@ -2215,15 +2230,20 @@ packages/maiw-agents/
     ├── labor/agent.py       LaborAgent
     ├── wave/agent.py        WaveAgent
     ├── equipment/agent.py   EquipmentAssetOperationsAgent
+    ├── safety/agent.py      SafetyComplianceAgent
+    ├── {equipment,wave,inventory}/predicates.py  domain-owned state predicates
     └── assessment.py        Assessment base types
 
 agents/sops/
 ├── operations_coordination/wave_risk_resolution.v1.yaml  (runtime_profile: adaptive, 8 steps, v1.1)
 ├── operations_coordination/wave_risk_resolution.v2.yaml  (runtime_profile: adaptive, 8 steps, v2.0 — Proof SOP A)
 ├── labor/labor_constraint_assessment.v1.yaml              (runtime_profile: strict, 8 steps, v1.1)
-└── wave/wave_risk_assessment.v1.yaml                      (runtime_profile: strict, 7 steps, v1.1)
+├── wave/wave_risk_assessment.v1.yaml                      (runtime_profile: strict, 7 steps, v1.1)
+├── equipment/equipment_failure_recovery.v1.yaml           (runtime_profile: adaptive, 8 steps, v1.0 — Proof SOP B)
+└── inventory/picking_inventory_exception.v1.yaml          (runtime_profile: strict, 9 steps, v1.0 — Proof SOP C)
 
-All four declare explicit next_step_id chains and a single terminal step.
+All six declare explicit next_step_id chains. Proof SOP C has two terminal steps
+(`resume_picking`, `escalate_to_human`); the others have a single terminal step.
 See "V1 Procedure Migration" above.
 ```
 
@@ -2432,7 +2452,7 @@ The engine's import closure — stdlib + `pydantic` + `yaml` + MAIW contracts �
 
 Policies remain *derived, not stored*, so a restarted sandbox rebuilds the identical grant and there is no stored policy to tamper with between runs.
 
-Not yet built, and explicitly out of scope here: the sandbox process boundary itself (OpenShell is not installed on any host this has run on), syscall/network confinement, per-sandbox credential brokering, and multi-replica durable state. See [NEMOCLAW_OPENSHELL_INTEGRATION.md](NEMOCLAW_OPENSHELL_INTEGRATION.md) § Current qualification status.
+Not built here: per-sandbox credential brokering and multi-replica durable state. The sandbox process boundary and its syscall/network confinement are provided by OpenShell, not by MAIW, and were qualified on a real host in Phase 20B / 20C-B. See [NEMOCLAW_OPENSHELL_INTEGRATION.md](NEMOCLAW_OPENSHELL_INTEGRATION.md) § Current qualification status.
 
 ### Deferred items
 

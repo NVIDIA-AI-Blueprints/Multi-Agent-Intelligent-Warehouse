@@ -39,7 +39,7 @@ response = await nim_client.generate_response(messages, temperature=0.0)
 **Description:** Maximum number of tokens to generate in the response. This limits the length of the output.
 
 **Range:** `1` to model's maximum context window
-- For Nemotron 3 Super 120B: Up to 131,072 tokens (context window)
+- The model is chosen per request by ModelGateway (Lightning for LOW/MEDIUM reasoning, Ultra for HIGH/CRITICAL by default); see its model card for the context window
 - Typical values: `500-4000` for most queries, `2000-8000` for complex queries
 
 **Default:** `2000`
@@ -140,8 +140,9 @@ response = await nim_client.generate_response(messages, presence_penalty=0.5)
 Add these to your `.env` file (or set as environment variables):
 
 ```bash
-# LLM Model Configuration
-LLM_MODEL=nvidia/nemotron-3-super-120b-a12b
+# Model selection is per role (NEMOTRON_<ROLE>_MODEL / NEMOTRON_<ROLE>_ENABLED);
+# see "MODEL ROLE BINDINGS" in .env.example. LLM_MODEL is not used by
+# ModelGateway dispatch.
 
 # LLM Generation Parameters
 LLM_TEMPERATURE=0.1          # Default: 0.1 (balanced, slightly creative)
@@ -212,7 +213,8 @@ Different agents in the system use different parameter settings:
 ## Implementation Details
 
 ### Code Location
-- **Configuration:** `src/api/services/llm/nim_client.py` - `NIMConfig` class
+- **Canonical (ModelGateway path):** `packages/maiw-models/maiw_models/providers/nim_client.py` - `NIMConfig` class
+- **Legacy configuration:** `src/api/services/llm/nim_client.py` - `NIMConfig` class
 - **Generation Method:** `src/api/services/llm/nim_client.py` - `NIMClient.generate_response()`
 
 ### How It Works
@@ -275,6 +277,6 @@ response = await nim_client.generate_response(
 ## See Also
 
 - [NVIDIA NIM Documentation](https://build.nvidia.com/)
-- [Nemotron 3 Super 120B Model Card](https://build.nvidia.com/nvidia/nemotron-3-super-120b-a12b/modelcard)
+- [docs/architecture/MODEL_GATEWAY.md](../architecture/MODEL_GATEWAY.md) (Nemotron roles and routing)
 - [OpenAI API Parameters Reference](https://platform.openai.com/docs/api-reference/chat/create) (similar parameter definitions)
 

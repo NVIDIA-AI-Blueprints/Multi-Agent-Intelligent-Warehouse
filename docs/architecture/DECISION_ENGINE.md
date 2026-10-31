@@ -27,7 +27,7 @@ WarehouseStateSnapshot ──────────────────┤
 
 ## Package
 
-`packages/maiw-decision/` — depends on `maiw-state` and `maiw-mcp`, never on `src/api/`.
+`packages/maiw-decision/` — depends on `maiw-state`, never on `src/api/`.
 
 ## Outcomes
 
@@ -137,7 +137,7 @@ To add a rule:
 
 ## State Drift Protection
 
-`EquipmentActionExecutor._check_state_drift()` runs **after** all rule-based guards pass and **before** the MCP write tool is called. It is best-effort:
+`EquipmentActionExecutor._check_additional_guards()` (the state-drift guard, guard 5) runs **after** all rule-based guards pass and **before** the MCP write tool is called. It is best-effort:
 
 | Classification | Meaning |
 |----------------|---------|
@@ -145,7 +145,7 @@ To add a rule:
 
 **Why LIMITED**: The drift check requires a live state fetch (`WarehouseStateProvider.get_state`). If the provider is absent, the check is skipped (no error). If the provider is present, only a single asset status field is validated. A full re-evaluation would require re-running DecisionEngine against a new snapshot, which is the caller's responsibility if the decision token expires.
 
-**`warehouse_id` propagation ():** `_check_state_drift()` reads `warehouse_id` from `proposal.parameters["warehouse_id"]` — never uses a hardcoded default. All three `ActionProposal` factories include `warehouse_id` in their parameters dict.
+**`warehouse_id` propagation ():** the drift guard reads `warehouse_id` from `proposal.parameters["warehouse_id"]` (falling back to `"default"` only if the key is absent). All three `ActionProposal` factories include `warehouse_id` in their parameters dict.
 
 ## NIM Fallback
 
@@ -155,7 +155,7 @@ The `_llm_generate()` path in `MCPEquipmentAssetOperationsAgent` can fall back t
 Classification: COMPATIBILITY_ONLY
 ```
 
-**When active**: `MAIW_MODEL_GATEWAY_ENABLED` is unset or `false`. 
+**When active**: `MODEL_GATEWAY_ENABLED=false` (default `true`; emergency rollback only). 
 **What it does**: Routes to `nim_client.generate_response()` directly, bypassing `ModelGateway`. 
 **Why kept**: Some deployments do not have `ModelGateway` configured; the fallback ensures the agent remains functional. It is not the production path. 
 **Invariant**: The NIM fallback path is not a new capability. No new code should use it. All new agent work should use `ModelGateway`.

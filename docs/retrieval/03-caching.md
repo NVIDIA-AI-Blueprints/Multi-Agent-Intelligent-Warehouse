@@ -38,6 +38,11 @@ The system implements multiple caching strategies for different data types:
 
 ## Implementation
 
+The snippets below are illustrative. The implementation is
+`RedisCacheService` (`src/retrieval/caching/redis_cache_service.py`, default
+TTLs in `cache_ttl_map`) and `CacheManager`
+(`src/retrieval/caching/cache_manager.py`); see `src/retrieval/caching/README.md`.
+
 ### Cache Manager
 
 ```python
@@ -114,7 +119,7 @@ class VectorSearchCache:
     
     def __init__(self, cache_manager):
         self.cache_manager = cache_manager
-        self.ttl = 600  # 10 minutes
+        self.ttl = 180  # 3 minutes
     
     async def get_search_result(self, query_hash, filters):
         """Get cached vector search result."""
@@ -134,7 +139,7 @@ class EvidencePackCache:
     
     def __init__(self, cache_manager):
         self.cache_manager = cache_manager
-        self.ttl = 1800  # 30 minutes
+        self.ttl = 600  # 10 minutes
     
     async def get_evidence_pack(self, query_hash, evidence_hash):
         """Get cached evidence pack."""
@@ -165,12 +170,12 @@ cache:
       compression: true
     
     vector_search:
-      ttl: 600  # 10 minutes
+      ttl: 180  # 3 minutes
       max_size: 500MB
       compression: true
     
     evidence_pack:
-      ttl: 1800  # 30 minutes
+      ttl: 600  # 10 minutes
       max_size: 200MB
       compression: true
     

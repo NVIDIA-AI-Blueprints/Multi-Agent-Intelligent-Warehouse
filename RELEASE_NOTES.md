@@ -1,4 +1,6 @@
-# MAIW v2 Release Notes
+# MAIW v2.0.0 Release Notes
+
+> Historical: the v2.0.0 notes. The current release is v2.1.0 — see [RELEASE_NOTES_v2.1.0.md](RELEASE_NOTES_v2.1.0.md).
 
 ## What is MAIW v2
 
@@ -21,7 +23,7 @@ MAIW v2 is organized around a set of canonical packages, each with a clear, enfo
 | `maiw-contracts` | Domain value objects (equipment, labor, wave, inventory contracts) |
 | `maiw-mcp` | MCP client, capability registry, circuit breakers |
 | `maiw-state` | `WarehouseState`, domain state models |
-| `maiw-decision` | `ActionProposal`, `DecisionResult`, `ApprovalRecord`, `DecisionEngine` — synchronous, no I/O, APPROVED/REJECTED/DEFERRED |
+| `maiw-decision` | `ActionProposal`, `DecisionResult`, `ApprovalRecord`, `DecisionEngine` — synchronous, no I/O, APPROVED/REJECTED/REQUIRES_HUMAN_APPROVAL/REQUIRES_FRESH_STATE |
 | `maiw-models` | `ModelGateway`, NIM provider, `PolicyFilter`, `ModelRouter` |
 | `maiw-skills` | Inventory, Equipment, Labor, Wave skills |
 | `maiw-execution` | `BaseActionExecutor` (6-guard pattern), domain executors |
@@ -88,7 +90,7 @@ The sandbox is **containment, not migration.** All SOP semantics, governance, an
 
 MAIW v2 ships a reference deployment for development, demo, and qualification:
 
-- Single-node Docker Compose stack (reference environment)
+- Single-node reference deployment (venv + lifecycle scripts + OpenShell sandbox; see the runbook below); Docker Compose stack for local development
 - Startup validation via `scripts/check_demo_environment.sh`
 - Demo mode (`MAIW_DEMO_MODE=true`) runs without PostgreSQL, Redis, Milvus, or Kafka — requires only `NVIDIA_API_KEY`
 - Reference deployment runbook: `docs/operations/REFERENCE_DEPLOYMENT_RUNBOOK.md`
@@ -129,7 +131,6 @@ Qualification host: epg-tme-smc-h100-02 (4 x H100 NVL, sm_90a, NemoClaw 0.0.124,
 - **Qualified on epg-tme-smc-h100-02 and reference environment.** Behavior on other GPU configurations or cloud environments is not qualified.
 - **real_sandbox tests skip on non-qualification hosts.** Tests marked `@pytest.mark.real_sandbox` require NemoClaw/OpenShell installed and skip elsewhere — this is expected behavior.
 - **Pre-existing ESLint warnings.** 1041 warnings (no-console, no-explicit-any); 0 errors. Non-blocking.
-- **Semantic Release skips on PR branches.** Expected CI behavior for release branches.
 
 ## Deferred (Post-v2)
 

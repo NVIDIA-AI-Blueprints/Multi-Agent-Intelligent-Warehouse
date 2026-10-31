@@ -67,7 +67,8 @@ docker run --gpus all -it \
 pip install asyncpg psycopg2-binary xgboost
 ``` ### 4. Test Installation
 ```bash
-python scripts/test_rapids_forecasting.py
+nvidia-smi
+python -c "import cudf, cuml; print('RAPIDS OK')"
 ``` ### 5. Run Forecasting Agent
 ```bash
 python scripts/forecasting/rapids_gpu_forecasting.py
@@ -76,6 +77,9 @@ python scripts/forecasting/rapids_gpu_forecasting.py
 ## Configuration
 
 ### ForecastingConfig
+
+Defined in `scripts/forecasting/rapids_forecasting_agent.py` (used by `RAPIDSForecastingAgent` in the examples below; `rapids_gpu_forecasting.py` uses a plain dict config instead).
+
 ```python
 @dataclass
 class ForecastingConfig:
@@ -96,7 +100,7 @@ class ForecastingConfig:
 
 ### Single SKU Forecast
 ```python
-from scripts.forecasting.rapids_gpu_forecasting import RAPIDSForecastingAgent
+from scripts.forecasting.rapids_forecasting_agent import RAPIDSForecastingAgent
 
 agent = RAPIDSForecastingAgent()
 forecast = await agent.forecast_demand("LAY001", horizon_days=30)
@@ -112,6 +116,9 @@ forecasts = await agent.batch_forecast(skus, horizon_days=30)
 for sku, forecast in forecasts.items():
     print(f"{sku}: {sum(forecast.predictions)/len(forecast.predictions):.1f} avg daily demand")
 ``` ### API Integration
+
+> **Note:** the release API (`apps/api/maiw_api/app.py`) mounts only the GET routes of the legacy forecasting and training routers; forecast-generation and training POST endpoints are not exposed. The snippet below is an illustration for custom integrations.
+
 ```python
 # FastAPI endpoint
 @router.post("/forecast/demand")
@@ -126,21 +133,15 @@ async def forecast_demand(request: ForecastRequest):
 ### Run Tests
 ```bash
 # Test GPU availability and RAPIDS installation
-python scripts/test_rapids_forecasting.py
+python -c "import cudf, cuml; print('RAPIDS OK')"
 
 # Test with sample data
 python -c "
 import asyncio
-from scripts.forecasting.rapids_gpu_forecasting import RAPIDSForecastingAgent
+from scripts.forecasting.rapids_forecasting_agent import RAPIDSForecastingAgent
 agent = RAPIDSForecastingAgent()
 asyncio.run(agent.run(['LAY001'], 7))
 "
-```
-
-### Performance Benchmarks
-```bash
-# Benchmark GPU vs CPU performance
-python scripts/benchmark_forecasting.py
 ```
 
 ## Model Performance
@@ -185,18 +186,15 @@ python scripts/benchmark_forecasting.py
 
 ### Project Structure
 ```
-scripts/
-├── rapids_gpu_forecasting.py      # Main GPU-accelerated forecasting agent
-├── test_rapids_forecasting.py     # Test suite
-└── benchmark_forecasting.py       # Performance benchmarks
+scripts/forecasting/
+├── rapids_gpu_forecasting.py      # Main GPU-accelerated forecasting script (batch run)
+└── rapids_forecasting_agent.py    # RAPIDSForecastingAgent API used in the examples above
 
 docs/forecasting/
-├── RAPIDS_IMPLEMENTATION_PLAN.md   # Implementation guide
-└── API_REFERENCE.md               # API documentation
+├── RAPIDS_SETUP.md                # GPU setup guide
+└── RAPIDS_IMPLEMENTATION_PLAN.md  # Implementation plan (historical)
 
-docker/
-├── Dockerfile.rapids              # RAPIDS container
-└── docker-compose.rapids.yml      # Multi-service setup
+Dockerfile.rapids                  # RAPIDS container (repository root)
 ``` ### Adding New Models
 ```python
 # Add new cuML model to ensemble
@@ -215,14 +213,10 @@ def custom_feature_engineering(self, df):
 
 ## Deployment
 
-### Docker Compose
-```bash
-# Start all services
-docker-compose -f docker-compose.rapids.yml up -d
+### Container Image
 
-# View logs
-docker-compose -f docker-compose.rapids.yml logs -f rapids-forecasting
-``` ### Production Deployment
+`deploy/compose/docker-compose.rapids.yml` is not currently usable (its build context and command path are wrong); build and run the image directly instead.
+
 ```bash
 # Build production image
 docker build -f Dockerfile.rapids -t frito-lay-forecasting:latest .
@@ -287,7 +281,7 @@ print(f"GPU memory: {mempool.used_bytes() / 1024**3:.2f} GB")
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the Apache License 2.0 - see the LICENSE file for details.
 
 ## 🆘 Support
 

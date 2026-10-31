@@ -19,16 +19,16 @@ Axios 1.13+ tries to bundle Node.js modules in browser builds, causing webpack e
    ```bash
    grep "start" package.json
    ```
-   Should show: `"start": "PORT=3001 craco start"`
+   Should show: `"start": "PORT=${PORT:-3001} HOST=${HOST:-127.0.0.1} craco start"`
 
 4. **Restart the dev server:**
    ```bash
    npm start
    ```
 
-5. **Look for this message in the console:**
+5. **Look for `✅ CRACO: ...` messages in the console, e.g.:**
    ```
-   ✅ CRACO webpack config applied - Axios browser mode forced
+   ✅ CRACO: /api proxy registered from src/setupProxy.js
    ```
    If you see this, CRACO is working.
 

@@ -1,5 +1,7 @@
 # MAIW Agent/SOP Progress + Delegation Experience
 
+> **Historical record (UX-1B, 2026-09-20).** Describes the feature as delivered; test counts, file lists and deferred items are point-in-time and may not match the current code.
+
 **Feature:** UX-1B  
 **Date:** 2026-09-20  
 **Branch:** feat/ux-1b-agent-sop-progress  
