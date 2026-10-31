@@ -1,9 +1,11 @@
 # MAIW v2.1.0 — Release Notes
 
-**Status:** not yet tagged or published. **Validated code commit:** `main`
-`c19f75f3a3a753d90687e8a6e7c7b0b1358d9ffe` (PR #162). Commits after it on
-`main` change only release documentation. The latest published release is
-still `v2.0.1` (`53a27e61…`).
+**Status:** released 2026-10-31. **Validated code commit:** `main`
+`c19f75f3a3a753d90687e8a6e7c7b0b1358d9ffe` (PR #162). Tag `v2.1.0` is on the
+`main` commit that merged these final notes. It differs from the validated
+code commit only in documentation, notebooks, `.env.example` comments and one
+documentation test (#163, #165 and this change), with no runtime code. Previous
+release: `v2.0.1` (`53a27e61…`).
 
 > **v2.0.1 users: MEDIUM and HIGH reasoning fail on hosted endpoints.**
 > NVIDIA retired the hosted Nemotron 3 Super endpoint
@@ -383,9 +385,18 @@ and reports `NOT_RUN` when the internal image is unavailable.
   - the UI's RECONCILE NOW button follows those events.
   - The full flow writes to the backend exactly once.
 
-### Documentation (#147)
-- The v2.0.1 notes and runbook now match the published release.
-- The runbook's clean-host procedure starts with `unset PYTHONPATH`.
+### Documentation (#147, #165)
+- The v2.0.1 notes and runbook now match the published release (#147).
+- The runbook's clean-host procedure starts with `unset PYTHONPATH` (#147).
+- **Documentation audit for v2.1.0 (#165).** Every current doc was checked
+  against the code:
+  - model routing and role settings (`NEMOTRON_<ROLE>_ENABLED`) everywhere;
+  - commands, routes and examples that failed as written;
+  - the API reference, rewritten for `maiw_api.app:app`;
+  - the runbook, security documents and notebooks.
+
+  Dated records are labelled as historical. The getting-started notebook was
+  rebuilt on the README quickstart and run against a demo backend.
 
 ## Upgrade notes
 - **Model defaults changed.** If your `.env` sets none of
@@ -504,6 +515,9 @@ and reports `NOT_RUN` when the internal image is unavailable.
 - **`/version` in Compose:** a Compose-built backend reports
   `0.0.0 (unknown)`, because Compose does not pass `GIT_SHA` / `BUILD_TIME`
   build arguments.
+- **Dependabot does not scan the UI's npm dependencies.** Its npm entry in
+  `.github/dependabot.yml` points at `/ui/web`; the UI is at `src/ui/web`.
+  Run `npm audit` in `src/ui/web` manually.
 - **Unhardened images:** `Dockerfile` (combined) and `Dockerfile.mcp` still
   use `python:3.11-slim` with `curl`. The #149 hardening covered the backend
   and frontend images only.
@@ -536,5 +550,7 @@ and reports `NOT_RUN` when the internal image is unavailable.
 | #157 | `88b73ae` | docs(release): draft v2.1.0 changelog and release notes (documentation only) |
 | #161 | `dd1b40c` | docs(release): finalize v2.1.0 notes (documentation only) |
 | #162 | `c19f75f` | fix(deploy): bind Compose ports and the UI dev server to localhost; make the quickstart work from a clean checkout |
+| #163 | `3f29471` | docs(release): v2.1.0 notes name c19f75f (#162) as the validated code commit (documentation only) |
+| #165 | — | docs: bring README and all current docs in line with v2.1.0 (documentation, notebooks, one test) |
 
 Full diff of the validated code: [`v2.0.1...c19f75f`](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/compare/v2.0.1...c19f75f3a3a753d90687e8a6e7c7b0b1358d9ffe)
