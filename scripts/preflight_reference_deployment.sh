@@ -242,6 +242,9 @@ MODEL_REPORT=$("$MAIW_PYTHON" "$SCRIPT_DIR/lib/check_model_config.py" --provider
 while IFS= read -r line; do
     case "$line" in
         PASS*) _pass "${line#PASS  }" ;;
+        "FAIL  provider does not serve"*)
+               _fail "${line#FAIL  }" "HTTP 200 from the provider as the approved model" \
+                   "not served" "Disable the role or deploy the approved model (see docs/operations/REFERENCE_DEPLOYMENT_RUNBOOK.md § Model bindings)" ;;
         FAIL*) _fail "${line#FAIL  }" "approved physical deployment (maiw_models.deployment.APPROVED_DEPLOYMENTS)" \
                    "not approved" "Set NEMOTRON_<ROLE>_MODEL to the approved ID for that role, or disable the role" ;;
         *) if [[ "$QUIET" != "--quiet" && -n "$line" ]]; then echo "  $line"; fi ;;

@@ -237,7 +237,7 @@ The system uses the following NVIDIA NIMs:
 
 | NIM Service | Model | Purpose | Environment Variable | Default Endpoint |
 |-------------|-------|---------|---------------------|------------------|
-| **LLM Service** | Nemotron 3 Super 120B (`nvidia/nemotron-3-super-120b-a12b`) | Primary language model for chat, reasoning, and generation | `LLM_NIM_URL` | `https://integrate.api.nvidia.com/v1` |
+| **LLM Service** | Nemotron 3.5 Lightning (`nvidia/nemotron-3.5-lightning-30b-a3b`) and Nemotron 3 Ultra (`nvidia/nemotron-3-ultra-550b-a55b`), routed by ModelGateway; Nemotron 3 Super for self-hosted NIMs only (hosted endpoint retired 2026-10-19) | Language models for chat, reasoning, and generation | `LLM_NIM_URL` | `https://integrate.api.nvidia.com/v1` |
 | **Embedding Service** | `nvidia/nemotron-3-embed-1b` (2048-dim multimodal) | Semantic search embeddings for RAG | `EMBEDDING_NIM_URL` | `https://integrate.api.nvidia.com/v1` |
 | **NeMo Retriever** | NeMo Retriever | Document preprocessing and structure analysis | `NEMO_RETRIEVER_URL` | `https://integrate.api.nvidia.com/v1` |
 | **NeMo OCR** | NeMoRetriever-OCR-v1 | Intelligent OCR with layout understanding | `NEMO_OCR_URL` | `https://integrate.api.nvidia.com/v1` |

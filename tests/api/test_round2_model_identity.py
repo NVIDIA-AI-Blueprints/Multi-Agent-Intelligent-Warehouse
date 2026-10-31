@@ -63,6 +63,9 @@ def app_env(monkeypatch, tmp_path, fake):
     for key in _ROLE_ENVS:
         monkeypatch.delenv(key, raising=False)
     token = canonical_env(monkeypatch, tmp_path, fake)
+    # Super is off by default since its hosted retirement (v2.1.0); these
+    # identity cases bind it as a self-hosted Super operator would.
+    monkeypatch.setenv("NEMOTRON_SUPER_ENABLED", "true")
     yield token, monkeypatch
     from maiw_models import reset_model_gateway
 
@@ -125,7 +128,10 @@ async def test_a_approved_role_and_physical_model_allowed(
 async def test_a_medium_reasoning_falls_back_to_super_with_nano_disabled_by_default(
     app_env, fake
 ):
-    """§13: Nano is not enabled by default (hosted Nano retired, HTTP 410)."""
+    """§13: Nano is not enabled by default (hosted Nano retired, HTTP 410).
+
+    With Super enabled (self-hosted), MEDIUM still falls back to Super first.
+    """
     token, _ = app_env
     response, _, _ = await _run(fake, token, reasoning="medium")
     assert response.status_code == 200, response.text

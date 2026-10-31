@@ -56,10 +56,10 @@ HOST (single node)
 │   └── legacy /api/v1/chat — NOT mounted (v2.0.1)
 ├── Postgres/TimescaleDB (reference DB; scripts/setup/reference_db.sh)
 ├── Approved Nemotron 3 / 3.5 deployments (maiw_models/deployment.py)
-│   ├── super      nvidia/nemotron-3-super-120b-a12b      (nemotron-3)
-│   ├── lightning  nvidia/nemotron-3.5-lightning-30b-a3b  (nemotron-3.5)
-│   ├── ultra      nvidia/nemotron-3-ultra-550b-a55b      (nemotron-3, disabled by default)
-│   └── nano       nvidia/nemotron-3-nano-30b-a3b         (nemotron-3, DISABLED: hosted EOL)
+│   ├── lightning  nvidia/nemotron-3.5-lightning-30b-a3b  (nemotron-3.5; LOW + MEDIUM)
+│   ├── ultra      nvidia/nemotron-3-ultra-550b-a55b      (nemotron-3; HIGH + CRITICAL)
+│   ├── super      nvidia/nemotron-3-super-120b-a12b      (nemotron-3, DISABLED: hosted EOL 2026-10-19)
+│   └── nano       nvidia/nemotron-3-nano-30b-a3b         (nemotron-3, DISABLED: hosted EOL 2026-09-01)
 │       Hosted at: https://integrate.api.nvidia.com/v1  OR a local NIM
 └── NemoClaw/OpenShell sandbox MAIW_SANDBOX_NAME (MAIW_SANDBOX_MODE=required)
     ├── policy deploy/openshell/maiw-inference-only.policy.yaml.tmpl
@@ -276,6 +276,16 @@ approved model. Check any configuration with:
 ```bash
 .venv/bin/python scripts/lib/check_model_config.py --provider-probe
 ```
+
+`--provider-probe` (also run by preflight) sends each enabled model one minimal
+completion and fails unless the provider answers HTTP 200 as that model. The
+hosted model list is not enough: it kept listing Nemotron 3 Super after its
+2026-10-19 retirement while every completion returned 404.
+
+Defaults (v2.1.0): Lightning serves LOW and MEDIUM reasoning, Ultra serves HIGH
+reasoning and CRITICAL risk. Super and Nano are disabled because their hosted
+endpoints are retired; set `NEMOTRON_SUPER_ENABLED=true` (or `_NANO_`) only with
+a deployment that serves that exact model ID, such as a self-hosted NIM.
 
 ### MCP (profile `reference_governed`)
 
@@ -721,7 +731,9 @@ Do not upgrade NemoClaw and OpenShell simultaneously.
 | Inference → 503 `MODEL_POLICY_VIOLATION` | a role is bound to an unapproved physical model | `check_model_config.py`; `/api/v1/ready` → `model_gateway.binding_violations` | unset or fix `NEMOTRON_<ROLE>_MODEL`; restart |
 | Inference → 502 `MODEL_IDENTITY_MISMATCH` | provider served/reported a different model | provider endpoint / NIM deployment | point `MAIW_NIM_BASE_URL` at a deployment serving the approved ID |
 | Inference → 502 `MODEL_IDENTITY_UNVERIFIABLE` | provider response has no usable `model` field | provider / proxy in front of it | use an OpenAI-compatible endpoint that reports the served model ID |
-| Inference → 503 `MODEL_UNAVAILABLE` (medium) | role disabled with no eligible fallback | `check_model_config.py` | enable Super (default) |
+| Inference → 503 `MODEL_UNAVAILABLE` (medium) | role disabled with no eligible fallback | `check_model_config.py` | enable Lightning (default) |
+| Inference → 503 `MODEL_UNAVAILABLE` (high / critical) | no high-capability role (Super, Ultra) enabled | `check_model_config.py` | enable Ultra (default) or a self-hosted Super |
+| Preflight FAIL `provider does not serve <role> model` | that model is retired or not available to this key | `check_model_config.py --provider-probe` | disable the role or point it at a deployment serving the approved ID |
 | Sandbox cannot call API | Network policy / wrong endpoint | MAIW_SANDBOX_MODEL_GATEWAY_ENDPOINT | Set correct host IP (not localhost) |
 | Procedure not resuming | State mismatch or inbox duplicate | Check /var/lib/maiw/procedures/*.json | Validate procedure_execution_id + revision |
 | Governance stuck | GovernanceInbox has duplicate | Check governance_inbox.jsonl | Verify idempotency_key not already accepted |

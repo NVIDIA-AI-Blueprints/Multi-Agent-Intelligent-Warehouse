@@ -101,7 +101,9 @@ class NIMConfig:
     embedding_base_url: str = os.getenv(
         "EMBEDDING_NIM_URL", "https://integrate.api.nvidia.com/v1"
     )
-    llm_model: str = os.getenv("LLM_MODEL", "nvidia/nemotron-3-super-120b-a12b")
+    # Hosted Nemotron 3 Super was retired 2026-10-19 (HTTP 404); Lightning is
+    # the live hosted default for callers that bypass ModelGateway routing.
+    llm_model: str = os.getenv("LLM_MODEL", "nvidia/nemotron-3.5-lightning-30b-a3b")
     embedding_model: str = os.getenv("EMBEDDING_MODEL", "nvidia/nemotron-3-embed-1b")
     timeout: int = _getenv_int("LLM_CLIENT_TIMEOUT", 240)  # 240s code default (doubled) to prevent premature timeouts
     # LLM generation parameters (configurable via environment variables)

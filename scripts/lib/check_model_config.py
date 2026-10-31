@@ -20,7 +20,11 @@ Usage:
         (used by the smoke test on the model the running app reports)
     python scripts/lib/check_model_config.py --provider-probe
         additionally GET {provider}/models (credential from the environment,
-        never printed) and report whether each enabled model is listed
+        never printed) and report whether each enabled model is listed, then
+        send each enabled model one minimal chat completion and FAIL unless it
+        answers HTTP 200 as that model.  The listing alone is not enough: the
+        hosted catalogue kept listing Nemotron 3 Super after its 2026-10-19
+        retirement while every completion returned HTTP 404.
 
 Exit codes: 0 = every enabled role approved; 1 = violation; 2 = usage/import.
 No secret value is ever printed.
@@ -108,7 +112,54 @@ def _provider_probe(rows: list[dict]) -> dict:
     except Exception as exc:  # noqa: BLE001
         out["reachable"] = False
         out["error"] = type(exc).__name__
+    out["dispatch"] = _dispatch_probe(base, key, rows) if key else None
     return out
+
+
+def _dispatch_probe(base: str, key: str, rows: list[dict]) -> dict:
+    """One minimal chat completion per enabled, approved role.
+
+    Returns {role: {"ok", "http", "reported"}}.  Only the status code and the
+    provider-reported model are kept; the key is sent as a header, never
+    printed.
+    """
+    import urllib.error
+    import urllib.request
+
+    results: dict = {}
+    for r in rows:
+        if not (r["enabled"] and r["approved"]):
+            continue
+        body = json.dumps(
+            {
+                "model": r["model_id"],
+                "messages": [{"role": "user", "content": "Reply with OK."}],
+                "max_tokens": 16,
+            }
+        ).encode()
+        req = urllib.request.Request(
+            f"{base}/chat/completions",
+            data=body,
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {key}",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                status = resp.status
+                reported = json.loads(resp.read() or b"{}").get("model")
+        except urllib.error.HTTPError as exc:
+            status, reported = exc.code, None
+        except Exception as exc:  # noqa: BLE001
+            status, reported = type(exc).__name__, None
+        results[r["role"]] = {
+            "ok": status == 200 and reported == r["model_id"],
+            "http": status,
+            "reported": reported,
+        }
+    return results
 
 
 def main() -> int:
@@ -163,6 +214,9 @@ def main() -> int:
     }
     if args.provider_probe:
         report["provider"] = _provider_probe(rows)
+        dispatch = report["provider"].get("dispatch") or {}
+        if any(not d["ok"] for d in dispatch.values()):
+            report["approved"] = False
 
     if args.json:
         print(json.dumps(report, indent=1))
@@ -196,6 +250,19 @@ def main() -> int:
                     )
             else:
                 print(f"WARN  provider not reachable ({p.get('error')})")
+            dispatch = p.get("dispatch")
+            if dispatch is None:
+                print("WARN  provider dispatch not probed (no API key in the environment)")
+            for role, d in (dispatch or {}).items():
+                if d["ok"]:
+                    print(f"PASS  provider serves {role} model (HTTP 200, reported {d['reported']})")
+                else:
+                    print(
+                        f"FAIL  provider does not serve {role} model "
+                        f"(HTTP {d['http']}, reported {d['reported']}) — disable the role "
+                        f"(NEMOTRON_{role.upper().replace('-', '_')}_ENABLED=false) or point "
+                        "it at a deployment that serves the approved model"
+                    )
     return 0 if report["approved"] else 1
 
 

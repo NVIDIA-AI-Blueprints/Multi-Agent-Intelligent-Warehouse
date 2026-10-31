@@ -84,6 +84,10 @@ class ApprovedDeployment:
 # Nemotron 3 *model* — it can be served by a self-hosted NIM — but the hosted
 # endpoint retired it on 2026-09-01 (HTTP 410), so the Nano role is DISABLED
 # by default in the registry (see registry._ENABLED_DEFAULTS).
+# ``nvidia/nemotron-3-super-120b-a12b`` likewise stays approved for self-hosted
+# NIMs, but the hosted endpoint retired it on 2026-10-19 (completions return
+# HTTP 404 while /v1/models still lists it), so Super is disabled by default and
+# HIGH reasoning / CRITICAL risk default to Ultra (v2.1.0).
 #
 # There is deliberately no Nano-Omni entry: no multimodal Nemotron 3 model has
 # been qualified for MAIW, so the vision role fails closed (MODEL_UNAVAILABLE /
