@@ -100,7 +100,8 @@ class FakeNIM:
                 if isinstance(body, dict):
                     # Round 3 cache tests: "{model}" / "{thinking}" placeholders
                     # make each answer identify what produced it.
-                    thinking = "budget" if "reasoning_budget" in body else "off"
+                    ctk = body.get("chat_template_kwargs") or {}
+                    thinking = "on" if ctk.get("enable_thinking") is True else "off"
                     content = content.replace(
                         "{model}", str(body.get("model"))
                     ).replace("{thinking}", thinking)

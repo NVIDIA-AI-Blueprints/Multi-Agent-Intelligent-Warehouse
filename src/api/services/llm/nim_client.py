@@ -424,15 +424,20 @@ class NIMClient:
             payload["presence_penalty"] = presence_penalty
 
         if "nemotron" in effective_model.lower():
+            # Same rule as maiw_models.providers.nim_client: thinking is switched
+            # explicitly, and a budget is sent only when configured (> 0) because
+            # hosted Nemotron 3 Ultra rejects any reasoning_budget (HTTP 400).
+            payload["chat_template_kwargs"] = {
+                "enable_thinking": bool(resolved_enable_thinking)
+            }
             if resolved_enable_thinking:
                 resolved_reasoning_budget = (
                     self.config.default_reasoning_budget
                     if reasoning_budget is None
                     else reasoning_budget
                 )
-                payload["reasoning_budget"] = resolved_reasoning_budget
-            else:
-                payload["chat_template_kwargs"] = {"enable_thinking": False}
+                if resolved_reasoning_budget:
+                    payload["reasoning_budget"] = resolved_reasoning_budget
 
         last_exception = None
 

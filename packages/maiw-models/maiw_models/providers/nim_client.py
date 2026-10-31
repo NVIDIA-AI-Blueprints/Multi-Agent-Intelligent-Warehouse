@@ -506,10 +506,16 @@ class NIMClient:
             payload["presence_penalty"] = presence_penalty
 
         if is_nemotron:
-            if resolved_enable_thinking:
+            # Thinking is switched explicitly both ways.  A token budget is sent
+            # only when one is configured (> 0): hosted Nemotron 3 Ultra rejects
+            # any ``reasoning_budget`` with HTTP 400 ("thinking_token_budget is
+            # not yet supported by the V2 model runner"), so the default (0)
+            # must not put the field on the wire.
+            payload["chat_template_kwargs"] = {
+                "enable_thinking": bool(resolved_enable_thinking)
+            }
+            if resolved_enable_thinking and effective_budget:
                 payload["reasoning_budget"] = effective_budget
-            else:
-                payload["chat_template_kwargs"] = {"enable_thinking": False}
 
         last_exception = None
 
