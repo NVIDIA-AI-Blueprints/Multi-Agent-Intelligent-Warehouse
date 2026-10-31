@@ -1,6 +1,12 @@
-## [2.1.0] — Unreleased (draft, not tagged)
+## [2.1.0] — Unreleased (not tagged)
 
-Candidate: `main` `b8b0a13`. Changes since [v2.0.1](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/releases/tag/v2.0.1). Full notes: [RELEASE_NOTES_v2.1.0.md](RELEASE_NOTES_v2.1.0.md).
+Validated code commit: `main` `e789069`. Changes since [v2.0.1](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/releases/tag/v2.0.1). Full notes: [RELEASE_NOTES_v2.1.0.md](RELEASE_NOTES_v2.1.0.md).
+
+### ⚠️ Model defaults (hosted Nemotron 3 Super retired 2026-10-19)
+
+* LOW and MEDIUM reasoning use Nemotron 3.5 Lightning; HIGH reasoning and CRITICAL risk use Nemotron 3 Ultra. Super is disabled by default (`NEMOTRON_SUPER_ENABLED=true` restores it for a self-hosted Super NIM). On v2.0.1 with hosted endpoints, MEDIUM/HIGH/CRITICAL requests have returned 503 since 2026-10-19 ([#159](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/159))
+* preflight's provider probe now sends one completion per enabled model and fails a model that is listed but not served ([#159](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/159))
+* HIGH reasoning no longer sends `reasoning_budget` unless one is configured; hosted Ultra rejects it with HTTP 400 ([#160](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/160))
 
 ### Features
 
@@ -21,13 +27,19 @@ Candidate: `main` `b8b0a13`. Changes since [v2.0.1](https://github.com/NVIDIA-AI
 * image: the backend image ships the demo evaluation artifact, and `/version` reports the build `GIT_SHA` ([#151](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/151))
 * security: hardened the backend and frontend images (NSPECT-NJMX-9GQU) ([#149](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/149))
 
+### Release process
+
+* no automatic releases on merge; the release workflow is a manual dry-run preview, and `docs/operations/RELEASING.md` documents the procedure ([#158](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/158))
+
 ### Documentation
 
+* v2.1.0 changelog and release notes ([#157](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/157))
 * aligned the v2.0.1 notes and setup guidance ([#147](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/147))
 
 ### Verification
 
-* On `b8b0a13`: CORE CI 3219 passed / 13 skipped; Jest 991/991; CodeQL and Security Scan passed; the Compose deployment test passed, including both end-to-end steps.
+* On `e789069`: CORE CI 3245 passed / 13 skipped; Jest 991/991; CodeQL and Security Scan passed; the Compose deployment test passed, including both end-to-end steps.
+* Reference-host release gate on `e789069` (2026-10-31): preflight 34/0, smoke 17/0, in-sandbox probe passed (HIGH → Ultra, identity verified; all governed writes denied; no host secrets), live HIGH → Ultra and MEDIUM/LOW → Lightning with provider-reported identity verified.
 * The internal NGC MAIW pytest suite did **not** run: the test image could not be pulled without internal NGC access.
 
 ## [1.0.0](https://github.com/T-DevH/warehouse-operational-assistant/compare/v0.1.0...v1.0.0) (2025-11-16)
