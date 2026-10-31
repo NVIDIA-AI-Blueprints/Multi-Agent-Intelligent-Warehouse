@@ -1,4 +1,11 @@
 version: "3.9"
+# Published ports bind to 127.0.0.1 (Docker otherwise binds them on every
+# host interface).  Datastores, the MCP domain servers and the local NIM are
+# loopback-only with no override: the MCP write tools trust the decision IDs
+# their caller sends, so only the backend (over the Compose network) may
+# reach them.  The operator-facing entry points (nginx 3000, frontend 3001,
+# API 8001) follow MAIW_PUBLISH_ADDRESS (default 127.0.0.1); widen it only
+# behind your own authentication and TLS.
 services:
   timescaledb:
     image: timescale/timescaledb:2.15.2-pg16
@@ -7,7 +14,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-    ports: ["5435:5432"]
+    ports: ["127.0.0.1:5435:5432"]
     volumes:
       - ./data/postgres:/docker-entrypoint-initdb.d:ro
     healthcheck:
@@ -19,7 +26,7 @@ services:
   redis:
     image: redis:7
     container_name: wosa-redis
-    ports: ["6379:6379"]
+    ports: ["127.0.0.1:6379:6379"]
 
   kafka:
     image: apache/kafka:3.7.0
@@ -39,7 +46,7 @@ services:
       - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
       - KAFKA_LOG_DIRS=/tmp/kraft-combined-logs
       - CLUSTER_ID=MkU3OEVBNTcwNTJENDM2Qk
-    ports: ["9092:9092"]
+    ports: ["127.0.0.1:9092:9092"]
     volumes:
       - kafka_data:/tmp/kraft-combined-logs
     command:
@@ -64,7 +71,7 @@ services:
       - ETCD_ELECTION_TIMEOUT=2500
       - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
       - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
-    ports: ["2379:2379"]
+    ports: ["127.0.0.1:2379:2379"]
 
   minio:
     image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z@sha256:b6bfe7239bfc83fb90d31612d9704d86039dd714f7904b3f1ad68f211e602372
@@ -73,7 +80,7 @@ services:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
     command: server /data --console-address ":9001"
-    ports: ["9000:9000","9001:9001"]
+    ports: ["127.0.0.1:9000:9000","127.0.0.1:9001:9001"]
 
   milvus:
     image: milvusdb/milvus:v2.4.3
@@ -86,8 +93,8 @@ services:
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
       MINIO_USE_SSL: "false"
     ports:
-      - "19530:19530"   # gRPC
-      - "9091:9091"     # HTTP
+      - "127.0.0.1:19530:19530"   # gRPC
+      - "127.0.0.1:9091:9091"     # HTTP
     depends_on: [etcd, minio]
 
   # Backend API Service
@@ -97,7 +104,7 @@ services:
       dockerfile: Dockerfile.backend
     container_name: wosa-backend
     ports:
-      - "8001:8001"
+      - "${MAIW_PUBLISH_ADDRESS:-127.0.0.1}:8001:8001"
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -154,7 +161,7 @@ services:
       dockerfile: Dockerfile.frontend
     container_name: wosa-frontend
     ports:
-      - "3001:8080"
+      - "${MAIW_PUBLISH_ADDRESS:-127.0.0.1}:3001:8080"
     environment:
       - MAIW_API_UPSTREAM=http://backend:8001
     depends_on:
@@ -166,7 +173,7 @@ services:
     image: nginx:1.25.3-alpine
     container_name: wosa-nginx
     ports:
-      - "3000:80"
+      - "${MAIW_PUBLISH_ADDRESS:-127.0.0.1}:3000:80"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
@@ -184,7 +191,7 @@ services:
         MCP_DOMAIN: inventory
     container_name: wosa-mcp-inventory
     ports:
-      - "${MAIW_MCP_INVENTORY_PORT:-8765}:8765"
+      - "127.0.0.1:${MAIW_MCP_INVENTORY_PORT:-8765}:8765"
     environment:
       - MAIW_MCP_TRANSPORT=streamable-http
       - MAIW_MCP_INVENTORY_PORT=8765
@@ -214,7 +221,7 @@ services:
         MCP_DOMAIN: equipment
     container_name: wosa-mcp-equipment
     ports:
-      - "${MAIW_MCP_EQUIPMENT_PORT:-8766}:8766"
+      - "127.0.0.1:${MAIW_MCP_EQUIPMENT_PORT:-8766}:8766"
     environment:
       - MAIW_MCP_TRANSPORT=streamable-http
       - MAIW_MCP_EQUIPMENT_PORT=8766
@@ -238,7 +245,7 @@ services:
         MCP_DOMAIN: labor
     container_name: wosa-mcp-labor
     ports:
-      - "${MAIW_MCP_LABOR_PORT:-8767}:8767"
+      - "127.0.0.1:${MAIW_MCP_LABOR_PORT:-8767}:8767"
     environment:
       - MAIW_MCP_TRANSPORT=streamable-http
       - MAIW_MCP_LABOR_PORT=8767
@@ -262,7 +269,7 @@ services:
         MCP_DOMAIN: wave
     container_name: wosa-mcp-wave
     ports:
-      - "${MAIW_MCP_WAVE_PORT:-8768}:8768"
+      - "127.0.0.1:${MAIW_MCP_WAVE_PORT:-8768}:8768"
     environment:
       - MAIW_MCP_TRANSPORT=streamable-http
       - MAIW_MCP_WAVE_PORT=8768
@@ -284,7 +291,7 @@ services:
     profiles:
       - gpu
     ports:
-      - "${LLM_NIM_PORT:-8000}:8000"
+      - "127.0.0.1:${LLM_NIM_PORT:-8000}:8000"
     environment:
       - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}
       - NGC_API_KEY=${NVIDIA_API_KEY:-}

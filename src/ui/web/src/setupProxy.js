@@ -7,7 +7,7 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 // may set MAIW_UI_OPERATOR_WRITE_TOKEN in the environment of THIS Node process;
 // the proxy then adds the header server-side for the three equipment write
 // routes only. Anyone who can reach this dev server can then perform governed
-// writes — bind it to localhost (HOST=127.0.0.1) and put real operator
+// writes — keep the default HOST=127.0.0.1 (npm start) and put real operator
 // authentication in front of any shared deployment. Unset = the UI cannot
 // perform operational writes (the API answers 403 and the UI says so).
 const OPERATOR_WRITE_PATHS = new Set([
@@ -15,6 +15,10 @@ const OPERATOR_WRITE_PATHS = new Set([
   '/api/v1/equipment/release',
   '/api/v1/equipment/maintenance',
 ]);
+
+// API the dev server proxies /api to.  Override with MAIW_API_PROXY_TARGET
+// when the backend runs somewhere other than localhost:8001.
+const API_TARGET = process.env.MAIW_API_PROXY_TARGET || 'http://localhost:8001';
 
 module.exports = function(app) {
   console.log('Setting up proxy middleware...');
@@ -32,7 +36,7 @@ module.exports = function(app) {
   app.use(
     '/api',
     createProxyMiddleware({
-      target: 'http://localhost:8001',
+      target: API_TARGET,
       changeOrigin: true,
       secure: false,
       logLevel: 'debug',
@@ -47,25 +51,31 @@ module.exports = function(app) {
         console.log('Rewriting path:', path, '->', newPath);
         return newPath;
       },
-      onError: function (err, req, res) {
-        console.log('Proxy error:', err.message);
-        res.status(500).json({ error: 'Proxy error: ' + err.message });
+      // http-proxy-middleware 3.x takes event handlers under `on`; the 2.x
+      // onProxyReq/onError/onProxyRes options are silently ignored.
+      on: {
+        error: function (err, req, res) {
+          console.log('Proxy error:', err.message);
+          if (!res.headersSent) {
+            res.status(500).json({ error: 'Proxy error: ' + err.message });
+          }
+        },
+        proxyReq: function (proxyReq, req, res) {
+          // Never forward an operator credential supplied by the browser.
+          proxyReq.removeHeader('x-maiw-operator-token');
+          const operatorToken = process.env.MAIW_UI_OPERATOR_WRITE_TOKEN;
+          const targetPath = (proxyReq.path || '').split('?')[0];
+          if (operatorToken && req.method === 'POST' && OPERATOR_WRITE_PATHS.has(targetPath)) {
+            proxyReq.setHeader('X-Maiw-Operator-Token', operatorToken);
+          }
+          console.log('Proxying request:', req.method, req.url, '->', proxyReq.path);
+        },
+        proxyRes: function (proxyRes, req, res) {
+          console.log('Proxy response:', proxyRes.statusCode, 'for', req.url);
+        },
       },
-      onProxyReq: function (proxyReq, req, res) {
-        // Never forward an operator credential supplied by the browser.
-        proxyReq.removeHeader('x-maiw-operator-token');
-        const operatorToken = process.env.MAIW_UI_OPERATOR_WRITE_TOKEN;
-        const targetPath = (proxyReq.path || '').split('?')[0];
-        if (operatorToken && req.method === 'POST' && OPERATOR_WRITE_PATHS.has(targetPath)) {
-          proxyReq.setHeader('X-Maiw-Operator-Token', operatorToken);
-        }
-        console.log('Proxying request:', req.method, req.url, '->', proxyReq.path);
-      },
-      onProxyRes: function (proxyRes, req, res) {
-        console.log('Proxy response:', proxyRes.statusCode, 'for', req.url);
-      }
     })
   );
   
-  console.log('Proxy middleware configured for /api -> http://localhost:8001');
+  console.log('Proxy middleware configured for /api -> ' + API_TARGET);
 };
