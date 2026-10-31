@@ -242,7 +242,10 @@ def test_preflight_rejects_unapproved_physical_model_from_env_file(tmp_path):
     env = _base_env(
         tmp_path,
         _free_port(),
-        {"NEMOTRON_SUPER_MODEL": "example-org/unapproved-model-x"},
+        {
+            "NEMOTRON_SUPER_ENABLED": "true",
+            "NEMOTRON_SUPER_MODEL": "example-org/unapproved-model-x",
+        },
     )
     res = _run("preflight_reference_deployment.sh", env)
     assert res.returncode == 1
@@ -255,8 +258,10 @@ def test_preflight_accepts_approved_defaults(tmp_path):
     env = _base_env(tmp_path, _free_port())
     res = _run("preflight_reference_deployment.sh", env)
     out = res.stdout + res.stderr
-    assert "PASS  role=super" in out and "nvidia/nemotron-3-super-120b-a12b" in out
+    # v2.1.0 defaults: Lightning + Ultra; hosted Super retired, disabled
+    assert "PASS  role=ultra" in out and "nvidia/nemotron-3-ultra-550b-a55b" in out
     assert "PASS  role=lightning" in out
+    assert "INFO  role=super" in out
     assert "FAIL  role=" not in out
 
 
@@ -431,8 +436,13 @@ def test_lifecycle_start_status_smoke_restart_stop(tmp_path, decoy):
         smoke = _run("smoke_test_reference_deployment.sh", env)
         assert smoke.returncode == 0, smoke.stdout + smoke.stderr
         assert "Physical model identity" in smoke.stdout
-        assert "nvidia/nemotron-3-super-120b-a12b" in smoke.stdout
-        assert set(provider.models) <= {"nvidia/nemotron-3-super-120b-a12b"}
+        # default (MEDIUM) inference resolves to Lightning; status also sends
+        # one dispatch probe per enabled role (Lightning, Ultra)
+        assert "nvidia/nemotron-3.5-lightning-30b-a3b" in smoke.stdout
+        assert set(provider.models) <= {
+            "nvidia/nemotron-3.5-lightning-30b-a3b",
+            "nvidia/nemotron-3-ultra-550b-a55b",
+        }
 
         # restart runs preflight BEFORE stopping: this test env cannot pass it
         # (sandbox mode disabled), so the running instance must be untouched
