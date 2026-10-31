@@ -37,7 +37,7 @@ Agent (either runtime)
     ↓
   DecisionEngine
     ↓
-  [APPROVED / REJECTED / DEFERRED]
+  [APPROVED / REJECTED / REQUIRES_HUMAN_APPROVAL / REQUIRES_FRESH_STATE]
     ↓
   Human Approval (where required)
     ↓
@@ -183,14 +183,17 @@ governance **without** re-reading authoritative state escalates as
 - **Policy-only** — evaluates constraints, risk, allowlist, state validity
 - **Non-overridable** — cannot be bypassed by a model-generated argument
 
-Outcomes: `APPROVED`, `REJECTED`, `DEFERRED`
+Outcomes: `APPROVED`, `REJECTED`, `REQUIRES_HUMAN_APPROVAL`, `REQUIRES_FRESH_STATE`
 
-Constraints evaluated:
-- Action name in static allowlist
-- Proposal snapshot matches current state snapshot
-- Risk level within approved threshold
-- No active conflicting proposals for the same target
-- Proposal not stale (TTL not exceeded)
+Constraints evaluated (in order):
+- `READ_ONLY` risk is approved immediately
+- Equipment proposals naming an `asset_id`: equipment state must be present and fresh
+  (else `REQUIRES_FRESH_STATE`), and the asset must exist in the snapshot (else `REJECTED`)
+- `LOW` risk without `requires_approval` is approved
+- `requires_approval` or `MEDIUM` / `HIGH` / `CRITICAL` risk requires human approval
+
+The action allowlist and decision staleness are enforced later by `ActionExecutor`
+(guards 3 and 4 below).
 
 See [DECISION_ENGINE.md](DECISION_ENGINE.md) for full constraint specifications.
 
@@ -198,7 +201,7 @@ See [DECISION_ENGINE.md](DECISION_ENGINE.md) for full constraint specifications.
 
 ## Approval Lifecycle
 
-When `DecisionEngine` returns `DEFERRED` or `REQUIRES_HUMAN_APPROVAL`:
+When `DecisionEngine` returns `REQUIRES_HUMAN_APPROVAL`:
 
 ```
 ApprovalState: PENDING
@@ -208,11 +211,12 @@ ApprovalState: APPROVED
 ApprovalState: CONSUMED
 ```
 
-Other transitions: `REJECTED` (operator rejects), `EXPIRED` (TTL exceeded — default 300s).
+Other transitions: `REJECTED` (operator rejects), `EXPIRED` (TTL exceeded — default 3600 s).
 
 **Approval properties:**
 - **Explicit** — requires an active human decision, not implicit model confidence
-- **Expirable** — default TTL 300s; expired approvals cannot execute
+- **Expirable** — default approval TTL 3600 s; expired approvals cannot execute (separately,
+  `ActionExecutor` refuses a decision older than `max_decision_age_seconds`, default 300 s)
 - **Single-use** — `consume()` transitions to `CONSUMED`; cannot be used again
 - **Bound** — approval is bound to the exact `proposal_id`, `decision_id`, and
   `warehouse_snapshot_id`; approving for a different proposal is not possible

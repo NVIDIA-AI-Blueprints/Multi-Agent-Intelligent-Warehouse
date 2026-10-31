@@ -245,9 +245,10 @@ class CapabilityRegistry:
 
 `from_env()` reads `MAIW_MCP_SERVER_INVENTORY_URL` and registers the two
 inventory capabilities. Equipment, labor, and wave capabilities are registered
-programmatically via `register_domain()` in application bootstrap code. The env
-vars `MAIW_MCP_SERVER_EQUIPMENT_URL`, `MAIW_MCP_SERVER_LABOR_URL`, and
-`MAIW_MCP_SERVER_WAVE_URL` are planned but not yet read by `from_env()`.
+programmatically via `register_domain()` in application bootstrap code:
+`apps/api/maiw_api/bootstrap.py` reads all four `MAIW_MCP_SERVER_{INVENTORY,EQUIPMENT,LABOR,WAVE}_URL`
+variables (Compose sets them to `http://mcp-<domain>:876x/mcp`). `from_env()` itself
+reads only the inventory URL.
 
 `server_url` accepts a string URL or an `MCPServer` instance. `mcp.client.Client`
 handles both transports transparently.
@@ -326,7 +327,15 @@ the MCP server tool registration and the capability registry use it.
 
 File: `packages/maiw-mcp/maiw_mcp/auth/auth.py`
 
-Bearer token auth via `MAIW_MCP_API_KEY` environment variable:
+> **The MCP domain servers are unauthenticated today.** `MCPAuthConfig` exists but
+> is not wired into `Client()` (see §16), and the servers in `mcp_servers/` perform
+> no token check. They must only be reachable on loopback or an internal network:
+> `deploy/compose/docker-compose.dev.yaml` binds ports 8765–8768 to `127.0.0.1`, and
+> the API reaches them over the Compose network. Operational write authority is
+> enforced upstream (DecisionEngine, approval, `BaseActionExecutor` guards, and the
+> API's operator write credential), not by MCP.
+
+`MCPAuthConfig` builds a bearer header from the `MAIW_MCP_API_KEY` environment variable:
 
 ```python
 class MCPAuthConfig:
@@ -457,11 +466,10 @@ are not invoked by skills directly — they are invoked by domain executors insi
 
 | Area | Current state | Next step |
 |------|--------------|-----------|
-| `from_env()` domain wiring | Only inventory wired; equipment/labor/wave require programmatic `register_domain()` | Add `MAIW_MCP_SERVER_{EQUIPMENT,LABOR,WAVE}_URL` to `from_env()` |
-| Auth wiring | `MCPAuthConfig.headers` defined but not injected into `Client()` | Wire auth headers at `Client` construction |
+| `from_env()` domain wiring | Only inventory wired in `from_env()`; the API bootstrap registers equipment/labor/wave from `MAIW_MCP_SERVER_{EQUIPMENT,LABOR,WAVE}_URL` via `register_domain()` | Add those URLs to `from_env()` |
+| Auth wiring | `MCPAuthConfig.headers` defined but not injected into `Client()`; servers perform no auth (loopback / internal network only) | Wire auth headers at `Client` construction and verify them server-side |
 | OAuth 2.0 | Not implemented; bearer token only | Implement via `mcp.client.auth.oauth2` |
 | `required_permission` enforcement | Field defined on `CapabilityMetadata` but not enforced | Enforce at `CapabilityRegistry.resolve()` |
-| Labor/wave `__main__` block | Not defined in current server files | Add for consistency with inventory/equipment |
 
 ---
 

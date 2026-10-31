@@ -22,13 +22,14 @@ The WMS integration system consists of:
 
 ## Quick Start
 
-### 1. Add a WMS Connection
+> **Release API:** `apps/api/maiw_api/app.py` mounts the WMS router **read-only** — only its GET endpoints are available. Adding/removing connections, creating or updating tasks and orders, and inventory sync (POST/DELETE/PATCH) return 404/405, so step 1 below is not available in the release API and steps 2–3 only work for connections that already exist.
+
+### 1. Add a WMS Connection (not available in the release API)
 
 ```bash
-curl -X POST "http://localhost:8001/api/v1/wms/connections" \
+curl -X POST "http://localhost:8001/api/v1/wms/connections?connection_id=sap_ewm_main" \
   -H "Content-Type: application/json" \
   -d '{
-    "connection_id": "sap_ewm_main",
     "wms_type": "sap_ewm",
     "config": {
       "host": "sap-ewm.company.com",
@@ -100,8 +101,8 @@ oracle_config = {
 
 ### Connection Management
 
-- `POST /api/v1/wms/connections` - Add WMS connection
-- `DELETE /api/v1/wms/connections/{connection_id}` - Remove WMS connection
+- `POST /api/v1/wms/connections?connection_id=...` - Add WMS connection (not mounted in the release API)
+- `DELETE /api/v1/wms/connections/{connection_id}` - Remove WMS connection (not mounted in the release API)
 - `GET /api/v1/wms/connections` - List all connections
 - `GET /api/v1/wms/connections/{connection_id}/status` - Get connection status
 - `GET /api/v1/wms/connections/status` - Get all connection status
@@ -110,18 +111,18 @@ oracle_config = {
 
 - `GET /api/v1/wms/connections/{connection_id}/inventory` - Get inventory
 - `GET /api/v1/wms/inventory/aggregated` - Get aggregated inventory
-- `POST /api/v1/wms/sync/inventory` - Sync inventory between systems
+- `POST /api/v1/wms/sync/inventory` - Sync inventory between systems (not mounted in the release API)
 
 ### Task Operations
 
 - `GET /api/v1/wms/connections/{connection_id}/tasks` - Get tasks
-- `POST /api/v1/wms/connections/{connection_id}/tasks` - Create task
-- `PATCH /api/v1/wms/connections/{connection_id}/tasks/{task_id}` - Update task status
+- `POST /api/v1/wms/connections/{connection_id}/tasks` - Create task (not mounted in the release API)
+- `PATCH /api/v1/wms/connections/{connection_id}/tasks/{task_id}` - Update task status (not mounted in the release API)
 
 ### Order Operations
 
 - `GET /api/v1/wms/connections/{connection_id}/orders` - Get orders
-- `POST /api/v1/wms/connections/{connection_id}/orders` - Create order
+- `POST /api/v1/wms/connections/{connection_id}/orders` - Create order (not mounted in the release API)
 
 ### Location Operations
 
@@ -250,7 +251,7 @@ Enable debug logging for detailed troubleshooting:
 
 ```python
 import logging
-logging.getLogger('adapters.wms').setLevel(logging.DEBUG)
+logging.getLogger('src.adapters.wms').setLevel(logging.DEBUG)
 ```
 
 ## Performance Optimization
@@ -294,14 +295,7 @@ def get_location_info(location_id):
 
 ```bash
 # Run WMS adapter tests
-pytest adapters/wms/tests/test_wms_adapters.py -v
-```
-
-### Integration Tests
-
-```bash
-# Test with real WMS systems (requires configuration)
-pytest adapters/wms/tests/test_integration.py -v
+pytest src/adapters/wms/tests/test_wms_adapters.py -v
 ```
 
 ## Support

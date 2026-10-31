@@ -14,7 +14,7 @@ then follow these same steps.
 ```
 MCP server tool (mcp_servers/<domain>/server.py)    ← capability entry point
      ↓
-MCP contracts (packages/maiw-mcp/maiw_mcp/contracts/<domain>.py)
+Contracts (packages/maiw-contracts/maiw_contracts/<domain>.py)
      ↓
 Skill (packages/maiw-skills/maiw_skills/<domain>/skills.py)
      ↓
@@ -28,13 +28,13 @@ Agent or ActionExecutor calls the skill
 Add request/result Pydantic models and a `CapabilityMetadata` entry to:
 
 ```
-packages/maiw-mcp/maiw_mcp/contracts/<domain>.py
+packages/maiw-contracts/maiw_contracts/<domain>.py
 ```
 
 **Example — adding `warehouse.labor.get_shift_schedule`:**
 
 ```python
-# In maiw_mcp/contracts/labor.py
+# In maiw_contracts/labor.py
 
 class LaborShiftScheduleRequest(BaseModel):
     warehouse_id: str
@@ -45,34 +45,43 @@ class LaborShiftScheduleResult(BaseModel):
 
 LABOR_GET_SHIFT_SCHEDULE_METADATA = CapabilityMetadata(
     name="warehouse.labor.get_shift_schedule",
+    version=1,
     domain="labor",
-    capability_type=CapabilityType.READ,
+    side_effect="read",
+    risk="read_only",
+    idempotent=True,
+    timeout_seconds=10,
+    required_permission="labor:read",
     description="Returns the shift schedule for a given date.",
-    risk_level=RiskLevel.low,
 )
 ```
 
-Export the new symbols from `maiw_mcp/contracts/__init__.py` (or from
+Export the new symbols from `maiw_contracts/__init__.py` (or from
 the domain module's `__all__`).
 
 ---
 
 ## Step 2 — Implement the MCP tool
 
-Register the tool in the FastMCP app in:
+Register the tool on the domain's `mcp_server` in:
 
 ```
 mcp_servers/<domain>/server.py
 ```
 
 ```python
-@mcp.tool(name="warehouse.labor.get_shift_schedule")
-async def get_shift_schedule(warehouse_id: str, shift_date: str) -> dict:
-    provider = get_labor_provider()
-    return await provider.get_shift_schedule(warehouse_id, shift_date)
+@mcp_server.tool(
+    name=LABOR_GET_SHIFT_SCHEDULE_METADATA.name,
+    description=LABOR_GET_SHIFT_SCHEDULE_METADATA.description,
+)
+async def warehouse_labor_get_shift_schedule(warehouse_id: str, shift_date: str) -> str:
+    provider = _get_provider()
+    req = LaborShiftScheduleRequest(warehouse_id=warehouse_id, shift_date=shift_date)
+    result = await provider.get_shift_schedule(req)
+    return json.dumps(result.model_dump())
 ```
 
-Implement the backing method in `mcp_servers/<domain>/provider.py`.
+Add the method to the provider protocol and mock in `mcp_servers/<domain>/provider.py` and to the backends in `mcp_servers/<domain>/adapters/`.
 
 ---
 
@@ -117,15 +126,15 @@ Export it from `packages/maiw-skills/maiw_skills/<domain>/__init__.py`.
 
 Read skills are injected into agents at construction. Add the skill as a
 constructor parameter in the relevant agent
-(`packages/maiw-agents/maiw_agents/<domain>/agent.py`) and call it from
-`analyze_disruption()`.
+(`packages/maiw-agents/maiw_agents/<domain>/agent.py`) and call it from the
+agent's assessment method (e.g. `LaborAgent.assess_labor_constraint()`).
 
 ---
 
 ## Step 5 — Write an executor (if it's a write skill)
 
 Write skills must only be called from a `BaseActionExecutor` subclass after
-the 4-guard check passes. Add the new action name to the executor's
+the guards in `BaseActionExecutor.execute()` pass. Add the new action name to the executor's
 `_ALLOWED_ACTIONS` frozenset and implement `_do_execute`.
 
 See `packages/maiw-execution/` for existing executor examples.

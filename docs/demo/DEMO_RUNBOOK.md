@@ -10,13 +10,19 @@ a cold start to a finished scenario, then through a fault injection sequence.
 
 ## Prerequisites
 
-Run the preflight check first:
+Install dependencies and all MAIW packages as in the README Quickstart:
 
 ```bash
-./scripts/check_demo_environment.sh
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+pip install -e packages/maiw-contracts -e packages/maiw-mcp -e packages/maiw-state \
+    -e packages/maiw-models -e packages/maiw-skills -e packages/maiw-decision \
+    -e packages/maiw-execution -e packages/maiw-agents -e packages/maiw-world \
+    -e apps/api
+cp .env.example .env   # set NVIDIA_API_KEY=nvapi-...
 ```
 
-All `[OK]` entries required. Fix any `[!!]` entries before continuing.
+(`./scripts/check_demo_environment.sh` is an optional preflight; it expects the virtual environment at `env/` rather than `.venv/`.)
 
 ---
 
@@ -28,18 +34,7 @@ PROPOSE → DECIDE → EXECUTE pipeline against a realistic labor/wave disruptio
 ### 1. Start the backend
 
 ```bash
-./scripts/start_demo_mode.sh
-```
-
-Expected output:
-```
-MAIW Synthetic Demo Mode
-─────────────────────────────────────────────────────
-  API port    : 8001
-  MCP servers : not required (SimulationProviders active)
-  [OK] NVIDIA_API_KEY set (nvapi-...)
-  ...
-  3. Select 'labor_constraint_wave_risk' and click START
+MAIW_DEMO_MODE=true MAIW_PERSISTENCE_MODE=memory uvicorn maiw_api.app:app --reload --port 8001
 ```
 
 Leave this terminal open. The API is ready when you see `Application startup complete.`
@@ -49,19 +44,19 @@ Leave this terminal open. The API is ready when you see `Application startup com
 In a new terminal:
 
 ```bash
-cd src/ui/web && npm start
+cd src/ui/web && npm install && npm start
 ```
 
-Open http://localhost:3001 in a browser.
+Open http://localhost:3001 in a browser (it opens on OPERATIONS, `/demo`).
 
-### 3. Navigate to the COMMAND tab
+### 3. Navigate to the RELIABILITY tab
 
-The top navigation has tabs: COMMAND, WAREHOUSE, FORECASTING, etc.  
-Click **COMMAND**.
+The top navigation has tabs: OPERATIONS, WORLD, RELIABILITY, MODELS, CAPABILITIES, ACTIVITY, DEPLOYMENT.  
+Click **RELIABILITY** (route `/command`), which hosts the Demo Control Bar.
 
 ### 4. Select the scenario
 
-In the **Demo Control Bar** at the top of the COMMAND view:
+In the **Demo Control Bar** at the top of the RELIABILITY view:
 - Select `Labor Constraint + Wave Risk` from the scenario dropdown
 - Click **START**
 
@@ -70,7 +65,7 @@ feed begin populating.
 
 ### 5. Trigger analysis
 
-Click **ANALYZE** (or the scenario auto-triggers analysis after a few seconds).
+Click **RUN MAIW** in the Demo Control Bar.
 
 **What to narrate:**
 > "MAIW is reading live warehouse state. Two operators are absent. A high-priority
@@ -98,14 +93,14 @@ The activity feed shows `DECISION: APPROVED` (or `REJECTED`/`DEFERRED`).
 
 ### 8. Approve and execute
 
-Click **APPROVE** in the Command Center, then **EXECUTE**.
+Click **APPROVE** on the pending approval. Execution follows automatically.
 
 The activity feed shows `EXECUTED` with an `execution_id`.
 
 **What to narrate:**
-> "The executor ran four guards before making any write: decision APPROVED,
-> decision bound to this exact proposal ID, action in the allowlist, state not
-> stale. Only then did it call the MCP write tool. The outcome is explicitly
+> "The executor ran five guards before making any write: decision APPROVED,
+> decision bound to this exact proposal ID, action in the allowlist, decision
+> not stale, plus any domain-specific guard. Only then did it call the MCP write tool. The outcome is explicitly
 > one of six states — EXECUTED, NO_OP, DEFERRED, CONFLICT, UNKNOWN, or FAILED.
 > We got EXECUTED."
 
@@ -115,16 +110,15 @@ The KPI panels show labor utilization rising and wave risk falling over time.
 
 ---
 
-## Part 2 — Fault Injection (requires REACT_APP_FAULT_INJECTION_ENABLED=true)
+## Part 2 — Fault Injection
 
-The Fault Injection panel appears on the right of the reliability row when:
-- Backend is running with `MAIW_DEMO_MODE=true`
-- Frontend was started with `REACT_APP_FAULT_INJECTION_ENABLED=true` in `.env`
+Run the fault sequence from **OPERATIONS** (`/demo`): start a scenario, then
+switch the mode selector in the top bar to **RELIABILITY**. Its Fault Injection
+panel needs only a backend running with `MAIW_DEMO_MODE=true`.
 
-To enable, add this line to `src/ui/web/.env` and restart the frontend:
-```
-REACT_APP_FAULT_INJECTION_ENABLED=true
-```
+(The RELIABILITY nav tab, `/command`, also shows a Fault Injection panel when
+the frontend is started with `REACT_APP_FAULT_INJECTION_ENABLED=true` in
+`src/ui/web/.env`, but there F06 is marked TEST ONLY and cannot be injected.)
 
 ### Recommended fault injection sequence
 
@@ -135,13 +129,13 @@ REACT_APP_FAULT_INJECTION_ENABLED=true
 > warehouse state, but the network drops before it can return. The system can't
 > distinguish 'write happened' from 'write didn't happen.' Watch the outcome."
 
-1. Select **F06 — Ambiguous Write** in the Fault Injection panel
-2. Ensure a scenario is active and EXECUTE is ready
-3. Click **INJECT**
-4. Observe: outcome is **UNKNOWN**, not FAILED
-5. The Reconciliation Status panel shows `RECONCILING`
-6. Click **RECONCILE** to verify against world state
-7. Outcome resolves to `CONFIRMED_EXECUTED`
+1. Select **F06 — Ambiguous Write** and click **INJECT FAULT** (arms a one-shot
+   lost response on the next equipment write)
+2. Run the analysis and approve the proposed action
+3. Observe: outcome is **UNKNOWN**, not FAILED, and `RECONCILIATION_REQUIRED`
+   is raised — no retry is attempted
+4. Click **RECONCILE NOW** to verify against world state
+5. Outcome resolves to `CONFIRMED_EXECUTED`
 
 **Safety scorecard shows `unauthorized_writes: 0` and `duplicate_writes: 0`.**
 
@@ -154,7 +148,7 @@ REACT_APP_FAULT_INJECTION_ENABLED=true
 
 #### F10 — State Drift
 
-1. Inject **F10 — State Drift**
+1. Select **F10 — State Drift** and click **INJECT STATE DRIFT**
 2. Start the analyze → approve → execute flow
 3. Observe: the executor detects that warehouse state changed between snapshot
    and execution time — outcome is **CONFLICT**
@@ -174,8 +168,8 @@ REACT_APP_FAULT_INJECTION_ENABLED=true
 
 To run the demo again from a clean state:
 
-1. Click **STOP** in the Demo Control Bar
-2. Click **RESET** (if available) or simply click **START** on the same scenario
+1. Click **RESET** in the Demo Control Bar
+2. Click **START** on the same scenario
 3. The simulation world re-initializes by reconstructing `DemoWarehouseWorld` from the immutable `WarehouseDataPack` + `ScenarioOverlay` sources — not from a YAML `initial_state` block or snapshot
 
 ---
@@ -184,9 +178,9 @@ To run the demo again from a clean state:
 
 | Symptom | Likely cause | Fix |
 |---------|-------------|-----|
-| `[!!] maiw_api not importable` from preflight | Workspace packages not installed | `./scripts/install_packages.sh` |
-| API starts but `/api/v1/health` returns 500 | `NVIDIA_API_KEY` invalid or missing | Check `.env` |
+| `ModuleNotFoundError` (e.g. `maiw_api`, `maiw_contracts`) | Workspace packages not installed | Run the README Quickstart install (all ten packages in one `pip install -e` command) |
+| Analysis fails with a model error | `NVIDIA_API_KEY` invalid or missing | Check `.env`; `GET /api/v1/ready` reports the `model_gateway` check |
 | Scenarios list is empty | YAML file not in `apps/api/maiw_api/demo/scenarios/` | Check filename and YAML syntax |
 | Fault Injection panel not visible | `REACT_APP_FAULT_INJECTION_ENABLED` not set | Add to `src/ui/web/.env`, restart frontend |
-| `NETWORK ERROR` in activity feed | Frontend proxy can't reach API on port 8001 | Ensure `start_demo_mode.sh` is running |
+| `NETWORK ERROR` in activity feed | Frontend proxy can't reach API on port 8001 | Ensure the backend (`uvicorn maiw_api.app:app --port 8001`) is running |
 | Analysis returns DEFERRED | DecisionEngine detected stale state | Click RESET then START to get a fresh snapshot |

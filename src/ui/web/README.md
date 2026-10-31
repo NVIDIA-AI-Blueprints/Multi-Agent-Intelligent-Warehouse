@@ -2,24 +2,15 @@
 
 A modern React-based web interface for the Multi-Agent-Intelligent-Warehouse, built with Material-UI and TypeScript.
 
-##  Current Status - All Issues Fixed + MCP Integration Complete
+## Overview
 
-**Recent Fixes Applied:**
--  **React 19.2.3 Upgrade**: Successfully upgraded from React 18.2.0 to React 19.2.3 (latest stable with security patches)
--  **MessageBubble Component**: Fixed syntax error (missing opening brace)
--  **ChatInterfaceNew Component**: Fixed "event is undefined" runtime error
--  **Equipment Assignments**: Backend endpoint working (no more 404 errors)
--  **Build Process**: React app compiles successfully without errors
--  **ESLint**: All warnings cleaned up (0 warnings)
--  **MCP Integration**: Complete MCP framework integration with dynamic tool discovery
--  **MCP Testing Navigation**: Added MCP Testing link to left sidebar navigation
--  **API Port Configuration**: Updated to use port 8002 for backend communication
-
-**System Status**: Fully functional with React 19.2.3 and MCP integration ready for production use.
+- Default route: `/demo` (the MAIW v2 demo shell, including Copilot)
+- Backend: the v2 API on port 8001, reached through the dev-server proxy (`src/setupProxy.js`)
 
 ## Features
 
-- **Real-time Chat Interface** - Interactive chat with AI agents
+- **Copilot** - ASK / ANALYZE / ACT / OBSERVE_OUTCOME through `POST /api/v1/copilot/turn` in the `/demo` shell
+- **Legacy Chat Interface** (`/chat`) - calls `POST /api/v1/chat`, which the v2 API does not mount (works only against the legacy dev server `src/api/app.py`)
 - **Dashboard** - Overview of warehouse operations and KPIs
 - **Inventory Management** - View and manage inventory items
 - **Operations Management** - Task assignment and workforce management
@@ -41,13 +32,13 @@ A modern React-based web interface for the Multi-Agent-Intelligent-Warehouse, bu
 
 ### Prerequisites
 
-- Node.js 16+ and npm
+- Node.js 20 (`.nvmrc`; minimum 18.17.0) and npm >= 9
 - Backend API running on port 8001
 
 ### Installation
 
 ```bash
-cd ui/web
+cd src/ui/web
 npm install
 ```
 
@@ -57,7 +48,8 @@ npm install
 npm start
 ```
 
-The app will open at http://localhost:3001
+The app will open at http://localhost:3001, bound to 127.0.0.1 by default
+(override with `HOST` / `PORT`; see DEPLOYMENT.md before exposing it).
 
 ### Build for Production
 
@@ -68,13 +60,15 @@ npm run build
 ## API Integration
 
 The frontend connects to the Multi-Agent-Intelligent-Warehouse API running on port 8001. Make sure the backend is running before starting the frontend.
+The dev server proxies `/api` to `MAIW_API_PROXY_TARGET` (default `http://localhost:8001`; see `src/setupProxy.js`).
 
 ### Environment Variables
 
-Create a `.env` file in the `ui/web` directory:
+Create a `.env` file in the `src/ui/web` directory (`cp .env.example .env`).
+`REACT_APP_API_URL` must stay relative so the proxy can forward requests:
 
 ```env
-REACT_APP_API_URL=http://localhost:8001
+REACT_APP_API_URL=/api/v1
 PORT=3001
 ```
 
@@ -109,7 +103,8 @@ src/
 
 ## Features Overview
 
-### Chat Interface
+### Chat Interface (legacy)
+- Requires the legacy `POST /api/v1/chat` (not mounted by the v2 API); use Copilot in `/demo` instead
 - Real-time conversation with AI agents
 - Intent classification and routing
 - Structured responses with recommendations

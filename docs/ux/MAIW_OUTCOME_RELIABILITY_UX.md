@@ -1,5 +1,7 @@
 # MAIW Outcome, Reliability & Decision Trace UX
 
+> **Historical record (UX-1D, 2026-09-20).** Describes the feature as delivered; test counts, file lists and deferred items are point-in-time and may not match the current code.
+
 UX-1D: Outcome, Reliability & Decision Trace Consolidation
 
 > A warehouse operator should be able to tell, at a glance, **whether the action happened,

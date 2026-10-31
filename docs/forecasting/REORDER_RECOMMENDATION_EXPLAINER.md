@@ -8,7 +8,7 @@
 ## Complete Flow
 
 ### Step 1: Identify Low Stock Items
-**Location:** `src/api/routers/advanced_forecasting.py:197-204`
+**Location:** `src/api/routers/advanced_forecasting.py:290-295`
 
 ```python
 # Get current inventory levels
@@ -23,7 +23,7 @@ ORDER BY quantity ASC
 The system identifies items that are at or near their reorder point (within 150% of reorder point).
 
 ### Step 2: Get Demand Forecast for Each SKU
-**Location:** `src/api/routers/advanced_forecasting.py:213-218`
+**Location:** `src/api/routers/advanced_forecasting.py:306-311`
 
 For each low-stock item, the system:
 1. Calls `get_real_time_forecast(sku, 30)` - Gets 30-day forecast
@@ -39,10 +39,10 @@ except:
     avg_daily_demand = 10  # Default fallback
 ```
 
-**Key Point:** The `recent_average_demand` comes from the ML forecasting models (XGBoost, Random Forest, etc.) that analyze historical patterns and predict future demand.
+**Key Point:** The `recent_average_demand` is the mean daily outbound demand over the last 30 days of history (`inventory_movements`), computed by `get_real_time_forecast()`; it is not produced by the trained ML models.
 
 ### Step 3: Calculate Recommended Order Quantity
-**Location:** `src/api/routers/advanced_forecasting.py:220-223`
+**Location:** `src/api/routers/advanced_forecasting.py:313-316`
 
 ```python
 # Calculate recommended order quantity
@@ -57,7 +57,7 @@ recommended_quantity = max(0, recommended_quantity)
 - Ensures enough inventory for 14 days of forecasted demand
 
 ### Step 4: Determine Urgency Level
-**Location:** `src/api/routers/advanced_forecasting.py:225-239`
+**Location:** `src/api/routers/advanced_forecasting.py:318-332`
 
 The urgency is calculated based on **days until stockout**:
 
@@ -79,7 +79,7 @@ else:
 This directly uses the forecast to predict when stockout will occur!
 
 ### Step 5: Calculate Confidence Score
-**Location:** `src/api/routers/advanced_forecasting.py:241-242`
+**Location:** `src/api/routers/advanced_forecasting.py:334-335`
 
 ```python
 confidence_score = min(0.95, max(0.5, 1.0 - (days_remaining / 30)))
@@ -92,27 +92,21 @@ Confidence increases as urgency increases (more urgent = higher confidence in th
 ## Where Forecast Data Comes From
 
 The `get_real_time_forecast()` method:
-1. Checks Redis cache for recent forecasts
-2. If not cached, loads forecast from `all_sku_forecasts.json`
-3. Returns forecast data including:
+1. Checks Redis cache for a recent forecast (`forecast:{sku}:{horizon_days}`)
+2. If not cached, queries the last 180 days of outbound `inventory_movements` for the SKU and computes a simple forecast (`model_type: real_time_simple`): the trailing 30-day mean demand × a seasonal factor (1.2 in summer, 0.8 on weekends), with small random variation per day
+3. Caches the result in Redis for 1 hour and returns:
    - `recent_average_demand` - Used for reorder calculations
-   - `predictions` - 30-day forecast
-   - `confidence_intervals` - Model confidence
-   - `best_model` - Which ML model performed best
+   - `predictions` - daily forecast for the horizon
+   - `confidence_intervals` - ±1.96 × std-dev of the last 30 days
+   - `seasonal_factor`, `model_type`
 
-**Forecast Source:** ML models trained on historical demand data:
-- XGBoost
-- Random Forest
-- Gradient Boosting
-- Linear Regression
-- Ridge Regression
-- SVR (Support Vector Regression)
+**Forecast Source:** historical demand statistics (`src/api/routers/advanced_forecasting.py:180-246`), not the trained ML models.
 
 ---
 
 ## How It Appears in the UI
 
-**Location:** `ui/web/src/pages/Forecasting.tsx:429-476`
+**Location:** `src/ui/web/src/pages/Forecasting.tsx:398-445`
 
 The forecasting dashboard displays reorder recommendations in a table showing:
 - **SKU** - Item identifier
@@ -135,7 +129,7 @@ For each SKU:
     ↓
 get_real_time_forecast(SKU, 30 days)
     ↓
-ML Forecast Models (XGBoost, Random Forest, etc.)
+Trailing 30-day demand statistics (real_time_simple forecast)
     ↓
 recent_average_demand (from forecast)
     ↓
@@ -161,7 +155,7 @@ Reorder recommendations are entirely based on demand forecasting results.
 
 The system performs the following operations:
 
-1. Uses ML models to predict daily demand
+1. Estimates daily demand from recent historical demand
 2. Calculates how many days of stock remain based on forecast
 3. Determines urgency from predicted stockout date
 4. Calculates optimal order quantity using forecasted demand

@@ -19,7 +19,13 @@ WarehouseStateProvider.get_state()
     ├──► EquipmentStatusSkill.execute() │  (if equipment=True)
     │  └────────────────────────────────┘
     │  ┌────────────────────────────────┐
-    └──► InventoryLookupSkill.execute() │  (if inventory=True)
+    ├──► InventoryLookupSkill.execute() │  (if inventory=True)
+    │  └────────────────────────────────┘
+    │  ┌────────────────────────────────┐
+    ├──► LaborCapacitySkill.execute()   │  (if labor=True)
+    │  └────────────────────────────────┘
+    │  ┌────────────────────────────────┐
+    └──► WaveGetSkill.execute()         │  (if waves=True)
        └────────────────────────────────┘
     │
     ▼
@@ -35,7 +41,7 @@ WarehouseStateSnapshot.seal()  ← assigns UUID, freezes for DecisionEngine
 |---------|----------------|
 | `packages/maiw-state/` | State models, freshness, provenance, provider |
 | `packages/maiw-decision/` | Evaluates proposals against snapshots |
-| `src/api/skills/` | Concrete skill implementations (app layer) |
+| `packages/maiw-skills/` | Skill implementations (`src/api/skills/` holds deprecated re-export shims) |
 
 **Dependency DAG**: `maiw-mcp` ← `maiw-state` ← `maiw-decision`  
 `src/api/` imports from `maiw-state`; `maiw-state` never imports from `src/api/`.
@@ -67,6 +73,8 @@ from maiw_state import WarehouseStateProvider
 provider = WarehouseStateProvider(
     equipment_status_skill=equipment_status_skill,  # injected, not imported
     inventory_skill=inventory_skill,
+    labor_capacity_skill=labor_capacity_skill,
+    wave_get_skill=wave_get_skill,
 )
 state = await provider.get_state("warehouse-001", requirements)
 ```
@@ -131,8 +139,8 @@ snapshot.is_equipment_stale() # → bool
 |--------|-------|-------------------|
 | `equipment` | `EquipmentState` | `warehouse.equipment.get_status` |
 | `inventory` | `InventoryState` | `warehouse.inventory.get` |
-| `waves` | *(planned)* | — |
-| `labor` | *(planned)* | — |
+| `labor` | `LaborState` | `warehouse.labor.get_capacity` |
+| `waves` | `WaveState` | `warehouse.wave.get` |
 | `orders` | *(planned)* | — |
 | `docks` | *(planned)* | — |
 

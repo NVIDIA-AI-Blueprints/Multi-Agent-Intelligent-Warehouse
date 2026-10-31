@@ -49,8 +49,15 @@ cd Multi-Agent-Intelligent-Warehouse
 # 2. Verify Node.js version (recommended before setup)
 ./scripts/setup/check_node_version.sh
 
-# 3. Setup environment
+# 3. Setup environment (creates env/ and installs requirements.txt)
 ./scripts/setup/setup_environment.sh
+# Then install the MAIW packages (editable) into the same venv — setup_environment.sh
+# does not, and the API (maiw_api) cannot start without them:
+source env/bin/activate
+pip install -e packages/maiw-contracts -e packages/maiw-mcp -e packages/maiw-state \
+    -e packages/maiw-models -e packages/maiw-skills -e packages/maiw-decision \
+    -e packages/maiw-execution -e packages/maiw-agents -e packages/maiw-world \
+    -e apps/api
 
 # 4. Configure environment variables (REQUIRED before starting services)
 # Create .env file for Docker Compose (recommended location)
@@ -58,7 +65,10 @@ cp .env.example deploy/compose/.env
 # Or create in project root: cp .env.example .env
 # Edit with your values: nano deploy/compose/.env
 
-# 5. Start infrastructure services
+# 5. Start the Docker Compose dev stack
+# dev_up.sh starts the FULL stack in deploy/compose/docker-compose.dev.yaml:
+# datastores, the four MCP servers, the backend API (:8001), the frontend
+# (:3001, production build) and nginx (:3000) — all bound to 127.0.0.1.
 ./scripts/setup/dev_up.sh
 
 # 6. Run database migrations
@@ -108,6 +118,11 @@ python scripts/data/generate_historical_demand.py
 # Note: If RAPIDS is not installed, forecasting will use CPU fallback with XGBoost GPU support
 #       The system automatically detects GPU availability and uses it when available
 
+# 11-12. The Compose stack from step 5 already serves the API (:8001) and the UI
+# (:3001). To run the API and UI from the host instead (hot reload), first stop
+# the containers that hold those ports, then start both from the host:
+docker compose -f deploy/compose/docker-compose.dev.yaml stop backend frontend nginx
+
 # 11. Start API server
 ./scripts/start_server.sh
 
@@ -118,7 +133,7 @@ npm start
 ```
 
 **Access:**
-- Frontend: http://localhost:3001 (login: `admin` / `changeme`)
+- Frontend: http://localhost:3001 (opens the `/demo` shell; the UI has no login screen)
 - API: http://localhost:8001
 - API Docs: http://localhost:8001/docs
 
@@ -152,7 +167,7 @@ For **10-100x faster forecasting** with NVIDIA RAPIDS cuML:
   - **Ubuntu/Debian**: `sudo apt-get install postgresql-client`
   - **macOS**: `brew install postgresql` or `brew install libpq`
   - **Windows**: Install from [PostgreSQL downloads](https://www.postgresql.org/download/windows/)
-  - **Alternative**: Use Docker (see [Complete Setup Guide](#complete-setup-guide) notebook)
+  - **Alternative**: Use Docker (see the [Complete Setup Guide](notebooks/setup/complete_setup_guide.ipynb) notebook)
 
 ## Environment Configuration
 
@@ -243,7 +258,7 @@ The system uses the following NVIDIA NIMs:
 | **NeMo OCR** | NeMoRetriever-OCR-v1 | Intelligent OCR with layout understanding | `NEMO_OCR_URL` | `https://integrate.api.nvidia.com/v1` |
 | **Nemotron Parse** | Nemotron Parse | Advanced document parsing and extraction | `NEMO_PARSE_URL` | `https://integrate.api.nvidia.com/v1` |
 | **Small LLM** | Multimodal VL model (runtime-configured via `NEMOTRON_OMNI_API_KEY`) | Structured data extraction and entity recognition | `NEMOTRON_OMNI_URL` | `https://integrate.api.nvidia.com/v1` |
-| **Large LLM Judge** | Nemotron 3 Super 120B (`nvidia/nemotron-3-super-120b-a12b`) | Quality validation and confidence scoring | `LLM_NIM_URL` | `https://integrate.api.nvidia.com/v1` |
+| **Large LLM Judge** | Routed by ModelGateway at HIGH reasoning → Nemotron 3 Ultra (`nvidia/nemotron-3-ultra-550b-a55b`) by default | Quality validation and confidence scoring | `LLM_NIM_URL` | `https://integrate.api.nvidia.com/v1` |
 | **NeMo Guardrails** | NeMo Guardrails | Content safety and compliance validation | `RAIL_API_URL` | `https://integrate.api.nvidia.com/v1` |
 
 ### Deployment Options
@@ -254,7 +269,7 @@ NIMs can be deployed in three ways:
 
 Use NVIDIA-hosted cloud endpoints for immediate deployment without infrastructure setup.
 
-**For the Nemotron 3 Super LLM:**
+**For the LLM (Nemotron 3.5 Lightning + Nemotron 3 Ultra, routed by ModelGateway):**
 - **Endpoint**: `https://integrate.api.nvidia.com/v1`
 - **Use Case**: Production deployments, quick setup
 - **Configuration**: Set `LLM_NIM_URL=https://integrate.api.nvidia.com/v1`
@@ -269,9 +284,8 @@ Use NVIDIA-hosted cloud endpoints for immediate deployment without infrastructur
 # NVIDIA API Key (required for all cloud endpoints)
 NVIDIA_API_KEY=your-nvidia-api-key-here
 
-# LLM Service (Nemotron 3 Super 120B - NVIDIA public cloud)
+# LLM Service (Lightning + Ultra, routed by ModelGateway - NVIDIA public cloud)
 LLM_NIM_URL=https://integrate.api.nvidia.com/v1
-LLM_MODEL=nvidia/nemotron-3-super-120b-a12b
 
 # Embedding Service (uses integrate.api.nvidia.com)
 EMBEDDING_NIM_URL=https://integrate.api.nvidia.com/v1
@@ -315,8 +329,12 @@ Deploy NIMs on your own infrastructure for data privacy, cost control, and custo
    ```bash
    # Self-hosted LLM NIM
    # Security: Use HTTPS for production deployments. HTTP is only acceptable for localhost/development.
-   LLM_NIM_URL=https://your-nim-host:8000/v1  # Use https:// for production (or https://integrate.api.nvidia.com/v1 for cloud)
-   LLM_MODEL=nvidia/nemotron-3-super-120b-a12b
+   # MAIW_NIM_BASE_URL overrides LLM_NIM_URL for ModelGateway inference. The NIM must serve
+   # the approved model ID of every enabled role; Super is disabled by default, so enable it
+   # only when this NIM serves nvidia/nemotron-3-super-120b-a12b.
+   MAIW_NIM_BASE_URL=https://your-nim-host:8000/v1  # Use https:// for production
+   NEMOTRON_SUPER_ENABLED=true  # self-hosted Super only
+   # MAIW_NIM_API_KEY=...       # overrides NVIDIA_API_KEY for this LLM endpoint, if it needs auth
    
    # Self-hosted Embedding NIM
    EMBEDDING_NIM_URL=https://your-nim-host:8001/v1  # Use https:// for production
@@ -362,7 +380,7 @@ Deploy NIMs on your own infrastructure for data privacy, cost control, and custo
 Mix cloud and self-hosted NIMs based on your requirements:
 
 ```bash
-# Use cloud for LLM (Nemotron 3 Super 120B)
+# Use cloud for LLM (Lightning + Ultra, routed by ModelGateway)
 LLM_NIM_URL=https://integrate.api.nvidia.com/v1
 
 # Use self-hosted for embeddings (for data privacy)
@@ -383,8 +401,10 @@ NEMO_OCR_URL=https://integrate.api.nvidia.com/v1
 # Security: Use HTTPS for production. HTTP is only acceptable for localhost/development.
 LLM_NIM_URL=https://integrate.api.nvidia.com/v1  # or https://your-nim-host:8000/v1 (use https:// for production)
 
-# Required: Model identifier (NVIDIA public cloud or self-hosted)
-LLM_MODEL=nvidia/nemotron-3-super-120b-a12b
+# Optional: NOT used by ModelGateway dispatch (each role is served by its approved
+# model ID; see NEMOTRON_<ROLE>_MODEL in .env.example). If set, it must name an
+# approved model.
+# LLM_MODEL=nvidia/nemotron-3.5-lightning-30b-a3b
 
 # Required: API key (same key works for all NVIDIA endpoints)
 NVIDIA_API_KEY=your-nvidia-api-key-here
@@ -448,7 +468,10 @@ After configuring NIMs, verify they are working:
 curl -X POST $LLM_NIM_URL/chat/completions \
   -H "Authorization: Bearer $NVIDIA_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"model":"'$LLM_MODEL'","messages":[{"role":"user","content":"Hello"}]}'
+  -d '{"model":"nvidia/nemotron-3.5-lightning-30b-a3b","messages":[{"role":"user","content":"Hello"}]}'
+
+# Check every enabled model binding against the provider (as preflight does)
+python scripts/lib/check_model_config.py --provider-probe
 
 # Test Embedding endpoint
 curl -X POST $EMBEDDING_NIM_URL/embeddings \
@@ -476,9 +499,9 @@ curl http://localhost:8001/api/v1/health
    - For self-hosted NIMs, ensure they are running and accessible
 
 3. **Model Not Found (404)**:
-   - Verify `LLM_MODEL` matches the model available at your endpoint
-   - For cloud endpoints, check model identifier format (e.g., `nvcf:nvidia/...`)
-   - For self-hosted or cloud, use model name (e.g., `nvidia/nemotron-3-super-120b-a12b`)
+   - Run `python scripts/lib/check_model_config.py --provider-probe` to see which enabled role's model the endpoint does not serve
+   - On the hosted endpoint, Super (retired 2026-10-19) and Nano (retired 2026-09-01) return 404/410; keep them disabled
+   - For self-hosted NIMs, the NIM must serve the approved model ID (e.g., `nvidia/nemotron-3.5-lightning-30b-a3b`)
 
 4. **Rate Limiting (429)**:
    - Reduce request frequency
@@ -530,7 +553,7 @@ PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse
 
 ```bash
 # Docker (development)
-docker compose -f deploy/compose/docker-compose.dev.yaml exec chain_server python scripts/setup/create_default_users.py
+docker compose -f deploy/compose/docker-compose.dev.yaml exec backend python scripts/setup/create_default_users.py
 
 # Or from host (recommended for development)
 source env/bin/activate
@@ -543,7 +566,10 @@ python scripts/setup/create_default_users.py
 
 ```bash
 # Health check
-curl http://localhost:8001/health
+curl http://localhost:8001/api/v1/health
+
+# Readiness (200 = ready, 503 NOT_READY lists failed_components)
+curl http://localhost:8001/api/v1/ready
 
 # API version
 curl http://localhost:8001/api/v1/version
@@ -553,18 +579,17 @@ curl http://localhost:8001/api/v1/version
 
 Once deployed, access the application at:
 
-- **Frontend UI**: http://localhost:3001 (or your LoadBalancer IP)
-  - **Login**: `admin` / password from `DEFAULT_ADMIN_PASSWORD`
-- **API Server**: http://localhost:8001 (or your service endpoint)
+- **Frontend UI**: http://localhost:3001 (opens the `/demo` shell; no UI login screen)
+- **API Server**: http://localhost:8001
 - **API Documentation**: http://localhost:8001/docs
-- **Health Check**: http://localhost:8001/health
-- **Metrics**: http://localhost:8001/api/v1/metrics (Prometheus format)
+- **Health Check**: http://localhost:8001/api/v1/health
+- **Readiness**: http://localhost:8001/api/v1/ready
 
 ### Default Credentials
 
 **⚠️ Change these in production!**
 
-- **UI Login**: `admin` / `changeme` (or `DEFAULT_ADMIN_PASSWORD`)
+- **API user** (`POST /api/v1/auth/login`): `admin` / `changeme` (or `DEFAULT_ADMIN_PASSWORD`)
 - **Database**: `warehouse` / `changeme` (or `POSTGRES_PASSWORD`)
 - **Grafana** (if enabled): `admin` / `changeme` (or `GRAFANA_ADMIN_PASSWORD`)
 
@@ -574,24 +599,16 @@ Once deployed, access the application at:
 
 The application provides multiple health check endpoints:
 
-- `/health` - Simple health check
+- `/api/v1/live` - Liveness (process alive)
+- `/api/v1/ready` - Readiness (503 `NOT_READY` with `failed_components`)
 - `/api/v1/health` - Comprehensive health with service status
 - `/api/v1/health/simple` - Simple health for frontend
 
 ### Prometheus Metrics
 
-Metrics are available at `/api/v1/metrics` in Prometheus format.
-
-**Configure Prometheus scraping:**
-
-```yaml
-scrape_configs:
-  - job_name: 'warehouse-assistant'
-    static_configs:
-      - targets: ['warehouse-assistant:8001']
-    metrics_path: '/api/v1/metrics'
-    scrape_interval: 5s
-```
+The v2 API (`maiw_api.app:app`) does not serve a Prometheus `/api/v1/metrics`
+endpoint; that route exists only on the legacy development server
+(`src/api/app.py`), which is never deployed.
 
 ### Database Maintenance
 
@@ -713,8 +730,8 @@ blocking the port after you have published it deliberately.
 
 ```bash
 # Docker
-docker compose down
-# Or change ports in docker-compose.yaml
+docker compose -f deploy/compose/docker-compose.dev.yaml down
+# Or change ports in deploy/compose/docker-compose.dev.yaml
 ```
 
 #### Database Connection Errors
@@ -733,10 +750,10 @@ PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse
 
 ```bash
 # Check logs
-docker compose logs api
+docker compose -f deploy/compose/docker-compose.dev.yaml logs backend
 
 # Verify environment variables
-docker compose exec api env | grep -E "DB_|JWT_|POSTGRES_"
+docker compose -f deploy/compose/docker-compose.dev.yaml exec backend env | grep -E "DB_|PG|JWT_|POSTGRES_"
 ```
 
 #### Password Not Working
@@ -748,11 +765,15 @@ docker compose exec api env | grep -E "DB_|JWT_|POSTGRES_"
 #### Module Not Found Errors
 
 ```bash
-# Rebuild Docker image
-docker compose build --no-cache
+# Rebuild Docker images
+docker compose -f deploy/compose/docker-compose.dev.yaml build --no-cache
 
-# Or reinstall dependencies
-docker compose exec api pip install -r requirements.txt
+# Host venv: reinstall dependencies and the MAIW packages (README "Quickstart" step 2)
+pip install -r requirements.txt
+pip install -e packages/maiw-contracts -e packages/maiw-mcp -e packages/maiw-state \
+    -e packages/maiw-models -e packages/maiw-skills -e packages/maiw-decision \
+    -e packages/maiw-execution -e packages/maiw-agents -e packages/maiw-world \
+    -e apps/api
 ```
 
 ### Performance Tuning
@@ -770,12 +791,9 @@ ORDER BY mean_time DESC
 LIMIT 10;
 ```
 
-**Scaling:**
-
-```bash
-# Docker Compose
-docker compose up -d --scale api=3
-```
+**Scaling:** the reference deployment is single-node; the Compose `backend`
+service has a fixed `container_name` and published port, so it cannot be
+scaled with `--scale`.
 
 ## GPU Acceleration with RAPIDS
 
@@ -823,7 +841,7 @@ python -c "import cudf, cuml; print('✅ RAPIDS installed successfully')"
 
 Once installed, RAPIDS is **automatically detected and used** when:
 1. GPU is available and CUDA is properly configured
-2. Training is initiated from the Forecasting page
+2. Training is run with the forecasting scripts (e.g. `python scripts/forecasting/rapids_gpu_forecasting.py`). The v2 API mounts the training and forecasting routes read-only, so training cannot be started from the Forecasting page.
 3. The system will show: `🚀 GPU acceleration: ✅ Enabled (RAPIDS cuML)`
 
 ### Performance Metrics

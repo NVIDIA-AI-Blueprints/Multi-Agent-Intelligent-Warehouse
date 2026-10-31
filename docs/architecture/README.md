@@ -25,7 +25,7 @@ material lives in [`docs/history/`](../history/).
 
 8. **[AGENT_RUNTIME.md](AGENT_RUNTIME.md)** — Three-layer ownership, MAIWDeterministicRuntime vs DeepAgentsRuntime
 9. **[MODEL_GATEWAY.md](MODEL_GATEWAY.md)** — PolicyFilter, ModelRouter, Deployment Resolver, Nemotron roles
-10. **[DECISION_ENGINE.md](DECISION_ENGINE.md)** — Constraint rules, APPROVED/REJECTED/DEFERRED, audit records
+10. **[DECISION_ENGINE.md](DECISION_ENGINE.md)** — Constraint rules, APPROVED/REJECTED/REQUIRES_HUMAN_APPROVAL/REQUIRES_FRESH_STATE, audit records
 11. **[WAREHOUSE_STATE.md](WAREHOUSE_STATE.md)** — WarehouseState assembly, StateRequirements, freshness, provenance
 12. **[WAREHOUSE_WORLD.md](WAREHOUSE_WORLD.md)** — BASE/SCENARIO/LIVE worlds, OperationalContextSnapshot
 13. **[DEPLOYMENT_ARCHITECTURE.md](DEPLOYMENT_ARCHITECTURE.md)** — Service boundaries, ports, env vars
@@ -54,7 +54,7 @@ material lives in [`docs/history/`](../history/).
 | `WAREHOUSE_STATE.md` | Authoritative | State assembly |
 | `WAREHOUSE_WORLD.md` | Authoritative | Synthetic world layer |
 | `DEPLOYMENT_ARCHITECTURE.md` | Authoritative | Deployment topology |
-| `NEMOCLAW_OPENSHELL_INTEGRATION.md` | Authoritative (contracts) / qualification pending | Sandbox containment boundary |
+| `NEMOCLAW_OPENSHELL_INTEGRATION.md` | Authoritative (qualified end to end, Phase 20C-B) | Sandbox containment boundary |
 | `TEST_STRATEGY.md` | Authoritative | CI test strategy |
 | `adr/` | Decision records | Accepted architectural decisions |
 | `diagrams/` | Assets | Architecture diagrams |

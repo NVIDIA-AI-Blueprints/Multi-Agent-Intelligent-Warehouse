@@ -4,8 +4,7 @@
 
 For complete deployment instructions including:
 - Quick start guide
-- Docker deployment (single and multi-container)
-- Kubernetes/Helm deployment
+- Docker Compose development stack
 - Environment configuration
 - Post-deployment setup
 - Monitoring and maintenance
@@ -16,6 +15,7 @@ Please see: **[../../DEPLOYMENT.md](../../DEPLOYMENT.md)**
 ## Quick Links
 
 - **Main Deployment Guide**: [../../DEPLOYMENT.md](../../DEPLOYMENT.md)
-- **Quick Start**: [../../QUICK_START.md](../../QUICK_START.md)
+- **Quick Start**: [../../README.md#quickstart](../../README.md#quickstart)
+- **Reference (single-node) deployment**: [../operations/REFERENCE_DEPLOYMENT_RUNBOOK.md](../operations/REFERENCE_DEPLOYMENT_RUNBOOK.md)
 - **Security Guide**: [../secrets.md](../secrets.md)
 - **Main README**: [../../README.md](../../README.md)

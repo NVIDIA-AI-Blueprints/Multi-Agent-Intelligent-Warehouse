@@ -3,7 +3,7 @@
 
 > **Historical document**
 >
-> This file reflects an earlier MAIW implementation phase and may not describe the current MAIW v2 architecture. See [ARCHITECTURE.md](ARCHITECTURE.md) and the project [README](../../README.md) for the current authoritative design.
+> This file reflects an earlier MAIW implementation phase and may not describe the current MAIW v2 architecture. See [ARCHITECTURE.md](../ARCHITECTURE.md) and the project [README](../../../README.md) for the current authoritative design. Ports, bind addresses (the dev UI now binds 127.0.0.1 by default) and model names in this file are not maintained.
 
 ## System Architecture Overview
 

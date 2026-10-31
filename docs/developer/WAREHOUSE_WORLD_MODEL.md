@@ -339,7 +339,7 @@ Reset does not use a snapshot of the pre-disruption state. It re-runs the projec
 Providers remained unchanged through Phase 14E. The integration is:
 
 1. `DemoWarehouseWorld.__init__(scenario_world=sw)` runs `WarehouseProjectionBuilder` at `sim_time_offset=0` and populates the internal dicts.
-2. Providers (`InventorySimProvider`, `LaborSimProvider`, `EquipmentSimProvider`, `WaveSimProvider`) read from and write to those internal dicts exactly as before.
+2. Providers (`SimulationInventoryProvider`, `SimulationLaborProvider`, `SimulationEquipmentProvider`, `SimulationWaveProvider`) read from and write to those internal dicts exactly as before.
 3. `ActionExecutor` mutates `DemoWarehouseWorld` through the existing provider write paths — no new write path was introduced.
 
 The projection builder is the only translation boundary between the graph model and the provider model.

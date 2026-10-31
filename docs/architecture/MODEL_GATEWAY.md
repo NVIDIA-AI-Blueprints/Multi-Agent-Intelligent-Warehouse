@@ -103,16 +103,18 @@ The telemetry records both success and failure paths.
 `PolicyFilter` (`packages/maiw-models/maiw_models/routing.py`) is the hard policy
 layer. It determines which models are **eligible** for a request before routing runs.
 
-Six eligibility constraints are applied. A model must pass all six:
+Eight eligibility constraints are applied (numbered as in `PolicyFilter._is_eligible`). A model must pass all of them:
 
 | # | Constraint | Rule |
 |---|------------|------|
 | 1 | **Enabled** | `ModelCapability.enabled` must be `True` |
-| 2 | **Provider / deployment mode** | Model's `provider` must match the allowed set for the request's `deployment_mode` |
-| 3 | **Modality** | Non-TEXT requests require the model to explicitly support that modality; TEXT requests require `"text"` in `modalities` |
-| 4 | **Risk level** | `risk_level=CRITICAL` → only high-capability roles (`super`, `ultra`) are eligible |
-| 5 | **Reasoning level** | `reasoning=HIGH` → only high-capability roles (`super`, `ultra`) are eligible |
-| 6 | **Required capabilities** | Any `required_capabilities` tag (`tool_use`, `structured_output`, `teacher_judge`) must be satisfied by the model's capability flags |
+| 2 | **Approved generation** | `ModelCapability.generation` must be in `APPROVED_MODEL_GENERATIONS` (`nemotron-3`, `nemotron-3.5`) |
+| 2b | **Physical identity** | The physical model ID must be the approved deployment for the candidate's role (`DeploymentResolver`) |
+| 3 | **Provider / deployment mode** | Model's `provider` must match the allowed set for the request's `deployment_mode` |
+| 4 | **Modality** | Non-TEXT requests require the model to explicitly support that modality; TEXT requests require `"text"` in `modalities` |
+| 5 | **Risk level** | `risk_level=CRITICAL` → only high-capability roles (`super`, `ultra`) are eligible |
+| 6 | **Reasoning level** | `reasoning=HIGH` → only high-capability roles (`super`, `ultra`) are eligible |
+| 7 | **Required capabilities** | Any `required_capabilities` tag (`tool_use`, `structured_output`, `teacher_judge`) must be satisfied by the model's capability flags |
 
 `PolicyFilter` does not rank candidates — that is the routing strategy's job.
 The eligible candidate list is recorded as `ModelRouteDecision.candidate_models`
@@ -143,10 +145,15 @@ When the preferred role is disabled, the router walks a fallback chain:
 | Primary role | Fallback order                              |
 |-------------|---------------------------------------------|
 | `lightning` | `nano` → `super`                            |
-| `nano` | `super`                                          |
-| `super` | *(none — raises `ModelUnavailable`)*         |
+| `nano` | `super` → `lightning`                            |
+| `super` | `ultra` *(nothing below a high-capability role)* |
 | `ultra` | `super`                                      |
 | `nano-omni` | `super` *(TEXT requests only — see below)*  |
+
+With the v2.1.0 defaults (Nano and Super disabled), MEDIUM requests are served by
+`lightning` via the `nano` chain and HIGH / CRITICAL requests by `ultra` via the
+`super` chain, both with `fallback_from` set. If neither `super` nor `ultra` is
+enabled, HIGH / CRITICAL raise `ModelUnavailable` (fail closed).
 
 When a fallback is used, `fallback_from` and `fallback_reason` are populated
 in `ModelRouteDecision` and surfaced in telemetry.
@@ -236,13 +243,13 @@ model IDs. Operators override via env var for self-hosted or alternate deploymen
 
 ### Nemotron model roles
 
-| Role | Generation | Routing use |
-|------|------------|-------------|
-| `lightning` | Nemotron 3.5 | LOW reasoning, LOW risk — quick classification |
-| `nano` | Nemotron 3 | MEDIUM reasoning — moderate analysis |
-| `super` | Nemotron 3 | HIGH reasoning, CRITICAL risk, wave recovery |
-| `ultra` | Nemotron 3 | Teacher/judge evaluation workloads |
-| `nano-omni` | Nemotron 3 *(no verified model ID yet)* | Multimodal (IMAGE/VIDEO/AUDIO) — operator must configure |
+| Role | Generation | Default (v2.1.0) | Routing use |
+|------|------------|------------------|-------------|
+| `lightning` | Nemotron 3.5 | enabled | LOW reasoning; also serves MEDIUM by default (fallback from `nano`) |
+| `nano` | Nemotron 3 | disabled — hosted endpoint retired 2026-09-01 | Preferred for MEDIUM reasoning when enabled on a self-hosted NIM |
+| `super` | Nemotron 3 | disabled — hosted endpoint retired 2026-10-19 | Preferred for HIGH reasoning / CRITICAL risk when re-enabled (`NEMOTRON_SUPER_ENABLED=true`, self-hosted Super NIM only) |
+| `ultra` | Nemotron 3 | enabled | Serves HIGH reasoning and CRITICAL risk by default (fallback from `super`); teacher/judge tasks |
+| `nano-omni` | Nemotron 3 *(no verified model ID yet)* | disabled | Multimodal (IMAGE/VIDEO/AUDIO) — operator must configure |
 
 ---
 
@@ -371,6 +378,8 @@ inference:
 > `nvidia/nemotron-3-super-120b-a12b` (gen=nemotron-3, latency 572ms). 51 `@real_sandbox`
 > tests pass on epg-tme-smc-h100-02. Bug fixed: `ModelResponse.usage` now `dict[str, Any]`
 > to accept nested NIM API sub-objects (`prompt_tokens_details`, `completion_tokens_details`).
+> *(Dated qualification record. Super has been disabled by default since v2.1.0 — hosted
+> endpoint retired 2026-10-19.)*
 >
 > **Approved model families (MAIW v2 production/qualification):** Nemotron 3 and Nemotron 3.5 only.
 > `nvidia/llama-3.1-nemotron-nano-8b-v1` (Phase 20B transport smoke test) is NOT an approved
@@ -479,16 +488,19 @@ Example provenance record:
 ```json
 {
   "requested_role": "nano",
-  "selected_role": "super",
+  "selected_role": "lightning",
   "routing_rule": "medium_reasoning",
   "routing_reason": "reasoning=MEDIUM prefers Nano",
   "fallback_from": "nano",
-  "fallback_reason": "role=nano is disabled; escalated to super",
-  "selected_model_id": "nvidia/nemotron-3-super-120b-a12b",
+  "fallback_reason": "role=nano is disabled or policy-ineligible; escalated to lightning",
+  "selected_model_id": "nvidia/nemotron-3.5-lightning-30b-a3b",
   "routing_strategy": "rules",
   "routing_latency_ms": 0.412,
-  "candidate_models": ["nvidia/nemotron-3-super-120b-a12b"],
-  "task": "warehouse.operations.summarize_state",
+  "candidate_models": [
+    "nvidia/nemotron-3.5-lightning-30b-a3b",
+    "nvidia/nemotron-3-ultra-550b-a55b"
+  ],
+  "task": "warehouse.operations.generate_response",
   "requested_reasoning": "medium",
   "requested_risk_level": "low"
 }
@@ -529,9 +541,11 @@ inform model selection decisions; they do not change live routing.
 ```bash
 # ── Enable/disable roles ──────────────────────────────────────────────────────
 NEMOTRON_LIGHTNING_ENABLED=true       # default true
-NEMOTRON_NANO_ENABLED=true            # default true
-NEMOTRON_SUPER_ENABLED=true           # default true
-NEMOTRON_ULTRA_ENABLED=false          # default false — high latency; operator opt-in
+NEMOTRON_NANO_ENABLED=false          # default false — hosted endpoint retired 2026-09-01;
+                                      # enable only with a self-hosted NIM serving that exact ID
+NEMOTRON_SUPER_ENABLED=false         # default false — hosted endpoint retired 2026-10-19;
+                                      # enable only with a self-hosted Super NIM
+NEMOTRON_ULTRA_ENABLED=true           # default true — serves HIGH reasoning / CRITICAL risk (slower)
 NEMOTRON_NANO_OMNI_ENABLED=false      # default false — no verified VL model ID
 
 # ── Override physical model IDs ────────────────────────────────────────────────
@@ -551,18 +565,18 @@ MODEL_GATEWAY_ENABLED=true            # default true; set false only for emergen
 
 ## Task Routing Reference
 
-| Task | Reasoning | Risk | Role target |
-|------|-----------|------|-------------|
-| `warehouse.*.understand_query` | LOW | LOW | lightning |
-| `warehouse.forecasting.generate_response` | MEDIUM | LOW | nano |
-| `warehouse.operations.generate_response` | MEDIUM | LOW/HIGH | nano/super |
-| `warehouse.operations.recover_wave` | MEDIUM | HIGH | super |
-| `warehouse.equipment.<maintenance/assign>` | HIGH | HIGH | super |
-| `warehouse.equipment.summarize_health` | MEDIUM | LOW | nano |
-| `warehouse.safety.broadcast_alert` | HIGH | CRITICAL | super |
-| `warehouse.safety.lockout_tagout` | HIGH | CRITICAL | super |
-| `warehouse.safety.incident_report` | HIGH | HIGH | super |
-| `warehouse.safety.summarize_event` | MEDIUM | MEDIUM | nano |
+| Task | Reasoning | Risk | Requested role | Served by default (v2.1.0) |
+|------|-----------|------|----------------|----------------------------|
+| `warehouse.*.understand_query` | LOW | LOW | lightning | lightning |
+| `warehouse.forecasting.generate_response` | MEDIUM | LOW | nano | lightning |
+| `warehouse.operations.generate_response` | MEDIUM | LOW/HIGH | nano | lightning |
+| `warehouse.equipment.maintenance` | HIGH | HIGH | super | ultra |
+| `warehouse.equipment.utilization` | HIGH | LOW | super | ultra |
+| `warehouse.equipment.assignment` | MEDIUM | HIGH | nano | lightning |
+| `warehouse.equipment.<other intent>` | MEDIUM | LOW | nano | lightning |
+| `warehouse.safety.broadcast_alert` / `lockout_tagout` | HIGH | CRITICAL | super | ultra |
+| `warehouse.safety.incident_report` / `corrective_action` / `near_miss` | HIGH | HIGH | super | ultra |
+| `warehouse.safety.<other intent>` | MEDIUM | MEDIUM | nano | lightning |
 
 ---
 
@@ -573,8 +587,10 @@ model requirements per stage. The document pipeline stages that use direct `NIMC
 calls (OCR, embedding, extraction) are an explicit compatibility exception pending
 multimodal NIM endpoint availability for the `nano-omni` role.
 
-Evidence: `document/action_tools.py`, `document/document_extraction_agent.py`,
-`document/processing/embedding_indexing.py`, `document/validation/large_llm_judge.py`.
+Evidence (under `src/api/agents/`): `document/document_extraction_agent.py`,
+`document/processing/embedding_indexing.py`. `document/action_tools.py` and
+`document/validation/large_llm_judge.py` already route through `ModelGateway`
+(`document/model_gateway_adapter.py`).
 
 These are pipeline-stage labels, not routing decisions. Full gateway integration
 requires multimodal NIM endpoint provisioning for the `nano-omni` role.
@@ -636,7 +652,9 @@ Changes to the model catalogue go in `ModelRegistry` (`maiw_models/registry.py`)
 
 **Deployment engineers:**
 Configure deployment mode and model IDs via environment variables.
-To enable `ultra` for evaluation workloads: `NEMOTRON_ULTRA_ENABLED=true`.
+`ultra` is enabled by default and serves HIGH reasoning / CRITICAL risk. `super` and
+`nano` are disabled by default; enable them (`NEMOTRON_SUPER_ENABLED=true`,
+`NEMOTRON_NANO_ENABLED=true`) only with a self-hosted NIM serving that exact model ID.
 To enable multimodal routing: set `NEMOTRON_NANO_OMNI_ENABLED=true` and
 `NEMOTRON_NANO_OMNI_MODEL=<verified-vl-model-id>`.
 
@@ -650,8 +668,8 @@ harness. Do not call the method directly in production agent code.
 
 ```bash
 python scripts/model_routing_report.py
-# With additional roles enabled:
-NEMOTRON_ULTRA_ENABLED=true python scripts/model_routing_report.py
+# With a self-hosted Super NIM enabled:
+NEMOTRON_SUPER_ENABLED=true python scripts/model_routing_report.py
 ```
 
 ---

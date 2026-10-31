@@ -21,7 +21,7 @@ from __future__ import annotations
 from maiw_models.gateway import ModelGateway
 from maiw_models.models import ModelRequest, ReasoningLevel, RiskLevel
 from maiw_decision.proposal import ActionProposal
-from maiw_state.snapshot import WarehouseStateSnapshot
+from maiw_state.warehouse import WarehouseStateSnapshot
 
 class MyDomainAgent:
     """
@@ -43,13 +43,16 @@ class MyDomainAgent:
 
         response = await self._gateway.generate(
             ModelRequest(
-                prompt=prompt,
-                system="You are a warehouse operations AI...",
-                reasoning_level=ReasoningLevel.STANDARD,
-                risk_level=RiskLevel.medium,
+                task="warehouse.my_domain.analyze",
+                messages=[
+                    {"role": "system", "content": "You are a warehouse operations AI..."},
+                    {"role": "user", "content": prompt},
+                ],
+                reasoning=ReasoningLevel.MEDIUM,
+                risk_level=RiskLevel.MEDIUM,
                 max_tokens=1500,
-            ),
-            trace_id=trace_id,
+                trace_id=trace_id,
+            )
         )
 
         return self._parse_proposal(response.content, snapshot)
@@ -68,14 +71,17 @@ class MyDomainAgent:
 
 ### Step 2 — Wire into bootstrap
 
-Add the agent to `apps/api/maiw_api/bootstrap.py`:
+Construct the agent in `apps/api/maiw_api/bootstrap.py` and attach it to the
+runtime, the same way the existing agents are wired (`runtime.equipment_agent`,
+`runtime.operations_agent`, `runtime.safety_agent`):
 
 ```python
 from maiw_agents.my_domain.agent import MyDomainAgent
 
-my_agent = MyDomainAgent(gateway=model_gateway)
-runtime.register_agent("my_domain", my_agent)
+runtime.my_domain_agent = MyDomainAgent(gateway=runtime.model_gateway)
 ```
+
+Add the matching `my_domain_agent` field to `MAIWRuntime`.
 
 ### Step 3 — Add a router endpoint (if needed)
 
@@ -132,7 +138,7 @@ class MyDomainAgent:
 | Rule | Where it applies |
 |------|-----------------|
 | Agents call **read skills only** during `analyze()` | No write MCP calls in agents |
-| Write capabilities go through **executor 4-guard check** | `BaseActionExecutor._check_guards()` |
+| Write capabilities go through the **executor guard checks** | `BaseActionExecutor.execute()` (subclass hook: `_check_additional_guards()`) |
 | Agents **propose** — they do not execute | Only `ActionExecutor.execute()` calls write skills |
 | No `fault_id` checks in agent code | Fault injection is test/demo infrastructure only |
 | ModelGateway is the only path to NIM | Never call `NIMClient` directly from an agent |

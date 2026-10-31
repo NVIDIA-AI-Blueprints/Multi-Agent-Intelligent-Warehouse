@@ -11,11 +11,11 @@ Mark each item **[PASS]**, **[FAIL]**, or **[N/A]** with a note.
 
 | # | Check | Status | Notes |
 |---|-------|--------|-------|
-| E1 | `./scripts/check_demo_environment.sh` exits 0 (all `[OK]`) | | |
+| E1 | README Quickstart install completed (requirements + all ten MAIW packages importable) | | |
 | E2 | `NVIDIA_API_KEY` is a live `nvapi-...` key (not placeholder) | | |
 | E3 | API starts on port 8001 without errors | | |
 | E4 | Frontend starts on port 3001 without errors | | |
-| E5 | `GET http://localhost:8001/api/v1/health` returns `{"status": "ok"}` | | |
+| E5 | `GET http://localhost:8001/api/v1/live` returns `{"status": "alive", ...}` and `GET /api/v1/ready` returns HTTP 200 | | |
 | E6 | `GET http://localhost:8001/api/v1/demo/scenarios` returns ≥ 5 scenarios | | |
 
 ---
@@ -33,7 +33,7 @@ Mark each item **[PASS]**, **[FAIL]**, or **[N/A]** with a note.
 | S7 | execution_id is visible in the activity feed | | |
 | S8 | KPI panels update after execution (labor utilization / wave risk) | | |
 | S9 | Safety Scorecard shows `unauthorized_writes: 0` and `duplicate_writes: 0` | | |
-| S10 | Scenario can be stopped and restarted cleanly (STOP → START) | | |
+| S10 | Scenario can be reset and restarted cleanly (RESET → START) | | |
 
 ---
 
@@ -54,7 +54,7 @@ Mark each item **[PASS]**, **[FAIL]**, or **[N/A]** with a note.
 
 | # | Check | Status | Notes |
 |---|-------|--------|-------|
-| R1 | Fault Injection panel is visible (requires `REACT_APP_FAULT_INJECTION_ENABLED=true` AND demo mode) | | |
+| R1 | Fault Injection panel is visible in OPERATIONS (`/demo`) → RELIABILITY mode (demo mode backend) | | |
 | R2 | F06 (Ambiguous Write): outcome is UNKNOWN, not FAILED | | |
 | R3 | F06: Reconciliation resolves to CONFIRMED_EXECUTED | | |
 | R4 | F06: `duplicate_writes: 0` remains zero after reconcile | | |
@@ -68,11 +68,11 @@ Mark each item **[PASS]**, **[FAIL]**, or **[N/A]** with a note.
 
 | # | Check | Status | Notes |
 |---|-------|--------|-------|
-| D1 | `./scripts/check_demo_environment.sh` produces a readable, actionable output | | |
-| D2 | `./scripts/install_packages.sh` completes without errors on a fresh venv | | |
-| D3 | `./scripts/testing/run_core_ci.sh` passes (528+ tests, 0 failures) | | |
-| D4 | `./scripts/testing/run_reliability.sh` passes (388 tests, 0 failures) | | |
-| D5 | `cd src/ui/web && npm test -- --watchAll=false` passes (94 tests, 0 failures) | | |
+| D1 | README Quickstart steps run without errors from a clean checkout | | |
+| D2 | README Quickstart `pip install -r requirements.txt` + single `pip install -e` (all ten packages) completes on a fresh venv | | |
+| D3 | `./scripts/testing/run_core_ci.sh` passes (0 failures) | | |
+| D4 | `./scripts/testing/run_reliability.sh` passes (0 failures) | | |
+| D5 | `cd src/ui/web && npm test -- --watchAll=false` passes (0 failures) | | |
 | D6 | `docs/developer/GETTING_STARTED.md` matches current package structure | | |
 | D7 | `docs/demo/DEMO_RUNBOOK.md` steps produce the described output | | |
 
@@ -82,8 +82,7 @@ Mark each item **[PASS]**, **[FAIL]**, or **[N/A]** with a note.
 
 All items in **Environment** and **Core Scenario** must be **[PASS]**.
 
-Reliability Demo items are required only if `REACT_APP_FAULT_INJECTION_ENABLED=true`
-is set for the demo.
+Reliability Demo items are required only if fault injection is part of the demo.
 
 Developer Experience items are required before any recording or publication.
 

@@ -26,7 +26,6 @@
 
 ## Infrastructure
 - Updated Docker images
-- Enhanced Helm charts
 - Improved CI/CD pipeline
 
 ## Metrics & Monitoring

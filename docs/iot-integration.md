@@ -23,13 +23,14 @@ The IoT integration system consists of:
 
 ## Quick Start
 
-### 1. Add an IoT Connection
+> **Release API:** `apps/api/maiw_api/app.py` mounts the IoT router **read-only** — only its GET endpoints are available. Adding/removing connections, acknowledging alerts and starting/stopping monitoring (POST/DELETE) return 404/405, so step 1 below is not available in the release API and steps 2–3 only work for connections that already exist.
+
+### 1. Add an IoT Connection (not available in the release API)
 
 ```bash
-curl -X POST "http://localhost:8001/api/v1/iot/connections" \
+curl -X POST "http://localhost:8001/api/v1/iot/connections/equipment_monitor_main" \
   -H "Content-Type: application/json" \
   -d '{
-    "connection_id": "equipment_monitor_main",
     "iot_type": "equipment_monitor",
     "config": {
       "host": "equipment-monitor.company.com",
@@ -209,8 +210,8 @@ asset_tracking_websocket_config = {
 
 ### Connection Management
 
-- `POST /api/v1/iot/connections` - Add IoT connection
-- `DELETE /api/v1/iot/connections/{connection_id}` - Remove IoT connection
+- `POST /api/v1/iot/connections/{connection_id}` - Add IoT connection (not mounted in the release API)
+- `DELETE /api/v1/iot/connections/{connection_id}` - Remove IoT connection (not mounted in the release API)
 - `GET /api/v1/iot/connections` - List all connections
 - `GET /api/v1/iot/connections/{connection_id}/status` - Get connection status
 - `GET /api/v1/iot/connections/status` - Get all connection status
@@ -229,12 +230,12 @@ asset_tracking_websocket_config = {
 
 - `GET /api/v1/iot/connections/{connection_id}/alerts` - Get alerts
 - `GET /api/v1/iot/alerts/all` - Get all alerts
-- `POST /api/v1/iot/connections/{connection_id}/alerts/{alert_id}/acknowledge` - Acknowledge alert
+- `POST /api/v1/iot/connections/{connection_id}/alerts/{alert_id}/acknowledge` - Acknowledge alert (not mounted in the release API)
 
 ### Monitoring Operations
 
-- `POST /api/v1/iot/monitoring/start` - Start real-time monitoring
-- `POST /api/v1/iot/monitoring/stop` - Stop real-time monitoring
+- `POST /api/v1/iot/monitoring/start` - Start real-time monitoring (not mounted in the release API)
+- `POST /api/v1/iot/monitoring/stop` - Stop real-time monitoring (not mounted in the release API)
 
 ## Data Models
 
@@ -395,7 +396,7 @@ Enable debug logging for detailed troubleshooting:
 
 ```python
 import logging
-logging.getLogger('adapters.iot').setLevel(logging.DEBUG)
+logging.getLogger('src.adapters.iot').setLevel(logging.DEBUG)
 ```
 
 ## Performance Optimization
@@ -439,14 +440,7 @@ def get_equipment_info(equipment_id):
 
 ```bash
 # Run IoT adapter tests
-pytest adapters/iot/tests/test_iot_adapters.py -v
-```
-
-### Integration Tests
-
-```bash
-# Test with real IoT systems (requires configuration)
-pytest adapters/iot/tests/test_integration.py -v
+pytest src/adapters/iot/tests/test_iot_adapters.py -v
 ```
 
 ## Support

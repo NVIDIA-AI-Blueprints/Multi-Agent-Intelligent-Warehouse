@@ -8,18 +8,39 @@ This directory contains utility scripts for the Warehouse Operational Assistant 
 scripts/
 ├── data/              # Data generation scripts
 ├── forecasting/       # Forecasting and ML model scripts
-├── setup/            # Environment and database setup scripts
-├── testing/          # Test and validation scripts
+├── lib/               # Shared helpers (.env loader, deployment identity, check_model_config.py)
+├── models/            # Local NIM setup/check scripts
+├── qualification/     # Reference-deployment qualification probes
+├── security/          # Dependency blocklist checker
+├── setup/            # Environment, database, gateway and sandbox setup scripts
+├── testing/          # Test and validation scripts (incl. run_core_ci.sh)
 ├── tools/            # Utility and helper scripts
-├── start_server.sh   # Main API server startup script
+├── start_server.sh   # Development API server startup script
+├── *_reference_deployment.sh  # Reference deployment lifecycle: preflight, start, status,
+│                              # smoke_test, restart, stop, qualify
+├── counterfactual_eval.py, trace_capture.py  # Demo evaluation artifacts
 └── README.md         # This file
 ```
+
+The reference (single-node) deployment scripts are documented in
+[docs/operations/REFERENCE_DEPLOYMENT_RUNBOOK.md](../docs/operations/REFERENCE_DEPLOYMENT_RUNBOOK.md).
 
 ---
 
 ## 🚀 Quick Start
 
 ### Start the API Server
+
+Prerequisite: `env/` (from `./scripts/setup/setup_environment.sh`) must also
+contain the MAIW packages, which `setup_environment.sh` does not install:
+
+```bash
+source env/bin/activate
+pip install -e packages/maiw-contracts -e packages/maiw-mcp -e packages/maiw-state \
+    -e packages/maiw-models -e packages/maiw-skills -e packages/maiw-decision \
+    -e packages/maiw-execution -e packages/maiw-agents -e packages/maiw-world \
+    -e apps/api
+```
 
 ```bash
 ./scripts/start_server.sh
@@ -264,7 +285,7 @@ Sets up Python virtual environment and installs dependencies.
 
 **Script:** `scripts/setup/dev_up.sh`
 
-Starts all development infrastructure services (PostgreSQL, Redis, Kafka, Milvus, etc.).
+Starts the full Docker Compose dev stack (`deploy/compose/docker-compose.dev.yaml`): datastores (PostgreSQL, Redis, Kafka, Milvus, etc.), the four MCP servers, the backend API (:8001), the frontend (:3001) and nginx (:3000), all bound to 127.0.0.1.
 
 **Usage:**
 ```bash
@@ -330,7 +351,7 @@ Located in `scripts/testing/` - Test and validation scripts.
 
 **Script:** `scripts/testing/test_chat_functionality.py`
 
-Tests the chat endpoint and MCP agent routing.
+Tests the chat endpoint and MCP agent routing. **Legacy:** it calls `POST /api/v1/chat`, which the v2 API (`maiw_api.app:app`) does not mount, so it only works against the legacy development server (`src/api/app.py`). The v2 conversational endpoint is `POST /api/v1/copilot/turn`.
 
 **Usage:**
 ```bash
@@ -364,7 +385,7 @@ Benchmarks GPU performance for Milvus vector operations.
 
 **Script:** `scripts/tools/debug_chat_response.py`
 
-Debug tool for analyzing chat responses and agent routing.
+Debug tool for analyzing chat responses and agent routing. **Legacy:** calls `POST /api/v1/chat`, which the v2 API does not mount.
 
 ### Demo Scripts
 
@@ -383,7 +404,7 @@ Docker build and tagging utility.
 
 ### Prerequisites
 
-- Python 3.9+
+- Python 3.11+
 - PostgreSQL/TimescaleDB running on port 5435
 - Redis running on port 6379 (optional)
 - Milvus running on port 19530 (optional)
@@ -440,8 +461,7 @@ Scripts use environment variables for database credentials:
 
 ## 📚 Additional Documentation
 
-- **Cleanup Summary**: See `scripts/CLEANUP_SUMMARY.md` for recent cleanup actions
-- **Analysis Report**: See `scripts/SCRIPTS_FOLDER_ANALYSIS.md` for detailed analysis
+- **Reference Deployment**: See `docs/operations/REFERENCE_DEPLOYMENT_RUNBOOK.md` for the lifecycle scripts
 - **Forecasting Docs**: See `docs/forecasting/` for forecasting documentation
 - **Deployment Guide**: See `DEPLOYMENT.md` for deployment instructions
 
@@ -475,7 +495,6 @@ After running the data generators, you should see:
 
 - All database tables populated with realistic data
 - Frontend showing populated inventory, tasks, and incidents
-- Chat interface working with realistic warehouse queries
 - Monitoring dashboards displaying metrics and KPIs
 - User authentication working with generated users
 - Action tools executing with realistic data context

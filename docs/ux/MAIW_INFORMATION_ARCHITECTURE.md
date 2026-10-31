@@ -1,5 +1,7 @@
 # MAIW Information Architecture
 
+> **Historical record (UX-1C, 2026-09-20).** Describes the feature as delivered; test counts, file lists and deferred items are point-in-time and may not match the current code.
+
 > Version: UX-1C  
 > Date: 2026-09-20  
 > Status: Implemented
@@ -22,7 +24,7 @@ After UX-1A, the global navigation is:
 
 ```
 MAIW OPERATIONS  [SIMULATED WAREHOUSE indicator when active]
-OPERATIONS | WORLD | RELIABILITY | MODELS | CAPABILITIES | ACTIVITY
+OPERATIONS | WORLD | RELIABILITY | MODELS | CAPABILITIES | ACTIVITY | DEPLOYMENT
 ```
 
 | Nav Label | Route | Persona | Description |
@@ -33,6 +35,7 @@ OPERATIONS | WORLD | RELIABILITY | MODELS | CAPABILITIES | ACTIVITY
 | **MODELS** | `/models` | DEV/GSI | Model Gateway — policy, model roles, status. Link to Model Lab sub-route |
 | **CAPABILITIES** | `/capabilities` | GSI | MCP capability catalogue |
 | **ACTIVITY** | `/activity` | DEV | Full session event log |
+| **DEPLOYMENT** | `/deployment` | GSI/DEV | Platform & security: sandbox, model policy, auth |
 
 **Not in primary nav (accessible via URL):**
 - `/models/lab` — Model Gateway Evaluation Lab (developer-only; VIEW ONLY, no live inference)

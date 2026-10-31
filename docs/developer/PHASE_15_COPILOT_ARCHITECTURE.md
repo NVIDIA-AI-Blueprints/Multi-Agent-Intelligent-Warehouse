@@ -1,5 +1,7 @@
 # Phase 15 — MAIW Copilot Architecture
 
+> **Historical document (Phase 15A design, 2026).** Routing changed in v2.1.0: by default LOW/MEDIUM-reasoning turns (e.g. ASK) are served by Lightning and HIGH-reasoning turns (e.g. ANALYZE) / CRITICAL risk by Ultra; Nano and Super are disabled. The "Missing Contracts" listed below have since been implemented. See [../architecture/ARCHITECTURE.md](../architecture/ARCHITECTURE.md) for the current design.
+
 > Supersedes `PHASE_15_COPILOT_INTEGRATION.md` (Phase 14G stub).
 
 Copilot is the human-interaction layer over MAIW's existing operational intelligence and governed decision architecture. It is not a warehouse agent and not an execution engine.

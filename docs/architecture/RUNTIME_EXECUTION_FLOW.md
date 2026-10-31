@@ -24,7 +24,7 @@ Agent / Skill
                                   └── <Domain>MCPServer → <Domain>Adapter → PostgreSQL
 ```
 
-Read capabilities (8 total, all `read_only` risk tier):
+Read capabilities (8 total; `read_only` or `low` risk tier, never proposal-generating):
 
 | Capability | Domain |
 |---|---|
@@ -54,19 +54,19 @@ API Router → <Domain>Agent / SOP Step
     │         └── ActionProposal.for_<action>()   ← pure factory, synchronous, no I/O
     │
     ├── 3. DecisionEngine.evaluate(DecisionRequest)   ← synchronous, no I/O, no MCP call
-    │         └── DecisionResult → APPROVED / REJECTED / DEFERRED
+    │         └── DecisionResult → APPROVED / REJECTED / REQUIRES_HUMAN_APPROVAL / REQUIRES_FRESH_STATE
     │
-    ├── 4. [if APPROVED] ApprovalStore.submit()   ← creates approval record, awaits human
+    ├── 4. [if REQUIRES_HUMAN_APPROVAL] ApprovalStore.create()   ← creates approval record, awaits human
     │
     ├── 5. [on human approval] <Domain>ActionExecutor.execute()
     │         │
     │         └── BaseActionExecutor — 6-guard check:
     │               ①  decision_outcome == APPROVED
-    │               ②  proposal_id matches decision_id
+    │               ②  decision.proposal_id == proposal.proposal_id
     │               ③  action_name in _ALLOWED_ACTIONS frozenset
-    │               ④  WarehouseStateSnapshot age ≤ max_decision_age_seconds
-    │               ⑤  _additional_guards() hook (domain-specific checks)
-    │               ⑥  decision deadline not expired
+    │               ④  decision age (evaluated_at) ≤ max_decision_age_seconds
+    │               ⑤  _check_additional_guards() hook (domain-specific checks)
+    │               ⑥  request deadline not expired
     │
     └── 6. [all guards pass] MAIWMCPClient.invoke("warehouse.<domain>.<write_tool>")
                 │
@@ -93,14 +93,15 @@ Write capabilities (5 total):
 
 | # | Guard | Failure → |
 |---|---|---|
-| ① | `decision_outcome == APPROVED` | `NotApprovedError` |
-| ② | `proposal_id == decision.proposal_id` | `ProposalMismatchError` |
-| ③ | `action_name in _ALLOWED_ACTIONS` | `ActionNotAllowedError` |
-| ④ | `snapshot.age ≤ max_decision_age_seconds` | `StaleDecisionError` |
-| ⑤ | `_additional_guards()` hook passes | domain-specific `GuardError` |
-| ⑥ | `decision.deadline` not expired | `DeadlineExpiredError` |
+| ① | `decision.outcome == APPROVED` | `ActionNotApproved` |
+| ② | `decision.proposal_id == proposal.proposal_id` | `ActionDecisionMismatch` |
+| ③ | `proposal.action in _ALLOWED_ACTIONS` | `ActionUnsupported` |
+| ④ | decision age ≤ `max_decision_age_seconds` (default 300 s) | `ActionExpired` |
+| ⑤ | `await _check_additional_guards(proposal)` passes | `ActionConflict` (domain-specific, e.g. equipment state drift) |
+| ⑥ | request deadline not expired | `RequestDeadlineExceeded` |
 
-All guards are synchronous. None call MCP. None call the LLM.
+Guards ①–④ and ⑥ are pure checks; ⑤ is an async hook that may read state (the
+equipment drift guard calls `WarehouseStateProvider`). None call an MCP write tool. None call the LLM.
 
 ---
 
@@ -110,9 +111,9 @@ After every write, the executor records the outcome in `ExecutionRegistry`:
 
 | MCP result | Registry call | Reconciliation status |
 |---|---|---|
-| Success response | `mark_executed()` | `CONFIRMED_EXECUTED` |
-| Error response | `mark_not_executed()` | `CONFIRMED_NOT_EXECUTED` |
-| Timeout / network | `mark_unknown()` | `UNKNOWN` → `RECONCILING` |
+| Success response | `complete(execution_id, outcome, result)` | `CONFIRMED_EXECUTED` |
+| Error response | `complete(execution_id, outcome, result)` | `CONFIRMED_NOT_EXECUTED` |
+| Timeout / network | `mark_unknown()` | `UNKNOWN` → reconciliation (`set_reconciliation()`) |
 
 `UNKNOWN` is never auto-retried. The `OBSERVE_OUTCOME` SOP step re-reads state and classifies to `CONFIRMED_EXECUTED`, `CONFIRMED_NOT_EXECUTED`, or `INDETERMINATE`.
 

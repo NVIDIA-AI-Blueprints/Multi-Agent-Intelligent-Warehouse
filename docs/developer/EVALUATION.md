@@ -13,10 +13,10 @@ active, once without (control) — and compares KPIs.
 
 ### Run it
 
-Start the demo API first:
+Start the demo API first (port 8001, see the README Quickstart):
 
 ```bash
-./scripts/start_demo_mode.sh &
+MAIW_DEMO_MODE=true MAIW_PERSISTENCE_MODE=memory uvicorn maiw_api.app:app --port 8001 &
 ```
 
 Then run the evaluation script:
@@ -71,7 +71,7 @@ under 13 fault profiles.
 ./scripts/testing/run_reliability.sh
 ```
 
-Expected output: `388 passed, 0 failed`.
+Expected output: all tests pass, 0 failures.
 
 ### Golden invariants
 
@@ -93,10 +93,10 @@ Expected output: `388 passed, 0 failed`.
 
 ### Adding a new fault profile
 
-1. Add a `FaultProfile` entry in
-   `tests/unit/reliability/fault_framework/__init__.py`
+1. Add a `FaultType` member in
+   `tests/unit/reliability/fault_framework/models.py`
 2. Write a test in `tests/unit/reliability/test_scenario_001_faults.py`
-   (by analogy with existing F01–F13 tests)
+   that constructs a `FaultProfile` (by analogy with existing F01–F13 tests)
 3. Call `check_golden_invariants(result)` at the end of the test
 4. Run `./scripts/testing/run_reliability.sh` — all 5 invariants must still pass
 
@@ -108,7 +108,7 @@ Expected output: `388 passed, 0 failed`.
 ./scripts/testing/run_core_ci.sh
 ```
 
-Expected output: 528+ passed. The exact count increases with each phase.
+Expected output: all tests pass, 0 failures (v2.1.0 CI: 3258 tests).
 
 ---
 
@@ -118,4 +118,4 @@ Expected output: 528+ passed. The exact count increases with each phase.
 cd src/ui/web && npm test -- --watchAll=false
 ```
 
-Expected: 94 passed (Phase 10E baseline).
+Expected: all tests pass, 0 failures (v2.1.0 CI: 991 tests in 42 suites).

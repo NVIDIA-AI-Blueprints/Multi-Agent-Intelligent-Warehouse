@@ -260,7 +260,7 @@ Proof: All four endpoints return the same value regardless of scenario or execut
 ## Developer Setup Journey
 
   01 CONFIGURE  — WarehouseWorldConfig.dc47_demo() defines the warehouse
-  02 GENERATE   — Run: maiw-world generate --preset dc47-demo (seed=42, ~700ms)
+  02 GENERATE   — Run: python -m maiw_world generate (default config = dc47_demo preset, seed=42)
   03 VALIDATE   — CanonicalWarehouseGraph loads from DataPack; checksum verified
   04 EXPLORE    — Open WORLD: OVERVIEW, GRAPH, CHANGES, RAW tabs
   05 DISRUPT    — Start scenario "labor_constraint_wave_risk" → CHANGES shows overlay

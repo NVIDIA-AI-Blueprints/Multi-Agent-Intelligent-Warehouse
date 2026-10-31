@@ -5,10 +5,9 @@ This repository uses GitHub Dependabot to automatically manage dependency update
 -**Minor Updates**: Manual review required
 -**Major Updates**: Blocked for critical packages, manual review for others ### 📅 Update Schedule
 -**Python/NPM/Docker/GitHub Actions**: Weekly updates (Mondays at 9:00 AM)
--**Helm Charts**: Monthly updates (first Monday at 9:00 AM) ### 🏷️ Labeling System
+-**Helm Charts**: Monthly entry configured for `/helm`, but that directory does not exist, so it scans nothing ### 🏷️ Labeling System
 All Dependabot PRs are automatically labeled with:
 - `dependencies` - General dependency updates
-- `security` - Security-related updates
 - `python`/`javascript`/`docker`/`github-actions`/`helm` - Ecosystem-specific labels
 - `backend`/`frontend`/`infrastructure`/`ci-cd`/`kubernetes` - Component-specific labels ### 🚫 Ignored Updates
 Major version updates are ignored for critical packages to prevent breaking changes: #### Python Packages
@@ -57,11 +56,13 @@ If an update causes issues:
 3. Investigate the issue
 4. Create a proper fix or find an alternative ## Configuration Files ### Main Configuration
 - `.github/dependabot.yml` - Main Dependabot configuration ### Package Files Monitored
-- `requirements.txt` - Python dependencies
-- `ui/web/package.json` - Node.js dependencies
-- `Dockerfile` - Docker base images
-- `.github/workflows/*.yml` - GitHub Actions
-- `helm/*/Chart.yaml` - Helm chart dependencies ## Best Practices ### Dependency Management
+- `pip` at `/` - root Python dependency files (`requirements.txt`, etc.)
+- `npm` at `/ui/web` - **this directory does not exist** (the UI is at `src/ui/web`), so UI npm dependencies (`src/ui/web/package.json`) are currently **not scanned** by Dependabot
+- `docker` at `/` - root `Dockerfile*` base images
+- `github-actions` at `/` - `.github/workflows/*.yml`
+- `helm` at `/helm` - **this directory does not exist**; there are no Helm charts in the repository
+
+**Known gap:** until `.github/dependabot.yml` is updated (npm `directory: "/src/ui/web"`, helm entry removed), review UI dependency updates manually (for example with `npm audit` in `src/ui/web`). ## Best Practices ### Dependency Management
 - Keep dependencies up to date regularly
 - Use semantic versioning constraints
 - Pin critical dependencies to specific versions

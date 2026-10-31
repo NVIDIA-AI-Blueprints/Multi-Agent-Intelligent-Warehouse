@@ -1,5 +1,7 @@
 # MAIW Live Agent Continuity
 
+> **Historical record (UX-1C, 2026-09-20).** Describes the feature as delivered; test counts, file lists and deferred items are point-in-time and may not match the current code.
+
 > Feature: UX-1C  
 > Status: Implemented  
 > Date: 2026-09-20

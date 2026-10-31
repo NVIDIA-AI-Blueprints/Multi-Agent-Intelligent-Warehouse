@@ -1,5 +1,7 @@
 # MCP Performance Test Review and Enhancement Report
 
+> **Historical record (pre-MAIW v2).** Point-in-time review of `tests/performance/test_mcp_performance.py`, which has since been removed from the repository; not the current test status.
+
 ## Executive Summary
 
 This document provides a comprehensive review of `tests/performance/test_mcp_performance.py`, including identified issues, applied fixes, suggested enhancements, and test execution results.

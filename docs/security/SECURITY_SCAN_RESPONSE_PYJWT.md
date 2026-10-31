@@ -65,7 +65,7 @@ We have implemented comprehensive security hardening in `src/api/services/auth/j
 
 **Location**: `src/api/services/auth/jwt_handler.py`
 
-#### Key Validation (lines 23-76)
+#### Key Validation (lines 40-93)
 
 ```python
 def validate_jwt_secret_key(secret_key: str, algorithm: str, environment: str) -> bool:
@@ -214,7 +214,7 @@ Risk Level: NONE - Vulnerability is mitigated through application-level controls
 - **Full Mitigation Details**: `docs/security/VULNERABILITY_MITIGATIONS.md`
 - **JWT Configuration**: `docs/secrets.md`
 - **Implementation**: `src/api/services/auth/jwt_handler.py`
-- **Requirements**: `requirements.txt` (line 14 - includes mitigation note)
+- **Requirements**: `requirements.txt` (line 16 - includes mitigation note)
 
 ---
 

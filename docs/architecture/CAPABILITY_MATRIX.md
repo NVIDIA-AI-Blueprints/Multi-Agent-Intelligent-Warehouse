@@ -40,8 +40,8 @@ APPROVED → binding → allowlist → staleness → additional_guards → deadl
 
 | Capability | Risk | Side-effect | Req. approval | Idempotent | Proposal skill | Exec skill | Executor | MCP server | State component |
 |---|---|---|---|---|---|---|---|---|---|
-| `warehouse.inventory.get` | read_only | read | No | Yes | — | `InventoryLookupSkill` | — | `mcp_servers/inventory` | `InventoryState` |
-| `warehouse.inventory.locate` | read_only | read | No | Yes | — | `InventoryLookupSkill` | — | `mcp_servers/inventory` | `InventoryState` |
+| `warehouse.inventory.get` | low | read | No | Yes | — | `InventoryLookupSkill` | — | `mcp_servers/inventory` | `InventoryState` |
+| `warehouse.inventory.locate` | low | read | No | Yes | — | `InventoryLookupSkill` | — | `mcp_servers/inventory` | `InventoryState` |
 
 **Permission token:** `inventory:read`  
 **State model:** `InventoryState` (items, low_stock_count)  
@@ -55,11 +55,11 @@ APPROVED → binding → allowlist → staleness → additional_guards → deadl
 
 | Capability | Risk | Side-effect | Req. approval | Idempotent | Proposal skill | Exec skill | Executor | MCP server | State component |
 |---|---|---|---|---|---|---|---|---|---|
-| `warehouse.equipment.get_status` | read_only | read | No | Yes | — | `EquipmentStatusSkill` | — | `mcp_servers/equipment` | `EquipmentState` |
-| `warehouse.equipment.get_telemetry` | read_only | read | No | Yes | — | `EquipmentTelemetrySkill` | — | `mcp_servers/equipment` | `EquipmentState` |
-| `warehouse.equipment.assign` | medium | write | Yes | No | `EquipmentAssignmentSkill` | `ExecuteEquipmentAssignSkill` | `EquipmentActionExecutor` | `mcp_servers/equipment` | `EquipmentState` |
+| `warehouse.equipment.get_status` | low | read | No | Yes | — | `EquipmentStatusSkill` | — | `mcp_servers/equipment` | `EquipmentState` |
+| `warehouse.equipment.get_telemetry` | low | read | No | Yes | — | `EquipmentTelemetrySkill` | — | `mcp_servers/equipment` | `EquipmentState` |
+| `warehouse.equipment.assign` | medium | write | Yes | No | `EquipmentAssignmentSkill` | `ExecuteEquipmentAssignmentSkill` | `EquipmentActionExecutor` | `mcp_servers/equipment` | `EquipmentState` |
 | `warehouse.equipment.release` | low | write | No | Yes | *(factory)* | `ExecuteEquipmentReleaseSkill` | `EquipmentActionExecutor` | `mcp_servers/equipment` | `EquipmentState` |
-| `warehouse.equipment.schedule_maintenance` | medium | write | Yes | No | *(factory)* | `ExecuteMaintenanceSkill` | `EquipmentActionExecutor` | `mcp_servers/equipment` | `EquipmentState` |
+| `warehouse.equipment.schedule_maintenance` | medium | write | Yes | No | *(factory)* | `ExecuteEquipmentMaintenanceSkill` | `EquipmentActionExecutor` | `mcp_servers/equipment` | `EquipmentState` |
 
 **Permission token:** `equipment:execute`  
 **State model:** `EquipmentState` (assets, available_count, summary)  
@@ -117,7 +117,7 @@ APPROVED → binding → allowlist → staleness → additional_guards → deadl
 
 | Risk tier | Requires human approval? | Auto-approve eligible? | Example |
 |-----------|--------------------------|------------------------|---------|
-| `read_only` | Never | N/A (reads, no proposal) | `get_status`, `get_capacity`, `get_risk`, `get`, `locate` |
+| `read_only` | Never | N/A (reads, no proposal) | `labor.get_capacity`, `labor.get_allocation`, `wave.get`, `wave.get_risk` (inventory and equipment reads carry `risk="low"` in `maiw_contracts` but are still reads — no proposal) |
 | `low` | No | Yes (by DecisionEngine) | `equipment.release` |
 | `medium` | Yes — always | Never | `allocate`, `reprioritize`, `assign`, `schedule_maintenance` |
 | `high` | Yes — always | Never | *(reserved, not yet implemented)* |
@@ -145,14 +145,16 @@ These invariants hold across all 4 domains and are enforced by `tests/unit/test_
 
 ## Capability Registry
 
-Environment variables for service discovery (all `CapabilityRegistry.from_env()` keys):
+Environment variables for service discovery, read by `apps/api/maiw_api/bootstrap.py`
+(`CapabilityRegistry.from_env()` reads only the inventory URL). There is no default:
+an unset URL leaves that domain unconfigured.
 
-| Variable | Default | Domain |
-|----------|---------|--------|
-| `MAIW_MCP_SERVER_INVENTORY_URL` | `http://localhost:8001` | Inventory |
-| `MAIW_MCP_SERVER_EQUIPMENT_URL` | `http://localhost:8002` | Equipment |
-| `MAIW_MCP_SERVER_LABOR_URL` | `http://localhost:8003` | Labor |
-| `MAIW_MCP_SERVER_WAVE_URL` | `http://localhost:8004` | Wave |
+| Variable | Compose value | Host process (local MCP server) | Domain |
+|----------|---------------|---------------------------------|--------|
+| `MAIW_MCP_SERVER_INVENTORY_URL` | `http://mcp-inventory:8765/mcp` | `http://127.0.0.1:8765/mcp` | Inventory |
+| `MAIW_MCP_SERVER_EQUIPMENT_URL` | `http://mcp-equipment:8766/mcp` | `http://127.0.0.1:8766/mcp` | Equipment |
+| `MAIW_MCP_SERVER_LABOR_URL` | `http://mcp-labor:8767/mcp` | `http://127.0.0.1:8767/mcp` | Labor |
+| `MAIW_MCP_SERVER_WAVE_URL` | `http://mcp-wave:8768/mcp` | `http://127.0.0.1:8768/mcp` | Wave |
 
 ---
 

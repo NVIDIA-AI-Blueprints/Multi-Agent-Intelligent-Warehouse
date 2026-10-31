@@ -38,9 +38,9 @@ The system evaluates evidence quality using five weighted factors:
 ### Confidence Assessment
 
 #### Thresholds
-- **High Confidence**: Evidence score ≥ 0.7
-- **Medium Confidence**: 0.4 ≤ Evidence score < 0.7
-- **Low Confidence**: Evidence score < 0.4
+- **High Confidence**: Evidence score ≥ 0.8
+- **Medium Confidence**: 0.6 ≤ Evidence score < 0.8
+- **Low Confidence**: Evidence score < 0.6
 
 #### Quality Indicators
 - **Source Count**: Minimum 2 distinct sources required
@@ -103,9 +103,9 @@ def calculate_evidence_score(evidence_pack):
 def assess_confidence(evidence_score, source_count, agreement_level):
     """Assess overall confidence level."""
     
-    if evidence_score >= 0.7 and source_count >= 2 and agreement_level >= 0.8:
+    if evidence_score >= 0.8:
         return "high"
-    elif evidence_score >= 0.4 and source_count >= 2:
+    elif evidence_score >= 0.6:
         return "medium"
     else:
         return "low"
@@ -158,6 +158,9 @@ def generate_clarifying_questions(query, evidence_pack, confidence_level):
 
 ### Evidence Scoring Parameters
 
+Illustrative only — there is no YAML config file; the defaults live in the
+`config` dict of `src/retrieval/vector/evidence_scoring.py`.
+
 ```yaml
 evidence_scoring:
   weights:
@@ -168,8 +171,8 @@ evidence_scoring:
     source_diversity: 0.10
   
   thresholds:
-    high_confidence: 0.7
-    medium_confidence: 0.4
+    high_confidence: 0.8
+    medium_confidence: 0.6
     low_confidence: 0.0
   
   requirements:

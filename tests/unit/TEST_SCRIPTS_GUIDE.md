@@ -1,7 +1,8 @@
 # Unit Test Scripts Usage Guide
 
-**Last Updated:** 2025-01-XX  
-**Purpose:** Guide for running and using unit test scripts in the Warehouse Operational Assistant
+**Purpose:** Guide for running and using the legacy standalone test scripts in this directory
+
+> **Legacy scripts.** These standalone scripts are excluded from the supported CORE CI suite — run that with `./scripts/testing/run_core_ci.sh`. Scripts that call `API_BASE_URL/api/v1/chat` (`test_all_agents.py`, `test_guardrails.py`, `test_nvidia_integration.py`) need the legacy development server `src/api/app.py`; the release API (`uvicorn maiw_api.app:app`, port 8001) does not mount `/api/v1/chat`. The legacy server is not a release or deployment path.
 
 ---
 

@@ -20,10 +20,12 @@ HOST (single node — epg-tme-smc-h100-02, 4×H100 NVL)
 │   ├── SOP Engine (ProcedureStateStore: JsonFileProcedureStateStore)
 │   └── MCP domain clients (Inventory/Equipment/Labor/Wave)
 │
-├── Approved Nemotron 3 / 3.5 deployment
-│   └── nvidia/nemotron-3-super-120b-a12b (gen=nemotron-3, qualified 2026-10-05)
-│       • Hosted: https://integrate.api.nvidia.com/v1  (NVIDIA cloud)
-│       • OR Local NIM: http://localhost:8000/v1
+├── Approved Nemotron 3 / 3.5 deployments (v2.1.0 defaults)
+│   ├── lightning  nvidia/nemotron-3.5-lightning-30b-a3b  (nemotron-3.5; LOW + MEDIUM)
+│   ├── ultra      nvidia/nemotron-3-ultra-550b-a55b      (nemotron-3; HIGH + CRITICAL)
+│   ├── super      nvidia/nemotron-3-super-120b-a12b      (nemotron-3, DISABLED: hosted EOL 2026-10-19)
+│   └── endpoint   Hosted: https://integrate.api.nvidia.com/v1  (NVIDIA cloud)
+│                  OR Local NIM: http://localhost:8000/v1
 │
 └── NemoClaw/OpenShell sandbox runtime
     ├── SandboxedAgentRuntime + SOP Engine (agent-side)
@@ -44,8 +46,11 @@ Persistence root: /var/lib/maiw/
 | NemoClaw | 0.0.124 | QUALIFIED |
 | OpenShell | 0.0.116 | QUALIFIED |
 | Python (host) | 3.12.3 | QUALIFIED |
-| nvidia/nemotron-3-super-120b-a12b | gen=nemotron-3 | QUALIFIED |
+| nvidia/nemotron-3-super-120b-a12b | gen=nemotron-3 | QUALIFIED 2026-10-05 (historical — Super has been disabled by default since v2.1.0; hosted endpoint retired 2026-10-19) |
 | Approved generations | nemotron-3, nemotron-3.5 | PolicyFilter enforced |
+
+The v2.1.0 model defaults (Lightning for LOW/MEDIUM, Ultra for HIGH/CRITICAL) are
+described in [`docs/operations/REFERENCE_DEPLOYMENT_RUNBOOK.md`](../operations/REFERENCE_DEPLOYMENT_RUNBOOK.md).
 
 ### Trust Boundaries
 
@@ -168,10 +173,14 @@ from a checkout, not from this image.
 | `wosa-redis` | `redis:7` | 6379 | Caching / session state |
 | `wosa-milvus` | `milvusdb/milvus:v2.4.3` | 19530, 9091 | Optional vector store |
 | `wosa-etcd` | `quay.io/coreos/etcd:v3.5.9` | 2379 | Milvus coordination |
-| `wosa-minio` | `minio/minio` (2024-03-15) | 9000, 9001 | Milvus object storage |
+| `wosa-minio` | `pgsty/minio` (RELEASE.2026-08-04, digest-pinned) | 9000, 9001 | Milvus object storage |
 | `wosa-kafka` | `apache/kafka:3.7.0` | 9092 | Event streaming |
 | `wosa-nginx` | `nginx:1.25.3-alpine` | 3000→80 | Reverse proxy (dev) |
 | `wosa-llm-nim` | `nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b:latest` | 8000 | GPU profile only |
+
+In `deploy/compose/docker-compose.dev.yaml` every published port binds `127.0.0.1`.
+nginx (3000), frontend (3001) and the API (8001) follow `MAIW_PUBLISH_ADDRESS`
+(default `127.0.0.1`); datastores and the MCP servers (8765–8768) are loopback-only.
 
 ### Optional: RAPIDS Forecasting Agent
 
@@ -269,8 +278,8 @@ See [NEMOCLAW_OPENSHELL_INTEGRATION.md](NEMOCLAW_OPENSHELL_INTEGRATION.md).
 | Variable | Default | Description |
 |---|---|---|
 | `ENVIRONMENT` | `development` | Runtime environment label |
-| `MAIW_APP_TITLE` | `MAIW API` | OpenAPI title |
-| `MAIW_APP_VERSION` | `0.0.0-dev` | Version string |
+| `MAIW_APP_TITLE` | `Multi-Agent Intelligent Warehouse API` | OpenAPI title |
+| `MAIW_APP_VERSION` | `0.1.0` | Version string |
 | `MAIW_CORS_ORIGINS` | `*` | CORS origin allowlist |
 | `MAIW_API_HOST` | `0.0.0.0` | Uvicorn bind address |
 | `SECRET_KEY` | — | Auth token signing key |
@@ -342,7 +351,7 @@ deployment manifests.
 | Endpoint | Semantic | Dependencies |
 |---|---|---|
 | `GET /api/v1/live` | Process alive | None |
-| `GET /api/v1/ready` | Runtime initialized + DB reachable | TimescaleDB |
+| `GET /api/v1/ready` | Deployment profile can do its work (503 `NOT_READY` otherwise) | Profile valid; runtime assembled; persistence writable; ModelGateway built with every enabled role bound to an approved model; governed write path (`demo` / `reference_governed` only); required MCP domains; DB when the profile requires it; sandbox when `MAIW_SANDBOX_MODE=required` |
 | `GET /api/v1/health` | Comprehensive status | DB + Redis + Milvus (degraded, not 503) |
 | `GET /api/v1/health/simple` | Lightweight DB check | TimescaleDB |
 | `GET /api/v1/runtime/status` | MAIWRuntime component availability | None (reflects startup state) |

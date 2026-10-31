@@ -40,9 +40,12 @@ persistence would be unchanged.
 
 Classification: **EXTERNAL INTEGRATION** — optional, additive, one-directional.
 
-Status: architecture and contracts implemented; **no runtime qualification** —
-NemoClaw and OpenShell are not installed on the development host, and the
-provisioners fail closed rather than pretending otherwise.
+Status: qualified end to end in a real OpenShell sandbox (inference through the
+MAIW HTTP boundary to approved Nemotron models; see the integration doc below
+and `docs/audits/MAIW_NEMOCLAW_SECURITY_QUALIFICATION.md`). The reference
+deployment uses an OpenShell sandbox when `MAIW_SANDBOX_MODE=required`
+(see `docs/operations/REFERENCE_DEPLOYMENT_RUNBOOK.md`). Where NemoClaw/OpenShell
+are not installed, the provisioners fail closed rather than pretending otherwise.
 
 See [docs/architecture/NEMOCLAW_OPENSHELL_INTEGRATION.md](../docs/architecture/NEMOCLAW_OPENSHELL_INTEGRATION.md).
 

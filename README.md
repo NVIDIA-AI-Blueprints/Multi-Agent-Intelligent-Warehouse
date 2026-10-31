@@ -235,7 +235,7 @@ MAIW provides two runtimes behind the `AgentRuntime` protocol:
 ### DeepAgentsRuntime (adaptive mode)
 
 - Adaptive reasoning within the SOP policy envelope
-- Uses ReAct-style tool/subagent scheduling via `deepagents==0.7.15`
+- Uses ReAct-style tool/subagent scheduling via `deepagents>=0.7.15,<0.8` (optional extra: `pip install -e 'packages/maiw-agents[deep-agents]'`)
 - MAIW supplies: system prompt, tools (READ/ANALYTICAL only), subagent specs, SOP envelope
 - Deep Agents provides: the runtime loop, tool selection, intermediate context management
 - All model calls route through `MAIWModelGatewayChat` — never directly to a provider
@@ -292,11 +292,11 @@ Three sandbox modes, and the middle one is the point:
 
 **A sandbox authorises nothing.** Every capability check that runs unsandboxed still runs sandboxed, through the same `authorize_step`. The sandbox is a second wall behind the first. If `integrations/nemoclaw/` were deleted, capability enforcement, governance and procedure persistence would be unchanged.
 
-**Qualification status.** NemoClaw v0.0.124 and OpenShell v0.0.116 are installed on epg-tme-smc-h100-02 and the package-level security boundary (capability policy, sandbox isolation, approved Nemotron 3/3.5 policy in `PolicyFilter`, `MAIWHTTPModelGatewayClient`) was qualified for v2.0.0 — see `docs/audits/MAIW_NEMOCLAW_SECURITY_QUALIFICATION.md` and `artifacts/nemoclaw/`. The independent post-release audit of v2.0.0 (PR #142) then found that the *shipped application composition* did not match those claims (inference endpoint not mounted on `maiw_api.app:app`, an ungoverned legacy chat write path, durable stores not wired, readiness that failed open, a document path outside ModelGateway). **v2.0.1** remediates those gaps on the canonical app — see [What ships](#what-ships-v201) and `docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md` — and is pending an independent re-audit.
+**Qualification status.** NemoClaw v0.0.124 and OpenShell v0.0.116 are installed on epg-tme-smc-h100-02 and the package-level security boundary (capability policy, sandbox isolation, approved Nemotron 3/3.5 policy in `PolicyFilter`, `MAIWHTTPModelGatewayClient`) was qualified for v2.0.0 — see `docs/audits/MAIW_NEMOCLAW_SECURITY_QUALIFICATION.md` and `artifacts/nemoclaw/`. The independent post-release audit of v2.0.0 (PR #142) then found that the *shipped application composition* did not match those claims (inference endpoint not mounted on `maiw_api.app:app`, an ungoverned legacy chat write path, durable stores not wired, readiness that failed open, a document path outside ModelGateway). **v2.0.1** (released) remediated those gaps on the canonical app — see `docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md`. **v2.1.0** is the current release — see [What ships](#what-ships-v210) and [RELEASE_NOTES_v2.1.0.md](RELEASE_NOTES_v2.1.0.md).
 
 See [docs/architecture/NEMOCLAW_OPENSHELL_INTEGRATION.md](docs/architecture/NEMOCLAW_OPENSHELL_INTEGRATION.md).
 
-### What ships (v2.0.1)
+### What ships (v2.1.0)
 
 The only release composition root is `apps/api/maiw_api/app.py` (`uvicorn maiw_api.app:app`, port 8001). `src/api/app.py` is a legacy development server and is never part of a deployment or qualification.
 
@@ -340,11 +340,11 @@ MAIW v2 permits **only Nemotron 3 and Nemotron 3.5** for production and qualific
 
 | Role | Model ID | Generation | Status |
 |------|----------|------------|--------|
-| `lightning` | `nvidia/nemotron-3.5-lightning-30b-a3b` | `nemotron-3.5` | Approved |
-| `nano` | `nvidia/nemotron-3-nano-30b-a3b` | `nemotron-3` | Approved |
-| `super` | `nvidia/nemotron-3-super-120b-a12b` | `nemotron-3` | Approved |
-| `ultra` | `nvidia/nemotron-3-ultra-550b-a55b` | `nemotron-3` | Approved |
-| `nano-omni` | `nvidia/nemotron-3-nano-omni-30b-a3b` | `nemotron-3` | Approved (disabled by default; operator-configured) |
+| `lightning` | `nvidia/nemotron-3.5-lightning-30b-a3b` | `nemotron-3.5` | Approved, **enabled** — LOW and MEDIUM reasoning |
+| `ultra` | `nvidia/nemotron-3-ultra-550b-a55b` | `nemotron-3` | Approved, **enabled** — HIGH reasoning and CRITICAL risk |
+| `super` | `nvidia/nemotron-3-super-120b-a12b` | `nemotron-3` | Approved, disabled (hosted endpoint retired 2026-10-19; self-hosted NIM only) |
+| `nano` | `nvidia/nemotron-3-nano-30b-a3b` | `nemotron-3` | Approved, disabled (hosted endpoint retired 2026-09-01; self-hosted NIM only) |
+| `nano-omni` | — | `nemotron-3` | No approved deployment; vision requests fail closed |
 
 MAIW v2 supports Nemotron 3 and Nemotron 3.5 model families. Any model whose `generation` is not in `{"nemotron-3", "nemotron-3.5"}` is rejected by `PolicyFilter` before any provider call. See `packages/maiw-models/maiw_models/routing.py` (`PolicyFilter.APPROVED_MODEL_GENERATIONS`).
 
@@ -362,7 +362,7 @@ Agent (either runtime)
 ActionProposal  (typed, immutable)
     ↓
 DecisionEngine  (synchronous, no I/O, deterministic)
-    → APPROVED / REJECTED / DEFERRED
+    → APPROVED / REJECTED / REQUIRES_HUMAN_APPROVAL / REQUIRES_FRESH_STATE
     ↓
 Human Approval  (where required — explicit, expirable, single-use)
     ↓
@@ -539,7 +539,8 @@ pip install -e packages/maiw-contracts -e packages/maiw-mcp -e packages/maiw-sta
 # 3. Configure model endpoint
 cp .env.example .env
 # Set NVIDIA_API_KEY=nvapi-...
-# For local NIM: set MAIW_NIM_BASE_URL and MAIW_NIM_MODEL
+# For a self-hosted NIM: set MAIW_NIM_BASE_URL (and MAIW_NIM_API_KEY if needed);
+#   it must serve the approved model ID of each enabled role (see .env.example)
 
 # 4. Warehouse World (DataPack): the canonical pack is committed at
 #    data/worlds/dc47-demo-v1, so this step is optional. To regenerate it:
@@ -561,7 +562,7 @@ cd src/ui/web && npm install && npm start
 # 13. Review RecommendedAction — semantic intent above the authority boundary
 # 14. Execute governed action: Copilot ACT or POST /api/v1/demo/approve
 # 15. Observe LIVE outcome in WORLD → LIVE tab
-# 16. Ask Copilot: "Did the intervention work?" (OBSERVE_OUTCOME intent)
+# 16. Ask Copilot: "Did it work?" (OBSERVE_OUTCOME intent)
 # 17. Open Model Gateway Lab at http://localhost:3001/models/lab
 ```
 
@@ -600,17 +601,18 @@ This notebook walks through the full 17-step journey — from environment valida
 |----------|---------|-------------|
 | `LLM_NIM_URL` | `https://integrate.api.nvidia.com/v1` | NIM inference endpoint |
 | `LLM_MODEL` | `nvidia/nemotron-3.5-lightning-30b-a3b` | Default model ID for callers that bypass ModelGateway |
-| `MAIW_MODEL_LIGHTNING` | `nvidia/nemotron-3.5-lightning-30b-a3b` | Lightning role override |
-| `MAIW_MODEL_NANO` | `nvidia/nemotron-3-nano-30b-a3b` | Nano role override |
-| `MAIW_MODEL_SUPER` | `nvidia/nemotron-3-super-120b-a12b` | Super role override |
-| `MAIW_MODEL_ULTRA` | `nvidia/nemotron-3-ultra-550b-a55b` | Ultra role override (opt-in) |
+| `NEMOTRON_LIGHTNING_ENABLED` | `true` | Lightning role (LOW and MEDIUM reasoning) |
+| `NEMOTRON_ULTRA_ENABLED` | `true` | Ultra role (HIGH reasoning, CRITICAL risk) |
+| `NEMOTRON_SUPER_ENABLED` | `false` | Super role; enable only for a self-hosted Super NIM (hosted endpoint retired) |
+| `NEMOTRON_NANO_ENABLED` | `false` | Nano role; enable only for a self-hosted Nano NIM (hosted endpoint retired) |
+| `NEMOTRON_<ROLE>_MODEL` | approved ID per role | May only name that role's approved model ID; anything else fails closed |
 
 ### Infrastructure (Full-stack only)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DB_HOST` | `localhost` | PostgreSQL host |
-| `DB_PORT` | `5435` | PostgreSQL port |
+| `PGHOST` / `PGPORT` | `localhost` / `5435` | PostgreSQL for the API's SQL data path and `/api/v1/ready` |
+| `DB_HOST` / `DB_PORT` | `localhost` / `5435` | PostgreSQL for legacy services and migrations |
 | `REDIS_HOST` | `localhost` | Redis host |
 | `MILVUS_HOST` | `localhost` | Milvus vector DB host |
 
@@ -643,7 +645,9 @@ These invariants are enforced by the test suite and must not be broken:
 MAIW uses a three-tier test structure. **CORE CI** requires no running services:
 
 ```bash
-python -m pytest tests/unit/ tests/contract/ tests/mcp/ \
+DATABASE_URL=postgresql://warehouse:ci_placeholder@localhost:5435/warehouse \
+python -m pytest tests/unit/ tests/contract/ tests/mcp/ tests/api/ packages/maiw-agents/tests/ \
+  --timeout=120 \
   --ignore=tests/unit/test_all_agents.py \
   --ignore=tests/unit/test_basic.py \
   --ignore=tests/unit/test_nvidia_llm.py \
@@ -667,7 +671,7 @@ python -m pytest tests/unit/ tests/contract/ tests/mcp/ \
   --ignore=tests/unit/test_prompt_injection_simple.py
 ```
 
-**MAIW v2 test baseline: 2400+ Python tests (CORE CI suite) + 963 UI tests (39 suites)**
+**MAIW v2.1.0 test baseline: 3258 Python tests (CORE CI suite, same command as `.github/workflows/ci-cd.yml`) + 991 UI tests (42 suites)**
 
 | Test tier | Command | Requires |
 |-----------|---------|---------|
@@ -763,7 +767,7 @@ A frozen pre-NemoClaw performance baseline is preserved under `artifacts/baselin
 ## Contributing
 
 1. Fork the repository and create a feature branch.
-2. All changes must keep CORE CI green: current baseline 2400+ Python tests + 963 UI tests (39 suites).
+2. All changes must keep CORE CI green: current baseline 3258 Python tests + 991 UI tests (42 suites).
 3. New canonical code goes in `packages/`, never in `src.*` for business logic.
 4. No `src.*` imports in any `packages/` code — enforced by the test suite.
 5. Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/).

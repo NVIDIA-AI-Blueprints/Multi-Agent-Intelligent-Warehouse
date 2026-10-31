@@ -3,7 +3,8 @@
 ## Canonical CORE CI Command
 
 ```bash
-python -m pytest tests/unit/ tests/contract/ tests/mcp/ tests/api/ \
+python -m pytest tests/unit/ tests/contract/ tests/mcp/ tests/api/ packages/maiw-agents/tests/ \
+  --timeout=120 \
   --ignore=tests/unit/test_all_agents.py \
   --ignore=tests/unit/test_basic.py \
   --ignore=tests/unit/test_nvidia_llm.py \
@@ -27,6 +28,9 @@ python -m pytest tests/unit/ tests/contract/ tests/mcp/ tests/api/ \
   --ignore=tests/unit/test_prompt_injection_simple.py
 ```
 
+This is the command `.github/workflows/ci-cd.yml` runs ("Run Python tests"; CI also adds
+`--cov=src --cov-report=xml --cov-report=term-missing`). `--timeout` requires `pytest-timeout`.
+
 > **Note:** `ci-cd.yml` previously ran only `tests/unit/` (327 tests). As of Phase 9A it was corrected to run `tests/unit/ tests/contract/ tests/mcp/` (528 tests). Phase 9B adds `tests/api/` to the canonical command.
 
 All final phase reports MUST use this command. Any regression against the baseline is a blocker.
@@ -44,6 +48,7 @@ tests/unit/          ← pure Python, no DB/API/GPU required
 tests/contract/      ← MCP capability contract tests (in-memory MockProvider)
 tests/mcp/           ← MCP SDK protocol tests (FastMCP not importable — tests verify SDK v2 boundary)
 tests/api/           ← infrastructure-free API app/router tests (httpx ASGI transport)
+packages/maiw-agents/tests/  ← SOP Engine, runtimes, capability policy, proof SOPs
 ```
 
 These tests run in < 10 seconds total. They require only the Python packages installed in the venv and no environment variables.
@@ -57,8 +62,8 @@ These tests run in < 10 seconds total. They require only the Python packages ins
 | `tests/unit/test_equipment_agent_state.py` | Equipment state assembly | 18 |
 | `tests/unit/test_model_gateway.py` | ModelGateway routing | 117 |
 | `tests/unit/test_state_aware_ops_phase6.py` | State-aware operations | 10 |
-| `tests/unit/test_warehouse_state.py` | WarehouseState / snapshot | 35 |
-| `tests/unit/test_architecture_invariants.py` | Architecture boundary enforcement | 18 |
+| `tests/unit/test_warehouse_state.py` | WarehouseState / snapshot | 37 |
+| `tests/unit/test_architecture_invariants.py` | Architecture boundary enforcement | 28 |
 | `tests/mcp/test_equipment_mcp_server.py` | Equipment MCP server protocol | 34 |
 | `tests/contract/test_equipment_capability.py` | Equipment capability contract | 45 |
 
@@ -77,7 +82,7 @@ These tests hit a live server at `API_BASE_URL` (default: `http://localhost:8001
 
 **Excluded from CORE CI due to:** `asyncpg` import failures at collection time.
 
-Key files: `test_mcp_agent_workflows.py`, `test_mcp_end_to_end.py`, `test_equipment_endpoint.py`, `test_chat_endpoint.py`
+Key files: `test_equipment_endpoint.py`, `test_chat_endpoint.py`, `test_reasoning_integration.py`, `test_forecasting_endpoint.py`
 
 ---
 
@@ -109,7 +114,13 @@ To run: set `NVIDIA_API_KEY` and use a compatible asyncio mode.
 
 ### GPU / NIM TESTS
 
-No tests in this repository require local GPU resources. All model inference calls go through NVIDIA's hosted NIM API (remote HTTP). Local GPU is not a test dependency.
+CORE CI requires no GPU and no NIM endpoint. Tests that need live inference or a sandbox host are marked and skip when their dependency is absent:
+
+- `nim_required` — a live NIM endpoint (e.g. `tests/contract/test_phase_20b_real_inference.py` targets a local NIM on `localhost:8002`)
+- `real_sandbox` / `sandbox` — a qualified NemoClaw/OpenShell host with an approved Nemotron deployment (`tests/real_sandbox/`)
+- `approved_model_required` — an approved Nemotron 3 / 3.5 deployment
+
+Markers are declared in `pyproject.toml` (`[tool.pytest.ini_options]`).
 
 ---
 

@@ -366,6 +366,10 @@ authority an agent was always supposed to have.
 
 ## Current qualification status
 
+> **Dated record.** This section is the Phase 20B (2026-10-03) / Phase 20C-B (2026-10-05)
+> qualification record. The 20C-B live run used `nvidia/nemotron-3-super-120b-a12b`;
+> Super has been disabled by default since v2.1.0 — hosted endpoint retired 2026-10-19.
+
 **Phase 20B — real NemoClaw/OpenShell runtime qualification performed on epg-tme-smc-h100-02.**
 
 See the full qualification report: `docs/audits/MAIW_NEMOCLAW_SECURITY_QUALIFICATION.md`
@@ -449,13 +453,13 @@ approved — it proved transport mechanics only (TRANSPORT_SMOKE_TEST_ONLY label
 - ✅ Credentials not injected into adapter response (`test_step13_credentials_not_injected_into_adapter_response`)
 - ✅ Sandbox policy network default deny (code invariant, `test_step14_sandbox_policy_network_default_deny`)
 - ✅ Write authority never rendered in policy (code invariant, `test_step14_sandbox_policy_write_never_rendered`)
-- ✅ HTTP inference API contract (54 tests, `tests/contract/test_phase_20c_approved_nemotron.py`)
+- ✅ HTTP inference API contract (63 tests, `tests/contract/test_phase_20c_approved_nemotron.py`)
 - ✅ Approved Nemotron family enforced by PolicyFilter (Nemotron 3/3.5 only; Llama-family rejected)
 - ✅ Forbidden fields (provider_url, api_key, force_model_id, deployment_mode) rejected at HTTP layer
 - ✅ Sandbox HTTP client never falls back to local gateway or direct NIM
-- ❌ Real OpenShell sandbox making real inference call — PENDING @real_sandbox tests on qualified host
-- ❌ Approved Nemotron 3/3.5 real response from real sandbox — PENDING real NIM deployment
-- ❌ localhost:8002 unreachable FROM real sandbox — SSRF documented, not runtime-verified in this PR
+- ✅ Real OpenShell sandbox making real inference call — qualified in Phase 20C-B (2026-10-05, `tests/real_sandbox/test_phase_20c_live_sandbox.py`)
+- ✅ Approved Nemotron 3/3.5 real response from real sandbox — qualified in Phase 20C-B (`artifacts/nemoclaw/phase20c/live_sandbox_qualification.json`)
+- ✅ localhost unreachable FROM real sandbox — SSRF denial runtime-verified in Phase 20C-B (`ssrf_denial_tests` in the same artifact)
 
 ---
 
@@ -466,12 +470,12 @@ approved — it proved transport mechanics only (TRANSPORT_SMOKE_TEST_ONLY label
 | ~~Host-side `/api/v1/inference` endpoint fronting `ModelGateway`~~ | 20C-A | **DONE** — `src/api/routers/inference.py` |
 | ~~Approved Nemotron 3/3.5 model family policy enforcement~~ | 20C-A | **DONE** — `PolicyFilter.APPROVED_MODEL_GENERATIONS` |
 | ~~Sandbox HTTP transport client~~ | 20C-A | **DONE** — `integrations/nemoclaw/http_model_gateway_client.py` |
-| Real OpenShell sandbox inference call with approved Nemotron | 20C-B | @real_sandbox qualification required |
+| ~~Real OpenShell sandbox inference call with approved Nemotron~~ | 20C-B | **DONE** — `artifacts/nemoclaw/phase20c/live_sandbox_qualification.json` |
 | Host-side `/api/v1/capabilities/read` endpoint | 20C | sandboxed reads E2E |
 | `OpenShellSandboxProvisioner.apply_policy` against real pinned version | 20C | real policy enforcement |
 | Reconcile `maiw.nemoclaw/v1alpha1` manifest against the real NemoClaw schema | 20C | `status: QUALIFIED` |
 | Agent image build + pin (`image_reference`) | 20C | packaging |
-| `GovernanceInbox` backed by the procedure store (currently per-process) | 20C | multi-process hosts |
+| ~~Durable `GovernanceInbox`~~ | v2.0.1 | **DONE** — `JsonFileGovernanceInbox` under `$MAIW_PERSISTENCE_ROOT/governance` (`apps/api/maiw_api/persistence.py`); multi-host coordination still deferred |
 | Full end-to-end Proof SOP A across real sandbox boundary | 20C | runtime denial, restart |
 | NeMo Relay | — | explicitly out of scope |
 | UX-1G | — | explicitly out of scope |

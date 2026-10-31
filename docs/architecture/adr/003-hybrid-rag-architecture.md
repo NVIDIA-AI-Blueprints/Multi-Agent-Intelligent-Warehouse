@@ -1,5 +1,7 @@
 # ADR-003: Hybrid RAG Architecture
 
+> **Dated record (accepted 2025-09-12).** Describes the decision at that date; the code and configuration samples are illustrative and not maintained.
+
 ## Status
 
 **Accepted** - 2025-09-12

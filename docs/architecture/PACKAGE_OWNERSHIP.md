@@ -10,14 +10,16 @@ It describes the current-state architecture; migration status codes are not used
 | Package | Owns | Depends on |
 |---|---|---|
 | `maiw-contracts` | Domain value objects (equipment, labor, wave, inventory contracts) | *(none)* |
-| `maiw-mcp` | `MAIWMCPClient`, `CapabilityRegistry`, MCP transport config | `maiw-contracts` |
-| `maiw-models` | `ModelGateway`, `PolicyFilter`, `ModelRouter`, `DeploymentResolver`, `ModelRegistry` | `maiw-contracts` |
-| `maiw-state` | `WarehouseStateProvider`, `WarehouseStateSnapshot`, `StateRequirements`, domain state models | `maiw-contracts`, `maiw-mcp` |
-| `maiw-skills` | Proposal skills, execution skills, read skills per domain | `maiw-state`, `maiw-mcp`, `maiw-models` |
-| `maiw-decision` | `ActionProposal`, `DecisionResult`, `ApprovalRecord`, `DecisionEngine`, constraint rules, `ApprovalStore` | `maiw-contracts`, `maiw-skills`, `maiw-state` |
-| `maiw-execution` | `BaseActionExecutor`, domain executors, `ExecutionRegistry` | `maiw-decision`, `maiw-skills`, `maiw-mcp` |
-| `maiw-world` | `WarehouseWorldGenerator`, BASE/SCENARIO/LIVE world states, `OperationalContextSnapshot` | `maiw-state` |
-| `maiw-agents` | `AgentRuntime`, `MAIWDeterministicRuntime`, `DeepAgentsRuntime`, `AgentDefinition`, `SOPDefinition`, SOP Engine V2 | `maiw-skills`, `maiw-state`, `maiw-models` |
+| `maiw-mcp` | `MAIWMCPClient`, `CapabilityRegistry`, MCP transport config | *(none at runtime; `maiw_mcp.testing` imports `maiw-contracts`)* |
+| `maiw-models` | `ModelGateway`, `PolicyFilter`, `ModelRouter`, `DeploymentResolver`, `ModelRegistry` | `maiw-mcp` |
+| `maiw-state` | `WarehouseStateProvider`, `WarehouseStateSnapshot`, `StateRequirements`, domain state models | `maiw-mcp`, `maiw-contracts` |
+| `maiw-skills` | Proposal skills, execution skills, read skills per domain | `maiw-mcp`, `maiw-contracts`, `maiw-decision` |
+| `maiw-decision` | `ActionProposal`, `DecisionResult`, `ApprovalRecord`, `DecisionEngine`, constraint rules, `ApprovalStore` | `maiw-state` |
+| `maiw-execution` | `BaseActionExecutor`, domain executors, `ExecutionRegistry` | `maiw-decision`, `maiw-state`, `maiw-mcp`, `maiw-contracts` |
+| `maiw-world` | `WarehouseWorldGenerator`, BASE/SCENARIO/LIVE world states (`OperationalContextSnapshot` itself is defined in `apps/api/maiw_api/copilot/models.py`) | *(none)* |
+| `maiw-agents` | `AgentRuntime`, `MAIWDeterministicRuntime`, `DeepAgentsRuntime`, `AgentDefinition`, `SOPDefinition`, SOP Engine V2 | `maiw-decision`, `maiw-state`, `maiw-models`, `maiw-contracts` |
+
+"Depends on" lists the actual `maiw_*` imports (excluding tests). The `pyproject.toml` declarations are narrower: no package declares `maiw-contracts`, `maiw-skills` declares only `maiw-mcp`, and `maiw-agents` declares `maiw-decision`, `maiw-mcp`, `maiw-state`.
 
 `maiw-agents` does **not** depend on `maiw-execution`. The dependency was removed when operational write authority was taken out of the agent package; a test asserts the absence of any `maiw_execution` or `ActionExecutor` import rather than trusting this table.
 
@@ -81,7 +83,6 @@ See [NEMOCLAW_OPENSHELL_INTEGRATION.md](NEMOCLAW_OPENSHELL_INTEGRATION.md).
 |---|---|
 | `maiw_api.app` | FastAPI application factory; registers all routers |
 | `maiw_api.routers.*` | REST API endpoints; delegates to canonical packages |
-| `maiw_api.services.*` | Thin adapters (DB sessions, monitoring, security); no business logic |
 
 The API shell imports from all canonical packages. No canonical package imports from `apps/api/`.
 

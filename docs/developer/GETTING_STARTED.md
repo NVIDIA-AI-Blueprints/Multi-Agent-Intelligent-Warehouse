@@ -2,13 +2,13 @@
 
 This guide walks through the MAIW v2 developer setup path. No PostgreSQL, Redis, Milvus, or Kafka required for Demo Mode.
 
-For architecture depth, see [WAREHOUSE_WORLD_MODEL.md](../WAREHOUSE_WORLD_MODEL.md).
+For architecture depth, see [WAREHOUSE_WORLD_MODEL.md](WAREHOUSE_WORLD_MODEL.md).
 
 ---
 
 ## 1. Prerequisites
 
-- Python 3.10+
+- Python 3.11+
 - Node.js 20+ (for the UI)
 - NVIDIA API key (`nvapi-...`)
 
@@ -20,9 +20,15 @@ For architecture depth, see [WAREHOUSE_WORLD_MODEL.md](../WAREHOUSE_WORLD_MODEL.
 git clone https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse
 cd Multi-Agent-Intelligent-Warehouse
 
-pip install -e packages/maiw-world packages/maiw-state packages/maiw-agents \
-            packages/maiw-decision packages/maiw-execution packages/maiw-mcp
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+pip install -e packages/maiw-contracts -e packages/maiw-mcp -e packages/maiw-state \
+    -e packages/maiw-models -e packages/maiw-skills -e packages/maiw-decision \
+    -e packages/maiw-execution -e packages/maiw-agents -e packages/maiw-world \
+    -e apps/api
 ```
+
+Install all packages in one `pip install` command so the local packages satisfy each other's dependencies.
 
 ---
 
@@ -97,7 +103,7 @@ python -m maiw_world inspect data/worlds/dc47-demo-v1
 
 # Inspect a specific entity
 python -m maiw_world inspect data/worlds/dc47-demo-v1 --entity DC-47
-python -m maiw_world inspect data/worlds/dc47-demo-v1 --entity wave-000
+python -m maiw_world inspect data/worlds/dc47-demo-v1 --entity wave-017
 ```
 
 The inspect command shows all fields, outgoing edges, and incoming edges for any entity ID in the graph.
@@ -142,12 +148,12 @@ python -m maiw_world scenarios data/worlds/dc47-demo-v1
 ## 9. Launch Demo Mode
 
 ```bash
-./scripts/start_demo_mode.sh
+MAIW_DEMO_MODE=true MAIW_PERSISTENCE_MODE=memory uvicorn maiw_api.app:app --reload --port 8001
 ```
 
 In a separate terminal:
 ```bash
-cd src/ui/web && npm start
+cd src/ui/web && npm install && npm start
 ```
 
 Open http://localhost:3001/demo

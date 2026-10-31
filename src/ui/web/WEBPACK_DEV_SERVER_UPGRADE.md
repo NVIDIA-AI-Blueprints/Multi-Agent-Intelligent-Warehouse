@@ -1,5 +1,7 @@
 # webpack-dev-server Security Upgrade
 
+> Historical change record (webpack-dev-server 4→5 upgrade); versions below are as of that change.
+
 ## Summary
 
 Successfully upgraded `webpack-dev-server` from `4.15.2` (vulnerable) to `5.2.2` (patched) to address security vulnerabilities:

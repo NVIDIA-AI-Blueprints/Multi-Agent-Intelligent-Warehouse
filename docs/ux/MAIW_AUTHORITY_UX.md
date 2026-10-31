@@ -1,5 +1,7 @@
 # MAIW Authority UX
 
+> **Historical record (UX-1A, 2026-09-20).** Describes the feature as delivered; test counts, file lists and deferred items are point-in-time and may not match the current code.
+
 > Version: UX-1A  
 > Date: 2026-09-20  
 > Status: Implemented

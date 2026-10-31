@@ -24,7 +24,7 @@ ModelRequest
     ↓
 HARD POLICY FILTER (PolicyFilter)
     ├── enabled state
-    ├── RiskLevel (CRITICAL/HIGH → high-capability models only)
+    ├── RiskLevel (CRITICAL → high-capability models only)
     ├── ReasoningLevel (HIGH → high-capability models only)
     ├── Modality (non-TEXT → multimodal models only)
     ├── DeploymentMode (LOCAL_NIM, NVIDIA_HOSTED, ENTERPRISE, OPENAI_COMPATIBLE)
@@ -52,7 +52,7 @@ A routing strategy MUST NOT select a model excluded by the policy filter.
 `ModelGateway` is the sole inference boundary in MAIW. All agents and Copilot service call `gateway.generate(ModelRequest)`. No code outside `ModelGateway` may instantiate `NIMClient` or `NIMProvider` directly.
 
 ```python
-from maiw_models import ModelGateway, ModelRequest, ReasoningLevel, RiskLevel
+from maiw_models import DeploymentMode, ModelGateway, ModelRequest, ReasoningLevel, RiskLevel
 
 response = await gateway.generate(ModelRequest(
     task="warehouse.wave_recovery",
@@ -143,15 +143,17 @@ Default: `NVIDIA_HOSTED` (backward compatible with all pre-18B code).
 
 ## Fallback Behavior
 
-The fallback chain is unchanged from pre-18B:
+The current fallback chain (`_FALLBACK_CHAIN` in `maiw_models/router.py`):
 
 ```
 lightning → nano → super
-nano → super
-super → (ModelUnavailable raised)
+nano → super → lightning
+super → ultra
 ultra → super
 nano-omni → super (degrades to text-only)
 ```
+
+HIGH reasoning and CRITICAL risk never fall back to Lightning or Nano (PolicyFilter rejects them); with neither Super nor Ultra enabled they fail closed. v2.1.0 defaults: Super and Nano disabled, so MEDIUM is served by Lightning and HIGH / CRITICAL by Ultra.
 
 Fallback information is preserved in `ModelRouteDecision`:
 - `fallback_from`: the skipped preferred role
@@ -230,10 +232,8 @@ Converts a stored `OperationalContextSnapshot` (WS2) into the exact bounded cont
 
 ```python
 from maiw_models.evaluation.replay import replay_context_from_snapshot
-from maiw_api.copilot.store import get_copilot_store
-
-store = get_copilot_store()
-snapshot = store.get_context_snapshot(context_snapshot_id)
+# `store` is the running app's InMemoryCopilotStore (maiw_api.copilot.store)
+snapshot = store.get_context_snapshot_by_id(context_snapshot_id)
 replay_ctx = replay_context_from_snapshot(snapshot, user_prompt="Why is Wave 17 at risk?")
 
 request = ModelRequest(
@@ -534,7 +534,7 @@ A model passing the offline benchmark does NOT change policy eligibility. Policy
 - **Registry status**: `DEPLOYED` (registry entry retained for potential re-enablement)
 - **Operator status**: DISABLED via `NEMOTRON_NANO_ENABLED=false`
 - **EOL date**: 2026-09-01T09:00:00Z
-- **Routing behavior**: All Nano-eligible requests fall back to Super per the policy fallback chain
+- **Routing behavior**: Nano-eligible (MEDIUM) requests fall back to Super if enabled, otherwise to Lightning (v2.1.0 default)
 - **Quality status**: NOT TESTED — no inference calls were made during qualification
 - **Lab display**: Shows `UNAVAILABLE / NOT TESTED` — never `FAILED`
 
