@@ -17,8 +17,8 @@ services:
       MILVUS_USE_GPU: "true"
       MILVUS_GPU_DEVICE_ID: "0"
     ports:
-      - "19530:19530"   # gRPC
-      - "9091:9091"     # HTTP
+      - "127.0.0.1:19530:19530"   # gRPC
+      - "127.0.0.1:9091:9091"     # HTTP
     volumes:
       - milvus_gpu_data:/var/lib/milvus
     deploy:
@@ -48,7 +48,7 @@ services:
     volumes:
       - etcd_data:/etcd
     ports:
-      - "2379:2379"
+      - "127.0.0.1:2379:2379"
     restart: unless-stopped
 
   # MinIO for Milvus storage
@@ -59,8 +59,8 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     volumes:
       - minio_data:/data
     command: minio server /data --console-address ":9001"
@@ -76,7 +76,7 @@ services:
       # SECURITY: POSTGRES_PASSWORD must be set in .env file (no hardcoded defaults)
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5435:5432"
+      - "127.0.0.1:5435:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
@@ -86,7 +86,7 @@ services:
     image: redis:7-alpine
     container_name: wosa-redis
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     restart: unless-stopped
@@ -100,7 +100,7 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     ports:
-      - "9092:9092"
+      - "127.0.0.1:9092:9092"
     depends_on: [zookeeper]
     restart: unless-stopped
 
@@ -111,7 +111,7 @@ services:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
     ports:
-      - "2181:2181"
+      - "127.0.0.1:2181:2181"
     restart: unless-stopped
 
 volumes:

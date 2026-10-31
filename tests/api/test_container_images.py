@@ -104,7 +104,7 @@ def test_compose_backend_healthcheck_does_not_need_curl():
     assert healthcheck and "curl" not in healthcheck.group(1)
     assert "urllib.request" in healthcheck.group(1)
     frontend = compose.split("\n  frontend:\n", 1)[1].split("\n  # Nginx", 1)[0]
-    assert '"3001:8080"' in frontend
+    assert ':3001:8080"' in frontend
 
 
 def test_backend_image_ships_demo_evaluation_artifact():

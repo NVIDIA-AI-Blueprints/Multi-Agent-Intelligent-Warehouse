@@ -6,7 +6,7 @@ services:
     image: prom/prometheus:latest
     container_name: warehouse-prometheus
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - ./monitoring/prometheus/rules:/etc/prometheus/rules
@@ -28,7 +28,7 @@ services:
     image: grafana/grafana:latest
     container_name: warehouse-grafana
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
@@ -49,7 +49,7 @@ services:
     image: prom/node-exporter:latest
     container_name: warehouse-node-exporter
     ports:
-      - "9100:9100"
+      - "127.0.0.1:9100:9100"
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
@@ -68,7 +68,7 @@ services:
     image: gcr.io/cadvisor/cadvisor:latest
     container_name: warehouse-cadvisor
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
@@ -87,7 +87,7 @@ services:
     image: prom/alertmanager:latest
     container_name: warehouse-alertmanager
     ports:
-      - "9093:9093"
+      - "127.0.0.1:9093:9093"
     volumes:
       - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
       - alertmanager_data:/alertmanager
@@ -104,7 +104,7 @@ services:
     image: oliver006/redis_exporter:latest
     container_name: warehouse-redis-exporter
     ports:
-      - "9121:9121"
+      - "127.0.0.1:9121:9121"
     environment:
       - REDIS_ADDR=redis://host.docker.internal:6379
     networks:
@@ -116,7 +116,7 @@ services:
     image: prometheuscommunity/postgres-exporter:latest
     container_name: warehouse-postgres-exporter
     ports:
-      - "9187:9187"
+      - "127.0.0.1:9187:9187"
     environment:
       # SECURITY: POSTGRES_PASSWORD must be set in .env file (no hardcoded defaults)
       - DATA_SOURCE_NAME=postgresql://${POSTGRES_USER:-warehouse}:${POSTGRES_PASSWORD}@host.docker.internal:5435/${POSTGRES_DB:-warehouse}?sslmode=disable

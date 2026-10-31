@@ -681,73 +681,33 @@ Failed to compile.
 - Use `.nvmrc` file: `cd src/ui/web && nvm use`
 - Ensure CI/CD uses Node.js 20+
 
-#### Frontend Port 3001 Not Accessible
+#### Frontend Port 3001 Not Accessible From Another Machine
 
-**Symptom:**
+**By design.** `npm start` (the development server) and every published
+Compose port bind to `127.0.0.1`, so they are reachable only from the host
+itself. Docker otherwise publishes ports on every host interface, which would
+expose the database, Redis, MinIO and the MCP domain servers (whose write tools
+trust the decision IDs their caller sends) to the network.
+
+**To use the UI from your workstation**, tunnel to the host instead of opening
+ports:
+
+```bash
+ssh -L 3001:127.0.0.1:3001 -L 8001:127.0.0.1:8001 <user>@<server>
+# then open http://localhost:3001 on your workstation
 ```
-Compiled successfully!
-Local:            http://localhost:3001
-On Your Network:  http://172.19.0.1:3001
-```
-But port 3001 is not accessible/opened.
 
-**Possible Causes:**
-1. Server binding to localhost only (not accessible from network)
-2. Firewall blocking port 3001
-3. Wrong IP address being used
-4. Port conflict with another process
+**To publish deliberately**, only behind your own authentication and TLS:
 
-**Solution:**
+- Development server: `HOST=0.0.0.0 npm start` (with
+  `MAIW_UI_OPERATOR_WRITE_TOKEN` set, anyone who reaches this server can
+  perform governed equipment writes).
+- Compose: set `MAIW_PUBLISH_ADDRESS=0.0.0.0` in `deploy/compose/.env`. This
+  widens only nginx (3000), the frontend (3001) and the API (8001); datastores
+  and the MCP domain servers stay on `127.0.0.1` with no override.
 
-1. **Verify port is listening:**
-   ```bash
-   # Check if port is listening
-   netstat -tuln | grep 3001
-   # or
-   ss -tuln | grep 3001
-   # Should show: 0.0.0.0:3001 (accessible from network)
-   ```
-
-2. **Ensure server binds to all interfaces:**
-   The start script should include `HOST=0.0.0.0`:
-   ```json
-   "start": "PORT=3001 HOST=0.0.0.0 craco start"
-   ```
-   If not, update `src/ui/web/package.json` and restart the server.
-
-3. **Check firewall rules:**
-   ```bash
-   # Linux (UFW)
-   sudo ufw allow 3001/tcp
-   sudo ufw status
-   
-   # Linux (firewalld)
-   sudo firewall-cmd --add-port=3001/tcp --permanent
-   sudo firewall-cmd --reload
-   ```
-
-4. **Verify correct URL:**
-   - **Same machine**: `http://localhost:3001`
-   - **Different machine**: `http://<server-ip>:3001` (use actual server IP, not 172.19.0.1)
-   - **Docker**: May need port mapping in docker compose
-
-5. **Test connectivity:**
-   ```bash
-   # From server
-   curl http://localhost:3001
-   
-   # From remote machine
-   curl http://<server-ip>:3001
-   ```
-
-6. **Check for port conflicts:**
-   ```bash
-   lsof -i :3001
-   # Kill conflicting process if needed
-   kill -9 <PID>
-   ```
-
-**Note:** The IP `172.19.0.1` shown in the output is the Docker bridge network IP. If accessing from outside Docker, use the actual server IP address.
+**Other causes:** a port conflict (`ss -tlnp | grep 3001`) or a firewall
+blocking the port after you have published it deliberately.
 
 #### Port Already in Use
 

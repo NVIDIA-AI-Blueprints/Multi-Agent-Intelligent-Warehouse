@@ -16,6 +16,10 @@ const OPERATOR_WRITE_PATHS = new Set([
   '/api/v1/equipment/maintenance',
 ]);
 
+// API the dev server proxies /api to.  Override with MAIW_API_PROXY_TARGET
+// when the backend runs somewhere other than localhost:8001.
+const API_TARGET = process.env.MAIW_API_PROXY_TARGET || 'http://localhost:8001';
+
 module.exports = function(app) {
   console.log('Setting up proxy middleware...');
   if (process.env.MAIW_UI_OPERATOR_WRITE_TOKEN) {
@@ -32,7 +36,7 @@ module.exports = function(app) {
   app.use(
     '/api',
     createProxyMiddleware({
-      target: 'http://localhost:8001',
+      target: API_TARGET,
       changeOrigin: true,
       secure: false,
       logLevel: 'debug',
@@ -67,5 +71,5 @@ module.exports = function(app) {
     })
   );
   
-  console.log('Proxy middleware configured for /api -> http://localhost:8001');
+  console.log('Proxy middleware configured for /api -> ' + API_TARGET);
 };

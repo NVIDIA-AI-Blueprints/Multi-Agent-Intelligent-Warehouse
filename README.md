@@ -539,15 +539,16 @@ cp .env.example .env
 # Set NVIDIA_API_KEY=nvapi-...
 # For local NIM: set MAIW_NIM_BASE_URL and MAIW_NIM_MODEL
 
-# 4. Generate Warehouse World (DataPack)
-python -m maiw_world dc47_demo --output data/worlds/
+# 4. Warehouse World (DataPack): the canonical pack is committed at
+#    data/worlds/dc47-demo-v1, so this step is optional. To regenerate it:
+#    python -m maiw_world generate --overwrite
 
 # 5. Start backend (development: in-memory procedure state, explicitly)
-MAIW_DEMO_MODE=true MAIW_PERSISTENCE_MODE=memory uvicorn maiw_api.app:app --reload --port 8000
+MAIW_DEMO_MODE=true MAIW_PERSISTENCE_MODE=memory uvicorn maiw_api.app:app --reload --port 8001
 
-# 6. Start frontend
-cd src/ui/web && npm install && npm run dev
-# Runs at http://localhost:3000
+# 6. Start frontend (in a second terminal; proxies /api to localhost:8001)
+cd src/ui/web && npm install && npm start
+# Runs at http://localhost:3001 (bound to 127.0.0.1; see DEPLOYMENT.md for remote access)
 
 # 7. Open WORLD tab → inspect DataPack, Operational Graph, LIVE state
 # 8. Activate Wave 17 scenario → observe SCENARIO layer
@@ -559,7 +560,7 @@ cd src/ui/web && npm install && npm run dev
 # 14. Execute governed action: Copilot ACT or POST /api/v1/demo/approve
 # 15. Observe LIVE outcome in WORLD → LIVE tab
 # 16. Ask Copilot: "Did the intervention work?" (OBSERVE_OUTCOME intent)
-# 17. Open Model Gateway Lab at http://localhost:3000/models/lab
+# 17. Open Model Gateway Lab at http://localhost:3001/models/lab
 ```
 
 > **Demo Mode** (`MAIW_DEMO_MODE=true`) does not require PostgreSQL, Redis, Milvus, or Kafka. Only `NVIDIA_API_KEY` is needed. For a durable local run set `MAIW_PERSISTENCE_ROOT` to a writable directory instead of `MAIW_PERSISTENCE_MODE=memory`; the reference deployment (`scripts/start_reference_deployment.sh`) is always file-backed.
@@ -576,7 +577,6 @@ notebooks/MAIW_v2_Getting_Started.ipynb
 
 This notebook walks through the full 17-step journey — from environment validation through Warehouse World generation, scenario activation, Copilot interaction, SOP-driven agent execution, governance, outcome observation, and the Model Gateway Evaluation Lab.
 
-For hosted deployment on Brev, see the Brev Launchable configuration in `deploy/brev/`.
 
 ---
 
@@ -693,7 +693,7 @@ Two warehouse worlds (same scenario, same seed) were advanced through the same d
 Reproduce with:
 
 ```bash
-MAIW_DEMO_MODE=true MAIW_PERSISTENCE_MODE=memory uvicorn maiw_api.app:app --port 8000
+MAIW_DEMO_MODE=true MAIW_PERSISTENCE_MODE=memory uvicorn maiw_api.app:app --port 8001
 python scripts/counterfactual_eval.py   # generates artifacts/demo/labor_wave_control_vs_maiw.*
 python scripts/trace_capture.py          # generates artifacts/demo/labor_constraint_wave_risk_trace.*
 ```
@@ -724,7 +724,7 @@ A frozen pre-NemoClaw performance baseline is preserved under `artifacts/baselin
 ├─ notebooks/              # Developer notebook (MAIW_v2_Getting_Started.ipynb)
 ├─ artifacts/              # Evaluation artifacts (reliability, model lab, counterfactual)
 ├─ data/                   # Generated world DataPacks (data/worlds/<dataset_id>/)
-├─ deploy/                 # Docker Compose, Helm, Brev configurations
+├─ deploy/                 # Docker Compose files, container configs, OpenShell sandbox policy
 ├─ scripts/                # Utility scripts (counterfactual eval, model scripts, data gen)
 ├─ tests/                  # Test suite (unit, contract, mcp, integration, reliability)
 └─ docs/                   # Documentation
