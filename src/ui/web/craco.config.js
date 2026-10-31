@@ -173,49 +173,17 @@ module.exports = {
     // Ensure setupMiddlewares is present (should already be set by patched webpackDevServer.config.js)
     // If not, we need to set it up to include the proxy middleware
     if (!devServerConfig.setupMiddlewares) {
-      console.warn('⚠️  CRACO: setupMiddlewares not found, setting it up with proxy...');
-      const { createProxyMiddleware } = require('http-proxy-middleware');
-      
+      // CRA registers src/setupProxy.js through onBeforeSetupMiddleware, which
+      // is removed above, so register it here.  setupProxy.js is the single
+      // /api proxy: it strips browser-supplied operator credentials, adds
+      // MAIW_UI_OPERATOR_WRITE_TOKEN server-side for the equipment write routes
+      // only, and honours MAIW_API_PROXY_TARGET.
+      const setupProxy = require('./src/setupProxy');
       devServerConfig.setupMiddlewares = (middlewares, devServer) => {
-        // Add proxy middleware FIRST (before other middlewares)
-        // Security: HTTP protocol is acceptable for localhost in development/testing only
-        // For production deployments, HTTPS must be used to encrypt API communications
-        // SonarQube may flag HTTP usage, but it's acceptable for:
-        // - localhost (127.0.0.1, 0.0.0.0) - development/testing only
-        // Production external services must use HTTPS
-        devServer.app.use(
-          '/api',
-          createProxyMiddleware({
-            target: 'http://localhost:8001',
-            changeOrigin: true,
-            secure: false,
-            logLevel: 'debug',
-            timeout: 300000,
-            pathRewrite: (path, req) => {
-              // path will be like '/v1/version' (without /api)
-              // Add /api back to get '/api/v1/version'
-              const newPath = '/api' + path;
-              console.log('🔄 CRACO Proxying request:', req.method, req.url, '->', newPath);
-              return newPath;
-            },
-            onError: function (err, req, res) {
-              console.error('❌ CRACO Proxy error:', err.message, 'for', req.url);
-              if (!res.headersSent) {
-                res.status(500).json({ error: 'Proxy error: ' + err.message });
-              }
-            },
-            onProxyReq: function (proxyReq, req, res) {
-              console.log('🔄 CRACO Proxying request:', req.method, req.url);
-            },
-            onProxyRes: function (proxyRes, req, res) {
-              console.log('✅ CRACO Proxy response:', proxyRes.statusCode, 'for', req.url);
-            }
-          })
-        );
-        
-        console.log('✅ CRACO: Proxy middleware configured for /api -> http://localhost:8001');
+        setupProxy(devServer.app);
         return middlewares;
       };
+      console.log('✅ CRACO: /api proxy registered from src/setupProxy.js');
     } else {
       console.log('✅ CRACO: setupMiddlewares is present in devServer config');
     }

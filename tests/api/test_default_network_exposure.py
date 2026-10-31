@@ -109,3 +109,25 @@ def test_notebook_targets_the_documented_ports():
     assert set(map(int, re.findall(r"--port (\d+)", text))) == {api}
     assert set(map(int, re.findall(r'API_BASE = "http://localhost:(\d+)"', text))) == {api}
     assert set(map(int, re.findall(r"http://localhost:(\d+)/?(?!api)", text))) <= {3001, api}
+
+
+def test_readme_quickstart_installs_requirements_before_packages():
+    quickstart = _quickstart()
+    requirements = quickstart.index("pip install -r requirements.txt")
+    assert requirements < quickstart.index("pip install -e packages/")
+
+
+def test_dev_server_proxy_is_setup_proxy_on_the_v3_api():
+    # craco removes the CRA hook that loads src/setupProxy.js, so craco must
+    # register it; otherwise the operator-header handling never runs.
+    craco = (WEB / "craco.config.js").read_text()
+    assert "require('./src/setupProxy')" in craco
+    assert "createProxyMiddleware" not in craco
+    proxy = (WEB / "src/setupProxy.js").read_text()
+    package = json.loads((WEB / "package.json").read_text())
+    deps = {**package.get("dependencies", {}), **package.get("devDependencies", {})}
+    assert deps["http-proxy-middleware"].lstrip("^~").startswith("3.")
+    # 3.x ignores the 2.x onProxyReq/onError/onProxyRes options.
+    assert re.search(r"^\s+on: \{", proxy, re.M)
+    for legacy in ("onProxyReq:", "onError:", "onProxyRes:"):
+        assert legacy not in proxy

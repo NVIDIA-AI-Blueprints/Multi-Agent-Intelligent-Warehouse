@@ -528,7 +528,9 @@ See [docs/developer/MODEL_GATEWAY_EVALUATION.md](docs/developer/MODEL_GATEWAY_EV
 git clone https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse.git
 cd Multi-Agent-Intelligent-Warehouse
 
-# 2. Install all MAIW packages (editable)
+# 2. Install dependencies, then all MAIW packages (editable), in a fresh venv
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
 pip install -e packages/maiw-contracts -e packages/maiw-mcp -e packages/maiw-state \
     -e packages/maiw-models -e packages/maiw-skills -e packages/maiw-decision \
     -e packages/maiw-execution -e packages/maiw-agents -e packages/maiw-world \
