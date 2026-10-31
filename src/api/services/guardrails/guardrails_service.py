@@ -59,7 +59,7 @@ class GuardrailsConfig:
     timeout: int = int(os.getenv("GUARDRAILS_TIMEOUT", "10").split('#')[0].strip())
     use_api: bool = os.getenv("GUARDRAILS_USE_API", "false").lower() == "true"  # Disabled by default - API endpoint not available
     use_sdk: bool = os.getenv("USE_NEMO_GUARDRAILS_SDK", "false").lower() == "true"
-    model_name: str = os.getenv("GUARDRAILS_MODEL", "nvidia/nemotron-3-super-120b-a12b")
+    model_name: str = os.getenv("GUARDRAILS_MODEL", "nvidia/nemotron-3.5-lightning-30b-a3b")  # hosted Super retired 2026-10-19
     temperature: float = 0.1
     max_tokens: int = 1000
     top_p: float = 0.9
@@ -214,7 +214,7 @@ class GuardrailsService:
             # Use chat completions endpoint for guardrails
             # NOTE: The API approach is currently disabled by default (GUARDRAILS_USE_API=false)
             # because the guardrails endpoint/model may not be available at integrate.api.nvidia.com
-            # Configure via GUARDRAILS_MODEL (default: nvidia/nemotron-3-super-120b-a12b).
+            # Configure via GUARDRAILS_MODEL (default: nvidia/nemotron-3.5-lightning-30b-a3b).
             # Use pattern matching (default) or SDK (USE_NEMO_GUARDRAILS_SDK=true) instead.
             response = await self.api_client.post(
                 "/chat/completions",

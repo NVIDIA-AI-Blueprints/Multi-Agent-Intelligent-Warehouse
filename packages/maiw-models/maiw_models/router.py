@@ -32,10 +32,15 @@ Routing rules (priority order):
 
 Fallback chain (when preferred role is disabled):
   lightning → nano → super
-  nano → super
-  super → (none; ModelUnavailable raised)
+  nano → super → lightning
+  super → ultra (the other high-capability role; nothing below it)
   ultra → super
   nano-omni → super (degrades to text-only)
+
+v2.1.0 defaults (hosted Super retired 2026-10-19): Super and Nano are
+disabled, so MEDIUM is served by Lightning and HIGH / CRITICAL by Ultra.
+HIGH and CRITICAL never fall back below a high-capability role (PolicyFilter
+rejects Lightning and Nano for them).
 
 Telemetry fields:
   requested_role  — ideal role from routing policy before fallbacks
@@ -73,8 +78,8 @@ _JUDGE_TASK_KEYWORDS = frozenset(
 # Fallback chain: role → ordered list of roles to try if preferred is unavailable
 _FALLBACK_CHAIN: dict[str, list[str]] = {
     "lightning": ["nano", "super"],
-    "nano": ["super"],
-    "super": [],
+    "nano": ["super", "lightning"],
+    "super": ["ultra"],
     "ultra": ["super"],
     "nano-omni": ["super"],
 }

@@ -131,8 +131,8 @@ class NIMConfig:
         "EMBEDDING_NIM_URL", "https://integrate.api.nvidia.com/v1"
     )
     llm_model: str = os.getenv("MAIW_NIM_MODEL") or os.getenv(
-        "LLM_MODEL", "nvidia/nemotron-3-super-120b-a12b"
-    )
+        "LLM_MODEL", "nvidia/nemotron-3.5-lightning-30b-a3b"
+    )  # hosted Super retired 2026-10-19; ModelGateway passes the routed ID
     embedding_model: str = os.getenv("EMBEDDING_MODEL", "nvidia/nemotron-3-embed-1b")
     timeout: int = _getenv_int(
         "LLM_CLIENT_TIMEOUT", 240

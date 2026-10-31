@@ -145,12 +145,21 @@ _ENABLED_DEFAULTS: dict[str, bool] = {
     _LIGHTNING_ENABLED_ENV: True,  # validated DEPLOYED; fast path now available
     # v2.0.1 round 2: Nano is DISABLED by default.  The hosted endpoint retired
     # nvidia/nemotron-3-nano-30b-a3b on 2026-09-01 (HTTP 410), so a default-on
-    # Nano role was a known-dead default.  MEDIUM reasoning falls back to Super
-    # (fallback_used=true).  Enable Nano only with a working approved deployment
-    # (e.g. a self-hosted NIM serving that exact model ID).
+    # Nano role was a known-dead default.  MEDIUM reasoning falls back along
+    # the router chain (fallback_used=true).  Enable Nano only with a working
+    # approved deployment (e.g. a self-hosted NIM serving that exact model ID).
     _NANO_ENABLED_ENV: False,
-    _SUPER_ENABLED_ENV: True,  # validated DEPLOYED; primary deployment
-    _ULTRA_ENABLED_ENV: False,  # validated DEPLOYED but ~31s latency; operator opt-in
+    # v2.1.0: Super is DISABLED by default.  The hosted endpoint retired
+    # nvidia/nemotron-3-super-120b-a12b on 2026-10-19 (HTTP 404 "Function ...
+    # Not found for account" for every key), so default-on Super was a
+    # known-dead default for HIGH, CRITICAL and (via fallback) MEDIUM requests.
+    # Enable Super only with a working approved deployment (e.g. a self-hosted
+    # NIM serving that exact model ID).
+    _SUPER_ENABLED_ENV: False,
+    # v2.1.0: Ultra is ENABLED by default — the remaining hosted high-capability
+    # model, so HIGH reasoning and CRITICAL risk keep a Super/Ultra-class model
+    # instead of failing or being downgraded.  Slower (~31s on long outputs).
+    _ULTRA_ENABLED_ENV: True,
     _NANO_OMNI_ENABLED_ENV: False,  # NOT_CURRENTLY_DEPLOYED; requires operator model config
 }
 

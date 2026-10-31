@@ -332,7 +332,7 @@ NVIDIA NIM / Hosted / Local
 
 Agents express **what level of reasoning a decision requires** (via `ReasoningLevel`). `ModelGateway` selects the physical model. Agents never reference model IDs directly.
 
-Nemotron model roles: `lightning` (fast, low-risk), `nano` (local NIM), `super` (default), `ultra` (opt-in for highest complexity).
+Nemotron model roles: `lightning` (fast; default for LOW and MEDIUM reasoning), `ultra` (default for HIGH reasoning and CRITICAL risk), `super` and `nano` (hosted endpoints retired; self-hosted NIM only, disabled by default).
 
 ### MAIW v2 Supported Models
 
@@ -597,7 +597,7 @@ For hosted deployment on Brev, see the Brev Launchable configuration in `deploy/
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `LLM_NIM_URL` | `https://integrate.api.nvidia.com/v1` | NIM inference endpoint |
-| `LLM_MODEL` | `nvidia/nemotron-3-super-120b-a12b` | Default model ID |
+| `LLM_MODEL` | `nvidia/nemotron-3.5-lightning-30b-a3b` | Default model ID for callers that bypass ModelGateway |
 | `MAIW_MODEL_LIGHTNING` | `nvidia/nemotron-3.5-lightning-30b-a3b` | Lightning role override |
 | `MAIW_MODEL_NANO` | `nvidia/nemotron-3-nano-30b-a3b` | Nano role override |
 | `MAIW_MODEL_SUPER` | `nvidia/nemotron-3-super-120b-a12b` | Super role override |

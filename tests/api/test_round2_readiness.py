@@ -362,6 +362,9 @@ async def test_provider_unavailable_is_non_critical(env, fake, mcp_servers, prof
 
 
 async def test_unapproved_model_binding_is_not_ready(env, fake):
+    # Super is off by default since its hosted retirement (v2.1.0); a binding
+    # violation only matters on an enabled role.
+    env.setenv("NEMOTRON_SUPER_ENABLED", "true")
     env.setenv("NEMOTRON_SUPER_MODEL", "example-org/unapproved-model-x")
     install_gateway(fake)  # rebuild the registry from the new env
     code, body = await _ready()

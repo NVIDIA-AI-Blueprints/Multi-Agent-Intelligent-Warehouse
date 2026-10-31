@@ -51,6 +51,9 @@ def token(monkeypatch, tmp_path, fake):
     for key in _ROLE_ENVS:
         monkeypatch.delenv(key, raising=False)
     tok = canonical_env(monkeypatch, tmp_path, fake)
+    # Super is off by default since its hosted retirement (v2.1.0); these
+    # identity/cache cases bind it as a self-hosted Super operator would.
+    monkeypatch.setenv("NEMOTRON_SUPER_ENABLED", "true")
     yield tok
     from maiw_models import reset_model_gateway
 

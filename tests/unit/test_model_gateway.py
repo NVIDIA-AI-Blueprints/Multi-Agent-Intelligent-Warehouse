@@ -851,12 +851,13 @@ class TestModelCapabilityFields:
 
     # ── Enabled defaults ───────────────────────────────────────────────────────
 
-    def test_lightning_and_super_enabled_nano_disabled_by_default(self):
-        """Lightning and Super are enabled by default; Nano is DISABLED.
+    def test_lightning_enabled_nano_and_super_disabled_by_default(self):
+        """Lightning is enabled by default; Nano and Super are DISABLED.
 
         v2.0.1 round 2 (§13): the hosted endpoint retired
-        nvidia/nemotron-3-nano-30b-a3b (HTTP 410), so a default-on Nano role was
-        a known-dead default.
+        nvidia/nemotron-3-nano-30b-a3b (HTTP 410).  v2.1.0: it retired
+        nvidia/nemotron-3-super-120b-a12b on 2026-10-19 (HTTP 404).  A
+        default-on retired role is a known-dead default.
         """
         env = {
             "NEMOTRON_LIGHTNING_MODEL": "nvidia/nemotron-3.5-lightning-30b-a3b",
@@ -887,10 +888,10 @@ class TestModelCapabilityFields:
         enabled = {c.role for c in registry.all_enabled()}
         assert "lightning" in enabled, "Lightning must be enabled by default"
         assert "nano" not in enabled, "Nano must be disabled by default"
-        assert "super" in enabled, "Super must be enabled by default"
+        assert "super" not in enabled, "Super must be disabled by default"
 
-    def test_ultra_disabled_by_default(self):
-        """Ultra has ~31s latency — requires explicit operator opt-in."""
+    def test_ultra_enabled_by_default(self):
+        """v2.1.0: Ultra is the default high-capability role (hosted Super retired)."""
         env = {
             "NEMOTRON_LIGHTNING_MODEL": "nvidia/nemotron-3.5-lightning-30b-a3b",
             "NEMOTRON_NANO_MODEL": "nvidia/nemotron-3-nano-30b-a3b",
@@ -909,8 +910,8 @@ class TestModelCapabilityFields:
                 os.environ.pop(key, None)
             registry = ModelRegistry(resolver=_TEST_RESOLVER)
         assert (
-            registry.get_enabled_by_role("ultra") is None
-        ), "Ultra must be disabled by default"
+            registry.get_enabled_by_role("ultra") is not None
+        ), "Ultra must be enabled by default"
 
     def test_nano_omni_disabled_by_default_no_model_configured(self):
         """Nano Omni is NOT_CURRENTLY_DEPLOYED — disabled unless operator configures a model."""

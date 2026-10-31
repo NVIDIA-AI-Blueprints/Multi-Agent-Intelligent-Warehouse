@@ -55,6 +55,9 @@ class RecordingProvider:
 
 def _gateway(env: dict[str, str], provider: RecordingProvider) -> ModelGateway:
     clean = {k: v for k, v in os.environ.items() if not k.startswith("NEMOTRON_")}
+    # These cases exercise the Super binding, which is off by default since
+    # the hosted retirement (v2.1.0); enable it as a self-hosted operator would.
+    clean["NEMOTRON_SUPER_ENABLED"] = "true"
     clean.update(env)
     with patch.dict(os.environ, clean, clear=True):
         registry = ModelRegistry()
