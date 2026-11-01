@@ -150,9 +150,13 @@ jobs:
       uses: actions/checkout@v4
     
     # Pinned to the commit of the signed v0.36.0 tag (Trivy v0.70.0), not a
-    # mutable branch or tag.
+    # mutable branch or tag. Both scans include lockfile devDependencies,
+    # which Trivy skips by default: the root lockfile is commit and release
+    # tooling only, and that tooling runs in CI and release jobs.
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      env:
+        TRIVY_INCLUDE_DEV_DEPS: 'true'
       with:
         scan-type: 'fs'
         scan-ref: '.'
@@ -169,6 +173,8 @@ jobs:
     # lockfiles carry fixable HIGH findings that need a dependency update first.
     - name: Trivy gate (fixable CRITICAL)
       uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      env:
+        TRIVY_INCLUDE_DEV_DEPS: 'true'
       with:
         scan-type: 'fs'
         scan-ref: '.'
