@@ -1,6 +1,6 @@
 fastapi>=0.120.0,<0.163  # Lower bound: starlette>=0.49.1 support (nemoguardrails 0.19.0+). Upper bound: newest minor CORE CI is tested on (0.162.0, pinned in requirements.docker.txt); raise it only after CI passes on the new minor (0.162 removed **extra and broke startup).
 starlette>=0.49.1,<1.11  # Required by nemoguardrails 0.19.0+ (server extra: starlette>=0.49.1). Upper bound: newest minor CORE CI is tested on (1.10.0, pinned in requirements.docker.txt).
-uvicorn[standard]==0.30.1
+uvicorn[standard]==0.54.0
 pydantic>=2.7
 httpx>=0.27.0
 python-dotenv>=1.0
