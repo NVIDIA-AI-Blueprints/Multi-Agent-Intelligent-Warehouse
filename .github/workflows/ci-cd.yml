@@ -116,7 +116,8 @@ jobs:
           --ignore=tests/unit/test_reasoning_evaluation.py \
           --ignore=tests/unit/test_prompt_injection_protection.py \
           --ignore=tests/unit/test_prompt_injection_simple.py \
-          --cov=src \
+          --cov=src --cov=apps --cov=packages \
+          --cov-fail-under=48 \
           --cov-report=xml \
           --cov-report=term-missing
     
@@ -148,8 +149,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
+    # Pinned to the commit of the signed v0.36.0 tag (Trivy v0.70.0), not a
+    # mutable branch or tag.
     - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@master
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
       with:
         scan-type: 'fs'
         scan-ref: '.'
@@ -160,3 +163,17 @@ jobs:
       uses: github/codeql-action/upload-sarif@v4
       with:
         sarif_file: 'trivy-results.sarif'
+
+    # Fail on any fixable CRITICAL finding. The full report (every severity)
+    # is uploaded above to code scanning. HIGH is not gated yet: the
+    # lockfiles carry fixable HIGH findings that need a dependency update first.
+    - name: Trivy gate (fixable CRITICAL)
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'table'
+        severity: 'CRITICAL'
+        ignore-unfixed: true
+        exit-code: '1'
+        skip-setup-trivy: true

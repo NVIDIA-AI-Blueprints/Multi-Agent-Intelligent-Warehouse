@@ -159,7 +159,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["src"]
+source = ["src", "apps", "packages"]
 omit = [
     "*/tests/*",
     "*/test_*",
