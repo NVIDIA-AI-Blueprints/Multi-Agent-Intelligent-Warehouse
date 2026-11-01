@@ -7,7 +7,8 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "09:00"
-    open-pull-requests-limit: 15
+    # Limits open version-update PRs only; security updates are not counted.
+    open-pull-requests-limit: 5
     reviewers:
       - "T-DevH"
     assignees:
@@ -19,6 +20,23 @@ updates:
       - "dependencies"
       - "python"
       - "backend"
+    # Routine minor and patch updates arrive as one PR. Major updates and the
+    # warehouse-integration libraries (MQTT, Modbus, BACnet, serial,
+    # websockets) still get their own PRs: their APIs change between
+    # releases, and CI does not exercise those adapters against real devices.
+    groups:
+      python-minor-and-patch:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "paho-mqtt"
+          - "pymodbus"
+          - "bacpypes3"
+          - "pyserial"
+          - "websockets"
+        update-types:
+          - "minor"
+          - "patch"
     # Ignore major version updates for critical packages
     ignore:
       - dependency-name: "fastapi"
