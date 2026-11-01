@@ -4,12 +4,11 @@ This repository uses GitHub Dependabot to automatically manage dependency update
 -**Patch Updates**: Manual review required for bug fixes (patch versions)
 -**Minor Updates**: Manual review required
 -**Major Updates**: Blocked for critical packages, manual review for others ### 📅 Update Schedule
--**Python/NPM/Docker/GitHub Actions**: Weekly updates (Mondays at 9:00 AM)
--**Helm Charts**: Monthly entry configured for `/helm`, but that directory does not exist, so it scans nothing ### 🏷️ Labeling System
+-**Python/NPM/Docker/GitHub Actions**: Weekly updates (Mondays at 9:00 AM) ### 🏷️ Labeling System
 All Dependabot PRs are automatically labeled with:
 - `dependencies` - General dependency updates
-- `python`/`javascript`/`docker`/`github-actions`/`helm` - Ecosystem-specific labels
-- `backend`/`frontend`/`infrastructure`/`ci-cd`/`kubernetes` - Component-specific labels ### 🚫 Ignored Updates
+- `python`/`javascript`/`docker`/`github-actions` - Ecosystem-specific labels
+- `backend`/`frontend`/`infrastructure`/`ci-cd` - Component-specific labels ### 🚫 Ignored Updates
 Major version updates are ignored for critical packages to prevent breaking changes: #### Python Packages
 - `fastapi` - Core API framework
 - `uvicorn` - ASGI server
@@ -25,8 +24,7 @@ All updates require manual review for safety:
 - Minor version updates
 - Major version updates (blocked for critical packages)
 - Docker image updates
-- GitHub Actions updates
-- Helm chart updates ### Review Checklist
+- GitHub Actions updates ### Review Checklist
 When reviewing Dependabot PRs:
 
 1.**Check Release Notes**- Review changelog for breaking changes
@@ -57,12 +55,11 @@ If an update causes issues:
 4. Create a proper fix or find an alternative ## Configuration Files ### Main Configuration
 - `.github/dependabot.yml` - Main Dependabot configuration ### Package Files Monitored
 - `pip` at `/` - root Python dependency files (`requirements.txt`, etc.)
-- `npm` at `/ui/web` - **this directory does not exist** (the UI is at `src/ui/web`), so UI npm dependencies (`src/ui/web/package.json`) are currently **not scanned** by Dependabot
+- `npm` at `/src/ui/web` - UI dependencies (`src/ui/web/package.json`, `package-lock.json`); minor and patch updates arrive bundled in one PR (group `ui-minor-and-patch`), major updates as separate PRs
 - `docker` at `/` - root `Dockerfile*` base images
 - `github-actions` at `/` - `.github/workflows/*.yml`
-- `helm` at `/helm` - **this directory does not exist**; there are no Helm charts in the repository
 
-**Known gap:** until `.github/dependabot.yml` is updated (npm `directory: "/src/ui/web"`, helm entry removed), review UI dependency updates manually (for example with `npm audit` in `src/ui/web`). ## Best Practices ### Dependency Management
+Not monitored: the root `package.json` (release tooling only) and the `pyproject.toml` files under `packages/` and `apps/`. There are no Helm charts in the repository. ## Best Practices ### Dependency Management
 - Keep dependencies up to date regularly
 - Use semantic versioning constraints
 - Pin critical dependencies to specific versions
