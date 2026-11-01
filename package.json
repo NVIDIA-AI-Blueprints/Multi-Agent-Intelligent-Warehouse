@@ -40,7 +40,7 @@
     "@semantic-release/exec": "^7.1.0",
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/github": "^11.0.6",
-    "commitizen": "^4.3.1",
+    "commitizen": "^4.3.2",
     "conventional-changelog-conventionalcommits": "^9.1.0",
     "cz-conventional-changelog": "^3.3.0",
     "husky": "^9.1.7"
