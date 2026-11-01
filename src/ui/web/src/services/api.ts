@@ -551,25 +551,6 @@ export const documentAPI = {
     const response = await api.post('/document/search', { query, filters });
     return response.data;
   },
-  
-  approveDocument: async (documentId: string, approverId: string, notes?: string): Promise<any> => {
-    const safeId = validatePathParam(documentId, 'documentId');
-    const response = await api.post(`/document/approve/${safeId}`, {
-      approver_id: approverId,
-      approval_notes: notes,
-    });
-    return response.data;
-  },
-  
-  rejectDocument: async (documentId: string, rejectorId: string, reason: string, suggestions?: string[]): Promise<any> => {
-    const safeId = validatePathParam(documentId, 'documentId');
-    const response = await api.post(`/document/reject/${safeId}`, {
-      rejector_id: rejectorId,
-      rejection_reason: reason,
-      suggestions: suggestions || [],
-    });
-    return response.data;
-  },
 };
 
 export const healthAPI = {

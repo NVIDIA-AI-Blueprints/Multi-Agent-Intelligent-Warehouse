@@ -34,8 +34,6 @@ docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md for the full authority graph):
         auth                       full (identity; own auth dependencies)
         document                   read-only + POST /upload (bounded inference
                                    via ModelGateway; document-workflow state)
-                                   + POST /approve|/reject (document-workflow
-                                   state only; no warehouse mutation)
         inventory, wms, iot, erp, scanning, attendance, migration,
         advanced_forecasting, training
                                    GET/HEAD routes only
@@ -45,6 +43,8 @@ docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md for the full authority graph):
                     (audit P1-01); use POST /api/v1/copilot/turn
         reasoning   legacy NIM client outside ModelGateway
         src.api.routers.mcp (retired; replaced by mcp_status)
+        document POST /approve|/reject — not implemented (no decision
+                    recorded, no WMS integration)
 """
 
 from __future__ import annotations
@@ -286,15 +286,15 @@ app.include_router(inference_router)
 app.include_router(auth_router)
 
 # Legacy — document workflow. Upload runs model inference only through
-# ModelGateway (audit P1-05); approve/reject record document-workflow state.
-# /search, /validate and /analytics returned fabricated data and are not shipped.
+# ModelGateway (audit P1-05). /search, /validate and /analytics returned
+# fabricated data and are not shipped. /approve and /reject are not shipped
+# either: nothing records the decision or integrates with a WMS, so they
+# returned "approved"/"rejected" for any document ID, from any caller.
 app.include_router(
     curated_view(
         document_router,
         allow_mutations={
             ("POST", "/api/v1/document/upload"),
-            ("POST", "/api/v1/document/approve/{document_id}"),
-            ("POST", "/api/v1/document/reject/{document_id}"),
         },
     )
 )

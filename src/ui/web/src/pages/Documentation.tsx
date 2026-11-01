@@ -262,8 +262,6 @@ const Documentation: React.FC = () => {
         { method: "GET", path: "/api/v1/document/results/{document_id}", description: "Get extraction results" },
         { method: "POST", path: "/api/v1/document/search", description: "Search documents" },
         { method: "POST", path: "/api/v1/document/validate/{document_id}", description: "Validate document extraction" },
-        { method: "POST", path: "/api/v1/document/approve/{document_id}", description: "Approve document" },
-        { method: "POST", path: "/api/v1/document/reject/{document_id}", description: "Reject document" },
         { method: "GET", path: "/api/v1/document/analytics", description: "Document processing analytics" }
       ]
     },

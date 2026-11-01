@@ -99,8 +99,6 @@ function validatePathParam(param: string, paramName: string = 'parameter'): stri
 - `inventoryAPI.deleteItem(sku)`
 - `documentAPI.getDocumentStatus(documentId)`
 - `documentAPI.getDocumentResults(documentId)`
-- `documentAPI.approveDocument(documentId, ...)`
-- `documentAPI.rejectDocument(documentId, ...)`
 - `InventoryAPI.getItemBySku(sku)`
 - `InventoryAPI.updateItem(sku, ...)`
 

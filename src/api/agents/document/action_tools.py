@@ -962,30 +962,23 @@ class DocumentActionTools:
         except Exception as e:
             return self._create_error_response("get document analytics", e)
 
+    # Document approval/rejection has no implementation: nothing records the
+    # decision or integrates with a WMS. Report that instead of a fake success.
+    _APPROVAL_NOT_IMPLEMENTED = (
+        "Document {action} is not implemented: no decision is recorded and "
+        "nothing is sent to a WMS."
+    )
+
     async def approve_document(
         self, document_id: str, approver_id: str, approval_notes: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Approve document for WMS integration."""
-        try:
-            logger.info(f"Approving document: {_sanitize_log_data(document_id)}")
-
-            # In real implementation, this would update database and trigger WMS integration
-            approval_result = await self._approve_document(
-                document_id, approver_id, approval_notes
-            )
-
-            return {
-                "success": True,
-                "document_id": document_id,
-                "approver_id": approver_id,
-                "approval_status": "approved",
-                "wms_integration_status": approval_result["wms_status"],
-                "approval_timestamp": datetime.now(),
-                "approval_notes": approval_notes,
-            }
-
-        except Exception as e:
-            return self._create_error_response("approve document", e)
+        """Approve document for WMS integration (not implemented)."""
+        return {
+            "success": False,
+            "error": "not_implemented",
+            "message": self._APPROVAL_NOT_IMPLEMENTED.format(action="approval"),
+            "document_id": document_id,
+        }
 
     async def reject_document(
         self,
@@ -994,27 +987,13 @@ class DocumentActionTools:
         rejection_reason: str,
         suggestions: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
-        """Reject document and provide feedback."""
-        try:
-            logger.info(f"Rejecting document: {_sanitize_log_data(document_id)}")
-
-            # In real implementation, this would update database and notify user
-            await self._reject_document(
-                document_id, rejector_id, rejection_reason, suggestions or []
-            )
-
-            return {
-                "success": True,
-                "document_id": document_id,
-                "rejector_id": rejector_id,
-                "rejection_status": "rejected",
-                "rejection_reason": rejection_reason,
-                "suggestions": suggestions or [],
-                "rejection_timestamp": datetime.now(),
-            }
-
-        except Exception as e:
-            return self._create_error_response("reject document", e)
+        """Reject document and provide feedback (not implemented)."""
+        return {
+            "success": False,
+            "error": "not_implemented",
+            "message": self._APPROVAL_NOT_IMPLEMENTED.format(action="rejection"),
+            "document_id": document_id,
+        }
 
     # Helper methods (mock implementations for now)
     async def _validate_document_file(self, file_path: str) -> Dict[str, Any]:
@@ -1903,21 +1882,3 @@ class DocumentActionTools:
                 },
                 "summary": f"Error calculating analytics: {str(e)}",
             }
-
-    async def _approve_document(
-        self, document_id: str, approver_id: str, notes: Optional[str]
-    ) -> Dict[str, Any]:
-        """Approve document (mock implementation)."""
-        return {
-            "wms_status": "integrated",
-            "integration_data": {
-                "wms_document_id": f"WMS-{document_id[:8]}",
-                "integration_timestamp": datetime.now(),
-            },
-        }
-
-    async def _reject_document(
-        self, document_id: str, rejector_id: str, reason: str, suggestions: List[str]
-    ) -> Dict[str, Any]:
-        """Reject document (mock implementation)."""
-        return {"rejection_recorded": True, "notification_sent": True}
