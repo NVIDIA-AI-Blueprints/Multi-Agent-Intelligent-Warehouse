@@ -67,6 +67,7 @@ class EquipmentMonitorAdapter(BaseIoTAdapter):
         
         self.session: Optional[httpx.AsyncClient] = None
         self.mqtt_client = None
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
         self.websocket = None
         self._monitoring = False
         self._monitoring_callback = None
@@ -106,8 +107,16 @@ class EquipmentMonitorAdapter(BaseIoTAdapter):
         try:
             import paho.mqtt.client as mqtt
             
-            self.mqtt_client = mqtt.Client(self.client_id)
-            
+            # paho-mqtt 2.x: the first positional argument is the callback API
+            # version, so client_id must be passed by keyword.
+            self.mqtt_client = mqtt.Client(
+                callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+                client_id=self.client_id,
+            )
+            # MQTT callbacks run on paho's network thread; the monitoring
+            # callback is a coroutine and must be scheduled on this loop.
+            self._loop = asyncio.get_running_loop()
+
             if self.username and self.password:
                 self.mqtt_client.username_pw_set(self.username, self.password)
             
@@ -476,13 +485,13 @@ class EquipmentMonitorAdapter(BaseIoTAdapter):
             self.logger.error(f"Failed to stop real-time monitoring: {e}")
             return False
     
-    def _on_mqtt_connect(self, client, userdata, flags, rc):
-        """MQTT connection callback."""
-        if rc == 0:
+    def _on_mqtt_connect(self, client, userdata, flags, reason_code, properties):
+        """MQTT connection callback (paho-mqtt callback API version 2)."""
+        if not reason_code.is_failure:
             self.logger.info("Connected to MQTT broker")
             self.connected = True
         else:
-            self.logger.error(f"Failed to connect to MQTT broker: {rc}")
+            self.logger.error(f"Failed to connect to MQTT broker: {reason_code}")
     
     def _on_mqtt_message(self, client, userdata, msg):
         """MQTT message callback."""
@@ -497,14 +506,16 @@ class EquipmentMonitorAdapter(BaseIoTAdapter):
                 self._process_sensor_reading_message(topic, payload)
             
             # Call monitoring callback if set
-            if self._monitoring_callback:
-                asyncio.create_task(self._monitoring_callback(topic, payload))
+            if self._monitoring_callback and self._loop is not None:
+                asyncio.run_coroutine_threadsafe(
+                    self._monitoring_callback(topic, payload), self._loop
+                )
                 
         except Exception as e:
             self.logger.error(f"Error processing MQTT message: {e}")
     
-    def _on_mqtt_disconnect(self, client, userdata, rc):
-        """MQTT disconnection callback."""
+    def _on_mqtt_disconnect(self, client, userdata, flags, reason_code, properties):
+        """MQTT disconnection callback (paho-mqtt callback API version 2)."""
         self.logger.info("Disconnected from MQTT broker")
         self.connected = False
     
