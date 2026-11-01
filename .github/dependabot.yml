@@ -100,3 +100,7 @@ updates:
       - "dependencies"
       - "github-actions"
       - "ci-cd"
+    # Allowed only at one pinned commit by the repository's allowed-actions
+    # policy; any other version fails the deployment workflow at startup.
+    ignore:
+      - dependency-name: "dawidd6/action-send-mail"

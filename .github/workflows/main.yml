@@ -616,8 +616,11 @@ jobs:
           fi
           echo "RESULT=${RESULT}" >> $GITHUB_OUTPUT
    
+      # Pinned to v7: the repository's allowed-actions list permits only this
+      # commit of dawidd6/action-send-mail. Any other SHA makes the whole
+      # workflow fail at startup; add the new SHA to the allowlist first.
       - name: Send mail
-        uses: dawidd6/action-send-mail@47af4a10b540781705f283a2cf1a9650713ac795
+        uses: dawidd6/action-send-mail@6e71c855c9a091d80a519621b9fd3e8d252ca40c # v7
         if: always()
         with:
           server_address: smtp.gmail.com
