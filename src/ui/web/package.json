@@ -91,7 +91,7 @@
     "eslint": "^8.57.0",
     "@craco/craco": "^7.1.0",
     "@types/react-copy-to-clipboard": "^5.0.7",
-    "http-proxy-middleware": "^3.0.5",
+    "http-proxy-middleware": "^4.2.1",
     "identity-obj-proxy": "^3.0.0",
     "license-checker": "^25.0.1",
     "babel-plugin-istanbul": "^6.1.1",
