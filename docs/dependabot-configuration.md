@@ -3,7 +3,7 @@ This repository uses GitHub Dependabot to automatically manage dependency update
 -**Security Updates**: Manual review required (GitHub will alert you)
 -**Patch Updates**: Manual review required for bug fixes (patch versions)
 -**Minor Updates**: Manual review required
--**Major Updates**: Blocked for critical packages, manual review for others ### 📅 Update Schedule
+-**Major Updates**: Blocked for critical Python packages and for all UI (`src/ui/web`) packages; manual review for others ### 📅 Update Schedule
 -**Python/NPM/Docker/GitHub Actions**: Weekly updates (Mondays at 9:00 AM) ### 🏷️ Labeling System
 All Dependabot PRs are automatically labeled with:
 - `dependencies` - General dependency updates
@@ -18,7 +18,8 @@ Major version updates are ignored for critical packages to prevent breaking chan
 - `@mui/material` - Material-UI core
 - `@mui/icons-material` - Material-UI icons
 - `typescript` - TypeScript compiler
-- `eslint`, `@babel/core`, `babel-plugin-istanbul` - pinned by `overrides` in `src/ui/web/package.json` ## How to Handle Dependabot PRs ### Manual Review Required
+
+In `src/ui/web`, major version updates are ignored for every package, not just these. ## How to Handle Dependabot PRs ### Manual Review Required
 All updates require manual review for safety:
 - Security patches (GitHub will alert you)
 - Bug fixes (patch versions)
@@ -56,7 +57,7 @@ If an update causes issues:
 4. Create a proper fix or find an alternative ## Configuration Files ### Main Configuration
 - `.github/dependabot.yml` - Main Dependabot configuration ### Package Files Monitored
 - `pip` at `/` - root Python dependency files (`requirements.txt`, etc.)
-- `npm` at `/src/ui/web` - UI dependencies (`src/ui/web/package.json`, `package-lock.json`); minor and patch updates arrive bundled in one PR (group `ui-minor-and-patch`), major updates in a second PR (group `ui-major`)
+- `npm` at `/src/ui/web` - UI dependencies (`src/ui/web/package.json`, `package-lock.json`); minor and patch updates arrive bundled in one PR (group `ui-minor-and-patch`), no version-update PRs for major versions (major upgrades are done deliberately; security updates are unaffected)
 - `docker` at `/` - root `Dockerfile*` base images
 - `github-actions` at `/` - `.github/workflows/*.yml`
 
