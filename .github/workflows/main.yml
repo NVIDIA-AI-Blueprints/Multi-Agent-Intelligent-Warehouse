@@ -617,7 +617,7 @@ jobs:
           echo "RESULT=${RESULT}" >> $GITHUB_OUTPUT
    
       - name: Send mail
-        uses: dawidd6/action-send-mail@6e71c855c9a091d80a519621b9fd3e8d252ca40c
+        uses: dawidd6/action-send-mail@47af4a10b540781705f283a2cf1a9650713ac795
         if: always()
         with:
           server_address: smtp.gmail.com
