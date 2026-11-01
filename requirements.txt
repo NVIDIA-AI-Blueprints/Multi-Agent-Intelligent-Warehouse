@@ -51,4 +51,4 @@ pdfplumber==0.11.9  # MIT License - PDF text extraction; 0.11.9 pins pdfminer.si
 # langchain, langchain-community, fastembed, annoy, jinja2, lark, nest-asyncio,
 # prompt-toolkit, rich, simpleeval, typer, watchdog, and others.
 # These are managed as transitive dependencies and don't need to be listed explicitly.
-nemoguardrails>=0.19.0  # NVIDIA NeMo Guardrails SDK for programmable guardrails (latest version)
+nemoguardrails>=0.24.1  # NVIDIA NeMo Guardrails SDK for programmable guardrails (latest version)
