@@ -2,7 +2,7 @@
 
 This document lists all third-party software packages used in this project, including their versions, licenses, authors, and sources.
 
-> **Dated snapshot** — generated on 2025-12-20 and not regenerated since (the generator script is no longer in the repository). Versions are the minimum versions declared at that time, with only the aiohttp floor and the PyMuPDF removal corrected since; the authoritative dependency lists are `requirements.txt`, `requirements.docker.txt`, `pyproject.toml`, `packages/*/pyproject.toml`, `apps/api/pyproject.toml`, the root `package.json` and `src/ui/web/package.json`.
+> **Dated snapshot** — generated on 2025-12-20 and not regenerated since (the generator script is no longer in the repository). Versions are the minimum versions declared at that time, with only the aiohttp and paho-mqtt floors and the PyMuPDF removal corrected since; the authoritative dependency lists are `requirements.txt`, `requirements.docker.txt`, `pyproject.toml`, `packages/*/pyproject.toml`, `apps/api/pyproject.toml`, the root `package.json` and `src/ui/web/package.json`.
 
 **Last Updated:** 2025-12-20
 
@@ -31,7 +31,7 @@ The snapshot was built from `requirements.txt`, `requirements.docker.txt`, `scri
 | mypy | 1.5.0 | MIT License | https://www.mypy-lang.org/ | Jukka Lehtosalo <jukka.lehtosalo@iki.fi> | PyPI | pip | https://pypi.org/project/mypy/ |
 | nemoguardrails | 0.19.0 | LICENSE.md | https://pypi.org/project/nemoguardrails/ | NVIDIA <nemoguardrails@nvidia.com> | PyPI | pip | https://pypi.org/project/nemoguardrails/ |
 | numpy | 1.24.0 | BSD-3-Clause | https://www.numpy.org | Travis E. Oliphant et al. | PyPI | pip | https://pypi.org/project/numpy/ |
-| paho-mqtt | 1.6.0 | Eclipse Public License v2.0 / Eclipse Distribution License v1.0 | http://eclipse.org/paho | Roger Light <roger@atchoo.org> | PyPI | pip | https://pypi.org/project/paho-mqtt/ |
+| paho-mqtt | 2.1.0 | Eclipse Public License v2.0 / Eclipse Distribution License v1.0 | http://eclipse.org/paho | Roger Light <roger@atchoo.org> | PyPI | pip | https://pypi.org/project/paho-mqtt/ |
 | pandas | 2.0.0 | MIT License | https://pypi.org/project/pandas/ | The Pandas Development Team <pandas-dev@python.org> | PyPI | pip | https://pypi.org/project/pandas/ |
 | passlib | 1.7.4 | BSD | https://passlib.readthedocs.io | Eli Collins <elic@assurancetechnologies.com> | PyPI | pip | https://pypi.org/project/passlib/ |
 | pillow | 10.3.0 | HPND | https://pypi.org/project/Pillow/ | "Jeffrey A. Clark" <aclark@aclark.net> | PyPI | pip | https://pypi.org/project/Pillow/ |

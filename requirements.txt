@@ -22,7 +22,7 @@ psutil>=5.9.0
 click>=8.5.0
 psycopg[binary]>=3.0.0
 websockets>=11.0.0
-paho-mqtt>=1.6.0
+paho-mqtt>=2.1.0
 pymodbus>=3.0.0
 bacpypes3>=0.0.110  # BACnet protocol library for IoT safety sensors (optional - only needed for BACnet integration)
 # ERP Integration
