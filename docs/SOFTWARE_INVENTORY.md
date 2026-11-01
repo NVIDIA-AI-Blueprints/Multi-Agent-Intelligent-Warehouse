@@ -2,7 +2,7 @@
 
 This document lists all third-party software packages used in this project, including their versions, licenses, authors, and sources.
 
-> **Dated snapshot** — generated on 2025-12-20 and not regenerated since (the generator script is no longer in the repository). Versions are the minimum versions declared at that time, with only the aiohttp floor and the PyMuPDF removal corrected since; the authoritative dependency lists are `requirements.txt`, `requirements.docker.txt`, `pyproject.toml`, `packages/*/pyproject.toml`, `apps/api/pyproject.toml`, the root `package.json` and `src/ui/web/package.json`.
+> **Dated snapshot** — generated on 2025-12-20 and not regenerated since (the generator script is no longer in the repository). Versions are the minimum versions declared at that time, with only the aiohttp and paho-mqtt floors and the PyMuPDF removal corrected since; the authoritative dependency lists are `requirements.txt`, `requirements.docker.txt`, `pyproject.toml`, `packages/*/pyproject.toml`, `apps/api/pyproject.toml`, the root `package.json` and `src/ui/web/package.json`.
 
 **Last Updated:** 2025-12-20
 
