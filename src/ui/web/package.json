@@ -96,7 +96,7 @@
     "license-checker": "^25.0.1",
     "babel-plugin-istanbul": "^6.1.1",
     "@babel/core": "^7.23.0",
-    "@babel/preset-env": "^7.23.0"
+    "@babel/preset-env": "^8.0.7"
   },
   "overrides": {
     "eslint": "^8.57.0",
