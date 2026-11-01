@@ -13,7 +13,7 @@
     "@emotion/styled": "^11.10.0",
     "@mui/icons-material": "^5.10.0",
     "@mui/material": "^5.18.0",
-    "@mui/x-data-grid": "^7.22.0",
+    "@mui/x-data-grid": "^9.16.0",
     "@tanstack/react-query": "^5.90.12",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^5.16.4",
