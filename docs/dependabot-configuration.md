@@ -55,7 +55,7 @@ If an update causes issues:
 4. Create a proper fix or find an alternative ## Configuration Files ### Main Configuration
 - `.github/dependabot.yml` - Main Dependabot configuration ### Package Files Monitored
 - `pip` at `/` - root Python dependency files (`requirements.txt`, etc.)
-- `npm` at `/src/ui/web` - UI dependencies (`src/ui/web/package.json`, `package-lock.json`)
+- `npm` at `/src/ui/web` - UI dependencies (`src/ui/web/package.json`, `package-lock.json`); minor and patch updates arrive bundled in one PR (group `ui-minor-and-patch`), major updates as separate PRs
 - `docker` at `/` - root `Dockerfile*` base images
 - `github-actions` at `/` - `.github/workflows/*.yml`
 

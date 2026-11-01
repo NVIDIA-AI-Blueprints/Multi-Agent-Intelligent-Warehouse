@@ -47,6 +47,14 @@ updates:
       - "dependencies"
       - "javascript"
       - "frontend"
+    # Bundle all minor and patch updates into one PR; major updates stay separate
+    groups:
+      ui-minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
     # Ignore major version updates for critical packages
     ignore:
       - dependency-name: "react"
