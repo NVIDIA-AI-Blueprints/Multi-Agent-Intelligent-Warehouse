@@ -17,7 +17,8 @@ Major version updates are ignored for critical packages to prevent breaking chan
 - `react-dom` - React DOM bindings
 - `@mui/material` - Material-UI core
 - `@mui/icons-material` - Material-UI icons
-- `typescript` - TypeScript compiler ## How to Handle Dependabot PRs ### Manual Review Required
+- `typescript` - TypeScript compiler
+- `eslint`, `@babel/core`, `babel-plugin-istanbul` - pinned by `overrides` in `src/ui/web/package.json` ## How to Handle Dependabot PRs ### Manual Review Required
 All updates require manual review for safety:
 - Security patches (GitHub will alert you)
 - Bug fixes (patch versions)
@@ -55,7 +56,7 @@ If an update causes issues:
 4. Create a proper fix or find an alternative ## Configuration Files ### Main Configuration
 - `.github/dependabot.yml` - Main Dependabot configuration ### Package Files Monitored
 - `pip` at `/` - root Python dependency files (`requirements.txt`, etc.)
-- `npm` at `/src/ui/web` - UI dependencies (`src/ui/web/package.json`, `package-lock.json`); minor and patch updates arrive bundled in one PR (group `ui-minor-and-patch`), major updates as separate PRs
+- `npm` at `/src/ui/web` - UI dependencies (`src/ui/web/package.json`, `package-lock.json`); minor and patch updates arrive bundled in one PR (group `ui-minor-and-patch`), major updates in a second PR (group `ui-major`)
 - `docker` at `/` - root `Dockerfile*` base images
 - `github-actions` at `/` - `.github/workflows/*.yml`
 

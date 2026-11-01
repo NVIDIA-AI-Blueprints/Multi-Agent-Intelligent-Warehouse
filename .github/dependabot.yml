@@ -55,6 +55,11 @@ updates:
         update-types:
           - "minor"
           - "patch"
+      ui-major:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
     # Ignore major version updates for critical packages
     ignore:
       - dependency-name: "react"
@@ -66,6 +71,14 @@ updates:
       - dependency-name: "@mui/icons-material"
         update-types: ["version-update:semver-major"]
       - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # Pinned by "overrides" in src/ui/web/package.json; npm cannot resolve
+      # a major bump of these, and a failed member blocks the ui-major group
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@babel/core"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "babel-plugin-istanbul"
         update-types: ["version-update:semver-major"]
 
   # Docker dependencies - Container images
