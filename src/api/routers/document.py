@@ -109,7 +109,12 @@ def _check_result_success(result: Dict[str, Any], operation: str) -> None:
         HTTPException: If result indicates failure
     """
     if not result.get("success"):
-        status_code = 404 if "not found" in result.get("message", "").lower() else 500
+        if result.get("error") == "not_implemented":
+            status_code = 501
+        elif "not found" in result.get("message", "").lower():
+            status_code = 404
+        else:
+            status_code = 500
         raise HTTPException(status_code=status_code, detail=result.get("message", f"{operation} failed"))
 
 

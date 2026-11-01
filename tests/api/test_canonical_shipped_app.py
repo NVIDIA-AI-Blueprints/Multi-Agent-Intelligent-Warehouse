@@ -186,8 +186,6 @@ EXPECTED_MUTATING_ROUTES: dict[tuple[str, str], str] = {
     ("PUT", "/api/v1/auth/users/{user_id}"): "identity",
     # document workflow state — no warehouse mutation; inference via ModelGateway
     ("POST", "/api/v1/document/upload"): "document-workflow",
-    ("POST", "/api/v1/document/approve/{document_id}"): "document-workflow",
-    ("POST", "/api/v1/document/reject/{document_id}"): "document-workflow",
 }
 
 
@@ -211,6 +209,35 @@ def test_p1_01_legacy_chat_and_reasoning_not_mounted():
         "src.api.routers.mcp",
     ):
         assert forbidden not in modules
+
+
+def test_document_approve_and_reject_not_mounted():
+    """
+    The legacy document approve/reject routes record nothing and integrate with
+    no WMS; they returned "approved"/"rejected" for any ID from any caller.
+    """
+    paths = {p for _, p, _ in _mounted()}
+    assert "/api/v1/document/approve/{document_id}" not in paths
+    assert "/api/v1/document/reject/{document_id}" not in paths
+
+
+async def test_document_approve_and_reject_unknown_id_not_reported_as_done(
+    canonical,
+):
+    async with running_canonical_app() as (_, client):
+        r_approve = await client.post(
+            "/api/v1/document/approve/no-such-document",
+            data={"approver_id": "anyone"},
+        )
+        r_reject = await client.post(
+            "/api/v1/document/reject/no-such-document",
+            data={"rejector_id": "anyone", "rejection_reason": "x"},
+        )
+
+    for r in (r_approve, r_reject):
+        assert r.status_code in (404, 405), (r.status_code, r.text)
+        assert "approval_status" not in r.text
+        assert "rejection_status" not in r.text
 
 
 def test_p1_01_legacy_routers_mounted_read_only():

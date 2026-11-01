@@ -29,8 +29,9 @@ Decision semantics: ``JudgeEvaluation.decision`` (APPROVE / REJECT /
 REVIEW_REQUIRED) is the *model's document-quality classification*
 (``decision_kind = "model_quality_classification"``). It is NOT a MAIW
 governance decision: it does not pass through DecisionEngine, creates no
-ApprovalRecord, and authorises no warehouse action. Document-workflow approval
-is a separate, human action (``POST /api/v1/document/approve/{id}``).
+ApprovalRecord, and authorises no warehouse action. Human document approval is
+not implemented; the legacy ``POST /api/v1/document/approve/{id}`` route
+returns 501 and is not mounted in the shipped app.
 """
 
 import asyncio

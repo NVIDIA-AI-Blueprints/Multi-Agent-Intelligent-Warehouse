@@ -218,15 +218,16 @@ From `src/api/routers/`, mounted with only their GET routes: `/api/v1/inventory/
 `/api/v1/attendance/*`, `/api/v1/migrations/*`, `/api/v1/forecasting/*`,
 `/api/v1/training/*`.
 
-`/api/v1/document/*` is mounted read-only except `POST /api/v1/document/upload`,
+`/api/v1/document/*` is mounted read-only except `POST /api/v1/document/upload`;
+`/search`, `/validate` and `/analytics` are not shipped. Neither are
 `POST /api/v1/document/approve/{document_id}` and
-`POST /api/v1/document/reject/{document_id}`; `/search`, `/validate` and
-`/analytics` are not shipped.
+`POST /api/v1/document/reject/{document_id}`: document approval is not
+implemented (no decision is recorded and nothing is sent to a WMS).
 
 ### Not mounted
 
 `/api/v1/chat`, `/api/v1/reasoning`, every POST/PUT/PATCH/DELETE of the legacy
-routers above other than the three document routes (including
+routers above other than `POST /api/v1/document/upload` (including
 `POST /api/v1/migrations/migrate`), and `/api/v1/metrics`
 (served only by the legacy `src/api/app.py`). There is no WebSocket endpoint.
 
