@@ -27,7 +27,7 @@
     "@uiw/react-json-view": "^2.0.0-alpha.39",
     "axios": "^1.8.3",
     "date-fns": "^2.29.0",
-    "fast-equals": "^5.4.0",
+    "fast-equals": "^6.2.1",
     "papaparse": "^5.5.3",
     "react": "^19.2.3",
     "react-copy-to-clipboard": "^5.1.0",
