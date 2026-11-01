@@ -36,7 +36,7 @@ redis>=5.0.0
 python-multipart
 scikit-learn>=1.5.0  # Fixed information exposure in TfidfVectorizer/CountVectorizer stop_words_ (CVE-2024-5206)
 pandas>=1.2.4
-xgboost>=1.6.0
+xgboost>=3.2.0
 # RAPIDS GPU acceleration (optional - requires NVIDIA GPU with CUDA 12.x)
 # Install with: pip install --extra-index-url=https://pypi.nvidia.com cudf-cu12 cuml-cu12
 # Or run: ./scripts/setup/install_rapids.sh
