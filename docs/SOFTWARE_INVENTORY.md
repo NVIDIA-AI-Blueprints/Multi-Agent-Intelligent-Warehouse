@@ -2,7 +2,7 @@
 
 This document lists all third-party software packages used in this project, including their versions, licenses, authors, and sources.
 
-> **Dated snapshot** — generated on 2025-12-20 and not regenerated since (the generator script is no longer in the repository). Versions are the minimum versions declared at that time, with only the aiohttp and paho-mqtt floors and the PyMuPDF removal corrected since; the authoritative dependency lists are `requirements.txt`, `requirements.docker.txt`, `pyproject.toml`, `packages/*/pyproject.toml`, `apps/api/pyproject.toml`, the root `package.json` and `src/ui/web/package.json`.
+> **Dated snapshot** — generated on 2025-12-20 and not regenerated since (the generator script is no longer in the repository). Versions are the minimum versions declared at that time, with only the aiohttp, paho-mqtt and pymodbus floors and the PyMuPDF removal corrected since; the authoritative dependency lists are `requirements.txt`, `requirements.docker.txt`, `pyproject.toml`, `packages/*/pyproject.toml`, `apps/api/pyproject.toml`, the root `package.json` and `src/ui/web/package.json`.
 
 **Last Updated:** 2025-12-20
 
@@ -42,7 +42,7 @@ The snapshot was built from `requirements.txt`, `requirements.docker.txt`, `scri
 | pydantic | 2.7.0 | MIT License | https://pypi.org/project/pydantic/ | Samuel Colvin <s@muelcolvin.com>, Eric Jolibois <em.jolibois@gmail.com>, Hasan Ramezani <hasan.r67@gmail.com>, Adrian Garcia Badaracco <1755071+adr... | PyPI | pip | https://pypi.org/project/pydantic/ |
 | PyJWT | 2.8.0 | MIT | https://github.com/jpadilla/pyjwt | Jose Padilla <hello@jpadilla.com> | PyPI | pip | https://pypi.org/project/PyJWT/ |
 | pymilvus | 2.3.0 | Apache Software License | https://pypi.org/project/pymilvus/ | Milvus Team <milvus-team@zilliz.com> | PyPI | pip | https://pypi.org/project/pymilvus/ |
-| pymodbus | 3.0.0 | BSD-3-Clause | https://github.com/riptideio/pymodbus/ | attr: pymodbus.__author__ | PyPI | pip | https://pypi.org/project/pymodbus/ |
+| pymodbus | 3.16.1 | BSD-3-Clause | https://github.com/riptideio/pymodbus/ | attr: pymodbus.__author__ | PyPI | pip | https://pypi.org/project/pymodbus/ |
 | pyserial | 3.5 | BSD | https://github.com/pyserial/pyserial | Chris Liechti <cliechti@gmx.net> | PyPI | pip | https://pypi.org/project/pyserial/ |
 | pytest | 7.4.0 | MIT | https://docs.pytest.org/en/latest/ | Holger Krekel, Bruno Oliveira, Ronny Pfannschmidt, Floris Bruynooghe, Brianna Laugher, Florian Bruhin and others | PyPI | pip | https://pypi.org/project/pytest/ |
 | pytest-asyncio | 0.21.0 | Apache 2.0 | https://github.com/pytest-dev/pytest-asyncio | Tin Tvrtković <tinchester@gmail.com> <tinchester@gmail.com> | PyPI | pip | https://pypi.org/project/pytest-asyncio/ |
