@@ -29,7 +29,12 @@ python -m pytest tests/unit/ tests/contract/ tests/mcp/ tests/api/ packages/maiw
 ```
 
 This is the command `.github/workflows/ci-cd.yml` runs ("Run Python tests"; CI also adds
-`--cov=src --cov-report=xml --cov-report=term-missing`). `--timeout` requires `pytest-timeout`.
+`--cov=src --cov=apps --cov=packages --cov-fail-under=48 --cov-report=xml --cov-report=term-missing`).
+`--timeout` requires `pytest-timeout`.
+
+Coverage covers the shipped app (`apps/`) and packages (`packages/`) as well as `src/`;
+total line coverage was 49.7% when the 48% floor was set (2026-11-01). CI fails below the
+floor. The Codecov upload is informational and does not gate CI.
 
 > **Note:** `ci-cd.yml` previously ran only `tests/unit/` (327 tests). As of Phase 9A it was corrected to run `tests/unit/ tests/contract/ tests/mcp/` (528 tests). Phase 9B adds `tests/api/` to the canonical command.
 

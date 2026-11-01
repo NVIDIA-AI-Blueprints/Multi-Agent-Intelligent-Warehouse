@@ -207,7 +207,8 @@ services:
       - timescaledb
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8765/health"]
+      # MCP initialize over streamable HTTP; the server has no /health route
+      test: ["CMD", "python", "-c", "import json, urllib.request; urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8765/mcp', data=json.dumps({'jsonrpc': '2.0', 'id': 1, 'method': 'initialize', 'params': {'protocolVersion': '2025-06-18', 'capabilities': {}, 'clientInfo': {'name': 'healthcheck', 'version': '1'}}}).encode(), headers={'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream'}), timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -236,6 +237,13 @@ services:
     depends_on:
       - timescaledb
     restart: unless-stopped
+    healthcheck:
+      # MCP initialize over streamable HTTP; the server has no /health route
+      test: ["CMD", "python", "-c", "import json, urllib.request; urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8766/mcp', data=json.dumps({'jsonrpc': '2.0', 'id': 1, 'method': 'initialize', 'params': {'protocolVersion': '2025-06-18', 'capabilities': {}, 'clientInfo': {'name': 'healthcheck', 'version': '1'}}}).encode(), headers={'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream'}), timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
   mcp-labor:
     build:
@@ -260,6 +268,13 @@ services:
     depends_on:
       - timescaledb
     restart: unless-stopped
+    healthcheck:
+      # MCP initialize over streamable HTTP; the server has no /health route
+      test: ["CMD", "python", "-c", "import json, urllib.request; urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8767/mcp', data=json.dumps({'jsonrpc': '2.0', 'id': 1, 'method': 'initialize', 'params': {'protocolVersion': '2025-06-18', 'capabilities': {}, 'clientInfo': {'name': 'healthcheck', 'version': '1'}}}).encode(), headers={'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream'}), timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
   mcp-wave:
     build:
@@ -284,6 +299,13 @@ services:
     depends_on:
       - timescaledb
     restart: unless-stopped
+    healthcheck:
+      # MCP initialize over streamable HTTP; the server has no /health route
+      test: ["CMD", "python", "-c", "import json, urllib.request; urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8768/mcp', data=json.dumps({'jsonrpc': '2.0', 'id': 1, 'method': 'initialize', 'params': {'protocolVersion': '2025-06-18', 'capabilities': {}, 'clientInfo': {'name': 'healthcheck', 'version': '1'}}}).encode(), headers={'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream'}), timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
   llm-nim:
     image: nvcr.io/nim/nvidia/nemotron-3-super-120b-a12b:latest
