@@ -47,7 +47,7 @@ updates:
       - "dependencies"
       - "javascript"
       - "frontend"
-    # Bundle all minor and patch updates into one PR; major updates stay separate
+    # All minor and patch updates arrive as one PR
     groups:
       ui-minor-and-patch:
         patterns:
@@ -55,30 +55,10 @@ updates:
         update-types:
           - "minor"
           - "patch"
-      ui-major:
-        patterns:
-          - "*"
-        update-types:
-          - "major"
-    # Ignore major version updates for critical packages
+    # No version-update PRs for major versions: UI majors are upgraded
+    # deliberately. Security updates are not affected by update-types ignores.
     ignore:
-      - dependency-name: "react"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "react-dom"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "@mui/material"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "@mui/icons-material"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "typescript"
-        update-types: ["version-update:semver-major"]
-      # Pinned by "overrides" in src/ui/web/package.json; npm cannot resolve
-      # a major bump of these, and a failed member blocks the ui-major group
-      - dependency-name: "eslint"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "@babel/core"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "babel-plugin-istanbul"
+      - dependency-name: "*"
         update-types: ["version-update:semver-major"]
 
   # Docker dependencies - Container images
