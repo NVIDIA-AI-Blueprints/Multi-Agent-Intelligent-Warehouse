@@ -25,6 +25,9 @@ share/python-wheels/
 *.egg
 MANIFEST
 
+# SBOMs written by scripts/security/generate_sbom.sh
+/sbom/
+
 # Virtual Environment
 .env
 .venv/
@@ -186,6 +189,3 @@ test_*.py
 
 # Documentation - Internal analysis files
 UNNECESSARY_FILES.md
-
-# SBOMs written by scripts/security/generate_sbom.sh
-/sbom/
