@@ -4,6 +4,10 @@ Releases are cut deliberately by a maintainer. No workflow creates a tag,
 a GitHub release or a release commit on its own: pushes to `main` run tests,
 scans and the deployment test only.
 
+Green CI is necessary, not sufficient. A release also needs the security
+gates in step 3 (SonarQube, nSpect, SBOM) recorded for the exact candidate
+commit; without them the decision is no-go.
+
 ## 1. Choose the candidate
 
 The candidate is a merged commit on `main` whose post-merge runs are green:
@@ -46,6 +50,40 @@ On the reference host, following
 Record anything that could not run (for example an internal test suite) as
 NOT RUN in the release notes; do not omit it.
 
+### Security gates (release-blocking)
+
+These apply to the exact candidate SHA. Unlike the NGC suite, a missing
+result is not a NOT RUN: it is a no-go. A failing result needs a written
+disposition from Blueprints SRE (or an approved nSpect exception) before
+release, recorded in the notes.
+
+- **SonarQube.** An analysis of the candidate SHA, from its
+  `SonarQube Analysis` run or, if CI has no NVIDIA-network runner, from
+  `scripts/security/run_sonar_scan.sh` on an NVIDIA-network host (candidate
+  checkout as `MAIW_SONAR_SOURCE_DIR`, with the `sonar-coverage` artifact of
+  its CI run as `coverage.xml`). Record the analysis ID, its timestamp and the
+  quality gate status from the evidence file. Exit code 0 is a passing gate;
+  5 is an analysis whose gate failed (each failing condition needs a
+  disposition); 2, 3 and 4 mean no usable analysis. An analysis of a
+  different commit does not count, and neither does a green CI run whose
+  SonarQube job did not submit an analysis. Review every new security hotspot
+  in SonarQube.
+- **nSpect (NSPECT-NJMX-9GQU).** A fresh nSpect / Pulse OSS scan of the
+  candidate. Critical and high findings are fixed or carry an approved
+  exception. See `docs/security/nspect-reconciliation.md`.
+- **SBOM.** The candidate's CycloneDX SBOMs (CI artifacts `sbom-<image>`, or
+  `scripts/security/generate_sbom.sh`), valid per
+  `scripts/security/validate_sbom.py`, submitted to nSpect
+  (**Actions → Manage SBOM**). See `docs/security/sbom-generation.md`.
+- **Evidence manifest.** Regenerate
+  `docs/security/security-evidence-manifest.json` with
+  `scripts/security/build_evidence_manifest.py`, the candidate SHA among the
+  targets.
+
+If a tool requires a tag before validation, use a release-candidate tag
+(`vX.Y.Z-rc.N`), never the final release tag. A published release tag is not
+moved or re-pointed; a fix ships in the next version.
+
 ## 4. Finalize the notes
 
 Release notes live in `RELEASE_NOTES_vX.Y.Z.md` with a matching
@@ -65,7 +103,14 @@ The NGC suite row is required, and when the suite did not run it reads
 | Deployment test (deploy, readiness, MCP tool calls, restart durability) | PASS ([run](<run url>)) |
 | Internal NGC MAIW pytest suite | **NOT RUN**: <reason> ([run](<run url>)) |
 | Release gate on the reference host | PASS |
+| SonarQube | analysis `<analysis id>` (<timestamp>), quality gate <OK, or ERROR with SRE disposition (link)> |
+| nSpect OSS scan (NSPECT-NJMX-9GQU) | <date>: <result; approved exceptions (link)> |
+| SBOM submitted to nSpect | <date>: <artifacts> |
 ```
+
+Changes that can break existing clients (removed routes, new request
+restrictions, changed defaults) go in a **Compatibility** section near the
+top of the notes, not only in the change list.
 
 The table goes into the GitHub release body too, because the release is
 published from this file. Remove the draft markers once
