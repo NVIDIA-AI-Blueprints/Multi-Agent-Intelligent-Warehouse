@@ -189,7 +189,9 @@ class SQLRetriever:
         except Exception as e:
             logger.error(f"Query execution failed: {e}")
             logger.error(f"Query: {query}")
-            logger.error(f"Params: {params}")
+            # Bound parameters carry request values and row data: log their
+            # count only.
+            logger.error("Params: %d value(s) not logged", len(params) if hasattr(params, "__len__") else 1)
             raise
     
     async def fetch_all(

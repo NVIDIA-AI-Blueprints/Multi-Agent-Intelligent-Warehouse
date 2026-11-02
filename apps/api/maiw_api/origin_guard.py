@@ -131,7 +131,7 @@ class CrossOriginWriteGuardMiddleware:
             return
 
         logger.warning(
-            "Refused cross-origin %s %s from origin %r",
+            "Refused cross-origin %s %r from origin %r",
             scope.get("method"),
             scope.get("path"),
             origin,

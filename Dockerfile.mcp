@@ -63,6 +63,7 @@ RUN python -m pip uninstall -y setuptools wheel pip
 COPY src/retrieval ./src/retrieval
 COPY src/api/agents ./src/api/agents
 COPY src/api/services ./src/api/services
+COPY src/api/utils ./src/api/utils
 COPY src/adapters ./src/adapters
 COPY mcp_servers/__init__.py ./mcp_servers/__init__.py
 COPY mcp_servers/${MCP_DOMAIN} ./mcp_servers/${MCP_DOMAIN}

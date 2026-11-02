@@ -106,6 +106,7 @@ from src.api.services.security.rate_limiter import (
     get_rate_limiter,
     resolve_fail_mode,
 )
+from src.api.utils.log_utils import install_log_injection_guard
 from src.api.utils.error_handler import (
     handle_generic_exception,
     handle_http_exception,
@@ -113,6 +114,10 @@ from src.api.utils.error_handler import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Every log message in the API process is a single line: request values that
+# reach log calls cannot forge entries (CWE-117). See install_log_injection_guard.
+install_log_injection_guard()
 
 
 def _safe_int_env(key: str, default: int) -> int:

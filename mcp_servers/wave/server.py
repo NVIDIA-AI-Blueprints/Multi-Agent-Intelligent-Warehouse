@@ -186,6 +186,10 @@ async def warehouse_wave_reprioritize(
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    # Tool arguments reach log calls: keep every log message on one line.
+    from src.api.utils.log_utils import install_log_injection_guard
+
+    install_log_injection_guard()
     # Dockerfile.mcp runs ``python -m mcp_servers.wave.server``; without this
     # block the module only imported, exited 0 and the container restart-looped.
     transport = os.getenv("MAIW_MCP_TRANSPORT", "stdio")

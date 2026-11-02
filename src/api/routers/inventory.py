@@ -18,6 +18,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 from src.retrieval.structured import SQLRetriever, InventoryQueries
 import logging
+from src.api.utils.log_utils import sanitize_log_data
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -98,7 +99,7 @@ async def get_inventory_item(sku: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get equipment item {sku}: {e}")
+        logger.error("Failed to get inventory item %s: %s", sanitize_log_data(sku, max_length=64), e)
         raise HTTPException(status_code=500, detail="Failed to retrieve inventory item")
 
 
@@ -321,8 +322,8 @@ async def get_daily_demand(
         }
         
     except Exception as e:
-        logger.error(f"Error getting daily demand for {sku}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve daily demand for {sku}")
+        logger.error("Error getting daily demand for %s: %s", sanitize_log_data(sku, max_length=64), e)
+        raise HTTPException(status_code=500, detail="Failed to retrieve daily demand")
 
 
 @router.get("/demand/weekly")

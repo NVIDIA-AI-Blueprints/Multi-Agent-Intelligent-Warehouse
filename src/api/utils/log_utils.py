@@ -21,6 +21,7 @@ safe prompt construction utilities to prevent template injection attacks.
 """
 
 import base64
+import logging
 import re
 import json
 from typing import Union, Any, Dict, List
@@ -65,6 +66,57 @@ def sanitize_log_data(data: Union[str, Any], max_length: int = 500) -> str:
     data_str = re.sub(r'[\r\n]', '', data_str)
     
     return data_str
+
+
+_LOG_CONTROL_CHARS = re.compile(r"[\x00-\x08\x0a-\x1f\x7f]")
+
+
+def escape_log_control_chars(text: str) -> str:
+    """Escape CR, LF and other control characters (tab is kept) as ``\\n`` etc."""
+    return _LOG_CONTROL_CHARS.sub(
+        lambda m: {"\n": "\\n", "\r": "\\r"}.get(m.group(), f"\\x{ord(m.group()):02x}"),
+        text,
+    )
+
+
+class _SingleLineLogRecord(logging.LogRecord):
+    """A log record whose message can never span lines."""
+
+    def getMessage(self) -> str:
+        return escape_log_control_chars(super().getMessage())
+
+
+_guard_installed = False
+
+
+def install_log_injection_guard() -> None:
+    """
+    Make every log message in this process a single line.
+
+    Request values (path parameters, form fields, MCP tool arguments, JWT
+    headers) reach many log calls. A value containing CR/LF would otherwise
+    start a forged log entry (CWE-117). This wraps the logging record factory
+    so the formatted message has its control characters escaped, whatever
+    the call site does; ``sanitize_log_data`` remains the per-call tool for
+    length limits and explicit redaction. Records keep their ``args``
+    (formatters such as uvicorn's access log rely on them). Tracebacks are
+    formatted separately and are not changed. Idempotent.
+    """
+    global _guard_installed
+    if _guard_installed:
+        return
+    previous = logging.getLogRecordFactory()
+
+    def factory(*args: Any, **kwargs: Any) -> logging.LogRecord:
+        record = previous(*args, **kwargs)
+        # Only re-class plain records; a custom factory's subclass is left
+        # alone rather than replaced.
+        if type(record) is logging.LogRecord:
+            record.__class__ = _SingleLineLogRecord
+        return record
+
+    logging.setLogRecordFactory(factory)
+    _guard_installed = True
 
 
 def sanitize_prompt_input(data: Union[str, Any], max_length: int = 10000) -> str:

@@ -19,6 +19,7 @@ import jwt
 import bcrypt
 import os
 import logging
+from src.api.utils.log_utils import sanitize_log_data
 import secrets
 import base64
 import json
@@ -249,9 +250,11 @@ class JWTHandler:
                 # This prevents algorithm confusion attacks where attacker tries to
                 # force use of a different algorithm (e.g., HS256 with RSA public key)
                 if token_algorithm != self.algorithm:
+                    # token_algorithm comes from the unverified header.
                     logger.warning(
-                        f"❌ SECURITY: Token algorithm mismatch - expected {self.algorithm}, "
-                        f"got {token_algorithm} - REJECTED"
+                        "❌ SECURITY: Token algorithm mismatch - expected %s, got %r - REJECTED",
+                        self.algorithm,
+                        sanitize_log_data(token_algorithm, max_length=32),
                     )
                     return None
             except (ValueError, json.JSONDecodeError, IndexError) as e:

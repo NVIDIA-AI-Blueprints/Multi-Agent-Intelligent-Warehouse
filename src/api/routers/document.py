@@ -985,7 +985,7 @@ async def process_document_background(
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
         
-        logger.info(f"✅ File exists: {file_path} ({os.path.getsize(file_path)} bytes)")
+        logger.info(f"✅ File exists: {_sanitize_log_data(file_path)} ({os.path.getsize(file_path)} bytes)")
 
         # Import the actual pipeline components
         from src.api.agents.document.preprocessing.nemo_retriever import (

@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials
 from typing import List
 import logging
+from ..utils.log_utils import sanitize_log_data
 from ..services.auth.models import (
     User,
     UserCreate,
@@ -66,10 +67,13 @@ async def register(
 async def login(user_login: UserLogin):
     """Authenticate user and return tokens."""
     import asyncio
+
+    # The username is attacker-controlled until authentication succeeds.
+    safe_username = sanitize_log_data(user_login.username, max_length=64)
     try:
         # Initialize with timeout to prevent hanging
         try:
-            logger.info(f"Initializing user service for login attempt by: {user_login.username}")
+            logger.info("Initializing user service for login attempt by: %s", safe_username)
             await asyncio.wait_for(
                 user_service.initialize(),
                 timeout=5.0  # 5 second timeout for initialization (increased from 3s to allow DB connection)
@@ -91,7 +95,7 @@ async def login(user_login: UserLogin):
         # Get user with hashed password (with timeout)
         # Strip username to handle any whitespace issues
         username_clean = user_login.username.strip()
-        logger.info(f"🔍 Starting user lookup for: '{username_clean}' (original: '{user_login.username}', len: {len(user_login.username)})")
+        logger.info("Starting user lookup for: %s", safe_username)
         # User lookup initiated
         try:
             user = await asyncio.wait_for(
@@ -101,13 +105,13 @@ async def login(user_login: UserLogin):
             logger.info(f"🔍 User lookup completed, user is {'None' if user is None else 'found'}")
             # User lookup completed
         except asyncio.TimeoutError:
-            logger.error(f"User lookup timed out for username: {user_login.username}")
+            logger.error("User lookup timed out for username: %s", safe_username)
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Authentication service is slow. Please try again.",
             )
         except Exception as user_lookup_err:
-            logger.error(f"User lookup failed for {user_login.username}: {user_lookup_err}", exc_info=True)
+            logger.error("User lookup failed for %s: %s", safe_username, user_lookup_err, exc_info=True)
             # Return generic error for security (don't leak error details)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -115,7 +119,7 @@ async def login(user_login: UserLogin):
             )
         
         if not user:
-            logger.warning(f"User not found: {user_login.username}")
+            logger.warning("User not found: %s", safe_username)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid username or password",
@@ -125,7 +129,7 @@ async def login(user_login: UserLogin):
 
         # Check if user is active
         if user.status != UserStatus.ACTIVE:
-            logger.warning(f"Login attempt for inactive user: {user_login.username}, status: {user.status}")
+            logger.warning("Login attempt for inactive user: %s, status: %s", safe_username, user.status)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="User account is not active",
@@ -134,7 +138,7 @@ async def login(user_login: UserLogin):
         # Verify password
         password_valid = jwt_handler.verify_password(user_login.password, user.hashed_password)
         if not password_valid:
-            logger.warning(f"Authentication failed for user: {user_login.username}")
+            logger.warning("Authentication failed for user: %s", safe_username)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid username or password",
