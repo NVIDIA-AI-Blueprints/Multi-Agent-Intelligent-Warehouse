@@ -62,15 +62,56 @@ def test_sonarqube_is_least_privilege_and_never_inlines_the_token():
     assert wf["permissions"] == {}
     job = wf["jobs"]["sonarqube"]
     assert job["permissions"] == {"contents": "read", "actions": "read"}
-    checkout = next(
+    checkouts = [
         s for s in job["steps"] if s.get("uses", "").startswith("actions/checkout")
-    )
-    assert checkout["with"]["persist-credentials"] is False
+    ]
+    assert checkouts
+    for checkout in checkouts:
+        assert checkout["with"]["persist-credentials"] is False
     for step in job["steps"]:
         assert "secrets." not in step.get("run", "")
     scan = next(s for s in job["steps"] if s.get("name") == "Run SonarQube analysis")
     assert scan["env"]["SONAR_TOKEN"] == "${{ secrets.SONAR_TOKEN }}"
-    assert scan["run"] == "scripts/security/run_sonar_scan.sh"
+
+
+def test_sonarqube_runs_trusted_tooling_against_the_analyzed_commit():
+    # The scan step holds SONAR_TOKEN, so its script and settings come from
+    # the commit the workflow runs from, never from the pull request under
+    # analysis; that commit is checked out apart and only scanned. PR branches
+    # cut before the script existed failed with exit 127 when it ran from the
+    # analyzed checkout.
+    steps = _workflow("sonarqube.yml")["jobs"]["sonarqube"]["steps"]
+    by_name = {s.get("name"): s for s in steps}
+    tools = by_name["Checkout trusted scan tooling"]["with"]
+    assert tools["ref"] == "${{ github.sha }}"
+    assert tools["path"] == "sonar-tools"
+    assert set(tools["sparse-checkout"].split()) == {
+        "scripts/security/run_sonar_scan.sh",
+        "sonar-project.properties",
+    }
+    source = by_name["Checkout analyzed commit"]["with"]
+    assert source["ref"] == "${{ steps.target.outputs.sha }}"
+    assert source["path"] == "source"
+    assert source["fetch-depth"] == 0
+    coverage = by_name["Download coverage from the CI/CD Pipeline run"]["with"]
+    assert coverage["path"] == "source"
+    assert coverage["run-id"] == "${{ steps.target.outputs.ci_run_id }}"
+    scan = by_name["Run SonarQube analysis"]
+    assert scan["run"] == "sonar-tools/scripts/security/run_sonar_scan.sh"
+    assert scan["env"]["MAIW_SONAR_SOURCE_DIR"] == "source"
+    assert scan["env"]["MAIW_SONAR_SETTINGS"] == "sonar-tools/sonar-project.properties"
+    # Tooling is in place before any step that uses it.
+    names = [s.get("name") for s in steps]
+    assert names.index("Checkout trusted scan tooling") < names.index(
+        "Run SonarQube analysis"
+    )
+
+    script = (REPO_ROOT / "scripts/security/run_sonar_scan.sh").read_text()
+    # The scanner reads the trusted settings, mounted read-only, not the
+    # analyzed checkout's sonar-project.properties.
+    assert '-v "$SETTINGS:/opt/maiw-sonar/sonar-project.properties:ro"' in script
+    assert "-Dproject.settings=/opt/maiw-sonar/sonar-project.properties" in script
+    assert "-Dsonar.projectBaseDir=/usr/src" in script
 
 
 def test_sonarqube_runner_is_configurable_and_reachability_is_checked():

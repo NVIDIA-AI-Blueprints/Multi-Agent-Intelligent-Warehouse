@@ -9,6 +9,11 @@ name: SonarQube Analysis
 #   with the coverage.xml that run produced (no second test run).
 # - Never runs for pull requests from forks: workflow_run executes with this
 #   repository's secrets and may be on an NVIDIA-network runner.
+# - The scan script and sonar-project.properties come from the commit this
+#   workflow runs from (github.sha: the default branch for workflow_run), in
+#   sonar-tools/. The analyzed commit is checked out separately in source/
+#   and is only data: a pull request branch never runs code in the step that
+#   holds SONAR_TOKEN, and branches cut before the script existed still scan.
 # - sonar.nvidia.com resolves to a private address. Set the repository
 #   variable MAIW_SONAR_RUNNER to the label of an approved NVIDIA-network
 #   runner; on a GitHub-hosted runner the job fails at the reachability check
@@ -95,10 +100,22 @@ jobs:
           core.setOutput('pr_base', prBase);
           core.info(`sha=${sha} ci_run_id=${runId} branch=${branch} pr=${prKey}`);
 
-    - name: Checkout
+    - name: Checkout trusted scan tooling
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.sha }}
+        path: sonar-tools
+        sparse-checkout: |
+          scripts/security/run_sonar_scan.sh
+          sonar-project.properties
+        sparse-checkout-cone-mode: false
+        persist-credentials: false
+
+    - name: Checkout analyzed commit
       uses: actions/checkout@v4
       with:
         ref: ${{ steps.target.outputs.sha }}
+        path: source
         fetch-depth: 0  # blame and tags (projectVersion) for the analysis
         persist-credentials: false
 
@@ -106,6 +123,7 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: sonar-coverage
+        path: source
         run-id: ${{ steps.target.outputs.ci_run_id }}
         github-token: ${{ github.token }}
 
@@ -117,8 +135,10 @@ jobs:
         MAIW_SONAR_PR_KEY: ${{ steps.target.outputs.pr_key }}
         MAIW_SONAR_PR_BRANCH: ${{ steps.target.outputs.pr_branch }}
         MAIW_SONAR_PR_BASE: ${{ steps.target.outputs.pr_base }}
-        MAIW_SONAR_EVIDENCE: sonar-evidence/maiw-sonar-evidence.json
-      run: scripts/security/run_sonar_scan.sh
+        MAIW_SONAR_SOURCE_DIR: source
+        MAIW_SONAR_SETTINGS: sonar-tools/sonar-project.properties
+        MAIW_SONAR_EVIDENCE: ${{ github.workspace }}/sonar-evidence/maiw-sonar-evidence.json
+      run: sonar-tools/scripts/security/run_sonar_scan.sh
 
     - name: Summary
       if: always()
@@ -127,6 +147,7 @@ jobs:
         {
           echo "### SonarQube analysis"
           echo "- Commit: \`${{ steps.target.outputs.sha }}\`"
+          echo "- Scan tooling: \`${{ github.sha }}\`"
           if [ -f "$f" ]; then
             python3 -c "import json;e=json.load(open('$f'));[print(f'- {k}: {e.get(k)}') for k in ('analysis_id','executed_at','branch','pull_request','quality_gate_status','dashboard_url')]"
           else

@@ -57,6 +57,7 @@ The server is healthy: version 2026.3.1.123439 (`GET /api/server/version`), and 
 - It runs after a successful CI/CD Pipeline for pushes to main and for pull requests from this repository's branches, and analyzes the same commit with that run's coverage. There is no second test run.
 - `workflow_dispatch` is available for troubleshooting.
 - It never runs for pull requests from forks.
+- The scan script and `sonar-project.properties` come from the commit the workflow runs from (`github.sha`; for `workflow_run`, the default branch), in a sparse checkout at `sonar-tools/`. The analyzed commit is checked out separately at `source/`, together with its CI run's `coverage.xml`, and is only scanned. A pull request branch therefore never runs code in the step that holds `SONAR_TOKEN`, and branches cut before the script existed are still analyzed (they used to fail with exit 127).
 - The runner comes from the repository variable `MAIW_SONAR_RUNNER`. On a GitHub-hosted runner the job **fails at the reachability check** instead of passing without a scan.
 - Permissions are `contents: read` and `actions: read`.
 
@@ -64,6 +65,7 @@ The server is healthy: version 2026.3.1.123439 (`GET /api/server/version`), and 
 - It uses the pinned scanner image `sonarsource/sonar-scanner-cli:12.3.0.4285_8.1.0@sha256:47956b…`.
 - `SONAR_TOKEN` is passed by name only, never on a command line.
 - `projectVersion` is the latest `v*` tag (2.1.0, not 1.0.0), and `sonar.scm.revision` is the commit.
+- `MAIW_SONAR_SOURCE_DIR` selects the checkout to analyze and `MAIW_SONAR_SETTINGS` the properties file; the scanner reads the settings file mounted read-only. Both default to the checkout the script lives in, so a manual run from the repository is unchanged.
 - It handles branch and pull-request analysis, waits for the quality gate, and writes `maiw-sonar-evidence.json` with the server's analysis ID, timestamp and gate result.
 
 **`sonar-project.properties`:**
