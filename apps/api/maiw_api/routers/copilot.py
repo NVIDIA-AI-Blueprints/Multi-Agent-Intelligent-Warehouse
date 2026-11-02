@@ -144,8 +144,12 @@ async def copilot_turn(body: CopilotTurnRequest, request: Request):
             return _ask_response(result, turn)
 
     except Exception as exc:
-        logger.error("copilot_turn: unexpected error — %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        # Exception text can carry connection strings, hosts or model
+        # responses; it goes to the log, not to the caller.
+        logger.exception("copilot_turn: unexpected error")
+        raise HTTPException(
+            status_code=500, detail="Copilot turn failed; see the API log."
+        ) from exc
 
 
 def _observe_response(result, turn) -> CopilotTurnResponse:
