@@ -38,6 +38,11 @@ jobs:
     if: github.repository == 'NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse'
     #runs-on: ubuntu-latest
     runs-on: arc-runners-org-nvidia-ai-bp-4-gpu
+    # The repository default token is read-only; checks: write lets the job
+    # post the separate "MAIW internal pytest (NGC)" commit check.
+    permissions:
+      contents: read
+      checks: write
 
     steps:
       # Step 1: Clone repository
@@ -545,6 +550,7 @@ jobs:
           if [ -z "${TEST_DOCKER_PULL_KEY}" ]; then
             echo "::warning title=MAIW pytest NOT RUN::TEST_DOCKER_PULL_KEY not set (requires internal NGC access)"
             echo "E2E=NOT_RUN" >> "$GITHUB_OUTPUT"
+            echo "REASON=TEST_DOCKER_PULL_KEY not set (requires internal NGC access)" >> "$GITHUB_OUTPUT"
             echo "### ⚠️ MAIW pytest NOT RUN — TEST_DOCKER_PULL_KEY not set" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
@@ -555,6 +561,7 @@ jobs:
           if ! docker pull "${TEST_IMAGE}"; then
             echo "::warning title=MAIW pytest NOT RUN::could not pull ${TEST_IMAGE} (requires internal NGC org access)"
             echo "E2E=NOT_RUN" >> "$GITHUB_OUTPUT"
+            echo "REASON=could not pull the internal test image (requires internal NGC org access)" >> "$GITHUB_OUTPUT"
             echo "### ⚠️ MAIW pytest NOT RUN — could not pull the internal test image" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
@@ -584,6 +591,18 @@ jobs:
             echo "### ❌ MAIW pytest failed (exit code ${PYTEST_EXIT})" >> "$GITHUB_STEP_SUMMARY"
           fi
           exit "$PYTEST_EXIT"
+
+      # The job above passes when the suite is NOT RUN (deployment and
+      # readiness only). Publish the suite's own result as a separate commit
+      # check so a NOT RUN cannot hide behind the green deployment check.
+      - name: "Report MAIW pytest as a commit check"
+        if: always()
+        env:
+          E2E: ${{ steps.maiw_pytest.outputs.E2E }}
+          REASON: ${{ steps.maiw_pytest.outputs.REASON }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/ci/report_maiw_pytest_check.py
 
       - name: Upload MAIW pytest HTML report
         if: always()
@@ -629,7 +648,9 @@ jobs:
           password: ${{ secrets.SMTP_PASSWORD }}
           
           # Email details
-          subject: "QA Test Workflow Result for ${{ github.repository }}"
+          # Same prefix as before, with the result appended, so a NOT RUN is
+          # visible without opening the mail.
+          subject: "QA Test Workflow Result for ${{ github.repository }}: ${{ steps.set_result.outputs.RESULT }}"
           to: Github-Action-Blueprint-QA@nvidia.com
           from: github-workflow-notification@gmail.com
           html_body: |
