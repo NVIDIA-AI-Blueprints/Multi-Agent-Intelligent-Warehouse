@@ -236,7 +236,8 @@ class EnvironmentalSensorAdapter(BaseIoTAdapter):
                 scale = config.get('scale', 1.0)
                 unit = config.get('unit', '')
                 
-                result = self.modbus_client.read_holding_registers(address, count)
+                # pymodbus 3.x takes count by keyword only
+                result = self.modbus_client.read_holding_registers(address, count=count)
                 
                 if not result.isError():
                     raw_value = result.registers[0]
