@@ -57,6 +57,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pytest pytest-cov pytest-asyncio pytest-timeout black
+        pip install "cyclonedx-python-lib[json-validation]==11.12.0"  # SBOM validator tests
         pip install -e packages/maiw-mcp
         pip install -e packages/maiw-state
         pip install -e packages/maiw-decision
@@ -215,21 +216,71 @@ jobs:
         include:
           - image: backend
             dockerfile: Dockerfile.backend
+            sbom-min-components: 100
             build-args: ""
           - image: frontend
             dockerfile: Dockerfile.frontend
+            sbom-min-components: 20
             build-args: ""
           # The four MCP domain images differ only in the server code copied
           # in; their packages are identical.
           - image: mcp
             dockerfile: Dockerfile.mcp
+            sbom-min-components: 60
             build-args: "--build-arg MCP_DOMAIN=equipment"
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # release tag for the SBOM version
 
     - name: Build image
-      run: docker build --pull ${{ matrix.build-args }} -f ${{ matrix.dockerfile }} -t maiw-${{ matrix.image }}:scan .
+      run: |
+        docker build --pull ${{ matrix.build-args }} -f ${{ matrix.dockerfile }} -t maiw-${{ matrix.image }}:scan .
+        mkdir -p sbom
+
+    # CycloneDX SBOM of the image (docs/security/sbom-generation.md). The
+    # frontend job also covers the UI's production npm dependencies, which
+    # are compiled into its static bundle where an image scan cannot see them.
+    - name: Generate SBOM
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      with:
+        scan-type: 'image'
+        image-ref: 'maiw-${{ matrix.image }}:scan'
+        format: 'cyclonedx'
+        output: 'sbom/maiw-${{ matrix.image }}.cdx.json'
+
+    - name: Generate UI bundle SBOM
+      if: matrix.image == 'frontend'
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      with:
+        scan-type: 'fs'
+        scan-ref: 'src/ui/web/package-lock.json'
+        format: 'cyclonedx'
+        output: 'sbom/maiw-ui-bundle.cdx.json'
+        skip-setup-trivy: true
+
+    - name: Validate SBOM
+      run: |
+        python3 -m pip install --quiet "cyclonedx-python-lib[json-validation]==11.12.0"
+        version="$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || echo v0.0.0)"
+        version="${version#v}"
+        image_id="$(docker image inspect --format '{{.Id}}' maiw-${{ matrix.image }}:scan)"
+        python3 scripts/security/validate_sbom.py sbom/maiw-${{ matrix.image }}.cdx.json \
+          --artifact maiw-${{ matrix.image }} --git-sha "$GITHUB_SHA" --version "$version" \
+          --artifact-digest "$image_id" --min-components "${{ matrix.sbom-min-components }}"
+        if [ -f sbom/maiw-ui-bundle.cdx.json ]; then
+          python3 scripts/security/validate_sbom.py sbom/maiw-ui-bundle.cdx.json \
+            --artifact maiw-ui-bundle --git-sha "$GITHUB_SHA" --version "$version" --min-components 50
+        fi
+
+    - name: Upload SBOM
+      uses: actions/upload-artifact@v4
+      with:
+        name: sbom-${{ matrix.image }}
+        path: sbom/
+        if-no-files-found: error
+        retention-days: 90
 
     # Every severity, uploaded to code scanning under its own category.
     - name: Scan image

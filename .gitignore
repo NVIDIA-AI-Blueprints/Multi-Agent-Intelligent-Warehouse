@@ -25,6 +25,9 @@ share/python-wheels/
 *.egg
 MANIFEST
 
+# SBOMs written by scripts/security/generate_sbom.sh
+/sbom/
+
 # Virtual Environment
 .env
 .venv/
