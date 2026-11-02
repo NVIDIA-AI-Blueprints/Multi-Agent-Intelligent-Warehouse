@@ -186,3 +186,6 @@ test_*.py
 
 # Documentation - Internal analysis files
 UNNECESSARY_FILES.md
+
+# SonarQube scanner work directory (scripts/security/run_sonar_scan.sh)
+.scannerwork/

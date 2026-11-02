@@ -160,6 +160,9 @@ markers = [
 
 [tool.coverage.run]
 source = ["src", "apps", "packages"]
+# Paths relative to the repository root in coverage.xml, so SonarQube can map
+# the report produced by the CI/CD Pipeline (sonar-project.properties).
+relative_files = true
 omit = [
     "*/tests/*",
     "*/test_*",
