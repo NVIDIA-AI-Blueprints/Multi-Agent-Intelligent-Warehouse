@@ -1,3 +1,28 @@
+## Unreleased
+
+Changes on `main` since [v2.1.0](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/releases/tag/v2.1.0). They are not part of any release yet; v2.1.0 does not include them.
+
+### ⚠️ Behavior changes
+
+* api: `POST /api/v1/document/approve/{id}` and `/reject/{id}` are no longer mounted in the shipped app. They never recorded a decision or reached a WMS, and the legacy router now answers 501 ([#195](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/195))
+
+### Bug Fixes
+
+* iot: the MQTT equipment adapter works on paho-mqtt 2.x (it could not connect), and MQTT messages reach the monitoring callback ([#202](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/202))
+* iot: the Modbus environmental adapter reads registers on pymodbus 3.x (every read returned no readings) ([#216](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/216))
+* deploy: the MCP domain containers have a working healthcheck (MCP `initialize`; there is no `/health` route) ([#196](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/196))
+
+### CI and dependencies
+
+* CI measures coverage across `src`, `apps` and `packages` with a 48% floor. Trivy is pinned to a release commit, scans devDependencies, and fails on fixable CRITICAL findings ([#196](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/196), [#203](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/203))
+* Dependabot scans the UI (`src/ui/web`) and groups routine npm and Python updates ([#166](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/166), [#192](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/192), [#193](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/193), [#215](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/215))
+* Security updates in the UI and root lockfiles (follow-redirects, body-parser, fast-uri, postcss-selector-parser, handlebars, minimatch and others) ([#197](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/197)–[#201](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/201), [#203](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/203))
+* Python minimum versions raised to what CI and the images already install (aiohttp, Pillow, paho-mqtt, pymodbus, websockets, PyJWT and others); `uvicorn` is pinned at 0.54.0, the version the backend image already ran ([#167](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/167)–[#214](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/214))
+
+### Documentation
+
+* SECURITY.md states the supported deployment boundary: a single trusted host, with remote UI access through an SSH tunnel. The MCP domain servers are unauthenticated and must not be exposed; publishing the API behind an authenticating proxy is an operator-managed extension outside the tested configuration
+
 ## [2.1.0](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/compare/v2.0.1...v2.1.0) (2026-10-31)
 
 Validated code commit: `main` `c19f75f`. Changes since [v2.0.1](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/releases/tag/v2.0.1). Full notes: [RELEASE_NOTES_v2.1.0.md](RELEASE_NOTES_v2.1.0.md).
