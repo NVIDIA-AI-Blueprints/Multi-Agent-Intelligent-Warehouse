@@ -21,7 +21,10 @@
 # governed writes get 403 from the API by design (see setupProxy.js).
 
 ARG NODE_IMAGE=node:22.23.3-alpine3.24@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402
-ARG NGINX_IMAGE=nginxinc/nginx-unprivileged:1.30.5-alpine3.24@sha256:56b8272e43a0525f67aed68d1e0794a712d10e3e45a563e118e9a77c817e6f86
+# nginx comes from nginx.org's own Alpine repository, so `apk upgrade` below
+# does not update it: bump this image for nginx fixes. Dependabot does not
+# update ARG defaults; check with an image scan (docs/security/IMAGE_SCANNING.md).
+ARG NGINX_IMAGE=nginxinc/nginx-unprivileged:1.30.6-alpine3.24@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03
 
 # =============================================================================
 # Build stage (not shipped)

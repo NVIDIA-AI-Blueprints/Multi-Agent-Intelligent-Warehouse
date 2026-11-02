@@ -40,7 +40,6 @@ ormsgpack==1.11.0
 packaging==25.0
 paho-mqtt==2.1.0
 pandas==2.3.3
-passlib==1.7.4
 pillow==11.3.0
 prometheus_client==0.23.1
 propcache==0.4.1

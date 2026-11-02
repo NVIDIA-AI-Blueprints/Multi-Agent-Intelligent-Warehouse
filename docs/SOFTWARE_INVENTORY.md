@@ -2,7 +2,7 @@
 
 This document lists all third-party software packages used in this project, including their versions, licenses, authors, and sources.
 
-> **Dated snapshot** — generated on 2025-12-20 and not regenerated since (the generator script is no longer in the repository). Versions are the minimum versions declared at that time, with only the aiohttp, paho-mqtt and pymodbus floors and the PyMuPDF removal corrected since; the authoritative dependency lists are `requirements.txt`, `requirements.docker.txt`, `pyproject.toml`, `packages/*/pyproject.toml`, `apps/api/pyproject.toml`, the root `package.json` and `src/ui/web/package.json`.
+> **Dated snapshot** — generated on 2025-12-20 and not regenerated since (the generator script is no longer in the repository). Versions are the minimum versions declared at that time, with only the aiohttp, bcrypt, paho-mqtt and pymodbus floors and the PyMuPDF and passlib removals corrected since; the authoritative dependency lists are `requirements.txt`, `requirements.docker.txt`, `pyproject.toml`, `packages/*/pyproject.toml`, `apps/api/pyproject.toml`, the root `package.json` and `src/ui/web/package.json`.
 
 **Last Updated:** 2025-12-20
 
@@ -15,7 +15,7 @@ The snapshot was built from `requirements.txt`, `requirements.docker.txt`, `scri
 | aiohttp | 3.13.3 | Apache 2 | https://github.com/aio-libs/aiohttp | N/A | PyPI | pip | https://pypi.org/project/aiohttp/ |
 | asyncpg | 0.29.0 | Apache License, Version 2.0 | https://pypi.org/project/asyncpg/ | MagicStack Inc <hello@magic.io> | PyPI | pip | https://pypi.org/project/asyncpg/ |
 | bacpypes3 | 0.0.100 | MIT | https://github.com/JoelBender/bacpypes3 | Joel Bender <joel@carrickbender.com> | PyPI | pip | https://pypi.org/project/bacpypes3/ |
-| bcrypt | 4.0.0 | Apache License, Version 2.0 | https://github.com/pyca/bcrypt/ | The Python Cryptographic Authority developers <cryptography-dev@python.org> | PyPI | pip | https://pypi.org/project/bcrypt/ |
+| bcrypt | 5.0.0 | Apache License, Version 2.0 | https://github.com/pyca/bcrypt/ | The Python Cryptographic Authority developers <cryptography-dev@python.org> | PyPI | pip | https://pypi.org/project/bcrypt/ |
 | black | 23.0.0 | N/A | https://pypi.org/project/black/ | N/A | PyPI | pip | https://pypi.org/project/black/ |
 | click | 8.0.0 | BSD-3-Clause | https://palletsprojects.com/p/click/ | Armin Ronacher <armin.ronacher@active-4.com> | PyPI | pip | https://pypi.org/project/click/ |
 | email-validator | 2.0.0 | CC0 (copyright waived) | https://github.com/JoshData/python-email-validator | Joshua Tauberer <jt@occams.info> | PyPI | pip | https://pypi.org/project/email-validator/ |
@@ -33,7 +33,6 @@ The snapshot was built from `requirements.txt`, `requirements.docker.txt`, `scri
 | numpy | 1.24.0 | BSD-3-Clause | https://www.numpy.org | Travis E. Oliphant et al. | PyPI | pip | https://pypi.org/project/numpy/ |
 | paho-mqtt | 2.1.0 | Eclipse Public License v2.0 / Eclipse Distribution License v1.0 | http://eclipse.org/paho | Roger Light <roger@atchoo.org> | PyPI | pip | https://pypi.org/project/paho-mqtt/ |
 | pandas | 2.0.0 | MIT License | https://pypi.org/project/pandas/ | The Pandas Development Team <pandas-dev@python.org> | PyPI | pip | https://pypi.org/project/pandas/ |
-| passlib | 1.7.4 | BSD | https://passlib.readthedocs.io | Eli Collins <elic@assurancetechnologies.com> | PyPI | pip | https://pypi.org/project/passlib/ |
 | pillow | 10.3.0 | HPND | https://pypi.org/project/Pillow/ | "Jeffrey A. Clark" <aclark@aclark.net> | PyPI | pip | https://pypi.org/project/Pillow/ |
 | pre-commit | 3.4.0 | MIT | https://github.com/pre-commit/pre-commit | Anthony Sottile <asottile@umich.edu> | PyPI | pip | https://pypi.org/project/pre-commit/ |
 | prometheus-client | 0.19.0 | Apache Software License 2.0 | https://github.com/prometheus/client_python | Brian Brazil <brian.brazil@robustperception.io> | PyPI | pip | https://pypi.org/project/prometheus-client/ |
