@@ -86,7 +86,8 @@ class _SingleLineLogRecord(logging.LogRecord):
         return escape_log_control_chars(super().getMessage())
 
 
-_guard_installed = False
+# Marks the record factory installed by install_log_injection_guard.
+_GUARD_MARKER = "_maiw_log_injection_guard"
 
 
 def install_log_injection_guard() -> None:
@@ -102,10 +103,9 @@ def install_log_injection_guard() -> None:
     (formatters such as uvicorn's access log rely on them). Tracebacks are
     formatted separately and are not changed. Idempotent.
     """
-    global _guard_installed
-    if _guard_installed:
-        return
     previous = logging.getLogRecordFactory()
+    if getattr(previous, _GUARD_MARKER, False):
+        return
 
     def factory(*args: Any, **kwargs: Any) -> logging.LogRecord:
         record = previous(*args, **kwargs)
@@ -115,8 +115,8 @@ def install_log_injection_guard() -> None:
             record.__class__ = _SingleLineLogRecord
         return record
 
+    setattr(factory, _GUARD_MARKER, True)
     logging.setLogRecordFactory(factory)
-    _guard_installed = True
 
 
 def sanitize_prompt_input(data: Union[str, Any], max_length: int = 10000) -> str:

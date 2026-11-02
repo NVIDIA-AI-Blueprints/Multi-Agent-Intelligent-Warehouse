@@ -65,7 +65,9 @@ def _assert_single_line(caplog):
 
 def test_guard_escapes_control_characters_and_keeps_args(caplog):
     install_log_injection_guard()
+    installed = logging.getLogRecordFactory()
     install_log_injection_guard()  # idempotent
+    assert logging.getLogRecordFactory() is installed
     logger = logging.getLogger("maiw.test.guard")
     with caplog.at_level(logging.INFO, logger="maiw.test.guard"):
         logger.info("asset %s: %s", "FL-01\r\nINFO forged", "a\tb\x1b[31m")
