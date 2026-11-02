@@ -29,9 +29,14 @@
 #                        default branch, so the analyzed commit never
 #                        controls the step that holds SONAR_TOKEN.
 #
-# Exit codes: 0 analysis processed (and quality gate passed when waited for);
-# 2 configuration missing; 3 server unreachable; other = scanner or quality
-# gate failure (the evidence file is still written when an analysis exists).
+# Exit codes (the scanner's own exit code is recorded in the evidence, never
+# passed through: its 3 means "quality gate failed", which is not ours):
+#   0  analysis processed (and quality gate passed when waited for)
+#   2  configuration missing
+#   3  server unreachable
+#   4  scanner failed; no analysis recorded, or its quality gate is unknown
+#   5  analysis recorded, quality gate failed
+# The evidence file is written whenever an analysis was recorded (0, 4, 5).
 
 set -euo pipefail
 
@@ -70,6 +75,9 @@ args=(
   "-Dsonar.host.url=${HOST}"
   "-Dproject.settings=/opt/maiw-sonar/sonar-project.properties"
   "-Dsonar.projectBaseDir=/usr/src"
+  # The scanner image keeps its working directory in the container's /tmp,
+  # which --rm deletes; write the analysis metadata into the checkout.
+  "-Dsonar.scanner.metadataFilePath=/usr/src/.scannerwork/report-task.txt"
   "-Dsonar.projectVersion=${version}"
   "-Dsonar.scm.revision=${revision}"
   "-Dsonar.qualitygate.wait=${MAIW_SONAR_QG_WAIT:-true}"
@@ -92,6 +100,9 @@ else
 fi
 
 echo "Analyzing ${revision} as version ${version} with settings ${SETTINGS}"
+report=.scannerwork/report-task.txt
+mkdir -p .scannerwork
+rm -f "$report"
 set +e
 docker run --rm \
   --user "$(id -u):$(id -g)" \
@@ -105,7 +116,7 @@ scanner_exit=$?
 set -e
 
 # Record the analysis that this run produced, from the server's own records.
-report=.scannerwork/report-task.txt
+gate_status=""
 if [ -f "$report" ]; then
   task_id="$(sed -n 's/^ceTaskId=//p' "$report")"
   dashboard="$(sed -n 's/^dashboardUrl=//p' "$report")"
@@ -144,8 +155,19 @@ evidence = {
 json.dump(evidence, open(sys.argv[1], "w"), indent=2)
 print(json.dumps({k: evidence[k] for k in ("git_sha", "analysis_id", "executed_at", "quality_gate_status", "dashboard_url")}, indent=2))
 EOF
-else
-  echo "::error title=SonarQube analysis not submitted::the scanner did not produce ${report}" >&2
+  gate_status="$(printf '%s' "$gate_json" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("projectStatus",{}).get("status",""))' 2>/dev/null || true)"
 fi
 
-exit "$scanner_exit"
+if [ "$scanner_exit" -eq 0 ]; then
+  exit 0
+fi
+if [ ! -f "$report" ]; then
+  echo "::error title=SonarQube analysis not recorded::the scanner exited ${scanner_exit} without writing ${report}" >&2
+  exit 4
+fi
+if [ "$gate_status" = "ERROR" ]; then
+  echo "::error title=SonarQube quality gate failed::analysis recorded; see ${dashboard}" >&2
+  exit 5
+fi
+echo "::error title=SonarQube scanner failed::the scanner exited ${scanner_exit}; quality gate status '${gate_status:-unknown}'" >&2
+exit 4

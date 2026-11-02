@@ -66,6 +66,8 @@ The server is healthy: version 2026.3.1.123439 (`GET /api/server/version`), and 
 - `SONAR_TOKEN` is passed by name only, never on a command line.
 - `projectVersion` is the latest `v*` tag (2.1.0, not 1.0.0), and `sonar.scm.revision` is the commit.
 - `MAIW_SONAR_SOURCE_DIR` selects the checkout to analyze and `MAIW_SONAR_SETTINGS` the properties file; the scanner reads the settings file mounted read-only. Both default to the checkout the script lives in, so a manual run from the repository is unchanged.
+- It writes the analysis metadata (`report-task.txt`) into the checkout with `sonar.scanner.metadataFilePath`; the scanner image's own working directory is in the container's `/tmp` and is lost with `--rm`.
+- Exit codes: 0 processed (gate passed), 2 configuration missing, 3 server unreachable, 4 scanner failed (no analysis recorded, or gate unknown), 5 analysis recorded and quality gate failed. The scanner's own exit code is recorded in the evidence, never passed through (its 3 means "quality gate failed").
 - It handles branch and pull-request analysis, waits for the quality gate, and writes `maiw-sonar-evidence.json` with the server's analysis ID, timestamp and gate result.
 
 **`sonar-project.properties`:**
