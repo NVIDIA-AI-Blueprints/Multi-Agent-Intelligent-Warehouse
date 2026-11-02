@@ -16,7 +16,12 @@ ARG MCP_DOMAIN=inventory
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+# Debian security fixes published after the base image was built. No curl:
+# the Compose healthchecks use the Python standard library.
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install shared packages first (cacheable layer).  Every maiw_* package the
 # servers import at startup must be here: maiw_contracts (all domains) and
@@ -48,6 +53,11 @@ RUN pip install --no-cache-dir \
     "tiktoken>=0.7.0" \
     "redis>=4.0.0" \
     "aiohttp>=3.13.3"
+
+# Nothing installs packages at runtime. setuptools, wheel and pip only carry
+# vendored copies of other packages (setuptools' jaraco.context and wheel were
+# HIGH findings), so remove them, as Dockerfile.backend does for pip.
+RUN python -m pip uninstall -y setuptools wheel pip
 
 # Copy only the code paths the MCP servers need
 COPY src/retrieval ./src/retrieval

@@ -183,3 +183,82 @@ jobs:
         ignore-unfixed: true
         exit-code: '1'
         skip-setup-trivy: true
+
+  # =============================================================================
+  # Container image scanning
+  # =============================================================================
+  # The filesystem scan above reads lockfiles and requirements; it does not
+  # see what the shipped images contain (OS packages, base-image nginx,
+  # setuptools' vendored packages). Build the three images MAIW ships and scan
+  # them. Baseline and triage: docs/security/IMAGE_SCANNING.md.
+  image-scan:
+    name: Image Scan (${{ matrix.image }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: backend
+            dockerfile: Dockerfile.backend
+            build-args: ""
+          - image: frontend
+            dockerfile: Dockerfile.frontend
+            build-args: ""
+          # The four MCP domain images differ only in the server code copied
+          # in; their packages are identical.
+          - image: mcp
+            dockerfile: Dockerfile.mcp
+            build-args: "--build-arg MCP_DOMAIN=equipment"
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Build image
+      run: docker build --pull ${{ matrix.build-args }} -f ${{ matrix.dockerfile }} -t maiw-${{ matrix.image }}:scan .
+
+    # Every severity, uploaded to code scanning under its own category.
+    - name: Scan image
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      with:
+        scan-type: 'image'
+        image-ref: 'maiw-${{ matrix.image }}:scan'
+        scanners: 'vuln'
+        format: 'sarif'
+        output: 'trivy-image-${{ matrix.image }}.sarif'
+
+    - name: Upload image scan results
+      uses: github/codeql-action/upload-sarif@v4
+      with:
+        sarif_file: 'trivy-image-${{ matrix.image }}.sarif'
+        category: 'trivy-image-${{ matrix.image }}'
+
+    # Report fixable HIGH findings in the job log without failing: HIGH is not
+    # gated yet (see the baseline in docs/security/IMAGE_SCANNING.md).
+    - name: Fixable HIGH findings (report only)
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      with:
+        scan-type: 'image'
+        image-ref: 'maiw-${{ matrix.image }}:scan'
+        scanners: 'vuln'
+        format: 'table'
+        severity: 'HIGH'
+        ignore-unfixed: true
+        exit-code: '0'
+        skip-setup-trivy: true
+
+    # Same policy as the filesystem gate: fail on any fixable CRITICAL.
+    - name: Image gate (fixable CRITICAL)
+      uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      with:
+        scan-type: 'image'
+        image-ref: 'maiw-${{ matrix.image }}:scan'
+        scanners: 'vuln'
+        format: 'table'
+        severity: 'CRITICAL'
+        ignore-unfixed: true
+        exit-code: '1'
+        skip-setup-trivy: true
