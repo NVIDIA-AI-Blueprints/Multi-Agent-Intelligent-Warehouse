@@ -537,11 +537,14 @@ pip install -e packages/maiw-contracts -e packages/maiw-mcp -e packages/maiw-sta
     -e packages/maiw-execution -e packages/maiw-agents -e packages/maiw-world \
     -e apps/api
 
-# 3. Configure model endpoint
-cp .env.example .env
-# Set NVIDIA_API_KEY=nvapi-...
-# For a self-hosted NIM: set MAIW_NIM_BASE_URL (and MAIW_NIM_API_KEY if needed);
-#   it must serve the approved model ID of each enabled role (see .env.example)
+# 3. Configure the model endpoint: a .env with only the provider key.
+#    Do not copy .env.example for Demo Mode: it configures the reference
+#    deployment (MAIW_DEPLOYMENT_PROFILE=reference, MAIW_SANDBOX_MODE=required),
+#    which overrides MAIW_DEMO_MODE and keeps /api/v1/ready at 503 without a
+#    database and an OpenShell sandbox.
+echo 'NVIDIA_API_KEY=nvapi-...' > .env && chmod 600 .env
+# For a self-hosted NIM: also add MAIW_NIM_BASE_URL (and MAIW_NIM_API_KEY if
+#   needed); it must serve the approved model ID of each enabled role (see .env.example)
 
 # 4. Warehouse World (DataPack): the canonical pack is committed at
 #    data/worlds/dc47-demo-v1, so this step is optional. To regenerate it:
@@ -549,6 +552,7 @@ cp .env.example .env
 
 # 5. Start backend (development: in-memory procedure state, explicitly)
 MAIW_DEMO_MODE=true MAIW_PERSISTENCE_MODE=memory uvicorn maiw_api.app:app --reload --port 8001
+#    Ready when GET http://localhost:8001/api/v1/ready returns "status": "READY", "profile": "demo"
 
 # 6. Start frontend (in a second terminal; proxies /api to localhost:8001)
 cd src/ui/web && npm install && npm start
