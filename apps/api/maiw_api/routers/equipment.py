@@ -29,6 +29,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from maiw_api.dependencies import get_runtime
+from src.api.utils.log_utils import sanitize_log_data
 from maiw_api.write_auth import (
     TypedHTTPError,
     require_governed_writes_offered,
@@ -343,7 +344,7 @@ async def get_equipment_by_id(asset_id: str):
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error("Failed to get equipment %s: %s", asset_id, exc)
+        logger.error("Failed to get equipment %s: %s", sanitize_log_data(asset_id, max_length=64), exc)
         raise HTTPException(
             status_code=500, detail="Failed to retrieve equipment asset"
         )
@@ -378,7 +379,7 @@ async def get_equipment_telemetry(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error("Failed to get telemetry for %s: %s", asset_id, exc)
+        logger.error("Failed to get telemetry for %s: %s", sanitize_log_data(asset_id, max_length=64), exc)
         raise HTTPException(status_code=500, detail="Failed to retrieve telemetry data")
 
 
@@ -412,7 +413,7 @@ async def get_equipment_status(asset_id: str, runtime=Depends(get_runtime)):
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error("Failed to get equipment status for %s: %s", asset_id, exc)
+        logger.error("Failed to get equipment status for %s: %s", sanitize_log_data(asset_id, max_length=64), exc)
         raise HTTPException(
             status_code=500, detail="Failed to retrieve equipment status"
         )
@@ -598,7 +599,7 @@ async def assign_equipment(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error("Failed to propose assignment for %s: %s", request.asset_id, exc)
+        logger.error("Failed to propose assignment for %s: %s", sanitize_log_data(request.asset_id, max_length=64), exc)
         raise HTTPException(
             status_code=500, detail="Failed to process assignment proposal"
         )
@@ -657,7 +658,7 @@ async def release_equipment(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error("Failed to release equipment %s: %s", request.asset_id, exc)
+        logger.error("Failed to release equipment %s: %s", sanitize_log_data(request.asset_id, max_length=64), exc)
         raise HTTPException(status_code=500, detail="Failed to release equipment")
 
 
@@ -696,5 +697,5 @@ async def schedule_maintenance(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error("Failed to schedule maintenance for %s: %s", request.asset_id, exc)
+        logger.error("Failed to schedule maintenance for %s: %s", sanitize_log_data(request.asset_id, max_length=64), exc)
         raise HTTPException(status_code=500, detail="Failed to schedule maintenance")

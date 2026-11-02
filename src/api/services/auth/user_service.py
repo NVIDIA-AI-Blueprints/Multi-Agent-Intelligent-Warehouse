@@ -16,6 +16,7 @@
 from typing import Optional, List
 from datetime import datetime
 import logging
+from src.api.utils.log_utils import sanitize_log_data
 from src.retrieval.structured.sql_retriever import get_sql_retriever
 from .models import User, UserCreate, UserUpdate, UserInDB, UserRole, UserStatus
 from .jwt_handler import jwt_handler
@@ -148,7 +149,7 @@ class UserService:
                 last_login=result["last_login"],
             )
         except Exception as e:
-            logger.error(f"Failed to get user by username {username}: {e}")
+            logger.error("Failed to get user by username %s: %s", sanitize_log_data(username, max_length=64), e)
             return None
 
     async def get_user_by_email(self, email: str) -> Optional[User]:
@@ -183,7 +184,7 @@ class UserService:
         """Get user with hashed password for authentication."""
         try:
             if not self._initialized or not self.sql_retriever:
-                logger.error(f"User service not initialized when getting user for auth: username={username}")
+                logger.error("User service not initialized when getting user for auth: username=%s", sanitize_log_data(username, max_length=64))
                 await self.initialize()
             
             query = """
@@ -191,13 +192,13 @@ class UserService:
                 FROM users
                 WHERE username = $1
             """
-            logger.info(f"Fetching user for auth: username='{username}' (type: {type(username)}, len: {len(username)})")
+            logger.info("Fetching user for auth: username=%s", sanitize_log_data(username, max_length=64))
             result = await self.sql_retriever.fetch_one(query, username)
             logger.info(f"User fetch result: {result is not None}, result type: {type(result)}")
             if result:
                 logger.info(f"User found in DB: username='{result.get('username')}', status='{result.get('status')}'")
             else:
-                logger.warning(f"No user found for username='{username}'")
+                logger.warning("No user found for username=%s", sanitize_log_data(username, max_length=64))
 
             if not result:
                 return None
@@ -215,7 +216,7 @@ class UserService:
                 last_login=result["last_login"],
             )
         except Exception as e:
-            logger.error(f"Failed to get user for auth {username}: {e}")
+            logger.error("Failed to get user for auth %s: %s", sanitize_log_data(username, max_length=64), e)
             return None
 
     async def update_user(

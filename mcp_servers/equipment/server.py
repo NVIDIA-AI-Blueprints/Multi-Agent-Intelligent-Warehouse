@@ -387,6 +387,10 @@ async def warehouse_equipment_schedule_maintenance(
 
 if __name__ == "__main__":
     logging.basicConfig(level=os.getenv("MAIW_MCP_LOG_LEVEL", "INFO"))
+    # Tool arguments reach log calls: keep every log message on one line.
+    from src.api.utils.log_utils import install_log_injection_guard
+
+    install_log_injection_guard()
     # Compose the shipped PostgreSQL provider at startup (round 4); tests and
     # demo mode call configure_server() with their own provider instead.
     if _provider is None:

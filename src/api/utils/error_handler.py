@@ -27,6 +27,8 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 import os
 
+from .log_utils import sanitize_log_data
+
 logger = logging.getLogger(__name__)
 
 # Environment variable to control error detail level
@@ -52,7 +54,13 @@ def sanitize_error_message(error: Exception, operation: str = "Operation") -> st
     error_str = str(error)
     
     # Always log full error details server-side
-    logger.error(f"{operation} failed: {error_type}: {error_str}", exc_info=True)
+    logger.error(
+        "%s failed: %s: %s",
+        operation,
+        error_type,
+        sanitize_log_data(error_str, max_length=1000),
+        exc_info=True,
+    )
     
     # In production, return generic messages
     if not DEBUG_MODE:
@@ -141,8 +149,13 @@ async def handle_validation_error(
     Returns:
         JSONResponse with validation error details
     """
-    # Log full validation errors server-side
-    logger.warning(f"Validation error: {exc.errors()}")
+    # Log where and why validation failed, never the submitted values:
+    # pydantic's errors() carry the request body in "input" (a login request
+    # missing a field logged its password).
+    logger.warning(
+        "Validation error: %s",
+        sanitize_log_data(_json_safe_validation_errors(exc.errors()), max_length=2000),
+    )
     
     # In production, return generic message
     if not DEBUG_MODE:
@@ -193,7 +206,10 @@ async def handle_http_exception(request, exc: HTTPException) -> JSONResponse:
         JSONResponse with error information
     """
     # Log HTTP exceptions
-    logger.warning(f"HTTP {exc.status_code}: {exc.detail}")
+    # Details often embed path or query values (asset IDs, SKUs, policy IDs).
+    logger.warning(
+        "HTTP %s: %s", exc.status_code, sanitize_log_data(exc.detail, max_length=300)
+    )
     
     # Sanitize error message if needed
     message = exc.detail

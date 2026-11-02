@@ -180,6 +180,10 @@ async def warehouse_inventory_locate(
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    # Tool arguments reach log calls: keep every log message on one line.
+    from src.api.utils.log_utils import install_log_injection_guard
+
+    install_log_injection_guard()
     transport = os.getenv("MAIW_MCP_TRANSPORT", "stdio")
     port = int(os.getenv("MAIW_MCP_INVENTORY_PORT", "8765"))
     host = os.getenv("MAIW_MCP_INVENTORY_HOST", "0.0.0.0")
