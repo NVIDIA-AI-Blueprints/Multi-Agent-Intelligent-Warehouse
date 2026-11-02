@@ -56,7 +56,7 @@ If an update causes issues:
 3. Investigate the issue
 4. Create a proper fix or find an alternative ## Configuration Files ### Main Configuration
 - `.github/dependabot.yml` - Main Dependabot configuration ### Package Files Monitored
-- `pip` at `/` - root Python dependency files (`requirements.txt`, etc.)
+- `pip` at `/` - root Python dependency files (`requirements.txt`, etc.); minor and patch updates arrive bundled in one PR (group `python-minor-and-patch`), except the warehouse-integration libraries (`paho-mqtt`, `pymodbus`, `bacpypes3`, `pyserial`, `websockets`), which get individual PRs like major updates; at most 5 version-update PRs are open at once (security updates are not limited by this)
 - `npm` at `/src/ui/web` - UI dependencies (`src/ui/web/package.json`, `package-lock.json`); minor and patch updates arrive bundled in one PR (group `ui-minor-and-patch`), no version-update PRs for major versions (major upgrades are done deliberately; security updates are unaffected)
 - `docker` at `/` - root `Dockerfile*` base images
 - `github-actions` at `/` - `.github/workflows/*.yml`
