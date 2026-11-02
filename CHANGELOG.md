@@ -4,7 +4,7 @@ Changes on `main` since [v2.1.0](https://github.com/NVIDIA-AI-Blueprints/Multi-A
 
 ### ⚠️ Behavior changes
 
-* api: the API refuses POST/PUT/PATCH/DELETE requests whose `Origin` header is not in `CORS_ORIGINS` or the API's own loopback origin (403 `CROSS_ORIGIN_REQUEST_FORBIDDEN`). Requests without `Origin` (curl, scripts, MCP clients) are unchanged. A UI served from another origin, including an SSH tunnel to a different local port, needs that origin added to `CORS_ORIGINS`. A `*` entry widens CORS reads only and never admits writes ([#223](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/223))
+* api: the API refuses POST/PUT/PATCH/DELETE requests whose `Origin` header is not in `CORS_ORIGINS` or the API's own loopback origin (403 `CROSS_ORIGIN_REQUEST_FORBIDDEN`). Requests without `Origin` (curl, scripts, MCP clients) are unchanged. A UI served from another origin, including an SSH tunnel to a different local port, needs that origin added to `CORS_ORIGINS`. A `*` entry widens CORS reads only and never admits writes ([#223](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/223), [#224](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/224))
 * api: `POST /api/v1/document/approve/{id}` and `/reject/{id}` are no longer mounted in the shipped app. They never recorded a decision or reached a WMS, and the legacy router now answers 501 ([#195](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/195))
 
 ### Security
