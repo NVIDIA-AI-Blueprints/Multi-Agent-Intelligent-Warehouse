@@ -12,6 +12,19 @@ The candidate is a merged commit on `main` whose post-merge runs are green:
 - Multi-Agent-Intelligent-Warehouse deployment test, including the
   `E2E: MCP tool calls` and `E2E: durability across backend restart` steps.
 
+Then read the candidate's **MAIW internal pytest (NGC)** check: the
+deployment test posts it on the same commit.
+
+| Check result | Meaning |
+|---|---|
+| success, `PASSED` | The internal NGC UI suite (`pytest -m maiw`) ran and passed. |
+| failure, `FAILED` | The suite ran and failed. This is also the deployment test failing; the commit is not a candidate. |
+| neutral, `NOT RUN: <reason>` | The suite did not execute, for example because the internal test image could not be pulled. The deployment test is still green, but **only deployment and readiness were verified**. |
+
+A NOT RUN is not a pass. It does not block a release, but it must appear in
+the release notes as described in step 4. The result mail's subject carries
+the same result.
+
 ## 2. Preview the version (optional)
 
 Run the **Release preview** workflow (`.github/workflows/release.yml`) from
@@ -37,7 +50,25 @@ NOT RUN in the release notes; do not omit it.
 
 Release notes live in `RELEASE_NOTES_vX.Y.Z.md` with a matching
 `CHANGELOG.md` entry. In the notes, identify the validated code commit (the
-candidate from step 1) and the gate results. Remove the draft markers once
+candidate from step 1) and the gate results.
+
+Near the top of the notes, before the list of changes, include a validation
+table with one row for each item that was checked or could not be checked.
+The NGC suite row is required, and when the suite did not run it reads
+**NOT RUN** with the reason and the deployment-test run link. Never write
+"passed" or leave the row out:
+
+```markdown
+| Validation | Result |
+|---|---|
+| CI/CD Pipeline, CodeQL | PASS (`<sha>`) |
+| Deployment test (deploy, readiness, MCP tool calls, restart durability) | PASS ([run](<run url>)) |
+| Internal NGC MAIW pytest suite | **NOT RUN**: <reason> ([run](<run url>)) |
+| Release gate on the reference host | PASS |
+```
+
+The table goes into the GitHub release body too, because the release is
+published from this file. Remove the draft markers once
 publication is approved. The notes do not name the tagged commit: its SHA
 is not known until the notes PR merges.
 
