@@ -714,6 +714,13 @@ ssh -L 3001:127.0.0.1:3001 -L 8001:127.0.0.1:8001 <user>@<server>
 # then open http://localhost:3001 on your workstation
 ```
 
+Keep the local port numbers. The API refuses state-changing requests from a
+browser page whose origin is not in `CORS_ORIGINS` (by default `localhost` and
+`127.0.0.1` on ports 3000 and 3001), so other web pages open in the same
+browser cannot upload documents or send writes to it. If you tunnel the UI to
+a different local port, add that origin (for example `http://localhost:8080`)
+to `CORS_ORIGINS`.
+
 **To publish deliberately**, only behind your own authentication and TLS:
 
 - Development server: `HOST=0.0.0.0 npm start` (with

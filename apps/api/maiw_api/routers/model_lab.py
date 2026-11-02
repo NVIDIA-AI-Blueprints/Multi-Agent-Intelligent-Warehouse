@@ -122,8 +122,8 @@ def _load_artifact(run_id: str) -> dict[str, Any]:
         logger.error("Malformed artifact for run %s: %s", run_id, exc)
         raise HTTPException(
             status_code=500,
-            detail=f"Artifact for run '{run_id}' is malformed JSON: {exc}",
-        )
+            detail=f"Artifact for run '{run_id}' is malformed JSON; see the API log.",
+        ) from exc
 
 
 def _strip_secrets(obj: Any) -> Any:

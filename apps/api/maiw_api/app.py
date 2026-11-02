@@ -59,6 +59,7 @@ from fastapi.responses import JSONResponse
 
 from maiw_api.config import settings
 from maiw_api.lifespan import lifespan
+from maiw_api.origin_guard import CrossOriginWriteGuardMiddleware
 from maiw_api.request_size import RequestBodySizeLimitMiddleware
 from maiw_api.write_auth import TypedHTTPError
 
@@ -185,6 +186,11 @@ app.add_middleware(
     expose_headers=["*"],
     max_age=3600,
 )
+# CORS only stops other origins reading responses; a browser still sends their
+# simple POSTs (multipart, text/plain, no Content-Type). Refuse state-changing
+# requests whose Origin is not one of the same browser origins — see
+# maiw_api.origin_guard.
+app.add_middleware(CrossOriginWriteGuardMiddleware, allowed_origins=_cors_origins)
 
 _RATE_LIMIT_SKIP = frozenset(
     {
