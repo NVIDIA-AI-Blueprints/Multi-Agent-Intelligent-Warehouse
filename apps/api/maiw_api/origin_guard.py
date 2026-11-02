@@ -25,8 +25,12 @@ middleware refuses such a request with 403 before any route runs unless its
   127.0.0.1, so ``Origin`` and ``Host`` agree, but the host is not loopback.
 
 Requests without ``Origin`` (curl, scripts, MCP clients, server-side proxies)
-and safe methods pass unchanged. ``CORS_ORIGINS=*`` disables the guard, as it
-disables CORS.
+and safe methods pass unchanged. A ``*`` entry in ``CORS_ORIGINS`` applies to
+CORS (reading responses) only: this guard never treats it as "any origin may
+write", so writes still need an explicitly listed origin.
+
+This is a browser protection, not authentication: a client that sends no
+``Origin`` header, or forges one, is not a browser page and is not stopped.
 """
 
 from __future__ import annotations
@@ -100,12 +104,17 @@ class CrossOriginWriteGuardMiddleware:
     def __init__(self, app: ASGIApp, allowed_origins: Iterable[str]) -> None:
         self.app = app
         origins = {_normalize(o) for o in allowed_origins if o.strip()}
-        self.allow_any = "*" in origins
+        if "*" in origins:
+            logger.warning(
+                "CORS_ORIGINS contains '*': any origin may read API responses, "
+                "but state-changing browser requests are accepted only from "
+                "the origins listed explicitly (%s) and the API's own loopback "
+                "origin.",
+                ", ".join(sorted(origins - {"*"})) or "none",
+            )
         self.allowed_origins = frozenset(origins - {"*"})
 
     def allows(self, origin: str, host: str | None) -> bool:
-        if self.allow_any:
-            return True
         normalized = _normalize(origin)
         return normalized in self.allowed_origins or _is_loopback_self(
             normalized, host

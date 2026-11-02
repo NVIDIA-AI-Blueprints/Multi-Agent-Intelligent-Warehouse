@@ -200,9 +200,21 @@ async def test_operator_configured_origin_is_accepted():
     _assert_cross_origin_refused(default_ui)
 
 
-async def test_wildcard_cors_origins_disables_the_guard():
+async def test_wildcard_cors_origin_never_authorizes_writes(caplog):
+    # `*` may widen CORS reads; it must not reopen cross-origin writes.
+    app = _guarded_app(["*", "http://localhost:3001"])
+    _assert_cross_origin_refused(await _post_write(app, "http://evil.example"))
+    # Logged when the middleware stack is built (first request / startup).
+    assert "CORS_ORIGINS contains '*'" in caplog.text
+    _assert_cross_origin_refused(await _post_write(app, "null"))
+    assert (await _post_write(app, "http://localhost:3001")).status_code == 200
+
+
+async def test_wildcard_only_leaves_the_loopback_self_origin():
     app = _guarded_app(["*"])
-    assert (await _post_write(app, "http://evil.example")).status_code == 200
+    _assert_cross_origin_refused(await _post_write(app, "http://localhost:3001"))
+    # The test client's Host is localhost:8001: the API's own /docs origin.
+    assert (await _post_write(app, "http://localhost:8001")).status_code == 200
 
 
 async def test_cross_origin_json_without_content_type_is_refused(
