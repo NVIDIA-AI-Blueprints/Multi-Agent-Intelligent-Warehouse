@@ -4,13 +4,13 @@ Changes on `main` since [v2.1.0](https://github.com/NVIDIA-AI-Blueprints/Multi-A
 
 ### ⚠️ Behavior changes
 
-* api: the API refuses POST/PUT/PATCH/DELETE requests whose `Origin` header is not in `CORS_ORIGINS` or the API's own loopback origin (403 `CROSS_ORIGIN_REQUEST_FORBIDDEN`). Requests without `Origin` (curl, scripts, MCP clients) are unchanged. A UI served from another origin, including an SSH tunnel to a different local port, needs that origin added to `CORS_ORIGINS`
+* api: the API refuses POST/PUT/PATCH/DELETE requests whose `Origin` header is not in `CORS_ORIGINS` or the API's own loopback origin (403 `CROSS_ORIGIN_REQUEST_FORBIDDEN`). Requests without `Origin` (curl, scripts, MCP clients) are unchanged. A UI served from another origin, including an SSH tunnel to a different local port, needs that origin added to `CORS_ORIGINS` ([#223](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/223))
 * api: `POST /api/v1/document/approve/{id}` and `/reject/{id}` are no longer mounted in the shipped app. They never recorded a decision or reached a WMS, and the legacy router now answers 501 ([#195](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/195))
 
 ### Security
 
-* api: a web page on another origin, opened in a browser on the host, could upload a document (starting the document pipeline and its model calls) and send other simple cross-origin POSTs; CORS only hid the response. Through `npm start` with `MAIW_UI_OPERATOR_WRITE_TOKEN` set, such a request to an equipment write route also carried the operator credential, added by the dev proxy, and passed operator authentication (the DecisionEngine still governed it). These requests are now refused before any route runs
-* api: the Copilot turn route and other shipped 5xx responses no longer return raw exception text (which could include connection strings or hosts); it is logged instead
+* api: a web page on another origin, opened in a browser on the host, could upload a document (starting the document pipeline and its model calls) and send other simple cross-origin POSTs; CORS only hid the response. Through `npm start` with `MAIW_UI_OPERATOR_WRITE_TOKEN` set, such a request to an equipment write route also carried the operator credential, added by the dev proxy, and passed operator authentication (the DecisionEngine still governed it). These requests are now refused before any route runs ([#223](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/223))
+* api: the Copilot turn route and other shipped 5xx responses no longer return raw exception text (which could include connection strings or hosts); it is logged instead ([#223](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/223))
 
 ### Bug Fixes
 
