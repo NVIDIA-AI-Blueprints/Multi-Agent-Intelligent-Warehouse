@@ -2,7 +2,7 @@
 
 This document lists all third-party software packages used in this project, including their versions, licenses, authors, and sources.
 
-> **Dated snapshot** — generated on 2025-12-20 and not regenerated since (the generator script is no longer in the repository). Versions are the minimum versions declared at that time, with only the aiohttp, bcrypt, paho-mqtt and pymodbus floors and the PyMuPDF and passlib removals corrected since; the authoritative dependency lists are `requirements.txt`, `requirements.docker.txt`, `pyproject.toml`, `packages/*/pyproject.toml`, `apps/api/pyproject.toml`, the root `package.json` and `src/ui/web/package.json`.
+> **Dated snapshot** — generated on 2025-12-20 and not regenerated since (the generator script is no longer in the repository). Versions are the minimum versions declared at that time, with only the aiohttp, bcrypt, paho-mqtt and pymodbus floors and the PyMuPDF, passlib and langchain removals corrected since; the authoritative dependency lists are `requirements.txt`, `requirements.docker.txt`, `pyproject.toml`, `packages/*/pyproject.toml`, `apps/api/pyproject.toml`, the root `package.json` and `src/ui/web/package.json`.
 
 **Last Updated:** 2025-12-20
 
@@ -12,7 +12,7 @@ The snapshot was built from `requirements.txt`, `requirements.docker.txt`, `scri
 
 | Package Name | Version | License | License URL | Author | Source | Distribution Method | Download Location |
 |--------------|---------|---------|-------------|--------|--------|---------------------|-------------------|
-| aiohttp | 3.13.3 | Apache 2 | https://github.com/aio-libs/aiohttp | N/A | PyPI | pip | https://pypi.org/project/aiohttp/ |
+| aiohttp | 3.14.5 | Apache 2 | https://github.com/aio-libs/aiohttp | N/A | PyPI | pip | https://pypi.org/project/aiohttp/ |
 | asyncpg | 0.29.0 | Apache License, Version 2.0 | https://pypi.org/project/asyncpg/ | MagicStack Inc <hello@magic.io> | PyPI | pip | https://pypi.org/project/asyncpg/ |
 | bacpypes3 | 0.0.100 | MIT | https://github.com/JoelBender/bacpypes3 | Joel Bender <joel@carrickbender.com> | PyPI | pip | https://pypi.org/project/bacpypes3/ |
 | bcrypt | 5.0.0 | Apache License, Version 2.0 | https://github.com/pyca/bcrypt/ | The Python Cryptographic Authority developers <cryptography-dev@python.org> | PyPI | pip | https://pypi.org/project/bcrypt/ |
@@ -24,7 +24,6 @@ The snapshot was built from `requirements.txt`, `requirements.docker.txt`, `scri
 | flake8 | 6.0.0 | MIT | https://github.com/pycqa/flake8 | Tarek Ziade <tarek@ziade.org> | PyPI | pip | https://pypi.org/project/flake8/ |
 | httpx | 0.27.0 | BSD License | https://pypi.org/project/httpx/ | Tom Christie <tom@tomchristie.com> | PyPI | pip | https://pypi.org/project/httpx/ |
 | isort | 5.12.0 | MIT | https://pycqa.github.io/isort/ | Timothy Crosley <timothy.crosley@gmail.com> | PyPI | pip | https://pypi.org/project/isort/ |
-| langchain | 0.1.0 | MIT | https://github.com/langchain-ai/langchain | N/A | PyPI | pip | https://pypi.org/project/langchain/ |
 | langchain-core | 1.2.6 | MIT | https://pypi.org/project/langchain-core/ | N/A | PyPI | pip | https://pypi.org/project/langchain-core/ |
 | langgraph | 1.0.5 | MIT | https://www.github.com/langchain-ai/langgraph | N/A | PyPI | pip | https://pypi.org/project/langgraph/ |
 | loguru | 0.7.0 | MIT license | https://github.com/Delgan/loguru | Delgan <delgan.py@gmail.com> | PyPI | pip | https://pypi.org/project/loguru/ |
