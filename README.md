@@ -552,7 +552,7 @@ echo 'NVIDIA_API_KEY=nvapi-...' > .env && chmod 600 .env
 
 # 5. Start backend (development: in-memory procedure state, explicitly)
 MAIW_DEMO_MODE=true MAIW_PERSISTENCE_MODE=memory uvicorn maiw_api.app:app --reload --port 8001
-#    Ready when GET http://localhost:8001/api/v1/ready returns "status": "READY", "profile": "demo"
+#    Ready when GET /api/v1/ready on port 8001 returns "status": "READY", "profile": "demo"
 
 # 6. Start frontend (in a second terminal; proxies /api to localhost:8001)
 cd src/ui/web && npm install && npm start
