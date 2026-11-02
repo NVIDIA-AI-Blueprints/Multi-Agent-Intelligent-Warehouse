@@ -63,7 +63,8 @@ class AllSKUForecastingEngine:
             'Linear Regression': LinearRegression(),
             # Note: Ridge is deterministic but random_state is included for consistency and SonarQube compliance
             'Ridge Regression': Ridge(alpha=1.0, random_state=42),
-            'Support Vector Regression': SVR(kernel='rbf', C=1.0, gamma='scale', random_state=42)
+            # SVR has no random_state parameter (libsvm's SVR fit is deterministic), so none is passed
+            'Support Vector Regression': SVR(kernel='rbf', C=1.0, gamma='scale')
         }
         
         # Try to import XGBoost
