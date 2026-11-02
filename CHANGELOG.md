@@ -21,7 +21,7 @@ Changes on `main` since [v2.1.0](https://github.com/NVIDIA-AI-Blueprints/Multi-A
 
 ### Documentation
 
-* SECURITY.md states the supported deployment boundary: a single trusted host or internal network, with the MCP domain servers unauthenticated and never exposed
+* SECURITY.md states the supported deployment boundary: a single trusted host, with remote UI access through an SSH tunnel. The MCP domain servers are unauthenticated and must not be exposed; publishing the API behind an authenticating proxy is an operator-managed extension outside the tested configuration
 
 ## [2.1.0](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/compare/v2.0.1...v2.1.0) (2026-10-31)
 
