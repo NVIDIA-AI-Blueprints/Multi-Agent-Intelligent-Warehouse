@@ -47,9 +47,10 @@ def _get_controller():
 
         return get_demo_controller()
     except Exception as exc:
+        logger.warning("Demo controller unavailable: %s", exc)
         raise HTTPException(
             status_code=503,
-            detail=f"Demo mode not active: {exc}",
+            detail="Demo mode not active (MAIW_DEMO_MODE=true required); see the API log.",
         ) from exc
 
 
@@ -335,8 +336,9 @@ async def analyze_disruption():
 
         runtime = await get_runtime()
     except Exception as exc:
+        logger.exception("MAIW runtime unavailable")
         raise HTTPException(
-            status_code=503, detail=f"Runtime unavailable: {exc}"
+            status_code=503, detail="Runtime unavailable; see the API log."
         ) from exc
 
     if runtime.state_provider is None:
@@ -395,8 +397,9 @@ async def analyze_disruption():
     except Exception as exc:
         await bus.publish_observe("State assembly failed", str(exc), trace_id=trace_id)
         _raise_typed_http(exc, "state assembly")
+        logger.exception("State assembly failed (trace_id=%s)", trace_id)
         raise HTTPException(
-            status_code=500, detail=f"State assembly failed: {exc}"
+            status_code=500, detail="State assembly failed; see the API log."
         ) from exc
 
     lifecycle.append(
@@ -443,8 +446,9 @@ async def analyze_disruption():
         )
     except Exception as exc:
         _raise_typed_http(exc, "agent analysis")
+        logger.exception("Agent analysis failed (trace_id=%s)", trace_id)
         raise HTTPException(
-            status_code=500, detail=f"Agent analysis failed: {exc}"
+            status_code=500, detail="Agent analysis failed; see the API log."
         ) from exc
 
     lifecycle.append(
@@ -1142,8 +1146,9 @@ async def approve_proposal(request: ApproveRequest):
 
         runtime = await get_runtime()
     except Exception as exc:
+        logger.exception("MAIW runtime unavailable")
         raise HTTPException(
-            status_code=503, detail=f"Runtime unavailable: {exc}"
+            status_code=503, detail="Runtime unavailable; see the API log."
         ) from exc
 
     trace_id = pending["trace_id"]
@@ -1179,8 +1184,9 @@ async def approve_proposal(request: ApproveRequest):
     try:
         proposal = ActionProposal.model_validate(proposal_data)
     except Exception as exc:
+        logger.exception("Failed to restore proposal (trace_id=%s)", trace_id)
         raise HTTPException(
-            status_code=500, detail=f"Failed to restore proposal: {exc}"
+            status_code=500, detail="Failed to restore proposal; see the API log."
         ) from exc
 
     # Fetch fresh state snapshot
@@ -1195,8 +1201,9 @@ async def approve_proposal(request: ApproveRequest):
         )
         fresh_snapshot = WarehouseStateSnapshot.seal(fresh_state)
     except Exception as exc:
+        logger.exception("State unavailable (trace_id=%s)", trace_id)
         raise HTTPException(
-            status_code=503, detail=f"State unavailable: {exc}"
+            status_code=503, detail="State unavailable; see the API log."
         ) from exc
 
     # Authorize with approval evidence (decision_id binding enforced)
@@ -1448,8 +1455,9 @@ async def reconcile_execution(request: ReconcileRequest):
 
         runtime = await get_runtime()
     except Exception as exc:
+        logger.exception("MAIW runtime unavailable")
         raise HTTPException(
-            status_code=503, detail=f"Runtime unavailable: {exc}"
+            status_code=503, detail="Runtime unavailable; see the API log."
         ) from exc
 
     # Resolve registry for the requested domain
@@ -1495,8 +1503,9 @@ async def reconcile_execution(request: ReconcileRequest):
         )
     except Exception as exc:
         _raise_typed_http(exc, "reconciliation")
+        logger.exception("Reconciliation failed (trace_id=%s)", trace_id)
         raise HTTPException(
-            status_code=500, detail=f"Reconciliation failed: {exc}"
+            status_code=500, detail="Reconciliation failed; see the API log."
         ) from exc
     registry.set_reconciliation(request.execution_id, reconciliation_record)
 

@@ -274,11 +274,11 @@ async def get_equipment_assignments(
             for r in rows
         ]
     except Exception as exc:
-        logger.error("Failed to list equipment assignments: %s", exc)
+        logger.exception("Failed to list equipment assignments")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to retrieve equipment assignments: {exc}",
-        )
+            detail="Failed to retrieve equipment assignments; see the API log.",
+        ) from exc
 
 
 @router.get("/equipment/maintenance/schedule", response_model=List[MaintenanceRecord])
