@@ -52,7 +52,7 @@ RUN pip install --no-cache-dir \
     "pymilvus>=2.3.0" \
     "tiktoken>=0.7.0" \
     "redis>=4.0.0" \
-    "aiohttp>=3.13.3"
+    "aiohttp>=3.14.5"
 
 # Nothing installs packages at runtime. setuptools, wheel and pip only carry
 # vendored copies of other packages (setuptools' jaraco.context and wheel were
