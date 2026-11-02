@@ -45,10 +45,14 @@ async def get_mcp_status(runtime=Depends(get_runtime)):
             "protocol": "MCP 2026-07-28",
             "client_ready": true,
             "domains": {
-                "inventory":  { "available": true,  "url": "http://..." },
-                "equipment":  { "available": false, "url": null },
-                "labor":      { "available": false, "url": null },
-                "wave":       { "available": false, "url": null },
+                "inventory":  { "available": true,  "transport": "url",
+                                "url": "http://..." },
+                "equipment":  { "available": true,  "transport": "in-memory",
+                                "url": null },
+                "labor":      { "available": false, "transport": null,
+                                "url": null },
+                "wave":       { "available": false, "transport": null,
+                                "url": null },
             },
             "registered_capabilities": ["warehouse.inventory.get", ...],
         }
@@ -62,37 +66,40 @@ async def get_mcp_status(runtime=Depends(get_runtime)):
         except Exception:
             pass
 
-    def _url_for(domain: str) -> str | None:
-        if registry is None:
-            return None
-        for cap in capabilities:
-            if cap.startswith(f"warehouse.{domain}."):
-                try:
-                    return registry.resolve(cap)
-                except Exception:
-                    pass
-        return None
+    endpoints = getattr(runtime, "mcp_domain_endpoints", None)
+    if not isinstance(endpoints, dict):
+        endpoints = {}
+
+    def _domain(domain: str) -> Dict[str, Any]:
+        # Transport is reported as /api/v1/ready's mcp_domains does: "url" for
+        # HTTP servers, "in-memory" for the in-process MCPServer instances
+        # Demo Mode registers.  Only a URL string is ever returned as "url" —
+        # registry.resolve() yields an MCPServer object for in-memory domains.
+        transport, url = endpoints.get(domain, (None, None))
+        if transport is None and registry is not None:
+            for cap in capabilities:
+                if cap.startswith(f"warehouse.{domain}."):
+                    try:
+                        target = registry.resolve(cap)
+                    except Exception:
+                        continue
+                    if isinstance(target, str):
+                        transport, url = "url", target
+                    else:
+                        transport = "in-memory"
+                    break
+        return {
+            "available": getattr(runtime, f"mcp_{domain}_available", False),
+            "transport": transport,
+            "url": url if transport == "url" and isinstance(url, str) else None,
+        }
 
     return {
         "protocol": "MCP 2026-07-28",
         "client_ready": runtime.mcp_client is not None,
         "domains": {
-            "inventory": {
-                "available": runtime.mcp_inventory_available,
-                "url": _url_for("inventory"),
-            },
-            "equipment": {
-                "available": runtime.mcp_equipment_available,
-                "url": _url_for("equipment"),
-            },
-            "labor": {
-                "available": runtime.mcp_labor_available,
-                "url": _url_for("labor"),
-            },
-            "wave": {
-                "available": runtime.mcp_wave_available,
-                "url": _url_for("wave"),
-            },
+            domain: _domain(domain)
+            for domain in ("inventory", "equipment", "labor", "wave")
         },
         "registered_capabilities": capabilities,
     }
