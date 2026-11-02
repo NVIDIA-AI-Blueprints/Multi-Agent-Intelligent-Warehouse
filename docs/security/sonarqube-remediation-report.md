@@ -4,9 +4,45 @@
 |---|---|
 | **Analysis triaged** | SonarQube project `TEGRASW_Blueprints-SRE_warehouse-operational-assistant_Multi-Agent-Intelligent-Warehouse`, last analysis **2026-01-05 22:01 UTC of `4df9a41`** (scope `src/` only). Read through the anonymous web API on 2026-11-02. |
 | **Code triaged** | `main` at `0fbcb69` (after v2.1.0, `2fdd9fe`) |
-| **Fresh analysis** | **Not yet available.** The scanner workflow is restored in #226, but a run needs an NVIDIA-network runner and an authorized token (see `sonarqube-root-cause-analysis.md`). The dispositions below are engineering dispositions. They must be confirmed against the first fresh analysis and recorded in SonarQube by a project administrator. |
+| **Fresh analysis** | **Available since 2026-11-02**, for `0ee535a` with the full source scope: see [Fresh analysis](#fresh-analysis-of-0ee535a-2026-11-02) below. It was run manually from an NVIDIA-network host, because CI still has no NVIDIA-network runner. The sections after it are the original triage of the January analysis. Their dispositions are engineering dispositions; they must be confirmed against the fresh analysis and recorded in SonarQube by a project administrator. |
 
-**Method:**
+## Fresh analysis of `0ee535a` (2026-11-02)
+
+| | |
+|---|---|
+| **Analyses** | `7e92b2b1-c11b-46f4-8125-68b8276cef69` (20:05 UTC) and `71633f76-f495-4848-bc6c-15ccb891629f` (20:32 UTC, run with the fixed script from #237); both of `main` at `0ee535a`, version 2.1.0 |
+| **Scope** | `src`, `apps`, `packages`, `mcp_servers`, `integrations`, `scripts` and the Dockerfiles (690 main files, 14,346 lines of code); the January analysis covered `src/` only |
+| **Quality gate** | **ERROR** |
+| **What it is** | A triage list. It is not a measurement of a release candidate: `af4c257` and later commits need their own analysis (`docs/operations/RELEASING.md`, step 3). Many findings come from code scanned for the first time, not from new defects. |
+
+| Gate condition | Fails when | Actual | Status |
+|---|---|---|---|
+| Coverage | < 0% | 34.6% | OK |
+| Coverage on new code | < 0% | 56.3% | OK |
+| Blocker issues | > 0 | 16 | ERROR |
+| Blocker issues on new code | > 0 | 10 | ERROR |
+| High issues | > 0 | 1,870 | ERROR |
+| High issues on new code | > 0 | 392 | ERROR |
+| New security hotspots reviewed | < 100% | 0% | ERROR |
+
+**Blocker issues (16), not yet triaged:**
+
+| Rule | Location | Message |
+|---|---|---|
+| `python:S8414` | `apps/api/maiw_api/app.py:185` | Add CORSMiddleware last in the middleware chain. |
+| `pythonsecurity:S2083` | `packages/maiw-models/maiw_models/eval/__main__.py:347` | Path constructed from user-controlled data. |
+| `python:S930` ×3 | `packages/maiw-skills/maiw_skills/labor/skills.py:170, 187, 214` | `register` called with 1 positional argument; it expects 2. |
+| `python:S930` ×3 | `packages/maiw-skills/maiw_skills/wave/skills.py:157, 174, 201` | Same. |
+| `python:S3516` ×7 | `scripts/ci/report_maiw_pytest_check.py:83`; `src/adapters/iot/environmental.py:406`; `src/adapters/iot/equipment_monitor.py:402`; `src/adapters/iot/safety_sensors.py:412, 431`; `src/api/routers/chat.py:408`; `src/api/services/evidence/evidence_collector.py:581` | Method always returns the same value. |
+| `typescript:S2699` | `src/ui/web/src/__tests__/reliability/ExecutionOutcomeBadge.test.tsx:52` | Test case without an assertion. |
+
+**Security hotspots to review (151):** weak cryptography 107, encrypt data 28, others 15, denial of service 1.
+
+**High issues (1,870):** concentrated in a few maintainability rules: `python:S8572` 1,026 (`logging.exception()` instead of `logging.error()` in exception handlers), `python:S8415` 271 (HTTPException responses not documented in endpoint metadata), `python:S3776` 189 (cognitive complexity), `python:S6903` 133 (timezone-aware `datetime`), `python:S1192` 86, `shelldre:S7688` 75.
+
+**Next:** fix confirmed defects (the blockers first), review the new hotspots, and get an explicit Blueprints SRE disposition for legacy findings. Do not bulk-edit the high issues only to lower the count.
+
+**Method (January triage below):**
 - Each finding's source-to-sink flow, from the SonarQube API, was matched to current code by content, not by line number.
 - For each one, I checked whether it is reachable in the shipped app (`maiw_api.app:app`): which routers are mounted, and which `route_policy` views drop which methods.
 - Suspected log-forging sinks were probed by sending CR/LF payloads through the app's test client.
