@@ -1,13 +1,29 @@
 name: "CodeQL Security Analysis"
 
+# Security code scanning (security-and-quality queries) uploaded to GitHub
+# code scanning. The push, pull_request and weekly triggers were removed in
+# #71 (2026-08-20), so main had no CodeQL security analysis after 2026-08-17;
+# see docs/security/sonarqube-root-cause-analysis.md. The "Analyze (...)"
+# checks from GitHub Code Quality are a separate product and do not upload
+# security alerts.
 on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 2 * * 1'  # weekly, Monday 02:00 UTC: new queries on unchanged code
   workflow_dispatch:
 
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   analyze:
-    name: Analyze
+    name: CodeQL
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       actions: read
       contents: read

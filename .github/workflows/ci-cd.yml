@@ -127,6 +127,16 @@ jobs:
         # Coverage disabled: babel-plugin-istanbul + test-exclude breaks under current Jest/Node (see package upgrades backlog).
         npm test -- --watchAll=false
     
+    # Consumed by the SonarQube Analysis workflow (.github/workflows/sonarqube.yml),
+    # which runs after this workflow and analyzes the same commit.
+    - name: Upload coverage for SonarQube
+      uses: actions/upload-artifact@v4
+      with:
+        name: sonar-coverage
+        path: coverage.xml
+        if-no-files-found: error
+        retention-days: 7
+
     - name: Upload coverage reports
       uses: codecov/codecov-action@v3
       with:
