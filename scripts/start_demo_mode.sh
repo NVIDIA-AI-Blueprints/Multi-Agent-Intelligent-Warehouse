@@ -2,10 +2,24 @@
 # Start the MAIW API in Synthetic Demo Mode.
 #
 # Usage:
-#   ./scripts/start_demo_mode.sh          # runs on port 8001
-#   DEMO_PORT=8003 ./scripts/start_demo_mode.sh  # runs on alternate port
+#   ./scripts/start_demo_mode.sh                     # 127.0.0.1:8001
+#   DEMO_PORT=8003 ./scripts/start_demo_mode.sh      # alternate port
+#   DEMO_HOST=0.0.0.0 ./scripts/start_demo_mode.sh   # all interfaces (see SECURITY.md)
+#   DEMO_PERSISTENCE_ROOT=$HOME/.maiw-demo ./scripts/start_demo_mode.sh
+#                                                    # durable procedure state
+#   DEMO_PYTHON=/path/to/python ./scripts/start_demo_mode.sh
+#                                                    # interpreter (default: .venv, then env)
 #
 # MCP servers are NOT required — demo mode uses SimulationProviders internally.
+#
+# .env is loaded with scripts/lib/load_env.sh (parsed, not executed; variables
+# already set in the shell win).  The demo profile is then forced, so a .env
+# copied from .env.example (MAIW_DEPLOYMENT_PROFILE=reference,
+# MAIW_SANDBOX_MODE=required, MAIW_PERSISTENCE_ROOT=/var/lib/maiw,
+# MAIW_API_HOST=0.0.0.0) still starts a READY demo API:
+#   MAIW_DEMO_MODE=true  MAIW_DEPLOYMENT_PROFILE=demo  MAIW_SANDBOX_MODE=disabled
+#   MAIW_READINESS_REQUIRE_DATABASE=false
+#   MAIW_PERSISTENCE_MODE=memory, unless DEMO_PERSISTENCE_ROOT is set
 #
 # To stop: Ctrl-C
 #
@@ -15,9 +29,18 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VENV="${REPO_ROOT}/env/bin/python"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+DEMO_HOST="${DEMO_HOST:-127.0.0.1}"
 DEMO_PORT="${DEMO_PORT:-8001}"
+
+if [[ -n "${DEMO_PYTHON:-}" ]]; then
+    VENV="${DEMO_PYTHON}"
+elif [[ -x "${REPO_ROOT}/.venv/bin/python" ]]; then
+    VENV="${REPO_ROOT}/.venv/bin/python"
+else
+    VENV="${REPO_ROOT}/env/bin/python"
+fi
 
 # ── DataPack preflight ───────────────────────────────────────────────────────
 
@@ -36,20 +59,21 @@ fi
 
 if [ ! -x "${VENV}" ]; then
     echo ""
-    echo "[!!] Virtual environment not found at env/"
-    echo "     Run: python3 -m venv env && source env/bin/activate"
+    echo "[!!] Python interpreter not found (looked for .venv/ and env/; or set DEMO_PYTHON)"
+    echo "     Run: python3 -m venv .venv && source .venv/bin/activate"
     echo "          pip install -r requirements.txt"
-    echo "          pip install -e packages/maiw-models packages/maiw-mcp packages/maiw-state"
-    echo "          pip install -e packages/maiw-skills packages/maiw-decision packages/maiw-execution"
-    echo "          pip install -e packages/maiw-agents apps/api"
+    echo "          pip install -e packages/maiw-contracts -e packages/maiw-mcp -e packages/maiw-state \\"
+    echo "              -e packages/maiw-models -e packages/maiw-skills -e packages/maiw-decision \\"
+    echo "              -e packages/maiw-execution -e packages/maiw-agents -e packages/maiw-world \\"
+    echo "              -e apps/api"
     echo ""
     exit 1
 fi
 
 if ! "${VENV}" -c "import maiw_api" &>/dev/null; then
     echo ""
-    echo "[!!] maiw_api package not importable from env/"
-    echo "     Run: source env/bin/activate && pip install -e apps/api"
+    echo "[!!] maiw_api package not importable from ${VENV}"
+    echo "     Run: pip install -e apps/api (in that environment)"
     echo ""
     exit 1
 fi
@@ -65,9 +89,33 @@ fi
 
 # ── Load .env if present ─────────────────────────────────────────────────────
 
-ENV_FILE="${REPO_ROOT}/.env"
-if [ -f "${ENV_FILE}" ]; then
-    set -a; source "${ENV_FILE}"; set +a
+# shellcheck source=lib/load_env.sh
+source "${SCRIPT_DIR}/lib/load_env.sh"
+maiw_load_env "${REPO_ROOT}"
+
+# ── Force the demo profile ───────────────────────────────────────────────────
+
+# An explicit MAIW_DEPLOYMENT_PROFILE beats MAIW_DEMO_MODE, and .env.example
+# selects the reference profile with a required sandbox, so set all of them.
+export MAIW_DEMO_MODE=true
+export MAIW_DEPLOYMENT_PROFILE=demo
+export MAIW_SANDBOX_MODE=disabled
+export MAIW_READINESS_REQUIRE_DATABASE=false
+
+# Development server: in-memory procedure state (lost on restart) unless the
+# caller opts into a durable root.  MAIW_PERSISTENCE_ROOT from .env is not an
+# opt-in: .env.example points it at /var/lib/maiw, the reference deployment's
+# root.  The reference deployment (scripts/start_reference_deployment.sh) is
+# file-backed.
+unset MAIW_PROCEDURE_STATE_DIR MAIW_GOVERNANCE_STATE_DIR MAIW_EXECUTION_STATE_DIR
+if [[ -n "${DEMO_PERSISTENCE_ROOT:-}" ]]; then
+    export MAIW_PERSISTENCE_MODE=file
+    export MAIW_PERSISTENCE_ROOT="${DEMO_PERSISTENCE_ROOT}"
+    PERSISTENCE_SUMMARY="file (${MAIW_PERSISTENCE_ROOT})"
+else
+    export MAIW_PERSISTENCE_MODE=memory
+    unset MAIW_PERSISTENCE_ROOT
+    PERSISTENCE_SUMMARY="memory (lost on restart; set DEMO_PERSISTENCE_ROOT to keep it)"
 fi
 
 # ── Readiness summary ────────────────────────────────────────────────────────
@@ -75,9 +123,16 @@ fi
 echo ""
 echo "MAIW Synthetic Demo Mode"
 echo "─────────────────────────────────────────────────────"
-echo "  API port    : ${DEMO_PORT}"
+echo "  API         : http://${DEMO_HOST}:${DEMO_PORT}"
+echo "  Profile     : demo (sandbox disabled, no database)"
+echo "  Persistence : ${PERSISTENCE_SUMMARY}"
 echo "  MCP servers : not required (SimulationProviders active)"
 echo ""
+
+if [[ "${DEMO_HOST}" != "127.0.0.1" && "${DEMO_HOST}" != "localhost" && "${DEMO_HOST}" != "::1" ]]; then
+    echo "  [!!] DEMO_HOST=${DEMO_HOST} exposes the API beyond this machine."
+    echo "       The supported boundary is 127.0.0.1 (see SECURITY.md)."
+fi
 
 if [ -z "${NVIDIA_API_KEY:-}" ]; then
     echo "  [--] NVIDIA_API_KEY not set — NIM calls will fail"
@@ -105,13 +160,7 @@ echo ""
 
 # ── Start API ────────────────────────────────────────────────────────────────
 
-# Development server: unless a durable root is configured, use the explicit
-# in-memory persistence profile (procedure state is lost on restart). The
-# reference deployment (scripts/start_reference_deployment.sh) is file-backed.
-if [[ -z "${MAIW_PERSISTENCE_ROOT:-}" ]]; then
-    export MAIW_PERSISTENCE_MODE="${MAIW_PERSISTENCE_MODE:-memory}"
-fi
 cd "${REPO_ROOT}"
-MAIW_DEMO_MODE=true exec "${VENV}" -m uvicorn maiw_api.app:app \
-    --host 0.0.0.0 \
+exec "${VENV}" -m uvicorn maiw_api.app:app \
+    --host "${DEMO_HOST}" \
     --port "${DEMO_PORT}"
