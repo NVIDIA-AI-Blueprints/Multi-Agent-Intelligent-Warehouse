@@ -67,3 +67,32 @@ def test_deploy_workflow_maiw_pytest_is_blocking_and_skip_is_reported():
     result = steps["Set result output"]["run"]
     assert "steps.maiw_pytest.outputs.E2E" in result
     assert "NOT RUN" in result
+
+
+def test_deploy_workflow_publishes_maiw_pytest_as_its_own_commit_check():
+    # A NOT RUN suite must not hide behind the green deployment check.
+    job = yaml.safe_load(WORKFLOW.read_text())["jobs"]["deploy-and-test"]
+    assert job["permissions"] == {"contents": "read", "checks": "write"}
+
+    steps = _steps()
+    run = steps["Post-deploy: Run MAIW pytest (pytest -m maiw)"]["run"]
+    assert run.count('echo "REASON=') == 2  # one per NOT_RUN path
+
+    report = steps["Report MAIW pytest as a commit check"]
+    assert report["if"] == "always()"
+    assert report["env"]["E2E"] == "${{ steps.maiw_pytest.outputs.E2E }}"
+    assert report["env"]["REASON"] == "${{ steps.maiw_pytest.outputs.REASON }}"
+    assert report["run"] == "python3 scripts/ci/report_maiw_pytest_check.py"
+
+    names = list(steps)
+    assert (
+        names.index("Post-deploy: Run MAIW pytest (pytest -m maiw)")
+        < names.index("Report MAIW pytest as a commit check")
+        < names.index("Send mail")
+    )
+
+
+def test_result_mail_subject_carries_the_result():
+    subject = _steps()["Send mail"]["with"]["subject"]
+    assert subject.startswith("QA Test Workflow Result for ${{ github.repository }}")
+    assert "steps.set_result.outputs.RESULT" in subject
