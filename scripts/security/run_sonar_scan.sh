@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
-# Run the NVIDIA SonarQube analysis of this checkout and record what happened.
+# Run the NVIDIA SonarQube analysis of a checkout and record what happened.
 #
 # Used by .github/workflows/sonarqube.yml and for manual runs from a host on
 # the NVIDIA network (sonar.nvidia.com resolves to a private address, so
@@ -21,6 +21,13 @@
 #   MAIW_SONAR_QG_WAIT   wait for the quality gate and fail on ERROR (default true)
 #   MAIW_SONAR_EVIDENCE  where to write the evidence JSON
 #                        (default .scannerwork/maiw-sonar-evidence.json)
+#   MAIW_SONAR_SOURCE_DIR  checkout to analyze (default: the one containing
+#                        the current directory)
+#   MAIW_SONAR_SETTINGS  sonar-project.properties to use (default: the one
+#                        next to this script, not the analyzed checkout's).
+#                        CI runs this script and these settings from the
+#                        default branch, so the analyzed commit never
+#                        controls the step that holds SONAR_TOKEN.
 #
 # Exit codes: 0 analysis processed (and quality gate passed when waited for);
 # 2 configuration missing; 3 server unreachable; other = scanner or quality
@@ -32,7 +39,14 @@ SCANNER_IMAGE="sonarsource/sonar-scanner-cli:12.3.0.4285_8.1.0@sha256:47956b669b
 HOST="${SONAR_HOST_URL:-https://sonar.nvidia.com}"
 HOST="${HOST%/}"
 EVIDENCE="${MAIW_SONAR_EVIDENCE:-.scannerwork/maiw-sonar-evidence.json}"
+SETTINGS="${MAIW_SONAR_SETTINGS:-$(dirname "${BASH_SOURCE[0]}")/../../sonar-project.properties}"
+if [ ! -f "$SETTINGS" ]; then
+  echo "::error title=SonarQube not configured::settings file ${SETTINGS} not found" >&2
+  exit 2
+fi
+SETTINGS="$(cd "$(dirname "$SETTINGS")" && pwd -P)/$(basename "$SETTINGS")"
 
+cd "${MAIW_SONAR_SOURCE_DIR:-.}"
 cd "$(git rev-parse --show-toplevel)"
 
 if [ -z "${SONAR_TOKEN:-}" ]; then
@@ -54,6 +68,8 @@ version="${version#v}"
 
 args=(
   "-Dsonar.host.url=${HOST}"
+  "-Dproject.settings=/opt/maiw-sonar/sonar-project.properties"
+  "-Dsonar.projectBaseDir=/usr/src"
   "-Dsonar.projectVersion=${version}"
   "-Dsonar.scm.revision=${revision}"
   "-Dsonar.qualitygate.wait=${MAIW_SONAR_QG_WAIT:-true}"
@@ -75,13 +91,14 @@ else
   echo "::warning title=No Python coverage::coverage.xml not found; SonarQube will report 0% Python coverage" >&2
 fi
 
-echo "Analyzing ${revision} as version ${version}"
+echo "Analyzing ${revision} as version ${version} with settings ${SETTINGS}"
 set +e
 docker run --rm \
   --user "$(id -u):$(id -g)" \
   -e SONAR_TOKEN \
   -e SONAR_USER_HOME=/usr/src/.scannerwork/.sonar \
   -v "$PWD:/usr/src" \
+  -v "$SETTINGS:/opt/maiw-sonar/sonar-project.properties:ro" \
   -w /usr/src \
   "${SCANNER_IMAGE}" "${args[@]}"
 scanner_exit=$?
