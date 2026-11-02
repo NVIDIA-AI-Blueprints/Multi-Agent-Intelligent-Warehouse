@@ -19,8 +19,15 @@ pip install -e packages/maiw-contracts -e packages/maiw-mcp -e packages/maiw-sta
     -e packages/maiw-models -e packages/maiw-skills -e packages/maiw-decision \
     -e packages/maiw-execution -e packages/maiw-agents -e packages/maiw-world \
     -e apps/api
-cp .env.example .env   # set NVIDIA_API_KEY=nvapi-...
+echo 'NVIDIA_API_KEY=nvapi-...' > .env && chmod 600 .env
 ```
+
+Create `.env` with only the provider key; do not copy `.env.example` for a
+demo. That file configures the reference deployment
+(`MAIW_DEPLOYMENT_PROFILE=reference`, `MAIW_SANDBOX_MODE=required`), which
+overrides `MAIW_DEMO_MODE` and keeps `/api/v1/ready` at 503 without a database
+and an OpenShell sandbox. For a self-hosted NIM, also add `MAIW_NIM_BASE_URL`
+(and `MAIW_NIM_API_KEY` if needed).
 
 (`./scripts/check_demo_environment.sh` is an optional preflight; it expects the virtual environment at `env/` rather than `.venv/`.)
 
