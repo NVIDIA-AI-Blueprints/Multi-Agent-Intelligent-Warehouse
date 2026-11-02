@@ -24,6 +24,18 @@ While NVIDIA currently does not have a bug bounty program, we do offer acknowled
 
 For all security-related concerns, please visit NVIDIA's Product Security portal at https://www.nvidia.com/en-us/security
 
+## Supported Deployment Boundary
+
+MAIW is a blueprint for **a single trusted host or a trusted internal network**. Access from an untrusted network is **not a supported scenario** in this release. The defaults enforce that boundary: every Compose port binds `127.0.0.1`, and `npm start` binds `127.0.0.1`.
+
+| Component | Default exposure | Caller authentication | Exposing it |
+|---|---|---|---|
+| MCP domain servers (ports 8765–8768) | `127.0.0.1` only, no override | **None** | **Not supported.** The write tools (equipment, labor and wave writes) execute the request they receive. The decision and approval IDs in that request are supplied by the caller and are recorded, not checked against an approved decision. Anyone who can reach these ports can change warehouse state. Governance (DecisionEngine, approval, `ActionExecutor`) is enforced in the API, upstream of MCP. |
+| API (8001), frontend (3001), nginx (3000) | `127.0.0.1`; `MAIW_PUBLISH_ADDRESS` widens it | Governed writes require the operator write credential (`MAIW_OPERATOR_WRITE_TOKEN`, see `apps/api/maiw_api/write_auth.py`). Read routes and `POST /api/v1/document/upload` do not require it. | Only behind your own authentication, TLS and usage limits. The upload route accepts an anonymous `user_id` and starts the document-processing pipeline, which calls the configured NVIDIA model endpoints. |
+| Datastores (PostgreSQL, Redis, MinIO, Milvus) | `127.0.0.1` only, no override | Development credentials | Not supported. |
+
+To reach the UI from another machine, use an SSH tunnel ([DEPLOYMENT.md](DEPLOYMENT.md#frontend-port-3001-not-accessible-from-another-machine)). Supporting remote MCP access would first need server-side authentication on the MCP servers and verification of each write's approval against the decision record. Neither is implemented. See [MCP authentication](docs/architecture/MCP.md#9-authentication).
+
 ## Project Security Documentation
 
 This project includes additional security documentation:

@@ -509,6 +509,7 @@ See [docs/developer/MODEL_GATEWAY_EVALUATION.md](docs/developer/MODEL_GATEWAY_EV
 | Direct LLM-to-tool execution | Governed: LLM → RecommendedAction → DecisionEngine → ActionExecutor → MCP |
 | An MCP orchestration layer | MCP is the interoperability layer; MAIW is the governance and semantic layer above it |
 | A replacement for enterprise warehouse systems | A complement that adds reasoning, governance, and outcome observation to existing systems |
+| A service hardened for untrusted networks | A blueprint for one trusted host or internal network: the MCP domain servers have no caller authentication, so every port binds `127.0.0.1` by default. See [Supported Deployment Boundary](SECURITY.md#supported-deployment-boundary) |
 
 ---
 
