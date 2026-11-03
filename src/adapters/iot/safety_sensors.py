@@ -420,9 +420,12 @@ class SafetySensorAdapter(BaseIoTAdapter):
                 response.raise_for_status()
                 return True
             else:
-                # For BACnet, log acknowledgment
-                self.logger.info(f"Acknowledged safety alert: {alert_id}")
-                return True
+                # BACnet acknowledgment is not implemented: report it as not acknowledged
+                self.logger.warning(
+                    f"Safety alert {alert_id} not acknowledged: "
+                    f"acknowledgment over {self.protocol} is not supported"
+                )
+                return False
                 
         except Exception as e:
             self.logger.error(f"Failed to acknowledge safety alert: {e}")
@@ -446,9 +449,15 @@ class SafetySensorAdapter(BaseIoTAdapter):
                 response.raise_for_status()
                 return True
             else:
-                # For BACnet, log emergency
-                self.logger.critical(f"EMERGENCY PROTOCOL TRIGGERED: {emergency_type} at {location}")
-                return True
+                # BACnet dispatch is not implemented: fail loudly rather than report
+                # an emergency that was never sent
+                self.logger.critical(
+                    f"EMERGENCY PROTOCOL NOT DISPATCHED: {emergency_type} at {location} "
+                    f"(dispatch over {self.protocol} is not supported)"
+                )
+                raise IoTDataError(
+                    f"Emergency protocol dispatch over {self.protocol} is not supported"
+                )
                 
         except Exception as e:
             self.logger.error(f"Failed to trigger emergency protocol: {e}")
