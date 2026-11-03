@@ -27,7 +27,7 @@ This document provides security guidelines for handling Python REPL (Read-Eval-P
 
 ✅ **This codebase does NOT use `langchain-experimental`**
 
-- `langchain-core>=1.2.6` is the only direct LangChain dependency (patched for template injection and CVE-2025-68664); `nemoguardrails` transitively installs `langchain` and `langchain-community` (see `requirements.txt`), and `langchain-experimental` is blocklisted
+- `langchain-core>=1.7.3` is the only direct LangChain dependency (patched for template injection, CVE-2025-68664 and BDSA-2026-9844); `nemoguardrails` transitively installs `langchain` and `langchain-community` (see `requirements.txt`), and `langchain-experimental` is blocklisted
 - No Python REPL or PALChain components are used
 - MCP tool discovery system includes security checks to block code execution tools
 

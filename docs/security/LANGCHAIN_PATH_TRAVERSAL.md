@@ -34,7 +34,7 @@ load_chain(user_input)  # If user_input contains ../ sequences
 
 ✅ **This codebase is NOT affected**
 
-- **Current version**: `langchain-core>=1.2.6` (well above patched version 0.1.29+, includes CVE-2025-68664 fix)
+- **Current version**: `langchain-core>=1.7.3` (well above patched version 0.1.29+, includes the CVE-2025-68664 and BDSA-2026-9844 fixes)
 - **No usage**: The codebase does NOT use `load_chain`, `load_prompt`, or `load_agent` functions
 - **No LangChain Hub**: The codebase does NOT load chains from LangChain Hub (`lc://` paths)
 - **Safe usage**: Only uses `langchain_core` messages, tools, language_models, outputs and callbacks (no chain/prompt/agent loading)

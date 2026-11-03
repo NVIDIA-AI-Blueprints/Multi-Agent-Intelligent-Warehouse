@@ -10,7 +10,7 @@ langgraph-checkpoint>=3.0.0  # Security: Fixed CVE-2025-64439 (RCE in JsonPlusSe
 asyncpg>=0.32.0
 pymilvus>=2.3.0
 numpy>=1.24.0
-langchain-core>=1.2.6  # Security: Fixed CVE-2025-68664 (serialization injection) and CVE-2024-28088 (directory traversal). We use 1.2.6 (latest, includes fixes). Note: We use json.dumps(), not LangChain serialization, as additional defense.
+langchain-core>=1.7.3  # Security: 1.7.3+ fixes BDSA-2026-9844 (langchain_core.load allowed_objects defaulted to "all"), CVE-2025-68664 (serialization injection) and CVE-2024-28088 (directory traversal). The app never calls langchain_core.load; it uses json.dumps() as additional defense.
 aiohttp>=3.14.5  # Security: Fixed zip bomb DoS (BDSA) in 3.13.3+ (DEFAULT_MAX_DECOMPRESS_SIZE=32MiB). Also fixes: CVE-2024-52304, CVE-2024-30251, CVE-2023-37276, CVE-2024-23829. Client-only usage (not server) = additional defense.
 PyJWT>=2.15.1
 bcrypt>=5.0.0  # password hashing in src/api/services/auth/jwt_handler.py (used directly; passlib is not used)
