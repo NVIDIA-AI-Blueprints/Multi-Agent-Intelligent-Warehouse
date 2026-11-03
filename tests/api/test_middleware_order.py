@@ -1,14 +1,15 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 """
-Security headers and CORS wrap every response of the shipped app.
+CORS and security headers wrap every response of the shipped app.
 
 Starlette makes the last middleware added the outermost.  ``maiw_api.app``
 added the security-headers and CORS middleware first (its comment said "first
 added = outermost"), so they were the two innermost layers: the 403 of the
 origin guard, the 413 of the body-size limit and the 429 of the rate limiter
 went out without security headers, and an allowed browser origin could not
-read the 413 or 429 (SonarQube python:S8414).
+read the 413 or 429.  CORS is now the outermost layer and security headers the
+next (SonarQube python:S8414 requires CORSMiddleware to be added last).
 """
 
 from __future__ import annotations
@@ -47,12 +48,12 @@ def _assert_security_headers(resp) -> None:
     assert "content-security-policy" in resp.headers
 
 
-def test_security_headers_then_cors_are_the_outermost_layers():
+def test_cors_then_security_headers_are_the_outermost_layers():
     from maiw_api.app import app
 
     stack = [m.cls for m in app.user_middleware]  # outermost first
-    assert stack[0] is SecurityHeadersMiddleware
-    assert stack[1] is CORSMiddleware
+    assert stack[0] is CORSMiddleware
+    assert stack[1] is SecurityHeadersMiddleware
     assert stack[-1] is CrossOriginWriteGuardMiddleware
 
 
@@ -97,7 +98,7 @@ async def test_rate_limit_429_is_readable_by_an_allowed_origin(canonical):
     _assert_security_headers(resp)
 
 
-async def test_preflight_is_answered_with_security_headers(canonical):
+async def test_preflight_is_answered_by_cors_for_an_allowed_origin(canonical):
     async with running_canonical_app() as (_, client):
         resp = await client.options(
             "/api/v1/copilot/turn",
@@ -107,6 +108,14 @@ async def test_preflight_is_answered_with_security_headers(canonical):
                 "access-control-request-headers": "content-type",
             },
         )
+    assert resp.status_code == 200
+    assert resp.headers.get("access-control-allow-origin") == ALLOWED
+    assert "POST" in resp.headers.get("access-control-allow-methods", "")
+
+
+async def test_actual_response_to_an_allowed_origin_carries_both(canonical):
+    async with running_canonical_app() as (_, client):
+        resp = await client.get("/api/v1/health", headers={"origin": ALLOWED})
     assert resp.status_code == 200
     assert resp.headers.get("access-control-allow-origin") == ALLOWED
     _assert_security_headers(resp)

@@ -172,11 +172,13 @@ async def generic_exception_handler(request: Request, exc: Exception):
 # ── Middleware ────────────────────────────────────────────────────────────────
 # Order matters: Starlette makes the LAST middleware added the OUTERMOST.
 # Resulting order, outermost first:
-#   security headers → CORS → metrics → request size → rate limit
+#   CORS → security headers → metrics → request size → rate limit
 #   → origin guard → routes
-# Security headers and CORS are added last (below the metrics middleware) so
+# CORS and security headers are added last (below the metrics middleware) so
 # every response, including the 403/413/429 the other middleware answer
 # itself, carries the security headers, and an allowed origin can read it.
+# CORS is the very last (SonarQube python:S8414): it answers preflights
+# itself, so those bodiless OPTIONS responses carry no security headers.
 
 _cors_origins = [
     o.strip()
@@ -266,6 +268,7 @@ async def metrics_middleware(request: Request, call_next):
     return response
 
 
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
@@ -275,7 +278,6 @@ app.add_middleware(
     expose_headers=["*"],
     max_age=3600,
 )
-app.add_middleware(SecurityHeadersMiddleware)
 
 
 # ── Routers ───────────────────────────────────────────────────────────────────

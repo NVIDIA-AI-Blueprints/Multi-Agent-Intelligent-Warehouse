@@ -4,14 +4,49 @@
 |---|---|
 | **Analysis triaged** | SonarQube project `TEGRASW_Blueprints-SRE_warehouse-operational-assistant_Multi-Agent-Intelligent-Warehouse`, last analysis **2026-01-05 22:01 UTC of `4df9a41`** (scope `src/` only). Read through the anonymous web API on 2026-11-02. |
 | **Code triaged** | `main` at `0fbcb69` (after v2.1.0, `2fdd9fe`) |
-| **Fresh analysis** | **Available since 2026-11-02**, for `0ee535a` with the full source scope: see [Fresh analysis](#fresh-analysis-of-0ee535a-2026-11-02) below. It was run manually from an NVIDIA-network host, because CI still has no NVIDIA-network runner. The sections after it are the original triage of the January analysis. Their dispositions are engineering dispositions; they must be confirmed against the fresh analysis and recorded in SonarQube by a project administrator. |
+| **Fresh analysis** | **Latest: `ff5ce22` on 2026-11-03**, see [Analysis of `ff5ce22`](#analysis-of-ff5ce22-2026-11-03) below; the first full-scope analysis was of `0ee535a` on 2026-11-02 ([Fresh analysis](#fresh-analysis-of-0ee535a-2026-11-02)). Both were run manually from an NVIDIA-network host, because CI still has no NVIDIA-network runner. The sections after it are the original triage of the January analysis. Their dispositions are engineering dispositions; they must be confirmed against the fresh analysis and recorded in SonarQube by a project administrator. |
+
+## Analysis of `ff5ce22` (2026-11-03)
+
+| | |
+|---|---|
+| **Analysis** | `13d9886d-3c72-45d5-a7d6-9abf288f2d62` (04:40 UTC), `main` at `ff5ce22`, version 2.1.0, with the CORE pytest `coverage.xml` of that commit's CI/CD Pipeline run (41576667514). Run with `scripts/security/run_sonar_scan.sh` from a standalone clone; the script exited 5 (analysis recorded, quality gate failed) |
+| **Scope** | Same as below: 667 files, 150,755 lines of code |
+| **Quality gate** | **ERROR** |
+| **Since `0ee535a`** | #239 (skill factories), #240 (middleware order), #241 (IoT acknowledgments, test assertion), #242 (`langchain-core` floor) |
+
+| Gate condition | Fails when | Actual | Status |
+|---|---|---|---|
+| Coverage | < 0% | 34.9% | OK |
+| Coverage on new code | < 0% | 56.9% | OK |
+| Blocker issues | > 0 | 5 | ERROR |
+| Blocker issues on new code | > 0 | 3 | ERROR |
+| High issues | > 0 | 1,873 | ERROR |
+| High issues on new code | > 0 | 395 | ERROR |
+| New security hotspots reviewed | < 100% | 0% | ERROR |
+
+**Blocker issues: 16 → 5.** Closed by code: `python:S930` ×6 (#239), `python:S3516` ×4 in the IoT adapters and `typescript:S2699` (#241). Remaining:
+
+| Rule | Location | Disposition |
+|---|---|---|
+| `python:S8414` | `apps/api/maiw_api/app.py:269` | **Fixed by this change.** #240 made the security-headers middleware the outermost layer and CORS the next; the rule requires `CORSMiddleware` to be added last. CORS is now added last. Every response still carries both (only CORS preflights, which CORS answers itself with no body, carry no security headers). |
+| `pythonsecurity:S2083` | `packages/maiw-models/maiw_models/eval/__main__.py:347` | **False positive.** The path is the `--output` argument of a local command-line tool, chosen by the person running it; nothing exposes it to a remote caller. |
+| `python:S3516` | `scripts/ci/report_maiw_pytest_check.py:83` | **False positive.** A CI reporter that returns 0 on purpose: failing to post the commit check must never fail the deployment job, and the check it posts carries the result. |
+| `python:S3516` | `src/api/routers/chat.py:408` | **False positive.** `_clean_response_text` returns the cleaned text it built; the legacy chat router is not mounted in the shipped app. |
+| `python:S3516` | `src/api/services/evidence/evidence_collector.py:581` | **False positive.** `_score_and_rank_evidence` sorts the list in place and returns it; nothing outside `src/api/services/evidence/` imports the module. |
+
+The four false positives need a project administrator to resolve them in SonarQube as "won't fix", with the reasons above.
+
+**Security hotspots to review (151, unchanged):** weak cryptography 107, encrypt data 28, others 15, denial of service 1. None reviewed.
+
+**High issues (1,873, +3):** `python:S8572` 1,026, `python:S8415` 271, `python:S3776` 189, `python:S6903` 133, `python:S1192` 86, `shelldre:S7688` 78. These need a Blueprints SRE baseline, not bulk edits.
 
 ## Fresh analysis of `0ee535a` (2026-11-02)
 
 | | |
 |---|---|
 | **Analyses** | `7e92b2b1-c11b-46f4-8125-68b8276cef69` (20:05 UTC) and `71633f76-f495-4848-bc6c-15ccb891629f` (20:32 UTC, run with the fixed script from #237); both of `main` at `0ee535a`, version 2.1.0 |
-| **Scope** | `src`, `apps`, `packages`, `mcp_servers`, `integrations`, `scripts` and the Dockerfiles (690 main files, 14,346 lines of code); the January analysis covered `src/` only |
+| **Scope** | `src`, `apps`, `packages`, `mcp_servers`, `integrations`, `scripts` and the Dockerfiles (667 files, 150,691 lines of code); the January analysis covered `src/` only |
 | **Quality gate** | **ERROR** |
 | **What it is** | A triage list. It is not a measurement of a release candidate: `af4c257` and later commits need their own analysis (`docs/operations/RELEASING.md`, step 3). Many findings come from code scanned for the first time, not from new defects. |
 
