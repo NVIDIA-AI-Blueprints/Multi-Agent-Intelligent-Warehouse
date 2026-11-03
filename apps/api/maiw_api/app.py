@@ -169,9 +169,14 @@ async def generic_exception_handler(request: Request, exc: Exception):
     return await handle_generic_exception(request, exc)
 
 
-# ── Middleware (order matters — first added = outermost) ──────────────────────
-
-app.add_middleware(SecurityHeadersMiddleware)
+# ── Middleware ────────────────────────────────────────────────────────────────
+# Order matters: Starlette makes the LAST middleware added the OUTERMOST.
+# Resulting order, outermost first:
+#   security headers → CORS → metrics → request size → rate limit
+#   → origin guard → routes
+# Security headers and CORS are added last (below the metrics middleware) so
+# every response, including the 403/413/429 the other middleware answer
+# itself, carries the security headers, and an allowed origin can read it.
 
 _cors_origins = [
     o.strip()
@@ -182,15 +187,6 @@ _cors_origins = [
     ).split(",")
     if o.strip()
 ]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_cors_origins,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-    max_age=3600,
-)
 # CORS only stops other origins reading responses; a browser still sends their
 # simple POSTs (multipart, text/plain, no Content-Type). Refuse state-changing
 # requests whose Origin is not one of the same browser origins — see
@@ -268,6 +264,18 @@ async def metrics_middleware(request: Request, call_next):
     except Exception:
         pass
     return response
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,
+)
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 # ── Routers ───────────────────────────────────────────────────────────────────
