@@ -154,9 +154,9 @@ async def get_wave_get_skill() -> WaveGetSkill:
                 "MAIW_MCP_SERVER_WAVE_URL not set — cannot create WaveGetSkill"
             )
         registry = CapabilityRegistry()
-        registry.register(WAVE_GET_METADATA)
+        registry.register(WAVE_GET_METADATA.name, url)
         telemetry = CapabilityTelemetry()
-        client = MAIWMCPClient(server_url=url, registry=registry, telemetry=telemetry)
+        client = MAIWMCPClient(registry, telemetry=telemetry)
         _wave_get_skill = WaveGetSkill(client)
         logger.info("WaveGetSkill initialised (url=%s)", url)
     return _wave_get_skill
@@ -171,9 +171,9 @@ async def get_wave_risk_skill() -> WaveRiskSkill:
                 "MAIW_MCP_SERVER_WAVE_URL not set — cannot create WaveRiskSkill"
             )
         registry = CapabilityRegistry()
-        registry.register(WAVE_GET_RISK_METADATA)
+        registry.register(WAVE_GET_RISK_METADATA.name, url)
         telemetry = CapabilityTelemetry()
-        client = MAIWMCPClient(server_url=url, registry=registry, telemetry=telemetry)
+        client = MAIWMCPClient(registry, telemetry=telemetry)
         _wave_risk_skill = WaveRiskSkill(client)
         logger.info("WaveRiskSkill initialised (url=%s)", url)
     return _wave_risk_skill
@@ -198,9 +198,9 @@ async def get_execute_wave_reprioritization_skill() -> ExecuteWaveReprioritizati
                 "MAIW_MCP_SERVER_WAVE_URL not set — cannot create ExecuteWaveReprioritizationSkill"
             )
         registry = CapabilityRegistry()
-        registry.register(WAVE_REPRIORITIZE_METADATA)
+        registry.register(WAVE_REPRIORITIZE_METADATA.name, url)
         telemetry = CapabilityTelemetry()
-        client = MAIWMCPClient(server_url=url, registry=registry, telemetry=telemetry)
+        client = MAIWMCPClient(registry, telemetry=telemetry)
         _execute_wave_reprioritization_skill = ExecuteWaveReprioritizationSkill(client)
         logger.info("ExecuteWaveReprioritizationSkill initialised (url=%s)", url)
     return _execute_wave_reprioritization_skill

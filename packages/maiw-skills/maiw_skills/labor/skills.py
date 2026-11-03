@@ -167,9 +167,9 @@ async def get_labor_capacity_skill() -> LaborCapacitySkill:
                 "MAIW_MCP_SERVER_LABOR_URL not set — cannot create LaborCapacitySkill"
             )
         registry = CapabilityRegistry()
-        registry.register(LABOR_GET_CAPACITY_METADATA)
+        registry.register(LABOR_GET_CAPACITY_METADATA.name, url)
         telemetry = CapabilityTelemetry()
-        client = MAIWMCPClient(server_url=url, registry=registry, telemetry=telemetry)
+        client = MAIWMCPClient(registry, telemetry=telemetry)
         _labor_capacity_skill = LaborCapacitySkill(client)
         logger.info("LaborCapacitySkill initialised (url=%s)", url)
     return _labor_capacity_skill
@@ -184,9 +184,9 @@ async def get_labor_allocation_skill() -> LaborAllocationSkill:
                 "MAIW_MCP_SERVER_LABOR_URL not set — cannot create LaborAllocationSkill"
             )
         registry = CapabilityRegistry()
-        registry.register(LABOR_GET_ALLOCATION_METADATA)
+        registry.register(LABOR_GET_ALLOCATION_METADATA.name, url)
         telemetry = CapabilityTelemetry()
-        client = MAIWMCPClient(server_url=url, registry=registry, telemetry=telemetry)
+        client = MAIWMCPClient(registry, telemetry=telemetry)
         _labor_allocation_skill = LaborAllocationSkill(client)
         logger.info("LaborAllocationSkill initialised (url=%s)", url)
     return _labor_allocation_skill
@@ -211,9 +211,9 @@ async def get_execute_labor_allocation_skill() -> ExecuteLaborAllocationSkill:
                 "MAIW_MCP_SERVER_LABOR_URL not set — cannot create ExecuteLaborAllocationSkill"
             )
         registry = CapabilityRegistry()
-        registry.register(LABOR_ALLOCATE_METADATA)
+        registry.register(LABOR_ALLOCATE_METADATA.name, url)
         telemetry = CapabilityTelemetry()
-        client = MAIWMCPClient(server_url=url, registry=registry, telemetry=telemetry)
+        client = MAIWMCPClient(registry, telemetry=telemetry)
         _execute_labor_allocation_skill = ExecuteLaborAllocationSkill(client)
         logger.info("ExecuteLaborAllocationSkill initialised (url=%s)", url)
     return _execute_labor_allocation_skill
