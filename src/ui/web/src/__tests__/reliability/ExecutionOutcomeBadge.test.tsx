@@ -49,10 +49,19 @@ describe('ExecutionOutcomeBadge', () => {
     expect(screen.queryByText(/reconcile before retry/i)).not.toBeInTheDocument();
   });
 
-  it('renders all 6 outcome states without crashing', () => {
-    const outcomes = ['EXECUTED', 'NO_OP', 'DEFERRED', 'CONFLICT', 'UNKNOWN', 'FAILED'] as const;
-    outcomes.forEach((o) => {
-      const { unmount } = wrap(<ExecutionOutcomeBadge outcome={o} />);
+  it('renders a label and description for all 6 outcome states', () => {
+    const outcomes = [
+      ['EXECUTED', 'EXECUTED', /mutation confirmed/i],
+      ['NO_OP', 'NO-OP', /idempotent replay/i],
+      ['DEFERRED', 'DEFERRED', /awaiting human approval/i],
+      ['CONFLICT', 'CONFLICT', /state drift blocked execution/i],
+      ['UNKNOWN', 'UNKNOWN', /reconcile before retry/i],
+      ['FAILED', 'FAILED', /safe to re-evaluate/i],
+    ] as const;
+    outcomes.forEach(([outcome, label, desc]) => {
+      const { unmount } = wrap(<ExecutionOutcomeBadge outcome={outcome} />);
+      expect(screen.getByText(label)).toBeInTheDocument();
+      expect(screen.getByText(desc)).toBeInTheDocument();
       unmount();
     });
   });

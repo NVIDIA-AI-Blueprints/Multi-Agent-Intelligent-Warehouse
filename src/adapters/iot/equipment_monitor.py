@@ -409,12 +409,20 @@ class EquipmentMonitorAdapter(BaseIoTAdapter):
                 response = await self.session.post(f"{self.endpoints['alerts']}/{alert_id}/acknowledge")
                 response.raise_for_status()
                 return True
-            else:
-                # For MQTT/WebSocket, publish acknowledgment
-                if self.mqtt_client:
-                    topic = f"alerts/{alert_id}/acknowledge"
-                    self.mqtt_client.publish(topic, json.dumps({"acknowledged": True}))
+            elif self.protocol == 'mqtt' and self.mqtt_client:
+                topic = f"alerts/{alert_id}/acknowledge"
+                info = self.mqtt_client.publish(topic, json.dumps({"acknowledged": True}))
+                if info.rc != 0:  # paho MQTT_ERR_SUCCESS
+                    self.logger.error(f"Failed to publish acknowledgment for alert {alert_id}: rc={info.rc}")
+                    return False
                 return True
+            else:
+                # WebSocket acknowledgment is not implemented: report it as not acknowledged
+                self.logger.warning(
+                    f"Alert {alert_id} not acknowledged: "
+                    f"acknowledgment over {self.protocol} is not supported"
+                )
+                return False
                 
         except Exception as e:
             self.logger.error(f"Failed to acknowledge alert: {e}")

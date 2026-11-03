@@ -414,9 +414,12 @@ class EnvironmentalSensorAdapter(BaseIoTAdapter):
                 response.raise_for_status()
                 return True
             else:
-                # For Modbus, log acknowledgment
-                self.logger.info(f"Acknowledged environmental alert: {alert_id}")
-                return True
+                # Modbus acknowledgment is not implemented: report it as not acknowledged
+                self.logger.warning(
+                    f"Environmental alert {alert_id} not acknowledged: "
+                    f"acknowledgment over {self.protocol} is not supported"
+                )
+                return False
                 
         except Exception as e:
             self.logger.error(f"Failed to acknowledge environmental alert: {e}")
