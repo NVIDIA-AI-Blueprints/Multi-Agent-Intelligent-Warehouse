@@ -294,7 +294,13 @@ async def get_equipment_status_skill() -> EquipmentStatusSkill:
     """
     global _equipment_status_skill
     if _equipment_status_skill is None:
-        registry = CapabilityRegistry.from_env()
+        url = os.environ.get("MAIW_MCP_SERVER_EQUIPMENT_URL")
+        if not url:
+            raise RuntimeError(
+                "MAIW_MCP_SERVER_EQUIPMENT_URL not set — cannot create EquipmentStatusSkill"
+            )
+        registry = CapabilityRegistry()
+        registry.register(EQUIPMENT_GET_STATUS_METADATA.name, url)
         telemetry = CapabilityTelemetry()
         client = MAIWMCPClient(registry, telemetry=telemetry)
         _equipment_status_skill = EquipmentStatusSkill(client)
@@ -309,7 +315,13 @@ async def get_equipment_telemetry_skill() -> EquipmentTelemetrySkill:
     """Return the process-level EquipmentTelemetrySkill singleton."""
     global _equipment_telemetry_skill
     if _equipment_telemetry_skill is None:
-        registry = CapabilityRegistry.from_env()
+        url = os.environ.get("MAIW_MCP_SERVER_EQUIPMENT_URL")
+        if not url:
+            raise RuntimeError(
+                "MAIW_MCP_SERVER_EQUIPMENT_URL not set — cannot create EquipmentTelemetrySkill"
+            )
+        registry = CapabilityRegistry()
+        registry.register(EQUIPMENT_GET_TELEMETRY_METADATA.name, url)
         telemetry = CapabilityTelemetry()
         client = MAIWMCPClient(registry, telemetry=telemetry)
         _equipment_telemetry_skill = EquipmentTelemetrySkill(client)
@@ -338,7 +350,13 @@ async def get_execute_equipment_assignment_skill() -> ExecuteEquipmentAssignment
     """Return the process-level ExecuteEquipmentAssignmentSkill singleton."""
     global _execute_equipment_assignment_skill
     if _execute_equipment_assignment_skill is None:
-        registry = CapabilityRegistry.from_env()
+        url = os.environ.get("MAIW_MCP_SERVER_EQUIPMENT_URL")
+        if not url:
+            raise RuntimeError(
+                "MAIW_MCP_SERVER_EQUIPMENT_URL not set — cannot create ExecuteEquipmentAssignmentSkill"
+            )
+        registry = CapabilityRegistry()
+        registry.register(EQUIPMENT_ASSIGN_METADATA.name, url)
         telemetry = CapabilityTelemetry()
         client = MAIWMCPClient(registry, telemetry=telemetry)
         _execute_equipment_assignment_skill = ExecuteEquipmentAssignmentSkill(client)
@@ -350,7 +368,13 @@ async def get_execute_equipment_release_skill() -> ExecuteEquipmentReleaseSkill:
     """Return the process-level ExecuteEquipmentReleaseSkill singleton."""
     global _execute_equipment_release_skill
     if _execute_equipment_release_skill is None:
-        registry = CapabilityRegistry.from_env()
+        url = os.environ.get("MAIW_MCP_SERVER_EQUIPMENT_URL")
+        if not url:
+            raise RuntimeError(
+                "MAIW_MCP_SERVER_EQUIPMENT_URL not set — cannot create ExecuteEquipmentReleaseSkill"
+            )
+        registry = CapabilityRegistry()
+        registry.register(EQUIPMENT_RELEASE_METADATA.name, url)
         telemetry = CapabilityTelemetry()
         client = MAIWMCPClient(registry, telemetry=telemetry)
         _execute_equipment_release_skill = ExecuteEquipmentReleaseSkill(client)
@@ -362,7 +386,13 @@ async def get_execute_equipment_maintenance_skill() -> ExecuteEquipmentMaintenan
     """Return the process-level ExecuteEquipmentMaintenanceSkill singleton."""
     global _execute_equipment_maintenance_skill
     if _execute_equipment_maintenance_skill is None:
-        registry = CapabilityRegistry.from_env()
+        url = os.environ.get("MAIW_MCP_SERVER_EQUIPMENT_URL")
+        if not url:
+            raise RuntimeError(
+                "MAIW_MCP_SERVER_EQUIPMENT_URL not set — cannot create ExecuteEquipmentMaintenanceSkill"
+            )
+        registry = CapabilityRegistry()
+        registry.register(EQUIPMENT_SCHEDULE_MAINTENANCE_METADATA.name, url)
         telemetry = CapabilityTelemetry()
         client = MAIWMCPClient(registry, telemetry=telemetry)
         _execute_equipment_maintenance_skill = ExecuteEquipmentMaintenanceSkill(client)
