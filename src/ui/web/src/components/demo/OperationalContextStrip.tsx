@@ -57,7 +57,7 @@ function KpiCell({ label, value, color, testId }: KpiCellProps) {
       <Typography
         sx={{
           fontFamily: 'monospace',
-          fontSize: '0.52rem',
+          fontSize: '0.6rem',
           color: '#484F58',
           letterSpacing: '0.1em',
           textTransform: 'uppercase',
@@ -137,7 +137,7 @@ export default function OperationalContextStrip({ kpis }: Props) {
         aria-hidden="true"
         sx={{
           fontFamily: 'monospace',
-          fontSize: '0.52rem',
+          fontSize: '0.6rem',
           color: '#484F58',
           letterSpacing: '0.1em',
           textTransform: 'uppercase',

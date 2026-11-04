@@ -493,7 +493,7 @@ const ChatInterfaceNew: React.FC = () => {
 
   if (!isAuthenticated) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
         <Typography variant="h6" sx={{ color: '#ffffff' }}>
           Please log in to access the chat interface.
         </Typography>
@@ -502,7 +502,7 @@ const ChatInterfaceNew: React.FC = () => {
   }
 
   return (
-    <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'background.default' }}>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'background.default' }}>
       {/* Top Bar */}
       <TopBar
         warehouse={warehouse}
@@ -657,7 +657,7 @@ const ChatInterfaceNew: React.FC = () => {
                             sx={{
                               backgroundColor: 'primary.main',
                               color: 'primary.contrastText',
-                              fontSize: '10px',
+                              fontSize: '0.625rem',
                               '& .MuiChip-deleteIcon': {
                                 color: 'primary.contrastText',
                               },

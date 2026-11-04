@@ -351,7 +351,7 @@ export default function DecisionGraph({
                 <Typography
                   data-testid="decision-graph-view-developer-trace"
                   onClick={onViewDeveloperTrace}
-                  sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#58A6FF', cursor: 'pointer', whiteSpace: 'nowrap', '&:hover': { textDecoration: 'underline' } }}
+                  sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#58A6FF', cursor: 'pointer', whiteSpace: 'nowrap', '&:hover': { textDecoration: 'underline' } }}
                 >
                   VIEW DEVELOPER TRACE
                 </Typography>
@@ -360,7 +360,7 @@ export default function DecisionGraph({
                 <Typography
                   data-testid="decision-graph-view-context"
                   onClick={onViewContextAtDecision}
-                  sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#58A6FF', cursor: 'pointer', whiteSpace: 'nowrap', '&:hover': { textDecoration: 'underline' } }}
+                  sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#58A6FF', cursor: 'pointer', whiteSpace: 'nowrap', '&:hover': { textDecoration: 'underline' } }}
                 >
                   VIEW CONTEXT AT DECISION TIME
                 </Typography>
@@ -369,7 +369,7 @@ export default function DecisionGraph({
                 <Typography
                   data-testid="decision-graph-view-live-world"
                   onClick={onViewLiveWorld}
-                  sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#58A6FF', cursor: 'pointer', whiteSpace: 'nowrap', '&:hover': { textDecoration: 'underline' } }}
+                  sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#58A6FF', cursor: 'pointer', whiteSpace: 'nowrap', '&:hover': { textDecoration: 'underline' } }}
                 >
                   VIEW LIVE WORLD
                 </Typography>
@@ -448,7 +448,7 @@ export default function DecisionGraph({
                     textAnchor="start"
                     fill="#F85149"
                     opacity={0.5}
-                    style={{ fontFamily: 'monospace', fontSize: '8px', letterSpacing: '0.1em' }}
+                    style={{ fontFamily: 'monospace', fontSize: '0.6rem', letterSpacing: '0.1em' }}
                   >
                     EXECUTION BOUNDARY
                   </text>

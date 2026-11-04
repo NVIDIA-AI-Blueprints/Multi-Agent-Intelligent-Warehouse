@@ -82,10 +82,10 @@ export default function FaultInjectionPanel({ scenarioActive }: Props) {
   return (
     <Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.75 }}>
-        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#F85149', letterSpacing: '0.08em', fontWeight: 700 }}>
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#F85149', letterSpacing: '0.08em', fontWeight: 700 }}>
           ⚠ DEMO FAULT INJECTION
         </Typography>
-        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#484F58' }}>
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>
           BATCH 6 VALIDATED · SAFE TO RE-RUN
         </Typography>
       </Box>
@@ -109,10 +109,10 @@ export default function FaultInjectionPanel({ scenarioActive }: Props) {
                 <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', fontWeight: 700, color: '#C9D1D9' }}>
                   {p.name}
                 </Typography>
-                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#6E7681', mt: 0.1 }}>
+                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#6E7681', mt: 0.1 }}>
                   {p.desc}
                 </Typography>
-                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.57rem', color: '#3FB950', mt: 0.1 }}>
+                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#3FB950', mt: 0.1 }}>
                   {p.safetyBehavior}
                 </Typography>
               </Box>
@@ -123,7 +123,7 @@ export default function FaultInjectionPanel({ scenarioActive }: Props) {
                   disabled={injecting === p.id}
                   onClick={() => handleInject(p)}
                   sx={{
-                    fontSize: '0.5rem', fontFamily: 'monospace', fontWeight: 700,
+                    fontSize: '0.6rem', fontFamily: 'monospace', fontWeight: 700,
                     py: 0.15, px: 0.5, minWidth: 0, flexShrink: 0,
                     borderColor: wasInjected ? '#3FB950' : '#F85149',
                     color: wasInjected ? '#3FB950' : '#F85149',
@@ -134,7 +134,7 @@ export default function FaultInjectionPanel({ scenarioActive }: Props) {
                   {wasInjected ? 'SENT' : injecting === p.id ? '…' : 'INJECT'}
                 </Button>
               ) : (
-                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#484F58', flexShrink: 0, mt: 0.25 }}>
+                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', flexShrink: 0, mt: 0.25 }}>
                   TEST ONLY
                 </Typography>
               )}
@@ -146,14 +146,14 @@ export default function FaultInjectionPanel({ scenarioActive }: Props) {
       {feedback && (
         <Typography
           data-testid="fault-inject-feedback"
-          sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: feedback.ok ? '#3FB950' : '#F85149', mt: 0.5 }}
+          sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: feedback.ok ? '#3FB950' : '#F85149', mt: 0.5 }}
         >
           {feedback.text}
         </Typography>
       )}
 
       {!scenarioActive && (
-        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', mt: 0.5 }}>
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', mt: 0.5 }}>
           Start a scenario to enable injectable faults
         </Typography>
       )}

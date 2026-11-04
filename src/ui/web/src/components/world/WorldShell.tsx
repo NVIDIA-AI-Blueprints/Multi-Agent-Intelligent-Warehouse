@@ -71,7 +71,7 @@ function WorldTabSwitcher({
               sx={{
                 ml: '5px',
                 fontFamily: 'monospace',
-                fontSize: '0.52rem',
+                fontSize: '0.6rem',
                 color: '#30363D',
                 border: '1px solid #21262D',
                 borderRadius: '3px',
@@ -221,7 +221,7 @@ export default function WorldShell({
         <Typography
           sx={{
             fontFamily: 'monospace',
-            fontSize: '0.58rem',
+            fontSize: '0.6rem',
             color: '#484F58',
             letterSpacing: '0.06em',
             textTransform: 'uppercase',

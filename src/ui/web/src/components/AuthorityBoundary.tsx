@@ -52,7 +52,7 @@ const AuthorityBoundary: React.FC<AuthorityBoundaryProps> = ({
         <Typography
           sx={{
             fontFamily: 'monospace',
-            fontSize: '0.58rem',
+            fontSize: '0.6rem',
             fontWeight: 700,
             color: '#D29922',
             letterSpacing: '0.14em',
@@ -66,7 +66,7 @@ const AuthorityBoundary: React.FC<AuthorityBoundaryProps> = ({
           <Typography
             sx={{
               fontFamily: 'monospace',
-              fontSize: '0.55rem',
+              fontSize: '0.6rem',
               color: '#484F58',
               letterSpacing: '0.04em',
               whiteSpace: 'nowrap',

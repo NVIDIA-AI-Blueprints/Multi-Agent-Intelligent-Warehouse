@@ -135,7 +135,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
           alignItems: 'center',
         }}
       >
-        <Typography variant="h6" sx={{ color: '#ffffff', fontSize: '16px' }}>
+        <Typography variant="h6" sx={{ color: '#ffffff', fontSize: '1rem' }}>
           Evidence & Context
         </Typography>
         <IconButton onClick={onClose} size="small" sx={{ color: '#666666' }}>
@@ -176,7 +176,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                     sx={{
                       backgroundColor: 'primary.main',
                       color: 'primary.contrastText',
-                      fontSize: '10px',
+                      fontSize: '0.625rem',
                       height: '18px',
                     }}
                   />
@@ -240,7 +240,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                                              itemType === 'doc' ? '#9C27B0' : 
                                              itemType === 'procedure' ? '#4CAF50' : '#FF9800',
                               color: '#ffffff',
-                              fontSize: '10px',
+                              fontSize: '0.625rem',
                             }}
                           />
                           {itemScore > 0 && (
@@ -273,12 +273,12 @@ const RightPanel: React.FC<RightPanelProps> = ({
                                   Key Steps:
                                 </Typography>
                                 {itemData.steps.slice(0, 3).map((step: any, stepIndex: number) => (
-                                  <Typography key={stepIndex} variant="caption" sx={{ color: '#ffffff', display: 'block', fontSize: '10px' }}>
+                                  <Typography key={stepIndex} variant="caption" sx={{ color: '#ffffff', display: 'block', fontSize: '0.625rem' }}>
                                     • {typeof step === 'string' ? step : JSON.stringify(step)}
                                   </Typography>
                                 ))}
                                 {itemData.steps.length > 3 && (
-                                  <Typography variant="caption" sx={{ color: '#cccccc', display: 'block', fontSize: '10px', fontStyle: 'italic' }}>
+                                  <Typography variant="caption" sx={{ color: '#cccccc', display: 'block', fontSize: '0.625rem', fontStyle: 'italic' }}>
                                     ... and {itemData.steps.length - 3} more steps
                                   </Typography>
                                 )}
@@ -294,7 +294,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                               Recommendations:
                             </Typography>
                             {recommendations.map((rec: any, recIndex: number) => (
-                              <Typography key={recIndex} variant="caption" sx={{ color: '#ffffff', display: 'block', fontSize: '10px' }}>
+                              <Typography key={recIndex} variant="caption" sx={{ color: '#ffffff', display: 'block', fontSize: '0.625rem' }}>
                                 • {typeof rec === 'string' ? rec : JSON.stringify(rec)}
                               </Typography>
                             ))}
@@ -308,7 +308,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                               Actions Taken:
                             </Typography>
                             {actionsTaken.map((action: any, actionIndex: number) => (
-                              <Typography key={actionIndex} variant="caption" sx={{ color: '#ffffff', display: 'block', fontSize: '10px' }}>
+                              <Typography key={actionIndex} variant="caption" sx={{ color: '#ffffff', display: 'block', fontSize: '0.625rem' }}>
                                 • {typeof action === 'string' ? action : JSON.stringify(action)}
                               </Typography>
                             ))}
@@ -320,14 +320,14 @@ const RightPanel: React.FC<RightPanelProps> = ({
                             <Chip
                               label={`${itemRows} rows`}
                               size="small"
-                              sx={{ backgroundColor: '#333333', color: '#ffffff', fontSize: '10px' }}
+                              sx={{ backgroundColor: '#333333', color: '#ffffff', fontSize: '0.625rem' }}
                             />
                           )}
                           {itemLatMs && (
                             <Chip
                               label={`${itemLatMs}ms`}
                               size="small"
-                              sx={{ backgroundColor: '#333333', color: '#ffffff', fontSize: '10px' }}
+                              sx={{ backgroundColor: '#333333', color: '#ffffff', fontSize: '0.625rem' }}
                             />
                           )}
                         </Box>
@@ -398,7 +398,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                       <Typography variant="caption" sx={{ color: '#666666', mb: 1, display: 'block' }}>
                         Result Sample:
                       </Typography>
-                      <Box sx={{ backgroundColor: 'background.default', p: 1, borderRadius: 1, fontFamily: 'monospace', fontSize: '10px', border: '1px solid', borderColor: 'divider', color: 'text.primary' }}>
+                      <Box sx={{ backgroundColor: 'background.default', p: 1, borderRadius: 1, fontFamily: 'monospace', fontSize: '0.625rem', border: '1px solid', borderColor: 'divider', color: 'text.primary' }}>
                         {JSON.stringify(sqlQuery.result_sample, null, 2)}
                       </Box>
                     </Box>
@@ -532,7 +532,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                               sx={{
                                 backgroundColor: getStatusColor(tool.status),
                                 color: '#ffffff',
-                                fontSize: '10px',
+                                fontSize: '0.625rem',
                               }}
                             />
                           </Box>
@@ -551,7 +551,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                               Result:
                             </Typography>
-                            <Typography variant="caption" sx={{ color: 'text.primary', fontFamily: 'monospace', fontSize: '10px' }}>
+                            <Typography variant="caption" sx={{ color: 'text.primary', fontFamily: 'monospace', fontSize: '0.625rem' }}>
                               {JSON.stringify(tool.result, null, 2)}
                             </Typography>
                           </Box>

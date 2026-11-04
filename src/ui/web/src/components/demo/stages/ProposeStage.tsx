@@ -56,7 +56,7 @@ function ProposalCard({ index, action, capability, target, riskLevel, proposalId
       }}>
         <Typography sx={{
           fontFamily: 'monospace',
-          fontSize: '0.55rem',
+          fontSize: '0.6rem',
           color: '#484F58',
           letterSpacing: '0.1em',
           textTransform: 'uppercase',
@@ -74,7 +74,7 @@ function ProposalCard({ index, action, capability, target, riskLevel, proposalId
       <Box sx={{ px: 1.5, py: 1.25, display: 'flex', flexDirection: 'column', gap: 1 }}>
         {/* Action */}
         <Box>
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.08em', mb: '3px' }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.08em', mb: '3px' }}>
             Action
           </Typography>
           <MonoText color="#C9D1D9" weight={500}>{action}</MonoText>
@@ -91,7 +91,7 @@ function ProposalCard({ index, action, capability, target, riskLevel, proposalId
         {/* Rationale */}
         {rationale && (
           <Box>
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.08em', mb: '3px' }}>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.08em', mb: '3px' }}>
               Reason
             </Typography>
             <MonoText color="#8B949E" size="0.68rem">{rationale}</MonoText>

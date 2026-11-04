@@ -59,7 +59,7 @@ function CategoryBadge({ category }: { category: TraceEventCategory }) {
       component="span"
       sx={{
         fontFamily: 'monospace',
-        fontSize: '0.55rem',
+        fontSize: '0.6rem',
         fontWeight: 700,
         color,
         border: `1px solid ${color}44`,
@@ -82,7 +82,7 @@ function ClockKindLabel({ label }: { label: string }) {
       component="span"
       sx={{
         fontFamily: 'monospace',
-        fontSize: '0.52rem',
+        fontSize: '0.6rem',
         color: '#30363D',
         letterSpacing: '0.1em',
         textTransform: 'uppercase',
@@ -142,7 +142,7 @@ function ExecutionBoundaryEvent() {
       </Box>
       <Typography sx={{
         fontFamily: 'monospace',
-        fontSize: '0.58rem',
+        fontSize: '0.6rem',
         color: '#484F58',
         textAlign: 'center',
         mt: '2px',
@@ -224,7 +224,7 @@ function TraceEventRow({
         {event.actor && (
           <Typography sx={{
             fontFamily: 'monospace',
-            fontSize: '0.58rem',
+            fontSize: '0.6rem',
             color: '#484F58',
             fontStyle: 'italic',
             mt: '1px',
@@ -240,7 +240,7 @@ function TraceEventRow({
             fontSize: '0.6rem',
             color: '#6E7681',
             mt: '2px',
-            wordBreak: 'break-all',
+            overflowWrap: 'anywhere',
           }}>
             {event.detail}
           </Typography>
@@ -270,7 +270,7 @@ function TraceEventRow({
         {event.timingNote && (
           <Typography sx={{
             fontFamily: 'monospace',
-            fontSize: '0.58rem',
+            fontSize: '0.6rem',
             color: '#484F58',
             fontStyle: 'italic',
             mt: '2px',
@@ -317,7 +317,7 @@ function InProgressRow({
         component="span"
         sx={{
           fontFamily: 'monospace',
-          fontSize: '0.55rem',
+          fontSize: '0.6rem',
           fontWeight: 700,
           color,
           border: `1px solid ${color}44`,

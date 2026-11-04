@@ -65,14 +65,14 @@ function PipelineNode({ step, label, color, detail, dim }: PipelineNodeProps) {
         backgroundColor: dim ? '#21262D' : color,
         boxShadow: dim ? 'none' : `0 0 6px ${color}`,
       }} />
-      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: dim ? '#21262D' : '#484F58', letterSpacing: '0.06em' }}>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: dim ? '#21262D' : '#484F58', letterSpacing: '0.06em' }}>
         {step}
       </Typography>
       <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700, color: dim ? '#21262D' : color, textAlign: 'center' }}>
         {label}
       </Typography>
       {detail && !dim && (
-        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#6E7681', textAlign: 'center', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#6E7681', textAlign: 'center', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {detail}
         </Typography>
       )}

@@ -209,7 +209,7 @@ const CopilotAgentStatus: React.FC<CopilotAgentStatusProps> = ({
             component="span"
             data-testid="copilot-agent-status-historical-badge"
             sx={{
-              ml: 1, px: 0.75, py: 0.1, fontSize: '0.55rem',
+              ml: 1, px: 0.75, py: 0.1, fontSize: '0.6rem',
               background: 'rgba(72, 79, 88, 0.3)', borderRadius: '2px', color: '#8B949E',
             }}
           >
@@ -305,7 +305,7 @@ const CopilotAgentStatus: React.FC<CopilotAgentStatusProps> = ({
               <Typography sx={{ fontSize: '0.6rem', color: '#484F58', fontFamily: 'monospace' }}>
                 {label}:
               </Typography>
-              <Typography sx={{ fontSize: '0.6rem', color: '#8B949E', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+              <Typography sx={{ fontSize: '0.6rem', color: '#8B949E', fontFamily: 'monospace', overflowWrap: 'anywhere' }}>
                 {value}
               </Typography>
             </Box>

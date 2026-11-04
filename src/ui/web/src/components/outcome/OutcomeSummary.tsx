@@ -115,7 +115,7 @@ function Section({
     >
       <Typography sx={{
         fontFamily: 'monospace',
-        fontSize: '0.55rem',
+        fontSize: '0.6rem',
         fontWeight: 700,
         color: '#484F58',
         letterSpacing: '0.12em',
@@ -231,7 +231,7 @@ export default function OutcomeSummary({
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Typography sx={{
           fontFamily: 'monospace',
-          fontSize: '0.58rem',
+          fontSize: '0.6rem',
           fontWeight: 700,
           color: '#484F58',
           letterSpacing: '0.12em',
@@ -244,7 +244,7 @@ export default function OutcomeSummary({
             <Typography
               data-testid="view-reliability-link"
               onClick={onViewReliability}
-              sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#58A6FF', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+              sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#58A6FF', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
             >
               VIEW RELIABILITY
             </Typography>
@@ -253,7 +253,7 @@ export default function OutcomeSummary({
             <Typography
               data-testid="view-trace-link"
               onClick={onViewTrace}
-              sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#58A6FF', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+              sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#58A6FF', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
             >
               VIEW TRACE
             </Typography>
@@ -318,7 +318,7 @@ export default function OutcomeSummary({
         <Box data-testid="outcome-entity-deltas">
           <Typography sx={{
             fontFamily: 'monospace',
-            fontSize: '0.55rem',
+            fontSize: '0.6rem',
             fontWeight: 700,
             color: '#484F58',
             letterSpacing: '0.12em',
@@ -340,7 +340,7 @@ export default function OutcomeSummary({
         <Box data-testid="outcome-kpi-deltas">
           <Typography sx={{
             fontFamily: 'monospace',
-            fontSize: '0.55rem',
+            fontSize: '0.6rem',
             fontWeight: 700,
             color: '#484F58',
             letterSpacing: '0.12em',

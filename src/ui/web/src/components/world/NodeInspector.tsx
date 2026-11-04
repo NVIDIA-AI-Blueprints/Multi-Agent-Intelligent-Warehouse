@@ -38,7 +38,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <Box sx={{ mb: '10px' }}>
       <Typography sx={{
-        fontFamily: 'monospace', fontSize: '0.55rem', fontWeight: 700,
+        fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
         color: '#484F58', letterSpacing: '0.12em', textTransform: 'uppercase', mb: '5px',
       }}>
         {title}
@@ -78,24 +78,24 @@ function EntityDetailPanel({ detail }: { detail: GraphEntityDetailResponse }) {
           }}
             data-testid="inspector-relationship-row"
           >
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: color, opacity: 0.8, minWidth: 50 }}>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: color, opacity: 0.8, minWidth: 50 }}>
               {edge.relationship_type}
             </Typography>
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58' }}>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>
               →
             </Typography>
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#6E7681', wordBreak: 'break-all' }}>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#6E7681', overflowWrap: 'anywhere' }}>
               {edge.target_id === detail.entity_id ? edge.source_id : edge.target_id}
             </Typography>
             {edge.temporal && (
-              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#D29922', ml: 'auto', flexShrink: 0 }}>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#D29922', ml: 'auto', flexShrink: 0 }}>
                 {edge.active ? 'ACTIVE' : 'EXP'}
               </Typography>
             )}
           </Box>
         ))}
         {detail.direct_relationships.length > 8 && (
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#30363D', mt: '2px' }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D', mt: '2px' }}>
             +{detail.direct_relationships.length - 8} more
           </Typography>
         )}

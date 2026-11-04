@@ -122,7 +122,7 @@ function SectionHeader({ icon, title, subtitle }: {
         </Typography>
       </Box>
       {subtitle && (
-        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.57rem', color: '#484F58', mt: '2px' }}>
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', mt: '2px' }}>
           {subtitle}
         </Typography>
       )}
@@ -189,7 +189,7 @@ function SecurityCard({
             fontSize: '0.68rem',
             color: '#8B949E',
             fontFamily: mono ? 'monospace' : 'inherit',
-            wordBreak: 'break-all',
+            overflowWrap: 'anywhere',
           }}>
             {detail}
           </Typography>
@@ -425,7 +425,7 @@ const DeploymentSecurity: React.FC = () => {
           {QUALIFICATION.sandbox.denied_capability_classes.map(c => (
             <CapabilityRow key={c} name={c} allowed={false} />
           ))}
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', mt: 0.75 }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', mt: 0.75 }}>
             Sandbox isolation ≠ governance approval. WRITE denial is enforced at the sandbox boundary, independent of the governance decision.
           </Typography>
         </Box>
@@ -482,7 +482,7 @@ const DeploymentSecurity: React.FC = () => {
           <ModelPolicyRow generation="nemotron-3.5 (e.g. nemotron-3.5-lightning-30b-a3b)" approved={true} />
           <ModelPolicyRow generation="Llama-family (all variants)" approved={false} />
           <ModelPolicyRow generation="Qwen-family (all variants)" approved={false} />
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', mt: 0.75 }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', mt: 0.75 }}>
             Model availability ≠ model eligibility. A model being reachable does not make it production-eligible.
           </Typography>
         </Box>

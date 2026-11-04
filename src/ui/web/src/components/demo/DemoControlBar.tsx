@@ -343,7 +343,7 @@ const DemoControlBar: React.FC<Props> = ({ status, onStatusChange, onAnalysisCom
                     {simMeta.display_name.toUpperCase()}
                   </Typography>
                   {simMeta.tags.map(t => (
-                    <Typography key={t} sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58' }}>
+                    <Typography key={t} sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>
                       [{t}]
                     </Typography>
                   ))}
@@ -365,7 +365,7 @@ const DemoControlBar: React.FC<Props> = ({ status, onStatusChange, onAnalysisCom
           {/* World KPIs (live from backend status) */}
           {world && (
             <Box sx={{ px: 1.5, py: 0.75, borderRight: '1px solid #1C2128', minWidth: 140 }}>
-              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', letterSpacing: '0.1em', mb: 0.5 }}>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', letterSpacing: '0.1em', mb: 0.5 }}>
                 WORLD STATE
               </Typography>
               {[
@@ -387,7 +387,7 @@ const DemoControlBar: React.FC<Props> = ({ status, onStatusChange, onAnalysisCom
           {/* Chaos injection */}
           <Box sx={{ px: 1.5, py: 0.75 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.75 }}>
-              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', letterSpacing: '0.1em' }}>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', letterSpacing: '0.1em' }}>
                 CHAOS INJECT
               </Typography>
               {injectMsg && (

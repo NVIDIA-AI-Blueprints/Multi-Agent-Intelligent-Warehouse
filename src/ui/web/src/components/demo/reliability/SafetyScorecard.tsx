@@ -107,14 +107,14 @@ export default function SafetyScorecard({ scenarioId }: Props) {
       {/* VALIDATED BATCH 6 header */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
         <Box sx={{
-          fontFamily: 'monospace', fontSize: '0.58rem', fontWeight: 700,
+          fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
           color: '#3FB950', border: '1px solid #3FB95044', borderRadius: '3px',
           px: '5px', py: '2px', letterSpacing: '0.08em', textTransform: 'uppercase',
           flexShrink: 0,
         }}>
           VALIDATED BATCH 6
         </Box>
-        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58' }}>
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>
           Phase 10E reliability test run
         </Typography>
       </Box>
@@ -150,7 +150,7 @@ export default function SafetyScorecard({ scenarioId }: Props) {
                   {entry.invariantLabel}
                 </Typography>
                 <Box sx={{
-                  fontFamily: 'monospace', fontSize: '0.55rem', fontWeight: 700,
+                  fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
                   color: '#3FB950', border: '1px solid #3FB95044', borderRadius: '2px',
                   px: '3px', py: '1px', letterSpacing: '0.08em',
                   ml: 'auto',

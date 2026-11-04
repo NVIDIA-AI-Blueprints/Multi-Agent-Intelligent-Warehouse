@@ -111,7 +111,7 @@ export default function StateDelta({ entityId, entityType, deltas }: StateDeltaP
         {entityType && (
           <Typography sx={{
             fontFamily: 'monospace',
-            fontSize: '0.55rem',
+            fontSize: '0.6rem',
             color: '#484F58',
             letterSpacing: '0.1em',
             textTransform: 'uppercase',

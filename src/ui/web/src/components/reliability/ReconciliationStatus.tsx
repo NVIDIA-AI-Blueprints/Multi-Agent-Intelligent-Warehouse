@@ -66,7 +66,7 @@ export default function ReconciliationStatus({ state = 'CONFIRMED_EXECUTED', com
               }}>
                 <Typography sx={{
                   fontFamily: 'monospace',
-                  fontSize: compact ? '0.58rem' : '0.65rem',
+                  fontSize: compact ? '0.6rem' : '0.65rem',
                   fontWeight: (step.done || step.active) ? 700 : 400,
                   color: step.done ? step.color : step.active ? step.color : '#30363D',
                   letterSpacing: '0.04em',
@@ -75,7 +75,7 @@ export default function ReconciliationStatus({ state = 'CONFIRMED_EXECUTED', com
                 </Typography>
               </Box>
               {!compact && (
-                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58', textAlign: 'center', maxWidth: 80 }}>
+                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', textAlign: 'center', maxWidth: 80 }}>
                   {step.desc}
                 </Typography>
               )}
@@ -96,7 +96,7 @@ export default function ReconciliationStatus({ state = 'CONFIRMED_EXECUTED', com
             {finalLabel}
           </Typography>
           {!compact && (
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', mt: 0.25 }}>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', mt: 0.25 }}>
               ExecutionRecord.outcome = UNKNOWN (immutable history preserved)
             </Typography>
           )}

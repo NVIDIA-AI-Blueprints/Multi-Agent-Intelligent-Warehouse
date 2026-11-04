@@ -77,7 +77,7 @@ export default function DeveloperTracePerformance({ timings }: DeveloperTracePer
               {t.kind === 'COMPONENT' && (
                 <Typography sx={{
                   fontFamily: 'monospace',
-                  fontSize: '0.52rem',
+                  fontSize: '0.6rem',
                   color: KIND_COLORS[t.kind],
                   letterSpacing: '0.08em',
                   textTransform: 'uppercase',

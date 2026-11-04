@@ -116,7 +116,7 @@ function Pillar({ index, title, accentColor, children, defaultOpen = true, empty
         }}>
           <Typography sx={{
             fontFamily: 'monospace',
-            fontSize: '0.55rem',
+            fontSize: '0.6rem',
             fontWeight: 700,
             color: empty ? '#30363D' : accentColor,
             lineHeight: 1,
@@ -128,7 +128,7 @@ function Pillar({ index, title, accentColor, children, defaultOpen = true, empty
         {/* Title */}
         <Typography sx={{
           fontFamily: 'monospace',
-          fontSize: '0.58rem',
+          fontSize: '0.6rem',
           fontWeight: 700,
           color: empty ? '#30363D' : accentColor,
           textTransform: 'uppercase',
@@ -292,9 +292,9 @@ export default function AgenticReasoningCanvas({ analysisResult, expertMode }: A
         </Typography>
         {expertMode && assessment?.model_id && (
           <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
-            <MonoText color="#484F58" size="0.58rem">{assessment.model_id}</MonoText>
+            <MonoText color="#484F58" size="0.6rem">{assessment.model_id}</MonoText>
             {assessment.latency_ms != null && (
-              <MonoText color="#30363D" size="0.58rem">{Math.round(assessment.latency_ms)}ms</MonoText>
+              <MonoText color="#30363D" size="0.6rem">{Math.round(assessment.latency_ms)}ms</MonoText>
             )}
           </Box>
         )}

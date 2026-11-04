@@ -74,14 +74,14 @@ export default function ExecutionOutcomeBadge({ outcome, reconciliation, compact
             backgroundColor: `${RECONCILE_META[reconciliation].color}11`,
           }}>
             <Typography sx={{
-              fontFamily: 'monospace', fontSize: compact ? '0.55rem' : '0.62rem',
+              fontFamily: 'monospace', fontSize: compact ? '0.6rem' : '0.62rem',
               color: RECONCILE_META[reconciliation].color, letterSpacing: '0.04em',
             }}>
               → {RECONCILE_META[reconciliation].label}
             </Typography>
           </Box>
           {!compact && (
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#6E7681' }}>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#6E7681' }}>
               {RECONCILE_META[reconciliation].desc}
             </Typography>
           )}

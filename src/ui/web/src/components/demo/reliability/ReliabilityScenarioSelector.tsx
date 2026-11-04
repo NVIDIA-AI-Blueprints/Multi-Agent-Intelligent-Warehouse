@@ -101,12 +101,12 @@ function ScenarioCard({
     >
       {/* Badges */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', letterSpacing: '0.1em' }}>
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', letterSpacing: '0.1em' }}>
           {id}
         </Typography>
         {recommended && (
           <Box component="span" sx={{
-            fontFamily: 'monospace', fontSize: '0.58rem', fontWeight: 700,
+            fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
             color: '#D29922', border: '1px solid #D2992244', borderRadius: '3px',
             px: '4px', py: '1px', letterSpacing: '0.08em', textTransform: 'uppercase',
           }}
@@ -134,11 +134,11 @@ function ScenarioCard({
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
         {narrative.map((step, i) => (
           <React.Fragment key={step}>
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: accent, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: accent, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               {step}
             </Typography>
             {i < narrative.length - 1 && (
-              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#30363D' }}>→</Typography>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D' }}>→</Typography>
             )}
           </React.Fragment>
         ))}
@@ -158,7 +158,7 @@ export default function ReliabilityScenarioSelector({ selectedId, onSelect }: Pr
   return (
     <Box data-testid="reliability-scenario-selector">
       <Typography sx={{
-        fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58',
+        fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58',
         letterSpacing: '0.12em', textTransform: 'uppercase', mb: 0.75,
       }}>
         Reliability scenario

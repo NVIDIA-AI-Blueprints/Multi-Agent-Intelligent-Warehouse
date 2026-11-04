@@ -236,7 +236,7 @@ function NarrativeNode({
             {step.sublabel}
           </Typography>
           {step.id === 'safety' && status !== 'pending' && (
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#3FB950', mt: '2px' }}>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#3FB950', mt: '2px' }}>
               ✓ invariant held
             </Typography>
           )}

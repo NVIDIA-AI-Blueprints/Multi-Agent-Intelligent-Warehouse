@@ -136,7 +136,7 @@ function ReasoningChain({ record, onClose }: { record: DecisionRecord; onClose: 
       </ChainNode>
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 1.5, ml: 0.5 }}>
-        <Box sx={{ width: 1, height: 16, backgroundColor: '#1C2128' }} />
+        <Box sx={{ width: '1px', height: 16, backgroundColor: '#1C2128' }} />
         <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D' }}>↓</Typography>
       </Box>
 

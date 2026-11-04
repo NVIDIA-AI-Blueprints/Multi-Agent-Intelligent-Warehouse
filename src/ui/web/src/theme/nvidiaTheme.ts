@@ -193,6 +193,11 @@ export const nvidiaTheme = createTheme({
   components: {
     MuiCssBaseline: {
       styleOverrides: {
+        // UI text is sized in rem; 125% (20px with the browser default) scales
+        // all of it. The smallest labels are 0.6rem (12px).
+        html: {
+          fontSize: '125%',
+        },
         body: {
           backgroundColor: '#0A0E13',
           color: '#E6EDF3',

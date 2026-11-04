@@ -127,7 +127,7 @@ export default function DecisionGraphNodeCard({
       {/* Top: node type label */}
       <Typography sx={{
         fontFamily: 'monospace',
-        fontSize: '0.5rem',
+        fontSize: '0.6rem',
         fontWeight: 700,
         color: colors.accent,
         textTransform: 'uppercase',
@@ -156,7 +156,7 @@ export default function DecisionGraphNodeCard({
         {node.subtitle && (
           <Typography sx={{
             fontFamily: 'monospace',
-            fontSize: '0.5rem',
+            fontSize: '0.6rem',
             color: '#484F58',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -168,7 +168,7 @@ export default function DecisionGraphNodeCard({
         )}
         <Box sx={{
           fontFamily: 'monospace',
-          fontSize: '0.45rem',
+          fontSize: '0.6rem',
           color: sourceColor,
           border: `1px solid ${sourceColor}44`,
           borderRadius: '2px',

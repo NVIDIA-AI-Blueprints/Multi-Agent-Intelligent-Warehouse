@@ -49,15 +49,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             key={path}
             onClick={() => { navigate(path); setMobileOpen(false); }}
             sx={{
-              px: { xs: 1.5, md: 2 },
+              px: { xs: 1.5, md: 1.25, xl: 1.75 },
               py: 0.5,
+              display: 'flex',
+              alignItems: 'center',
               cursor: 'pointer',
               position: 'relative',
               color: active ? '#E6EDF3' : '#484F58',
               fontFamily: 'monospace',
               fontWeight: active ? 700 : 500,
               fontSize: '0.72rem',
-              letterSpacing: '0.07em',
+              letterSpacing: '0.05em',
               textTransform: 'uppercase',
               whiteSpace: 'nowrap',
               transition: 'color 0.15s',
@@ -126,8 +128,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </Box>
 
         {/* Warehouse ID */}
-        <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', pr: 2.5, borderRight: '1px solid #1C2128', mr: 2, flexShrink: 0 }}>
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.67rem', color: '#8B949E', letterSpacing: '0.04em' }}>
+        <Box sx={{ display: { xs: 'none', xl: 'flex' }, alignItems: 'center', pr: 2.5, borderRight: '1px solid #1C2128', mr: 2, flexShrink: 0 }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.67rem', color: '#8B949E', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
             WAREHOUSE: <Box component="span" sx={{ color: '#C9D1D9', fontWeight: 700 }}>{WAREHOUSE_ID}</Box>
           </Typography>
         </Box>
@@ -142,6 +144,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               px: 1.25, py: 0,
               mr: 2,
               borderRight: '1px solid #1C2128',
+              flexShrink: 0,
             }}
           >
             <Box sx={{
@@ -159,8 +162,19 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </Box>
         )}
 
-        {/* Desktop nav */}
-        <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'stretch', gap: 0 }}>
+        {/* Desktop nav — scrolls sideways rather than cutting off items on narrow windows */}
+        <Box
+          data-testid="desktop-nav"
+          sx={{
+            display: { xs: 'none', lg: 'flex' },
+            alignItems: 'stretch',
+            gap: 0,
+            minWidth: 0,
+            overflowX: 'auto',
+            scrollbarWidth: 'none',
+            '&::-webkit-scrollbar': { display: 'none' },
+          }}
+        >
           <NavItems />
         </Box>
 
@@ -168,7 +182,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <Box sx={{ flexGrow: 1 }} />
         <IconButton
           onClick={() => setMobileOpen(true)}
-          sx={{ display: { md: 'none' }, color: '#484F58', p: 0.5 }}
+          sx={{ display: { lg: 'none' }, color: '#484F58', p: 0.5 }}
           size="small"
         >
           <MenuIcon sx={{ fontSize: 18 }} />
@@ -186,11 +200,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </Box>
       </Drawer>
 
-      {/* Content */}
+      {/* Content — scrolls when a page is taller than the window; pages with
+          their own scroll regions (height: 100%) fill it and scroll inside. */}
       <Box
+        data-testid="layout-content"
         sx={{
           flex: 1,
-          overflow: 'hidden',
+          minHeight: 0,
+          overflow: 'auto',
           display: 'flex',
           flexDirection: 'column',
         }}

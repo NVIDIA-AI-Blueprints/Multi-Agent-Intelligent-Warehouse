@@ -55,7 +55,7 @@ export function SectionHeader({ children }: { children: React.ReactNode }) {
   return (
     <Typography sx={{
       fontFamily: 'monospace',
-      fontSize: '0.58rem',
+      fontSize: '0.6rem',
       fontWeight: 700,
       color: '#484F58',
       letterSpacing: '0.12em',
@@ -154,7 +154,7 @@ export function OutcomeBadge({ outcome }: { outcome: string }) {
 export function IdText({ label, value }: { label: string; value: string }) {
   return (
     <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75 }}>
-      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
         {label}
       </Typography>
       <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#8B949E', letterSpacing: '0.04em' }}>
@@ -231,7 +231,7 @@ function ViewModeToggle({
           onClick={() => onChange(m)}
           sx={{
             fontFamily: 'monospace',
-            fontSize: '0.58rem',
+            fontSize: '0.6rem',
             fontWeight: 700,
             textTransform: 'uppercase',
             letterSpacing: '0.1em',

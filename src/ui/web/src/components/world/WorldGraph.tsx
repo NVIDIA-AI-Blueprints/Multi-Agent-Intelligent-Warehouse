@@ -62,11 +62,11 @@ function SearchResultItem({
         <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: '#C9D1D9' }}>
           {result.label}
         </Typography>
-        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58' }}>
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>
           {result.entity_type} · {result.entity_id}
         </Typography>
       </Box>
-      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#30363D', flexShrink: 0 }}>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D', flexShrink: 0 }}>
         {result.match_type}
       </Typography>
     </Box>
@@ -109,12 +109,12 @@ function ContextProvenanceBanner({
         ['Depth', String(depth)],
       ].map(([k, v]) => (
         <Box key={k} sx={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58' }}>{k}</Typography>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>{k}</Typography>
           <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#8B949E' }}>{v}</Typography>
         </Box>
       ))}
       <Box sx={{ flexGrow: 1 }} />
-      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#1F3A5A', fontStyle: 'italic' }}>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#1F3A5A', fontStyle: 'italic' }}>
         CURRENT OPERATIONAL NEIGHBORHOOD
       </Typography>
     </Box>
@@ -145,7 +145,7 @@ function SearchEmptyState({ onSearch }: { onSearch: (q: string) => void }) {
             component="button"
             onClick={() => onSearch(ex)}
             sx={{
-              fontFamily: 'monospace', fontSize: '0.58rem', color: '#6E7681',
+              fontFamily: 'monospace', fontSize: '0.6rem', color: '#6E7681',
               border: '1px solid #30363D', borderRadius: '3px', px: '6px', py: '2px',
               background: 'transparent', cursor: 'pointer',
               '&:hover': { color: '#C9D1D9', borderColor: '#58A6FF' },
@@ -334,7 +334,7 @@ export default function WorldGraph({ worldView, focusContext, onReturnToCopilot 
       {/* Depth selector */}
       {focusEntityId && (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58' }}>DEPTH</Typography>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>DEPTH</Typography>
           {[1, 2].map((d) => (
             <Box
               key={d}

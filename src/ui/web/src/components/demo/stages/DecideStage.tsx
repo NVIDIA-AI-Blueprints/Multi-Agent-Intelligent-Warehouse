@@ -98,7 +98,7 @@ function DecisionCard({ index, outcome, proposalId, decisionId, violations, requ
       }}>
         <Typography sx={{
           fontFamily: 'monospace',
-          fontSize: '0.55rem',
+          fontSize: '0.6rem',
           color: '#484F58',
           letterSpacing: '0.1em',
           textTransform: 'uppercase',
@@ -121,7 +121,7 @@ function DecisionCard({ index, outcome, proposalId, decisionId, violations, requ
         {/* Violations (if any) */}
         {violations && violations.length > 0 && (
           <Box>
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.08em', mb: '3px' }}>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.08em', mb: '3px' }}>
               Policy violations
             </Typography>
             {violations.map((v, i) => (
@@ -308,7 +308,7 @@ export default function DecideStage({ sseEvents, analysisResult, pendingApproval
                   {pa.target}
                 </Typography>
                 <Box sx={{ ml: 'auto' }}>
-                  <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                     {pa.priority}
                   </Typography>
                 </Box>

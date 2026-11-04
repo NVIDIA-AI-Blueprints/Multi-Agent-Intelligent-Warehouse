@@ -165,13 +165,13 @@ function RecommendationCard({ rec, index }: { rec: CopilotRecommendation; index:
       {/* Header row */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: '6px' }}>
         <Typography sx={{
-          fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58',
+          fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58',
           textTransform: 'uppercase', letterSpacing: '0.1em',
         }}>
           RECOMMENDATION {index + 1}
         </Typography>
         <Box component="span" sx={{
-          fontFamily: 'monospace', fontSize: '0.58rem', fontWeight: 700,
+          fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
           color: priColor, border: `1px solid ${priColor}44`, borderRadius: '3px',
           px: '4px', py: '1px', textTransform: 'uppercase', letterSpacing: '0.08em',
         }}>
@@ -198,7 +198,7 @@ function RecommendationCard({ rec, index }: { rec: CopilotRecommendation; index:
       {/* Capability row */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px', mb: '3px' }}>
         <Typography sx={{
-          fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58',
+          fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58',
           textTransform: 'uppercase', letterSpacing: '0.08em', minWidth: '68px', flexShrink: 0,
         }}>
           CAPABILITY
@@ -206,7 +206,7 @@ function RecommendationCard({ rec, index }: { rec: CopilotRecommendation; index:
         <Box component="span" sx={{
           fontFamily: 'monospace', fontSize: '0.6rem', color: '#58A6FF',
           border: '1px solid #1F6FEB33', borderRadius: '3px',
-          px: '4px', py: '1px', wordBreak: 'break-all',
+          px: '4px', py: '1px', overflowWrap: 'anywhere',
         }}>
           {rec.capability}
         </Box>
@@ -214,7 +214,7 @@ function RecommendationCard({ rec, index }: { rec: CopilotRecommendation; index:
       {/* Target row */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px', mb: '4px' }}>
         <Typography sx={{
-          fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58',
+          fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58',
           textTransform: 'uppercase', letterSpacing: '0.08em', minWidth: '68px', flexShrink: 0,
         }}>
           TARGET
@@ -234,7 +234,7 @@ function RecommendationCard({ rec, index }: { rec: CopilotRecommendation; index:
         onClick={() => setOpen(o => !o)}
         sx={{
           background: 'transparent', border: 'none', cursor: 'pointer',
-          fontFamily: 'monospace', fontSize: '0.58rem', color: '#30363D',
+          fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D',
           p: 0, mt: '4px',
           '&:hover': { color: '#484F58' },
         }}
@@ -252,14 +252,14 @@ function RecommendationCard({ rec, index }: { rec: CopilotRecommendation; index:
           ].map(([label, val]) => val && (
             <Box key={String(label)} sx={{ display: 'flex', gap: '6px' }}>
               <Typography sx={{
-                fontFamily: 'monospace', fontSize: '0.58rem', color: '#30363D',
+                fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D',
                 minWidth: '58px', flexShrink: 0,
               }}>
                 {label}
               </Typography>
               <Typography sx={{
-                fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58',
-                wordBreak: 'break-all',
+                fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58',
+                overflowWrap: 'anywhere',
               }}>
                 {String(val)}
               </Typography>
@@ -294,7 +294,7 @@ function CopilotActAnswer({ turn, isLatest, onReviewApproval }: CopilotAnswerPro
         display: 'flex', flexDirection: 'column', gap: '6px',
       }}>
         <Typography sx={{
-          fontFamily: 'monospace', fontSize: '0.52rem', fontWeight: 700,
+          fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
           color: '#484F58', letterSpacing: '0.14em', textTransform: 'uppercase',
         }}>
           AI REQUEST
@@ -331,7 +331,7 @@ function CopilotActAnswer({ turn, isLatest, onReviewApproval }: CopilotAnswerPro
         display: 'flex', flexDirection: 'column', gap: '6px',
       }}>
         <Typography sx={{
-          fontFamily: 'monospace', fontSize: '0.52rem', fontWeight: 700,
+          fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
           color: '#484F58', letterSpacing: '0.14em', textTransform: 'uppercase',
         }}>
           DECISION ENGINE
@@ -370,7 +370,7 @@ function CopilotActAnswer({ turn, isLatest, onReviewApproval }: CopilotAnswerPro
         display: 'flex', flexDirection: 'column', gap: '6px',
       }}>
         <Typography sx={{
-          fontFamily: 'monospace', fontSize: '0.52rem', fontWeight: 700,
+          fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
           color: '#484F58', letterSpacing: '0.14em', textTransform: 'uppercase',
         }}>
           EXECUTION
@@ -444,7 +444,7 @@ function CopilotActAnswer({ turn, isLatest, onReviewApproval }: CopilotAnswerPro
           onClick={() => setDetailsOpen(o => !o)}
           sx={{
             background: 'transparent', border: 'none', cursor: 'pointer',
-            fontFamily: 'monospace', fontSize: '0.58rem', color: '#30363D',
+            fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D',
             p: 0, textAlign: 'left',
             '&:hover': { color: '#484F58' },
           }}
@@ -486,8 +486,8 @@ function CopilotActAnswer({ turn, isLatest, onReviewApproval }: CopilotAnswerPro
       </Box>
 
       <Typography sx={{
-        fontFamily: 'monospace', fontSize: '0.52rem', color: '#30363D',
-        wordBreak: 'break-all',
+        fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D',
+        overflowWrap: 'anywhere',
       }}>
         trace: {turn.trace_id}
       </Typography>
@@ -519,7 +519,7 @@ function CopilotObserveAnswer({ turn, isLatest }: CopilotAnswerProps & { isLates
 
       {/* Section header */}
       <Typography sx={{
-        fontFamily: 'monospace', fontSize: '0.52rem', fontWeight: 700,
+        fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
         color: '#484F58', letterSpacing: '0.14em', textTransform: 'uppercase',
       }}>
         OBSERVED OUTCOME
@@ -562,7 +562,7 @@ function CopilotObserveAnswer({ turn, isLatest }: CopilotAnswerProps & { isLates
           p: '10px',
         }}>
           <Typography sx={{
-            fontFamily: 'monospace', fontSize: '0.52rem', fontWeight: 700,
+            fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
             color: '#484F58', letterSpacing: '0.12em', textTransform: 'uppercase', mb: '8px',
           }}>
             STATE DELTA
@@ -645,8 +645,8 @@ function CopilotObserveAnswer({ turn, isLatest }: CopilotAnswerProps & { isLates
       )}
 
       <Typography sx={{
-        fontFamily: 'monospace', fontSize: '0.52rem', color: '#30363D',
-        wordBreak: 'break-all',
+        fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D',
+        overflowWrap: 'anywhere',
       }}>
         trace: {turn.trace_id}
       </Typography>
@@ -671,7 +671,7 @@ function CopilotAnswer({ turn, isLatest, onViewOperationalContext, onViewContext
       {/* ── A. ANSWER / ANALYSIS section ──────────────────────────────────── */}
       <Box>
         <Typography sx={{
-          fontFamily: 'monospace', fontSize: '0.58rem', fontWeight: 700,
+          fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
           color: '#484F58', letterSpacing: '0.12em', textTransform: 'uppercase',
           mb: '4px',
         }}>
@@ -732,7 +732,7 @@ function CopilotAnswer({ turn, isLatest, onViewOperationalContext, onViewContext
       {hasEvidence && (
         <Box>
           <Typography sx={{
-            fontFamily: 'monospace', fontSize: '0.58rem', fontWeight: 700,
+            fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
             color: '#484F58', letterSpacing: '0.12em', textTransform: 'uppercase',
             mb: '6px',
           }}>
@@ -763,7 +763,7 @@ function CopilotAnswer({ turn, isLatest, onViewOperationalContext, onViewContext
                 </Typography>
                 <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
                   <Box component="span" sx={{
-                    fontFamily: 'monospace', fontSize: '0.58rem', color: '#3FB950',
+                    fontFamily: 'monospace', fontSize: '0.6rem', color: '#3FB950',
                     border: '1px solid #3FB95044', borderRadius: '3px',
                     px: '4px', py: '1px', letterSpacing: '0.06em',
                   }}>
@@ -780,7 +780,7 @@ function CopilotAnswer({ turn, isLatest, onViewOperationalContext, onViewContext
       {hasRecs && (
         <Box>
           <Typography sx={{
-            fontFamily: 'monospace', fontSize: '0.58rem', fontWeight: 700,
+            fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
             color: '#484F58', letterSpacing: '0.12em', textTransform: 'uppercase',
             mb: '6px',
           }}>
@@ -814,7 +814,7 @@ function CopilotAnswer({ turn, isLatest, onViewOperationalContext, onViewContext
       {turn.neighborhood && (
         <Box>
           <Typography sx={{
-            fontFamily: 'monospace', fontSize: '0.58rem', fontWeight: 700,
+            fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
             color: '#484F58', letterSpacing: '0.12em', textTransform: 'uppercase',
             mb: '4px',
           }}>
@@ -841,7 +841,7 @@ function CopilotAnswer({ turn, isLatest, onViewOperationalContext, onViewContext
                   sx={{
                     background: 'transparent', border: '1px solid #1F6FEB44',
                     borderRadius: '3px', px: '6px', py: '2px', flexShrink: 0,
-                    fontFamily: 'monospace', fontSize: '0.58rem',
+                    fontFamily: 'monospace', fontSize: '0.6rem',
                     color: '#58A6FF', cursor: 'pointer', fontWeight: 600,
                     '&:hover': { background: '#0D1420', borderColor: '#58A6FF' },
                   }}
@@ -864,7 +864,7 @@ function CopilotAnswer({ turn, isLatest, onViewOperationalContext, onViewContext
                   sx={{
                     background: 'transparent', border: '1px solid #21262D',
                     borderRadius: '3px', px: '6px', py: '2px', flexShrink: 0,
-                    fontFamily: 'monospace', fontSize: '0.58rem',
+                    fontFamily: 'monospace', fontSize: '0.6rem',
                     color: '#484F58', cursor: 'pointer',
                     '&:hover': { background: '#0F1923', color: '#8B949E', borderColor: '#484F58' },
                   }}
@@ -898,7 +898,7 @@ function CopilotAnswer({ turn, isLatest, onViewOperationalContext, onViewContext
           sx={{
             background: 'transparent', border: '1px solid #1F6FEB44',
             borderRadius: '3px', px: '6px', py: '2px',
-            fontFamily: 'monospace', fontSize: '0.58rem',
+            fontFamily: 'monospace', fontSize: '0.6rem',
             color: '#58A6FF', cursor: 'pointer', fontWeight: 600,
             '&:hover': { background: '#0D1420', borderColor: '#58A6FF' },
           }}
@@ -993,8 +993,8 @@ function CopilotAnswer({ turn, isLatest, onViewOperationalContext, onViewContext
       {/* ── H. Trace link ─────────────────────────────────────────────────── */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: '2px' }}>
         <Typography sx={{
-          fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58',
-          wordBreak: 'break-all', flexGrow: 1, mr: 1,
+          fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58',
+          overflowWrap: 'anywhere', flexGrow: 1, mr: 1,
         }}>
           trace: {turn.trace_id}
         </Typography>
@@ -1007,7 +1007,7 @@ function CopilotAnswer({ turn, isLatest, onViewOperationalContext, onViewContext
             border: '1px solid #21262D',
             borderRadius: '3px',
             px: '6px', py: '2px',
-            fontFamily: 'monospace', fontSize: '0.58rem',
+            fontFamily: 'monospace', fontSize: '0.6rem',
             color: '#484F58', cursor: 'pointer', flexShrink: 0,
             '&:hover': { color: '#58A6FF', borderColor: '#58A6FF44' },
           }}
@@ -1178,7 +1178,7 @@ export default function CopilotDrawer({
             COPILOT
           </Typography>
           <Box component="span" sx={{
-            fontFamily: 'monospace', fontSize: '0.52rem', color: '#58A6FF',
+            fontFamily: 'monospace', fontSize: '0.6rem', color: '#58A6FF',
             border: '1px solid #1F6FEB44', borderRadius: '3px',
             px: '4px', py: '0px', lineHeight: 1.6,
           }}>
@@ -1226,7 +1226,7 @@ export default function CopilotDrawer({
               Ask about warehouse state or request recommendations
             </Typography>
             <Typography sx={{
-              fontFamily: 'monospace', fontSize: '0.58rem', color: '#21262D',
+              fontFamily: 'monospace', fontSize: '0.6rem', color: '#21262D',
               textAlign: 'center',
             }}>
               Labor availability · Equipment status · Wave risk · Inventory
@@ -1255,7 +1255,7 @@ export default function CopilotDrawer({
                 }}
               >
                 <Typography sx={{
-                  fontFamily: 'monospace', fontSize: '0.52rem', fontWeight: 700,
+                  fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
                   color: '#484F58', letterSpacing: '0.14em', textTransform: 'uppercase',
                 }}>
                   GOVERNED ACTION RESOLVED

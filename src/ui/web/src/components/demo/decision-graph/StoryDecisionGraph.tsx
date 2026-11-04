@@ -130,11 +130,11 @@ function MiniCard({ label, typeLabel, accentColor = '#484F58', selected = false,
       }}
     >
       {typeLabel && (
-        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.42rem', color: accentColor, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: accentColor, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
           {typeLabel}
         </Typography>
       )}
-      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#C9D1D9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#C9D1D9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {label}
       </Typography>
     </Box>
@@ -149,7 +149,7 @@ function StatusBadge({ status }: { status: string }) {
   return (
     <Box component="span" sx={{
       fontFamily: 'monospace',
-      fontSize: '0.42rem',
+      fontSize: '0.6rem',
       fontWeight: 700,
       color,
       border: `1px solid ${color}44`,
@@ -186,7 +186,7 @@ function SituationContent({ region, zoomLevel, selectedNodeId, onNodeClick }: Co
 
   if (zoomLevel === 'OVERVIEW') {
     return (
-      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#8B949E' }}>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#8B949E' }}>
         {nodes.length} evidence node{nodes.length !== 1 ? 's' : ''}
       </Typography>
     );
@@ -210,7 +210,7 @@ function SituationContent({ region, zoomLevel, selectedNodeId, onNodeClick }: Co
               '&:hover': { borderColor: '#A371F7' },
             }}
           >
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.42rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               {n.label.replace(/_/g, ' ')}
             </Typography>
             <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#C9D1D9', fontWeight: 700 }}>
@@ -220,7 +220,7 @@ function SituationContent({ region, zoomLevel, selectedNodeId, onNodeClick }: Co
         ))}
       </Box>
       {factNodes.slice(0, 2).map(n => (
-        <Typography key={n.id} sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#484F58', mt: '2px' }}>
+        <Typography key={n.id} sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', mt: '2px' }}>
           • {n.subtitle}
         </Typography>
       ))}
@@ -247,17 +247,17 @@ function IntelligenceContent({ region, zoomLevel, skillsExpanded, onToggleSkills
     return (
       <Box>
         {agentNode && (
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#8B949E', mb: '2px' }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#8B949E', mb: '2px' }}>
             {agentNode.label}
           </Typography>
         )}
         {skillNodes.length > 0 && (
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#39D2C0' }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#39D2C0' }}>
             {skillNodes.length} capabilities: {skillDomains}
           </Typography>
         )}
         {assessmentNode && (
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#8B949E', mt: '2px' }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#8B949E', mt: '2px' }}>
             assessment: {assessmentNode.subtitle}
           </Typography>
         )}
@@ -317,10 +317,10 @@ function IntelligenceContent({ region, zoomLevel, skillsExpanded, onToggleSkills
               '&:hover': { borderColor: '#39D2C0' },
             }}
           >
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.45rem', color: '#39D2C0' }}>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#39D2C0' }}>
               {skillsExpanded ? '▾' : '▸'}
             </Typography>
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#39D2C0' }}>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#39D2C0' }}>
               {skillNodes.length} capabilities: {skillDomains}
             </Typography>
           </Box>
@@ -330,7 +330,7 @@ function IntelligenceContent({ region, zoomLevel, skillsExpanded, onToggleSkills
               onClick={() => onNodeClick(n.id)}
               sx={{
                 fontFamily: 'monospace',
-                fontSize: '0.5rem',
+                fontSize: '0.6rem',
                 color: '#C9D1D9',
                 pl: '12px',
                 py: '2px',
@@ -358,11 +358,11 @@ function IntelligenceContent({ region, zoomLevel, skillsExpanded, onToggleSkills
             '&:hover': { borderColor: '#8B949E' },
           }}
         >
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.42rem', color: '#8B949E', textTransform: 'uppercase', letterSpacing: '0.08em', mb: '2px' }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#8B949E', textTransform: 'uppercase', letterSpacing: '0.08em', mb: '2px' }}>
             ASSESSMENT
           </Typography>
           {metaStr(assessmentNode, 'summary') && (
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#C9D1D9', lineHeight: 1.3 }}>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#C9D1D9', lineHeight: 1.3 }}>
               {truncate(metaStr(assessmentNode, 'summary'), 80)}
             </Typography>
           )}
@@ -386,7 +386,7 @@ function ResponseContent({ region, zoomLevel, selectedNodeId, onNodeClick }: Con
 
   if (zoomLevel === 'OVERVIEW') {
     return (
-      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#8B949E' }}>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#8B949E' }}>
         {propNodes.length} proposal{propNodes.length !== 1 ? 's' : ''}
       </Typography>
     );
@@ -416,10 +416,10 @@ function ResponseContent({ region, zoomLevel, selectedNodeId, onNodeClick }: Con
               '&:hover': { borderColor: '#58A6FF' },
             }}
           >
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.42rem', color: '#388BFD', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#388BFD', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               AI RECOMMENDATION
             </Typography>
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#C9D1D9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#C9D1D9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {rec.label}
             </Typography>
           </Box>
@@ -438,13 +438,13 @@ function ResponseContent({ region, zoomLevel, selectedNodeId, onNodeClick }: Con
               }}
             >
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: '2px' }}>
-                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.42rem', color: '#D29922', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#D29922', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                   ACTION PROPOSAL
                 </Typography>
                 {prop.subtitle && <StatusBadge status={prop.subtitle} />}
               </Box>
               {prop.artifact_id && (
-                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.42rem', color: '#484F58', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {prop.artifact_id.slice(0, 12)}
                 </Typography>
               )}
@@ -477,7 +477,7 @@ function GovernanceContent({ region, zoomLevel, approvalsExpanded, onToggleAppro
   if (zoomLevel === 'OVERVIEW') {
     const hasApprovals = approvalNodes.length > 0;
     return (
-      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#8B949E' }}>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#8B949E' }}>
         {hasApprovals ? 'REQUIRES APPROVAL' : `${decisionNodes.length} decision${decisionNodes.length !== 1 ? 's' : ''}`}
       </Typography>
     );
@@ -501,10 +501,10 @@ function GovernanceContent({ region, zoomLevel, approvalsExpanded, onToggleAppro
             '&:hover': { borderColor: '#F85149' },
           }}
         >
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.42rem', color: '#F85149', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#F85149', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
             DECISION ENGINE
           </Typography>
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#8B949E' }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#8B949E' }}>
             Policy · Risk · State
           </Typography>
         </Box>
@@ -529,7 +529,7 @@ function GovernanceContent({ region, zoomLevel, approvalsExpanded, onToggleAppro
             '&:hover': { borderColor: '#8B949E' },
           }}
         >
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.42rem', color: '#484F58', textTransform: 'uppercase' }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', textTransform: 'uppercase' }}>
             decision
           </Typography>
           <StatusBadge status={n.label} />
@@ -552,14 +552,14 @@ function GovernanceContent({ region, zoomLevel, approvalsExpanded, onToggleAppro
                 '&:hover': { borderColor: '#D29922' },
               }}
             >
-              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.45rem', color: '#D29922', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', mb: '2px' }}>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#D29922', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', mb: '2px' }}>
                 HUMAN AUTHORITY REQUIRED
               </Typography>
-              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#C9D1D9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#C9D1D9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {approvalNodes[0].label}
               </Typography>
               {metaStr(approvalNodes[0], 'risk_level') && (
-                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.42rem', color: '#D29922' }}>
+                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#D29922' }}>
                   risk: {metaStr(approvalNodes[0], 'risk_level')}
                 </Typography>
               )}
@@ -578,10 +578,10 @@ function GovernanceContent({ region, zoomLevel, approvalsExpanded, onToggleAppro
                   '&:hover': { borderColor: '#D29922' },
                 }}
               >
-                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.45rem', color: '#D29922', fontWeight: 700, textTransform: 'uppercase' }}>
+                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#D29922', fontWeight: 700, textTransform: 'uppercase' }}>
                   {approvalsExpanded ? '▾' : '▸'} HUMAN AUTHORITY REQUIRED
                 </Typography>
-                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#8B949E' }}>
+                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#8B949E' }}>
                   {approvalNodes.length} pending approvals
                 </Typography>
               </Box>
@@ -589,7 +589,7 @@ function GovernanceContent({ region, zoomLevel, approvalsExpanded, onToggleAppro
                 <Box
                   key={n.id}
                   onClick={() => onNodeClick(n.id)}
-                  sx={{ cursor: 'pointer', pl: '12px', py: '2px', fontFamily: 'monospace', fontSize: '0.5rem', color: '#C9D1D9', '&:hover': { color: '#D29922' } }}
+                  sx={{ cursor: 'pointer', pl: '12px', py: '2px', fontFamily: 'monospace', fontSize: '0.6rem', color: '#C9D1D9', '&:hover': { color: '#D29922' } }}
                 >
                   {n.label}
                 </Box>
@@ -613,7 +613,7 @@ function ActionContent({ region, zoomLevel, selectedNodeId, onNodeClick }: Conte
 
   if (zoomLevel === 'OVERVIEW') {
     return (
-      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#8B949E' }}>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#8B949E' }}>
         {execNodes.length} execution{execNodes.length !== 1 ? 's' : ''}
       </Typography>
     );
@@ -623,7 +623,7 @@ function ActionContent({ region, zoomLevel, selectedNodeId, onNodeClick }: Conte
     <Box>
       {/* Execution boundary divider */}
       <Box sx={{ borderBottom: '1px solid #F85149', mb: '8px', pb: '4px' }}>
-        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.42rem', color: '#F85149', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#F85149', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
           EXECUTION BOUNDARY
         </Typography>
       </Box>
@@ -671,7 +671,7 @@ function ActionContent({ region, zoomLevel, selectedNodeId, onNodeClick }: Conte
             '&:hover': { borderColor: '#8B949E' },
           }}
         >
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#484F58', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexGrow: 1, mr: '4px' }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexGrow: 1, mr: '4px' }}>
             {n.subtitle ?? 'execution'}
           </Typography>
           <StatusBadge status={n.label} />
@@ -694,10 +694,10 @@ function ActionContent({ region, zoomLevel, selectedNodeId, onNodeClick }: Conte
             '&:hover': { borderColor: '#D29922' },
           }}
         >
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.45rem', color: '#D29922', fontWeight: 700 }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#D29922', fontWeight: 700 }}>
             UNKNOWN → ReconciliationService
           </Typography>
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.42rem', color: '#484F58' }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>
             execution status unconfirmed
           </Typography>
         </Box>
@@ -714,7 +714,7 @@ function OutcomeContent({ region, zoomLevel, selectedNodeId, onNodeClick }: Cont
 
   if (zoomLevel === 'OVERVIEW') {
     return (
-      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#8B949E' }}>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#8B949E' }}>
         {outcomeNode ? 'outcome recorded' : 'awaiting'}
       </Typography>
     );
@@ -722,7 +722,7 @@ function OutcomeContent({ region, zoomLevel, selectedNodeId, onNodeClick }: Cont
 
   if (!outcomeNode) {
     return (
-      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#484F58', fontStyle: 'italic' }}>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', fontStyle: 'italic' }}>
         AWAITING OBSERVED OUTCOME
       </Typography>
     );
@@ -767,14 +767,14 @@ function OutcomeContent({ region, zoomLevel, selectedNodeId, onNodeClick }: Cont
             : '#484F58';
           return (
             <Box key={row.key} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: '2px', borderBottom: `1px solid #1C2128` }}>
-              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.42rem', color: '#484F58', minWidth: 50 }}>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', minWidth: 50 }}>
                 {row.label}
               </Typography>
-              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#8B949E' }}>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#8B949E' }}>
                 {row.pre} → {row.post}
               </Typography>
               {row.delta !== null && (
-                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: deltaColor, fontWeight: 700, ml: '4px' }}>
+                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: deltaColor, fontWeight: 700, ml: '4px' }}>
                   {deltaNum !== null && deltaNum > 0 ? '+' : ''}{row.delta}
                 </Typography>
               )}
@@ -782,7 +782,7 @@ function OutcomeContent({ region, zoomLevel, selectedNodeId, onNodeClick }: Cont
           );
         })}
       </Box>
-      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.42rem', color: '#30363D', textTransform: 'uppercase', letterSpacing: '0.08em', mt: '4px' }}>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D', textTransform: 'uppercase', letterSpacing: '0.08em', mt: '4px' }}>
         Next Observe →
       </Typography>
     </Box>
@@ -880,7 +880,7 @@ export default function StoryDecisionGraph({
             }}>
               <Typography sx={{
                 fontFamily: 'monospace',
-                fontSize: '0.5rem',
+                fontSize: '0.6rem',
                 fontWeight: 700,
                 color: region.accentColor,
                 textTransform: 'uppercase',

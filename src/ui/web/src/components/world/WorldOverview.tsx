@@ -96,7 +96,7 @@ function Badge({ children, color = C.muted, bg = C.card }: { children: React.Rea
       component="span"
       sx={{
         fontFamily: C.mono,
-        fontSize: '0.58rem',
+        fontSize: '0.6rem',
         fontWeight: 700,
         color,
         background: bg,
@@ -241,7 +241,7 @@ function JourneyStrip({ scenarioActive }: { scenarioActive: boolean }) {
               <Typography
                 sx={{
                   fontFamily: C.mono,
-                  fontSize: '0.58rem',
+                  fontSize: '0.6rem',
                   color: done ? C.dim : '#21262D',
                   letterSpacing: '0.04em',
                 }}
@@ -297,7 +297,7 @@ function ChecksumCell({ checksum }: { checksum: string | null }) {
       <Typography sx={{ fontFamily: C.mono, fontSize: '0.65rem', color: C.text }}>
         {expanded ? checksum : `${short}...`}
       </Typography>
-      <Typography sx={{ fontFamily: C.mono, fontSize: '0.55rem', color: C.accent }}>
+      <Typography sx={{ fontFamily: C.mono, fontSize: '0.6rem', color: C.accent }}>
         {expanded ? '[collapse]' : '[expand]'}
       </Typography>
     </Box>
@@ -386,7 +386,7 @@ function GraphCard({ summary }: { summary: WorldSummaryResponse }) {
       {chartData.length > 0 && (
         <Box sx={{ mt: 1.5, mb: 1 }}>
           <Typography
-            sx={{ fontFamily: C.mono, fontSize: '0.58rem', color: C.dim, mb: 0.75, textTransform: 'uppercase', letterSpacing: '0.06em' }}
+            sx={{ fontFamily: C.mono, fontSize: '0.6rem', color: C.dim, mb: 0.75, textTransform: 'uppercase', letterSpacing: '0.06em' }}
           >
             Entity Distribution
           </Typography>
@@ -401,7 +401,7 @@ function GraphCard({ summary }: { summary: WorldSummaryResponse }) {
                 type="category"
                 dataKey="name"
                 width={90}
-                tick={{ fontFamily: 'monospace', fontSize: 9, fill: C.muted }}
+                tick={{ fontFamily: 'monospace', fontSize: '0.6rem', fill: C.muted }}
                 axisLine={false}
                 tickLine={false}
               />
@@ -410,7 +410,7 @@ function GraphCard({ summary }: { summary: WorldSummaryResponse }) {
                   background: C.card,
                   border: `1px solid ${C.border}`,
                   fontFamily: 'monospace',
-                  fontSize: 11,
+                  fontSize: '0.6875rem',
                   color: C.text,
                 }}
                 cursor={{ fill: '#21262D44' }}
@@ -438,7 +438,7 @@ function GraphCard({ summary }: { summary: WorldSummaryResponse }) {
         <Typography sx={{ fontFamily: C.mono, fontSize: '0.65rem', color: C.dim, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           Graph Explorer
         </Typography>
-        <Typography sx={{ fontFamily: C.mono, fontSize: '0.58rem', color: '#30363D', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        <Typography sx={{ fontFamily: C.mono, fontSize: '0.6rem', color: '#30363D', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           Coming in Phase 17C
         </Typography>
       </Box>

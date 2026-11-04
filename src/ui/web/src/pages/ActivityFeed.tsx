@@ -153,7 +153,7 @@ const ActivityFeed: React.FC = () => {
   const filtered = filter === 'ALL' ? entries : entries.filter((e) => e.category === filter);
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', p: 1.5, gap: 1.5 }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'auto', p: 1.5, gap: 1.5 }}>
 
       {/* Controls bar */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0 }}>
@@ -186,7 +186,7 @@ const ActivityFeed: React.FC = () => {
           </Box>
         )}
 
-        <Box sx={{ width: 1, height: 14, backgroundColor: '#1C2128', flexShrink: 0 }} />
+        <Box sx={{ width: '1px', height: 14, backgroundColor: '#1C2128', flexShrink: 0 }} />
 
         {/* Category filters */}
         {FILTERS.map(f => (

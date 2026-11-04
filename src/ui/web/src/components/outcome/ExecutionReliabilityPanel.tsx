@@ -124,7 +124,7 @@ function FieldRow({ label, value, testId }: { label: string; value: string; test
       <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', width: 130, flexShrink: 0 }}>
         {label}
       </Typography>
-      <Typography data-testid={testId} sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#8B949E', wordBreak: 'break-all' }}>
+      <Typography data-testid={testId} sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#8B949E', overflowWrap: 'anywhere' }}>
         {value}
       </Typography>
     </Box>
@@ -150,14 +150,14 @@ export default function ExecutionReliabilityPanel({
     <Box data-testid="execution-reliability-panel" sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', fontWeight: 700, color: '#484F58', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700, color: '#484F58', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
           Execution Certainty
         </Typography>
         {onViewTrace && (
           <Typography
             data-testid="view-reliability-link"
             onClick={onViewTrace}
-            sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#58A6FF', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+            sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#58A6FF', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
           >
             VIEW DEVELOPER TRACE
           </Typography>
@@ -182,7 +182,7 @@ export default function ExecutionReliabilityPanel({
 
       {/* Next action */}
       <Box sx={{ borderLeft: '2px solid #21262D', pl: 1 }}>
-        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', letterSpacing: '0.08em', mb: 0.25 }}>
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', letterSpacing: '0.08em', mb: 0.25 }}>
           WHAT HAPPENS NEXT
         </Typography>
         <Typography data-testid="reliability-next-action" sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: '#6E7681' }}>
@@ -205,7 +205,7 @@ export default function ExecutionReliabilityPanel({
             gap: 0.1,
           }}
         >
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58', letterSpacing: '0.1em', mb: 0.5 }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', letterSpacing: '0.1em', mb: 0.5 }}>
             EXPERT
           </Typography>
           <FieldRow
@@ -233,7 +233,7 @@ export default function ExecutionReliabilityPanel({
             />
           )}
           {(reliabilityState === 'INDETERMINATE' || reliabilityState === 'UNKNOWN') && (
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#D29922', mt: 0.5 }}>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#D29922', mt: 0.5 }}>
               No automatic retry has been issued.
             </Typography>
           )}

@@ -85,7 +85,7 @@ export default function KPIDelta({
       {/* Label */}
       <Typography sx={{
         fontFamily: 'monospace',
-        fontSize: '0.58rem',
+        fontSize: '0.6rem',
         color: '#484F58',
         letterSpacing: '0.08em',
         textTransform: 'uppercase',

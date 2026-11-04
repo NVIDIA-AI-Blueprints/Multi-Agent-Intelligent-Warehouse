@@ -326,7 +326,7 @@ const CommandCenter: React.FC = () => {
   };
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', p: 1.5, gap: 1.5 }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'auto', p: 1.5, gap: 1.5 }}>
 
       {/* ── SYNTHETIC DEMO CONTROL BAR (only in demo mode) ── */}
       {isDemoMode && (
@@ -334,7 +334,7 @@ const CommandCenter: React.FC = () => {
       )}
 
       {/* Main 3-column area */}
-      <Box sx={{ display: 'flex', gap: 1.5, flex: 1, overflow: 'hidden', minHeight: 0 }}>
+      <Box sx={{ display: 'flex', gap: 1.5, flex: 1, overflow: 'hidden', minHeight: 380 }}>
 
         {/* ── LEFT COLUMN ── */}
         <Box sx={{ flex: '0 0 22%', minWidth: 200, maxWidth: 280, display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'auto' }}>
@@ -359,7 +359,7 @@ const CommandCenter: React.FC = () => {
                 <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.6rem', color: '#8B949E', letterSpacing: '0.1em' }}>
                   MCP
                 </Typography>
-                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: mcpStatus?.client_ready ? '#3FB950' : '#484F58' }}>
+                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: mcpStatus?.client_ready ? '#3FB950' : '#484F58' }}>
                   {mcpStatus?.client_ready ? '●' : '○'}
                 </Typography>
               </Box>
@@ -390,9 +390,9 @@ const CommandCenter: React.FC = () => {
                       <Typography sx={{ fontFamily: 'monospace', fontSize: '0.72rem', color: isActive ? '#76B900' : isDisabled ? '#30363D' : '#C9D1D9', flexGrow: 1 }}>
                         {role}
                       </Typography>
-                      {isActive && <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#76B900' }}>ACTIVE</Typography>}
-                      {!isActive && !isDisabled && <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58' }}>READY</Typography>}
-                      {isDisabled && <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#30363D' }}>DISABLED</Typography>}
+                      {isActive && <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#76B900' }}>ACTIVE</Typography>}
+                      {!isActive && !isDisabled && <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>READY</Typography>}
+                      {isDisabled && <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D' }}>DISABLED</Typography>}
                     </Box>
                   );
                 })}
@@ -417,8 +417,8 @@ const CommandCenter: React.FC = () => {
                       <Typography sx={{ fontFamily: 'monospace', fontSize: '0.72rem', color: isActive ? '#C9D1D9' : '#484F58', flexGrow: 1 }}>
                         {agent}
                       </Typography>
-                      {isActive && <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#76B900' }}>ACTIVE</Typography>}
-                      {!isActive && <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#30363D' }}>IDLE</Typography>}
+                      {isActive && <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#76B900' }}>ACTIVE</Typography>}
+                      {!isActive && <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D' }}>IDLE</Typography>}
                     </Box>
                   );
                 })}
@@ -452,7 +452,7 @@ const CommandCenter: React.FC = () => {
                     <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.65rem', color: '#8B949E', letterSpacing: '0.1em' }}>
                       OPERATIONAL RISK TREND
                     </Typography>
-                    <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58' }}>
+                    <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>
                       {demoStatus?.world?.clock_iso
                         ? `t=${demoStatus.world.elapsed_seconds}s`
                         : ''}
@@ -501,7 +501,7 @@ const CommandCenter: React.FC = () => {
                             border: `1px solid ${step.active ? step.color : '#1C2128'}`,
                             borderRadius: 0.5,
                           }}>
-                            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', fontWeight: 700, color: step.active ? step.color : '#30363D', letterSpacing: '0.06em' }}>
+                            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700, color: step.active ? step.color : '#30363D', letterSpacing: '0.06em' }}>
                               {step.label}
                             </Typography>
                           </Box>
@@ -537,7 +537,7 @@ const CommandCenter: React.FC = () => {
                       },
                     ].map(m => (
                       <Box key={m.label} sx={{ backgroundColor: '#080C10', borderRadius: 0.5, px: 1, py: 0.75 }}>
-                        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58', letterSpacing: '0.08em', mb: 0.25 }}>
+                        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', letterSpacing: '0.08em', mb: 0.25 }}>
                           {m.label}
                         </Typography>
                         <Typography sx={{ fontFamily: 'monospace', fontSize: '0.9rem', fontWeight: 700, color: m.color }}>
@@ -741,7 +741,8 @@ const CommandCenter: React.FC = () => {
 
         {/* ── RIGHT COLUMN ── */}
         <Box sx={{ flex: '0 0 26%', minWidth: 220, maxWidth: 320, display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'auto' }}>
-          <Box sx={panelSx}>
+          {/* Full height: the column scrolls instead of the panel clipping its list */}
+          <Box sx={{ ...panelSx, flexShrink: 0 }}>
             <Box sx={panelHeaderSx}>
               <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.65rem', color: '#8B949E', letterSpacing: '0.1em' }}>
                 DECISION CENTER
@@ -791,10 +792,10 @@ const CommandCenter: React.FC = () => {
                       <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#C9D1D9', mt: 0.25 }}>
                         {pa.capability}
                       </Typography>
-                      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#6E7681', mt: 0.25 }}>
+                      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#6E7681', mt: 0.25 }}>
                         {pa.objective}
                       </Typography>
-                      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#8B949E', mt: 0.25 }}>
+                      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#8B949E', mt: 0.25 }}>
                         Risk: {pa.risk_level?.toUpperCase()}  ·  {pa.domain}
                       </Typography>
                       <Box sx={{ display: 'flex', gap: 0.5, mt: 0.75 }}>
@@ -803,7 +804,7 @@ const CommandCenter: React.FC = () => {
                           variant="outlined"
                           onClick={() => handleApprove(pa.pending_id)}
                           sx={{
-                            fontSize: '0.55rem', fontFamily: 'monospace', fontWeight: 700,
+                            fontSize: '0.6rem', fontFamily: 'monospace', fontWeight: 700,
                             py: 0.25, px: 0.75, minWidth: 0, borderColor: '#3FB950', color: '#3FB950',
                             '&:hover': { borderColor: '#3FB950', background: '#3FB95018' },
                           }}
@@ -815,7 +816,7 @@ const CommandCenter: React.FC = () => {
                           variant="outlined"
                           onClick={() => handleReject(pa.pending_id)}
                           sx={{
-                            fontSize: '0.55rem', fontFamily: 'monospace', fontWeight: 700,
+                            fontSize: '0.6rem', fontFamily: 'monospace', fontWeight: 700,
                             py: 0.25, px: 0.75, minWidth: 0, borderColor: '#F85149', color: '#F85149',
                             '&:hover': { borderColor: '#F85149', background: '#F8514918' },
                           }}
@@ -952,7 +953,7 @@ const CommandCenter: React.FC = () => {
               <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.6rem', color: '#F85149', letterSpacing: '0.1em' }}>
                 FAULT INJECTION
               </Typography>
-              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#484F58' }}>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>
                 DEMO ONLY
               </Typography>
             </Box>

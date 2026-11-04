@@ -119,7 +119,7 @@ function StageNode({
         aria-hidden="true"
         sx={{
           fontFamily: 'monospace',
-          fontSize: '0.52rem',
+          fontSize: '0.6rem',
           color: '#484F58',
           letterSpacing: '0.05em',
           lineHeight: 1,
@@ -150,7 +150,7 @@ function StageNode({
           aria-hidden="true"
           sx={{
             fontFamily: 'monospace',
-            fontSize: '0.5rem',
+            fontSize: '0.6rem',
             color: '#484F58',
             letterSpacing: '0.02em',
             lineHeight: 1,

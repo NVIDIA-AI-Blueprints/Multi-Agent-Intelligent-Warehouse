@@ -36,7 +36,7 @@ function LayerLabel({ label }: { label: string }) {
   return (
     <Typography sx={{
       fontFamily: 'monospace',
-      fontSize: '0.55rem',
+      fontSize: '0.6rem',
       color: '#484F58',
       textTransform: 'uppercase',
       letterSpacing: '0.1em',
@@ -115,7 +115,7 @@ function IdEntry({
         {truncId(id)}
       </Typography>
       {suffix && (
-        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58' }}>
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>
           {suffix}
         </Typography>
       )}
@@ -151,7 +151,7 @@ export default function DeveloperTraceArtifacts({ artifacts, onViewContextSnapsh
             <IdEntry id={artifacts.contextSnapshotId} color="#58A6FF" />
             {artifacts.contextSnapshotFocus && (
               <Typography sx={{
-                fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58',
+                fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58',
                 ml: '4px',
               }}>
                 {artifacts.contextSnapshotFocus}
@@ -168,7 +168,7 @@ export default function DeveloperTraceArtifacts({ artifacts, onViewContextSnapsh
                 sx={{
                   background: 'transparent', border: '1px solid #1F6FEB33',
                   borderRadius: '3px', px: '5px', py: '1px', ml: '6px',
-                  fontFamily: 'monospace', fontSize: '0.55rem',
+                  fontFamily: 'monospace', fontSize: '0.6rem',
                   color: '#58A6FF', cursor: 'pointer',
                   '&:hover': { borderColor: '#58A6FF' },
                 }}

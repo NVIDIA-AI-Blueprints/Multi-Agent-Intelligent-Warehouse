@@ -185,7 +185,7 @@ const DemoScript: React.FC<DemoScriptProps> = ({ onScenarioSelect }) => {
                 {flow.icon}
               </Box>
               <Box sx={{ flex: 1 }}>
-                <Typography variant="h6" sx={{ color: 'text.primary', fontSize: '16px', fontWeight: 500 }}>
+                <Typography variant="h6" sx={{ color: 'text.primary', fontSize: '1rem', fontWeight: 500 }}>
                   {flow.title}
                 </Typography>
                 <Typography variant="body2" sx={{ color: 'text.secondary' }}>
@@ -262,7 +262,7 @@ const DemoScript: React.FC<DemoScriptProps> = ({ onScenarioSelect }) => {
                         cursor: isClickable ? 'pointer' : 'default',
                         '& .MuiStepLabel-label': {
                           color: isActive ? '#76B900' : isCompleted ? '#76B900' : '#333333',
-                          fontSize: '14px',
+                          fontSize: '0.875rem',
                           fontWeight: isActive ? 'bold' : 'normal',
                         },
                         '&:hover': isClickable ? {
@@ -285,7 +285,7 @@ const DemoScript: React.FC<DemoScriptProps> = ({ onScenarioSelect }) => {
                           sx={{
                             backgroundColor: isCompleted ? '#76B900' : '#e0e0e0',
                             color: isCompleted ? '#ffffff' : '#333333',
-                            fontSize: '10px',
+                            fontSize: '0.625rem',
                           }}
                         />
                       </Box>
@@ -324,44 +324,44 @@ const DemoScript: React.FC<DemoScriptProps> = ({ onScenarioSelect }) => {
 
       <Card sx={{ backgroundColor: '#fafafa', border: '1px solid #e0e0e0', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
         <CardContent>
-          <Typography variant="h6" sx={{ color: '#333333', mb: 2, fontSize: '16px', fontWeight: 500 }}>
+          <Typography variant="h6" sx={{ color: '#333333', mb: 2, fontSize: '1rem', fontWeight: 500 }}>
             Demo Tips
           </Typography>
           <List dense>
             <ListItem>
               <ListItemIcon>
-                <CheckIcon sx={{ color: '#76B900', fontSize: '16px' }} />
+                <CheckIcon sx={{ color: '#76B900', fontSize: '1rem' }} />
               </ListItemIcon>
               <ListItemText
                 primary="Choose WH-01, Role Manager"
-                primaryTypographyProps={{ fontSize: '12px', color: '#333333' }}
+                primaryTypographyProps={{ fontSize: '0.75rem', color: '#333333' }}
               />
             </ListItem>
             <ListItem>
               <ListItemIcon>
-                <CheckIcon sx={{ color: '#76B900', fontSize: '16px' }} />
+                <CheckIcon sx={{ color: '#76B900', fontSize: '1rem' }} />
               </ListItemIcon>
               <ListItemText
                 primary="Toggle Show Internals for detailed view"
-                primaryTypographyProps={{ fontSize: '12px', color: '#333333' }}
+                primaryTypographyProps={{ fontSize: '0.75rem', color: '#333333' }}
               />
             </ListItem>
             <ListItem>
               <ListItemIcon>
-                <CheckIcon sx={{ color: '#76B900', fontSize: '16px' }} />
+                <CheckIcon sx={{ color: '#76B900', fontSize: '1rem' }} />
               </ListItemIcon>
               <ListItemText
                 primary="Check Evidence & Tool timeline in right panel"
-                primaryTypographyProps={{ fontSize: '12px', color: '#333333' }}
+                primaryTypographyProps={{ fontSize: '0.75rem', color: '#333333' }}
               />
             </ListItem>
             <ListItem>
               <ListItemIcon>
-                <CheckIcon sx={{ color: '#76B900', fontSize: '16px' }} />
+                <CheckIcon sx={{ color: '#76B900', fontSize: '1rem' }} />
               </ListItemIcon>
               <ListItemText
                 primary="Use quick replies for clarifying questions"
-                primaryTypographyProps={{ fontSize: '12px', color: '#333333' }}
+                primaryTypographyProps={{ fontSize: '0.75rem', color: '#333333' }}
               />
             </ListItem>
           </List>

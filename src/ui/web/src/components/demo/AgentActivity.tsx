@@ -79,7 +79,7 @@ function FreshnessTag({ updatedAt }: { updatedAt: string | null }) {
       data-testid="freshness-tag"
       sx={{
         fontFamily: 'monospace',
-        fontSize: '0.5rem',
+        fontSize: '0.6rem',
         color: isStale ? '#D29922' : '#484F58',
         letterSpacing: '0.04em',
       }}
@@ -138,7 +138,7 @@ function HistoricalBadge({ task }: { task: AgentTaskView }) {
       <Typography
         sx={{
           fontFamily: 'monospace',
-          fontSize: '0.5rem',
+          fontSize: '0.6rem',
           color: '#484F58',
           letterSpacing: '0.08em',
           textTransform: 'uppercase',
@@ -463,7 +463,7 @@ const AgentActivity: React.FC<AgentActivityProps> = ({
           aria-label={`Status: ${statusLabel}`}
           sx={{
             fontFamily: 'monospace',
-            fontSize: '0.55rem',
+            fontSize: '0.6rem',
             color: statusColor,
             letterSpacing: '0.06em',
           }}
@@ -472,7 +472,7 @@ const AgentActivity: React.FC<AgentActivityProps> = ({
         </Typography>
 
         {compact && (
-          <Typography aria-hidden="true" sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58' }}>
+          <Typography aria-hidden="true" sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>
             {expanded ? '▲' : '▼'}
           </Typography>
         )}
@@ -493,7 +493,7 @@ const AgentActivity: React.FC<AgentActivityProps> = ({
             <Typography
               sx={{
                 fontFamily: 'monospace',
-                fontSize: '0.5rem',
+                fontSize: '0.6rem',
                 color: '#484F58',
                 textTransform: 'uppercase',
                 letterSpacing: '0.08em',
@@ -519,7 +519,7 @@ const AgentActivity: React.FC<AgentActivityProps> = ({
             <Typography
               sx={{
                 fontFamily: 'monospace',
-                fontSize: '0.5rem',
+                fontSize: '0.6rem',
                 color: '#484F58',
                 textTransform: 'uppercase',
                 letterSpacing: '0.08em',
@@ -538,7 +538,7 @@ const AgentActivity: React.FC<AgentActivityProps> = ({
             <Typography
               sx={{
                 fontFamily: 'monospace',
-                fontSize: '0.5rem',
+                fontSize: '0.6rem',
                 color: '#484F58',
                 textTransform: 'uppercase',
                 letterSpacing: '0.08em',
@@ -551,7 +551,7 @@ const AgentActivity: React.FC<AgentActivityProps> = ({
               {runtimeLabel}
             </Typography>
             {expertMode && (
-              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#30363D' }}>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D' }}>
                 ({RUNTIME_PROFILE_DEV_LABEL['strict']})
               </Typography>
             )}
@@ -573,7 +573,7 @@ const AgentActivity: React.FC<AgentActivityProps> = ({
               <Typography
                 sx={{
                   fontFamily: 'monospace',
-                  fontSize: '0.5rem',
+                  fontSize: '0.6rem',
                   color: '#484F58',
                   textTransform: 'uppercase',
                   letterSpacing: '0.08em',
@@ -597,10 +597,10 @@ const AgentActivity: React.FC<AgentActivityProps> = ({
                 ['completed_steps', task.completed_steps.join(', ') || '—'],
               ].map(([k, v]) => (
                 <Box key={k} sx={{ display: 'flex', gap: 1, mb: 0.125 }}>
-                  <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#484F58', flexShrink: 0, width: '10rem' }}>
+                  <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', flexShrink: 0, width: '10rem' }}>
                     {k}
                   </Typography>
-                  <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#8B949E', wordBreak: 'break-all' }}>
+                  <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#8B949E', overflowWrap: 'anywhere' }}>
                     {v}
                   </Typography>
                 </Box>
@@ -683,7 +683,7 @@ const AgentActivity: React.FC<AgentActivityProps> = ({
               <Typography
                 sx={{
                   fontFamily: 'monospace',
-                  fontSize: '0.5rem',
+                  fontSize: '0.6rem',
                   color: '#484F58',
                   textTransform: 'uppercase',
                   letterSpacing: '0.08em',

@@ -59,7 +59,7 @@ export default function SafetyScorecard({ counters, showValidatedBadge = false }
           </Typography>
         </Box>
         {(isBaseline || showValidatedBadge) && (
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58', letterSpacing: '0.06em' }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', letterSpacing: '0.06em' }}>
             VALIDATED BATCH 6
           </Typography>
         )}
