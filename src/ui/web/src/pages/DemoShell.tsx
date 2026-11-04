@@ -19,6 +19,7 @@ import { GraphFocusContext } from '../services/worldAPI';
 import CopilotDrawer, { SnapshotContextLocal } from '../components/demo/copilot/CopilotDrawer';
 import { SnapshotViewContext } from '../components/world/WorldContextSnapshot';
 import { useCopilotConversation, CopilotSystemCard } from '../hooks/useCopilotConversation';
+import { describeDemoApiError } from '../components/demo/injectFeedback';
 
 const WAREHOUSE_ID = process.env.REACT_APP_WAREHOUSE_ID || 'DC-47';
 
@@ -356,6 +357,7 @@ export default function DemoShell() {
   const [showSelector, setShowSelector] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [selectedStage, setSelectedStage] = useState<RailStage | null>(null);
   const [selectedApprovalId, setSelectedApprovalId] = useState<string | null>(null);
@@ -467,6 +469,7 @@ export default function DemoShell() {
   const handleStart = useCallback(async (name: string) => {
     await demoAPI.startScenario(name);
     setShowSelector(false);
+    setAnalysisError(null);
     sseState.clear();
     setSelectedStage(null);
     setSelectedApprovalId(null);
@@ -478,6 +481,7 @@ export default function DemoShell() {
     setShowSelector(true);       // show selector immediately
     sseState.clear();            // wipe SSE buffer so no stale events leak
     setAnalysisResult(null);     // clear pipeline result from previous run
+    setAnalysisError(null);
     setAnalyzing(false);
     setSelectedStage(null);
     setSelectedApprovalId(null);
@@ -489,10 +493,13 @@ export default function DemoShell() {
   const handleAnalyze = useCallback(async () => {
     if (analyzing) return;
     setAnalyzing(true);
+    setAnalysisError(null);
     try {
       const result = await demoAPI.analyze();
       setAnalysisResult(result);
       await queryClient.invalidateQueries({ queryKey: ['demo-status'] });
+    } catch (e) {
+      setAnalysisError(describeDemoApiError(e));
     } finally {
       setAnalyzing(false);
     }
@@ -623,6 +630,7 @@ export default function DemoShell() {
               analysisResult={analysisResult}
               pendingApprovals={pendingApprovals}
               analyzing={analyzing}
+              analysisError={analysisError}
               onAnalyze={handleAnalyze}
               onReset={handleReset}
               onViewFullTrace={handleViewFullTrace}

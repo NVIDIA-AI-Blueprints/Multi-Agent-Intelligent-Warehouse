@@ -18,6 +18,7 @@ Changes on `main` since [v2.1.0](https://github.com/NVIDIA-AI-Blueprints/Multi-A
 * iot: the MQTT equipment adapter works on paho-mqtt 2.x (it could not connect), and MQTT messages reach the monitoring callback ([#202](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/202))
 * iot: the Modbus environmental adapter reads registers on pymodbus 3.x (every read returned no readings) ([#216](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/216))
 * deploy: the MCP domain containers have a working healthcheck (MCP `initialize`; there is no `/health` route) ([#196](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/196))
+* ui: the demo shows why a scenario did not start or an analysis failed. "Start scenario" did nothing on an error (for example the 403 `CROSS_ORIGIN_REQUEST_FORBIDDEN` when the UI is served from an origin missing from `CORS_ORIGINS`), and a failed `/demo/analyze` (503 `MODEL UNAVAILABLE` without an NVIDIA API key) left REASON on "Awaiting model response...". Both now show the API's error message.
 
 ### CI and dependencies
 

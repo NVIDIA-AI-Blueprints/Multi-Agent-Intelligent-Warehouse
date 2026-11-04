@@ -188,6 +188,8 @@ export interface StageContentPaneProps {
   analysisResult: AnalysisResult | null;
   pendingApprovals: PendingApproval[];
   analyzing: boolean;
+  /** Why the last analysis request failed (e.g. MODEL UNAVAILABLE), shown in OBSERVE and REASON. */
+  analysisError?: string | null;
   onAnalyze: () => Promise<void>;
   onReset?: () => void;
   /** Injected by StageContentPane — stage components may call this to open the explanation drawer. */

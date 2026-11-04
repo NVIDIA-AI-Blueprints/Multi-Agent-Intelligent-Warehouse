@@ -19,6 +19,7 @@ import {
   runWindowEvents,
   StageContentPaneProps,
 } from '../StageContentPane';
+import ApiErrorNotice from '../ApiErrorNotice';
 
 // ── Warehouse world grid ───────────────────────────────────────────────────────
 
@@ -172,6 +173,7 @@ export default function ObserveStage({
   sseEvents,
   analysisResult,
   analyzing,
+  analysisError,
   onAnalyze,
   expertMode,
 }: StageContentPaneProps) {
@@ -287,6 +289,12 @@ export default function ObserveStage({
         <StageSection>
           <SectionHeader>Pipeline events</SectionHeader>
           <ObserveEventList events={observeEvents} />
+        </StageSection>
+      )}
+
+      {analysisError && (
+        <StageSection>
+          <ApiErrorNotice testId="analysis-error" title="Analysis failed" message={analysisError} />
         </StageSection>
       )}
 
