@@ -67,5 +67,7 @@ def test_url_resolved_on_first_use_and_cached(no_database_env, tmp_path):
 
 
 def test_explicit_url_is_used(no_database_env, tmp_path):
-    migrator = DatabaseMigrator("postgresql://u:p@db:5432/x", migrations_dir=str(tmp_path))
+    migrator = DatabaseMigrator(
+        "postgresql://u:p@db:5432/x", migrations_dir=str(tmp_path)
+    )
     assert migrator.database_url == "postgresql://u:p@db:5432/x"
