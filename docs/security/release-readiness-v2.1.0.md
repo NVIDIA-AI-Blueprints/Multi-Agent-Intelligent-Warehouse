@@ -81,7 +81,7 @@ NVIDIA release-policy thresholds (for example, which severities block, and SLA w
    - SonarQube Analysis on it, recording the analysis ID, timestamp and quality gate;
    - a fresh nSpect / Pulse OSS scan.
 4. Decide on the quality-gate conditions (new-code coverage 85%, duplication 0%), which were failing in January. Fix, or agree exceptions under policy.
-5. File nSpect exceptions for svgo and undici, or remediate them.
+5. File an nSpect exception for undici, or remediate it. svgo is fixed on `main` by the npm override; confirm it cleared in the fresh scan.
 6. Upload the release candidate's SBOMs (CI artifacts `sbom-*`); register images if they are distributed.
 7. Regenerate the manifest for the release candidate:
 

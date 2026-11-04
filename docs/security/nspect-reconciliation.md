@@ -29,11 +29,11 @@
 | Registered version v2.1.0 ↔ SonarQube version | **Mismatch.** SonarQube shows version `1.0.0` and its analyses stop on 2026-01-05. | #226 sets `sonar.projectVersion` from the release tag (`2.1.0`) |
 | Valid SonarQube association | The project exists and is public. Analysis has been **stale for ten months** (root cause: `sonarqube-root-cause-analysis.md`). | #226, plus the owner runner and token actions below |
 | Scan timestamp current | **No** | First fresh analysis after #226 is merged and configured |
-| Current OSS findings | The historical langchain and aiohttp findings do not match shipped versions; svgo is real but not reachable | `oss-vulnerability-remediation.md`; #227 removes the stale manifests. A fresh nSpect scan is needed. |
+| Current OSS findings | The historical langchain and aiohttp findings do not match shipped versions; svgo 1.3.2 is replaced by 4.1.0 through an npm override | `oss-vulnerability-remediation.md`; #227 removes the stale manifests. A fresh nSpect scan is needed. |
 | Current static-analysis findings | 11 open S5145 findings triaged; 6 were reachable and are fixed in #229, together with a credential-logging issue | `sonarqube-remediation-report.md` |
 | "Scan health: no failures in two days" | Not evidence of scanning. SonarQube had not run since 2026-07-29 (dispatch-only placeholder), so there was nothing to fail. | — |
 | `v0.2-test` rows in reports | Not from this repository: no `v0.2*` tag exists upstream | Owner: check whether an old test registration or release in the program feeds the v2.1.0 report, and archive or separate it |
-| Security exceptions | None requested here | Possible: svgo (not reachable) and undici (release tooling, not shipped); evidence in the OSS document |
+| Security exceptions | None requested here | Possible: undici (release tooling, not shipped). svgo is fixed by the npm override; evidence in the OSS document |
 | SBOM | Available (see below); **not uploaded** | Owner: Manage SBOM |
 | Registered builds | Zero | Owner: decide whether `bpf-maiw-*` images are release artifacts; if so, register them and attach their image SBOMs |
 
@@ -67,5 +67,5 @@ The files are not committed. Regenerate them with `git checkout v2.1.0 && script
    - If it is, upload the release candidate's `sbom-*` CI artifacts, or the v2.1.0 files listed above.
    - Record the response.
 5. **Artifacts:** decide whether `bpf-maiw-backend` and `bpf-maiw-frontend` are distributed. If they are, register them, with their image digests and SBOMs.
-6. **Exceptions:** if svgo and undici are not remediated, file exceptions with the reachability evidence. `.nspect-allowlist.toml` could exclude the root release tooling, which is not shipped; that is a policy decision, so the file is unchanged.
+6. **Exceptions:** if undici is not remediated, file exceptions with the reachability evidence. `.nspect-allowlist.toml` could exclude the root release tooling, which is not shipped; that is a policy decision, so the file is unchanged.
 7. **Release identity:** v2.1.0 (`2fdd9fe`) predates the security fixes in #222–#229. If the registered release must carry them, register the next tag (for example v2.1.1, cut from `main` after these PRs are merged) rather than re-pointing v2.1.0.
