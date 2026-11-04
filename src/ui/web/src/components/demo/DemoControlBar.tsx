@@ -13,7 +13,7 @@ import { Box, Typography, Select, MenuItem, CircularProgress } from '@mui/materi
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { demoAPI, ScenarioMeta, InjectEventType, DemoStatus, AnalysisResult } from '../../services/demoAPI';
 import { format } from 'date-fns';
-import { describeInjectError, describeInjectTarget } from './injectFeedback';
+import { describeDemoApiError, describeInjectError, describeInjectTarget } from './injectFeedback';
 
 // ── Scenario objectives — demo narrative, not duplicating YAML description ────
 
@@ -188,8 +188,8 @@ const DemoControlBar: React.FC<Props> = ({ status, onStatusChange, onAnalysisCom
       sessionStorage.setItem('maiw_analysis_result', JSON.stringify(result));
       onAnalysisComplete?.(result);
       invalidate();
-    } catch (e: any) {
-      setAnalysisError(e?.response?.data?.detail ?? e.message ?? 'Analysis failed');
+    } catch (e) {
+      setAnalysisError(describeDemoApiError(e));
     } finally {
       setBusy(null);
     }

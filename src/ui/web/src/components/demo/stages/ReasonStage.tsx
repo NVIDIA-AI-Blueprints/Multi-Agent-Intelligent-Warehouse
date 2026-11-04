@@ -16,8 +16,9 @@ import { Box, Typography } from '@mui/material';
 import { StageSection, MonoText, StageContentPaneProps } from '../StageContentPane';
 import AgenticReasoningCanvas from '../AgenticReasoningCanvas';
 import AgentActivity from '../AgentActivity';
+import ApiErrorNotice from '../ApiErrorNotice';
 
-export default function ReasonStage({ analysisResult, expertMode, agentTask }: StageContentPaneProps) {
+export default function ReasonStage({ analysisResult, analysisError, expertMode, agentTask }: StageContentPaneProps) {
   return (
     <Box data-testid="reason-stage">
       {/* Stage header */}
@@ -43,6 +44,12 @@ export default function ReasonStage({ analysisResult, expertMode, agentTask }: S
           compact
         />
       </StageSection>
+
+      {analysisError && (
+        <StageSection>
+          <ApiErrorNotice testId="analysis-error" title="Analysis failed" message={analysisError} />
+        </StageSection>
+      )}
 
       <AgenticReasoningCanvas analysisResult={analysisResult} expertMode={expertMode} />
     </Box>

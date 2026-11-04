@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Box, Typography, CircularProgress } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { demoAPI, ScenarioMeta } from '../../services/demoAPI';
+import { describeDemoApiError } from './injectFeedback';
+import ApiErrorNotice from './ApiErrorNotice';
 
 // The canonical first scenario for the MAIW demo narrative
 const RECOMMENDED = 'labor_constraint_wave_risk';
@@ -30,12 +32,16 @@ function TagChip({ label }: { label: string }) {
 
 function ScenarioCard({ scenario, onStart }: { scenario: ScenarioMeta; onStart: (name: string) => Promise<void> }) {
   const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
   const isRec = scenario.name === RECOMMENDED;
 
   async function handleStart() {
     setStarting(true);
+    setStartError(null);
     try {
       await onStart(scenario.name);
+    } catch (e) {
+      setStartError(describeDemoApiError(e));
     } finally {
       setStarting(false);
     }
@@ -123,6 +129,10 @@ function ScenarioCard({ scenario, onStart }: { scenario: ScenarioMeta; onStart: 
         {starting && <CircularProgress size={10} sx={{ color: 'inherit' }} />}
         {starting ? 'Starting...' : 'Start scenario'}
       </Box>
+
+      {startError && (
+        <ApiErrorNotice testId="scenario-start-error" title="Could not start scenario" message={startError} />
+      )}
     </Box>
   );
 }
