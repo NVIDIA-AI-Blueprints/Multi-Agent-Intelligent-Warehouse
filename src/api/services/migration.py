@@ -97,11 +97,26 @@ class DatabaseMigrator:
     """
 
     def __init__(
-        self, database_url: str, migrations_dir: str = "data/postgres/migrations"
+        self,
+        database_url: Optional[str] = None,
+        migrations_dir: str = "data/postgres/migrations",
     ):
-        self.database_url = database_url
+        self._database_url = database_url
         self.migrations_dir = Path(migrations_dir)
         self.migrations_dir.mkdir(parents=True, exist_ok=True)
+
+    @property
+    def database_url(self) -> str:
+        """Database URL, resolved on first use when not given.
+
+        The module-level ``migrator`` is created when the API imports the
+        migration router. Resolving the URL here instead of at import lets
+        Demo Mode start without PostgreSQL settings; a migration request
+        still fails with the missing-password error.
+        """
+        if self._database_url is None:
+            self._database_url = _get_database_url()
+        return self._database_url
 
     async def initialize_migration_table(self, conn: asyncpg.Connection) -> None:
         """Initialize the migrations tracking table."""
@@ -415,8 +430,5 @@ class DatabaseMigrator:
 from .database import _get_database_url
 
 
-# Global migrator instance
-migrator = DatabaseMigrator(
-    database_url=_get_database_url(),
-    migrations_dir="data/postgres/migrations",
-)
+# Global migrator instance (database URL resolved on first use)
+migrator = DatabaseMigrator(migrations_dir="data/postgres/migrations")
