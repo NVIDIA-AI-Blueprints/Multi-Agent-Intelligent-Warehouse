@@ -37,22 +37,22 @@ Changes that reached this baseline:
   - Removed the unused `curl`, which carried 4 unfixed HIGH findings.
   - Added `apt-get upgrade`, as in the backend image.
 
-### Repository: 5 fixable HIGH, none fixable here (report-only)
+### Repository: 3 fixable HIGH, none fixable here (report-only)
 
 | Package | Lockfile | Findings | Why it stays |
 |---|---|---|---|
 | `undici` 6.29.0 | `package-lock.json` (root) | 3 HIGH (CVE-2026-87018, CVE-2026-109383, CVE-2026-109869) | Bundled inside the `npm` package that `semantic-release` depends on. A bundled dependency cannot be overridden, and the newest `npm` (12.2.1) still bundles a vulnerable `undici`. The top-level `undici` is already 6.29.1. Release tooling only: it runs in the release job, not in any image. |
-| `svgo` 1.3.2 | `src/ui/web/package-lock.json` | 2 HIGH (CVE-2026-73650, CVE-2026-84370) | Pulled in by `react-scripts` → `@svgr/webpack` 5. The fixed `svgo` versions (2.8.3+) have a different API that `@svgr/plugin-svgo` 5 cannot call. It runs only when application code imports an SVG as a component, which this UI does not: the one SVG is served from `public/`. It runs at build time and is not in the shipped image. |
 
 `webpack-dev-middleware` was updated from 7.4.5 to 7.4.6 (one HIGH finding). It is used only by the development server.
+
+`svgo` 1.3.2 (3 HIGH: CVE-2026-73650, CVE-2026-84369, CVE-2026-84370; nSpect BDSA-2026-24092), pulled in by `react-scripts` → `@svgr/webpack` 5 → `@svgr/plugin-svgo` 5, is replaced by 4.1.0 through a scoped `overrides` entry in `src/ui/web/package.json`. `@svgr/plugin-svgo` 5 cannot call the 4.x API, which is safe only because `react-scripts` configures that loader with `svgo: false`, so the plugin never runs svgo. `src/ui/web/src/__tests__/svgrSvgoDisabled.test.ts` fails if svgo is enabled there or the override stops resolving. The production build is byte-identical with and without the override. The other copy, `svgo` 2.8.4 under `cssnano` → `postcss-svgo`, is already past the fixed versions.
 
 ## HIGH gating
 
 - **Images:** fixable HIGH and CRITICAL fail the Image Scan job. In practice, the job fails when a released fix has not reached an image: a base-image bump (nginx is set by an `ARG` that Dependabot does not update) or a Python package.
-- **Repository:** HIGH stays report-only until the five findings above clear. Do not add them to a `.trivyignore`: Trivy would leave them out of the uploaded SARIF, and code scanning would then close those alerts as fixed. The options are:
+- **Repository:** HIGH stays report-only until the three `undici` findings above clear. Do not add them to a `.trivyignore`: Trivy would leave them out of the uploaded SARIF, and code scanning would then close those alerts as fixed. The options are:
   - an `npm` release that bundles a fixed `undici`;
-  - moving the UI off `react-scripts` 5, or onto an `@svgr/webpack` that uses a fixed `svgo`;
-  - scoping the repository HIGH gate to Python and the UI's production dependencies.
+  - excluding the root release tooling from the repository HIGH gate.
 
 ## Running the scans locally
 
