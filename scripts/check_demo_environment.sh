@@ -155,7 +155,7 @@ if [ "${FAILED}" -eq 0 ]; then
     echo "  To start the demo:"
     echo "    ./scripts/start_demo_mode.sh"
     echo "    cd src/ui/web && npm start"
-    echo "    Open http://localhost:3001 → COMMAND tab"
+    echo "    Open http://localhost:3001 → OPERATIONS"
     echo ""
     exit 0
 else
