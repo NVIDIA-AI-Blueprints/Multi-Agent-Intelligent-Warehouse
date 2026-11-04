@@ -26,6 +26,81 @@ MAIW addresses this by separating intelligence from operational authority.
 
 ---
 
+## Quickstart
+
+Demo Mode runs the full MAIW pipeline against a simulated warehouse. It needs no PostgreSQL, Redis, Milvus, Kafka or MCP servers, only an NVIDIA API key for the agent analysis and Copilot. To run the API and UI as containers instead, see [Demo Mode with the container images](DEPLOYMENT.md#demo-mode-with-the-container-images); for the full stack with databases, see [DEPLOYMENT.md](DEPLOYMENT.md).
+
+### Prerequisites
+
+- Python 3.11+
+- Node.js 22 (the version CI and the images use)
+- NVIDIA API key (`nvapi-...`) from [build.nvidia.com](https://build.nvidia.com/)
+- Git
+
+### Steps
+
+```bash
+# 1. Clone
+git clone https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse.git
+cd Multi-Agent-Intelligent-Warehouse
+
+# 2. Install dependencies, then all MAIW packages (editable), in a fresh venv
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+pip install -e packages/maiw-contracts -e packages/maiw-mcp -e packages/maiw-state \
+    -e packages/maiw-models -e packages/maiw-skills -e packages/maiw-decision \
+    -e packages/maiw-execution -e packages/maiw-agents -e packages/maiw-world \
+    -e apps/api
+
+# 3. Configure the model endpoint: a .env with only the provider key.
+#    Do not copy .env.example for Demo Mode: it configures the reference
+#    deployment (MAIW_DEPLOYMENT_PROFILE=reference, MAIW_SANDBOX_MODE=required),
+#    which overrides MAIW_DEMO_MODE and keeps /api/v1/ready at 503 without a
+#    database and an OpenShell sandbox.
+echo 'NVIDIA_API_KEY=nvapi-...' > .env && chmod 600 .env
+# For a self-hosted NIM: also add MAIW_NIM_BASE_URL (and MAIW_NIM_API_KEY if
+#   needed); it must serve the approved model ID of each enabled role (see .env.example)
+
+# 4. Warehouse World (DataPack): the canonical pack is committed at
+#    data/worlds/dc47-demo-v1, so this step is optional. To regenerate it:
+#    python -m maiw_world generate --overwrite
+
+# 5. Start the backend (development: in-memory procedure state, explicitly)
+MAIW_DEMO_MODE=true MAIW_PERSISTENCE_MODE=memory uvicorn maiw_api.app:app --reload --port 8001
+#    Or ./scripts/start_demo_mode.sh, which also forces the demo profile if a
+#    .env selects another one.
+#    Ready when GET /api/v1/ready on port 8001 returns "status": "READY", "profile": "demo"
+
+# 6. Start the frontend (in a second terminal; proxies /api to localhost:8001)
+cd src/ui/web && npm install && npm start
+# Runs at http://localhost:3001 (bound to 127.0.0.1; see DEPLOYMENT.md for remote access)
+```
+
+> For a durable local run set `MAIW_PERSISTENCE_ROOT` to a writable directory instead of `MAIW_PERSISTENCE_MODE=memory`; the reference deployment (`scripts/start_reference_deployment.sh`) is always file-backed.
+
+### Walk through the demo
+
+1. Open http://localhost:3001. **OPERATIONS** is the operator surface. Pick a scenario; **Labor Constraint + Wave Risk** is the recommended first run.
+2. In **OBSERVE**, click **Run MAIW Analysis**. OperationsCoordinationAgent follows its SOP, and the stage rail moves through **REASON** (evidence, interpretation, skills, recommended response), **PROPOSE** and **DECIDE** (the DecisionEngine's constraint checks).
+3. In **APPROVE**, approve the pending action. **EXECUTE** performs the governed write, and **OUTCOME** compares the KPIs before and after.
+4. Open **COPILOT** (top right; enabled once a scenario is running) and ask:
+   - "What is the current wave risk?" (ASK)
+   - "What should I do about the labor shortage?" (ANALYZE)
+   - "Did it work?" (OBSERVE_OUTCOME)
+5. Open **WORLD**: the DataPack (**BASE**), the scenario and live layers (**SCENARIO**, **LIVE**), the Operational Graph (**GRAPH**; search for "Wave 17"), and the OperationalContextSnapshot each decision used (**CONTEXT**).
+6. Open the Model Gateway Evaluation Lab: **MODELS**, then http://localhost:3001/models/lab.
+
+### Troubleshooting
+
+| Symptom | Cause and fix |
+|---------|---------------|
+| "Could not start scenario" or other actions fail with `403 CROSS_ORIGIN_REQUEST_FORBIDDEN` | The UI is open on an origin the API does not accept. By default only `localhost` and `127.0.0.1` on ports 3000 and 3001 may change state. Use one of those, or add the origin to `CORS_ORIGINS` for the API, for example `CORS_ORIGINS=http://localhost:<port>`. |
+| "Analysis failed: MODEL UNAVAILABLE" | The API has no usable `NVIDIA_API_KEY`: it is not set in the API's environment, is invalid, or has no access to the model the request is routed to (Ultra for the analysis). The API log shows the failed model call. |
+| `/api/v1/ready` returns 503 | The API is not running the demo profile, usually because `.env` came from `.env.example`. Use a `.env` with only the key (step 3), or start with `./scripts/start_demo_mode.sh`. |
+| Equipment, Operations and Safety pages, or their `/api/v1` routes, return 500 | These legacy pages read PostgreSQL, which Demo Mode does not run. They need the full stack ([DEPLOYMENT.md](DEPLOYMENT.md)). |
+
+---
+
 ## Why This Architecture
 
 Warehouse AI is different from general AI deployment:
@@ -510,68 +585,6 @@ See [docs/developer/MODEL_GATEWAY_EVALUATION.md](docs/developer/MODEL_GATEWAY_EV
 | An MCP orchestration layer | MCP is the interoperability layer; MAIW is the governance and semantic layer above it |
 | A replacement for enterprise warehouse systems | A complement that adds reasoning, governance, and outcome observation to existing systems |
 | A service hardened for untrusted networks | A blueprint for a single trusted host (remote UI access via SSH tunnel): the MCP domain servers have no caller authentication, so every port binds `127.0.0.1` by default. See [Supported Deployment Boundary](SECURITY.md#supported-deployment-boundary) |
-
----
-
-## Quickstart
-
-### Prerequisites
-
-- Python 3.11+
-- Node.js 20+
-- NVIDIA API key (`nvapi-...`) from [build.nvidia.com](https://build.nvidia.com/)
-- Git
-
-### Steps
-
-```bash
-# 1. Clone
-git clone https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse.git
-cd Multi-Agent-Intelligent-Warehouse
-
-# 2. Install dependencies, then all MAIW packages (editable), in a fresh venv
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-pip install -e packages/maiw-contracts -e packages/maiw-mcp -e packages/maiw-state \
-    -e packages/maiw-models -e packages/maiw-skills -e packages/maiw-decision \
-    -e packages/maiw-execution -e packages/maiw-agents -e packages/maiw-world \
-    -e apps/api
-
-# 3. Configure the model endpoint: a .env with only the provider key.
-#    Do not copy .env.example for Demo Mode: it configures the reference
-#    deployment (MAIW_DEPLOYMENT_PROFILE=reference, MAIW_SANDBOX_MODE=required),
-#    which overrides MAIW_DEMO_MODE and keeps /api/v1/ready at 503 without a
-#    database and an OpenShell sandbox.
-echo 'NVIDIA_API_KEY=nvapi-...' > .env && chmod 600 .env
-# For a self-hosted NIM: also add MAIW_NIM_BASE_URL (and MAIW_NIM_API_KEY if
-#   needed); it must serve the approved model ID of each enabled role (see .env.example)
-
-# 4. Warehouse World (DataPack): the canonical pack is committed at
-#    data/worlds/dc47-demo-v1, so this step is optional. To regenerate it:
-#    python -m maiw_world generate --overwrite
-
-# 5. Start backend (development: in-memory procedure state, explicitly)
-MAIW_DEMO_MODE=true MAIW_PERSISTENCE_MODE=memory uvicorn maiw_api.app:app --reload --port 8001
-#    Ready when GET /api/v1/ready on port 8001 returns "status": "READY", "profile": "demo"
-
-# 6. Start frontend (in a second terminal; proxies /api to localhost:8001)
-cd src/ui/web && npm install && npm start
-# Runs at http://localhost:3001 (bound to 127.0.0.1; see DEPLOYMENT.md for remote access)
-
-# 7. Open WORLD tab → inspect DataPack, Operational Graph, LIVE state
-# 8. Activate Wave 17 scenario → observe SCENARIO layer
-# 9. Ask Copilot: "What is the current wave risk?" (ASK intent)
-# 10. Ask Copilot: "What should I do about the labor shortage?" (ANALYZE intent)
-# 11. Inspect OperationalContextSnapshot in WORLD → CONTEXT tab
-# 12. Run SOP-driven agent: OperationsCoordinationAgent → wave_risk_resolution SOP
-# 13. Review RecommendedAction — semantic intent above the authority boundary
-# 14. Execute governed action: Copilot ACT or POST /api/v1/demo/approve
-# 15. Observe LIVE outcome in WORLD → LIVE tab
-# 16. Ask Copilot: "Did it work?" (OBSERVE_OUTCOME intent)
-# 17. Open Model Gateway Lab at http://localhost:3001/models/lab
-```
-
-> **Demo Mode** (`MAIW_DEMO_MODE=true`) does not require PostgreSQL, Redis, Milvus, or Kafka. Only `NVIDIA_API_KEY` is needed. For a durable local run set `MAIW_PERSISTENCE_ROOT` to a writable directory instead of `MAIW_PERSISTENCE_MODE=memory`; the reference deployment (`scripts/start_reference_deployment.sh`) is always file-backed.
 
 ---
 

@@ -39,7 +39,11 @@ need the infrastructure layer without the full MAIW v2 developer journey.
 
 **Option 2: Command-Line Setup (For Experienced Users)**
 
-### Local Development (Fastest Setup)
+### Full Stack with Docker Compose
+
+This sets up the full stack: databases, the four MCP servers, the API and the UI.
+To try MAIW without databases, the [README Quickstart](README.md#quickstart) (Demo
+Mode) is faster.
 
 ```bash
 # 1. Clone repository
@@ -136,6 +140,47 @@ npm start
 - Frontend: http://localhost:3001 (opens the `/demo` shell; the UI has no login screen)
 - API: http://localhost:8001
 - API Docs: http://localhost:8001/docs
+
+### Demo Mode with the container images
+
+The API and UI images (`Dockerfile.backend`, `Dockerfile.frontend`) run Demo
+Mode on their own: no databases, MCP servers or sandbox. The containers do not
+read `.env`, so export the key in the shell that runs `docker run`; `-e
+NVIDIA_API_KEY` without a value copies it from that shell and keeps it off the
+command line.
+
+```bash
+docker build -f Dockerfile.backend -t maiw-backend .
+docker build -f Dockerfile.frontend -t maiw-frontend .
+docker network create maiw-demo
+
+# Enter the key at a hidden prompt (not echoed, not saved to history)
+read -rsp 'NVIDIA API key: ' NVIDIA_API_KEY && echo && export NVIDIA_API_KEY
+
+docker run -d --name maiw-backend --network maiw-demo -p 127.0.0.1:8001:8001 \
+  -e NVIDIA_API_KEY \
+  -e MAIW_DEPLOYMENT_PROFILE=demo -e MAIW_DEMO_MODE=true \
+  -e MAIW_SANDBOX_MODE=disabled -e MAIW_PERSISTENCE_MODE=memory \
+  maiw-backend
+docker run -d --name maiw-frontend --network maiw-demo -p 127.0.0.1:3001:8080 \
+  -e MAIW_API_UPSTREAM=http://maiw-backend:8001 \
+  maiw-frontend
+```
+
+Open http://localhost:3001 once `curl -s http://127.0.0.1:8001/api/v1/ready`
+reports `"status":"READY"` and `"profile":"demo"`. Then:
+
+- **Another UI port.** The frontend container serves on 8080, and nginx proxies
+  `/api/` to `MAIW_API_UPSTREAM`. If you publish it on a port other than 3000 or
+  3001, add that origin to `CORS_ORIGINS` for the API (for example
+  `-e CORS_ORIGINS=http://localhost:3011`); otherwise every action fails with
+  `403 CROSS_ORIGIN_REQUEST_FORBIDDEN`.
+- **Changing the key.** A container reads its environment when it is created:
+  export the new key, then remove and recreate `maiw-backend`.
+- **Clean up:** `docker rm -f maiw-frontend maiw-backend && docker network rm maiw-demo`.
+
+The README [troubleshooting table](README.md#troubleshooting) covers the common
+failures.
 
 ## Prerequisites
 

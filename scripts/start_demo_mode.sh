@@ -25,7 +25,7 @@
 #
 # To start the frontend (in a separate terminal):
 #   cd src/ui/web && npm start
-#   Open http://localhost:3001 → COMMAND tab
+#   Open http://localhost:3001 → OPERATIONS
 
 set -euo pipefail
 
@@ -153,7 +153,7 @@ echo "    state_drift                   — warehouse state changes between prop
 echo ""
 echo "  Next steps:"
 echo "    1. In a separate terminal: cd src/ui/web && npm start"
-echo "    2. Open http://localhost:3001 → COMMAND tab"
+echo "    2. Open http://localhost:3001 → OPERATIONS"
 echo "    3. Select 'labor_constraint_wave_risk' and click START"
 echo "─────────────────────────────────────────────────────"
 echo ""
