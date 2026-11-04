@@ -2,7 +2,7 @@
 
 This document lists all third-party software packages used in this project, including their versions, licenses, authors, and sources.
 
-> **Dated snapshot** — generated on 2025-12-20 and not regenerated since (the generator script is no longer in the repository). Versions are the minimum versions declared at that time, with only the aiohttp, bcrypt, paho-mqtt and pymodbus floors and the PyMuPDF, passlib and langchain removals corrected since; the authoritative dependency lists are `requirements.txt`, `requirements.docker.txt`, `pyproject.toml`, `packages/*/pyproject.toml`, `apps/api/pyproject.toml`, the root `package.json` and `src/ui/web/package.json`.
+> **Dated snapshot** — generated on 2025-12-20 and not regenerated since (the generator script is no longer in the repository). Versions are the minimum versions declared at that time, with only the aiohttp, bcrypt, paho-mqtt, pymodbus, langgraph and starlette floors and the PyMuPDF, passlib and langchain removals corrected since; the authoritative dependency lists are `requirements.txt`, `requirements.docker.txt`, `pyproject.toml`, `packages/*/pyproject.toml`, `apps/api/pyproject.toml`, the root `package.json` and `src/ui/web/package.json`.
 
 **Last Updated:** 2025-12-20
 
@@ -25,7 +25,7 @@ The snapshot was built from `requirements.txt`, `requirements.docker.txt`, `scri
 | httpx | 0.27.0 | BSD License | https://pypi.org/project/httpx/ | Tom Christie <tom@tomchristie.com> | PyPI | pip | https://pypi.org/project/httpx/ |
 | isort | 5.12.0 | MIT | https://pycqa.github.io/isort/ | Timothy Crosley <timothy.crosley@gmail.com> | PyPI | pip | https://pypi.org/project/isort/ |
 | langchain-core | 1.2.6 | MIT | https://pypi.org/project/langchain-core/ | N/A | PyPI | pip | https://pypi.org/project/langchain-core/ |
-| langgraph | 1.0.5 | MIT | https://www.github.com/langchain-ai/langgraph | N/A | PyPI | pip | https://pypi.org/project/langgraph/ |
+| langgraph | 1.2.19 | MIT | https://www.github.com/langchain-ai/langgraph | N/A | PyPI | pip | https://pypi.org/project/langgraph/ |
 | loguru | 0.7.0 | MIT license | https://github.com/Delgan/loguru | Delgan <delgan.py@gmail.com> | PyPI | pip | https://pypi.org/project/loguru/ |
 | mypy | 1.5.0 | MIT License | https://www.mypy-lang.org/ | Jukka Lehtosalo <jukka.lehtosalo@iki.fi> | PyPI | pip | https://pypi.org/project/mypy/ |
 | nemoguardrails | 0.19.0 | LICENSE.md | https://pypi.org/project/nemoguardrails/ | NVIDIA <nemoguardrails@nvidia.com> | PyPI | pip | https://pypi.org/project/nemoguardrails/ |
@@ -52,7 +52,7 @@ The snapshot was built from `requirements.txt`, `requirements.docker.txt`, `scri
 | redis | 5.0.0 | MIT | https://github.com/redis/redis-py | Redis Inc. <oss@redis.com> | PyPI | pip | https://pypi.org/project/redis/ |
 | requests | 2.32.4 | Apache-2.0 | https://requests.readthedocs.io | Kenneth Reitz <me@kennethreitz.org> | PyPI | pip | https://pypi.org/project/requests/ |
 | scikit-learn | 1.5.0 | new BSD | https://scikit-learn.org | N/A | PyPI | pip | https://pypi.org/project/scikit-learn/ |
-| starlette | 0.49.1 | N/A | https://pypi.org/project/starlette/ | Tom Christie <tom@tomchristie.com> | PyPI | pip | https://pypi.org/project/starlette/ |
+| starlette | 1.10.0 | N/A | https://pypi.org/project/starlette/ | Tom Christie <tom@tomchristie.com> | PyPI | pip | https://pypi.org/project/starlette/ |
 | tiktoken | 0.12.0 | MIT License | https://pypi.org/project/tiktoken/ | Shantanu Jain <shantanu@openai.com> | PyPI | pip | https://pypi.org/project/tiktoken/ |
 | uvicorn | 0.30.1 | BSD License | https://pypi.org/project/uvicorn/ | Tom Christie <tom@tomchristie.com> | PyPI | pip | https://pypi.org/project/uvicorn/ |
 | websockets | 11.0 | BSD-3-Clause | https://pypi.org/project/websockets/ | Aymeric Augustin <aymeric.augustin@m4x.org> | PyPI | pip | https://pypi.org/project/websockets/ |
