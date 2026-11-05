@@ -189,8 +189,9 @@ class DocumentExtractionAgent:
                 preprocessing_result["images"], layout_result
             )
 
-            # Advanced OCR with Nemotron Parse for complex documents
-            if ocr_result["confidence"] < 0.8:  # Low confidence, try advanced OCR
+            # Low confidence: try advanced OCR with Nemotron Parse, when a
+            # Nemotron Parse NIM is configured (NEMO_PARSE_URL)
+            if ocr_result["confidence"] < 0.8 and self.nemotron_parse.enabled:
                 advanced_ocr = await self.nemotron_parse.parse_document(
                     preprocessing_result["images"], layout_result
                 )

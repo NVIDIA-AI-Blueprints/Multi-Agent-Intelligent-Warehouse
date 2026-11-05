@@ -301,7 +301,7 @@ The system uses the following NVIDIA NIMs:
 | **Embedding Service** | `nvidia/nemotron-3-embed-1b` (2048-dim multimodal) | Semantic search embeddings for RAG | `EMBEDDING_NIM_URL` | `https://integrate.api.nvidia.com/v1` |
 | **NeMo Retriever** | NeMo Retriever | Document preprocessing and structure analysis | `NEMO_RETRIEVER_URL` | `https://integrate.api.nvidia.com/v1` |
 | **NeMo OCR** | NeMoRetriever-OCR-v1 | Intelligent OCR with layout understanding | `NEMO_OCR_URL` | `https://integrate.api.nvidia.com/v1` |
-| **Nemotron Parse** | Nemotron Parse | Advanced document parsing and extraction | `NEMO_PARSE_URL` | `https://integrate.api.nvidia.com/v1` |
+| **Nemotron Parse** | Nemotron Parse | Optional advanced OCR for low-confidence pages | `NEMO_PARSE_URL` | None: self-hosted NIM only (hosted endpoint retired 2026-11-16); disabled when unset |
 | **Small LLM** | Multimodal VL model (runtime-configured via `NEMOTRON_OMNI_API_KEY`) | Structured data extraction and entity recognition | `NEMOTRON_OMNI_URL` | `https://integrate.api.nvidia.com/v1` |
 | **Large LLM Judge** | Routed by ModelGateway at HIGH reasoning → Nemotron 3 Ultra (`nvidia/nemotron-3-ultra-550b-a55b`) by default | Quality validation and confidence scoring | `LLM_NIM_URL` | `https://integrate.api.nvidia.com/v1` |
 | **NeMo Guardrails** | NeMo Guardrails | Content safety and compliance validation | `RAIL_API_URL` | `https://integrate.api.nvidia.com/v1` |
@@ -338,7 +338,7 @@ EMBEDDING_NIM_URL=https://integrate.api.nvidia.com/v1
 # Document Processing NIMs (all use integrate.api.nvidia.com)
 NEMO_RETRIEVER_URL=https://integrate.api.nvidia.com/v1
 NEMO_OCR_URL=https://integrate.api.nvidia.com/v1
-NEMO_PARSE_URL=https://integrate.api.nvidia.com/v1
+# Nemotron Parse has no hosted endpoint (retired 2026-11-16); see self-hosted NIMs
 NEMOTRON_OMNI_URL=https://integrate.api.nvidia.com/v1
 LLM_NIM_URL=https://integrate.api.nvidia.com/v1
 
@@ -387,7 +387,7 @@ Deploy NIMs on your own infrastructure for data privacy, cost control, and custo
    # Self-hosted Document Processing NIMs
    NEMO_RETRIEVER_URL=https://your-nim-host:8002/v1  # Use https:// for production
    NEMO_OCR_URL=https://your-nim-host:8003/v1  # Use https:// for production
-   NEMO_PARSE_URL=https://your-nim-host:8004/v1  # Use https:// for production
+   NEMO_PARSE_URL=https://your-nim-host:8004/v1  # Optional; Nemotron Parse is off when unset
    NEMOTRON_OMNI_URL=https://your-nim-host:8005/v1  # Use https:// for production
    
    # Self-hosted NeMo Guardrails

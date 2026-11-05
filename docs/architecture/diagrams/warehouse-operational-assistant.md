@@ -572,7 +572,7 @@ The Warehouse Operational Assistant uses multiple NVIDIA NIMs (NVIDIA Inference 
 | **Embedding Service** | nemotron-3-embed-1b | Semantic search embeddings for RAG | Cloud (integrate.api.nvidia.com) or Self-hosted | `EMBEDDING_NIM_URL` | `https://integrate.api.nvidia.com/v1` |
 | **NeMo Retriever** | NeMo Retriever | Document preprocessing and structure analysis | Cloud or Self-hosted | `NEMO_RETRIEVER_URL` | `https://integrate.api.nvidia.com/v1` |
 | **NeMo OCR** | NeMoRetriever-OCR-v1 | Intelligent OCR with layout understanding | Cloud or Self-hosted | `NEMO_OCR_URL` | `https://integrate.api.nvidia.com/v1` |
-| **Nemotron Parse** | Nemotron Parse | Advanced document parsing and extraction | Cloud or Self-hosted | `NEMO_PARSE_URL` | `https://integrate.api.nvidia.com/v1` |
+| **Nemotron Parse** | Nemotron Parse | Optional advanced OCR for low-confidence pages | Self-hosted only (hosted endpoint retired 2026-11-16) | `NEMO_PARSE_URL` | None (disabled when unset) |
 | **Small LLM** | nemotron-nano-12b-v2-vl | Structured data extraction and entity recognition | Cloud or Self-hosted | `LLAMA_NANO_VL_URL` | `https://integrate.api.nvidia.com/v1` |
 | **Large LLM Judge** | Nemotron 3 Super 120B | Quality validation and confidence scoring | Cloud or Self-hosted | `LLM_NIM_URL` | `https://integrate.api.nvidia.com/v1` |
 | **NeMo Guardrails** | NeMo Guardrails | Content safety and compliance validation | Cloud or Self-hosted | `RAIL_API_KEY` (uses NVIDIA endpoint) | `https://integrate.api.nvidia.com/v1` |
