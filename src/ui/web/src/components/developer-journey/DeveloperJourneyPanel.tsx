@@ -35,7 +35,7 @@ function PanelSection({ title, children }: { title: string; children: React.Reac
     <Box sx={{ mb: 2 }}>
       <Typography sx={{
         fontFamily: 'monospace',
-        fontSize: '0.55rem',
+        fontSize: '0.6rem',
         fontWeight: 700,
         color: '#484F58',
         letterSpacing: '0.12em',
@@ -55,7 +55,7 @@ function FieldRow({ label, value, mono = true }: { label: string; value: string 
     <Box sx={{ display: 'flex', gap: 1, mb: '4px', alignItems: 'flex-start' }}>
       <Typography sx={{
         fontFamily: 'monospace',
-        fontSize: '0.58rem',
+        fontSize: '0.6rem',
         color: '#6E7681',
         minWidth: 120,
         flexShrink: 0,
@@ -64,9 +64,9 @@ function FieldRow({ label, value, mono = true }: { label: string; value: string 
       </Typography>
       <Typography sx={{
         fontFamily: mono ? 'monospace' : 'inherit',
-        fontSize: '0.58rem',
+        fontSize: '0.6rem',
         color: '#C9D1D9',
-        wordBreak: 'break-all',
+        overflowWrap: 'anywhere',
       }}>
         {value}
       </Typography>
@@ -90,7 +90,7 @@ function CrossLink({ label, onClick }: { label: string; onClick: () => void }) {
       onKeyDown={handleKeyDown}
       sx={{
         fontFamily: 'monospace',
-        fontSize: '0.55rem',
+        fontSize: '0.6rem',
         color: '#58A6FF',
         cursor: 'pointer',
         letterSpacing: '0.04em',
@@ -225,7 +225,7 @@ function ApprovedFamilyBadge({ status }: { status: 'approved' | 'unapproved' | '
           {label}
         </Typography>
       </Box>
-      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.57rem', color: '#484F58' }}>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>
         {desc}
       </Typography>
     </Box>
@@ -321,7 +321,7 @@ function SkillsPanel({ copilotTurn, onNavigate }: {
           {skillsUsed.map(skill => (
             <Typography key={skill} sx={{
               fontFamily: 'monospace',
-              fontSize: '0.58rem',
+              fontSize: '0.6rem',
               color: '#3FB950',
               mb: '2px',
             }}>
@@ -335,7 +335,7 @@ function SkillsPanel({ copilotTurn, onNavigate }: {
           {skillsAvail.map(skill => (
             <Typography key={skill} sx={{
               fontFamily: 'monospace',
-              fontSize: '0.58rem',
+              fontSize: '0.6rem',
               color: '#484F58',
               mb: '2px',
             }}>
@@ -384,16 +384,16 @@ function DecisionPanel({ identity, copilotTurn, analysisResult, onNavigate }: {
         <PanelSection title={`Recommendations (${recs.length})`}>
           {recs.slice(0, 3).map((r, i) => (
             <Box key={i} sx={{ mb: 0.75, pl: 1, borderLeft: '2px solid #21262D' }}>
-              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#8B949E' }}>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#8B949E' }}>
                 {r.domain.toUpperCase()} · {r.capability}
               </Typography>
-              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#6E7681' }}>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#6E7681' }}>
                 {r.target}
               </Typography>
             </Box>
           ))}
           {recs.length > 3 && (
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.52rem', color: '#484F58' }}>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>
               +{recs.length - 3} more
             </Typography>
           )}
@@ -427,7 +427,7 @@ function ExecutionPanel({ identity, copilotTurn, onNavigate }: {
         {(copilotTurn?.act_violations ?? []).length > 0 && (
           <Box sx={{ mt: 0.5 }}>
             {(copilotTurn!.act_violations ?? []).map((v, i) => (
-              <Typography key={i} sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#F85149' }}>
+              <Typography key={i} sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#F85149' }}>
                 VIOLATION [{v.code}]: {v.message}
               </Typography>
             ))}
@@ -466,7 +466,7 @@ function OutcomePanel({ copilotTurn, analysisResult, onNavigate }: {
           <FieldRow label="operational_improved" value={String(improved)} />
         )}
         {summary && (
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#C9D1D9', mb: 1 }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#C9D1D9', mb: 1 }}>
             {summary}
           </Typography>
         )}

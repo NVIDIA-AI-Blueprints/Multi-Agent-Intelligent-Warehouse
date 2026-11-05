@@ -121,7 +121,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                 <Typography variant="body2" sx={{ color: 'text.primary', mb: 1, fontWeight: 500 }}>
                   Data Summary:
                 </Typography>
-                <Box sx={{ backgroundColor: 'background.default', p: 1, borderRadius: 1, fontFamily: 'monospace', fontSize: '10px', border: '1px solid', borderColor: 'divider' }}>
+                <Box sx={{ backgroundColor: 'background.default', p: 1, borderRadius: 1, fontFamily: 'monospace', fontSize: '0.625rem', border: '1px solid', borderColor: 'divider' }}>
                   <pre style={{ color: 'text.primary', margin: 0, whiteSpace: 'pre-wrap' }}>
                     {JSON.stringify(message.structured_data.data, null, 2)}
                   </pre>
@@ -211,7 +211,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             <Typography variant="h6" sx={{ color: 'text.primary', mb: 1, fontWeight: 500 }}>
               Structured Data
             </Typography>
-            <Box sx={{ backgroundColor: 'background.default', p: 1, borderRadius: 1, fontFamily: 'monospace', fontSize: '10px', border: '1px solid', borderColor: 'divider' }}>
+            <Box sx={{ backgroundColor: 'background.default', p: 1, borderRadius: 1, fontFamily: 'monospace', fontSize: '0.625rem', border: '1px solid', borderColor: 'divider' }}>
               <pre style={{ color: 'inherit', margin: 0, whiteSpace: 'pre-wrap' }}>
                 {JSON.stringify(message.structured_data, null, 2)}
               </pre>
@@ -434,7 +434,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                     sx={{
                       backgroundColor: getConfidenceColor(message.confidence),
                       color: '#ffffff',
-                      fontSize: '10px',
+                      fontSize: '0.625rem',
                     }}
                   />
                 </Tooltip>

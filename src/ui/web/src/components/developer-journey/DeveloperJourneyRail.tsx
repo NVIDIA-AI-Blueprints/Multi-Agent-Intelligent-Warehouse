@@ -187,7 +187,7 @@ function StagePill({
           aria-hidden="true"
           sx={{
             fontFamily: 'monospace',
-            fontSize: '0.5rem',
+            fontSize: '0.6rem',
             color: '#6E7681',
             mt: '1px',
             textAlign: 'center',

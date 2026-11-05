@@ -20,7 +20,7 @@ export function BreadcrumbBar({ steps }: { steps: string[] }) {
         <React.Fragment key={s}>
           <Typography sx={{
             fontFamily: 'monospace',
-            fontSize: '0.58rem',
+            fontSize: '0.6rem',
             color: i === steps.length - 1 ? '#58A6FF' : '#484F58',
             fontWeight: i === steps.length - 1 ? 700 : 400,
             letterSpacing: '0.06em',
@@ -28,7 +28,7 @@ export function BreadcrumbBar({ steps }: { steps: string[] }) {
             {s}
           </Typography>
           {i < steps.length - 1 && (
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#30363D', px: '4px' }}>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D', px: '4px' }}>
               →
             </Typography>
           )}
@@ -44,7 +44,7 @@ export function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <Typography sx={{
       fontFamily: 'monospace',
-      fontSize: '0.58rem',
+      fontSize: '0.6rem',
       fontWeight: 700,
       color: '#484F58',
       letterSpacing: '0.12em',
@@ -76,7 +76,7 @@ export function SourceBadge({ source }: { source: NodeSource }) {
   return (
     <Box component="span" sx={{
       fontFamily: 'monospace',
-      fontSize: '0.55rem',
+      fontSize: '0.6rem',
       fontWeight: 700,
       color,
       border: `1px solid ${color}44`,
@@ -96,7 +96,7 @@ export function SourceBadge({ source }: { source: NodeSource }) {
 export function EvidenceRow({ label, value, suffix, source }: ExplanationEvidence) {
   return (
     <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, py: '2px' }}>
-      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', minWidth: 80, flexShrink: 0 }}>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', minWidth: 80, flexShrink: 0 }}>
         {label}
       </Typography>
       <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: '#C9D1D9', flex: 1 }}>
@@ -167,10 +167,10 @@ export function TraceSection({ traceIds }: { traceIds: ExplanationTraceIds }) {
           py: '4px',
         }}
       >
-        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58' }}>
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>
           {open ? '▾' : '▸'}
         </Typography>
-        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
           TRACE DETAILS
         </Typography>
       </Box>
@@ -178,10 +178,10 @@ export function TraceSection({ traceIds }: { traceIds: ExplanationTraceIds }) {
         <Box sx={{ mt: 0.5, pl: 1.5, display: 'flex', flexDirection: 'column', gap: 0.25 }}>
           {entries.map(([k, v]) => (
             <Box key={k} sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75 }}>
-              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58', minWidth: 84 }}>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', minWidth: 84 }}>
                 {k}:
               </Typography>
-              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#6E7681', wordBreak: 'break-all' }}>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#6E7681', overflowWrap: 'anywhere' }}>
                 {v}
               </Typography>
             </Box>

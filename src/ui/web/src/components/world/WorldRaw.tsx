@@ -65,7 +65,7 @@ function SectionHeading({ label }: { label: string }) {
     <Typography
       sx={{
         fontFamily: C.mono,
-        fontSize: '0.58rem',
+        fontSize: '0.6rem',
         color: C.dim,
         letterSpacing: '0.1em',
         textTransform: 'uppercase',
@@ -201,7 +201,7 @@ function ManifestSection() {
                   fontFamily: C.mono,
                   fontSize: '0.62rem',
                   color: f.key === 'semantic_checksum' ? C.accent : C.text,
-                  wordBreak: 'break-all',
+                  overflowWrap: 'anywhere',
                 }}
               >
                 {String(f.value)}
@@ -298,7 +298,7 @@ function EntityRow({
       <Typography
         sx={{
           fontFamily: C.mono,
-          fontSize: '0.55rem',
+          fontSize: '0.6rem',
           color: C.dim,
           width: '90px',
           flexShrink: 0,
@@ -324,7 +324,7 @@ function EntityRow({
       <Typography
         sx={{
           fontFamily: C.mono,
-          fontSize: '0.55rem',
+          fontSize: '0.6rem',
           color: C.dim,
           flexShrink: 0,
           ml: 'auto',
@@ -380,7 +380,7 @@ function EntitiesSection({
 
       {/* Type selector */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-        <Typography sx={{ fontFamily: C.mono, fontSize: '0.58rem', color: C.dim }}>
+        <Typography sx={{ fontFamily: C.mono, fontSize: '0.6rem', color: C.dim }}>
           Type:
         </Typography>
         <Box
@@ -408,7 +408,7 @@ function EntitiesSection({
           ))}
         </Box>
         {total > 0 && (
-          <Typography sx={{ fontFamily: C.mono, fontSize: '0.58rem', color: C.dim, ml: 'auto' }}>
+          <Typography sx={{ fontFamily: C.mono, fontSize: '0.6rem', color: C.dim, ml: 'auto' }}>
             {total.toLocaleString()} total
           </Typography>
         )}
@@ -553,7 +553,7 @@ function ContextSnapshotRow({
         >
           {snap.focus_label}
         </Typography>
-        <Typography sx={{ fontFamily: C.mono, fontSize: '0.55rem', color: C.dim, mt: '2px' }}>
+        <Typography sx={{ fontFamily: C.mono, fontSize: '0.6rem', color: C.dim, mt: '2px' }}>
           {snap.entity_count} entities
           {snap.truncated ? ' (TRUNCATED)' : ''}
           {' · '}
@@ -563,7 +563,7 @@ function ContextSnapshotRow({
       <Typography
         sx={{
           fontFamily: C.mono,
-          fontSize: '0.55rem',
+          fontSize: '0.6rem',
           color: C.dim,
           flexShrink: 0,
           alignSelf: 'center',
@@ -644,7 +644,7 @@ function ContextSnapshotsSection({
 
       {selectedTurnId && (
         <Box sx={{ mt: 1 }}>
-          <Typography sx={{ fontFamily: C.mono, fontSize: '0.55rem', color: C.dim }}>
+          <Typography sx={{ fontFamily: C.mono, fontSize: '0.6rem', color: C.dim }}>
             Open CONTEXT tab to view full snapshot for this turn.
           </Typography>
         </Box>

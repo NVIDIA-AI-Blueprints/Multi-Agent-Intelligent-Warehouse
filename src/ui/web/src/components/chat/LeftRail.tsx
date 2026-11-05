@@ -71,7 +71,7 @@ const LeftRail: React.FC<LeftRailProps> = ({ onScenarioSelect, recentTasks }) =>
           sx={{
             '& .MuiTab-root': {
               color: 'text.secondary',
-              fontSize: '12px',
+              fontSize: '0.75rem',
               minHeight: '40px',
               '&.Mui-selected': {
                 color: 'primary.main',
@@ -88,7 +88,7 @@ const LeftRail: React.FC<LeftRailProps> = ({ onScenarioSelect, recentTasks }) =>
       <Box sx={{ flex: 1, overflow: 'hidden' }}>
         {activeTab === 0 && (
           <Box sx={{ p: 2, height: '100%', overflow: 'auto' }}>
-            <Typography variant="h6" sx={{ color: 'text.primary', mb: 2, fontSize: '14px', fontWeight: 500 }}>
+            <Typography variant="h6" sx={{ color: 'text.primary', mb: 2, fontSize: '0.875rem', fontWeight: 500 }}>
               Quick Actions
             </Typography>
             <List dense>
@@ -107,7 +107,7 @@ const LeftRail: React.FC<LeftRailProps> = ({ onScenarioSelect, recentTasks }) =>
                     <ListItemText
                       primary={scenario.label}
                       primaryTypographyProps={{
-                        fontSize: '12px',
+                        fontSize: '0.75rem',
                         color: 'text.primary',
                       }}
                     />
@@ -118,7 +118,7 @@ const LeftRail: React.FC<LeftRailProps> = ({ onScenarioSelect, recentTasks }) =>
 
             <Divider sx={{ my: 2 }} />
 
-            <Typography variant="h6" sx={{ color: 'text.primary', mb: 2, fontSize: '14px', fontWeight: 500 }}>
+            <Typography variant="h6" sx={{ color: 'text.primary', mb: 2, fontSize: '0.875rem', fontWeight: 500 }}>
               Recent Tasks
             </Typography>
             <List dense>
@@ -136,7 +136,7 @@ const LeftRail: React.FC<LeftRailProps> = ({ onScenarioSelect, recentTasks }) =>
                       }}
                     >
                       <ListItemIcon sx={{ minWidth: 32 }}>
-                        <HistoryIcon sx={{ color: 'text.secondary', fontSize: '16px' }} />
+                        <HistoryIcon sx={{ color: 'text.secondary', fontSize: '1rem' }} />
                       </ListItemIcon>
                       <ListItemText
                         primary={task.title}
@@ -148,7 +148,7 @@ const LeftRail: React.FC<LeftRailProps> = ({ onScenarioSelect, recentTasks }) =>
                               sx={{
                                 backgroundColor: getStatusColor(task.status),
                                 color: '#ffffff',
-                                fontSize: '10px',
+                                fontSize: '0.625rem',
                                 height: '16px',
                               }}
                             />
@@ -156,7 +156,7 @@ const LeftRail: React.FC<LeftRailProps> = ({ onScenarioSelect, recentTasks }) =>
                           </Typography>
                         }
                         primaryTypographyProps={{
-                          fontSize: '12px',
+                          fontSize: '0.75rem',
                           color: 'text.primary',
                         }}
                       />

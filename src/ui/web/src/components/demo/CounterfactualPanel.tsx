@@ -131,7 +131,7 @@ function MiniChart({
           return (
             <g key={i}>
               <line x1={PL} y1={y} x2={W - PR} y2={y} stroke="#21262D" strokeWidth="0.5" />
-              <text x={PL - 3} y={y + 3} textAnchor="end" fill="#484F58" fontSize="7" fontFamily="monospace">
+              <text x={PL - 3} y={y + 3} textAnchor="end" fill="#484F58" fontSize="12" fontFamily="monospace">
                 {seriesDef.maxVal === 10 ? String(Math.round(v / 10)) : String(v)}
               </text>
             </g>
@@ -151,7 +151,7 @@ function MiniChart({
         )}
         {/* X axis */}
         {[0, 300, 600, 900, 1200, 1800].filter(t => t <= maxElapsed + 60).map(t => (
-          <text key={t} x={toX(t)} y={H - 4} textAnchor="middle" fill="#484F58" fontSize="7" fontFamily="monospace">
+          <text key={t} x={toX(t)} y={H - 4} textAnchor="middle" fill="#484F58" fontSize="12" fontFamily="monospace">
             {t}s
           </text>
         ))}

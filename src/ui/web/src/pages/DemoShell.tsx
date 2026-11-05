@@ -132,7 +132,7 @@ function Phase15CopilotButton({
     >
       Copilot
       <Box component="span" sx={{
-        fontFamily: 'monospace', fontSize: '0.52rem',
+        fontFamily: 'monospace', fontSize: '0.6rem',
         color: active ? (open ? '#58A6FF' : '#6E7681') : '#484F58',
         border: '1px solid #21262D', borderRadius: '3px',
         px: '4px', py: '0px', ml: 0.25, lineHeight: 1.6,
@@ -155,7 +155,7 @@ function SSEStatusChip({ connected, error }: { connected: boolean; error: string
         sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
       >
         <Box sx={{ width: 5, height: 5, borderRadius: '50%', background: '#3FB950', flexShrink: 0, boxShadow: '0 0 4px #3FB950' }} />
-        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
           Live
         </Typography>
       </Box>
@@ -167,7 +167,7 @@ function SSEStatusChip({ connected, error }: { connected: boolean; error: string
       sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
     >
       <Box sx={{ width: 5, height: 5, borderRadius: '50%', background: '#D29922', flexShrink: 0 }} />
-      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#D29922', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#D29922', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
         {error ? 'Reconnecting' : 'Connecting'}
       </Typography>
     </Box>

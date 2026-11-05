@@ -91,7 +91,7 @@ export default function TerminalTypewriter({
       {isTyping && (
         <Typography sx={{
           fontFamily: 'monospace',
-          fontSize: '0.52rem',
+          fontSize: '0.6rem',
           color: '#30363D',
           mt: '2px',
           letterSpacing: '0.06em',

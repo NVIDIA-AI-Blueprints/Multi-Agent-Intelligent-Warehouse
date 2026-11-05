@@ -73,7 +73,7 @@ function Badge({
       component="span"
       sx={{
         fontFamily: C.mono,
-        fontSize: '0.58rem',
+        fontSize: '0.6rem',
         fontWeight: 700,
         color,
         border: `1px solid ${color}44`,
@@ -201,7 +201,7 @@ function ChangedEntityCard({ entity }: { entity: ChangedEntityDTO }) {
           <Badge color={C.green}>{String(cf.after_value ?? 'null')}</Badge>
         </Box>
       ))}
-      <Mono color={C.dim} size="0.58rem" >{entity.note}</Mono>
+      <Mono color={C.dim} size="0.6rem" >{entity.note}</Mono>
     </Box>
   );
 }
@@ -404,7 +404,7 @@ export default function WorldLive() {
           >
             <Mono color={color} size="1.1rem">{value}</Mono>
             <Mono color={C.muted} size="0.6rem">{label}</Mono>
-            <Mono color={C.dim} size="0.58rem">{sub}</Mono>
+            <Mono color={C.dim} size="0.6rem">{sub}</Mono>
           </Box>
         ))}
       </Box>
@@ -428,7 +428,7 @@ export default function WorldLive() {
         <Mono color={C.dim} size="0.62rem">Last execution:</Mono>
         <Badge color={sem.color}>{sem.label}</Badge>
         {live.last_execution?.trace_id && (
-          <Mono color={C.dim} size="0.58rem">trace {live.last_execution.trace_id.slice(0, 8)}</Mono>
+          <Mono color={C.dim} size="0.6rem">trace {live.last_execution.trace_id.slice(0, 8)}</Mono>
         )}
       </Box>
 

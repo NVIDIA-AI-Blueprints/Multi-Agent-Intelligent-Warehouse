@@ -339,7 +339,7 @@ export default function OperationalGraph({
             sx={{
               background: 'transparent', border: '1px solid #21262D',
               borderRadius: '3px', px: '6px', py: '2px',
-              fontFamily: 'monospace', fontSize: label === '%' ? '0.58rem' : '0.8rem',
+              fontFamily: 'monospace', fontSize: label === '%' ? '0.6rem' : '0.8rem',
               color: disabled ? '#30363D' : '#6E7681', cursor: disabled ? 'default' : 'pointer',
               '&:hover:not(:disabled)': { color: '#8B949E', borderColor: '#30363D' },
             }}
@@ -353,7 +353,7 @@ export default function OperationalGraph({
           </Typography>
         )}
         <Box sx={{ flexGrow: 1 }} />
-        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#30363D' }}>
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D' }}>
           CANONICAL OPERATIONAL GRAPH
         </Typography>
       </Box>

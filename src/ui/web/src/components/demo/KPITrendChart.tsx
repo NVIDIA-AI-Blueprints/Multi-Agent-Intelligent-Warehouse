@@ -87,7 +87,7 @@ const KPITrendChart: React.FC<Props> = React.memo(({ history, lifecycleEvents = 
             return (
               <g key={v}>
                 <line x1={PAD_L} y1={y} x2={W - PAD_R} y2={y} stroke="#1C2128" strokeWidth="0.8" />
-                <text x={PAD_L - 4} y={y + 3} textAnchor="end" fontSize="8" fill="#30363D" fontFamily="monospace">{v}</text>
+                <text x={PAD_L - 4} y={y + 3} textAnchor="end" fontSize="12" fill="#30363D" fontFamily="monospace">{v}</text>
               </g>
             );
           })}
@@ -131,16 +131,16 @@ const KPITrendChart: React.FC<Props> = React.memo(({ history, lifecycleEvents = 
             ) : (
               <Box sx={{ width: 12, height: 2, backgroundColor: s.color, borderRadius: 1, flexShrink: 0 }} />
             )}
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58' }}>{s.label}</Typography>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>{s.label}</Typography>
           </Box>
         ))}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           <Box sx={{ width: 10, height: 1, borderTop: '1px dashed #F85149', opacity: 0.7 }} />
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58' }}>INJECT</Typography>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>INJECT</Typography>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           <Box sx={{ width: 10, height: 1, borderTop: '1px dashed #76B900', opacity: 0.7 }} />
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58' }}>MAIW</Typography>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>MAIW</Typography>
         </Box>
       </Box>
     </Box>

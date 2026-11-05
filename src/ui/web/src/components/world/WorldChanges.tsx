@@ -80,7 +80,7 @@ function Badge({
       component="span"
       sx={{
         fontFamily: C.mono,
-        fontSize: '0.58rem',
+        fontSize: '0.6rem',
         fontWeight: 700,
         color,
         border: `1px solid ${color}44`,
@@ -117,7 +117,7 @@ function ChecksumCell({ checksum }: { checksum: string | null }) {
       <Typography sx={{ fontFamily: C.mono, fontSize: '0.65rem', color: C.text }}>
         {expanded ? checksum : `${short}...`}
       </Typography>
-      <Typography sx={{ fontFamily: C.mono, fontSize: '0.55rem', color: C.accent }}>
+      <Typography sx={{ fontFamily: C.mono, fontSize: '0.6rem', color: C.accent }}>
         {expanded ? '[collapse]' : '[expand]'}
       </Typography>
     </Box>
@@ -350,7 +350,7 @@ function AffectedEntityCard({ entity }: { entity: AffectedEntityDTO }) {
         }}
       >
         <Box sx={{ flex: 1 }}>
-          <Typography sx={{ fontFamily: C.mono, fontSize: '0.55rem', color: C.dim, textTransform: 'uppercase', mb: 0.25 }}>
+          <Typography sx={{ fontFamily: C.mono, fontSize: '0.6rem', color: C.dim, textTransform: 'uppercase', mb: 0.25 }}>
             Base
           </Typography>
           <Typography sx={{ fontFamily: C.mono, fontSize: '0.65rem', color: C.muted }}>
@@ -361,7 +361,7 @@ function AffectedEntityCard({ entity }: { entity: AffectedEntityDTO }) {
           &rarr;
         </Typography>
         <Box sx={{ flex: 1, textAlign: 'right' }}>
-          <Typography sx={{ fontFamily: C.mono, fontSize: '0.55rem', color: C.dim, textTransform: 'uppercase', mb: 0.25 }}>
+          <Typography sx={{ fontFamily: C.mono, fontSize: '0.6rem', color: C.dim, textTransform: 'uppercase', mb: 0.25 }}>
             Scenario
           </Typography>
           <Typography sx={{ fontFamily: C.mono, fontSize: '0.65rem', color: C.text, fontWeight: 600 }}>

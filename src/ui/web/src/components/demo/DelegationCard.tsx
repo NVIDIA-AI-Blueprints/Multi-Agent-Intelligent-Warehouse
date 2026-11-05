@@ -151,7 +151,7 @@ function SingleDelegationCard({ result, parentTaskId, expertMode }: SingleDelega
             data-testid={`delegation-status-${result.status.toLowerCase()}`}
             sx={{
               fontFamily: 'monospace',
-              fontSize: '0.55rem',
+              fontSize: '0.6rem',
               color: result.status === 'RUNNING' ? '#58A6FF' : '#8B949E',
             }}
           >
@@ -168,7 +168,7 @@ function SingleDelegationCard({ result, parentTaskId, expertMode }: SingleDelega
           </Typography>
         </Box>
 
-        <Typography aria-hidden="true" sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58' }}>
+        <Typography aria-hidden="true" sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>
           {expanded ? '▲' : '▼'}
         </Typography>
       </Box>
@@ -176,7 +176,7 @@ function SingleDelegationCard({ result, parentTaskId, expertMode }: SingleDelega
       {/* Summary (always visible) */}
       {assessmentSummary && (
         <Box sx={{ px: 1.5, py: 0.75 }}>
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.25 }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.25 }}>
             Finding
           </Typography>
           <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: '#8B949E' }}>
@@ -188,7 +188,7 @@ function SingleDelegationCard({ result, parentTaskId, expertMode }: SingleDelega
       {/* Evidence */}
       {result.evidence.length > 0 && (
         <Box sx={{ px: 1.5, pb: 0.75 }}>
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.25 }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.25 }}>
             Evidence
           </Typography>
           {result.evidence.map((ev, i) => (
@@ -211,7 +211,7 @@ function SingleDelegationCard({ result, parentTaskId, expertMode }: SingleDelega
               borderTop: '1px solid #21262D',
             }}
           >
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.5 }}>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.5 }}>
               Developer detail
             </Typography>
             {[
@@ -226,10 +226,10 @@ function SingleDelegationCard({ result, parentTaskId, expertMode }: SingleDelega
               ['trace_id', result.trace_id ?? '—'],
             ].map(([k, v]) => (
               <Box key={k} sx={{ display: 'flex', gap: 1, mb: 0.125 }}>
-                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#484F58', flexShrink: 0, width: '10rem' }}>
+                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', flexShrink: 0, width: '10rem' }}>
                   {k}
                 </Typography>
-                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#8B949E', wordBreak: 'break-all' }}>
+                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#8B949E', overflowWrap: 'anywhere' }}>
                   {v}
                 </Typography>
               </Box>
@@ -242,7 +242,7 @@ function SingleDelegationCard({ result, parentTaskId, expertMode }: SingleDelega
                 href={`/world?snapshot=${result.context_snapshot_id}`}
                 sx={{
                   fontFamily: 'monospace',
-                  fontSize: '0.5rem',
+                  fontSize: '0.6rem',
                   color: '#58A6FF',
                   display: 'block',
                   mt: 0.5,
@@ -261,7 +261,7 @@ function SingleDelegationCard({ result, parentTaskId, expertMode }: SingleDelega
                 href={`/decision-center?trace=${result.trace_id}`}
                 sx={{
                   fontFamily: 'monospace',
-                  fontSize: '0.5rem',
+                  fontSize: '0.6rem',
                   color: '#58A6FF',
                   display: 'block',
                   mt: 0.25,
@@ -293,7 +293,7 @@ function DelegationChain({ task, expertMode }: DelegationChainProps) {
 
   return (
     <Box data-testid="delegation-chain" sx={{ mt: 1 }}>
-      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.5 }}>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.08em', mb: 0.5 }}>
         Specialist consultations
       </Typography>
 

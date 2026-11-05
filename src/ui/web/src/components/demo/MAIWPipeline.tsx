@@ -118,17 +118,17 @@ function StepCard({ num, label, status, sub1, sub2 }: StepCardProps) {
       minWidth: 0,
     }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58', flexShrink: 0 }}>{num}</Typography>
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', flexShrink: 0 }}>{num}</Typography>
         <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', fontWeight: 700, color: '#C9D1D9', flexGrow: 1 }}>{label}</Typography>
         <Typography sx={{ fontFamily: 'monospace', fontSize: '0.7rem', color, flexShrink: 0 }}>{STEP_STATUS_ICON[status]}</Typography>
       </Box>
       {sub1 && (
-        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#6E7681', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#6E7681', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {sub1}
         </Typography>
       )}
       {sub2 && (
-        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {sub2}
         </Typography>
       )}
@@ -213,10 +213,10 @@ const MAIWPipeline: React.FC<Props> = ({ result }) => {
           MAIW INTELLIGENCE PIPELINE
         </Typography>
         <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58' }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>
             trace:{result.trace_id.slice(0, 8)}
           </Typography>
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58' }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>
             {a.latency_ms}ms
           </Typography>
         </Box>
@@ -270,13 +270,13 @@ const MAIWPipeline: React.FC<Props> = ({ result }) => {
               {a.summary}
             </Typography>
             <Box sx={{ px: 0.75, py: 0.2, flexShrink: 0, border: `1px solid ${SEVERITY_COLOR[a.severity] ?? '#484F58'}`, borderRadius: 0.5 }}>
-              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', fontWeight: 700, color: SEVERITY_COLOR[a.severity] ?? '#484F58' }}>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700, color: SEVERITY_COLOR[a.severity] ?? '#484F58' }}>
                 {a.severity.toUpperCase()}
               </Typography>
             </Box>
           </Box>
 
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', letterSpacing: '0.08em', mb: 0.5 }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', letterSpacing: '0.08em', mb: 0.5 }}>
             FACTS OBSERVED
           </Typography>
           {a.facts_observed.map((f, i) => (
@@ -288,7 +288,7 @@ const MAIWPipeline: React.FC<Props> = ({ result }) => {
 
           {skillsConsulted.length > 0 && (
             <>
-              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', letterSpacing: '0.08em', mt: 0.75, mb: 0.5 }}>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', letterSpacing: '0.08em', mt: 0.75, mb: 0.5 }}>
                 SKILLS CONSULTED
               </Typography>
               {skillsConsulted.map((s, i) => (
@@ -300,7 +300,7 @@ const MAIWPipeline: React.FC<Props> = ({ result }) => {
             </>
           )}
 
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#30363D', mt: 0.75 }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D', mt: 0.75 }}>
             {modelShortName(a.model_id)} · {a.latency_ms}ms
           </Typography>
         </Box>
@@ -336,7 +336,7 @@ const MAIWPipeline: React.FC<Props> = ({ result }) => {
                     AI RECOMMENDATION
                   </Typography>
                   <Box sx={{ px: 0.75, py: 0.15, border: `1px solid ${priorityColor}`, borderRadius: 0.5 }}>
-                    <Typography sx={{ fontFamily: 'monospace', fontSize: '0.52rem', fontWeight: 700, color: priorityColor }}>
+                    <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700, color: priorityColor }}>
                       {rec.priority.toUpperCase()}
                     </Typography>
                   </Box>
@@ -349,7 +349,7 @@ const MAIWPipeline: React.FC<Props> = ({ result }) => {
                   {rec.objective}
                 </Typography>
 
-                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#30363D', mb: 0.5 }}>
+                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D', mb: 0.5 }}>
                   ↓ CANONICAL PROPOSAL BUILDER
                 </Typography>
 
@@ -359,16 +359,16 @@ const MAIWPipeline: React.FC<Props> = ({ result }) => {
                       {proposal.action ?? rec.capability}
                     </Typography>
                     {proposal.proposal_id && (
-                      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', mb: 0.2 }}>
+                      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', mb: 0.2 }}>
                         proposal: {String(proposal.proposal_id).slice(0, 8)}
                       </Typography>
                     )}
-                    <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', mb: 0.5 }}>
+                    <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', mb: 0.5 }}>
                       risk: {risk}
                     </Typography>
 
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.25 }}>
-                      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58' }}>DECIDE:</Typography>
+                      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>DECIDE:</Typography>
                       <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', fontWeight: 700, color: statusColor }}>
                         {status.toUpperCase().replace(/_/g, ' ')}
                       </Typography>
@@ -440,7 +440,7 @@ const MAIWPipeline: React.FC<Props> = ({ result }) => {
           <Box sx={{ display: 'grid', gridTemplateColumns: '1.8fr 1fr 1fr 1fr', gap: 0, borderTop: '1px solid #1C2128' }}>
             {/* Header */}
             {['METRIC', 'BEFORE', 'AFTER', 'Δ'].map((h, i) => (
-              <Typography key={h} sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58', fontWeight: 700, py: 0.5, px: 0.5, borderBottom: '1px solid #1C2128', borderRight: i < 3 ? '1px solid #1C2128' : 'none' }}>
+              <Typography key={h} sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', fontWeight: 700, py: 0.5, px: 0.5, borderBottom: '1px solid #1C2128', borderRight: i < 3 ? '1px solid #1C2128' : 'none' }}>
                 {h}
               </Typography>
             ))}
@@ -466,7 +466,7 @@ const MAIWPipeline: React.FC<Props> = ({ result }) => {
               );
             })}
           </Box>
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#21262D', mt: 0.5 }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#21262D', mt: 0.5 }}>
             Pre-intervention vs. post-execution snapshot · not a MAIW-vs-control comparison
           </Typography>
         </Box>

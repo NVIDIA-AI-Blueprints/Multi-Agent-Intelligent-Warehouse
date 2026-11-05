@@ -43,7 +43,7 @@ function MetaRow({ label, value }: { label: string; value: string | number | boo
   return (
     <Box sx={{ display: 'flex', gap: '10px', alignItems: 'baseline' }}>
       <Typography sx={{
-        fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58',
+        fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58',
         textTransform: 'uppercase', letterSpacing: '0.08em',
         minWidth: '120px', flexShrink: 0,
       }}>
@@ -51,7 +51,7 @@ function MetaRow({ label, value }: { label: string; value: string | number | boo
       </Typography>
       <Typography sx={{
         fontFamily: 'monospace', fontSize: '0.68rem', color: '#8B949E',
-        wordBreak: 'break-all',
+        overflowWrap: 'anywhere',
       }}>
         {String(value)}
       </Typography>
@@ -62,7 +62,7 @@ function MetaRow({ label, value }: { label: string; value: string | number | boo
 function EntityTypeChip({ type }: { type: string }) {
   return (
     <Box component="span" sx={{
-      fontFamily: 'monospace', fontSize: '0.55rem', color: '#58A6FF',
+      fontFamily: 'monospace', fontSize: '0.6rem', color: '#58A6FF',
       border: '1px solid #1F6FEB33', borderRadius: '3px',
       px: '4px', py: '1px',
     }}>
@@ -124,7 +124,7 @@ export default function WorldContextSnapshot({
             sx={{
               background: 'transparent', border: '1px solid #21262D',
               borderRadius: '3px', px: '8px', py: '3px',
-              fontFamily: 'monospace', fontSize: '0.58rem',
+              fontFamily: 'monospace', fontSize: '0.6rem',
               color: '#484F58', cursor: 'pointer',
               '&:hover': { color: '#C9D1D9', borderColor: '#484F58' },
             }}
@@ -179,7 +179,7 @@ export default function WorldContextSnapshot({
             }}
           >
             <Typography sx={{
-              fontFamily: 'monospace', fontSize: '0.58rem', fontWeight: 700,
+              fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
               color: '#58A6FF', textTransform: 'uppercase', letterSpacing: '0.12em',
               mb: '4px',
             }}>
@@ -210,7 +210,7 @@ export default function WorldContextSnapshot({
                     background: 'transparent',
                     border: '1px solid #3FB95044',
                     borderRadius: '3px', px: '8px', py: '3px',
-                    fontFamily: 'monospace', fontSize: '0.58rem',
+                    fontFamily: 'monospace', fontSize: '0.6rem',
                     color: '#3FB950', cursor: 'pointer',
                     '&:hover': { background: '#0D1B0D', borderColor: '#3FB950' },
                   }}
@@ -227,7 +227,7 @@ export default function WorldContextSnapshot({
                     background: 'transparent',
                     border: '1px solid #1F6FEB33',
                     borderRadius: '3px', px: '8px', py: '3px',
-                    fontFamily: 'monospace', fontSize: '0.58rem',
+                    fontFamily: 'monospace', fontSize: '0.6rem',
                     color: '#8B949E', cursor: 'pointer',
                     '&:hover': { color: '#58A6FF', borderColor: '#58A6FF44' },
                   }}
@@ -253,7 +253,7 @@ export default function WorldContextSnapshot({
             }}
           >
             <Typography sx={{
-              fontFamily: 'monospace', fontSize: '0.58rem', fontWeight: 700,
+              fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
               color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.12em',
               mb: '4px',
             }}>
@@ -271,7 +271,7 @@ export default function WorldContextSnapshot({
           {/* ── Node list ────────────────────────────────────────────────────── */}
           <Box>
             <Typography sx={{
-              fontFamily: 'monospace', fontSize: '0.58rem', fontWeight: 700,
+              fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
               color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.1em',
               mb: '6px',
             }}>
@@ -293,7 +293,7 @@ export default function WorldContextSnapshot({
                 >
                   {i === 0 && (
                     <Box component="span" sx={{
-                      fontFamily: 'monospace', fontSize: '0.52rem', color: '#58A6FF',
+                      fontFamily: 'monospace', fontSize: '0.6rem', color: '#58A6FF',
                       border: '1px solid #1F6FEB44', borderRadius: '3px',
                       px: '3px', flexShrink: 0,
                     }}>
@@ -308,8 +308,8 @@ export default function WorldContextSnapshot({
                     {node.label}
                   </Typography>
                   <Typography sx={{
-                    fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58',
-                    wordBreak: 'break-all',
+                    fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58',
+                    overflowWrap: 'anywhere',
                   }}>
                     {node.entity_id}
                   </Typography>
@@ -322,7 +322,7 @@ export default function WorldContextSnapshot({
           {Object.keys(snapshot.relationship_summary).length > 0 && (
             <Box>
               <Typography sx={{
-                fontFamily: 'monospace', fontSize: '0.58rem', fontWeight: 700,
+                fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
                 color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.1em',
                 mb: '6px',
               }}>
@@ -331,7 +331,7 @@ export default function WorldContextSnapshot({
               {Object.entries(snapshot.relationship_summary).map(([group, labels]) => (
                 <Box key={group} sx={{ mb: '4px' }}>
                   <Typography sx={{
-                    fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58',
+                    fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58',
                     textTransform: 'uppercase', letterSpacing: '0.06em',
                   }}>
                     {group} ({labels.length})
@@ -365,7 +365,7 @@ export default function WorldContextSnapshot({
 
           {/* ── Store note ───────────────────────────────────────────────────── */}
           <Typography sx={{
-            fontFamily: 'monospace', fontSize: '0.58rem', color: '#30363D', mt: '4px',
+            fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D', mt: '4px',
           }}>
             {snapshot.store_note}
           </Typography>

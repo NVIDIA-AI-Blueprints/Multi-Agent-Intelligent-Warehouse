@@ -33,7 +33,7 @@ function SourceBadge({ source }: { source: NodeSource }) {
   return (
     <Box component="span" sx={{
       fontFamily: 'monospace',
-      fontSize: '0.55rem',
+      fontSize: '0.6rem',
       fontWeight: 700,
       color,
       border: `1px solid ${color}44`,
@@ -56,7 +56,7 @@ function KVRow({ k, v }: { k: string; v: string | number | null | undefined }) {
     <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, py: '3px', borderBottom: '1px solid #1C2128' }}>
       <Typography sx={{
         fontFamily: 'monospace',
-        fontSize: '0.55rem',
+        fontSize: '0.6rem',
         color: '#484F58',
         textTransform: 'uppercase',
         letterSpacing: '0.08em',
@@ -69,7 +69,7 @@ function KVRow({ k, v }: { k: string; v: string | number | null | undefined }) {
         fontFamily: 'monospace',
         fontSize: '0.65rem',
         color: '#8B949E',
-        wordBreak: 'break-all',
+        overflowWrap: 'anywhere',
       }}>
         {display}
       </Typography>
@@ -118,7 +118,7 @@ export default function DecisionGraphDetails({
         <Box>
           <Typography sx={{
             fontFamily: 'monospace',
-            fontSize: '0.52rem',
+            fontSize: '0.6rem',
             fontWeight: 700,
             color: '#484F58',
             textTransform: 'uppercase',
@@ -162,10 +162,10 @@ export default function DecisionGraphDetails({
       {/* Artifact ID */}
       {selectedNode.artifact_id && (
         <Box>
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.52rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.08em', mb: '4px' }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.08em', mb: '4px' }}>
             Artifact ID
           </Typography>
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#58A6FF', wordBreak: 'break-all' }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.65rem', color: '#58A6FF', overflowWrap: 'anywhere' }}>
             {selectedNode.artifact_id}
           </Typography>
         </Box>
@@ -176,7 +176,7 @@ export default function DecisionGraphDetails({
         <Box>
           <Typography sx={{
             fontFamily: 'monospace',
-            fontSize: '0.52rem',
+            fontSize: '0.6rem',
             fontWeight: 700,
             color: '#484F58',
             textTransform: 'uppercase',
@@ -195,7 +195,7 @@ export default function DecisionGraphDetails({
 
       {/* Layer / column for debugging */}
       <Box sx={{ mt: 'auto', pt: 1, borderTop: '1px solid #1C2128' }}>
-        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.5rem', color: '#30363D' }}>
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D' }}>
           layer {selectedNode.layer} · col {selectedNode.column} · id {selectedNode.id}
         </Typography>
       </Box>

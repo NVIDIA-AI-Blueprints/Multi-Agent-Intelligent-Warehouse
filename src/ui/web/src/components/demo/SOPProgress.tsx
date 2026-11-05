@@ -119,7 +119,7 @@ function SOPStepItem({
         <Typography
           sx={{
             fontFamily: 'monospace',
-            fontSize: '0.55rem',
+            fontSize: '0.6rem',
             color,
             letterSpacing: '0.06em',
           }}
@@ -132,7 +132,7 @@ function SOPStepItem({
           <Typography
             sx={{
               fontFamily: 'monospace',
-              fontSize: '0.5rem',
+              fontSize: '0.6rem',
               color: '#30363D',
               mt: 0.25,
             }}
@@ -217,7 +217,7 @@ const SOPProgress: React.FC<SOPProgressProps> = ({
         <Typography
           sx={{
             fontFamily: 'monospace',
-            fontSize: '0.55rem',
+            fontSize: '0.6rem',
             color: '#484F58',
           }}
         >
@@ -227,7 +227,7 @@ const SOPProgress: React.FC<SOPProgressProps> = ({
         {collapsible && (
           <Typography
             aria-hidden="true"
-            sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58', ml: 'auto' }}
+            sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', ml: 'auto' }}
           >
             {expanded ? '▲' : '▼'}
           </Typography>
@@ -239,7 +239,7 @@ const SOPProgress: React.FC<SOPProgressProps> = ({
         <Typography
           sx={{
             fontFamily: 'monospace',
-            fontSize: '0.5rem',
+            fontSize: '0.6rem',
             color: '#30363D',
             mb: 0.5,
           }}

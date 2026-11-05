@@ -875,7 +875,7 @@ const EquipmentNew: React.FC = () => {
                               <CartesianGrid strokeDasharray="3 3" />
                               <XAxis 
                                 dataKey="timeLabel" 
-                                tick={{ fontSize: 12 }}
+                                tick={{ fontSize: '0.75rem' }}
                                 angle={-45}
                                 textAnchor="end"
                                 height={80}

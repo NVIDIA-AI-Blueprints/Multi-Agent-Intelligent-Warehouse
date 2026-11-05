@@ -242,7 +242,7 @@ export default function FaultInjectionPanel({ scenarioId, sseEvents }: Props) {
   return (
     <Box data-testid="fault-injection-panel" sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
       <Typography sx={{
-        fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58',
+        fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58',
         letterSpacing: '0.12em', textTransform: 'uppercase', mb: 0.5,
       }}>
         Fault controls

@@ -139,7 +139,7 @@ function RiskBadge({ level }: { level: string }) {
 function MonoField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 0.5 }}>
-      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.08em', minWidth: 72, flexShrink: 0, pt: '1px' }}>
+      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.08em', minWidth: 72, flexShrink: 0, pt: '1px' }}>
         {label}
       </Typography>
       <Box sx={{ flex: 1 }}>
@@ -222,7 +222,7 @@ function ExplanationBody({ explanation }: { explanation: DecisionExplanation }) 
           <SectionLabel>ASSESSMENT</SectionLabel>
           <MonoValue>{assessment.summary}</MonoValue>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.75, mb: 0.5 }}>
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
               SEVERITY
             </Typography>
             <SeverityBadge severity={assessment.severity} />
@@ -334,7 +334,7 @@ function ExplanationBody({ explanation }: { explanation: DecisionExplanation }) 
         <>
           <SectionLabel>POLICY EVALUATION</SectionLabel>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
               OUTCOME
             </Typography>
             <OutcomeBadge outcome={policyEvaluation.outcome} />
@@ -440,7 +440,7 @@ function ExplanationBody({ explanation }: { explanation: DecisionExplanation }) 
           <SectionLabel>OBSERVED OPERATIONAL IMPACT</SectionLabel>
           <Box sx={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr', gap: 0.5, pb: '4px', borderBottom: '1px solid #21262D', mb: 0.5 }}>
             {['METRIC', 'BEFORE', 'AFTER', 'DELTA'].map(h => (
-              <Typography key={h} sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#30363D', letterSpacing: '0.06em' }}>{h}</Typography>
+              <Typography key={h} sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D', letterSpacing: '0.06em' }}>{h}</Typography>
             ))}
           </Box>
           <KPIDeltaRow
@@ -594,7 +594,7 @@ export default function DecisionExplanationDrawer({
             {explanation?.title ?? 'DECISION EXPLANATION'}
           </Typography>
           <Typography sx={{
-            fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58',
+            fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58',
             letterSpacing: '0.1em', textTransform: 'uppercase', mt: '2px',
           }}>
             STRUCTURED DECISION EXPLANATION
@@ -641,7 +641,7 @@ export default function DecisionExplanationDrawer({
             <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: '#484F58', textAlign: 'center' }}>
               DETAIL NOT AVAILABLE
             </Typography>
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#30363D', textAlign: 'center', mt: 0.5 }}>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D', textAlign: 'center', mt: 0.5 }}>
               No artifact data for this node yet.
             </Typography>
           </Box>
@@ -682,7 +682,7 @@ export default function DecisionExplanationDrawer({
         alignItems: 'center',
         gap: 1,
       }}>
-        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#30363D', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+        <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
           Source:
         </Typography>
         {explanation && <SourceBadge source={explanation.source} />}
@@ -699,7 +699,7 @@ export default function DecisionExplanationDrawer({
               color: '#58A6FF',
               cursor: 'pointer',
               fontFamily: 'monospace',
-              fontSize: '0.58rem',
+              fontSize: '0.6rem',
               fontWeight: 600,
               letterSpacing: '0.04em',
               px: '8px',

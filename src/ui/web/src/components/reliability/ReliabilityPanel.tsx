@@ -111,7 +111,7 @@ export default function ReliabilityPanel({ runtime }: Props) {
                   <Typography sx={{ fontFamily: 'monospace', fontSize: '0.62rem', color: '#F85149' }}>
                     {domainKey.toUpperCase()} CIRCUIT {d.state.toUpperCase()}
                   </Typography>
-                  <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58' }}>
+                  <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>
                     ({d.failure_count} failures)
                   </Typography>
                 </Box>

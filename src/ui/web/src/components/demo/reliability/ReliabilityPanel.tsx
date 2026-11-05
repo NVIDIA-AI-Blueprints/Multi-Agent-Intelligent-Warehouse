@@ -71,7 +71,7 @@ export default function ReliabilityPanel({ sseEvents, runtime }: Props) {
               {/* Scenario header */}
               <Box>
                 <Typography sx={{
-                  fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58',
+                  fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58',
                   letterSpacing: '0.12em', textTransform: 'uppercase', mb: 0.25,
                 }}>
                   {selectedScenario.id}
@@ -98,7 +98,7 @@ export default function ReliabilityPanel({ sseEvents, runtime }: Props) {
                   p: 1.5,
                 }}>
                   <Typography sx={{
-                    fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58',
+                    fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58',
                     letterSpacing: '0.12em', textTransform: 'uppercase', mb: 1,
                   }}>
                     Fault lifecycle

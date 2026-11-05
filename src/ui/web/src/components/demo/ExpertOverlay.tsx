@@ -35,7 +35,7 @@ import DeveloperTraceView from './developer-trace/DeveloperTraceView';
 function SectionHeader({ label }: { label: string }) {
   return (
     <Typography sx={{
-      fontFamily: 'monospace', fontSize: '0.58rem', fontWeight: 700,
+      fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700,
       color: '#484F58', letterSpacing: '0.12em', textTransform: 'uppercase', mb: 1,
     }}>
       {label}
@@ -226,7 +226,7 @@ function SseSection({ events }: { events: SSEEvent[] }) {
             onClick={() => setExpanded(e => !e)}
             sx={{
               background: 'transparent', border: 'none', cursor: 'pointer',
-              fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58',
+              fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58',
               mb: 1, '&:hover': { color: '#8B949E' },
             }}
           >
@@ -247,17 +247,17 @@ function SseSection({ events }: { events: SSEEvent[] }) {
           const ts = ev.ts ? ev.ts.split('T')[1]?.slice(0, 8) : '';
           return (
             <Box key={`${ev.id}-${i}`} sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#30363D', flexShrink: 0, minWidth: 64 }}>
+              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D', flexShrink: 0, minWidth: 64 }}>
                 {ts}
               </Typography>
               <Typography sx={{
-                fontFamily: 'monospace', fontSize: '0.58rem', color: catColor,
+                fontFamily: 'monospace', fontSize: '0.6rem', color: catColor,
                 flexShrink: 0, minWidth: 80, letterSpacing: '0.04em',
               }}>
                 {ev.category}
               </Typography>
               <Typography sx={{
-                fontFamily: 'monospace', fontSize: '0.58rem', color: '#6E7681',
+                fontFamily: 'monospace', fontSize: '0.6rem', color: '#6E7681',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}>
                 {ev.message ?? ''}
@@ -291,7 +291,7 @@ function TabPill({
       onClick={onClick}
       sx={{
         fontFamily: 'monospace',
-        fontSize: '0.58rem',
+        fontSize: '0.6rem',
         fontWeight: 700,
         textTransform: 'uppercase',
         letterSpacing: '0.1em',

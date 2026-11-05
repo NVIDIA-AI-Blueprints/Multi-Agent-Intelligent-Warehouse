@@ -197,7 +197,7 @@ function ApprovalCard({
         <Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
             <Typography sx={{
-              fontFamily: 'monospace', fontSize: '0.58rem', color: '#D29922',
+              fontFamily: 'monospace', fontSize: '0.6rem', color: '#D29922',
               letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700,
             }}>
               05 APPROVE
@@ -212,7 +212,7 @@ function ApprovalCard({
         </Box>
         <Box sx={{ textAlign: 'right' }}>
           <RiskBadge level={risk_level} />
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', mt: '4px' }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', mt: '4px' }}>
             {priority} priority
           </Typography>
         </Box>
@@ -385,7 +385,7 @@ function ApprovalCard({
                 APPROVE ACTION
               </Box>
               <Typography sx={{
-                fontFamily: 'monospace', fontSize: '0.57rem', color: '#484F58',
+                fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58',
                 letterSpacing: '0.02em',
               }}>
                 Governance approval — execution follows automatically

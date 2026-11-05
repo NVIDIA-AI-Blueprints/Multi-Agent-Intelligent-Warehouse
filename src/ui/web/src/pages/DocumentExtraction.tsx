@@ -1486,11 +1486,11 @@ const DocumentExtraction: React.FC = () => {
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis 
                             dataKey="day" 
-                            tick={{ fontSize: 12 }}
+                            tick={{ fontSize: '0.75rem' }}
                           />
                           <YAxis 
                             domain={[0, 5]}
-                            tick={{ fontSize: 12 }}
+                            tick={{ fontSize: '0.75rem' }}
                             label={{ value: 'Quality Score', angle: -90, position: 'insideLeft' }}
                           />
                           <Tooltip 
@@ -1547,10 +1547,10 @@ const DocumentExtraction: React.FC = () => {
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis 
                             dataKey="day" 
-                            tick={{ fontSize: 12 }}
+                            tick={{ fontSize: '0.75rem' }}
                           />
                           <YAxis 
-                            tick={{ fontSize: 12 }}
+                            tick={{ fontSize: '0.75rem' }}
                             label={{ value: 'Documents Processed', angle: -90, position: 'insideLeft' }}
                           />
                           <Tooltip 

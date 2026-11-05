@@ -88,7 +88,7 @@ export default function SafetyContextStrip({ sseEvents }: Props) {
       }}
     >
       <Typography sx={{
-        fontFamily: 'monospace', fontSize: '0.58rem', color: '#30363D',
+        fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D',
         letterSpacing: '0.1em', textTransform: 'uppercase', flexShrink: 0,
       }}>
         Safety

@@ -60,14 +60,14 @@ function WorldGrid({ world }: { world: NonNullable<StageContentPaneProps['demoSt
             py: 1,
           }}
         >
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.1em', mb: '3px' }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', textTransform: 'uppercase', letterSpacing: '0.1em', mb: '3px' }}>
             {c.label}
           </Typography>
           <Typography sx={{ fontFamily: 'monospace', fontSize: '0.82rem', fontWeight: 700, color: '#C9D1D9' }}>
             {c.primary}
           </Typography>
           {c.secondary && (
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', mt: '2px' }}>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', mt: '2px' }}>
               {c.secondary}
             </Typography>
           )}
@@ -86,7 +86,7 @@ function FreshnessTag({ seconds }: { seconds: number | null | undefined }) {
   return (
     <Box component="span" sx={{
       fontFamily: 'monospace',
-      fontSize: '0.58rem',
+      fontSize: '0.6rem',
       color,
       border: `1px solid ${color}33`,
       borderRadius: '3px',
@@ -108,7 +108,7 @@ function ObserveEventList({ events }: { events: ReturnType<typeof runWindowEvent
         const detail = parseDetail(ev.detail);
         return (
           <Box key={ev.id} sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5 }}>
-            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', flexShrink: 0 }}>
+            <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', flexShrink: 0 }}>
               {detail.snapshot ? `snapshot=${detail.snapshot}` : (detail.trace ? `trace=${detail.trace}` : '')}
             </Typography>
             <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: '#8B949E' }}>
@@ -225,25 +225,25 @@ export default function ObserveStage({
           <SectionHeader>Operational context</SectionHeader>
           <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
             <Box>
-              <MonoText color="#484F58" size="0.58rem">Equipment</MonoText>
+              <MonoText color="#484F58" size="0.6rem">Equipment</MonoText>
               <MonoText color="#C9D1D9" weight={700}>
                 {Math.round(current_kpis.equipment_operational_pct)}%
               </MonoText>
             </Box>
             <Box>
-              <MonoText color="#484F58" size="0.58rem">Labor</MonoText>
+              <MonoText color="#484F58" size="0.6rem">Labor</MonoText>
               <MonoText color="#C9D1D9" weight={700}>
                 {Math.round(current_kpis.labor_availability_pct)}%
               </MonoText>
             </Box>
             <Box>
-              <MonoText color="#484F58" size="0.58rem">Backlog</MonoText>
+              <MonoText color="#484F58" size="0.6rem">Backlog</MonoText>
               <MonoText color="#C9D1D9" weight={700}>
                 {current_kpis.pending_backlog}
               </MonoText>
             </Box>
             <Box>
-              <MonoText color="#484F58" size="0.58rem">Wave risk</MonoText>
+              <MonoText color="#484F58" size="0.6rem">Wave risk</MonoText>
               <Box sx={{ mt: '2px' }}>
                 <RiskBadge level={current_kpis.wave_risk_level} />
               </Box>
@@ -260,7 +260,7 @@ export default function ObserveStage({
             {expertMode && <IdText label="ID" value={observeLifecycle.snapshot_id ?? '—'} />}
             <IdText label="Warehouse" value={observeLifecycle.warehouse_id ?? '—'} />
             <Box>
-              <MonoText color="#484F58" size="0.58rem">Domains</MonoText>
+              <MonoText color="#484F58" size="0.6rem">Domains</MonoText>
               <MonoText color="#8B949E" size="0.65rem">equipment · labor · waves</MonoText>
             </Box>
           </Box>

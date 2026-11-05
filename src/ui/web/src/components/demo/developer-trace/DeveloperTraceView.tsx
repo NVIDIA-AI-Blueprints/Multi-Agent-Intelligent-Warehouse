@@ -47,7 +47,7 @@ function StatusBadge({ status }: { status: DeveloperTraceStatus }) {
       component="span"
       sx={{
         fontFamily: 'monospace',
-        fontSize: '0.58rem',
+        fontSize: '0.6rem',
         fontWeight: 700,
         color,
         border: `1px solid ${color}44`,
@@ -77,7 +77,7 @@ function SectionHeader({ label }: { label: string }) {
   return (
     <Typography sx={{
       fontFamily: 'monospace',
-      fontSize: '0.58rem',
+      fontSize: '0.6rem',
       fontWeight: 700,
       color: '#484F58',
       letterSpacing: '0.12em',
@@ -278,7 +278,7 @@ export default function DeveloperTraceView({
           </Typography>
         )}
         {trace.warehouseId && (
-          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.58rem', color: '#484F58', mb: '4px' }}>
+          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58', mb: '4px' }}>
             {trace.warehouseId}
           </Typography>
         )}
@@ -293,7 +293,7 @@ export default function DeveloperTraceView({
             <Typography
               data-testid="dev-trace-view-decision-graph"
               onClick={onViewDecisionGraph}
-              sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#58A6FF', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+              sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#58A6FF', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
             >
               VIEW DECISION GRAPH
             </Typography>
@@ -302,7 +302,7 @@ export default function DeveloperTraceView({
             <Typography
               data-testid="dev-trace-view-context"
               onClick={onViewContextAtDecision}
-              sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#58A6FF', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+              sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#58A6FF', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
             >
               VIEW CONTEXT AT DECISION TIME
             </Typography>
@@ -311,7 +311,7 @@ export default function DeveloperTraceView({
             <Typography
               data-testid="dev-trace-view-live-world"
               onClick={onViewLiveWorld}
-              sx={{ fontFamily: 'monospace', fontSize: '0.55rem', color: '#58A6FF', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+              sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#58A6FF', cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
             >
               VIEW LIVE WORLD
             </Typography>

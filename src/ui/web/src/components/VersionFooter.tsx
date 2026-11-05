@@ -129,7 +129,7 @@ export const VersionFooter: React.FC<VersionFooterProps> = ({
   if (error || !versionInfo) {
     return (
       <Box sx={getPositionStyles()}>
-        <Typography variant="caption" sx={{ color: '#ff6b6b', fontSize: '10px' }}>
+        <Typography variant="caption" sx={{ color: '#ff6b6b', fontSize: '0.625rem' }}>
           Version: Error
         </Typography>
       </Box>
@@ -140,7 +140,7 @@ export const VersionFooter: React.FC<VersionFooterProps> = ({
     <>
       <Box sx={getPositionStyles()}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="caption" sx={{ color: '#ffffff', fontSize: '10px' }}>
+          <Typography variant="caption" sx={{ color: '#ffffff', fontSize: '0.625rem' }}>
             v{versionInfo.version}
           </Typography>
           
@@ -151,7 +151,7 @@ export const VersionFooter: React.FC<VersionFooterProps> = ({
               sx={{ 
                 backgroundColor: '#333', 
                 color: '#fff', 
-                fontSize: '10px',
+                fontSize: '0.625rem',
                 height: '16px',
                 '& .MuiChip-label': {
                   px: 0.5
@@ -173,7 +173,7 @@ export const VersionFooter: React.FC<VersionFooterProps> = ({
                   }
                 }}
               >
-                <InfoIcon sx={{ fontSize: '12px' }} />
+                <InfoIcon sx={{ fontSize: '0.75rem' }} />
               </IconButton>
             </Tooltip>
           )}
