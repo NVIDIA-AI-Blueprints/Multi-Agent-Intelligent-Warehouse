@@ -16,6 +16,12 @@
 """
 Advanced OCR with Nemotron Parse
 VLM-based OCR with semantic understanding for complex documents.
+
+The hosted build.nvidia.com endpoint for nvidia/nemotron-parse is retired on
+2026-11-16, so the service only runs against a NIM set in NEMO_PARSE_URL.
+Without one, or when a call fails, it reports itself unavailable with zero
+confidence and the pipeline keeps its primary OCR result. It never returns
+placeholder text.
 """
 
 import asyncio
@@ -45,25 +51,31 @@ class NemotronParseService:
 
     def __init__(self):
         self.api_key = os.getenv("NEMO_PARSE_API_KEY", "")
-        self.base_url = os.getenv(
-            "NEMO_PARSE_URL", "https://integrate.api.nvidia.com/v1"
-        )
+        # No default: the hosted endpoint is retired (see module docstring).
+        self.base_url = os.getenv("NEMO_PARSE_URL", "").rstrip("/")
         self.timeout = 60
+
+    @property
+    def enabled(self) -> bool:
+        """True when a Nemotron Parse NIM is configured in NEMO_PARSE_URL."""
+        return bool(self.base_url)
+
+    def _headers(self) -> Dict[str, str]:
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        return headers
 
     async def initialize(self):
         """Initialize the Nemotron Parse service."""
+        if not self.enabled:
+            logger.info("Nemotron Parse disabled: NEMO_PARSE_URL is not set")
+            return
         try:
-            if not self.api_key:
-                logger.warning(
-                    "NEMO_PARSE_API_KEY not found, using mock implementation"
-                )
-                return
-
             # Test API connection
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(
-                    f"{self.base_url}/models",
-                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    f"{self.base_url}/models", headers=self._headers()
                 )
                 response.raise_for_status()
 
@@ -71,7 +83,20 @@ class NemotronParseService:
 
         except Exception as e:
             logger.error(f"Failed to initialize Nemotron Parse Service: {e}")
-            logger.warning("Falling back to mock implementation")
+            logger.warning("Nemotron Parse calls will report it unavailable")
+
+    def _unavailable(self, reason: str) -> Dict[str, Any]:
+        """Result used when Nemotron Parse is not configured or failed."""
+        return {
+            "text": "",
+            "page_results": [],
+            "confidence": 0.0,
+            "total_pages": 0,
+            "model_used": "Nemotron-Parse",
+            "processing_timestamp": datetime.now().isoformat(),
+            "available": False,
+            "error": reason,
+        }
 
     async def parse_document(
         self, images: List[Image.Image], layout_result: Dict[str, Any]
@@ -84,8 +109,11 @@ class NemotronParseService:
             layout_result: Layout detection results
 
         Returns:
-            Advanced OCR results with semantic understanding
+            Advanced OCR results with semantic understanding, or an
+            unavailable result with zero confidence
         """
+        if not self.enabled:
+            return self._unavailable("NEMO_PARSE_URL is not set")
         try:
             logger.info(f"Parsing {len(images)} images using Nemotron Parse")
 
@@ -121,63 +149,51 @@ class NemotronParseService:
                 "processing_timestamp": datetime.now().isoformat(),
                 "semantic_enhanced": True,
                 "reading_order_preserved": True,
+                "available": True,
             }
 
         except Exception as e:
             logger.error(f"Document parsing failed: {e}")
-            raise
+            return self._unavailable("Nemotron Parse request failed")
 
     async def _parse_image(
         self, image: Image.Image, page_number: int
     ) -> Dict[str, Any]:
         """Parse a single image using Nemotron Parse."""
-        try:
-            if not self.api_key:
-                # Mock implementation for development
-                return await self._mock_parse_extraction(image, page_number)
+        # Convert image to base64
+        image_base64 = await self._image_to_base64(image)
 
-            # Convert image to base64
-            image_base64 = await self._image_to_base64(image)
+        # Call Nemotron Parse API
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.post(
+                f"{self.base_url}/models/nemotron-parse/infer",
+                headers=self._headers(),
+                json={
+                    "inputs": [
+                        {
+                            "name": "image",
+                            "shape": [1],
+                            "datatype": "BYTES",
+                            "data": [image_base64],
+                        }
+                    ]
+                },
+            )
+            response.raise_for_status()
 
-            # Call Nemotron Parse API
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(
-                    f"{self.base_url}/models/nemotron-parse/infer",
-                    headers={
-                        "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "inputs": [
-                            {
-                                "name": "image",
-                                "shape": [1],
-                                "datatype": "BYTES",
-                                "data": [image_base64],
-                            }
-                        ]
-                    },
-                )
-                response.raise_for_status()
+            result = response.json()
 
-                result = response.json()
+            # Parse results
+            parse_data = self._parse_parse_result(result, image.size)
 
-                # Parse results
-                parse_data = self._parse_parse_result(result, image.size)
-
-                return {
-                    "page_number": page_number,
-                    "text": parse_data["text"],
-                    "elements": parse_data["elements"],
-                    "reading_order": parse_data["reading_order"],
-                    "confidence": parse_data["confidence"],
-                    "image_dimensions": image.size,
-                }
-
-        except Exception as e:
-            logger.error(f"Image parsing failed for page {page_number}: {e}")
-            # Fall back to mock implementation
-            return await self._mock_parse_extraction(image, page_number)
+            return {
+                "page_number": page_number,
+                "text": parse_data["text"],
+                "elements": parse_data["elements"],
+                "reading_order": parse_data["reading_order"],
+                "confidence": parse_data["confidence"],
+                "image_dimensions": image.size,
+            }
 
     async def _image_to_base64(self, image: Image.Image) -> str:
         """Convert PIL Image to base64 string."""
@@ -508,59 +524,3 @@ class NemotronParseService:
         analysis["completeness"] = len(found_fields) / len(required_fields)
 
         return analysis
-
-    async def _mock_parse_extraction(
-        self, image: Image.Image, page_number: int
-    ) -> Dict[str, Any]:
-        """Mock parse extraction for development."""
-        width, height = image.size
-
-        # Generate mock parse data with semantic understanding
-        mock_elements = [
-            {
-                "text": "INVOICE",
-                "type": "title",
-                "bbox": [50, 50, 150, 80],
-                "confidence": 0.95,
-                "reading_order": 0,
-            },
-            {
-                "text": "#INV-2024-001",
-                "type": "text",
-                "bbox": [200, 50, 350, 80],
-                "confidence": 0.92,
-                "reading_order": 1,
-            },
-            {
-                "text": "Vendor: ABC Supply Company",
-                "type": "text",
-                "bbox": [50, 120, 400, 150],
-                "confidence": 0.88,
-                "reading_order": 2,
-            },
-            {
-                "text": "Date: 2024-01-15",
-                "type": "text",
-                "bbox": [50, 180, 250, 210],
-                "confidence": 0.90,
-                "reading_order": 3,
-            },
-            {
-                "text": "Total: $1,763.13",
-                "type": "text",
-                "bbox": [400, 300, 550, 330],
-                "confidence": 0.94,
-                "reading_order": 4,
-            },
-        ]
-
-        mock_text = "\n".join([elem["text"] for elem in mock_elements])
-
-        return {
-            "page_number": page_number,
-            "text": mock_text,
-            "elements": mock_elements,
-            "reading_order": list(range(len(mock_elements))),
-            "confidence": 0.91,
-            "image_dimensions": image.size,
-        }
