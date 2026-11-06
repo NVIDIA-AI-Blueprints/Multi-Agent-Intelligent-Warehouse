@@ -15,7 +15,9 @@ Explicitly absent (trust boundary):
 These paths are validated by architecture invariant tests.
 
 ACT intent routes to CopilotService.act() which delegates governance to
-GovernedActionOrchestrator. The router has no direct access to DecisionEngine,
+GovernedActionOrchestrator. A cancellation / negated message ("cancel that",
+"don't move it") routes to CopilotService.decline_action(), which answers
+deterministically and selects, proposes and runs nothing. The router has no direct access to DecisionEngine,
 ApprovalStore, or ActionExecutor.
 """
 
@@ -114,6 +116,18 @@ async def copilot_turn(body: CopilotTurnRequest, request: Request):
                 pending_outcome=pending_outcome,
             )
             return _observe_response(result, turn)
+
+        # A cancellation / negated message ("cancel that", "don't move it")
+        # gets the deterministic non-executing reply. classify() never returns
+        # ACT for it, so without this check it would fall through to ASK.
+        if intent_classifier.is_cancellation(body.message):
+            result, turn = await svc.decline_action(
+                message=body.message,
+                conversation_id=body.conversation_id,
+                warehouse_id=body.warehouse_id,
+                scenario_name=body.scenario_name,
+            )
+            return _act_response(result, turn)
 
         if detected_intent == CopilotIntent.ACT:
             result, turn = await svc.act(
