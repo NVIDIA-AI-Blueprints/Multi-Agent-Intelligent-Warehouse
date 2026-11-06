@@ -35,6 +35,23 @@ from .models import CopilotActResult, GovernedActionRequest, MutationState
 
 logger = logging.getLogger(__name__)
 
+
+def _default_scheduled_for(ctrl: Any = None) -> str:
+    """
+    Next-day slot for maintenance proposals that carry no explicit time.
+
+    The copilot governs actions against the demo world, which runs on its own
+    SimulationClock (not wall time), so "tomorrow" is read from that clock when
+    the controller has one. Without a simulation clock it falls back to UTC
+    wall time.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    clock = getattr(getattr(ctrl, "world", None), "clock", None)
+    now = clock.now() if clock is not None else datetime.now(timezone.utc)
+    return (now + timedelta(days=1)).isoformat()
+
+
 _SAFETY_NO_MUTATION = "No warehouse changes have been made."
 _SAFETY_CONFIRMED   = "Execution confirmed."
 _SAFETY_UNKNOWN     = "Execution status uncertain — reconciliation required."
@@ -394,6 +411,7 @@ class GovernedActionOrchestrator:
                 maintenance_type=req.subtype or "unscheduled",
                 description=req.objective,
                 scheduled_by="copilot-operator",
+                scheduled_for=_default_scheduled_for(self._ctrl),
                 priority=req.priority,
                 reason=req.rationale,
                 requested_by="copilot-operator",
