@@ -16,8 +16,8 @@ break existing clients; read "Compatibility" first.**
 | Deployment test (deploy, readiness, MCP tool calls, restart durability) | PASS ([run](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/actions/runs/42111328531)) |
 | Internal NGC MAIW pytest suite | **NOT RUN**: could not pull the internal test image (requires internal NGC org access) ([run](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/actions/runs/42111328531)) |
 | Release gate on the reference host | PASS (2026-11-05, on `4259fa3`; details below) |
-| SonarQube | **PENDING (release-blocking).** No analysis of `4259fa3`: the SonarQube Analysis run for it ([run](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/actions/runs/42113662581)) exited 3 because `sonar.nvidia.com` is not reachable from GitHub-hosted runners (no `MAIW_SONAR_RUNNER` is configured). The latest analysis is of `ff5ce22` (2026-11-03, `13d9886d…`), quality gate ERROR. Needs an analysis of `4259fa3` or a written Blueprints SRE disposition |
-| nSpect OSS scan (NSPECT-NJMX-9GQU) | 2026-11-05, program version **MAIW v2.1.1**, source at `4259fa3`: 0 Critical, **2 High**, 10 Medium, 4 Low. **PENDING (release-blocking):** the two High findings need an approved exception or discrepancy ruling (see below) |
+| SonarQube | analysis `eb6b331f-47c1-4647-86f9-3486418d02f0` of `4259fa3` (dated 2026-11-06 04:47 UTC, processed 05:00 UTC), version `2.1.1-rc.1`, quality gate **ERROR**: 46 issues of prioritized security rules and 128 HIGH issues overall; 0 blocker issues, and every new-code condition passes. **PENDING (release-blocking):** written Blueprints SRE disposition. Triage: `docs/security/sonarqube-remediation-report.md` ("Analysis of `4259fa3`"). Run manually from an NVIDIA-network host; CI's own run for this commit ([run](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/actions/runs/42113662581)) could not reach `sonar.nvidia.com` (exit 3) |
+| nSpect OSS scan (NSPECT-NJMX-9GQU) | 2026-11-05, program version **MAIW v2.1.1**, source at `4259fa3`: 0 Critical, **2 High**, 10 Medium, 4 Low. **PENDING (release-blocking):** `react-dev-utils`: Not Affected exception **EXC-HPU1-JZI6** filed 2026-11-06, awaiting PLC Security PIC approval; `svgo`: version-mapping correction (nv/sbom) to be filed (see below) |
 | SBOM submitted to nSpect | 2026-11-06: `maiw-v2.1.1-4259fa3.cdx.json` uploaded to MAIW v2.1.1 (Manage SBOM → Upload an SBOM). It merges the CI SBOMs `sbom-backend`, `sbom-frontend` (frontend image and UI bundle) and `sbom-mcp` of the CI run above: CycloneDX 1.6, 1642 components, sha256 `800278356c94534946dffabe9db35a9063c673f80aa5bd4afb3484c7b9f35c1b` |
 
 ## Compatibility
@@ -84,8 +84,8 @@ tooling pulled in by `react-scripts` 5.
 
 | Severity | Package | Disposition |
 |---|---|---|
-| High | `react-dev-utils` 12.0.1 (BDSA-2026-18203 / CVE-2026-14802) | **Exception requested.** OS command injection in `openBrowser` (macOS). No fixed release exists. Since #251 the UI start script defaults `BROWSER=none`, so `openBrowser` never runs; a test pins this. Development server only. Removed when the UI leaves `react-scripts` |
-| High | `svgo` 2.8.4 (BDSA-2026-27126 / CVE-2026-73650) | **Discrepancy reported.** GitHub's advisory (GHSA-2p49-hgcm-8545) lists 2.8.3 as the 2.x fix, so 2.8.4 is patched; Dependabot raises no alert. Build-time only (cssnano / postcss-svgo) |
+| High | `react-dev-utils` 12.0.1 (BDSA-2026-18203 / CVE-2026-14802) | **Not Affected exception EXC-HPU1-JZI6** (justification `requires_configuration`), awaiting approval. OS command injection in `openBrowser` (macOS). No fixed release exists. Since #251 the UI start script defaults `BROWSER=none`, so `openBrowser` never runs; a test pins this. Development server only. Removed when the UI leaves `react-scripts` |
+| High | `svgo` 2.8.4 (BDSA-2026-27126 / CVE-2026-73650) | **Version-mapping correction** (nv/sbom ticket; Product Security's process for a vulnerability assigned to the wrong version). GitHub's advisory (GHSA-2p49-hgcm-8545) lists 2.8.3 as the 2.x fix, so 2.8.4 is patched; Dependabot raises no alert. Build-time only (cssnano / postcss-svgo) |
 | Medium | `react-router` 6.30.6 (CVE-2026-53666) | SSR hydration only; MAIW's UI is a client-rendered SPA. The fix is 7.18.0, a major upgrade, planned after this release |
 | Medium | `react-is` 19.2.5 (CVE-2026-23870) | Mismatch: the advisory covers `react-server-dom-*`, not `react-is` |
 | Medium | `serialize-javascript` 7.0.5 | Real, build-time only (CSS and Rollup minifier plugins). Fixed in 7.1.3; the npm override will be raised after this release |
@@ -187,9 +187,14 @@ Details: `docs/security/nspect-reconciliation.md`.
 - **Release checks not run:** the internal NGC MAIW pytest suite (above). The
   Compose deployment test makes no live model calls; live models were
   verified on the reference host only.
-- **SonarQube:** analysis needs an NVIDIA-network runner; the latest
-  analysis (`ff5ce22`) has quality gate ERROR. Triage:
-  `docs/security/sonarqube-remediation-report.md`.
+- **SonarQube:** the analysis of `4259fa3` has quality gate ERROR (see the
+  validation table); CI cannot analyze until it has an NVIDIA-network runner.
+  Triage: `docs/security/sonarqube-remediation-report.md`.
+- **Default passwords in setup scripts:** `scripts/setup/create_default_users.py`
+  and the demo data generators fall back to the password `changeme` when
+  `DEFAULT_ADMIN_PASSWORD` / `DEFAULT_USER_PASSWORD` are unset (SonarQube
+  `python:S2068`). Set both before running them; the scripts will refuse to
+  run without them in a later release.
 - **UI toolchain:** the UI is built with `react-scripts` 5, which carries the
   nSpect findings above and Dependabot alerts in build tooling. Moving to Vite
   is planned.

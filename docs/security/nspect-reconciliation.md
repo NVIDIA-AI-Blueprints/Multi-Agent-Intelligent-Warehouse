@@ -13,7 +13,7 @@ from or wrote to nSpect.
 | OSS scan | Repository `…multi-agent-intelligent-warehouse--4259fa37aa3676bbcc3378f00d067d9bdcc01174`, last scan 2026-11-05 17:57 (nSpect display time): **0 Critical, 2 High, 10 Medium, 4 Low** |
 | Package inventory | npm rows match the UI SBOM (`maiw-ui-bundle.cdx.json`) version for version. Python rows are the minimums in `requirements.txt` (for example `requests` 2.32.4 and `xgboost` 3.2.0), not installed versions: the images install `requests` 2.34.2 and the backend image has no `xgboost` |
 | SBOM | Uploaded 2026-11-06 under Manage SBOM → Upload an SBOM (see below) |
-| Exceptions | **Pending:** `react-dev-utils` exception and `svgo` discrepancy (below) |
+| Exceptions | `react-dev-utils`: Not Affected exception **EXC-HPU1-JZI6** (Launch nAbler / Exception Tracker), filed 2026-11-06, awaiting PLC Security PIC approval. `svgo`: nv/sbom correction to be filed (below) |
 | Registered builds or images | None. Binary and container-image sources are not registered: no image is distributed; Compose builds them locally |
 
 ### Findings
@@ -25,8 +25,8 @@ nSpect records a decision:
 
 | Finding | Requested disposition | Evidence |
 |---|---|---|
-| `react-dev-utils` 12.0.1, BDSA-2026-18203 / CVE-2026-14802 | Exception | No fixed release. `openBrowser` never runs: the UI start script defaults `BROWSER=none` (#251, pinned by `src/ui/web/src/__tests__/devServerNoAutoBrowser.test.ts`). Development server only. Removed with the move off `react-scripts` |
-| `svgo` 2.8.4, BDSA-2026-27126 / CVE-2026-73650 | Discrepancy | GHSA-2p49-hgcm-8545 lists 2.8.3 as the 2.x fix; Dependabot has no alert. Build-time only (cssnano / postcss-svgo) |
+| `react-dev-utils` 12.0.1, BDSA-2026-18203 / CVE-2026-14802 | Not Affected, justification `requires_configuration`: **EXC-HPU1-JZI6** (SLA breach date 2027-02-03) | No fixed release. `openBrowser` never runs: the UI start script defaults `BROWSER=none` (#251, pinned by `src/ui/web/src/__tests__/devServerNoAutoBrowser.test.ts`). Development server only. Removed with the move off `react-scripts` |
+| `svgo` 2.8.4, BDSA-2026-27126 / CVE-2026-73650 | Version-mapping correction through http://nv/sbom: Product Security's process when a vulnerability is assigned to the wrong version, instead of a Not Affected exception (SLA breach date 2027-02-03) | GHSA-2p49-hgcm-8545 lists 2.8.3 as the 2.x fix; Dependabot has no alert. Build-time only (cssnano / postcss-svgo) |
 
 ### SBOM submitted
 
@@ -48,10 +48,11 @@ when an uploaded SBOM is used"; the program owner checks the v2.1.1 ConneX
 report for child programs.
 
 ### Remaining owner steps for v2.1.1
-1. Record the nSpect decision on the two High findings.
-2. SonarQube: an analysis of `4259fa3` (NVIDIA-network runner or
-   `scripts/security/run_sonar_scan.sh`), or a written Blueprints SRE
-   disposition. The latest analysis is of `ff5ce22`, quality gate ERROR.
+1. Approval of EXC-HPU1-JZI6 by the PLC Security PIC; the nv/sbom ticket
+   for `svgo` and its outcome.
+2. SonarQube: the analysis of `4259fa3` (`eb6b331f…`, 2026-11-06) has quality
+   gate ERROR; it needs a written Blueprints SRE disposition
+   (`sonarqube-remediation-report.md`).
 3. Confirm the ConneX children question above.
 
 ## MAIW v2.1.0 (historical, 2026-11-02)

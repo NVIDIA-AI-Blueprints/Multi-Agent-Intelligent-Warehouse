@@ -4,7 +4,51 @@
 |---|---|
 | **Analysis triaged** | SonarQube project `TEGRASW_Blueprints-SRE_warehouse-operational-assistant_Multi-Agent-Intelligent-Warehouse`, last analysis **2026-01-05 22:01 UTC of `4df9a41`** (scope `src/` only). Read through the anonymous web API on 2026-11-02. |
 | **Code triaged** | `main` at `0fbcb69` (after v2.1.0, `2fdd9fe`) |
-| **Fresh analysis** | **Latest: `ff5ce22` on 2026-11-03**, see [Analysis of `ff5ce22`](#analysis-of-ff5ce22-2026-11-03) below; the first full-scope analysis was of `0ee535a` on 2026-11-02 ([Fresh analysis](#fresh-analysis-of-0ee535a-2026-11-02)). Both were run manually from an NVIDIA-network host, because CI still has no NVIDIA-network runner. The sections after it are the original triage of the January analysis. Their dispositions are engineering dispositions; they must be confirmed against the fresh analysis and recorded in SonarQube by a project administrator. |
+| **Fresh analysis** | **Latest: `4259fa3` (v2.1.1 candidate) on 2026-11-06**, see [Analysis of `4259fa3`](#analysis-of-4259fa3-2026-11-06-v211-candidate) below. Before it: `ff5ce22` on 2026-11-03, see [Analysis of `ff5ce22`](#analysis-of-ff5ce22-2026-11-03); the first full-scope analysis was of `0ee535a` on 2026-11-02 ([Fresh analysis](#fresh-analysis-of-0ee535a-2026-11-02)). Both were run manually from an NVIDIA-network host, because CI still has no NVIDIA-network runner. The sections after it are the original triage of the January analysis. Their dispositions are engineering dispositions; they must be confirmed against the fresh analysis and recorded in SonarQube by a project administrator. |
+
+## Analysis of `4259fa3` (2026-11-06): v2.1.1 candidate
+
+| | |
+|---|---|
+| **Analysis** | `eb6b331f-47c1-4647-86f9-3486418d02f0` (dated 04:47 UTC, processed 05:00 UTC), `main` at `4259fa3`, version `2.1.1-rc.1`, with the CORE pytest `coverage.xml` of that commit's CI/CD Pipeline run (42111328437). Run with `scripts/security/run_sonar_scan.sh` from a standalone clone on an NVIDIA-network host; the script exited 5 (analysis recorded, quality gate failed). The version comes from a local, unpushed `v2.1.1-rc.1` tag in that clone |
+| **Quality gate** | **ERROR**. The project now uses the default gate "Security", and its Python profile changed from "Sonar way" to "Security CWETop25" with this analysis (project events). The counts are therefore not comparable with `ff5ce22` |
+
+| Gate condition | Fails when | Actual | Status |
+|---|---|---|---|
+| Coverage | < 0% | 35.2% | OK |
+| Coverage on new code | < 0% | 53.3% | OK |
+| Blocker issues | > 0 | 0 | OK |
+| Blocker issues on new code | > 0 | 0 | OK |
+| High issues on new code | > 0 | 0 | OK |
+| Issues of prioritized rules | > 0 | 46 | ERROR |
+| High issues | > 0 | 128 | ERROR |
+
+**Issues of prioritized rules (46, all security):**
+
+| Rule | Count | Where | Disposition |
+|---|---|---|---|
+| `pythonsecurity:S5145` (log injection) | 40 | `apps/api` routers, `packages/` (agents, decision, execution), legacy `src/api` routers and agents | **Mitigated.** All 40 are in code that runs inside the API or an MCP server, where `install_log_injection_guard()` escapes CR, LF and other control characters in every log message (see "Process-wide guard" below). SonarQube's taint analysis does not model the guard. The reachable sinks found earlier were fixed explicitly in #229 |
+| `python:S2068` (hard-coded credential) | 4 | `scripts/setup/create_default_users.py:79,112`, `scripts/data/generate_synthetic_data.py:188`, `scripts/data/quick_demo_data.py:183` | **Real, accepted for v2.1.1.** These setup and demo-data scripts fall back to `changeme` when `DEFAULT_ADMIN_PASSWORD` / `DEFAULT_USER_PASSWORD` are unset. They are not part of the API or any image. Fix after the release: refuse to run without the variables. Documented in the v2.1.1 known limitations |
+| `pythonsecurity:S2083` (path injection) | 1 | `packages/maiw-models/maiw_models/eval/__main__.py:347` | **False positive** (as for `ff5ce22`): the `--output` path of a local command-line tool, chosen by the person running it |
+| `pythonsecurity:S7044` (URL from user data) | 1 | `scripts/testing/smoke_e2e.py:320` | **False positive.** A test script that builds request URLs from its own `--api` argument, run by the operator against their own deployment |
+
+**High issues (128):** reliability 78, all `shelldre:S7688` (shell-script
+test syntax); maintainability 49 (`typescript:S3776` cognitive complexity
+30, `plsql:S1192` duplicated literals 12, others 7); security 1 (the
+`S2083` false positive above). By location: `scripts/` 79, `src/ui/` 39,
+`tests/` 9, `packages/maiw-models` 1 (the `S2083`). None is in new code.
+
+**Security hotspots to review (6):** `typescript:S2245` (pseudorandom
+number for a UI log-entry key, `ActivityFeed.tsx:41`: not security-relevant);
+`shell:S5332` ×3 (an `http://` URL printed in a message, in
+`setup_environment.sh:113`, `start_demo_mode.sh:126`,
+`start_reference_deployment.sh:153`); `shell:S6506` ×2 (`curl -L` to
+`https://nvidia.github.io` in `setup_rapids_phase1.sh:30-31`, which could
+follow a redirect to HTTP). A project administrator marks them reviewed in
+SonarQube. The gate no longer has a hotspot condition.
+
+**Needed for release:** a written Blueprints SRE disposition of the two
+failing conditions, with the dispositions above.
 
 ## Analysis of `ff5ce22` (2026-11-03)
 

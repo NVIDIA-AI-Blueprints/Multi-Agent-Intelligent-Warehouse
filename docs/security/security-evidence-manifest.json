@@ -1,7 +1,7 @@
 {
   "schema": "maiw-security-evidence/1",
   "repository": "https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse",
-  "generated_at": "2026-11-06T04:37:45+00:00",
+  "generated_at": "2026-11-06T05:04:11+00:00",
   "generator": "scripts/security/build_evidence_manifest.py",
   "nspect": {
     "id": "NSPECT-NJMX-9GQU",
@@ -54,101 +54,6 @@
       }
     },
     {
-      "label": "sonar-analyzed",
-      "git_sha": "ff5ce22f2d3b541361eeb083278b903926d7eda5",
-      "workflow_runs": {
-        "ci": {
-          "workflow": "ci-cd.yml",
-          "run_url": "https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/actions/runs/41576667514",
-          "event": "push",
-          "status": "completed",
-          "conclusion": "success",
-          "executed_at": "2026-11-03T04:11:41Z"
-        },
-        "deployment_test": {
-          "workflow": "main.yml",
-          "run_url": "https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/actions/runs/41576667487",
-          "event": "push",
-          "status": "completed",
-          "conclusion": "success",
-          "executed_at": "2026-11-03T04:11:41Z"
-        },
-        "codeql": {
-          "workflow": "codeql.yml",
-          "run_url": "https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/actions/runs/41576667524",
-          "event": "push",
-          "status": "completed",
-          "conclusion": "success",
-          "executed_at": "2026-11-03T04:11:41Z"
-        },
-        "sonarqube": {
-          "workflow": "sonarqube.yml",
-          "run_url": "https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/actions/runs/41586661295",
-          "event": "workflow_run",
-          "status": "completed",
-          "conclusion": "failure",
-          "executed_at": "2026-11-03T05:54:54Z"
-        }
-      },
-      "code_scanning": [
-        {
-          "scan_type": "CodeQL (/language:javascript)",
-          "scanner": "CodeQL",
-          "scanner_version": "2.27.3",
-          "executed_at": "2026-11-03T04:12:53Z",
-          "results_count": 77,
-          "analysis_url": "https://api.github.com/repos/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/code-scanning/analyses/2082895876"
-        },
-        {
-          "scan_type": "CodeQL (/language:python)",
-          "scanner": "CodeQL",
-          "scanner_version": "2.27.3",
-          "executed_at": "2026-11-03T04:13:29Z",
-          "results_count": 1092,
-          "analysis_url": "https://api.github.com/repos/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/code-scanning/analyses/2082898358"
-        },
-        {
-          "scan_type": "Trivy (.github/workflows/ci-cd.yml:security)",
-          "scanner": "Trivy",
-          "scanner_version": "0.70.0",
-          "executed_at": "2026-11-03T04:11:57Z",
-          "results_count": 27,
-          "analysis_url": "https://api.github.com/repos/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/code-scanning/analyses/2082891802"
-        },
-        {
-          "scan_type": "Trivy (trivy-image-backend)",
-          "scanner": "Trivy",
-          "scanner_version": "0.70.0",
-          "executed_at": "2026-11-03T04:14:03Z",
-          "results_count": 185,
-          "analysis_url": "https://api.github.com/repos/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/code-scanning/analyses/2082900583"
-        },
-        {
-          "scan_type": "Trivy (trivy-image-frontend)",
-          "scanner": "Trivy",
-          "scanner_version": "0.70.0",
-          "executed_at": "2026-11-03T04:13:28Z",
-          "results_count": 0,
-          "analysis_url": "https://api.github.com/repos/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/code-scanning/analyses/2082898275"
-        },
-        {
-          "scan_type": "Trivy (trivy-image-mcp)",
-          "scanner": "Trivy",
-          "scanner_version": "0.70.0",
-          "executed_at": "2026-11-03T04:13:26Z",
-          "results_count": 185,
-          "analysis_url": "https://api.github.com/repos/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/code-scanning/analyses/2082898132"
-        }
-      ],
-      "sonarqube": {
-        "status": "analyzed",
-        "analysis_key": "13d9886d-3c72-45d5-a7d6-9abf288f2d62",
-        "executed_at": "2026-11-03T04:40:00+0000",
-        "project_version": "2.1.0",
-        "dashboard_url": "https://sonar.nvidia.com/dashboard?id=TEGRASW_Blueprints-SRE_warehouse-operational-assistant_Multi-Agent-Intelligent-Warehouse"
-      }
-    },
-    {
       "label": "v2.1.1-candidate",
       "git_sha": "4259fa37aa3676bbcc3378f00d067d9bdcc01174",
       "workflow_runs": {
@@ -178,11 +83,11 @@
         },
         "sonarqube": {
           "workflow": "sonarqube.yml",
-          "run_url": "https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/actions/runs/42113662581",
+          "run_url": "https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/actions/runs/42165769109",
           "event": "workflow_run",
           "status": "completed",
           "conclusion": "failure",
-          "executed_at": "2026-11-05T21:33:06Z"
+          "executed_at": "2026-11-06T05:00:12Z"
         }
       },
       "code_scanning": [
@@ -236,8 +141,11 @@
         }
       ],
       "sonarqube": {
-        "status": null,
-        "reason": "no SonarQube analysis of this revision"
+        "status": "analyzed",
+        "analysis_key": "eb6b331f-47c1-4647-86f9-3486418d02f0",
+        "executed_at": "2026-11-06T04:47:21+0000",
+        "project_version": "2.1.1-rc.1",
+        "dashboard_url": "https://sonar.nvidia.com/dashboard?id=TEGRASW_Blueprints-SRE_warehouse-operational-assistant_Multi-Agent-Intelligent-Warehouse"
       }
     }
   ],
@@ -260,8 +168,8 @@
     },
     "secret_scanning_open_alerts": 0,
     "sonarqube_latest_analysis": {
-      "executed_at": "2026-11-03T04:40:00+0000",
-      "project_version": "2.1.0",
+      "executed_at": "2026-11-06T04:47:21+0000",
+      "project_version": "2.1.1-rc.1",
       "quality_gate_status": "ERROR",
       "dashboard_url": "https://sonar.nvidia.com/dashboard?id=TEGRASW_Blueprints-SRE_warehouse-operational-assistant_Multi-Agent-Intelligent-Warehouse"
     }
