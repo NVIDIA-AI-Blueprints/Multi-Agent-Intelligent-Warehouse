@@ -717,6 +717,97 @@ class CopilotService:
         )
         return result, turn
 
+    async def decline_action(
+        self,
+        *,
+        message: str,
+        conversation_id: str | None,
+        warehouse_id: str,
+        scenario_name: str = "",
+    ) -> tuple[CopilotActResult, CopilotTurn]:
+        """
+        Answer a cancellation / negated message ("cancel that", "don't move it")
+        deterministically, without selecting, proposing or running anything.
+
+        Nothing reaches the orchestrator, and the conversation's stored
+        recommendations and last ACT result are left untouched, so a later
+        OBSERVE_OUTCOME turn still sees an earlier pending approval. The reply
+        does not claim that nothing is pending: an approval created by an
+        earlier turn is not withdrawn by this message, and the reply says so.
+        """
+        _t0 = time.monotonic()
+        trace_id = str(uuid.uuid4())
+        turn_id = str(uuid.uuid4())
+
+        conv = self._store.get_or_create(conversation_id, warehouse_id, scenario_name)
+        parent_turn_id = conv.last_turn.turn_id if conv.last_turn else None
+
+        await self._publish(
+            "COPILOT_TURN_STARTED",
+            f"Copilot ACT — turn {turn_id[:8]}",
+            trace_id=trace_id,
+        )
+        await self._publish(
+            "COPILOT_INTENT_RESOLVED", "intent=ACT (cancellation)", trace_id=trace_id
+        )
+
+        text = "Understood — I have not prepared or run any action for this message."
+        last_act = conv.last_act_result
+        earlier_pending_id = (
+            getattr(last_act, "pending_approval_id", None) if last_act else None
+        )
+        if earlier_pending_id:
+            text += (
+                f" An earlier action ({getattr(last_act, 'capability', '') or 'action'}"
+                f" on {getattr(last_act, 'target', '') or 'its target'}) was already"
+                f" submitted for approval as {earlier_pending_id}; this message does"
+                " not withdraw it. If it is still awaiting approval, reject it in the"
+                " approval queue so it does not run."
+            )
+        elif conv.last_recommendations:
+            text += " The recommendations remain available if you change your mind."
+
+        result = CopilotActResult(
+            message=text,
+            recommendation_id="",
+            capability="",
+            target="",
+            decision_outcome="CLARIFICATION_REQUIRED",
+            proposal_id=None,
+            decision_id=None,
+            approval_required=False,
+            pending_approval_id=None,
+            execution_status=None,
+            execution_id=None,
+            mutation_state=MutationState.NOT_ATTEMPTED,
+            safety_note="No warehouse changes have been made.",
+            violations=[],
+            source_recommendation_id="",
+            source_snapshot_id="none",
+            snapshot_id="none",
+            conversation_id=conv.conversation_id,
+            turn_id=turn_id,
+            trace_id=trace_id,
+            warehouse_id=warehouse_id,
+            latency_ms=(time.monotonic() - _t0) * 1000,
+            degraded=False,
+            degradation_reason=None,
+        )
+        turn = self._make_turn(
+            turn_id=turn_id,
+            conv_id=conv.conversation_id,
+            message=message,
+            intent=CopilotIntent.ACT,
+            trace_id=trace_id,
+            summary=result.message,
+            parent_turn_id=parent_turn_id,
+        )
+        self._store.add_turn(turn)
+        await self._publish(
+            "COPILOT_TURN_COMPLETE", "action_cancelled", trace_id=trace_id
+        )
+        return result, turn
+
     async def act(
         self,
         *,
@@ -732,7 +823,18 @@ class CopilotService:
         All governance is delegated to GovernedActionOrchestrator.
 
         Returns (CopilotActResult, CopilotTurn). The turn is persisted internally.
+
+        A cancellation / negated message ("cancel that", "don't move it") never
+        selects a recommendation: it gets the decline_action() reply instead.
         """
+        if intent_classifier.is_cancellation(message):
+            return await self.decline_action(
+                message=message,
+                conversation_id=conversation_id,
+                warehouse_id=warehouse_id,
+                scenario_name=scenario_name,
+            )
+
         _t0 = time.monotonic()
         trace_id = str(uuid.uuid4())
         turn_id = str(uuid.uuid4())
@@ -1725,10 +1827,14 @@ def _select_recommendation(
       "explicit_index"   — operator referenced first/second/etc.
       "capability_match" — operator referenced capability domain keyword
       "not_found"        — no recommendations available
+      "cancelled"        — the message cancels or negates ("cancel that",
+                           "don't move it"); nothing is selected
       "ambiguous"        — multiple recommendations, cannot resolve deterministically
     """
     if not recs:
         return None, "not_found"
+    if intent_classifier.is_cancellation(message):
+        return None, "cancelled"
     if len(recs) == 1:
         return recs[0], "single"
 
