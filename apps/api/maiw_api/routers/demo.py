@@ -34,11 +34,19 @@ from pydantic import BaseModel, Field
 from maiw_api.config import settings
 
 
-def _default_scheduled_for() -> str:
-    """Next-day slot for maintenance proposals that carry no explicit time."""
+def _default_scheduled_for(ctrl: Any = None) -> str:
+    """
+    Next-day slot for maintenance proposals that carry no explicit time.
+
+    Demo mode runs on the world's SimulationClock, which is deliberately not
+    tied to wall time, so "tomorrow" is the simulated now + 1 day. Without a
+    simulation clock it falls back to UTC wall time.
+    """
     from datetime import datetime, timedelta, timezone
 
-    return (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+    clock = getattr(getattr(ctrl, "world", None), "clock", None)
+    now = clock.now() if clock is not None else datetime.now(timezone.utc)
+    return (now + timedelta(days=1)).isoformat()
 
 
 logger = logging.getLogger(__name__)
@@ -638,7 +646,7 @@ async def _build_and_execute_proposal(
     # Select proposal skill based on capability
     try:
         proposal = await _build_proposal(
-            rec, trace_id, runtime, warehouse_id=warehouse_id
+            rec, trace_id, runtime, warehouse_id=warehouse_id, ctrl=ctrl
         )
     except Exception as exc:
         lifecycle.append(
@@ -875,13 +883,14 @@ def _resolve_labor_allocation_target(rec: Any) -> tuple[str, list[str]]:
 
 
 async def _build_proposal(
-    rec: Any, trace_id: str, runtime: Any, *, warehouse_id: str
+    rec: Any, trace_id: str, runtime: Any, *, warehouse_id: str, ctrl: Any = None
 ) -> Any:
     """
     Translate a RecommendedAction into an ActionProposal using the correct skill.
 
     Every proposal is bound to ``warehouse_id`` (the active world's warehouse —
-    the one its approval record is bound to).
+    the one its approval record is bound to).  ``ctrl`` is the demo controller;
+    its world's simulation clock dates time-based parameters (scheduled_for).
     """
     cap = rec.capability
 
@@ -921,7 +930,7 @@ async def _build_proposal(
             maintenance_type=rec.subtype or "unscheduled",
             description=rec.objective,
             scheduled_by="operations-agent",
-            scheduled_for=_default_scheduled_for(),
+            scheduled_for=_default_scheduled_for(ctrl),
             priority=rec.priority,
             reason=rec.rationale,
             requested_by="operations-agent",
