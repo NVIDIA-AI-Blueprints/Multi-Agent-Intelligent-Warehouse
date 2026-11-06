@@ -88,8 +88,9 @@ ACT_MESSAGES = [
     "Reprioritize wave 17 so we don't miss the carrier cutoff",
     "Approve it, I don't see any risk",
     "Move FL-01 to the next stop",
-    "Why not move it?",
 ]
+# "Why not move it?" used to be listed here. It is a question, so it no longer
+# classifies as ACT (#258; see test_copilot_act_requires_command.py).
 
 # Questions that open with a marker but name no action: answered as ASK, not
 # with the cancellation reply (they cannot run anything either way).

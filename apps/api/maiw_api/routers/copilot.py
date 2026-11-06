@@ -17,7 +17,10 @@ These paths are validated by architecture invariant tests.
 ACT intent routes to CopilotService.act() which delegates governance to
 GovernedActionOrchestrator. A cancellation / negated message ("cancel that",
 "don't move it") routes to CopilotService.decline_action(), which answers
-deterministically and selects, proposes and runs nothing. The router has no direct access to DecisionEngine,
+deterministically and selects, proposes and runs nothing. ACT needs a command
+("Do it.", "Reassign Maria to wave 17"): a question or statement that only
+mentions an action ("Should we reassign Maria?") is answered as ASK / ANALYZE
+and runs nothing. The router has no direct access to DecisionEngine,
 ApprovalStore, or ActionExecutor.
 """
 
