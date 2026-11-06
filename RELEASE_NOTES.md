@@ -1,6 +1,6 @@
 # MAIW v2.0.0 Release Notes
 
-> Historical: the v2.0.0 notes. The current release is v2.1.0 — see [RELEASE_NOTES_v2.1.0.md](RELEASE_NOTES_v2.1.0.md).
+> Historical: the v2.0.0 notes. The current release is v2.1.1 — see [RELEASE_NOTES_v2.1.1.md](RELEASE_NOTES_v2.1.1.md).
 
 ## What is MAIW v2
 
