@@ -1,7 +1,7 @@
 # MAIW v2.1.1 — Release Notes
 
-**Status:** DRAFT, not tagged or published. Release-blocking security gates
-are still open (see the validation table). **Validated code commit:** `main`
+**Status:** DRAFT, not tagged or published. One release-blocking security
+gate is still open: the SonarQube disposition (see the validation table). **Validated code commit:** `main`
 `4259fa37aa3676bbcc3378f00d067d9bdcc01174` (PR #252). Previous release:
 `v2.1.0` (`2fdd9fea…`).
 
@@ -17,7 +17,7 @@ break existing clients; read "Compatibility" first.**
 | Internal NGC MAIW pytest suite | **NOT RUN**: could not pull the internal test image (requires internal NGC org access) ([run](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/actions/runs/42111328531)) |
 | Release gate on the reference host | PASS (2026-11-05, on `4259fa3`; details below) |
 | SonarQube | analysis `eb6b331f-47c1-4647-86f9-3486418d02f0` of `4259fa3` (dated 2026-11-06 04:47 UTC, processed 05:00 UTC), version `2.1.1-rc.1`, quality gate **ERROR**: 46 issues of prioritized security rules and 128 HIGH issues overall; 0 blocker issues, and every new-code condition passes. **PENDING (release-blocking):** written Blueprints SRE disposition. Triage: `docs/security/sonarqube-remediation-report.md` ("Analysis of `4259fa3`"). Run manually from an NVIDIA-network host; CI's own run for this commit ([run](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/actions/runs/42113662581)) could not reach `sonar.nvidia.com` (exit 3) |
-| nSpect OSS scan (NSPECT-NJMX-9GQU) | 2026-11-05, program version **MAIW v2.1.1**, source at `4259fa3`: 0 Critical, **2 High**, 10 Medium, 4 Low. **PENDING (release-blocking):** `react-dev-utils`: Not Affected exception **EXC-HPU1-JZI6** filed 2026-11-06, awaiting PLC Security PIC approval; `svgo`: Resolved exception **EXC-TNK9-0X62** filed 2026-11-06 (vendor fix in 2.8.3), awaiting PLC Security PIC approval (see below) |
+| nSpect OSS scan (NSPECT-NJMX-9GQU) | 2026-11-05, program version **MAIW v2.1.1**, source at `4259fa3`: 0 Critical, 2 High, 10 Medium, 4 Low. **PASS:** both High findings carry exceptions approved 2026-11-06 in the Exception Tracker: `react-dev-utils` Not Affected **EXC-HPU1-JZI6**, `svgo` Resolved **EXC-TNK9-0X62** (vendor fix in 2.8.3); see below |
 | SBOM submitted to nSpect | 2026-11-06: `maiw-v2.1.1-4259fa3.cdx.json` uploaded to MAIW v2.1.1 (Manage SBOM → Upload an SBOM). It merges the CI SBOMs `sbom-backend`, `sbom-frontend` (frontend image and UI bundle) and `sbom-mcp` of the CI run above: CycloneDX 1.6, 1642 components, sha256 `800278356c94534946dffabe9db35a9063c673f80aa5bd4afb3484c7b9f35c1b` |
 
 ## Compatibility
@@ -84,8 +84,8 @@ tooling pulled in by `react-scripts` 5.
 
 | Severity | Package | Disposition |
 |---|---|---|
-| High | `react-dev-utils` 12.0.1 (BDSA-2026-18203 / CVE-2026-14802) | **Not Affected exception EXC-HPU1-JZI6** (justification `requires_configuration`), awaiting approval. OS command injection in `openBrowser` (macOS). No fixed release exists. Since #251 the UI start script defaults `BROWSER=none`, so `openBrowser` never runs; a test pins this. Development server only. Removed when the UI leaves `react-scripts` |
-| High | `svgo` 2.8.4 (BDSA-2026-27126 / CVE-2026-73650) | **Resolved exception EXC-TNK9-0X62**, awaiting approval. GitHub's advisory (GHSA-2p49-hgcm-8545) lists 2.8.3 as the 2.x fix, so 2.8.4 is patched; Dependabot raises no alert. Build-time only (cssnano / postcss-svgo) |
+| High | `react-dev-utils` 12.0.1 (BDSA-2026-18203 / CVE-2026-14802) | **Not Affected exception EXC-HPU1-JZI6** (justification `requires_configuration`), approved 2026-11-06. OS command injection in `openBrowser` (macOS). No fixed release exists. Since #251 the UI start script defaults `BROWSER=none`, so `openBrowser` never runs; a test pins this. Development server only. Removed when the UI leaves `react-scripts` |
+| High | `svgo` 2.8.4 (BDSA-2026-27126 / CVE-2026-73650) | **Resolved exception EXC-TNK9-0X62**, approved 2026-11-06. GitHub's advisory (GHSA-2p49-hgcm-8545) lists 2.8.3 as the 2.x fix, so 2.8.4 is patched; Dependabot raises no alert. Build-time only (cssnano / postcss-svgo) |
 | Medium | `react-router` 6.30.6 (CVE-2026-53666) | SSR hydration only; MAIW's UI is a client-rendered SPA. The fix is 7.18.0, a major upgrade, planned after this release |
 | Medium | `react-is` 19.2.5 (CVE-2026-23870) | Mismatch: the advisory covers `react-server-dom-*`, not `react-is` |
 | Medium | `serialize-javascript` 7.0.5 | Real, build-time only (CSS and Rollup minifier plugins). Fixed in 7.1.3; the npm override will be raised after this release |

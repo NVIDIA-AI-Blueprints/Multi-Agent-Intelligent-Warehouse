@@ -13,15 +13,14 @@ from or wrote to nSpect.
 | OSS scan | Repository `…multi-agent-intelligent-warehouse--4259fa37aa3676bbcc3378f00d067d9bdcc01174`, last scan 2026-11-05 17:57 (nSpect display time): **0 Critical, 2 High, 10 Medium, 4 Low** |
 | Package inventory | npm rows match the UI SBOM (`maiw-ui-bundle.cdx.json`) version for version. Python rows are the minimums in `requirements.txt` (for example `requests` 2.32.4 and `xgboost` 3.2.0), not installed versions: the images install `requests` 2.34.2 and the backend image has no `xgboost` |
 | SBOM | Uploaded 2026-11-06 under Manage SBOM → Upload an SBOM (see below) |
-| Exceptions | `react-dev-utils`: Not Affected exception **EXC-HPU1-JZI6** (Launch nAbler / Exception Tracker), filed 2026-11-06, awaiting PLC Security PIC approval. `svgo`: Resolved exception **EXC-TNK9-0X62**, filed 2026-11-06, awaiting PLC Security PIC approval |
+| Exceptions | `react-dev-utils`: Not Affected exception **EXC-HPU1-JZI6** (Launch nAbler / Exception Tracker), filed and approved 2026-11-06. `svgo`: Resolved exception **EXC-TNK9-0X62**, filed and approved 2026-11-06. Approvals as reported by the program owner |
 | Registered builds or images | None. Binary and container-image sources are not registered: no image is distributed; Compose builds them locally |
 
 ### Findings
 
 All 16 are in the UI's npm lockfile or a Python minimum; none is in a shipped
 image. Dispositions and reasoning are in `RELEASE_NOTES_v2.1.1.md` ("nSpect
-findings for MAIW v2.1.1"). The two High findings are release-blocking until
-nSpect records a decision:
+findings for MAIW v2.1.1"). Both High findings carry approved exceptions:
 
 | Finding | Requested disposition | Evidence |
 |---|---|---|
@@ -48,7 +47,7 @@ when an uploaded SBOM is used"; the program owner checks the v2.1.1 ConneX
 report for child programs.
 
 ### Remaining owner steps for v2.1.1
-1. Approval of EXC-HPU1-JZI6 and EXC-TNK9-0X62 by the PLC Security PIC.
+1. ~~Approval of EXC-HPU1-JZI6 and EXC-TNK9-0X62~~: both approved 2026-11-06.
 2. SonarQube: the analysis of `4259fa3` (`eb6b331f…`, 2026-11-06) has quality
    gate ERROR; it needs a written Blueprints SRE disposition
    (`sonarqube-remediation-report.md`).
