@@ -3,12 +3,16 @@
 """
 Deterministic Copilot intent classification.
 
-Classifies operator messages into ASK / ANALYZE / ACT without an LLM call.
-Pattern matching is ordered: ACT markers first (explicit commands), then
-ANALYZE markers (recommendation requests), then default to ASK.
+Classifies operator messages into ASK / ANALYZE / ACT / OBSERVE_OUTCOME
+without an LLM call. Pattern matching is ordered: OBSERVE_OUTCOME markers,
+then ACT (an explicit command that is not a cancellation), then ANALYZE
+markers (recommendation requests), then default to ASK.
 
-ACT is detected but not executed in Phase 15C — the caller returns a safe
-"governed action handling is not yet available" response.
+ACT can select a stored recommendation and submit it for governance, so it
+needs a command: an action verb that opens a clause of a sentence that is not
+a question. A message that only mentions an action ("Should we reassign
+Maria?", "I didn't ask you to move it", "Tell me about the dispatch") is not
+ACT.
 """
 
 from __future__ import annotations
@@ -32,8 +36,10 @@ _OBSERVE_PATTERNS: list[re.Pattern] = [
     re.compile(r"\bis\s+(wave\s+17|the\s+backlog|the\s+risk)\s+(better|lower|improved|reduced)\b", re.IGNORECASE),
 ]
 
-# ── ACT markers — explicit operational commands ───────────────────────────────
+# ── ACT markers — the action vocabulary ──────────────────────────────────────
 # Match whole-word or start-of-phrase to avoid false positives like "movement".
+# A match anywhere means the message *names* an action; it is ACT only when
+# the action is also commanded (see is_directive below).
 _ACT_PATTERNS: list[re.Pattern] = [
     re.compile(r"\b(do it|execute|confirm|apply|approve|commit)\b", re.IGNORECASE),
     re.compile(r"\b(allocate|reassign|move|reprioritize|reprioritise|dispatch)\b", re.IGNORECASE),
@@ -67,14 +73,20 @@ _NEGATOR = (
     rf"|must\s+not|mustn{_APOS}t|should\s+not|shouldn{_APOS}t"
     rf"|will\s+not|won{_APOS}t|would\s+not|wouldn{_APOS}t"
     rf"|cannot|can\s+not|can{_APOS}t|could\s+not|couldn{_APOS}t"
+    rf"|didn{_APOS}t|hasn{_APOS}t|haven{_APOS}t|hadn{_APOS}t"
+    rf"|isn{_APOS}t|aren{_APOS}t|wasn{_APOS}t|weren{_APOS}t"
+    r"|nobody|no\s*-?\s*one|none\s+of\s+us"
     r")"
 )
 
 # Words allowed between the negator and the verb ("don't actually move",
-# "not to move", "don't you dare move", "no need to go and dispatch").
+# "not to move", "don't you dare move", "no need to go and dispatch", and
+# reported requests: "I didn't ask you to move it", "nobody said to reassign").
 _FILLER = (
-    r"(?:to|you|we|i|actually|really|yet|just|even|ever|please|now|need|have"
-    r"|want|bother|try|dare|go\s+and)"
+    r"(?:to|you|we|i|me|us|them|actually|really|yet|just|even|ever|please|now"
+    r"|need|have|want(?:ed)?|bother|try|dare|go\s+and"
+    r"|ask(?:ed)?|tell|told|say|said|mean|meant|agree(?:d)?|plan(?:ned)?"
+    r"|intend(?:ed)?|decide(?:d)?)"
 )
 
 # Things a cancel-family verb can take as its object: the pending action.
@@ -110,7 +122,7 @@ _LEADING_CANCEL = re.compile(
 
 # (b) A negator directly governs an operational verb.
 _NEGATED_ACT = re.compile(
-    _NEGATOR + rf"(?:\s+{_FILLER}){{0,2}}\s+" + _NEGATABLE_VERB, re.IGNORECASE
+    _NEGATOR + rf"(?:\s+{_FILLER}){{0,3}}\s+" + _NEGATABLE_VERB, re.IGNORECASE
 )
 
 # (c) A cancel-family verb takes the pending action as its object, or an
@@ -119,6 +131,42 @@ _CANCEL_ACTION = re.compile(
     rf"\b{_CANCEL_VERB}\s+{_ACTION_OBJECT}"
     r"|\bhold\s+off\b|\bnever\s*-?\s*mind\b",
     re.IGNORECASE,
+)
+
+# ── Directive guard — ACT needs a command, not a mention ─────────────────────
+# An action verb only makes a message ACT when it opens a clause ("Do it.",
+# "OK, go ahead", "Let's reprioritize wave 17", "If it is safe, move it") of a
+# sentence that is not a question. A question ("Should we reassign Maria?",
+# "Why not move it?"), a report ("I didn't ask you to move it") or a noun use
+# ("Tell me about the dispatch") names an action without asking for it.
+
+# A sentence and its terminator(s); a sentence containing "?" is a question.
+_SENTENCE = re.compile(r"[^.!?\n]+[.!?]*")
+
+# Clause breaks inside a sentence: comma, semicolon, en / em dash, " - ".
+_CLAUSE_BREAK = re.compile(r"[,;–—]|\s-\s")
+
+# Words that may precede the verb of a command in the same clause.
+_DIRECTIVE_LEAD = (
+    r"(?:(?:please|pls|kindly|ok(?:ay)?|yes|yeah|yep|yup|sure|alright"
+    r"|all\s+right|right|fine|great|good|perfect|cool|agreed"
+    r"|sounds\s+good|looks\s+good|then|so|now|just|and"
+    rf"|let{_APOS}s|let\s+us|you\s+(?:can|may)"
+    r"|i\s+(?:want|need)\s+you\s+to"
+    rf"|i{_APOS}d\s+like\s+you\s+to|i\s+would\s+like\s+you\s+to"
+    r")\W+)*"
+)
+
+# The command verbs: the ACT vocabulary in imperative position.
+_DIRECTIVE_VERB = (
+    r"(?:do\s+it|do\s+(?:the\s+)?(?:first|second|third|1st|2nd|3rd|#?[123]|one|that)"
+    r"|execute|confirm|apply|approve|commit|allocate|reassign|move"
+    r"|reprioriti[sz]e|dispatch|make\s+it\s+happen|go\s+ahead|proceed"
+    r"|prepare\s+(?:that|this|the)\s+action)\b"
+)
+
+_DIRECTIVE_CLAUSE = re.compile(
+    r"^\W*" + _DIRECTIVE_LEAD + _DIRECTIVE_VERB, re.IGNORECASE
 )
 
 # ── ANALYZE markers — recommendation-oriented questions ───────────────────────
@@ -168,14 +216,35 @@ def is_cancellation(message: str) -> bool:
     return not (is_question and not names_an_action)
 
 
+def is_directive(message: str) -> bool:
+    """
+    True if the message commands an action, so it may select a recommendation.
+
+    Some clause of a sentence that is not a question must open with a command
+    verb, optionally after a lead-in ("ok", "yes", "please", "let's", "then",
+    "I want you to"). Cancellation is checked separately (is_cancellation):
+    "Move it. Actually, cancel that." is directive and a cancellation, and the
+    cancellation wins.
+    """
+    for sentence in _SENTENCE.findall(message):
+        if "?" in sentence:
+            continue
+        for clause in _CLAUSE_BREAK.split(sentence):
+            if _DIRECTIVE_CLAUSE.search(clause):
+                return True
+    return False
+
+
 def classify(message: str) -> CopilotIntent:
     """
     Classify a single operator message into ASK / ANALYZE / ACT / OBSERVE_OUTCOME.
 
     Order of precedence:
     1. OBSERVE_OUTCOME markers (post-execution questions — checked before ACT)
-    2. ACT markers (explicit operational commands) — skipped for cancellation /
-       negated messages ("cancel that", "don't dispatch anything")
+    2. ACT — an explicit command (is_directive) that is not a cancellation /
+       negated message ("cancel that", "don't dispatch anything"). A question
+       or statement that only mentions an action ("Should we reassign
+       Maria?") falls through to ANALYZE / ASK.
     3. ANALYZE markers (recommendation-oriented questions)
     4. Default: ASK (explanation / status / "why")
     """
@@ -183,10 +252,8 @@ def classify(message: str) -> CopilotIntent:
         if pattern.search(message):
             return CopilotIntent.OBSERVE_OUTCOME
 
-    if not is_cancellation(message):
-        for pattern in _ACT_PATTERNS:
-            if pattern.search(message):
-                return CopilotIntent.ACT
+    if is_directive(message) and not is_cancellation(message):
+        return CopilotIntent.ACT
 
     for pattern in _ANALYZE_PATTERNS:
         if pattern.search(message):

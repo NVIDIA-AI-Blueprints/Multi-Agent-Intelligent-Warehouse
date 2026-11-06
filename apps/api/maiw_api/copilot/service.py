@@ -826,6 +826,9 @@ class CopilotService:
 
         A cancellation / negated message ("cancel that", "don't move it") never
         selects a recommendation: it gets the decline_action() reply instead.
+        Nor does a message that does not command an action ("Should we
+        reassign Maria?"); it gets a CLARIFICATION_REQUIRED reply. The router
+        never sends either here, since classify() returns ACT for neither.
         """
         if intent_classifier.is_cancellation(message):
             return await self.decline_action(
@@ -948,6 +951,31 @@ class CopilotService:
             return result, turn
 
         selected_rec, resolution_reason = _select_recommendation(message, recs)
+
+        if selected_rec is None and resolution_reason == "not_a_command":
+            result = _make_act_error(
+                "CLARIFICATION_REQUIRED",
+                (
+                    "I have not prepared or run any action: this message does not "
+                    "ask me to act. To prepare a recommended action for governance, "
+                    "say 'Do it.' or 'Do the first one.'"
+                ),
+                degraded=False,
+            )
+            turn = self._make_turn(
+                turn_id=turn_id,
+                conv_id=conv.conversation_id,
+                message=message,
+                intent=CopilotIntent.ACT,
+                trace_id=trace_id,
+                summary=result.message,
+                parent_turn_id=parent_turn_id,
+            )
+            self._store.add_turn(turn)
+            await self._publish(
+                "COPILOT_TURN_COMPLETE", "not_a_command", trace_id=trace_id
+            )
+            return result, turn
 
         if selected_rec is None and resolution_reason == "ambiguous":
             rec_list = "\n".join(
@@ -1829,12 +1857,16 @@ def _select_recommendation(
       "not_found"        — no recommendations available
       "cancelled"        — the message cancels or negates ("cancel that",
                            "don't move it"); nothing is selected
+      "not_a_command"    — the message does not command an action ("Should we
+                           reassign Maria?"); nothing is selected
       "ambiguous"        — multiple recommendations, cannot resolve deterministically
     """
     if not recs:
         return None, "not_found"
     if intent_classifier.is_cancellation(message):
         return None, "cancelled"
+    if not intent_classifier.is_directive(message):
+        return None, "not_a_command"
     if len(recs) == 1:
         return recs[0], "single"
 

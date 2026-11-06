@@ -98,6 +98,14 @@ from browser requests, so governed writes from that UI are refused by design.
 OBSERVE_OUTCOME; intent is classified server-side). Returns 503 unless the
 Copilot service is available (`MAIW_DEMO_MODE=true`).
 
+ACT, which submits a stored recommendation to governance, needs a command:
+an action verb that opens a clause of a sentence that is not a question ("Do
+it.", "OK, go ahead", "Do the first one.", "Reassign Maria to wave 17"). A
+question or statement that only mentions an action ("Should we reassign
+Maria?", "Why not move it?") is answered as ASK / ANALYZE and runs nothing. A
+cancellation or negation ("cancel that", "don't move it", "I didn't ask you to
+move it") gets a fixed reply that prepares nothing.
+
 Request (`CopilotTurnRequest`):
 
 ```json
