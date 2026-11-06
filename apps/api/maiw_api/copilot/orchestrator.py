@@ -435,6 +435,7 @@ class GovernedActionOrchestrator:
                 new_priority=req.priority,
                 reason=req.rationale,
                 requested_by="copilot-operator",
+                warehouse_id=warehouse_id,
                 trace_id=trace_id,
             )
 
