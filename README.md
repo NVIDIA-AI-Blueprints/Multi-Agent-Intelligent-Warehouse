@@ -367,11 +367,11 @@ Three sandbox modes, and the middle one is the point:
 
 **A sandbox authorises nothing.** Every capability check that runs unsandboxed still runs sandboxed, through the same `authorize_step`. The sandbox is a second wall behind the first. If `integrations/nemoclaw/` were deleted, capability enforcement, governance and procedure persistence would be unchanged.
 
-**Qualification status.** NemoClaw v0.0.124 and OpenShell v0.0.116 are installed on epg-tme-smc-h100-02 and the package-level security boundary (capability policy, sandbox isolation, approved Nemotron 3/3.5 policy in `PolicyFilter`, `MAIWHTTPModelGatewayClient`) was qualified for v2.0.0 — see `docs/audits/MAIW_NEMOCLAW_SECURITY_QUALIFICATION.md` and `artifacts/nemoclaw/`. The independent post-release audit of v2.0.0 (PR #142) then found that the *shipped application composition* did not match those claims (inference endpoint not mounted on `maiw_api.app:app`, an ungoverned legacy chat write path, durable stores not wired, readiness that failed open, a document path outside ModelGateway). **v2.0.1** (released) remediated those gaps on the canonical app — see `docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md`. **v2.1.0** is the current release — see [What ships](#what-ships-v210) and [RELEASE_NOTES_v2.1.0.md](RELEASE_NOTES_v2.1.0.md).
+**Qualification status.** NemoClaw v0.0.124 and OpenShell v0.0.116 are installed on epg-tme-smc-h100-02 and the package-level security boundary (capability policy, sandbox isolation, approved Nemotron 3/3.5 policy in `PolicyFilter`, `MAIWHTTPModelGatewayClient`) was qualified for v2.0.0 — see `docs/audits/MAIW_NEMOCLAW_SECURITY_QUALIFICATION.md` and `artifacts/nemoclaw/`. The independent post-release audit of v2.0.0 (PR #142) then found that the *shipped application composition* did not match those claims (inference endpoint not mounted on `maiw_api.app:app`, an ungoverned legacy chat write path, durable stores not wired, readiness that failed open, a document path outside ModelGateway). **v2.0.1** (released) remediated those gaps on the canonical app — see `docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md`. **v2.1.1** is the current release — see [What ships](#what-ships-v211) and [RELEASE_NOTES_v2.1.1.md](RELEASE_NOTES_v2.1.1.md).
 
 See [docs/architecture/NEMOCLAW_OPENSHELL_INTEGRATION.md](docs/architecture/NEMOCLAW_OPENSHELL_INTEGRATION.md).
 
-### What ships (v2.1.0)
+### What ships (v2.1.1)
 
 The only release composition root is `apps/api/maiw_api/app.py` (`uvicorn maiw_api.app:app`, port 8001). `src/api/app.py` is a legacy development server and is never part of a deployment or qualification.
 
@@ -380,6 +380,8 @@ The only release composition root is `apps/api/maiw_api/app.py` (`uvicorn maiw_a
 | `POST /api/v1/inference` | Mounted on the API port. Internal token required (fail-closed 401/503); forbidden routing fields and unknown fields → 422; every call goes through the canonical ModelGateway → PolicyFilter (Nemotron 3 / 3.5 only). |
 | Operational writes | Only governed routes mutate: agent proposal → DecisionEngine → ActionExecutor (`/equipment/{assign,release,maintenance}`, `/copilot/turn`, `/demo/{analyze,approve,reject,reconcile}`). |
 | Legacy `/api/v1/chat`, `/api/v1/reasoning` | **Not mounted.** Use `POST /api/v1/copilot/turn`. |
+| Document approve/reject (`/api/v1/document/{approve,reject}/{id}`) | **Not mounted** (they never recorded a decision). |
+| Cross-origin browser writes | POST/PUT/PATCH/DELETE with an `Origin` not in `CORS_ORIGINS` (or the API's own loopback origin) → 403 `CROSS_ORIGIN_REQUEST_FORBIDDEN`. Requests without `Origin` are unaffected. |
 | Other legacy routers (inventory, WMS, IoT, ERP, scanning, attendance, migrations, forecasting, training) and operations/safety | Read-only (GET) in the shipped app. |
 | Procedure state | `JsonFileProcedureStateStore` + `JsonFileGovernanceInbox` under `MAIW_PERSISTENCE_ROOT` (default `/var/lib/maiw`), built once by the composition root; `GET /api/v1/procedures` is a read-only view. `MAIW_PERSISTENCE_MODE=memory` is an explicit development/test opt-in. |
 | `GET /api/v1/ready` | 503 `NOT_READY` with `failed_components` when persistence, ModelGateway, the governed write path, MCP domains or (outside demo mode) the database are unavailable. |
@@ -689,7 +691,7 @@ python -m pytest tests/unit/ tests/contract/ tests/mcp/ tests/api/ packages/maiw
   --ignore=tests/unit/test_prompt_injection_simple.py
 ```
 
-**MAIW v2.1.0 test baseline: 3258 Python tests (CORE CI suite, same command as `.github/workflows/ci-cd.yml`) + 991 UI tests (42 suites)**
+**MAIW v2.1.1 test baseline: 3385 Python tests (CORE CI suite, same command as `.github/workflows/ci-cd.yml`) + 1010 UI tests (46 suites)**
 
 | Test tier | Command | Requires |
 |-----------|---------|---------|

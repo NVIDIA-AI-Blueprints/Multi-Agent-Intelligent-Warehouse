@@ -1,8 +1,10 @@
 # MAIW v2.1.1 — Release Notes
 
-**Status:** final notes, not yet tagged. **Validated code commit:** `main`
-`4259fa37aa3676bbcc3378f00d067d9bdcc01174` (PR #252). Previous release:
-`v2.1.0` (`2fdd9fea…`).
+**Status:** released 2026-11-06. **Validated code commit:** `main`
+`4259fa37aa3676bbcc3378f00d067d9bdcc01174` (PR #252). Tag `v2.1.1` is on
+`6d1395b`, the `main` commit that merged these notes (#253); it differs from
+the validated code commit only in documentation. Previous release: `v2.1.0`
+(`2fdd9fea…`).
 
 v2.1.1 is a security and bug-fix release. **It changes two behaviors that can
 break existing clients; read "Compatibility" first.**
