@@ -277,10 +277,23 @@ approved model. Check any configuration with:
 .venv/bin/python scripts/lib/check_model_config.py --provider-probe
 ```
 
-`--provider-probe` (also run by preflight) sends each enabled model one minimal
-completion and fails unless the provider answers HTTP 200 as that model. The
-hosted model list is not enough: it kept listing Nemotron 3 Super after its
-2026-10-19 retirement while every completion returned 404.
+`--provider-probe` (also run by preflight and status) sends each enabled model
+one minimal completion and fails unless the provider answers HTTP 200 as that
+model. The hosted model list is not enough: it kept listing Nemotron 3 Super
+after its 2026-10-19 retirement while every completion returned 404.
+
+A rate limit (429) or provider error (500/502/503/504) is retried twice
+(honouring `Retry-After`, at most 10 s). If it persists, the role is reported
+`WARN provider could not verify <role> model`. That does not fail preflight;
+rerun it later. Back-to-back probes can hit the hosted rate limit, for example
+a manual probe, then preflight (which start also runs), then status, all within
+seconds. Any other answer still fails:
+- a 4xx such as 404 or 410, or a 200 from a different model → `does not serve`;
+- 401 or 403 → `refused the API key`;
+- no answer (connection error, timeout) → `did not answer`.
+
+Status runs the same check but its verdict is readiness only. A FAIL there
+is followed by a NOTE that it does not change the verdict.
 
 Defaults (v2.1.0): Lightning serves LOW and MEDIUM reasoning, Ultra serves HIGH
 reasoning and CRITICAL risk. Super and Nano are disabled because their hosted
@@ -749,6 +762,9 @@ Do not upgrade NemoClaw and OpenShell simultaneously.
 | Inference → 503 `MODEL_UNAVAILABLE` (medium) | role disabled with no eligible fallback | `check_model_config.py` | enable Lightning (default) |
 | Inference → 503 `MODEL_UNAVAILABLE` (high / critical) | no high-capability role (Super, Ultra) enabled | `check_model_config.py` | enable Ultra (default) or a self-hosted Super |
 | Preflight FAIL `provider does not serve <role> model` | that model is retired or not available to this key | `check_model_config.py --provider-probe` | disable the role or point it at a deployment serving the approved ID |
+| Preflight FAIL `provider refused the API key for <role> model` | key invalid, expired, or not entitled to that model (401/403) | `check_model_config.py --provider-probe` | fix `MAIW_NIM_API_KEY` / `NVIDIA_API_KEY`, or disable the role |
+| Preflight FAIL `provider did not answer for <role> model` | wrong `MAIW_NIM_BASE_URL`, no network path, or timeout | `curl $MAIW_NIM_BASE_URL/models` | fix the URL / network; rerun preflight |
+| WARN `provider could not verify <role> model (HTTP 429 …)` | hosted rate limit or provider error persisted through retries | rerun `check_model_config.py --provider-probe` after a minute | none needed if a later probe passes; not a configuration error |
 | Sandbox cannot call API | Network policy / wrong endpoint | MAIW_SANDBOX_MODEL_GATEWAY_ENDPOINT | Set correct host IP (not localhost) |
 | Procedure not resuming | State mismatch or inbox duplicate | Check /var/lib/maiw/procedures/*.json | Validate procedure_execution_id + revision |
 | Governance stuck | GovernanceInbox has duplicate | Check governance_inbox.jsonl | Verify idempotency_key not already accepted |

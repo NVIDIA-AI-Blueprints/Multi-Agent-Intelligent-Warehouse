@@ -57,9 +57,11 @@ MIN_DISK_MB_STATE=1024
 MIN_DISK_MB_LOG=512
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+# (if-statements, not `[[ ]] && echo`: under `set -e` a false test as a
+# function's last command made --quiet exit at the first passing check.)
 _pass() {
     CHECKS_PASSED=$((CHECKS_PASSED + 1))
-    [[ "$QUIET" != "--quiet" ]] && echo "  PASS  $1"
+    if [[ "$QUIET" != "--quiet" ]]; then echo "  PASS  $1"; fi
 }
 
 _fail() {
@@ -74,8 +76,10 @@ _fail() {
 }
 
 _header() {
-    [[ "$QUIET" != "--quiet" ]] && echo ""
-    [[ "$QUIET" != "--quiet" ]] && echo "=== $1 ==="
+    if [[ "$QUIET" != "--quiet" ]]; then
+        echo ""
+        echo "=== $1 ==="
+    fi
 }
 
 _version_ge() {
@@ -245,8 +249,17 @@ while IFS= read -r line; do
         "FAIL  provider does not serve"*)
                _fail "${line#FAIL  }" "HTTP 200 from the provider as the approved model" \
                    "not served" "Disable the role or deploy the approved model (see docs/operations/REFERENCE_DEPLOYMENT_RUNBOOK.md § Model bindings)" ;;
+        "FAIL  provider refused"*)
+               _fail "${line#FAIL  }" "HTTP 200 from the provider as the approved model" \
+                   "key refused" "Check the API key, or disable the role this key may not use" ;;
+        "FAIL  provider did not answer"*)
+               _fail "${line#FAIL  }" "HTTP 200 from the provider as the approved model" \
+                   "no answer" "Check MAIW_NIM_BASE_URL and network access, then rerun preflight" ;;
         FAIL*) _fail "${line#FAIL  }" "approved physical deployment (maiw_models.deployment.APPROVED_DEPLOYMENTS)" \
                    "not approved" "Set NEMOTRON_<ROLE>_MODEL to the approved ID for that role, or disable the role" ;;
+        # A warning (e.g. a rate-limited probe that could not verify a model)
+        # does not fail preflight, but is shown even with --quiet.
+        WARN*) echo "  $line" ;;
         *) if [[ "$QUIET" != "--quiet" && -n "$line" ]]; then echo "  $line"; fi ;;
     esac
 done <<< "$MODEL_REPORT"

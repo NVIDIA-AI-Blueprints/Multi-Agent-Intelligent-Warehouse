@@ -545,6 +545,7 @@ curl http://localhost:8001/api/v1/health
 
 3. **Model Not Found (404)**:
    - Run `python scripts/lib/check_model_config.py --provider-probe` to see which enabled role's model the endpoint does not serve
+   - A `WARN … could not verify` line (HTTP 429 or 5xx after retries) is a rate limit or provider-side error, not a missing model; rerun the probe later
    - On the hosted endpoint, Super (retired 2026-10-19) and Nano (retired 2026-09-01) return 404/410; keep them disabled
    - For self-hosted NIMs, the NIM must serve the approved model ID (e.g., `nvidia/nemotron-3.5-lightning-30b-a3b`)
 
