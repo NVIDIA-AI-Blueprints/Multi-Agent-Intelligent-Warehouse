@@ -36,12 +36,27 @@ _OBSERVE_PATTERNS: list[re.Pattern] = [
 # Match whole-word or start-of-phrase to avoid false positives like "movement".
 _ACT_PATTERNS: list[re.Pattern] = [
     re.compile(r"\b(do it|execute|confirm|apply|approve|commit)\b", re.IGNORECASE),
-    re.compile(r"\b(allocate|reassign|move|reprioritize|reprioritise|dispatch|cancel)\b", re.IGNORECASE),
+    re.compile(r"\b(allocate|reassign|move|reprioritize|reprioritise|dispatch)\b", re.IGNORECASE),
     re.compile(r"\b(make it happen|go ahead|proceed with)\b", re.IGNORECASE),
     re.compile(r"\bproceed\b", re.IGNORECASE),
     re.compile(r"\bprepare (that|this|the) action\b", re.IGNORECASE),
     # Explicit index reference to a listed recommendation: "do the first one", "do #1", etc.
     re.compile(r"\bdo (the )?(first|second|third|1st|2nd|3rd|#?1|#?2|#?3|one|that)\b", re.IGNORECASE),
+]
+
+# ── Cancellation / negation guard ────────────────────────────────────────────
+# "cancel that", "stop", or a negated command ("don't dispatch anything",
+# "no, don't move it") must never select and run a pending recommendation.
+# Checked before the ACT markers: a message that calls something off is not an
+# operational command, so it falls through to the conversational path.
+_CANCEL_PATTERNS: list[re.Pattern] = [
+    re.compile(
+        r"\b(cancel|stop|abort|never\s?mind|hold\s+off|do\s+not|cannot"
+        r"|(do|should|would|could|ca|wo)n['\u2019]?t)\b",
+        re.IGNORECASE,
+    ),
+    # A reply that opens with "No," / "No." / "Nope!" — but not "No problem, ...".
+    re.compile(r"^\s*(no|nope)\s*[,.!]", re.IGNORECASE),
 ]
 
 # ── ANALYZE markers — recommendation-oriented questions ───────────────────────
@@ -61,13 +76,19 @@ _ANALYZE_PATTERNS: list[re.Pattern] = [
 ]
 
 
+def is_cancellation(message: str) -> bool:
+    """True if the message cancels, stops or negates an action ("cancel that", "don't move it")."""
+    return any(pattern.search(message) for pattern in _CANCEL_PATTERNS)
+
+
 def classify(message: str) -> CopilotIntent:
     """
     Classify a single operator message into ASK / ANALYZE / ACT / OBSERVE_OUTCOME.
 
     Order of precedence:
     1. OBSERVE_OUTCOME markers (post-execution questions — checked before ACT)
-    2. ACT markers (explicit operational commands)
+    2. ACT markers (explicit operational commands) — skipped for cancellation /
+       negated messages ("cancel that", "don't dispatch anything")
     3. ANALYZE markers (recommendation-oriented questions)
     4. Default: ASK (explanation / status / "why")
     """
@@ -75,9 +96,10 @@ def classify(message: str) -> CopilotIntent:
         if pattern.search(message):
             return CopilotIntent.OBSERVE_OUTCOME
 
-    for pattern in _ACT_PATTERNS:
-        if pattern.search(message):
-            return CopilotIntent.ACT
+    if not is_cancellation(message):
+        for pattern in _ACT_PATTERNS:
+            if pattern.search(message):
+                return CopilotIntent.ACT
 
     for pattern in _ANALYZE_PATTERNS:
         if pattern.search(message):

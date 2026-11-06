@@ -847,6 +847,30 @@ class CopilotService:
 
         selected_rec, resolution_reason = _select_recommendation(message, recs)
 
+        if selected_rec is None and resolution_reason == "cancelled":
+            result = _make_act_error(
+                "CLARIFICATION_REQUIRED",
+                (
+                    "Understood — I have not prepared or run any action. "
+                    "The recommendations remain available if you change your mind."
+                ),
+                degraded=False,
+            )
+            turn = self._make_turn(
+                turn_id=turn_id,
+                conv_id=conv.conversation_id,
+                message=message,
+                intent=CopilotIntent.ACT,
+                trace_id=trace_id,
+                summary=result.message,
+                parent_turn_id=parent_turn_id,
+            )
+            self._store.add_turn(turn)
+            await self._publish(
+                "COPILOT_TURN_COMPLETE", "action_cancelled", trace_id=trace_id
+            )
+            return result, turn
+
         if selected_rec is None and resolution_reason == "ambiguous":
             rec_list = "\n".join(
                 f"{i + 1}. {r.objective} ({r.capability})" for i, r in enumerate(recs)
@@ -1725,10 +1749,14 @@ def _select_recommendation(
       "explicit_index"   — operator referenced first/second/etc.
       "capability_match" — operator referenced capability domain keyword
       "not_found"        — no recommendations available
+      "cancelled"        — the message cancels or negates ("cancel that",
+                           "don't move it"); nothing is selected
       "ambiguous"        — multiple recommendations, cannot resolve deterministically
     """
     if not recs:
         return None, "not_found"
+    if intent_classifier.is_cancellation(message):
+        return None, "cancelled"
     if len(recs) == 1:
         return recs[0], "single"
 
