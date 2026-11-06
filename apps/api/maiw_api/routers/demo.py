@@ -33,6 +33,14 @@ from pydantic import BaseModel, Field
 
 from maiw_api.config import settings
 
+
+def _default_scheduled_for() -> str:
+    """Next-day slot for maintenance proposals that carry no explicit time."""
+    from datetime import datetime, timedelta, timezone
+
+    return (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["demo"])
@@ -913,6 +921,7 @@ async def _build_proposal(
             maintenance_type=rec.subtype or "unscheduled",
             description=rec.objective,
             scheduled_by="operations-agent",
+            scheduled_for=_default_scheduled_for(),
             priority=rec.priority,
             reason=rec.rationale,
             requested_by="operations-agent",

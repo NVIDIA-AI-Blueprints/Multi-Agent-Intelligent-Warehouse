@@ -35,6 +35,14 @@ from .models import CopilotActResult, GovernedActionRequest, MutationState
 
 logger = logging.getLogger(__name__)
 
+
+def _default_scheduled_for() -> str:
+    """Next-day slot for maintenance proposals that carry no explicit time."""
+    from datetime import datetime, timedelta, timezone
+
+    return (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+
+
 _SAFETY_NO_MUTATION = "No warehouse changes have been made."
 _SAFETY_CONFIRMED   = "Execution confirmed."
 _SAFETY_UNKNOWN     = "Execution status uncertain — reconciliation required."
@@ -394,6 +402,7 @@ class GovernedActionOrchestrator:
                 maintenance_type=req.subtype or "unscheduled",
                 description=req.objective,
                 scheduled_by="copilot-operator",
+                scheduled_for=_default_scheduled_for(),
                 priority=req.priority,
                 reason=req.rationale,
                 requested_by="copilot-operator",
