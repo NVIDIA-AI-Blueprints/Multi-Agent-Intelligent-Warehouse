@@ -4,6 +4,10 @@
 
 * api: a Copilot message runs a recommendation only when it commands an action ("Do it.", "OK, go ahead", "Do the first one.", "Reassign Maria to wave 17"). A question or statement that merely contained an action verb ("Should we reassign Maria?", "Why not move it?", "Tell me about the dispatch") was classified as ACT and, with one stored recommendation (or a matching keyword among several), submitted it to governance, where an APPROVED decision executes without a human approval step. It is now answered as ASK / ANALYZE. Past-tense and reported negations ("I didn't ask you to move it", "nobody said to reassign anyone") get the fixed cancellation reply. A tag question ("Go ahead, OK?") no longer acts; say "Go ahead." ([#258](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/issues/258))
 
+### Bug Fixes
+
+* decision: an approved maintenance proposal whose slot has already passed is not executed. Maintenance proposals without an explicit time are dated the next simulated day and always wait for a human; approving one after the simulation clock had passed that slot executed it with `scheduled_for` in the past. In demo mode the DecisionEngine now checks `scheduled_for` against the world's simulation clock, at evaluation and again at approval, and rejects a past or unparseable slot (`maintenance.scheduled_for_past` / `maintenance.scheduled_for_invalid`); the approval card shows the reason. Engine version 1.1.0 ([#259](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/issues/259))
+
 ## [2.1.1](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/compare/v2.1.0...v2.1.1) (2026-11-06)
 
 Validated code commit: `main` `4259fa3`. Changes since [v2.1.0](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/releases/tag/v2.1.0). Full notes and validation table: [RELEASE_NOTES_v2.1.1.md](RELEASE_NOTES_v2.1.1.md).

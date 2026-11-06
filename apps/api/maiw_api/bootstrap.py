@@ -353,8 +353,22 @@ async def get_runtime() -> MAIWRuntime:
     try:
         from maiw_decision import DecisionEngine
 
-        runtime.decision_engine = DecisionEngine()
-        logger.info("MAIW bootstrap: DecisionEngine ready")
+        clock = None
+        if runtime.demo_controller is not None:
+            # Demo writes act on the simulated world, whose SimulationClock is
+            # not wall time; time-bound parameters (a maintenance slot) are
+            # checked against it. Read through the controller on every call:
+            # loading a scenario replaces the world and its clock.
+            demo_controller = runtime.demo_controller
+
+            def clock():
+                return demo_controller.world.clock.now()
+
+        runtime.decision_engine = DecisionEngine(clock=clock)
+        logger.info(
+            "MAIW bootstrap: DecisionEngine ready (clock=%s)",
+            "simulation" if clock is not None else "none",
+        )
     except Exception as exc:
         logger.warning("MAIW bootstrap: DecisionEngine unavailable — %s", exc)
 

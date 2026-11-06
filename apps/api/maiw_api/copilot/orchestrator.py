@@ -31,25 +31,11 @@ import time
 import uuid
 from typing import Any
 
+from maiw_api.demo.scheduling import default_scheduled_for as _default_scheduled_for
+
 from .models import CopilotActResult, GovernedActionRequest, MutationState
 
 logger = logging.getLogger(__name__)
-
-
-def _default_scheduled_for(ctrl: Any = None) -> str:
-    """
-    Next-day slot for maintenance proposals that carry no explicit time.
-
-    The copilot governs actions against the demo world, which runs on its own
-    SimulationClock (not wall time), so "tomorrow" is read from that clock when
-    the controller has one. Without a simulation clock it falls back to UTC
-    wall time.
-    """
-    from datetime import datetime, timedelta, timezone
-
-    clock = getattr(getattr(ctrl, "world", None), "clock", None)
-    now = clock.now() if clock is not None else datetime.now(timezone.utc)
-    return (now + timedelta(days=1)).isoformat()
 
 
 _SAFETY_NO_MUTATION = "No warehouse changes have been made."
