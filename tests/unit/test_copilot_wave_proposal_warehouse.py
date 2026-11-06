@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 """
-Copilot wave proposals are bound to the request's warehouse.
+Copilot wave proposals are bound to the request's warehouse (#220).
 
 The DecisionEngine rejects an approval whose ``warehouse_id`` differs from the
 proposal's (``approval.warehouse_mismatch``, confused-deputy check 1c). The
