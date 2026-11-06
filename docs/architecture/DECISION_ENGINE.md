@@ -48,9 +48,24 @@ Rules are evaluated in sequence; the first matching rule determines the outcome.
 | 2 | `domain == equipment` + `asset_id` provided + equipment state **absent** | `REQUIRES_FRESH_STATE` |
 | 3 | `domain == equipment` + `asset_id` provided + equipment state **stale** | `REQUIRES_FRESH_STATE` |
 | 4 | `domain == equipment` + `asset_id` provided + **asset not in snapshot** | `REJECTED` |
+| 4b | `schedule_maintenance` + engine **clock configured** + `scheduled_for` missing, not ISO-8601, or **before the clock's now** | `REJECTED` (`maintenance.scheduled_for_invalid` / `maintenance.scheduled_for_past`) |
 | 5 | `risk_level == LOW` + `requires_approval == False` | `APPROVED` |
 | 6 | `requires_approval == True` OR `risk_level` in MEDIUM/HIGH/CRITICAL | `REQUIRES_HUMAN_APPROVAL` |
 | 7 | *(fallback)* | `APPROVED` |
+
+`authorize_with_approval()` re-applies the hard constraints (rules 2–4b) to an
+approved proposal before it may execute; approval evidence cannot override
+them. So a maintenance slot that passed while the proposal waited for a human
+is rejected rather than executed, and the operator proposes it again.
+
+### Clock
+
+`DecisionEngine(clock=...)` takes a callable returning the warehouse's current
+time (timezone-aware; a naive value is read as UTC). Rule 4b runs only when a
+clock is configured. The API bootstrap passes the demo world's
+`SimulationClock` in demo mode, because demo proposals are dated on that clock,
+which is not tied to wall time. Outside demo mode no clock is configured: the
+API's maintenance route only proposes, and nothing in it executes maintenance.
 
 ## Usage
 
@@ -84,6 +99,7 @@ The engine reads the following fields from `ActionProposal`:
 | `requires_approval` | Rules 5, 6 |
 | `domain` | Rules 2–4 (equipment domain checks) |
 | `parameters["asset_id"]` | Rules 2–4 (existence and freshness gating) |
+| `action`, `parameters["scheduled_for"]` | Rule 4b (maintenance slot not in the past) |
 | `proposal_id` | Echoed in result and audit |
 
 ## DecisionAuditRecord
@@ -96,7 +112,7 @@ audit.proposal_id # cross-references ActionProposal.proposal_id
 audit.snapshot_id # the exact state version evaluated
 audit.outcome # DecisionOutcome value
 audit.violation_rules # ["equipment.asset_not_found"]
-audit.engine_version # "1.0.0"
+audit.engine_version # "1.1.0"
 audit.trace_id # propagated from DecisionRequest
 
 log.info(audit.to_log_dict()) # flat dict with event="decision_engine.evaluation"
@@ -166,3 +182,4 @@ Classification: COMPATIBILITY_ONLY
 |---------|---------|
 | `1.0.0` | Initial: READ_ONLY bypass, freshness check, asset-not-found, approval threshold |
 | `1.0.0` () | State drift documentation: `STATE_DRIFT_PROTECTION = LIMITED`; `warehouse_id` propagation fix |
+| `1.1.0` | Optional `clock`; rule 4b rejects a `schedule_maintenance` slot that is unparseable or in the past, at evaluation and at authorization (#259) |

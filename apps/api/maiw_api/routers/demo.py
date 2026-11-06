@@ -32,22 +32,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from maiw_api.config import settings
-
-
-def _default_scheduled_for(ctrl: Any = None) -> str:
-    """
-    Next-day slot for maintenance proposals that carry no explicit time.
-
-    Demo mode runs on the world's SimulationClock, which is deliberately not
-    tied to wall time, so "tomorrow" is the simulated now + 1 day. Without a
-    simulation clock it falls back to UTC wall time.
-    """
-    from datetime import datetime, timedelta, timezone
-
-    clock = getattr(getattr(ctrl, "world", None), "clock", None)
-    now = clock.now() if clock is not None else datetime.now(timezone.utc)
-    return (now + timedelta(days=1)).isoformat()
-
+from maiw_api.demo.scheduling import default_scheduled_for as _default_scheduled_for
 
 logger = logging.getLogger(__name__)
 

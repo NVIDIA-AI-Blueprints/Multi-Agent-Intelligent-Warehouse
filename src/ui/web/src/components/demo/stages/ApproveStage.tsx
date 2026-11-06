@@ -75,6 +75,15 @@ export function approveResultFor(r: any): CardResult {
         ok: false,
         message: `Not executed (${status}) — exec_id: ${execId}${r?.error_code ? ` · ${r.error_code}` : ''}`,
       };
+    case 'rejected':
+    case 'requires_fresh_state':
+      // The DecisionEngine refused the approved proposal on re-check (a hard
+      // constraint: stale state, asset gone, maintenance slot in the past).
+      return {
+        outcome: 'error',
+        ok: false,
+        message: `Not executed (${status}) — ${r?.violations?.[0]?.message ?? 'refused by the DecisionEngine'}`,
+      };
     case 'CAPACITY_UNAVAILABLE':
       return { outcome: 'error', ok: false, message: `Capacity unavailable: ${r?.reason ?? ''}` };
     default:

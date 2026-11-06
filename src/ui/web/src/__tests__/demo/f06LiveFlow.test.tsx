@@ -205,6 +205,26 @@ describe('ApproveStage — UNKNOWN execution outcome', () => {
     expect(failed.message).toContain('Not executed (failed)');
   });
 
+  it('shows the DecisionEngine reason when an approved proposal is refused on re-check', () => {
+    const r = approveResultFor({
+      ok: false,
+      status: 'rejected',
+      violations: [
+        {
+          rule: 'maintenance.scheduled_for_past',
+          message: 'scheduled_for=2026-08-24T08:00:00+00:00 is before the warehouse\'s current time',
+        },
+      ],
+    });
+    expect(r.outcome).toBe('error');
+    expect(r.ok).toBe(false);
+    expect(r.message).toContain('Not executed (rejected)');
+    expect(r.message).toContain('is before the warehouse');
+    expect(approveResultFor({ ok: false, status: 'requires_fresh_state' }).message).toContain(
+      'refused by the DecisionEngine',
+    );
+  });
+
   it('renders UNKNOWN — RECONCILE (not APPROVED / Executed) after approve', async () => {
     (demoAPI.approvePending as jest.Mock).mockResolvedValue(UNKNOWN_APPROVE);
     wrap(<ApproveStage {...approveStageProps()} />);

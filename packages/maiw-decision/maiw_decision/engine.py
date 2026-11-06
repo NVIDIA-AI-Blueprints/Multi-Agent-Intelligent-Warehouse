@@ -8,6 +8,9 @@ Rules (evaluated in order, first match wins)
 1. READ_ONLY risk → APPROVED immediately (read actions bypass the engine).
 2. Required state component absent or stale → REQUIRES_FRESH_STATE.
 3. equipment domain + asset_id provided but not found in snapshot → REJECTED.
+3b. schedule_maintenance whose scheduled_for is missing, unparseable or
+    before the engine clock's now → REJECTED (only when a clock is
+    configured; see ``DecisionEngine(clock=...)``).
 4. LOW risk + requires_approval=False → APPROVED.
 5. requires_approval=True (any risk) → REQUIRES_HUMAN_APPROVAL.
 6. MEDIUM / HIGH / CRITICAL risk → REQUIRES_HUMAN_APPROVAL.
@@ -19,6 +22,9 @@ in-memory rule processing.
 """
 
 from __future__ import annotations
+
+from collections.abc import Callable
+from datetime import datetime, timezone
 
 from maiw_decision.proposal import RiskLevel
 from maiw_state.errors import StateFreshnessError
@@ -32,7 +38,9 @@ from .models import (
     DecisionResult,
 )
 
-_ENGINE_VERSION = "1.0.0"
+_ENGINE_VERSION = "1.1.0"
+
+_SCHEDULE_MAINTENANCE = "warehouse.equipment.schedule_maintenance"
 
 
 class DecisionEngine:
@@ -49,7 +57,21 @@ class DecisionEngine:
     (DecisionResult, DecisionAuditRecord)
         Both are returned together so callers can ship the audit record
         without a second method call.
+
+    Parameters
+    ----------
+    clock:
+        Returns the warehouse's current time (timezone-aware). When set,
+        time-bound parameters are checked against it: a schedule_maintenance
+        proposal must name a ``scheduled_for`` that is not in the past, at
+        evaluation and again at authorization, so an approval that arrives
+        after the slot has passed cannot execute it. The demo runtime passes
+        the world's SimulationClock, which is not tied to wall time. When
+        ``None`` (the default) no time-bound check runs.
     """
+
+    def __init__(self, clock: Callable[[], datetime] | None = None) -> None:
+        self._clock = clock
 
     @property
     def version(self) -> str:
@@ -103,6 +125,13 @@ class DecisionEngine:
                         outcome=DecisionOutcome.REJECTED,
                         violations=violations,
                     )
+
+            # Rule 3b: a maintenance slot must not be in the past
+            outcome = self._check_maintenance_slot(request, violations)
+            if outcome is not None:
+                return self._build(
+                    request=request, outcome=outcome, violations=violations
+                )
 
         # Rule 4: LOW risk + no approval required → APPROVED
         if proposal.risk_level == RiskLevel.LOW and not proposal.requires_approval:
@@ -166,7 +195,8 @@ class DecisionEngine:
         1c. If both warehouse_ids set: warehouse binding check.
         2. Approval has not expired.
         3. Approval is not a rejection (state == APPROVED).
-        4. Hard constraints still pass (equipment freshness, asset presence).
+        4. Hard constraints still pass (equipment freshness, asset presence,
+           maintenance slot not in the past).
         5. If all pass: return APPROVED.
         """
         proposal = request.proposal
@@ -313,6 +343,12 @@ class DecisionEngine:
                         violations=violations,
                     )
 
+            outcome = self._check_maintenance_slot(request, violations)
+            if outcome is not None:
+                return self._build(
+                    request=request, outcome=outcome, violations=violations
+                )
+
         # All checks passed — approval grants authority
         return self._build(
             request=request, outcome=DecisionOutcome.APPROVED, violations=[]
@@ -368,6 +404,59 @@ class DecisionEngine:
             )
             return DecisionOutcome.REQUIRES_FRESH_STATE
 
+        return None
+
+    def _check_maintenance_slot(
+        self,
+        request: DecisionRequest,
+        violations: list[ConstraintViolation],
+    ) -> DecisionOutcome | None:
+        """
+        Return REJECTED if a schedule_maintenance slot is unusable.
+
+        Applies only with a configured clock. The slot must be an ISO-8601
+        datetime (a naive one is read as UTC) that is not before the clock's
+        now. Approval evidence cannot override this: the human approved that
+        slot, so a slot that has passed needs a new proposal, not a silently
+        moved one.
+        """
+        if self._clock is None or request.proposal.action != _SCHEDULE_MAINTENANCE:
+            return None
+
+        raw = request.proposal.parameters.get("scheduled_for")
+        try:
+            slot = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            violations.append(
+                ConstraintViolation(
+                    rule="maintenance.scheduled_for_invalid",
+                    message=f"scheduled_for={raw!r} is not an ISO-8601 datetime",
+                    details={"scheduled_for": raw},
+                )
+            )
+            return DecisionOutcome.REJECTED
+        if slot.tzinfo is None:
+            slot = slot.replace(tzinfo=timezone.utc)
+
+        now = self._clock()
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+        if slot < now:
+            violations.append(
+                ConstraintViolation(
+                    rule="maintenance.scheduled_for_past",
+                    message=(
+                        f"scheduled_for={slot.isoformat()} is before the warehouse's "
+                        f"current time {now.isoformat()}; propose the maintenance "
+                        "again with a future slot"
+                    ),
+                    details={
+                        "scheduled_for": slot.isoformat(),
+                        "now": now.isoformat(),
+                    },
+                )
+            )
+            return DecisionOutcome.REJECTED
         return None
 
     def _build(
