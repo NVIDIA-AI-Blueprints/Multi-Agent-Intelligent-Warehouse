@@ -47,8 +47,10 @@ number for a UI log-entry key, `ActivityFeed.tsx:41`: not security-relevant);
 follow a redirect to HTTP). A project administrator marks them reviewed in
 SonarQube. The gate no longer has a hotspot condition.
 
-**Needed for release:** a written Blueprints SRE disposition of the two
-failing conditions, with the dispositions above.
+**Release decision:** the maintainer decided on 2026-11-06 that this gate
+result does not block v2.1.1. `docs/operations/RELEASING.md` asks for a
+written Blueprints SRE disposition of the two failing conditions; none was
+obtained. The engineering dispositions above stand.
 
 ## Analysis of `ff5ce22` (2026-11-03)
 

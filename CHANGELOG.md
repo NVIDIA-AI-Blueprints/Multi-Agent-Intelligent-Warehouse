@@ -1,4 +1,4 @@
-## [2.1.1] — Unreleased (draft, not tagged)
+## [2.1.1] — Unreleased (not yet tagged)
 
 Validated code commit: `main` `4259fa3`. Changes since [v2.1.0](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/releases/tag/v2.1.0). Full notes, validation table and open release gates: [RELEASE_NOTES_v2.1.1.md](RELEASE_NOTES_v2.1.1.md).
 

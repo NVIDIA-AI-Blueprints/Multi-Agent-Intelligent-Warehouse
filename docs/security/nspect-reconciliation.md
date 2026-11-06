@@ -49,8 +49,8 @@ report for child programs.
 ### Remaining owner steps for v2.1.1
 1. ~~Approval of EXC-HPU1-JZI6 and EXC-TNK9-0X62~~: both approved 2026-11-06.
 2. SonarQube: the analysis of `4259fa3` (`eb6b331f…`, 2026-11-06) has quality
-   gate ERROR; it needs a written Blueprints SRE disposition
-   (`sonarqube-remediation-report.md`).
+   gate ERROR. By maintainer decision (2026-11-06) it does not block v2.1.1;
+   no SRE disposition was obtained (`sonarqube-remediation-report.md`).
 3. Confirm the ConneX children question above.
 
 ## MAIW v2.1.0 (historical, 2026-11-02)
