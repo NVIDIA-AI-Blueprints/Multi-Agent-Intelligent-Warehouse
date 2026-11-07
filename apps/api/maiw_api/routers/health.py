@@ -13,6 +13,8 @@ Endpoints preserved from src/api/routers/health.py:
     GET /api/v1/health/simple    — lightweight health for frontend
     GET /api/v1/version          — version info
     GET /api/v1/version/detailed — detailed build info
+    GET /api/v1/metrics          — Prometheus metrics (HTTP request counts and
+                                   latency, labelled by route template)
 
 Changes from src/ version:
     - Adds MAIW runtime status block to /health response
@@ -28,8 +30,10 @@ import os
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import PlainTextResponse
 
 from maiw_api.dependencies import get_runtime
+from src.api.services.monitoring.metrics import get_metrics_response
 
 logger = logging.getLogger(__name__)
 
@@ -682,6 +686,12 @@ async def health_check(request: Request):
         data["unhealthy_services"] = unhealthy
 
     return data
+
+
+@router.get("/metrics", response_class=PlainTextResponse)
+async def metrics():
+    """Prometheus metrics in the text exposition format."""
+    return get_metrics_response()
 
 
 @router.get("/version")

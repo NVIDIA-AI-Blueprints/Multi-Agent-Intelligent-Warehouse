@@ -652,9 +652,16 @@ The application provides multiple health check endpoints:
 
 ### Prometheus Metrics
 
-The v2 API (`maiw_api.app:app`) does not serve a Prometheus `/api/v1/metrics`
-endpoint; that route exists only on the legacy development server
-(`src/api/app.py`), which is never deployed.
+The v2 API (`maiw_api.app:app`) serves Prometheus metrics at
+`GET /api/v1/metrics`: `http_requests_total` and
+`http_request_duration_seconds`, labelled by method, route template (for
+example `/api/v1/procedures/{procedure_id}`; `unmatched` for unknown paths) and
+status. The endpoint is unauthenticated, like the health endpoints, so keep the
+API on the trusted host or network.
+
+```bash
+curl -s http://localhost:${MAIW_API_PORT}/api/v1/metrics | grep http_requests_total
+```
 
 ### Database Maintenance
 

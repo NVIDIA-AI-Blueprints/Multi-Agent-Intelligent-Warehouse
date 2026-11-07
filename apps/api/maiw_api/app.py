@@ -51,6 +51,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -249,22 +250,25 @@ app.add_middleware(
 )
 
 
+# Mutated in place (no `global` rebinding): set once the first failure is logged.
+_metrics_failure_state = {"logged": False}
+
+
 @app.middleware("http")
 async def metrics_middleware(request: Request, call_next):
-    import time
-
-    start = time.time()
+    start = time.perf_counter()
     response = await call_next(request)
-    duration = time.time() - start
+    duration = time.perf_counter() - start
     try:
-        record_request_metrics(
-            method=request.method,
-            path=request.url.path,
-            status_code=response.status_code,
-            duration=duration,
-        )
+        record_request_metrics(request, response, duration)
     except Exception:
-        pass
+        # Never fail the request over instrumentation, but don't hide it:
+        # log the first failure with its traceback, later ones at debug.
+        if not _metrics_failure_state["logged"]:
+            _metrics_failure_state["logged"] = True
+            logger.warning("HTTP request metrics not recorded", exc_info=True)
+        else:
+            logger.debug("HTTP request metrics not recorded", exc_info=True)
     return response
 
 

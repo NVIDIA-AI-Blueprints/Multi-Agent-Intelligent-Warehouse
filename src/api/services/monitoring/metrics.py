@@ -149,6 +149,20 @@ warehouse_safety_violations_by_category = Gauge(
 system_info = Info("warehouse_system_info", "System information")
 
 
+UNMATCHED_ENDPOINT = "unmatched"
+
+
+def endpoint_label(request: Request) -> str:
+    """The route template a request matched, e.g. ``/api/v1/procedures/{procedure_id}``.
+
+    Labelling by raw path would create a new series for every distinct ID in a
+    URL. Requests that matched no route (404s) share one fixed label.
+    """
+    route = request.scope.get("route")
+    path = getattr(route, "path", None)
+    return path if isinstance(path, str) and path else UNMATCHED_ENDPOINT
+
+
 class MetricsCollector:
     """Collects and manages warehouse operational metrics."""
 
@@ -167,7 +181,7 @@ class MetricsCollector:
     ):
         """Record HTTP request metrics."""
         method = request.method
-        endpoint = request.url.path
+        endpoint = endpoint_label(request)
         status = str(response.status_code)
 
         http_requests_total.labels(
