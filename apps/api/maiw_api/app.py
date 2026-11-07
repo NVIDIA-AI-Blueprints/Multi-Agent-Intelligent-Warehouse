@@ -250,13 +250,12 @@ app.add_middleware(
 )
 
 
-_metrics_failure_logged = False
+# Mutated in place (no `global` rebinding): set once the first failure is logged.
+_metrics_failure_state = {"logged": False}
 
 
 @app.middleware("http")
 async def metrics_middleware(request: Request, call_next):
-    global _metrics_failure_logged
-
     start = time.perf_counter()
     response = await call_next(request)
     duration = time.perf_counter() - start
@@ -265,8 +264,8 @@ async def metrics_middleware(request: Request, call_next):
     except Exception:
         # Never fail the request over instrumentation, but don't hide it:
         # log the first failure with its traceback, later ones at debug.
-        if not _metrics_failure_logged:
-            _metrics_failure_logged = True
+        if not _metrics_failure_state["logged"]:
+            _metrics_failure_state["logged"] = True
             logger.warning("HTTP request metrics not recorded", exc_info=True)
         else:
             logger.debug("HTTP request metrics not recorded", exc_info=True)

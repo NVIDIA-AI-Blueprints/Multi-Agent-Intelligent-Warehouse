@@ -125,7 +125,7 @@ async def test_recording_failure_keeps_the_response_and_is_logged(
         raise RuntimeError("collector down")
 
     monkeypatch.setattr(app_module, "record_request_metrics", broken)
-    monkeypatch.setattr(app_module, "_metrics_failure_logged", False)
+    monkeypatch.setitem(app_module._metrics_failure_state, "logged", False)
     with caplog.at_level(logging.DEBUG, logger="maiw_api.app"):
         async with running_canonical_app() as (_, client):
             first = await client.get("/api/v1/live")
