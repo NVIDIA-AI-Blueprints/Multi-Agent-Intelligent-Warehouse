@@ -25,6 +25,12 @@ Usage:
         answers HTTP 200 as that model.  The listing alone is not enough: the
         hosted catalogue kept listing Nemotron 3 Super after its 2026-10-19
         retirement while every completion returned HTTP 404.
+        A rate limit (429) or a provider-side error (500/502/503/504) says
+        "try again later", not "this model is not served": the completion is
+        retried (honouring Retry-After, capped), and if it still does not
+        answer the role is reported WARN "could not verify" without failing
+        the check.  A 4xx answer, a 200 from a different model, or no answer
+        at all (network error, timeout) is still a FAIL.
 
 Exit codes: 0 = every enabled role approved; 1 = violation; 2 = usage/import.
 No secret value is ever printed.
@@ -36,6 +42,13 @@ import argparse
 import json
 import os
 import sys
+import time
+
+# HTTP statuses that mean "try again later", not "this model is not served".
+_TRANSIENT_HTTP = frozenset({429, 500, 502, 503, 504})
+_TRANSIENT_RETRIES = 2  # further attempts after a transient answer
+_BACKOFF_SECONDS = (2.0, 5.0)
+_MAX_RETRY_AFTER_SECONDS = 10.0
 
 
 def _registry():
@@ -109,19 +122,44 @@ def _provider_probe(rows: list[dict]) -> dict:
     except urllib.error.HTTPError as exc:
         out["reachable"] = False
         out["error"] = f"HTTP {exc.code}"
+        out["answered"] = True
     except Exception as exc:  # noqa: BLE001
         out["reachable"] = False
         out["error"] = type(exc).__name__
+        out["answered"] = False
     out["dispatch"] = _dispatch_probe(base, key, rows) if key else None
     return out
+
+
+def _retry_delay(attempt: int, retry_after: str | None) -> float:
+    """Seconds to wait before retry *attempt* (0-based): Retry-After, capped."""
+    try:
+        seconds = float(retry_after)  # an HTTP-date is not honoured
+    except (TypeError, ValueError):
+        seconds = _BACKOFF_SECONDS[min(attempt, len(_BACKOFF_SECONDS) - 1)]
+    return max(0.0, min(seconds, _MAX_RETRY_AFTER_SECONDS))
+
+
+def _verdict(status, reported, model_id: str) -> str:
+    """served | unverified (429/5xx: try later) | refused (401/403) | no_answer | not_served."""
+    if status == 200 and reported == model_id:
+        return "served"
+    if status in _TRANSIENT_HTTP:
+        return "unverified"
+    if status in (401, 403):
+        return "refused"
+    if not isinstance(status, int):
+        return "no_answer"
+    return "not_served"
 
 
 def _dispatch_probe(base: str, key: str, rows: list[dict]) -> dict:
     """One minimal chat completion per enabled, approved role.
 
-    Returns {role: {"ok", "http", "reported"}}.  Only the status code and the
-    provider-reported model are kept; the key is sent as a header, never
-    printed.
+    Returns {role: {"ok", "verdict", "http", "reported", "attempts"}}.  Only
+    the status code and the provider-reported model are kept; the key is sent
+    as a header, never printed.  A transient answer (_TRANSIENT_HTTP) is
+    retried up to _TRANSIENT_RETRIES times before it is reported "unverified".
     """
     import urllib.error
     import urllib.request
@@ -146,18 +184,34 @@ def _dispatch_probe(base: str, key: str, rows: list[dict]) -> dict:
                 "Authorization": f"Bearer {key}",
             },
         )
-        try:
-            with urllib.request.urlopen(req, timeout=120) as resp:
-                status = resp.status
-                reported = json.loads(resp.read() or b"{}").get("model")
-        except urllib.error.HTTPError as exc:
-            status, reported = exc.code, None
-        except Exception as exc:  # noqa: BLE001
-            status, reported = type(exc).__name__, None
+        attempts = 0
+        while True:
+            attempts += 1
+            retry_after = None
+            try:
+                with urllib.request.urlopen(req, timeout=120) as resp:
+                    status = resp.status
+                    raw = resp.read()
+                try:
+                    reported = json.loads(raw or b"{}").get("model")
+                except (ValueError, AttributeError):
+                    reported = None  # a 200 that is not a completion
+            except urllib.error.HTTPError as exc:
+                status, reported = exc.code, None
+                retry_after = exc.headers.get("Retry-After") if exc.headers else None
+            except Exception as exc:  # noqa: BLE001
+                status, reported = type(exc).__name__, None
+            if status in _TRANSIENT_HTTP and attempts <= _TRANSIENT_RETRIES:
+                time.sleep(_retry_delay(attempts - 1, retry_after))
+                continue
+            break
+        verdict = _verdict(status, reported, r["model_id"])
         results[r["role"]] = {
-            "ok": status == 200 and reported == r["model_id"],
+            "ok": verdict == "served",
+            "verdict": verdict,
             "http": status,
             "reported": reported,
+            "attempts": attempts,
         }
     return results
 
@@ -215,7 +269,9 @@ def main() -> int:
     if args.provider_probe:
         report["provider"] = _provider_probe(rows)
         dispatch = report["provider"].get("dispatch") or {}
-        if any(not d["ok"] for d in dispatch.values()):
+        # "unverified" (rate limit / provider error after retries) is a
+        # warning: nothing shows the configuration is wrong.
+        if any(d["verdict"] not in ("served", "unverified") for d in dispatch.values()):
             report["approved"] = False
 
     if args.json:
@@ -248,19 +304,42 @@ def main() -> int:
                         f"{'PASS' if ok else 'WARN'}  provider lists {role} model"
                         + ("" if ok else " (not listed — the provider may not serve it)")
                     )
+            elif p.get("answered"):
+                print(f"WARN  provider model list unavailable ({p.get('error')})")
             else:
                 print(f"WARN  provider not reachable ({p.get('error')})")
             dispatch = p.get("dispatch")
             if dispatch is None:
                 print("WARN  provider dispatch not probed (no API key in the environment)")
             for role, d in (dispatch or {}).items():
-                if d["ok"]:
+                enable_var = f"NEMOTRON_{role.upper().replace('-', '_')}_ENABLED"
+                verdict = d["verdict"]
+                if verdict == "served":
                     print(f"PASS  provider serves {role} model (HTTP 200, reported {d['reported']})")
+                elif verdict == "unverified":
+                    reason = "rate limited" if d["http"] == 429 else "provider error"
+                    print(
+                        f"WARN  provider could not verify {role} model (HTTP {d['http']}, "
+                        f"{reason}, {d['attempts']} attempts) — retry later; this is not "
+                        "a configuration error"
+                    )
+                elif verdict == "refused":
+                    print(
+                        f"FAIL  provider refused the API key for {role} model "
+                        f"(HTTP {d['http']}) — check MAIW_NIM_API_KEY / NVIDIA_API_KEY, or "
+                        f"disable the role ({enable_var}=false) if this key may not use "
+                        "that model"
+                    )
+                elif verdict == "no_answer":
+                    print(
+                        f"FAIL  provider did not answer for {role} model ({d['http']}) — "
+                        "check MAIW_NIM_BASE_URL and network access to the provider"
+                    )
                 else:
                     print(
                         f"FAIL  provider does not serve {role} model "
                         f"(HTTP {d['http']}, reported {d['reported']}) — disable the role "
-                        f"(NEMOTRON_{role.upper().replace('-', '_')}_ENABLED=false) or point "
+                        f"({enable_var}=false) or point "
                         "it at a deployment that serves the approved model"
                     )
     return 0 if report["approved"] else 1

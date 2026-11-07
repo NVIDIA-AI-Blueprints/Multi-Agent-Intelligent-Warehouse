@@ -109,7 +109,13 @@ fi
 
 echo ""
 echo "--- Configured physical model bindings (shared DeploymentResolver check) ---"
-"$PY" "$SCRIPT_DIR/lib/check_model_config.py" --provider-probe | sed 's/^/  /' || true
+MODEL_REPORT=$("$PY" "$SCRIPT_DIR/lib/check_model_config.py" --provider-probe 2>&1) && MODEL_RC=0 || MODEL_RC=$?
+sed 's/^/  /' <<< "$MODEL_REPORT"
+if [[ "$MODEL_RC" -ne 0 ]]; then
+    # Advisory here: the verdict below is the running instance's readiness.
+    echo "  NOTE: the model check found a configuration problem (FAIL above). It does"
+    echo "        not change the readiness verdict below; fix it before the next restart."
+fi
 
 echo ""
 echo "--- Sandbox ---"
