@@ -94,6 +94,7 @@ Only an admin changes a user's role or status, through
 | GET | `/api/v1/health` | Comprehensive status; `degraded`, not non-2xx, when optional services are down |
 | GET | `/api/v1/health/simple` | Lightweight DB check |
 | GET | `/api/v1/version`, `/api/v1/version/detailed` | Build / version information |
+| GET | `/api/v1/metrics` | Prometheus metrics: `http_requests_total` and `http_request_duration_seconds` by method, route template (`unmatched` for unknown paths) and status; unauthenticated and not rate limited |
 | GET | `/api/v1/runtime/status` | MAIW runtime component availability |
 | GET | `/api/v1/mcp/status`, `/api/v1/mcp/capabilities` | MCP domain status and registered capabilities |
 
@@ -241,8 +242,7 @@ implemented (no decision is recorded and nothing is sent to a WMS).
 
 `/api/v1/chat`, `/api/v1/reasoning`, every POST/PUT/PATCH/DELETE of the legacy
 routers above other than `POST /api/v1/document/upload` (including
-`POST /api/v1/migrations/migrate`), and `/api/v1/metrics`
-(served only by the legacy `src/api/app.py`). There is no WebSocket endpoint.
+`POST /api/v1/migrations/migrate`). There is no WebSocket endpoint.
 
 ## Rate limiting
 
