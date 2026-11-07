@@ -18,7 +18,15 @@ from datetime import datetime
 import logging
 from src.api.utils.log_utils import sanitize_log_data
 from src.retrieval.structured.sql_retriever import get_sql_retriever
-from .models import User, UserCreate, UserUpdate, UserInDB, UserRole, UserStatus
+from .models import (
+    User,
+    UserCreate,
+    UserUpdate,
+    UserSelfUpdate,
+    UserInDB,
+    UserRole,
+    UserStatus,
+)
 from .jwt_handler import jwt_handler
 
 logger = logging.getLogger(__name__)
@@ -281,6 +289,19 @@ class UserService:
         except Exception as e:
             logger.error(f"Failed to update user {user_id}: {e}")
             return None
+
+    async def update_profile(
+        self, user_id: int, profile: UserSelfUpdate
+    ) -> Optional[User]:
+        """Update a user's own profile: email and full name only.
+
+        Builds the update from those two fields explicitly, so role and status
+        are never written here whatever object the caller passes. Role and
+        status changes go through ``update_user`` (admin route only).
+        """
+        return await self.update_user(
+            user_id, UserUpdate(email=profile.email, full_name=profile.full_name)
+        )
 
     async def update_last_login(self, user_id: int) -> None:
         """Update user's last login timestamp."""

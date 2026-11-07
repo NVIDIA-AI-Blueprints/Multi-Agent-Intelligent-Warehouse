@@ -22,6 +22,7 @@ from ..services.auth.models import (
     User,
     UserCreate,
     UserUpdate,
+    UserSelfUpdate,
     UserLogin,
     Token,
     TokenRefresh,
@@ -239,12 +240,16 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)):
 
 @router.put("/auth/me", response_model=User)
 async def update_current_user(
-    user_update: UserUpdate, current_user: User = Depends(get_current_user)
+    profile: UserSelfUpdate, current_user: User = Depends(get_current_user)
 ):
-    """Update current user information."""
+    """Update the current user's email and full name.
+
+    Role and status are not accepted here (422); only an admin can change them,
+    through ``PUT /auth/users/{user_id}``.
+    """
     try:
         await user_service.initialize()
-        updated_user = await user_service.update_user(current_user.id, user_update)
+        updated_user = await user_service.update_profile(current_user.id, profile)
         if not updated_user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
@@ -252,6 +257,8 @@ async def update_current_user(
 
         logger.info(f"User {current_user.username} updated their profile")
         return updated_user
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"User update failed: {e}")
         raise HTTPException(

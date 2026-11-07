@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr
 from typing import Optional, List
 from enum import Enum
 from datetime import datetime
@@ -55,12 +55,25 @@ class UserCreate(UserBase):
 
 
 class UserUpdate(BaseModel):
-    """User update model."""
+    """User update model (admin only: includes role and status)."""
 
     email: Optional[EmailStr] = None
     full_name: Optional[str] = None
     role: Optional[UserRole] = None
     status: Optional[UserStatus] = None
+
+
+class UserSelfUpdate(BaseModel):
+    """Self-service profile update: personal fields only.
+
+    Any other field (role, status, ...) is rejected, so a user cannot change
+    their own role or account status through ``PUT /auth/me``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    email: Optional[EmailStr] = None
+    full_name: Optional[str] = None
 
 
 class UserInDB(UserBase):

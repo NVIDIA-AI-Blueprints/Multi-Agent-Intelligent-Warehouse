@@ -78,6 +78,11 @@ from browser requests, so governed writes from that UI are refused by design.
 `GET /api/v1/auth/users/public` (active users' `id`, `username`, `full_name`,
 `role`, for login dropdowns).
 
+`PUT /api/v1/auth/me` changes only the caller's own `email` and `full_name`. A
+body with any other field, including `role` or `status`, is refused with 422.
+Only an admin changes a user's role or status, through
+`PUT /api/v1/auth/users/{user_id}`.
+
 ## Endpoints mounted by the release app
 
 ### Health and status
