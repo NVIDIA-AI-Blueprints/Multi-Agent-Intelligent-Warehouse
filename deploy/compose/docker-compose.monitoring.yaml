@@ -1,55 +1,61 @@
-version: '3.8'
+# Optional monitoring stack for the MAIW dev stack (#277).
+#
+# Start the dev stack first (scripts/setup/dev_up.sh), then:
+#   scripts/setup/setup_monitoring.sh
+# or
+#   docker compose -f deploy/compose/docker-compose.monitoring.yaml up -d
+#
+# Prometheus and the database exporters join the dev stack's Compose network
+# (default name `compose_default`; set MAIW_COMPOSE_NETWORK if your dev project
+# has another name) and scrape the API as `backend:8001`.
+#
+# Required in deploy/compose/.env: GRAFANA_ADMIN_PASSWORD and POSTGRES_PASSWORD.
+# Published ports bind to 127.0.0.1: Prometheus 9090, Alertmanager 9093,
+# Grafana MAIW_GRAFANA_PORT (default 3030; the dev stack's nginx uses 3000).
+# Images are pinned by tag and digest.
 
 services:
-  # Prometheus - Metrics collection and storage
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.15.1@sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2
     container_name: warehouse-prometheus
     ports:
       - "127.0.0.1:9090:9090"
     volumes:
-      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-      - ./monitoring/prometheus/rules:/etc/prometheus/rules
+      - ../../monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../../monitoring/prometheus/rules:/etc/prometheus/rules:ro
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
       - '--storage.tsdb.retention.time=200h'
       - '--web.enable-lifecycle'
-      - '--web.enable-admin-api'
     networks:
       - monitoring
+      - maiw
     restart: unless-stopped
 
-  # Grafana - Visualization and dashboards
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:13.2.5@sha256:9f7aa1e1e3246aade5792d35a738049f7f32f89cd51d1956cf426a4e86268a84
     container_name: warehouse-grafana
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:${MAIW_GRAFANA_PORT:-3030}:3000"
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
-      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+      - ../../monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ../../monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
     environment:
       - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-changeme}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in deploy/compose/.env}
       - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_INSTALL_PLUGINS=grafana-piechart-panel
     networks:
       - monitoring
     restart: unless-stopped
     depends_on:
       - prometheus
 
-  # Node Exporter - System metrics
   node-exporter:
-    image: prom/node-exporter:latest
+    image: prom/node-exporter:v1.12.1@sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0
     container_name: warehouse-node-exporter
-    ports:
-      - "127.0.0.1:9100:9100"
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
@@ -63,12 +69,9 @@ services:
       - monitoring
     restart: unless-stopped
 
-  # cAdvisor - Container metrics
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:latest
+    image: ghcr.io/google/cadvisor:v0.60.6@sha256:b8e7d1093144fd088f425ff003d75a4aa405de075db78dae3bc563730b1bd07a
     container_name: warehouse-cadvisor
-    ports:
-      - "127.0.0.1:8080:8080"
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
@@ -82,14 +85,13 @@ services:
       - monitoring
     restart: unless-stopped
 
-  # Alertmanager - Alert handling
   alertmanager:
-    image: prom/alertmanager:latest
+    image: prom/alertmanager:v0.34.1@sha256:e9733bafb1bdef9b00e25a21f8f99dc26a22224bf16641ad754d1649f4c3357a
     container_name: warehouse-alertmanager
     ports:
       - "127.0.0.1:9093:9093"
     volumes:
-      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - ../../monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - alertmanager_data:/alertmanager
     command:
       - '--config.file=/etc/alertmanager/alertmanager.yml'
@@ -99,29 +101,27 @@ services:
       - monitoring
     restart: unless-stopped
 
-  # Redis Exporter - Redis metrics
   redis-exporter:
-    image: oliver006/redis_exporter:latest
+    image: oliver006/redis_exporter:v1.95.0@sha256:afb21407aba3df1b4010899f155fc6b1ba2026c97b725d72aca4019d772e7b6b
     container_name: warehouse-redis-exporter
-    ports:
-      - "127.0.0.1:9121:9121"
     environment:
-      - REDIS_ADDR=redis://host.docker.internal:6379
+      - REDIS_ADDR=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
     networks:
       - monitoring
+      - maiw
     restart: unless-stopped
 
-  # PostgreSQL Exporter - Database metrics
   postgres-exporter:
-    image: prometheuscommunity/postgres-exporter:latest
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1@sha256:ac5ec343104fae0e2d84a27bb8d69b38430a11910c5382cad85d478d2bab713e
     container_name: warehouse-postgres-exporter
-    ports:
-      - "127.0.0.1:9187:9187"
     environment:
-      # SECURITY: POSTGRES_PASSWORD must be set in .env file (no hardcoded defaults)
-      - DATA_SOURCE_NAME=postgresql://${POSTGRES_USER:-warehouse}:${POSTGRES_PASSWORD}@host.docker.internal:5435/${POSTGRES_DB:-warehouse}?sslmode=disable
+      - DATA_SOURCE_URI=timescaledb:5432/${POSTGRES_DB:-warehouse}?sslmode=disable
+      - DATA_SOURCE_USER=${POSTGRES_USER:-warehouse}
+      - DATA_SOURCE_PASS=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/compose/.env}
     networks:
       - monitoring
+      - maiw
     restart: unless-stopped
 
 volumes:
@@ -132,3 +132,6 @@ volumes:
 networks:
   monitoring:
     driver: bridge
+  maiw:
+    external: true
+    name: ${MAIW_COMPOSE_NETWORK:-compose_default}

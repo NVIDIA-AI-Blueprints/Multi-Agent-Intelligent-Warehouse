@@ -618,7 +618,7 @@ Once deployed, access the application at:
 **⚠️ Change these in production!**
 
 - **Database**: `warehouse` / `changeme` (or `POSTGRES_PASSWORD`)
-- **Grafana** (if enabled): `admin` / `changeme` (or `GRAFANA_ADMIN_PASSWORD`)
+- **Grafana** (optional monitoring stack): `admin` / the `GRAFANA_ADMIN_PASSWORD` you set (required, no default)
 
 ## Monitoring & Maintenance
 
@@ -637,12 +637,39 @@ The v2 API (`maiw_api.app:app`) serves Prometheus metrics at
 `GET /api/v1/metrics`: `http_requests_total` and
 `http_request_duration_seconds`, labelled by method, route template (for
 example `/api/v1/procedures/{procedure_id}`; `unmatched` for unknown paths) and
-status. The endpoint is unauthenticated, like the health endpoints, so keep the
-API on the trusted host or network.
+status, plus `warehouse_system_info` (release version, git SHA, environment).
+The endpoint is unauthenticated, like the health endpoints, so keep the API on
+the trusted host or network.
 
 ```bash
 curl -s http://localhost:${MAIW_API_PORT}/api/v1/metrics | grep http_requests_total
 ```
+
+### Monitoring Stack (optional)
+
+`deploy/compose/docker-compose.monitoring.yaml` adds Prometheus, Grafana,
+Alertmanager, node-exporter, cAdvisor and the PostgreSQL and Redis exporters
+next to the dev stack. Prometheus and the database exporters join the dev
+stack's Compose network (`compose_default`; set `MAIW_COMPOSE_NETWORK` if yours
+differs) and scrape the API as `backend:8001`, so start the dev stack first.
+
+```bash
+# deploy/compose/.env must set GRAFANA_ADMIN_PASSWORD (no default) and POSTGRES_PASSWORD
+echo "GRAFANA_ADMIN_PASSWORD=$(openssl rand -hex 16)" >> deploy/compose/.env
+./scripts/setup/setup_monitoring.sh
+```
+
+- Grafana: `http://localhost:3030` (`MAIW_GRAFANA_PORT`; user `admin`) with the
+  **MAIW - Overview** dashboard: service status, API request rate, latency and
+  status codes, host CPU and memory, database connections and Redis memory.
+- Prometheus: `http://localhost:9090` (Status → Targets shows each scrape).
+- Alertmanager: `http://localhost:9093`. Alerts cover the API (down, 5xx rate,
+  p95 latency), PostgreSQL, Redis, Milvus and the host. No notifications are
+  sent until you add a receiver to `monitoring/alertmanager/alertmanager.yml`.
+
+The stack monitors the platform, not warehouse operations: the API exports no
+business metrics (tasks, safety, equipment). Images are pinned by tag and
+digest.
 
 ### Database Maintenance
 

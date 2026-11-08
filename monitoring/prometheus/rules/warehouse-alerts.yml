@@ -1,27 +1,26 @@
 groups:
-  - name: warehouse-operational-assistant
+  - name: maiw-api
     rules:
-      # API Health Checks
       - alert: APIDown
         expr: up{job="warehouse-api"} == 0
         for: 1m
         labels:
           severity: critical
         annotations:
-          summary: "Warehouse API is down"
-          description: "Warehouse Operational Assistant API has been down for more than 1 minute."
+          summary: "MAIW API is down"
+          description: "Prometheus has not been able to scrape the MAIW API for more than 1 minute."
 
       - alert: APIHighErrorRate
-        expr: rate(http_requests_total{job="warehouse-api",status=~"5.."}[5m]) > 0.1
+        expr: sum(rate(http_requests_total{job="warehouse-api",status=~"5.."}[5m])) > 0.1
         for: 2m
         labels:
           severity: warning
         annotations:
           summary: "High API error rate"
-          description: "API error rate is {{ $value }} errors per second."
+          description: "The API is answering {{ $value }} 5xx responses per second."
 
       - alert: APIHighLatency
-        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="warehouse-api"}[5m])) > 2
+        expr: histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job="warehouse-api",endpoint!="/api/v1/metrics"}[5m]))) > 2
         for: 5m
         labels:
           severity: warning
@@ -29,18 +28,20 @@ groups:
           summary: "High API latency"
           description: "95th percentile latency is {{ $value }} seconds."
 
-      # Database Health Checks
+  - name: datastores
+    rules:
+      # pg_up / redis_up report the database itself; up{} only reports the exporter.
       - alert: DatabaseDown
-        expr: up{job="postgres"} == 0
+        expr: pg_up == 0 or up{job="postgres"} == 0
         for: 1m
         labels:
           severity: critical
         annotations:
-          summary: "PostgreSQL database is down"
-          description: "PostgreSQL database has been down for more than 1 minute."
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL (or its exporter) has been unreachable for more than 1 minute."
 
       - alert: DatabaseHighConnections
-        expr: pg_stat_database_numbackends / pg_settings_max_connections > 0.8
+        expr: sum(pg_stat_database_numbackends) / max(pg_settings_max_connections) > 0.8
         for: 5m
         labels:
           severity: warning
@@ -48,36 +49,36 @@ groups:
           summary: "High database connection usage"
           description: "Database connection usage is {{ $value | humanizePercentage }}."
 
-      # Redis Health Checks
       - alert: RedisDown
-        expr: up{job="redis"} == 0
+        expr: redis_up == 0 or up{job="redis"} == 0
         for: 1m
         labels:
           severity: critical
         annotations:
           summary: "Redis is down"
-          description: "Redis cache has been down for more than 1 minute."
+          description: "Redis (or its exporter) has been unreachable for more than 1 minute."
 
+      # redis_memory_max_bytes is 0 when Redis has no maxmemory limit.
       - alert: RedisHighMemoryUsage
-        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        expr: (redis_memory_used_bytes / redis_memory_max_bytes > 0.9) and redis_memory_max_bytes > 0
         for: 5m
         labels:
           severity: warning
         annotations:
           summary: "High Redis memory usage"
-          description: "Redis memory usage is {{ $value | humanizePercentage }}."
+          description: "Redis memory usage is {{ $value | humanizePercentage }} of maxmemory."
 
-      # Milvus Health Checks
       - alert: MilvusDown
         expr: up{job="milvus"} == 0
         for: 1m
         labels:
           severity: critical
         annotations:
-          summary: "Milvus vector database is down"
-          description: "Milvus vector database has been down for more than 1 minute."
+          summary: "Milvus is down"
+          description: "Milvus has been unreachable for more than 1 minute."
 
-      # System Resource Alerts
+  - name: host
+    rules:
       - alert: HighCPUUsage
         expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
         for: 5m
@@ -97,38 +98,10 @@ groups:
           description: "Memory usage is {{ $value }}% on {{ $labels.instance }}."
 
       - alert: DiskSpaceLow
-        expr: (1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)) * 100 > 90
+        expr: (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"})) * 100 > 90
         for: 5m
         labels:
           severity: critical
         annotations:
           summary: "Low disk space"
-          description: "Disk space usage is {{ $value }}% on {{ $labels.instance }}."
-
-      # Business Logic Alerts
-      - alert: HighInventoryAlerts
-        expr: increase(warehouse_inventory_alerts_total[1h]) > 10
-        for: 0m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High number of inventory alerts"
-          description: "{{ $value }} inventory alerts in the last hour."
-
-      - alert: SafetyIncidentDetected
-        expr: increase(warehouse_safety_incidents_total[1h]) > 0
-        for: 0m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Safety incident detected"
-          description: "{{ $value }} safety incidents in the last hour."
-
-      - alert: LowTaskCompletionRate
-        expr: rate(warehouse_tasks_completed_total[1h]) / rate(warehouse_tasks_created_total[1h]) < 0.8
-        for: 10m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Low task completion rate"
-          description: "Task completion rate is {{ $value | humanizePercentage }}."
+          description: "Disk usage is {{ $value }}% on {{ $labels.instance }} ({{ $labels.mountpoint }})."
