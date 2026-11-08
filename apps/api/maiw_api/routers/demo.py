@@ -306,6 +306,8 @@ async def analyze_disruption():
        a. Build ActionProposal via canonical proposal skill.
        b. Evaluate with DecisionEngine.
        c. If APPROVED, execute via domain ActionExecutor (fresh execution deadline).
+       A recommendation whose proposal cannot be built is reported as
+       ``status: "error"`` at its index and the loop continues (#260).
     4. Refresh state post-execution.
     5. Return full lifecycle record + assessment.
 
@@ -507,14 +509,20 @@ async def analyze_disruption():
             execution_timeout_seconds=settings.execution_timeout_seconds,
             warehouse_id=warehouse_id,
         )
+        proposal_result["index"] = i
         proposal_results.append(proposal_result)
 
-        # Stop if we hit an error that should abort further processing
+        # A build error happens before the DecisionEngine and changes nothing,
+        # so it never stops the remaining recommendations (#260): each one is
+        # still proposed, decided and, if approved, executed on its own. The
+        # failure stays in proposal_results and the lifecycle at its index.
         if proposal_result.get("status") == "error":
             logger.warning(
-                "analyze_disruption: aborting at rec[%d] due to build error", i
+                "analyze_disruption: rec[%d] %s proposal not built; continuing "
+                "with the remaining recommendations",
+                i,
+                rec.capability,
             )
-            break
 
     # Track time to decision (after DECIDE phase completes, before EXECUTE)
     decide_wall_elapsed = _time.perf_counter() - analyze_wall_start
@@ -590,6 +598,7 @@ async def analyze_disruption():
             "latency_ms": assessment.latency_ms,
         },
         "proposal_results": proposal_results,
+        "proposal_summary": _proposal_summary(proposal_results),
         "lifecycle": lifecycle,
         "pre_kpis": pre_kpis_dict,
         "post_kpis": post_kpis_dict,
@@ -599,6 +608,25 @@ async def analyze_disruption():
             "time_to_decision_ms": time_to_decision_ms,
             "time_to_execution_ms": time_to_execution_ms,
         },
+    }
+
+
+def _proposal_summary(proposal_results: list[dict[str, Any]]) -> dict[str, Any]:
+    """Counts for one analyze run, so a partial result is visible at a glance."""
+    failed = [
+        r.get("index", i)
+        for i, r in enumerate(proposal_results)
+        if r.get("status") == "error"
+    ]
+    return {
+        "recommendations": len(proposal_results),
+        "proposed": len(proposal_results) - len(failed),
+        "build_errors": len(failed),
+        "build_error_indices": failed,
+        "executed": sum(1 for r in proposal_results if r.get("status") == "executed"),
+        "awaiting_approval": sum(
+            1 for r in proposal_results if r.get("status") == "requires_human_approval"
+        ),
     }
 
 
