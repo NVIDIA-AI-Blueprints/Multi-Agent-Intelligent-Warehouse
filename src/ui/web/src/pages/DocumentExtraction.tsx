@@ -654,7 +654,7 @@ const DocumentExtraction: React.FC = () => {
             { name: '1. Document Preprocessing', description: 'NeMo Retriever Extraction', color: 'primary' },
             { name: '2. Intelligent OCR', description: 'NeMoRetriever-OCR-v1', color: 'primary' },
             { name: '3. Small LLM Processing', description: 'Nemotron Nano VL (runtime-configured)', color: 'primary' },
-            { name: '4. Large LLM Judge', description: 'Nemotron 3 Super 120B', color: 'primary' },
+            { name: '4. Large LLM Judge', description: 'ModelGateway, HIGH reasoning (Nemotron 3 Ultra by default)', color: 'primary' },
             { name: '5. Intelligent Routing', description: 'Quality-based routing', color: 'primary' },
           ].map((stage, index) => (
             <ListItem key={index} sx={{ py: 0.5 }}>

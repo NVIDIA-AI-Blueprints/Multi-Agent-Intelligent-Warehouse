@@ -47,8 +47,20 @@ class DocumentActionTools:
     # MODEL_SMALL_LLM is derived from env at class definition so operators can
     # override it without a code change when switching VL model deployments.
     MODEL_SMALL_LLM: str = os.getenv("NEMOTRON_OMNI_MODEL_LABEL", "Nemotron Nano VL")
-    MODEL_LARGE_JUDGE: str = "Nemotron 3 Super 120B"
+    # The judge's model is chosen by ModelGateway at HIGH reasoning (Nemotron 3
+    # Ultra by default). The judge reports the model that answered
+    # (JudgeEvaluation.judge_model); this label is only the fallback.
+    MODEL_LARGE_JUDGE: str = "ModelGateway (HIGH reasoning)"
     MODEL_OCR: str = "NeMoRetriever-OCR-v1"
+
+    @classmethod
+    def _judge_model_of(cls, validation: Any) -> str:
+        """The model that answered the judge call, or the routing label."""
+        if isinstance(validation, dict):
+            model = validation.get("judge_model")
+        else:
+            model = getattr(validation, "judge_model", None)
+        return str(model) if model else cls.MODEL_LARGE_JUDGE
 
     def __init__(self):
         self.nim_client = None
@@ -234,7 +246,7 @@ class DocumentActionTools:
                 reasoning=reasoning_data,
                 issues_found=getattr(validation_data, "issues_found", []),
                 confidence=getattr(validation_data, "confidence", 0.0),
-                judge_model=self.MODEL_LARGE_JUDGE,
+                judge_model=self._judge_model_of(validation_data),
             )
         
         # Handle dictionary
@@ -255,7 +267,7 @@ class DocumentActionTools:
             reasoning=reasoning_data,
             issues_found=validation_data.get("issues_found", []),
             confidence=validation_data.get("confidence", 0.0),
-            judge_model=self.MODEL_LARGE_JUDGE,
+            judge_model=self._judge_model_of(validation_data),
         )
 
     def _parse_hours_range(self, time_str: str) -> Optional[int]:
@@ -1161,7 +1173,7 @@ class DocumentActionTools:
                             processed_data=serialized_validation,
                             confidence_score=validation_result.get("confidence", 0.0) if isinstance(validation_result, dict) else (getattr(validation_result, "confidence", 0.0) if hasattr(validation_result, "confidence") else 0.0),
                             processing_time_ms=validation_result.get("processing_time_ms", 0) if isinstance(validation_result, dict) else 0,
-                            model_used=self.MODEL_LARGE_JUDGE,
+                            model_used=self._judge_model_of(validation_result),
                         )
                     
                     # Save routing stage extraction result
@@ -1204,7 +1216,7 @@ class DocumentActionTools:
                                     reasoning=validation_dict.get("reasoning", {}),
                                     issues_found=validation_dict.get("issues_found", []),
                                     confidence=validation_dict.get("confidence", 0.0),
-                                    judge_model=self.MODEL_LARGE_JUDGE,
+                                    judge_model=self._judge_model_of(validation_dict),
                                 )
                                 logger.info(f"Saved quality score for document {document_id}: overall_score={overall_score}")
                         elif validation_dict.get("overall_score", 0) > 0:
@@ -1220,7 +1232,7 @@ class DocumentActionTools:
                                 reasoning=validation_dict.get("reasoning", {}),
                                 issues_found=validation_dict.get("issues_found", []),
                                 confidence=validation_dict.get("confidence", 0.0),
-                                judge_model=self.MODEL_LARGE_JUDGE,
+                                judge_model=self._judge_model_of(validation_dict),
                             )
                             logger.info(f"Saved quality score for document {document_id}: overall_score={validation_dict.get('overall_score', 0.0)}")
                         else:
@@ -1534,9 +1546,9 @@ class DocumentActionTools:
                                 },
                                 confidence_score=quality_score.confidence if quality_score else 0.0,
                                 processing_time_ms=0,  # Validation doesn't track processing time yet
-                                model_used=self.MODEL_LARGE_JUDGE,
+                                model_used=self._judge_model_of(validation_data),
                                 metadata={
-                                    "judge_model": self.MODEL_LARGE_JUDGE,
+                                    "judge_model": self._judge_model_of(validation_data),
                                     "timestamp": datetime.now().isoformat(),
                                 },
                             )

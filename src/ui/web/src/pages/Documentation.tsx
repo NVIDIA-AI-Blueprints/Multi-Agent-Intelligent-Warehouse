@@ -151,7 +151,7 @@ const Documentation: React.FC = () => {
     },
     {
       name: "NVIDIA NIMs Integration",
-      description: "Nemotron 3 Super 120B + llama-nemotron-embed-vl-1b-v2 embeddings",
+      description: "Nemotron 3.5 Lightning and Nemotron 3 Ultra via ModelGateway + llama-nemotron-embed-vl-1b-v2 embeddings",
       status: "✅ Fully Operational",
       icon: <CloudIcon />
     },
@@ -451,7 +451,7 @@ const Documentation: React.FC = () => {
                 <ListItem sx={{ py: 0 }}>
                   <ListItemText 
                     primary="AI Services - NVIDIA NIMs" 
-                    secondary="LLM NIM (Nemotron 3 Super 120B), VL NIM (Nemotron Nano VL), Embed NIM (llama-nemotron-embed-vl-1b-v2), NeMo Guardrails"
+                    secondary="LLM NIM (Nemotron 3.5 Lightning and Nemotron 3 Ultra via ModelGateway), VL NIM (Nemotron Nano VL), Embed NIM (llama-nemotron-embed-vl-1b-v2), NeMo Guardrails"
                   />
                 </ListItem>
                 <ListItem sx={{ py: 0 }}>
@@ -615,7 +615,7 @@ const Documentation: React.FC = () => {
                     Stage 4: Large LLM Judge
                   </Typography>
                   <Typography variant="body2" sx={{ mb: 2 }}>
-                    <strong>Model:</strong> Nemotron 3 Super 120B NIM
+                    <strong>Model:</strong> routed by ModelGateway at HIGH reasoning (Nemotron 3 Ultra by default)
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Comprehensive quality validation with 4 evaluation criteria: completeness, accuracy, compliance, and quality scoring.
@@ -1280,7 +1280,7 @@ const Documentation: React.FC = () => {
                 • Multi-agent orchestration with LangGraph + MCP integration<br/>
                 • <strong>5 Specialized Agents:</strong> Equipment, Operations, Safety, Forecasting, Document<br/>
                 • <strong>34+ production-ready action tools</strong> across all agents<br/>
-                • NVIDIA NIMs integration (Nemotron 3 Super 120B + llama-nemotron-embed-vl-1b-v2 + Vision models)<br/>
+                • NVIDIA NIMs integration (Nemotron 3.5 Lightning and Nemotron 3 Ultra via ModelGateway + llama-nemotron-embed-vl-1b-v2 + Vision models)<br/>
                 • <strong>Document Processing:</strong> 5-stage NVIDIA NeMo pipeline with vision models<br/>
                 • <strong>Demand Forecasting:</strong> 6 ML models with NVIDIA RAPIDS GPU acceleration<br/>
                 • <strong>NeMo Guardrails:</strong> Content safety and compliance protection<br/>
