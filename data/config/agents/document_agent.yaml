@@ -2,7 +2,7 @@ name: "Document Processing Agent"
 description: |
   Provides comprehensive document processing capabilities including:
   - Multi-format document support (PDF, PNG, JPG, JPEG, TIFF, BMP)
-  - 6-stage NVIDIA NeMo processing pipeline
+  - 5-stage NVIDIA NeMo processing pipeline
   - Intelligent OCR with vision models
   - Structured data extraction
   - Quality validation and scoring

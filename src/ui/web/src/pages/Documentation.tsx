@@ -151,7 +151,7 @@ const Documentation: React.FC = () => {
     },
     {
       name: "NVIDIA NIMs Integration",
-      description: "Nemotron 3 Super 120B + llama-nemotron-embed-vl-1b-v2 embeddings",
+      description: "Nemotron 3.5 Lightning and Nemotron 3 Ultra via ModelGateway + llama-nemotron-embed-vl-1b-v2 embeddings",
       status: "✅ Fully Operational",
       icon: <CloudIcon />
     },
@@ -187,7 +187,7 @@ const Documentation: React.FC = () => {
     },
     {
       name: "Document Processing",
-      description: "6-stage NVIDIA NeMo pipeline with Nemotron Nano VL vision model",
+      description: "5-stage NVIDIA NeMo pipeline with Nemotron Nano VL vision model",
       status: "✅ Production Ready",
       icon: <ArticleIcon />
     },
@@ -451,7 +451,7 @@ const Documentation: React.FC = () => {
                 <ListItem sx={{ py: 0 }}>
                   <ListItemText 
                     primary="AI Services - NVIDIA NIMs" 
-                    secondary="LLM NIM (Nemotron 3 Super 120B), VL NIM (Nemotron Nano VL), Embed NIM (llama-nemotron-embed-vl-1b-v2), NeMo Guardrails"
+                    secondary="LLM NIM (Nemotron 3.5 Lightning and Nemotron 3 Ultra via ModelGateway), VL NIM (Nemotron Nano VL), Embed NIM (llama-nemotron-embed-vl-1b-v2), NeMo Guardrails"
                   />
                 </ListItem>
                 <ListItem sx={{ py: 0 }}>
@@ -462,8 +462,8 @@ const Documentation: React.FC = () => {
                 </ListItem>
                 <ListItem sx={{ py: 0 }}>
                   <ListItemText 
-                    primary="6 Stages NeMo Document Processing Pipeline" 
-                    secondary="NeMo Retriever, Intelligent OCR, Small LLM, Embedding & Indexing, LLM as a Judge, Routing"
+                    primary="5 Stages NeMo Document Processing Pipeline" 
+                    secondary="NeMo Retriever, Intelligent OCR, Small LLM, LLM as a Judge, Routing"
                   />
                 </ListItem>
                 <ListItem sx={{ py: 0 }}>
@@ -571,7 +571,7 @@ const Documentation: React.FC = () => {
                     Stage 2: Intelligent OCR
                   </Typography>
                   <Typography variant="body2" sx={{ mb: 2 }}>
-                    <strong>Model:</strong> NeMoRetriever-OCR-v1 + Nemotron Parse
+                    <strong>Model:</strong> NeMoRetriever-OCR-v1
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Fast, accurate text extraction with layout awareness, preserving spatial relationships and document structure.
@@ -612,25 +612,10 @@ const Documentation: React.FC = () => {
               <Card variant="outlined" sx={{ height: '100%' }}>
                 <CardContent>
                   <Typography variant="h6" gutterBottom color="primary">
-                    Stage 4: Embedding & Indexing
+                    Stage 4: Large LLM Judge
                   </Typography>
                   <Typography variant="body2" sx={{ mb: 2 }}>
-                    <strong>Model:</strong> llama-nemotron-embed-vl-1b-v2 (NVIDIA NeMo)
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Vector embeddings generation for semantic search and intelligent document indexing with GPU acceleration.
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Card variant="outlined" sx={{ height: '100%' }}>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom color="primary">
-                    Stage 5: Large LLM Judge
-                  </Typography>
-                  <Typography variant="body2" sx={{ mb: 2 }}>
-                    <strong>Model:</strong> Nemotron 3 Super 120B NIM
+                    <strong>Model:</strong> routed by ModelGateway at HIGH reasoning (Nemotron 3 Ultra by default)
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Comprehensive quality validation with 4 evaluation criteria: completeness, accuracy, compliance, and quality scoring.
@@ -642,7 +627,7 @@ const Documentation: React.FC = () => {
               <Card variant="outlined" sx={{ height: '100%' }}>
                 <CardContent>
                   <Typography variant="h6" gutterBottom color="primary">
-                    Stage 6: Intelligent Routing
+                    Stage 5: Intelligent Routing
                   </Typography>
                   <Typography variant="body2" sx={{ mb: 2 }}>
                     <strong>System:</strong> Quality-based routing decisions
@@ -1295,8 +1280,8 @@ const Documentation: React.FC = () => {
                 • Multi-agent orchestration with LangGraph + MCP integration<br/>
                 • <strong>5 Specialized Agents:</strong> Equipment, Operations, Safety, Forecasting, Document<br/>
                 • <strong>34+ production-ready action tools</strong> across all agents<br/>
-                • NVIDIA NIMs integration (Nemotron 3 Super 120B + llama-nemotron-embed-vl-1b-v2 + Vision models)<br/>
-                • <strong>Document Processing:</strong> 6-stage NVIDIA NeMo pipeline with vision models<br/>
+                • NVIDIA NIMs integration (Nemotron 3.5 Lightning and Nemotron 3 Ultra via ModelGateway + llama-nemotron-embed-vl-1b-v2 + Vision models)<br/>
+                • <strong>Document Processing:</strong> 5-stage NVIDIA NeMo pipeline with vision models<br/>
                 • <strong>Demand Forecasting:</strong> 6 ML models with NVIDIA RAPIDS GPU acceleration<br/>
                 • <strong>NeMo Guardrails:</strong> Content safety and compliance protection<br/>
                 • Advanced reasoning engine with 5 reasoning types<br/>

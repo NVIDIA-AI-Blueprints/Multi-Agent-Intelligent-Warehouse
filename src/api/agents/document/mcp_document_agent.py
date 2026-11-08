@@ -336,8 +336,7 @@ class MCPDocumentExtractionAgent:
                         "Document Preprocessing (NeMo Retriever)",
                         "Intelligent OCR (NeMoRetriever-OCR-v1)",
                         "Small LLM Processing (Nemotron Nano VL, runtime-configured)",
-                        "Embedding & Indexing (nemotron-3-embed-1b)",
-                        "Large LLM Judge (Nemotron 3 Super 120B)",
+                        "Large LLM Judge (ModelGateway, HIGH reasoning)",
                         "Intelligent Routing",
                     ],
                     "estimated_processing_time": "30-60 seconds",
@@ -615,7 +614,7 @@ class MCPDocumentExtractionAgent:
                         "Packing Lists",
                         "Safety Reports",
                     ],
-                    "processing_pipeline": "6-stage NVIDIA NeMo pipeline with intelligent routing",
+                    "processing_pipeline": "5-stage NVIDIA NeMo pipeline with intelligent routing",
                 },
                 natural_language="I'm the Document Extraction Agent, specialized in processing warehouse documents using NVIDIA's NeMo models. I can upload, process, validate, and search documents with intelligent quality-based routing. How can I help you with document processing?",
                 recommendations=[
