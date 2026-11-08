@@ -42,7 +42,7 @@ import {
   CheckCircle,
   Close as CloseIcon,
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { documentAPI } from '../services/api';
 import { TabPanel } from '../components/common';

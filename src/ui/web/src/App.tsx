@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router';
 import { Box } from '@mui/material';
 import Layout from './components/Layout';
 import ChatInterfaceNew from './pages/ChatInterfaceNew';

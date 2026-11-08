@@ -29,7 +29,7 @@ import {
   CheckCircle as CheckCircleIcon,
   GitHub as GitHubIcon,
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { CodeBlock, SectionAccordion, InfoCard, MethodChip, StatusChip } from '../components/common';
 
 const APIReference: React.FC = () => {

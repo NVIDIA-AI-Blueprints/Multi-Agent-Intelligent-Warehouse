@@ -39,7 +39,7 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { modelLabAPI, ModelLabRun, ModelLabCase, ModelStatus } from '../services/api';
 
 // ── Colour constants ───────────────────────────────────────────────────────────

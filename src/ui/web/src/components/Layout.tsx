@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Typography, Drawer, IconButton } from '@mui/material';
 import { Menu as MenuIcon } from '@mui/icons-material';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { healthAPI } from '../services/api';
 import { useDemoStatus } from '../hooks/useDemoStatus';

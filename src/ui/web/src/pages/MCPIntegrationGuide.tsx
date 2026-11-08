@@ -40,7 +40,7 @@ import {
   ArrowBack as ArrowBackIcon,
   CheckCircle as CheckIcon,
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 const MCPIntegrationGuide: React.FC = () => {
   const navigate = useNavigate();

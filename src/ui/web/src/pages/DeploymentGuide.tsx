@@ -45,7 +45,7 @@ import {
   CheckCircle as CheckCircleIcon,
   Storage as DockerIcon,
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 const DeploymentGuide: React.FC = () => {
   const navigate = useNavigate();

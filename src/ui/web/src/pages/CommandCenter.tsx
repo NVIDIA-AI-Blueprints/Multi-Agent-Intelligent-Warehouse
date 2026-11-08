@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Box, Typography, Grid, Button } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRuntimeStatus } from '../hooks/useRuntimeStatus';
 import { useDemoStatus } from '../hooks/useDemoStatus';

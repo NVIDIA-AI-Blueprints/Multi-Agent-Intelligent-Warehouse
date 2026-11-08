@@ -22,7 +22,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import '@testing-library/jest-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { nvidiaTheme } from '../../theme/nvidiaTheme';
 
 import StageContentPane, { parseDetail, runWindowEvents } from '../../components/demo/StageContentPane';
@@ -573,7 +573,7 @@ describe('DecideStage', () => {
 // ── DemoShell integration: analyze trigger ─────────────────────────────────────
 
 describe('DemoShell — analyze integration', () => {
-  const { MemoryRouter } = require('react-router-dom');
+  const { MemoryRouter } = require('react-router');
   const { QueryClient, QueryClientProvider } = require('@tanstack/react-query');
 
   jest.mock('../../services/demoAPI', () => ({

@@ -80,7 +80,7 @@ import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Cart
 import { format as formatDate, subDays, parseISO } from 'date-fns';
 import Papa from 'papaparse';
 import { mcpAPI } from '../services/api';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router';
 
 interface MCPTool {
   tool_id: string;

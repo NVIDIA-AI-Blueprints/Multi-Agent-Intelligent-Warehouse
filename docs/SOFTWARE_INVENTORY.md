@@ -2,7 +2,7 @@
 
 This document lists all third-party software packages used in this project, including their versions, licenses, authors, and sources.
 
-> **Dated snapshot** — generated on 2025-12-20 and not regenerated since (the generator script is no longer in the repository). Versions are the minimum versions declared at that time, with only the aiohttp, paho-mqtt, pymodbus, langgraph and starlette floors and the PyMuPDF, passlib, langchain, PyJWT, python-jose, bcrypt and email-validator removals corrected since; the authoritative dependency lists are `requirements.txt`, `requirements.docker.txt`, `pyproject.toml`, `packages/*/pyproject.toml`, `apps/api/pyproject.toml`, the root `package.json` and `src/ui/web/package.json`.
+> **Dated snapshot** — generated on 2025-12-20 and not regenerated since (the generator script is no longer in the repository). Versions are the minimum versions declared at that time, with only the aiohttp, paho-mqtt, pymodbus, langgraph, starlette and requests floors, the `react-router-dom` → `react-router` 7 change, and the PyMuPDF, passlib, langchain, PyJWT, python-jose, bcrypt and email-validator removals corrected since; the authoritative dependency lists are `requirements.txt`, `requirements.docker.txt`, `pyproject.toml`, `packages/*/pyproject.toml`, `apps/api/pyproject.toml`, the root `package.json` and `src/ui/web/package.json`.
 
 **Last Updated:** 2025-12-20
 
@@ -95,7 +95,7 @@ The snapshot was built from `requirements.txt`, `requirements.docker.txt`, `scri
 | react | 19.2.3 | MIT | https://github.com/facebook/react/blob/main/LICENSE | N/A | npm | npm | https://www.npmjs.com/package/react |
 | react-copy-to-clipboard | 5.1.0 | MIT | https://github.com/nkbt/react-copy-to-clipboard/blob/main/LICENSE | Nik Butenko <nik@butenko.me> | npm | npm | https://www.npmjs.com/package/react-copy-to-clipboard |
 | react-dom | 19.2.3 | MIT | https://github.com/facebook/react/blob/main/LICENSE | N/A | npm | npm | https://www.npmjs.com/package/react-dom |
-| react-router-dom | 6.8.0 | MIT | https://github.com/remix-run/react-router/blob/main/LICENSE | Remix Software <hello@remix.run> | npm | npm | https://www.npmjs.com/package/react-router-dom |
+| react-router | 7.18.5 | MIT | https://github.com/remix-run/react-router/blob/main/LICENSE.md | Remix Software <hello@remix.run> | npm | npm | https://www.npmjs.com/package/react-router |
 | react-scripts | 5.0.1 | MIT | https://github.com/facebook/create-react-app/blob/main/LICENSE | N/A | npm | npm | https://www.npmjs.com/package/react-scripts |
 | recharts | 2.5.0 | MIT | https://github.com/recharts/recharts/blob/main/LICENSE | recharts group | npm | npm | https://www.npmjs.com/package/recharts |
 | typescript | 4.7.4 | Apache-2.0 | https://github.com/Microsoft/TypeScript/blob/main/LICENSE | Microsoft Corp. | npm | npm | https://www.npmjs.com/package/typescript |
