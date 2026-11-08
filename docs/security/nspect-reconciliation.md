@@ -40,9 +40,11 @@ SBOMs of `4259fa3` ([CI run 42111328437](https://github.com/NVIDIA-AI-Blueprints
 | Merge | Each input's image or bundle component becomes a component that the release depends on. Components are kept flat, a `bom-ref` present in more than one input is listed once, and dependency entries are unioned. No component was added or edited. Validated with `scripts/security/validate_sbom.py` from `4259fa3` (schema, ≥ 1000 components, tool recorded); no dangling dependency references |
 | Inputs (sha256, recorded in the file as `merged-from:*` properties) | `maiw-backend.cdx.json` (190 components) `51bf7b3a…b088`; `maiw-frontend.cdx.json` (71) `b43153e9…35ca9`; `maiw-ui-bundle.cdx.json` (1365) `a2659151…78ec6`; `maiw-mcp.cdx.json` (154) `eea0a18d…c331e` |
 
-The CI SBOMs say `maiw:release_version=2.1.0`: CI stamps the latest tag
+The CI SBOMs say `maiw:release_version=2.1.0`: CI stamped the latest tag
 (`git describe`), not the version being prepared. The merged file is stamped
-`2.1.1`. The form warns that "ConneX children SBOM data will become empty
+`2.1.1`. Since #268, a candidate's SBOMs are stamped with the release version
+directly (CI/CD Pipeline run by hand with `release_version`, see
+`sbom-generation.md`), so no re-stamping is needed. The form warns that "ConneX children SBOM data will become empty
 when an uploaded SBOM is used"; the program owner checks the v2.1.1 ConneX
 report for child programs.
 

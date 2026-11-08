@@ -23,6 +23,10 @@
 #                        (default .scannerwork/maiw-sonar-evidence.json)
 #   MAIW_SONAR_SOURCE_DIR  checkout to analyze (default: the one containing
 #                        the current directory)
+#   MAIW_RELEASE_VERSION projectVersion for a release candidate (see
+#                        release_version.sh next to this script; default:
+#                        the tag, or a development version such as
+#                        2.1.1+16.g4d2e0c4)
 #   MAIW_SONAR_SETTINGS  sonar-project.properties to use (default: the one
 #                        next to this script, not the analyzed checkout's).
 #                        CI runs this script and these settings from the
@@ -40,6 +44,7 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 SCANNER_IMAGE="sonarsource/sonar-scanner-cli:12.3.0.4285_8.1.0@sha256:47956b669bf486bdad919e1cbd0533223515aa0b6d1d31763e5a3754942df6d7"
 HOST="${SONAR_HOST_URL:-https://sonar.nvidia.com}"
 HOST="${HOST%/}"
@@ -67,9 +72,12 @@ fi
 echo "SonarQube server ${HOST} version ${server_version}"
 
 revision="$(git rev-parse HEAD)"
-# The release this commit belongs to: the latest v* tag reachable from it.
-version="$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || echo v0.0.0)"
-version="${version#v}"
+# The version this commit is analyzed as (release_version.sh next to this
+# script, i.e. the trusted copy, run inside the analyzed checkout).
+if ! version="$("${SCRIPT_DIR}/release_version.sh")"; then
+  echo "::error title=SonarQube not configured::invalid MAIW_RELEASE_VERSION" >&2
+  exit 2
+fi
 
 args=(
   "-Dsonar.host.url=${HOST}"

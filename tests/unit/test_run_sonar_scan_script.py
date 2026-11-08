@@ -106,6 +106,17 @@ def run(tmp_path):
         ev = json.loads(evidence.read_text()) if evidence.exists() else None
         return proc, docker_args, ev
 
+    def _commit():
+        (src / "a.py").write_text((src / "a.py").read_text() + "x += 1\n")
+        subprocess.run([*git, "commit", "-qam", "next"], check=True)
+        return subprocess.run(
+            [*git, "rev-parse", "--short=7", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+    _run.commit = _commit
     return _run
 
 
@@ -156,3 +167,30 @@ def test_missing_token_exits_2(run):
     proc, docker_args, _ = run(SONAR_TOKEN="")
     assert proc.returncode == 2
     assert docker_args == []
+
+
+# ── projectVersion (#268) ─────────────────────────────────────────────────────
+
+
+def test_untagged_commit_is_analyzed_as_a_development_version(run):
+    sha = run.commit()
+    proc, docker_args, ev = run()
+    assert proc.returncode == 0, proc.stderr
+    assert f"-Dsonar.projectVersion=9.8.7+1.g{sha}" in docker_args
+    assert ev["project_version"] == f"9.8.7+1.g{sha}"
+
+
+def test_release_candidate_version_comes_from_maiw_release_version(run):
+    run.commit()
+    proc, docker_args, ev = run(MAIW_RELEASE_VERSION="9.9.0")
+    assert proc.returncode == 0, proc.stderr
+    assert "-Dsonar.projectVersion=9.9.0" in docker_args
+    assert ev["project_version"] == "9.9.0"
+
+
+def test_invalid_release_version_exits_2_without_scanning(run):
+    run.commit()
+    proc, docker_args, ev = run(MAIW_RELEASE_VERSION="9.9")
+    assert proc.returncode == 2
+    assert docker_args == []
+    assert ev is None

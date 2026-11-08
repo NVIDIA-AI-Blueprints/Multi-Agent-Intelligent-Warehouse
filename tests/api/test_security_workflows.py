@@ -87,6 +87,7 @@ def test_sonarqube_runs_trusted_tooling_against_the_analyzed_commit():
     assert tools["path"] == "sonar-tools"
     assert set(tools["sparse-checkout"].split()) == {
         "scripts/security/run_sonar_scan.sh",
+        "scripts/security/release_version.sh",
         "sonar-project.properties",
     }
     source = by_name["Checkout analyzed commit"]["with"]
@@ -182,3 +183,41 @@ def test_codeql_runs_on_push_pull_request_and_schedule():
     job = wf["jobs"]["analyze"]
     assert job["permissions"]["security-events"] == "write"
     assert set(job["strategy"]["matrix"]["language"]) == {"python", "javascript"}
+
+
+# ── Release version stamping (#268) ───────────────────────────────────────────
+
+
+def test_sbom_and_sonar_versions_come_from_one_helper():
+    # git describe --abbrev=0 stamped a candidate with the previous release and
+    # every later main build with the last one. All three places now ask
+    # scripts/security/release_version.sh.
+    ci = (WORKFLOWS / "ci-cd.yml").read_text()
+    generate = (REPO_ROOT / "scripts/security/generate_sbom.sh").read_text()
+    sonar = (REPO_ROOT / "scripts/security/run_sonar_scan.sh").read_text()
+    for text in (ci, generate, sonar):
+        assert "--abbrev=0" not in text
+    assert 'version="$(scripts/security/release_version.sh)"' in generate
+    assert '"${SCRIPT_DIR}/release_version.sh"' in sonar
+
+    steps = _workflow("ci-cd.yml")["jobs"]["image-scan"]["steps"]
+    validate = {s.get("name"): s for s in steps}["Validate SBOM"]
+    assert 'version="$(scripts/security/release_version.sh)"' in validate["run"]
+    # The input reaches the script through the environment, not by
+    # interpolation into the shell script.
+    assert validate["env"]["MAIW_RELEASE_VERSION"] == "${{ inputs.release_version }}"
+    assert "inputs." not in validate["run"]
+
+
+def test_release_candidate_version_can_be_supplied_when_dispatching():
+    ci = _workflow("ci-cd.yml")["on"]
+    assert ci["workflow_dispatch"]["inputs"]["release_version"]["required"] is False
+    for event in ("push", "pull_request", "release"):
+        assert event in ci
+
+    sonar = _workflow("sonarqube.yml")
+    assert "release_version" in sonar["on"]["workflow_dispatch"]["inputs"]
+    scan = {s.get("name"): s for s in sonar["jobs"]["sonarqube"]["steps"]}[
+        "Run SonarQube analysis"
+    ]
+    assert scan["env"]["MAIW_RELEASE_VERSION"] == "${{ inputs.release_version }}"
