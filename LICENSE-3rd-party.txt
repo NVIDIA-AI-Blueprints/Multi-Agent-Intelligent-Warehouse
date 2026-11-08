@@ -173,7 +173,7 @@ Packages under the Apache License, Version 2.0 with their respective copyright h
   @craco/craco 7.1.0
   Copyright (c) 2023 Dilan Nair
 
-  requests 2.32.5
+  requests 2.34.2
   Copyright (c) 2025 Kenneth Reitz
 
   typescript 5.9.3

@@ -46,7 +46,7 @@ The snapshot was built from `requirements.txt`, `requirements.docker.txt`, `scri
 | python-multipart | 0.0.21 | Apache Software License | https://pypi.org/project/python-multipart/ | Andrew Dunham <andrew@du.nham.ca>, Marcelo Trylesinski <marcelotryle@gmail.com> | PyPI | pip | https://pypi.org/project/python-multipart/ |
 | PyYAML | 6.0 | MIT | https://pyyaml.org/ | Kirill Simonov <xi@resolvent.net> | PyPI | pip | https://pypi.org/project/PyYAML/ |
 | redis | 5.0.0 | MIT | https://github.com/redis/redis-py | Redis Inc. <oss@redis.com> | PyPI | pip | https://pypi.org/project/redis/ |
-| requests | 2.32.4 | Apache-2.0 | https://requests.readthedocs.io | Kenneth Reitz <me@kennethreitz.org> | PyPI | pip | https://pypi.org/project/requests/ |
+| requests | 2.34.2 | Apache-2.0 | https://requests.readthedocs.io | Kenneth Reitz <me@kennethreitz.org> | PyPI | pip | https://pypi.org/project/requests/ |
 | scikit-learn | 1.5.0 | new BSD | https://scikit-learn.org | N/A | PyPI | pip | https://pypi.org/project/scikit-learn/ |
 | starlette | 1.10.0 | N/A | https://pypi.org/project/starlette/ | Tom Christie <tom@tomchristie.com> | PyPI | pip | https://pypi.org/project/starlette/ |
 | tiktoken | 0.12.0 | MIT License | https://pypi.org/project/tiktoken/ | Shantanu Jain <shantanu@openai.com> | PyPI | pip | https://pypi.org/project/tiktoken/ |

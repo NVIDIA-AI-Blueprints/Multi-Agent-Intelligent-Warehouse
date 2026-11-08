@@ -801,7 +801,7 @@ Key implementation files for major components:
 | **ML/AI** | scikit-learn | 1.5+ | Complete | Machine learning models |
 | **ML/AI** | RAPIDS cuML | Latest | Complete | GPU-accelerated ML (optional) |
 | **ML/AI** | Pillow | 10.3+ | Complete | Image processing (document pipeline) |
-| **ML/AI** | requests | 2.32.4+ | Complete | HTTP library (patched for security) |
+| **ML/AI** | requests | 2.34.2+ | Complete | HTTP library (patched for security) |
 | **Container** | Docker | 24+ | Complete | Containerization |
 | **Container** | Docker Compose | 2.20+ | Complete | Multi-container orchestration |
 
