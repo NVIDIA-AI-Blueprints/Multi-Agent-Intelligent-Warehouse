@@ -13,6 +13,12 @@
 # Published ports bind to 127.0.0.1: Prometheus 9090, Alertmanager 9093,
 # Grafana MAIW_GRAFANA_PORT (default 3030; the dev stack's nginx uses 3000).
 # Images are pinned by tag and digest.
+#
+# The stack has its own Compose project name. Without it, Compose names the
+# project after the directory (`compose`), the same as the dev stack, and
+# `down --remove-orphans` from either file removes the other stack's containers.
+
+name: maiw-monitoring
 
 services:
   prometheus:

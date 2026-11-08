@@ -173,6 +173,26 @@ def test_prometheus_and_db_exporters_join_the_dev_stack_network():
         assert "maiw" in compose["services"][name]["networks"], name
 
 
+def test_monitoring_is_its_own_compose_project():
+    """Both Compose files live in deploy/compose, so without an explicit name
+    they share the project `compose`, and `down --remove-orphans` from the
+    monitoring file removed the whole dev stack (deployment test on b1f1d11)."""
+    name = _compose().get("name")
+    assert name == "maiw-monitoring"
+    assert name != yaml.safe_load(DEV_COMPOSE.read_text()).get("name", "compose")
+
+
+def test_deployment_check_never_removes_other_projects_containers():
+    workflow = yaml.safe_load((REPO_ROOT / ".github/workflows/main.yml").read_text())
+    (step,) = [
+        s
+        for s in workflow["jobs"]["deploy-and-test"]["steps"]
+        if s.get("name") == "Verify: monitoring stack scrapes the API"
+    ]
+    assert "--remove-orphans" not in step["run"]
+    assert "docker-compose.monitoring.yaml" in step["run"]
+
+
 # ── Prometheus scrape configuration ──────────────────────────────────────────
 
 
