@@ -119,3 +119,49 @@ def test_restamping_replaces_previous_identity(tmp_path):
     names = [p["name"] for p in stamped["metadata"]["properties"]]
     assert names.count("maiw:git_sha") == 1
     assert "aquasecurity:trivy:SchemaVersion" in names
+
+
+@pytest.mark.parametrize(
+    "version", ["2.1.1", "2.2.0-rc.1", "2.1.1+16.g4d2e0c4", "0.0.0+g4d2e0c4"]
+)
+def test_release_and_development_versions_are_accepted(tmp_path, version):
+    path = tmp_path / "sbom.cdx.json"
+    path.write_text(json.dumps(_bom()))
+    code = validate_sbom.main(
+        [
+            str(path),
+            "--artifact",
+            "maiw-backend",
+            "--git-sha",
+            SHA,
+            "--version",
+            version,
+        ]
+    )
+    assert code == 0
+    props = {
+        p["name"]: p["value"]
+        for p in json.loads(path.read_text())["metadata"]["properties"]
+    }
+    assert props["maiw:release_version"] == version
+
+
+@pytest.mark.parametrize(
+    "version", ["v2.1.1", "2.1", "", "2.1.1+", "02.1.1", "unknown"]
+)
+def test_non_semantic_version_fails(tmp_path, capsys, version):
+    path = tmp_path / "sbom.cdx.json"
+    path.write_text(json.dumps(_bom()))
+    code = validate_sbom.main(
+        [
+            str(path),
+            "--artifact",
+            "maiw-backend",
+            "--git-sha",
+            SHA,
+            "--version",
+            version,
+        ]
+    )
+    assert code == 1
+    assert "is not a semantic version" in capsys.readouterr().out

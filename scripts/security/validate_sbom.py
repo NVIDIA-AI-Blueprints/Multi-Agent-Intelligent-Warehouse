@@ -14,7 +14,10 @@ then fails unless the document:
 - validates against the CycloneDX JSON schema of its declared specVersion
   (cyclonedx-python-lib's strict validator), and
 - lists at least ``--min-components`` components, so an empty or truncated
-  inventory never passes, and records the generating tool.
+  inventory never passes, and records the generating tool,
+and unless ``--version`` is a semantic version without a leading "v": a
+release (``2.1.1``, ``2.1.2-rc.1``) or a development build of a later commit
+(``2.1.1+16.g4d2e0c4``), as printed by ``scripts/security/release_version.sh``.
 
 Prints a one-line summary. Exit 1 on any failure.
 """
@@ -23,10 +26,29 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
 REPOSITORY = "https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse"
+
+# Semantic Versioning 2.0.0 (https://semver.org), core plus optional
+# pre-release and build metadata.
+_IDENT = r"(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)"
+SEMVER = re.compile(
+    r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
+    rf"(?:-{_IDENT}(?:\.{_IDENT})*)?"
+    r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"
+)
+
+
+def version_errors(version: str) -> list[str]:
+    if SEMVER.match(version):
+        return []
+    return [
+        f"release version {version!r} is not a semantic version "
+        "(X.Y.Z, X.Y.Z-pre or X.Y.Z+build; see scripts/security/release_version.sh)"
+    ]
 
 
 def stamp(bom: dict, *, artifact: str, git_sha: str, version: str, digest: str | None) -> dict:
@@ -98,11 +120,11 @@ def main(argv: list[str] | None = None) -> int:
     raw = json.dumps(bom, indent=2)
     args.sbom.write_text(raw + "\n")
 
-    errors = validate(bom, raw, args.min_components)
+    errors = version_errors(args.version) + validate(bom, raw, args.min_components)
     summary = (
         f"{args.sbom.name}: CycloneDX {bom.get('specVersion')}, "
         f"{len(bom.get('components', []))} components, "
-        f"tools={tool_names(bom)}, git_sha={args.git_sha[:12]}"
+        f"tools={tool_names(bom)}, git_sha={args.git_sha[:12]}, version={args.version}"
     )
     if errors:
         for error in errors:

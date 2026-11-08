@@ -17,6 +17,10 @@
 #                            an image scan cannot see them.
 # Each file is stamped with the git SHA, release version and image ID, and
 # validated against the CycloneDX schema (scripts/security/validate_sbom.py).
+# The version comes from scripts/security/release_version.sh: the tag when the
+# commit is tagged, MAIW_RELEASE_VERSION for a release candidate
+# (MAIW_RELEASE_VERSION=2.1.2 scripts/security/generate_sbom.sh), otherwise a
+# development version such as 2.1.1+16.g4d2e0c4.
 #
 # Requires docker and python3 with cyclonedx-python-lib[json-validation].
 # Same Trivy version as CI (aquasecurity/trivy-action v0.36.0 = Trivy 0.70.0).
@@ -32,8 +36,7 @@ mkdir -p "$OUT"
 OUT="$(cd "$OUT" && pwd)"
 
 git_sha="$(git rev-parse HEAD)"
-version="$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || echo v0.0.0)"
-version="${version#v}"
+version="$(scripts/security/release_version.sh)"
 cache="${TRIVY_CACHE_DIR:-$HOME/.cache/trivy}"
 mkdir -p "$cache"
 

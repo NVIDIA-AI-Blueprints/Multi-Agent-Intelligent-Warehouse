@@ -7,6 +7,14 @@ on:
     branches: [ main ]
   release:
     types: [ published ]
+  # Release-candidate evidence: run on the candidate commit with the version
+  # being prepared, so its SBOMs are stamped with it (docs/operations/RELEASING.md).
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: "Release version for the SBOMs, e.g. 2.1.2 (empty: tag or development version)"
+        required: false
+        type: string
 
 jobs:
   # =============================================================================
@@ -261,10 +269,12 @@ jobs:
         skip-setup-trivy: true
 
     - name: Validate SBOM
+      env:
+        MAIW_RELEASE_VERSION: ${{ inputs.release_version }}
       run: |
         python3 -m pip install --quiet "cyclonedx-python-lib[json-validation]==11.12.0"
-        version="$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || echo v0.0.0)"
-        version="${version#v}"
+        version="$(scripts/security/release_version.sh)"
+        echo "SBOM release version: ${version}"
         image_id="$(docker image inspect --format '{{.Id}}' maiw-${{ matrix.image }}:scan)"
         python3 scripts/security/validate_sbom.py sbom/maiw-${{ matrix.image }}.cdx.json \
           --artifact maiw-${{ matrix.image }} --git-sha "$GITHUB_SHA" --version "$version" \

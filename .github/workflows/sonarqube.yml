@@ -29,6 +29,9 @@ on:
       ci_run_id:
         description: "CI/CD Pipeline run whose coverage.xml to use (default: latest successful run for the selected commit)"
         required: false
+      release_version:
+        description: "projectVersion for a release candidate, e.g. 2.1.2 (empty: tag or development version)"
+        required: false
 
 permissions: {}
 
@@ -107,6 +110,7 @@ jobs:
         path: sonar-tools
         sparse-checkout: |
           scripts/security/run_sonar_scan.sh
+          scripts/security/release_version.sh
           sonar-project.properties
         sparse-checkout-cone-mode: false
         persist-credentials: false
@@ -138,6 +142,7 @@ jobs:
         MAIW_SONAR_SOURCE_DIR: source
         MAIW_SONAR_SETTINGS: sonar-tools/sonar-project.properties
         MAIW_SONAR_EVIDENCE: ${{ github.workspace }}/sonar-evidence/maiw-sonar-evidence.json
+        MAIW_RELEASE_VERSION: ${{ inputs.release_version }}
       run: sonar-tools/scripts/security/run_sonar_scan.sh
 
     - name: Summary

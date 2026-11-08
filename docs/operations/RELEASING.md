@@ -61,8 +61,11 @@ release, recorded in the notes.
   `SonarQube Analysis` run or, if CI has no NVIDIA-network runner, from
   `scripts/security/run_sonar_scan.sh` on an NVIDIA-network host (candidate
   checkout as `MAIW_SONAR_SOURCE_DIR`, with the `sonar-coverage` artifact of
-  its CI run as `coverage.xml`). Record the analysis ID, its timestamp and the
-  quality gate status from the evidence file. Exit code 0 is a passing gate;
+  its CI run as `coverage.xml`). Set `MAIW_RELEASE_VERSION` to the version
+  being released (the `release_version` input when dispatching the
+  workflow), so the analysis is recorded under that version rather than a
+  development version such as `2.1.1+16.g<sha>`. Record the analysis ID,
+  its timestamp and the quality gate status from the evidence file. Exit code 0 is a passing gate;
   5 is an analysis whose gate failed (each failing condition needs a
   disposition); 2, 3 and 4 mean no usable analysis. An analysis of a
   different commit does not count, and neither does a green CI run whose
@@ -71,9 +74,13 @@ release, recorded in the notes.
 - **nSpect (NSPECT-NJMX-9GQU).** A fresh nSpect / Pulse OSS scan of the
   candidate. Critical and high findings are fixed or carry an approved
   exception. See `docs/security/nspect-reconciliation.md`.
-- **SBOM.** The candidate's CycloneDX SBOMs (CI artifacts `sbom-<image>`, or
-  `scripts/security/generate_sbom.sh`), valid per
-  `scripts/security/validate_sbom.py`, submitted to nSpect
+- **SBOM.** The candidate's CycloneDX SBOMs, stamped with the version being
+  released: run **CI/CD Pipeline** by hand on the candidate with the
+  `release_version` input (artifacts `sbom-<image>`), or
+  `MAIW_RELEASE_VERSION=<version> scripts/security/generate_sbom.sh` from a
+  checkout of it. Check that `maiw:release_version` is the release version,
+  not a `+…` development version, and that `maiw:git_sha` is the candidate.
+  Valid per `scripts/security/validate_sbom.py`, submitted to nSpect
   (**Actions → Manage SBOM**). See `docs/security/sbom-generation.md`.
 - **Evidence manifest.** Regenerate
   `docs/security/security-evidence-manifest.json` with
