@@ -73,6 +73,12 @@ After analysis completes, the lifecycle rail advances. Each stage shows:
 
 All data comes from `analysisResult` returned by `POST /api/v1/demo/analyze`.
 
+`proposal_results` has one entry per recommendation, in order, with its
+`index`. A recommendation whose proposal cannot be built is reported there as
+`status: "error"` with a `reason`, and the remaining recommendations are still
+proposed and decided. `proposal_summary` counts recommendations, proposals,
+build errors (with their indices), executions and pending approvals.
+
 ### Step 5 — APPROVE (Human Governance)
 
 If the policy engine requires approval, an **ApprovalCard** appears showing:

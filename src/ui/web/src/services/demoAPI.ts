@@ -138,6 +138,15 @@ export interface AnalysisResult {
   trace_id: string;
   assessment: AnalysisAssessment;
   proposal_results: Array<{ status: string; capability: string; [key: string]: any }>;
+  /** Counts for the run; a build error does not stop later recommendations (#260). */
+  proposal_summary?: {
+    recommendations: number;
+    proposed: number;
+    build_errors: number;
+    build_error_indices: number[];
+    executed: number;
+    awaiting_approval: number;
+  };
   lifecycle: LifecycleRecord[];
   pre_kpis?: KPISnapshot;
   post_kpis?: KPISnapshot;
