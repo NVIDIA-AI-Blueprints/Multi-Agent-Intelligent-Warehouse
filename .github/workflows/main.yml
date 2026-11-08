@@ -511,6 +511,42 @@ jobs:
 
           echo "✅ Access point verification completed!"
 
+      # #277: the bundled Prometheus joins the dev stack's network and must
+      # scrape the API (backend:8001) and the Postgres / Redis exporters.
+      - name: "Verify: monitoring stack scrapes the API"
+        run: |
+          set -euo pipefail
+          MON=(docker compose -f deploy/compose/docker-compose.monitoring.yaml)
+          export GRAFANA_ADMIN_PASSWORD=$(python3 -c "import secrets; print(secrets.token_hex(16))")
+          echo "::add-mask::${GRAFANA_ADMIN_PASSWORD}"
+          trap '"${MON[@]}" down -v --remove-orphans' EXIT
+
+          docker network inspect compose_default >/dev/null
+          "${MON[@]}" up -d prometheus postgres-exporter redis-exporter
+
+          query() {
+            curl -sf --get http://127.0.0.1:9090/api/v1/query --data-urlencode "query=$1" \
+              | python3 -c "import json,sys; r=json.load(sys.stdin)['data']['result']; print(r[0]['value'][1] if r else 'none')"
+          }
+          for i in $(seq 1 24); do
+            api=$(query 'up{job="warehouse-api"}' || echo none)
+            pg=$(query 'pg_up' || echo none)
+            redis=$(query 'redis_up' || echo none)
+            echo "attempt $i: warehouse-api=$api pg_up=$pg redis_up=$redis"
+            if [ "$api" = 1 ] && [ "$pg" = 1 ] && [ "$redis" = 1 ]; then break; fi
+            sleep 5
+          done
+          [ "$api" = 1 ] && [ "$pg" = 1 ] && [ "$redis" = 1 ] || {
+            curl -s http://127.0.0.1:9090/api/v1/targets | python3 -m json.tool | head -80
+            "${MON[@]}" logs --tail 50
+            exit 1
+          }
+          requests=$(query 'sum(http_requests_total{job="warehouse-api"})')
+          echo "http_requests_total (scraped): $requests"
+          [ "$requests" != none ]
+          echo "milvus: up=$(query 'up{job="milvus"}' || echo none) (informational)"
+          echo "✅ Prometheus scrapes the API, PostgreSQL and Redis"
+
       # A real pytest failure fails the job.  When the internal NGC test image
       # is unavailable (no key / no org access) the step is skipped, but the
       # skip is reported as E2E=NOT_RUN in the job summary, annotations and

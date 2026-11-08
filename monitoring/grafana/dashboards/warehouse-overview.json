@@ -1,294 +1,408 @@
 {
-  "dashboard": {
-    "id": null,
-    "title": "Warehouse Operational Assistant - Overview",
-    "tags": ["warehouse", "operations", "overview"],
-    "style": "dark",
-    "timezone": "browser",
-    "panels": [
-      {
-        "id": 1,
-        "title": "System Health Status",
-        "type": "stat",
-        "targets": [
-          {
-            "expr": "up{job=\"warehouse-api\"}",
-            "legendFormat": "API Server",
-            "refId": "A"
+  "uid": "maiw-overview",
+  "title": "MAIW - Overview",
+  "tags": [
+    "maiw",
+    "api"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Service status",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 5
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          {
-            "expr": "up{job=\"postgres\"}",
-            "legendFormat": "Database",
-            "refId": "B"
+          "expr": "up{job=\"warehouse-api\"}",
+          "legendFormat": "API",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          {
-            "expr": "up{job=\"redis\"}",
-            "legendFormat": "Redis",
-            "refId": "C"
+          "expr": "pg_up",
+          "legendFormat": "PostgreSQL",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          {
-            "expr": "up{job=\"milvus\"}",
-            "legendFormat": "Milvus",
-            "refId": "D"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "color": {
-              "mode": "thresholds"
-            },
-            "thresholds": {
-              "steps": [
-                {
-                  "color": "red",
-                  "value": 0
+          "expr": "redis_up",
+          "legendFormat": "Redis",
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "up{job=\"milvus\"}",
+          "legendFormat": "Milvus",
+          "refId": "D"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN",
+                  "color": "red"
                 },
-                {
-                  "color": "green",
-                  "value": 1
+                "1": {
+                  "text": "UP",
+                  "color": "green"
                 }
-              ]
-            },
-            "mappings": [
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
               {
-                "options": {
-                  "0": {
-                    "text": "DOWN"
-                  },
-                  "1": {
-                    "text": "UP"
-                  }
-                },
-                "type": "value"
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
               }
             ]
           }
         },
-        "gridPos": {
-          "h": 8,
-          "w": 24,
-          "x": 0,
-          "y": 0
-        }
+        "overrides": []
       },
-      {
-        "id": 2,
-        "title": "API Request Rate",
-        "type": "graph",
-        "targets": [
-          {
-            "expr": "rate(http_requests_total{job=\"warehouse-api\"}[5m])",
-            "legendFormat": "{{method}} {{endpoint}}",
-            "refId": "A"
-          }
-        ],
-        "yAxes": [
-          {
-            "label": "Requests/sec",
-            "min": 0
-          }
-        ],
-        "gridPos": {
-          "h": 8,
-          "w": 12,
-          "x": 0,
-          "y": 8
-        }
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "API requests per second by route",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
       },
-      {
-        "id": 3,
-        "title": "API Response Time",
-        "type": "graph",
-        "targets": [
-          {
-            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"warehouse-api\"}[5m]))",
-            "legendFormat": "95th percentile",
-            "refId": "A"
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
           },
-          {
-            "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{job=\"warehouse-api\"}[5m]))",
-            "legendFormat": "50th percentile",
-            "refId": "B"
-          }
-        ],
-        "yAxes": [
-          {
-            "label": "Seconds",
-            "min": 0
-          }
-        ],
-        "gridPos": {
-          "h": 8,
-          "w": 12,
-          "x": 12,
-          "y": 8
+          "expr": "sum by (endpoint) (rate(http_requests_total{job=\"warehouse-api\",endpoint!=\"/api/v1/metrics\"}[5m]))",
+          "legendFormat": "{{endpoint}}",
+          "refId": "A"
         }
-      },
-      {
-        "id": 4,
-        "title": "Active Users",
-        "type": "stat",
-        "targets": [
-          {
-            "expr": "warehouse_active_users",
-            "legendFormat": "Active Users",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "color": {
-              "mode": "palette-classic"
-            },
-            "unit": "short"
-          }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
         },
-        "gridPos": {
-          "h": 4,
-          "w": 6,
-          "x": 0,
-          "y": 16
-        }
+        "overrides": []
       },
-      {
-        "id": 5,
-        "title": "Tasks Completed Today",
-        "type": "stat",
-        "targets": [
-          {
-            "expr": "increase(warehouse_tasks_completed_total[1d])",
-            "legendFormat": "Tasks Completed",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "color": {
-              "mode": "palette-classic"
-            },
-            "unit": "short"
-          }
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "gridPos": {
-          "h": 4,
-          "w": 6,
-          "x": 6,
-          "y": 16
-        }
-      },
-      {
-        "id": 6,
-        "title": "Inventory Alerts",
-        "type": "stat",
-        "targets": [
-          {
-            "expr": "warehouse_inventory_alerts_total",
-            "legendFormat": "Active Alerts",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "color": {
-              "mode": "thresholds"
-            },
-            "thresholds": {
-              "steps": [
-                {
-                  "color": "green",
-                  "value": 0
-                },
-                {
-                  "color": "yellow",
-                  "value": 5
-                },
-                {
-                  "color": "red",
-                  "value": 10
-                }
-              ]
-            }
-          }
-        },
-        "gridPos": {
-          "h": 4,
-          "w": 6,
-          "x": 12,
-          "y": 16
-        }
-      },
-      {
-        "id": 7,
-        "title": "Safety Incidents",
-        "type": "stat",
-        "targets": [
-          {
-            "expr": "warehouse_safety_incidents_total",
-            "legendFormat": "Total Incidents",
-            "refId": "A"
-          }
-        ],
-        "fieldConfig": {
-          "defaults": {
-            "color": {
-              "mode": "thresholds"
-            },
-            "thresholds": {
-              "steps": [
-                {
-                  "color": "green",
-                  "value": 0
-                },
-                {
-                  "color": "red",
-                  "value": 1
-                }
-              ]
-            }
-          }
-        },
-        "gridPos": {
-          "h": 4,
-          "w": 6,
-          "x": 18,
-          "y": 16
-        }
-      },
-      {
-        "id": 8,
-        "title": "System Resource Usage",
-        "type": "graph",
-        "targets": [
-          {
-            "expr": "100 - (avg by(instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
-            "legendFormat": "CPU Usage %",
-            "refId": "A"
-          },
-          {
-            "expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100",
-            "legendFormat": "Memory Usage %",
-            "refId": "B"
-          }
-        ],
-        "yAxes": [
-          {
-            "label": "Percentage",
-            "min": 0,
-            "max": 100
-          }
-        ],
-        "gridPos": {
-          "h": 8,
-          "w": 24,
-          "x": 0,
-          "y": 20
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
         }
       }
-    ],
-    "time": {
-      "from": "now-1h",
-      "to": "now"
     },
-    "refresh": "30s"
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "API latency",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 5,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"warehouse-api\",endpoint!=\"/api/v1/metrics\"}[5m])))",
+          "legendFormat": "p95",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"warehouse-api\",endpoint!=\"/api/v1/metrics\"}[5m])))",
+          "legendFormat": "p50",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "API responses by status",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (status) (rate(http_requests_total{job=\"warehouse-api\",endpoint!=\"/api/v1/metrics\"}[5m]))",
+          "legendFormat": "{{status}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Slowest routes (p95)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 13,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "topk(5, histogram_quantile(0.95, sum by (le, endpoint) (rate(http_request_duration_seconds_bucket{job=\"warehouse-api\",endpoint!=\"/api/v1/metrics\"}[5m]))))",
+          "legendFormat": "{{endpoint}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Host CPU and memory",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 21,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "100 - (avg by(instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+          "legendFormat": "CPU %",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100",
+          "legendFormat": "Memory %",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Database connections and Redis memory",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 21,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(pg_stat_database_numbackends)",
+          "legendFormat": "PostgreSQL connections",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "redis_memory_used_bytes / 1024 / 1024",
+          "legendFormat": "Redis memory (MiB)",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    }
+  ],
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
   }
 }

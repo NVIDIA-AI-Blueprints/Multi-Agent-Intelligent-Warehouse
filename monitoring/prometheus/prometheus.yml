@@ -11,46 +11,46 @@ alerting:
         - targets:
           - alertmanager:9093
 
+# Targets are Compose service names. Prometheus and the database exporters join
+# the dev stack's network (deploy/compose/docker-compose.dev.yaml), so they reach
+# the API and datastores directly; the dev stack binds its published ports to
+# 127.0.0.1, which a container cannot reach through the host.
 scrape_configs:
-  # Prometheus itself
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
 
-  # Warehouse Operational Assistant API
+  # MAIW API (the dev stack's `backend` service): GET /api/v1/metrics
   - job_name: 'warehouse-api'
     static_configs:
-      - targets: ['localhost:8001']
+      - targets: ['backend:8001']
     metrics_path: '/api/v1/metrics'
     scrape_interval: 10s
     scrape_timeout: 5s
 
-  # PostgreSQL Database
+  # PostgreSQL / TimescaleDB, through postgres-exporter
   - job_name: 'postgres'
     static_configs:
-      - targets: ['localhost:5435']
+      - targets: ['postgres-exporter:9187']
     scrape_interval: 30s
 
-  # Redis
+  # Redis, through redis-exporter
   - job_name: 'redis'
     static_configs:
-      - targets: ['localhost:6379']
+      - targets: ['redis-exporter:9121']
     scrape_interval: 30s
 
-  # Milvus Vector Database
+  # Milvus serves Prometheus metrics on its HTTP port
   - job_name: 'milvus'
     static_configs:
-      - targets: ['localhost:19530']
+      - targets: ['milvus:9091']
+    metrics_path: '/metrics'
     scrape_interval: 30s
 
-  # Node Exporter for system metrics
   - job_name: 'node-exporter'
     static_configs:
-      - targets: ['localhost:9100']
-    scrape_interval: 15s
+      - targets: ['node-exporter:9100']
 
-  # cAdvisor for container metrics
   - job_name: 'cadvisor'
     static_configs:
-      - targets: ['localhost:8080']
-    scrape_interval: 15s
+      - targets: ['cadvisor:8080']
