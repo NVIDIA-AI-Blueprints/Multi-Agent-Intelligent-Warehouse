@@ -20,7 +20,8 @@ docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md for the full authority graph):
                       APPROVED; 503 in profiles without governed writes)
         executions    operator-authenticated journal + reconciliation of
                       UNKNOWN writes, every profile (round 3 NEW3-P1-02)
-        operations    GET only in the shipped app (SQL task writes unmounted)
+        operations    GET only in the shipped app (SQL task writes unmounted;
+                      GET /operations/workers is the worker roster)
         safety        GET only in the shipped app (SQL incident writes unmounted)
         mcp_status, runtime_status, world, model_lab, agent_tasks,
         procedures    GET only
@@ -31,7 +32,6 @@ docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md for the full authority graph):
                       fail-closed internal token, no governance below it
 
     Legacy (src.api.routers) — mounted READ-ONLY unless listed
-        auth                       full (identity; own auth dependencies)
         document                   read-only + POST /upload (bounded inference
                                    via ModelGateway; document-workflow state)
         inventory, wms, iot, erp, scanning, attendance, migration,
@@ -43,6 +43,7 @@ docs/audits/MAIW_V2.0.1_REMEDIATION_AUDIT.md for the full authority graph):
                     (audit P1-01); use POST /api/v1/copilot/turn
         reasoning   legacy NIM client outside ModelGateway
         src.api.routers.mcp (retired; replaced by mcp_status)
+        auth        removed (#261): the blueprint has no user login
         document POST /approve|/reject — not implemented (no decision
                     recorded, no WMS integration)
 """
@@ -86,7 +87,6 @@ from maiw_api.route_policy import curated_view, read_only_view
 from src.api.routers.inference import router as inference_router
 
 # ── Legacy routers (mounted through route_policy views only) ─────────────────
-from src.api.routers.auth import router as auth_router
 from src.api.routers.inventory import router as inventory_router
 from src.api.routers.wms import router as wms_router
 from src.api.routers.iot import router as iot_router
@@ -306,9 +306,6 @@ app.include_router(procedures_router)
 
 # Bounded inference boundary (v2.0.1, audit P1-02)
 app.include_router(inference_router)
-
-# Legacy — identity management keeps its own auth dependencies.
-app.include_router(auth_router)
 
 # Legacy — document workflow. Upload runs model inference only through
 # ModelGateway (audit P1-05). /search, /validate and /analytics returned

@@ -4,17 +4,17 @@
 
 ** WARNING: These are development-only credentials. NEVER use in production!**
 
-### Authentication
-- **Username**: `admin`
-- **Password**: Set via `DEFAULT_ADMIN_PASSWORD` environment variable (default: `changeme`)
-- **Role**: `admin`
+### No user login
+The blueprint has no user accounts, passwords or sessions. The `users` table is
+the worker roster. Governed writes are gated by `MAIW_OPERATOR_WRITE_TOKEN`, and
+`POST /api/v1/inference` by `MAIW_INFERENCE_INTERNAL_TOKEN` (see below).
 
 ### Database
 - **Host**: `localhost`
 - **Port**: `5435`
 - **Database**: Set via `POSTGRES_DB` environment variable (default: `warehouse`)
 - **Username**: Set via `POSTGRES_USER` environment variable (default: `warehouse`)
-- **Password**: Set via `POSTGRES_PASSWORD` environment variable (default: `changeme`)
+- **Password**: Set via `POSTGRES_PASSWORD` environment variable (required; `.env.example` ships the placeholder `changeme`)
 
 ### Redis
 - **Host**: `localhost`
@@ -36,9 +36,8 @@
 3. **Enable database authentication**
 4. **Use environment variables for all secrets**
 5. **Enable HTTPS/TLS**
-6. **Use proper JWT secrets**
-7. **Enable Redis authentication**
-8. **Use secure database connections**
+6. **Enable Redis authentication**
+7. **Use secure database connections**
 
 ### Environment Variables
 
@@ -49,9 +48,6 @@ Create a `.env` file with production values:
 DATABASE_URL=postgresql://username:password@host:port/database
 POSTGRES_PASSWORD=your-db-password
 REDIS_PASSWORD=your-redis-password
-
-# JWT (HS256, 30-minute access tokens are fixed in code)
-JWT_SECRET_KEY=your-super-secret-jwt-key-here
 
 # NVIDIA NIMs
 NVIDIA_API_KEY=your-nvidia-api-key
@@ -68,10 +64,7 @@ See the "Secrets" table in [operations/REFERENCE_DEPLOYMENT_RUNBOOK.md](operatio
 ## Security Best Practices
 
 1. **Never commit secrets to version control**
-2. **Never hardcode password hashes in SQL files or source code**
-   - Password hashes should be generated dynamically from environment variables
-   - Use the setup script (`scripts/setup/create_default_users.py`) to create users securely
-   - The SQL schema (`data/postgres/000_schema.sql`) does not contain hardcoded credentials
+2. **Never hardcode credentials in SQL files or source code**
 3. **Use secrets management systems in production**
 4. **Rotate credentials regularly**
 5. **Use least privilege principle**
@@ -79,110 +72,3 @@ See the "Secrets" table in [operations/REFERENCE_DEPLOYMENT_RUNBOOK.md](operatio
 7. **Use secure communication protocols**
 8. **Implement proper access controls**
 9. **Regular security audits**
-
-## User Creation Security
-
-### ⚠️ Important: Never Hardcode Password Hashes
-
-**The SQL schema file (`data/postgres/000_schema.sql`) does NOT contain hardcoded password hashes or sample user data.** This is a security best practice to prevent credential exposure in source code.
-
-### Creating Users Securely
-
-Users must be created using the setup script, which:
-- Generates unique bcrypt hashes with random salts
-- Reads passwords from environment variables (never hardcoded)
-- Does not expose credentials in source code
-
-**To create default users:**
-```bash
-# Set password via environment variable
-export DEFAULT_ADMIN_PASSWORD=your-secure-password-here
-
-# Run the setup script
-python scripts/setup/create_default_users.py
-```
-
-**Environment Variables:**
-- `DEFAULT_ADMIN_PASSWORD` - Password for the admin user (default: `changeme` for development only)
-- `DEFAULT_USER_PASSWORD` - Password for regular users (default: `changeme` for development only)
-
-**For Production:**
-- Always set strong, unique passwords via environment variables
-- Never use default passwords in production
-- Consider using a secrets management system (AWS Secrets Manager, HashiCorp Vault, etc.)
-
-## JWT Secret Configuration
-
-### Development vs Production Behavior
-
-**Development Mode (default):**
-- If `JWT_SECRET_KEY` is not set or uses the placeholder value, the application will:
-  - Use a default development key
-  - Log warnings about using the default key
-  - Continue to run normally
-- This allows for easy local development without requiring secret configuration
-
-**Production Mode:**
-- Set `ENVIRONMENT=production` in your `.env` file
-- The application **requires** `JWT_SECRET_KEY` to be set with a secure value
-- If `JWT_SECRET_KEY` is not set or uses the placeholder, the application will:
-  - Log an error
-  - Exit immediately (fail to start)
-  - Prevent deployment with insecure defaults
-
-### Setting JWT_SECRET_KEY
-
-**For Development:**
-```bash
-# Optional - application will use default if not set
-JWT_SECRET_KEY=dev-secret-key-change-in-production-not-for-production-use
-```
-
-**For Production (REQUIRED):**
-```bash
-# Generate a strong random secret (minimum 32 bytes/characters, recommended 64+)
-# The application validates key strength to prevent weak encryption (CVE-2025-45768)
-JWT_SECRET_KEY=your-super-secret-jwt-key-here-must-be-at-least-32-characters-long
-ENVIRONMENT=production
-```
-
-**Generating a Secure Secret:**
-```bash
-# Using OpenSSL (generates 32 bytes = 64 hex characters)
-openssl rand -hex 32
-
-# Using Python (recommended: 64 bytes for better security)
-python -c "import secrets; print(secrets.token_urlsafe(64))"
-
-# Minimum length (32 bytes = 43 base64 characters)
-python -c "import secrets; print(secrets.token_urlsafe(32))"
-```
-
-### JWT Secret Key Requirements
-
-**Minimum Requirements (HS256 algorithm):**
-- **Minimum length**: 32 bytes (256 bits) - Required by RFC 7518 Section 3.2
-- **Recommended length**: 64+ bytes (512+ bits) - For better security
-- **Validation**: The application automatically validates key strength at startup
-- **Production**: Weak keys are rejected in production mode
-
-**Security Standards Compliance:**
-- RFC 7518 Section 3.2 (JWS HMAC SHA-2 Algorithms)
-- NIST SP800-117 (Key Management)
-- Addresses CVE-2025-45768 (PyJWT weak encryption vulnerability)
-
-### JWT Secret Example
-
-**Sample JWT secret (change in production):**
-```
-your-super-secret-jwt-key-here-must-be-at-least-32-characters-long
-```
-
-**⚠️ This is a sample only - change in production!**
-
-**Security Note:** 
-- The JWT secret key is critical for security. Never commit it to version control.
-- Use a secrets management system in production.
-- Rotate keys regularly.
-- The application enforces minimum key length to prevent weak encryption vulnerabilities.
-- Keys shorter than 32 bytes will be rejected in production.

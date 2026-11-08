@@ -40,13 +40,24 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def postgres_password() -> str:
+    """Return POSTGRES_PASSWORD, or exit with a clear message when it is unset."""
+    password = os.getenv("POSTGRES_PASSWORD")
+    if not password:
+        raise SystemExit(
+            "POSTGRES_PASSWORD is not set. Set it in .env or the environment "
+            "to the password of the warehouse database."
+        )
+    return password
+
+
 async def generate_telemetry_data():
     """Generate sample telemetry data for equipment."""
     conn = await asyncpg.connect(
         host=os.getenv("PGHOST", "localhost"),
         port=int(os.getenv("PGPORT", "5435")),
         user=os.getenv("POSTGRES_USER", "warehouse"),
-        password=os.getenv("POSTGRES_PASSWORD", "changeme"),
+        password=postgres_password(),
         database=os.getenv("POSTGRES_DB", "warehouse"),
     )
 

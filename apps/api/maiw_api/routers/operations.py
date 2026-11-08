@@ -78,6 +78,15 @@ class WorkforceStatus(BaseModel):
     tasks_pending: int
 
 
+class Worker(BaseModel):
+    """One active worker from the roster (the ``users`` table)."""
+
+    id: int
+    username: str
+    full_name: str
+    role: str
+
+
 def _parse_payload(raw) -> dict:
     if isinstance(raw, dict):
         return raw
@@ -252,3 +261,26 @@ async def get_workforce_status():
         raise HTTPException(
             status_code=500, detail="Failed to retrieve workforce status"
         )
+
+
+@router.get("/operations/workers", response_model=List[Worker])
+async def get_workers():
+    """List active workers for assignment and reporting dropdowns.
+
+    The ``users`` table is the worker roster read by the labor tools and by
+    ``/operations/workforce``. The blueprint has no login, so this returns only
+    the roster fields.
+    """
+    try:
+        sql = _get_sql()
+        await sql.initialize()
+        rows = await sql.fetch_all("""
+            SELECT id, username, full_name, role::text AS role
+            FROM users
+            WHERE status::text = 'active'
+            ORDER BY full_name, username
+            """)
+        return [Worker(**row) for row in rows]
+    except Exception as exc:
+        logger.error("Failed to get workers: %s", exc)
+        raise HTTPException(status_code=500, detail="Failed to retrieve workers")

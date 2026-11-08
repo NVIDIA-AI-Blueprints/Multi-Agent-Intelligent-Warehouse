@@ -1,7 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Box } from '@mui/material';
-import { AuthProvider } from './contexts/AuthContext';
 import Layout from './components/Layout';
 import ChatInterfaceNew from './pages/ChatInterfaceNew';
 import Equipment from './pages/EquipmentNew';
@@ -31,49 +30,47 @@ import DeploymentSecurity from './pages/DeploymentSecurity';
 
 function App() {
   return (
-    <AuthProvider>
-      <Box sx={{ display: 'flex', minHeight: '100vh', width: '100%' }}>
-        <Routes>
-          <Route
-            path="/*"
-            element={
-              <Layout>
-                <Routes>
-                  <Route path="/command" element={<CommandCenter />} />
-                  <Route path="/demo" element={<DemoShell />} />
-                  <Route path="/state" element={<WarehouseStatePage />} />
-                  <Route path="/decisions" element={<DecisionCenter />} />
-                  <Route path="/models" element={<ModelGateway />} />
-                  <Route path="/models/lab" element={<ModelGatewayLab />} />
-                  <Route path="/world" element={<WorldShell />} />
-                  <Route path="/capabilities" element={<CapabilityPlane />} />
-                  <Route path="/activity" element={<ActivityFeed />} />
-                  <Route path="/health" element={<SystemHealth />} />
-                  <Route path="/deployment" element={<DeploymentSecurity />} />
-                  <Route path="/chat" element={<ChatInterfaceNew />} />
-                  <Route path="/equipment" element={<Equipment />} />
-                  <Route path="/forecasting" element={<Forecasting />} />
-                  <Route path="/operations" element={<Operations />} />
-                  <Route path="/safety" element={<Safety />} />
-                  <Route path="/documents" element={<DocumentExtraction />} />
-                  <Route path="/analytics" element={<Analytics />} />
-                  <Route path="/documentation" element={<Documentation />} />
-                  <Route path="/documentation/mcp-integration" element={<MCPIntegrationGuide />} />
-                  <Route path="/documentation/api-reference" element={<APIReference />} />
-                  <Route path="/documentation/deployment" element={<DeploymentGuide />} />
-                  <Route path="/documentation/architecture" element={<ArchitectureDiagrams />} />
-                  <Route path="/mcp-test" element={<MCPTest />} />
-                  <Route path="/" element={<Navigate to="/demo" replace />} />
-                  <Route path="/login" element={<Navigate to="/demo" replace />} />
-                  <Route path="*" element={<Navigate to="/demo" replace />} />
-                </Routes>
-              </Layout>
-            }
-          />
-        </Routes>
-        <VersionFooter />
-      </Box>
-    </AuthProvider>
+    <Box sx={{ display: 'flex', minHeight: '100vh', width: '100%' }}>
+      <Routes>
+        <Route
+          path="/*"
+          element={
+            <Layout>
+              <Routes>
+                <Route path="/command" element={<CommandCenter />} />
+                <Route path="/demo" element={<DemoShell />} />
+                <Route path="/state" element={<WarehouseStatePage />} />
+                <Route path="/decisions" element={<DecisionCenter />} />
+                <Route path="/models" element={<ModelGateway />} />
+                <Route path="/models/lab" element={<ModelGatewayLab />} />
+                <Route path="/world" element={<WorldShell />} />
+                <Route path="/capabilities" element={<CapabilityPlane />} />
+                <Route path="/activity" element={<ActivityFeed />} />
+                <Route path="/health" element={<SystemHealth />} />
+                <Route path="/deployment" element={<DeploymentSecurity />} />
+                <Route path="/chat" element={<ChatInterfaceNew />} />
+                <Route path="/equipment" element={<Equipment />} />
+                <Route path="/forecasting" element={<Forecasting />} />
+                <Route path="/operations" element={<Operations />} />
+                <Route path="/safety" element={<Safety />} />
+                <Route path="/documents" element={<DocumentExtraction />} />
+                <Route path="/analytics" element={<Analytics />} />
+                <Route path="/documentation" element={<Documentation />} />
+                <Route path="/documentation/mcp-integration" element={<MCPIntegrationGuide />} />
+                <Route path="/documentation/api-reference" element={<APIReference />} />
+                <Route path="/documentation/deployment" element={<DeploymentGuide />} />
+                <Route path="/documentation/architecture" element={<ArchitectureDiagrams />} />
+                <Route path="/mcp-test" element={<MCPTest />} />
+                <Route path="/" element={<Navigate to="/demo" replace />} />
+                <Route path="/login" element={<Navigate to="/demo" replace />} />
+                <Route path="*" element={<Navigate to="/demo" replace />} />
+              </Routes>
+            </Layout>
+          }
+        />
+      </Routes>
+      <VersionFooter />
+    </Box>
   );
 }
 

@@ -29,7 +29,6 @@ import {
 } from '@mui/icons-material';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { chatAPI, healthAPI, operationsAPI, ReasoningChain, ReasoningStep } from '../services/api';
-import { useAuth } from '../contexts/AuthContext';
 import TopBar from '../components/chat/TopBar';
 import LeftRail from '../components/chat/LeftRail';
 import MessageBubble from '../components/chat/MessageBubble';
@@ -84,7 +83,6 @@ interface StreamingEvent {
 }
 
 const ChatInterfaceNew: React.FC = () => {
-  const { isAuthenticated } = useAuth();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -131,21 +129,8 @@ const ChatInterfaceNew: React.FC = () => {
   const [warehouse, setWarehouse] = useState(process.env.REACT_APP_WAREHOUSE_ID || 'WH-01');
   const [environment, setEnvironment] = useState(process.env.NODE_ENV === 'production' ? 'Prod' : 'Dev');
   
-  // Get user role from auth context if available
-  const getUserRole = () => {
-    try {
-      const token = localStorage.getItem('auth_token');
-      if (token) {
-        // In a real app, decode JWT to get role
-        // For now, default to manager
-        return 'manager';
-      }
-      return 'guest';
-    } catch {
-      return 'guest';
-    }
-  };
-  const [role, setRole] = useState(getUserRole());
+  // The blueprint has no login; the role is chosen in the top bar.
+  const [role, setRole] = useState('guest');
   
   // Connection status - check health endpoints
   const { data: healthStatus } = useQuery({
@@ -490,16 +475,6 @@ const ChatInterfaceNew: React.FC = () => {
     inputRef.current?.focus();
   };
 
-
-  if (!isAuthenticated) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-        <Typography variant="h6" sx={{ color: '#ffffff' }}>
-          Please log in to access the chat interface.
-        </Typography>
-      </Box>
-    );
-  }
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'background.default' }}>

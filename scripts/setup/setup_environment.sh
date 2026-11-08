@@ -156,7 +156,6 @@ echo "📝 Next steps:"
 echo "   1. Activate the virtual environment: source env/bin/activate"
 echo "   2. Set up environment variables (copy .env.example to .env and configure)"
 echo "   3. Run database migrations: ./scripts/setup/run_migrations.sh"
-echo "   4. Create default users: python scripts/setup/create_default_users.py"
-echo "   5. Start the server: ./scripts/start_server.sh"
+echo "   4. Start the server: ./scripts/start_server.sh"
 echo ""
 

@@ -98,72 +98,17 @@ if (process.env.NODE_ENV === 'development') {
   console.log('[API Config] Using proxy middleware for /api/* requests');
 }
 
-// Request interceptor
-api.interceptors.request.use(
-  (config) => {
-    // Add auth token if available
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
 // Response interceptor
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const status = error.response?.status;
     const url = error.config?.url || '';
     
     // Suppress error logging for version endpoint - it's non-critical
     // Still reject the promise so calling code can handle it, but don't log
     const isVersionEndpoint = url.includes('/version');
     
-    // 403 (Forbidden) = authenticated but not authorized - never redirect to login
-    if (status === 403) {
-      // Let the component handle permission errors gracefully
-      if (!isVersionEndpoint) {
-        console.error('API Error:', error.response?.status, error.response?.data);
-      }
-      return Promise.reject(error);
-    }
-    
-    // 401 (Unauthorized) handling - only redirect if token is truly invalid
-    if (status === 401) {
-      // Don't redirect for endpoints that handle their own auth errors gracefully
-      const isOptionalEndpoint = url.includes('/auth/users') || url.includes('/auth/me') || url.includes('/login');
-      
-      // Check if request had auth token - if yes, token is likely invalid/expired
-      const hasAuthHeader = error.config?.headers?.Authorization;
-      const token = localStorage.getItem('auth_token');
-      
-      // Only redirect if:
-      // 1. We have a token in localStorage (user thinks they're logged in)
-      // 2. Request included auth header (token was sent)
-      // 3. It's not an optional endpoint that handles its own errors
-      // 4. We're not already on login page
-      if (token && hasAuthHeader && !isOptionalEndpoint && window.location.pathname !== '/login') {
-        // Token exists but request failed with 401 - token is invalid/expired
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user_info');
-        window.location.href = '/login';
-      }
-      // For /auth/me, /auth/users, and /login, let the calling component handle the error gracefully
-      // For other cases (no token, optional endpoints), let component handle it
-      
-      // Log 401 errors for non-version endpoints (login errors should be handled by login component)
-      if (!isVersionEndpoint && !url.includes('/login')) {
-        console.error('API Error:', error.response?.status, error.response?.data);
-      }
-      return Promise.reject(error);
-    }
-    
-    // For other errors (network errors, etc.), log them normally (but not for version endpoint)
+    // Log every error except for the version endpoint
     if (!isVersionEndpoint) {
       if (error.response) {
         // Server responded with error status
@@ -637,32 +582,21 @@ export interface User {
 }
 
 export const userAPI = {
+  /** Active workers from the roster (GET /operations/workers). The blueprint has no login. */
   getUsers: async (): Promise<User[]> => {
     try {
-      // Try public endpoint first (for dropdowns)
-      const response = await api.get('/auth/users/public');
-      // Map the public response to User format
-      return response.data.map((user: any) => ({
-        id: user.id,
-        username: user.username,
-        full_name: user.full_name,
-        role: user.role,
-        email: '', // Not included in public endpoint
+      const response = await api.get('/operations/workers');
+      return response.data.map((worker: any) => ({
+        id: worker.id,
+        username: worker.username,
+        full_name: worker.full_name,
+        role: worker.role,
+        email: '',
         status: 'active',
-        created_at: '',
-        updated_at: '',
-        last_login: null,
       }));
     } catch (error) {
-      // Fallback to admin endpoint if public fails
-      try {
-        const response = await api.get('/auth/users');
-        return response.data;
-      } catch (adminError) {
-        // If both fail, return empty array
-        console.warn('Could not fetch users:', error);
-        return [];
-      }
+      console.warn('Could not fetch workers:', error);
+      return [];
     }
   },
 };

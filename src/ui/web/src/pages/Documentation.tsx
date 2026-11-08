@@ -204,8 +204,8 @@ const Documentation: React.FC = () => {
       icon: <SecurityIcon />
     },
     {
-      name: "Security & RBAC",
-      description: "JWT authentication with 5 user roles",
+      name: "Security",
+      description: "Operator write token for governed writes; no user login",
       status: "✅ Production Ready",
       icon: <SecurityIcon />
     }
@@ -445,7 +445,7 @@ const Documentation: React.FC = () => {
                 <ListItem sx={{ py: 0 }}>
                   <ListItemText 
                     primary="User Interaction Layer" 
-                    secondary="Frontend (Port 3001), API Gateway (Port 8001), Security (JWT, RBAC), MCP Integration Layer"
+                    secondary="Frontend (Port 3001), API Gateway (Port 8001), Security (operator write token, rate limiting), MCP Integration Layer"
                   />
                 </ListItem>
                 <ListItem sx={{ py: 0 }}>
@@ -1304,7 +1304,7 @@ const Documentation: React.FC = () => {
                 • Real-time equipment telemetry and monitoring<br/>
                 • Automated reorder recommendations with AI-powered insights<br/>
                 • <strong>Chat System Optimizations (Dec 2024):</strong> Query caching, request deduplication, semantic routing, parallel tool execution, performance monitoring<br/>
-                • Complete security stack with JWT authentication + RBAC (5 user roles)<br/>
+                • Governed writes behind an operator write token (no user login)<br/>
                 • Comprehensive monitoring with Prometheus/Grafana<br/>
                 • React frontend with Material-UI, message pagination, and real-time interfaces
               </Typography>

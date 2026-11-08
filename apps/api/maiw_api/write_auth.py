@@ -31,10 +31,9 @@ ActionExecutor or MCP call:
     (unset, < 32 chars, the .env.example placeholder, or equal to the
     inference token)
 
-A missing header is 403 rather than 401 so that a logged-in UI session (JWT in
-``Authorization``) is told "not authorised for operational writes" instead of
-being logged out by the UI's 401 handler.  A JWT alone never authorises an
-operational write.
+A missing header is 403 ("not authorised for operational writes") rather than
+401.  The blueprint has no user login (#261), so no other credential can stand
+in for this one.
 
 ``require_governed_writes_offered`` then refuses (503
 GOVERNED_WRITES_NOT_OFFERED) in a profile that does not offer governed writes,

@@ -71,11 +71,11 @@ const ArchitectureDiagrams: React.FC = () => {
     },
     {
       name: "API Gateway",
-      description: "FastAPI-based API gateway with authentication and routing",
-      technologies: ["FastAPI", "Python", "JWT", "OpenAPI"],
+      description: "FastAPI-based API gateway with write control and routing",
+      technologies: ["FastAPI", "Python", "OpenAPI"],
       responsibilities: [
         "Request routing and load balancing",
-        "Authentication and authorization",
+        "Operator write-token checks on governed writes",
         "API documentation (Swagger)",
         "Rate limiting and throttling",
         "Request/response validation",
@@ -194,9 +194,9 @@ const ArchitectureDiagrams: React.FC = () => {
     {
       step: 2,
       title: "API Gateway Processing",
-      description: "FastAPI gateway handles authentication and routing",
-      components: ["FastAPI", "JWT Validation", "Rate Limiting"],
-      details: "Gateway validates JWT token, applies rate limiting, and routes request to appropriate service"
+      description: "FastAPI gateway handles write control and routing",
+      components: ["FastAPI", "Operator Write Token", "Rate Limiting"],
+      details: "Gateway applies rate limiting, checks the operator write token on governed writes, and routes the request to the appropriate service"
     },
     {
       step: 3,

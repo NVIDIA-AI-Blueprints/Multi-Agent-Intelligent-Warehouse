@@ -222,7 +222,6 @@ required = [
     'generate_demo_data',
     'start_backend',
     'setup_database',
-    'create_default_users'
 ]
 
 missing = [f for f in required if f'def {f}(' not in source]

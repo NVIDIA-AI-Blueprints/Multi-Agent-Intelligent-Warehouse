@@ -1,6 +1,6 @@
 name: Multi-Agent-Intelligent-Warehouse deployment test
 
-# This workflow strictly follows the 13-step deployment procedure from DEPLOYMENT.md:
+# This workflow strictly follows the 12-step deployment procedure from DEPLOYMENT.md:
 # 1. Clone repository
 # 2. Verify Node.js version (check_node_version.sh)
 # 3. Setup environment (setup_environment.sh)
@@ -8,12 +8,11 @@ name: Multi-Agent-Intelligent-Warehouse deployment test
 # 5. Start infrastructure services (dev_up.sh)
 # 6. Wait for wosa-llm-nim (GET /v1/health/ready on :8000, up to 20 min, every 2 min)
 # 7. Run database migrations (5 SQL files via Docker Compose)
-# 8. Create default users (create_default_users.py)
-# 9. Generate demo data (quick_demo_data.py)
-# 10. Generate historical demand data (generate_historical_demand.py)
-# 11. (Optional) Install RAPIDS GPU acceleration (install_rapids.sh)
-# 12. Start API server (start_server.sh)
-# 13. Start frontend (npm install + npm start)
+# 8. Generate demo data (quick_demo_data.py)
+# 9. Generate historical demand data (generate_historical_demand.py)
+# 10. (Optional) Install RAPIDS GPU acceleration (install_rapids.sh)
+# 11. Start API server (start_server.sh)
+# 12. Start frontend (npm install + npm start)
 #
 # Post-deployment verification:
 # - Health checks: /health, /api/v1/health, /api/v1/health/simple
@@ -275,18 +274,8 @@ jobs:
 
           echo "✅ All 5 migrations completed"
 
-      # Step 8: Create default users
-      - name: "Step 8: Create default users"
-        run: |
-          source env/bin/activate
-          set -a && source deploy/compose/.env && set +a
-
-          echo "Running create_default_users.py..."
-          python scripts/setup/create_default_users.py
-          echo "✅ Default users created"
-
-      # Step 9: Generate demo data (optional but recommended)
-      - name: "Step 9: Generate demo data"
+      # Step 8: Generate demo data (optional but recommended)
+      - name: "Step 8: Generate demo data"
         run: |
           source env/bin/activate
           set -a && source deploy/compose/.env && set +a
@@ -295,8 +284,8 @@ jobs:
           python scripts/data/quick_demo_data.py
           echo "✅ Demo data generated"
 
-      # Step 10: Generate historical demand data for forecasting (optional, required for Forecasting page)
-      - name: "Step 10: Generate historical demand data"
+      # Step 9: Generate historical demand data for forecasting (optional, required for Forecasting page)
+      - name: "Step 9: Generate historical demand data"
         run: |
           source env/bin/activate
           set -a && source deploy/compose/.env && set +a
@@ -305,8 +294,8 @@ jobs:
           python scripts/data/generate_historical_demand.py || echo "⚠️ Historical demand generation failed (non-blocking)"
           echo "✅ Historical demand data generated"
 
-      # Step 11: (Optional) Install RAPIDS GPU acceleration
-      - name: "Step 11: (Optional) Install RAPIDS GPU acceleration"
+      # Step 10: (Optional) Install RAPIDS GPU acceleration
+      - name: "Step 10: (Optional) Install RAPIDS GPU acceleration"
         run: |
           source env/bin/activate
 
@@ -320,8 +309,8 @@ jobs:
 
           echo "✅ RAPIDS GPU acceleration setup completed"
 
-      # Step 12: Start API server
-      - name: "Step 12: Start API server"
+      # Step 11: Start API server
+      - name: "Step 11: Start API server"
         run: |
           source env/bin/activate
           set -a && source deploy/compose/.env && set +a
@@ -344,8 +333,8 @@ jobs:
           fi
           echo "✅ API server ready"
 
-      # Step 13: Start frontend
-      - name: "Step 13: Start frontend"
+      # Step 12: Start frontend
+      - name: "Step 12: Start frontend"
         run: |
           echo "Starting frontend..."
           cd src/ui/web

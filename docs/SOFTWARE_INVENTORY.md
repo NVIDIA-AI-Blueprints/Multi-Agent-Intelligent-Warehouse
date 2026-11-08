@@ -2,7 +2,7 @@
 
 This document lists all third-party software packages used in this project, including their versions, licenses, authors, and sources.
 
-> **Dated snapshot** — generated on 2025-12-20 and not regenerated since (the generator script is no longer in the repository). Versions are the minimum versions declared at that time, with only the aiohttp, bcrypt, paho-mqtt, pymodbus, langgraph and starlette floors and the PyMuPDF, passlib and langchain removals corrected since; the authoritative dependency lists are `requirements.txt`, `requirements.docker.txt`, `pyproject.toml`, `packages/*/pyproject.toml`, `apps/api/pyproject.toml`, the root `package.json` and `src/ui/web/package.json`.
+> **Dated snapshot** — generated on 2025-12-20 and not regenerated since (the generator script is no longer in the repository). Versions are the minimum versions declared at that time, with only the aiohttp, paho-mqtt, pymodbus, langgraph and starlette floors and the PyMuPDF, passlib, langchain, PyJWT, python-jose, bcrypt and email-validator removals corrected since; the authoritative dependency lists are `requirements.txt`, `requirements.docker.txt`, `pyproject.toml`, `packages/*/pyproject.toml`, `apps/api/pyproject.toml`, the root `package.json` and `src/ui/web/package.json`.
 
 **Last Updated:** 2025-12-20
 
@@ -15,10 +15,8 @@ The snapshot was built from `requirements.txt`, `requirements.docker.txt`, `scri
 | aiohttp | 3.14.5 | Apache 2 | https://github.com/aio-libs/aiohttp | N/A | PyPI | pip | https://pypi.org/project/aiohttp/ |
 | asyncpg | 0.29.0 | Apache License, Version 2.0 | https://pypi.org/project/asyncpg/ | MagicStack Inc <hello@magic.io> | PyPI | pip | https://pypi.org/project/asyncpg/ |
 | bacpypes3 | 0.0.100 | MIT | https://github.com/JoelBender/bacpypes3 | Joel Bender <joel@carrickbender.com> | PyPI | pip | https://pypi.org/project/bacpypes3/ |
-| bcrypt | 5.0.0 | Apache License, Version 2.0 | https://github.com/pyca/bcrypt/ | The Python Cryptographic Authority developers <cryptography-dev@python.org> | PyPI | pip | https://pypi.org/project/bcrypt/ |
 | black | 23.0.0 | N/A | https://pypi.org/project/black/ | N/A | PyPI | pip | https://pypi.org/project/black/ |
 | click | 8.0.0 | BSD-3-Clause | https://palletsprojects.com/p/click/ | Armin Ronacher <armin.ronacher@active-4.com> | PyPI | pip | https://pypi.org/project/click/ |
-| email-validator | 2.0.0 | CC0 (copyright waived) | https://github.com/JoshData/python-email-validator | Joshua Tauberer <jt@occams.info> | PyPI | pip | https://pypi.org/project/email-validator/ |
 | Faker | 19.0.0 | MIT License | https://github.com/joke2k/faker | joke2k <joke2k@gmail.com> | PyPI | pip | https://pypi.org/project/faker/ |
 | fastapi | 0.120.0 | MIT License | https://pypi.org/project/fastapi/ | Sebastián Ramírez <tiangolo@gmail.com> | PyPI | pip | https://pypi.org/project/fastapi/ |
 | flake8 | 6.0.0 | MIT | https://github.com/pycqa/flake8 | Tarek Ziade <tarek@ziade.org> | PyPI | pip | https://pypi.org/project/flake8/ |
@@ -38,7 +36,6 @@ The snapshot was built from `requirements.txt`, `requirements.docker.txt`, `scri
 | psutil | 5.9.0 | BSD | https://github.com/giampaolo/psutil | Giampaolo Rodola <g.rodola@gmail.com> | PyPI | pip | https://pypi.org/project/psutil/ |
 | psycopg | 3.1 | GNU Lesser General Public License v3 (LGPLv3) | https://psycopg.org/psycopg3/ | Daniele Varrazzo <daniele.varrazzo@gmail.com> | PyPI | pip | https://pypi.org/project/psycopg/ |
 | pydantic | 2.7.0 | MIT License | https://pypi.org/project/pydantic/ | Samuel Colvin <s@muelcolvin.com>, Eric Jolibois <em.jolibois@gmail.com>, Hasan Ramezani <hasan.r67@gmail.com>, Adrian Garcia Badaracco <1755071+adr... | PyPI | pip | https://pypi.org/project/pydantic/ |
-| PyJWT | 2.8.0 | MIT | https://github.com/jpadilla/pyjwt | Jose Padilla <hello@jpadilla.com> | PyPI | pip | https://pypi.org/project/PyJWT/ |
 | pymilvus | 2.3.0 | Apache Software License | https://pypi.org/project/pymilvus/ | Milvus Team <milvus-team@zilliz.com> | PyPI | pip | https://pypi.org/project/pymilvus/ |
 | pymodbus | 3.16.1 | BSD-3-Clause | https://github.com/riptideio/pymodbus/ | attr: pymodbus.__author__ | PyPI | pip | https://pypi.org/project/pymodbus/ |
 | pyserial | 3.5 | BSD | https://github.com/pyserial/pyserial | Chris Liechti <cliechti@gmx.net> | PyPI | pip | https://pypi.org/project/pyserial/ |
@@ -46,7 +43,6 @@ The snapshot was built from `requirements.txt`, `requirements.docker.txt`, `scri
 | pytest-asyncio | 0.21.0 | Apache 2.0 | https://github.com/pytest-dev/pytest-asyncio | Tin Tvrtković <tinchester@gmail.com> <tinchester@gmail.com> | PyPI | pip | https://pypi.org/project/pytest-asyncio/ |
 | pytest-cov | 4.1.0 | MIT | https://github.com/pytest-dev/pytest-cov | Marc Schlaich <marc.schlaich@gmail.com> | PyPI | pip | https://pypi.org/project/pytest-cov/ |
 | python-dotenv | 1.0.0 | BSD-3-Clause | https://github.com/theskumar/python-dotenv | Saurabh Kumar <me+github@saurabh-kumar.com> | PyPI | pip | https://pypi.org/project/python-dotenv/ |
-| python-jose | 3.3.0 | MIT | http://github.com/mpdavis/python-jose | Michael Davis <mike.philip.davis@gmail.com> | PyPI | pip | https://pypi.org/project/python-jose/ |
 | python-multipart | 0.0.21 | Apache Software License | https://pypi.org/project/python-multipart/ | Andrew Dunham <andrew@du.nham.ca>, Marcelo Trylesinski <marcelotryle@gmail.com> | PyPI | pip | https://pypi.org/project/python-multipart/ |
 | PyYAML | 6.0 | MIT | https://pyyaml.org/ | Kirill Simonov <xi@resolvent.net> | PyPI | pip | https://pypi.org/project/PyYAML/ |
 | redis | 5.0.0 | MIT | https://github.com/redis/redis-py | Redis Inc. <oss@redis.com> | PyPI | pip | https://pypi.org/project/redis/ |

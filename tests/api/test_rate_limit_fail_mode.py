@@ -30,7 +30,7 @@ from tests.api.canonical_harness import (
 
 class _Req:
     client = type("C", (), {"host": "10.0.0.7"})()
-    url = type("U", (), {"path": "/api/v1/auth/login"})()
+    url = type("U", (), {"path": "/api/v1/document/upload"})()
 
 
 async def _boom(self, *a, **kw):
@@ -143,7 +143,7 @@ async def test_redis_backend_failure_follows_fail_mode(monkeypatch, mode, allowe
 async def test_limiters_own_429_propagates_in_every_mode(monkeypatch, mode):
     monkeypatch.setenv("RATE_LIMIT_FAIL_MODE", mode)
     limiter = RateLimiter()  # in-memory
-    for _ in range(5):
+    for _ in range(10):
         assert await limiter.check_rate_limit(_Req()) is True
     with pytest.raises(HTTPException) as info:
         await limiter.check_rate_limit(_Req())
@@ -203,17 +203,14 @@ async def test_app_closed_mode_still_answers_real_429(canonical, monkeypatch):
     monkeypatch.setenv("RATE_LIMIT_FAIL_MODE", "closed")
     async with running_canonical_app() as (_, client):
         responses = [
-            await client.post(
-                "/api/v1/auth/login", json={"username": "x", "password": "y"}
-            )
-            for _ in range(7)
+            await client.post("/api/v1/document/upload", json={}) for _ in range(12)
         ]
     codes = [r.status_code for r in responses]
-    assert 429 not in codes[:5], codes
-    assert codes[5:] == [429, 429], codes
-    assert responses[5].json()["detail"].startswith("Rate limit exceeded")
-    # The login endpoint itself may answer 503 (no database in CORE CI), but
-    # never the limiter: a healthy limiter does not trip the closed mode.
+    assert 429 not in codes[:10], codes
+    assert codes[10:] == [429, 429], codes
+    assert responses[10].json()["detail"].startswith("Rate limit exceeded")
+    # The upload endpoint itself rejects the empty body (422), but never the
+    # limiter: a healthy limiter does not trip the closed mode.
     assert all(
         r.json().get("code") != "RATE_LIMITER_UNAVAILABLE" for r in responses
     ), codes

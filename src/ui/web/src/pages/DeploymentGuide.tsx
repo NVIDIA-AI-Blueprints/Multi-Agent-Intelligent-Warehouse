@@ -444,8 +444,8 @@ const DeploymentGuide: React.FC = () => {
                   <List>
                     <ListItem>
                       <ListItemText 
-                        primary="JWT Token Configuration" 
-                        secondary="Set secure JWT secret and expiration times"
+                        primary="Operator Write Token" 
+                        secondary="Set MAIW_OPERATOR_WRITE_TOKEN (32+ characters) to enable governed writes; the blueprint has no user login"
                       />
                     </ListItem>
                     <ListItem>

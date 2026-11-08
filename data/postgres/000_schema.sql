@@ -44,7 +44,8 @@ BEGIN
   END IF;
 END $$;
 
--- User authentication and authorization tables
+-- Worker roster, read by the labor tools and /api/v1/operations/workers.
+-- The blueprint has no user login, so there are no passwords or sessions.
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   username TEXT UNIQUE NOT NULL,
@@ -52,21 +53,14 @@ CREATE TABLE IF NOT EXISTS users (
   full_name TEXT NOT NULL,
   role user_role NOT NULL,
   status user_status NOT NULL DEFAULT 'active',
-  hashed_password TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now(),
   last_login TIMESTAMPTZ
 );
 
--- User sessions for token management
-CREATE TABLE IF NOT EXISTS user_sessions (
-  id SERIAL PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  refresh_token_hash TEXT NOT NULL,
-  expires_at TIMESTAMPTZ NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  is_revoked BOOLEAN DEFAULT FALSE
-);
+-- Databases created before the login system was removed (#261).
+ALTER TABLE users DROP COLUMN IF EXISTS hashed_password;
+DROP TABLE IF EXISTS user_sessions;
 
 -- Audit log for user actions
 CREATE TABLE IF NOT EXISTS audit_log (
@@ -120,15 +114,5 @@ ON CONFLICT (sku) DO UPDATE SET
   reorder_point = EXCLUDED.reorder_point,
   updated_at = now();
 
--- Sample users should be created using the setup script: scripts/setup/create_default_users.py
--- This script properly generates password hashes from environment variables and does not expose
--- sensitive credentials in source code. Never hardcode password hashes in SQL files.
---
--- To create default users, run:
---   python scripts/setup/create_default_users.py
---
--- The script uses the following environment variables:
---   - DEFAULT_ADMIN_PASSWORD: Password for the admin user (default: 'changeme')
---   - DEFAULT_USER_PASSWORD: Password for regular users (default: 'changeme')
---
--- For production deployments, always set strong passwords via environment variables.
+-- Demo workers are created by scripts/data/quick_demo_data.py and
+-- scripts/data/generate_synthetic_data.py.

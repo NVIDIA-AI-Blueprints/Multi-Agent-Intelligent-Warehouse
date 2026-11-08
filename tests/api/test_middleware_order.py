@@ -87,8 +87,8 @@ async def test_rate_limit_429_is_readable_by_an_allowed_origin(canonical):
     async with running_canonical_app() as (_, client):
         for _ in range(12):
             resp = await client.post(
-                "/api/v1/auth/login",
-                json={"username": "x", "password": "y"},
+                "/api/v1/document/upload",
+                json={},
                 headers={"origin": ALLOWED},
             )
             if resp.status_code == 429:

@@ -168,11 +168,11 @@ python generate_historical_demand.py
 
 ### Data Types Generated
 
-#### 👥 Users
-- **Roles**: admin, manager, supervisor, operator, viewer
+#### 👥 Workers
+- **Roles**: manager, supervisor, operator, viewer
 - **Realistic Names**: Generated using Faker library
-- **Authentication**: Properly hashed passwords (set via `DEFAULT_ADMIN_PASSWORD` env var)
-- **Activity**: Last login times and session data
+- **No logins**: the blueprint has no user login; the `users` table is the worker roster
+- **Activity**: Last-seen times
 
 #### Inventory Items
 - **SKUs**: Realistic product codes (SKU001, SKU002, etc.) or Frito-Lay product codes (LAY001, DOR001, etc.)
@@ -294,36 +294,13 @@ Starts the full Docker Compose dev stack (`deploy/compose/docker-compose.dev.yam
 
 ### Database Setup
 
-**Script:** `scripts/setup/create_default_users.py`
-
-Creates default users with proper password hashing. This script:
-- Generates unique bcrypt password hashes with random salts
-- Reads passwords from environment variables (never hardcoded)
-- Does not expose credentials in source code
-- **Security:** The SQL schema does not contain hardcoded password hashes - users must be created via this script
-
-**Usage:**
-```bash
-# Set password via environment variable (optional, defaults to 'changeme' for development)
-export DEFAULT_ADMIN_PASSWORD=your-secure-password-here
-
-# Create default users
-python scripts/setup/create_default_users.py
-```
-
-**Environment Variables:**
-- `DEFAULT_ADMIN_PASSWORD` - Password for admin user (default: `changeme` for development only)
-- `DEFAULT_USER_PASSWORD` - Password for regular users (default: `changeme` for development only)
-
-**⚠️ Production:** Always set strong, unique passwords via environment variables. Never use default passwords in production.
-
 **SQL Script:** `scripts/setup/create_model_tracking_tables.sql`
 
 Creates tables for tracking model training history and predictions.
 
 **Usage:**
 ```bash
-PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse -d warehouse -f scripts/setup/create_model_tracking_tables.sql
+PGPASSWORD=${POSTGRES_PASSWORD} psql -h localhost -p 5435 -U warehouse -d warehouse -f scripts/setup/create_model_tracking_tables.sql
 ```
 
 ### RAPIDS Installation
