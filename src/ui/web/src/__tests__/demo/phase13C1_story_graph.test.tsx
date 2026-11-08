@@ -33,7 +33,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router';
 
 import { getSemanticZoomLevel } from '../../components/demo/decision-graph/semanticZoom';
 import { buildDecisionGraph, BuildDecisionGraphParams } from '../../components/demo/decision-graph/buildDecisionGraph';
