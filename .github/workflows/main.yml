@@ -519,14 +519,20 @@ jobs:
           MON=(docker compose -f deploy/compose/docker-compose.monitoring.yaml)
           export GRAFANA_ADMIN_PASSWORD=$(python3 -c "import secrets; print(secrets.token_hex(16))")
           echo "::add-mask::${GRAFANA_ADMIN_PASSWORD}"
-          trap '"${MON[@]}" down -v --remove-orphans' EXIT
+          # Separate project (name: maiw-monitoring): this removes only the
+          # monitoring containers and volumes, never the dev stack.
+          trap '"${MON[@]}" down -v' EXIT
 
           docker network inspect compose_default >/dev/null
           "${MON[@]}" up -d prometheus postgres-exporter redis-exporter
 
           query() {
-            curl -sf --get http://127.0.0.1:9090/api/v1/query --data-urlencode "query=$1" \
-              | python3 -c "import json,sys; r=json.load(sys.stdin)['data']['result']; print(r[0]['value'][1] if r else 'none')"
+            # Prints the first value, or "none" (also while Prometheus is starting).
+            curl -sf --get http://127.0.0.1:9090/api/v1/query --data-urlencode "query=$1" 2>/dev/null \
+              | python3 -c "import json,sys
+          try: r=json.load(sys.stdin)['data']['result']
+          except ValueError: r=[]
+          print(r[0]['value'][1] if r else 'none')" || true
           }
           for i in $(seq 1 24); do
             api=$(query 'up{job="warehouse-api"}' || echo none)
