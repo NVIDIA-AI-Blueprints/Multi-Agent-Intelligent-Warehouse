@@ -181,8 +181,8 @@ jobs:
 
     # Fail on any fixable CRITICAL finding. The full report (every severity)
     # is uploaded above to code scanning. HIGH stays report-only here while
-    # the five repository findings in docs/security/IMAGE_SCANNING.md remain
-    # (npm-bundled undici, react-scripts' svgo); the image jobs gate HIGH.
+    # the repository finding in docs/security/IMAGE_SCANNING.md remains
+    # (react-scripts' uuid); the image jobs gate HIGH.
     - name: Trivy gate (fixable CRITICAL)
       uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
       env:

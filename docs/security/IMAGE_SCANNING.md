@@ -37,11 +37,13 @@ Changes that reached this baseline:
   - Removed the unused `curl`, which carried 4 unfixed HIGH findings.
   - Added `apt-get upgrade`, as in the backend image.
 
-### Repository: 3 fixable HIGH, none fixable here (report-only)
+### Repository (report-only)
+
+The three `undici` 6.29.0 HIGH findings (CVE-2026-87018, CVE-2026-109383, CVE-2026-109869) in the root `package-lock.json` are fixed (#266). That copy is bundled inside the `npm` package that `semantic-release` depends on, so it could not be overridden; `npm` 11.21.2 bundles `undici` 6.29.1, and the root lockfile now resolves it.
 
 | Package | Lockfile | Findings | Why it stays |
 |---|---|---|---|
-| `undici` 6.29.0 | `package-lock.json` (root) | 3 HIGH (CVE-2026-87018, CVE-2026-109383, CVE-2026-109869) | Bundled inside the `npm` package that `semantic-release` depends on. A bundled dependency cannot be overridden, and the newest `npm` (12.2.1) still bundles a vulnerable `undici`. The top-level `undici` is already 6.29.1. Release tooling only: it runs in the release job, not in any image. |
+| `uuid` 8.3.2 | `src/ui/web/package-lock.json` | 1 HIGH (CVE-2026-41907; Medium on GitHub) | Pulled in by the `react-scripts` 5 build and development-server chain; not in the browser bundle or any image. Goes away with the move off Create React App (#265). |
 
 `webpack-dev-middleware` was updated from 7.4.5 to 7.4.6 (one HIGH finding). It is used only by the development server.
 
@@ -50,9 +52,7 @@ Changes that reached this baseline:
 ## HIGH gating
 
 - **Images:** fixable HIGH and CRITICAL fail the Image Scan job. In practice, the job fails when a released fix has not reached an image: a base-image bump (nginx is set by an `ARG` that Dependabot does not update) or a Python package.
-- **Repository:** HIGH stays report-only until the three `undici` findings above clear. Do not add them to a `.trivyignore`: Trivy would leave them out of the uploaded SARIF, and code scanning would then close those alerts as fixed. The options are:
-  - an `npm` release that bundles a fixed `undici`;
-  - excluding the root release tooling from the repository HIGH gate.
+- **Repository:** HIGH stays report-only while the `uuid` finding above remains. Do not add findings to a `.trivyignore`: Trivy would leave them out of the uploaded SARIF, and code scanning would then close those alerts as fixed. Once the UI is off `react-scripts` (#265), the filesystem gate can be raised to fixable HIGH.
 
 ## Running the scans locally
 
