@@ -41,7 +41,7 @@ load_dotenv(project_root / ".env")
 
 # Collections used by document pipeline and retrievers
 COLLECTIONS = (
-    "warehouse_documents",  # EmbeddingIndexingService (document extraction)
+    "warehouse_documents",  # legacy document-embedding collection (indexer removed, #270)
     "warehouse_docs",       # MilvusRetriever
     "warehouse_docs_gpu",   # GPUMilvusRetriever
 )

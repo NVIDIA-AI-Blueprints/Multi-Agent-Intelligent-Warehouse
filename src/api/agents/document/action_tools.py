@@ -570,7 +570,6 @@ class DocumentActionTools:
                     "Preprocessing (NeMo Retriever)",
                     "OCR Extraction (NeMoRetriever-OCR-v1)",
                     f"Small LLM Processing ({self.MODEL_SMALL_LLM})",
-                    "Embedding & Indexing (nemotron-3-embed-1b)",
                     f"Large LLM Judge ({self.MODEL_LARGE_JUDGE})",
                     "Intelligent Routing",
                 ],

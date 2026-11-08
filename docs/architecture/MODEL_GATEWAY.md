@@ -582,18 +582,17 @@ MODEL_GATEWAY_ENABLED=true            # default true; set false only for emergen
 
 ## DocumentAgent Compatibility Exception
 
-DocumentAgent implements a multi-stage NeMo OCR/extraction pipeline with distinct
-model requirements per stage. The document pipeline stages that use direct `NIMClient`
-calls (OCR, embedding, extraction) are an explicit compatibility exception pending
-multimodal NIM endpoint availability for the `nano-omni` role.
+The shipped document upload pipeline (`src/api/routers/document.py`) runs five
+stages: preprocessing, OCR, small-LLM extraction, the large-LLM judge and
+routing. Every stage that calls a model goes through `ModelGateway` via
+`document/model_gateway_adapter.py` (OCR as `Modality.IMAGE`).
 
-Evidence (under `src/api/agents/`): `document/document_extraction_agent.py`,
-`document/processing/embedding_indexing.py`. `document/action_tools.py` and
-`document/validation/large_llm_judge.py` already route through `ModelGateway`
-(`document/model_gateway_adapter.py`).
-
-These are pipeline-stage labels, not routing decisions. Full gateway integration
-requires multimodal NIM endpoint provisioning for the `nano-omni` role.
+The only remaining direct `NIMClient` use in the document package is
+`document/mcp_document_agent.py`, reached only from the legacy planner graphs
+(`src/api/graphs/`), which the shipped app does not mount. The legacy
+`DocumentExtractionAgent` and the stages only it used (layout detection,
+Nemotron Parse, entity extraction, embedding and indexing, quality scoring,
+workflow manager) were removed in #270.
 
 ---
 
