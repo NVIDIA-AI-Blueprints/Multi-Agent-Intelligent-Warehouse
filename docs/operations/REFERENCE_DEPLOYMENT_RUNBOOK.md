@@ -107,8 +107,8 @@ after authentication.
 Authentication is a route dependency: it is decided before the body is read
 and before any agent, DecisionEngine, ActionExecutor or MCP call. The
 DecisionEngine remains the *authority* decision after authentication; it is
-not a substitute for it. A JWT user session alone never authorises an
-operational write. The two tokens must differ (preflight and the app both
+not a substitute for it. The blueprint has no user login, so there is no
+user session that could stand in for either token. The two tokens must differ (preflight and the app both
 refuse an operator token equal to the inference token).
 
 **UI.** The browser never holds the operator credential (never use a
@@ -181,7 +181,7 @@ for p in maiw-mcp maiw-state maiw-decision maiw-models maiw-skills maiw-executio
 # 2. Configure
 cp .env.example .env
 #    edit .env: NVIDIA_API_KEY, MAIW_INFERENCE_INTERNAL_TOKEN (fresh random),
-#    POSTGRES_PASSWORD, JWT_SECRET_KEY, MAIW_PYTHON=$PWD/.venv/bin/python,
+#    POSTGRES_PASSWORD, MAIW_PYTHON=$PWD/.venv/bin/python,
 #    MAIW_PERSISTENCE_ROOT (writable), MAIW_API_PORT (free), PGPORT (free),
 #    MAIW_DB_CONTAINER, MAIW_SANDBOX_NAME,
 #    MAIW_SANDBOX_MODEL_GATEWAY_ENDPOINT=http://<HOST_IP>:<MAIW_API_PORT>/api/v1/inference,
@@ -254,7 +254,7 @@ the app reads only what the loader exported.
 | `MAIW_INFERENCE_INTERNAL_TOKEN` | auth token for the inference boundary (fresh, >= 32 chars) | `python3 -c "import secrets; print(secrets.token_hex(32))"` |
 | `MAIW_OPERATOR_WRITE_TOKEN` | **`reference_governed` only** — operator write credential (fresh, >= 32 chars, different from the inference token; never given to the sandbox) | `python3 -c "import secrets; print(secrets.token_hex(32))"` |
 | `NVIDIA_API_KEY` | hosted NIM credential (host only) | `nvapi-...` |
-| `POSTGRES_PASSWORD`, `JWT_SECRET_KEY` | DB / auth secrets | |
+| `POSTGRES_PASSWORD` | DB secret | |
 | `PGHOST`, `PGPORT`, `POSTGRES_USER`, `POSTGRES_DB` | the data-path database (readiness probes exactly these) | `127.0.0.1`, `5435` |
 | `MAIW_DB_CONTAINER` | reference DB container name (unique per host) | `maiw-reference-db` |
 | `MAIW_SANDBOX_MODE` | must be `required` | `required` |
@@ -363,13 +363,12 @@ An equipment-only governed deployment sets `MAIW_REQUIRED_MCP_DOMAINS=equipment`
 | `MAIW_INFERENCE_INTERNAL_TOKEN` | MAIW operator | MAIW API + sandbox | YES (to authenticate to MAIW API; passed on stdin) | YES — API and sandbox must restart |
 | `MAIW_OPERATOR_WRITE_TOKEN` | MAIW operator | MAIW API; host operator tooling / operator proxy | **NO** — never; the sandbox probe proves it by digest comparison | YES — API must restart |
 | `NVIDIA_API_KEY` | MAIW operator | MAIW API (NIMProvider) | NO — never forwarded to sandbox | YES — API must restart |
-| `JWT_SECRET_KEY` | MAIW operator | MAIW API (auth signing) | NO | YES |
 | `POSTGRES_PASSWORD` | MAIW operator | MAIW API (DB layer), reference DB container | NO | YES |
 
 **Invariants**:
 - No secrets are committed to version control
 - No secrets appear in logs, script output, or health endpoints
-- No warehouse write credentials in sandbox — the operator write token is never injected; `reference_sandbox.sh probe` fails if a digest of it (or of the provider key, DB password or JWT secret) is found in the sandbox environment
+- No warehouse write credentials in sandbox — the operator write token is never injected; `reference_sandbox.sh probe` fails if a digest of it (or of the provider key or DB password) is found in the sandbox environment
 - No NIM/provider credential in sandbox
 - `MAIW_INFERENCE_INTERNAL_TOKEN` is the only credential that flows to the sandbox
 

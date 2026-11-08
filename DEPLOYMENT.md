@@ -93,16 +93,13 @@ docker compose -f deploy/compose/docker-compose.dev.yaml exec -T timescaledb psq
 docker compose -f deploy/compose/docker-compose.dev.yaml exec -T timescaledb psql -U warehouse -d warehouse < scripts/setup/create_model_tracking_tables.sql
 
 
-# 7. Create default users
-python scripts/setup/create_default_users.py
-
-# 8. Generate demo data (optional but recommended)
+# 7. Generate demo data (optional but recommended)
 python scripts/data/quick_demo_data.py
 
-# 9. Generate historical demand data for forecasting (optional, required for Forecasting page)
+# 8. Generate historical demand data for forecasting (optional, required for Forecasting page)
 python scripts/data/generate_historical_demand.py
 
-# 10. (Optional) Install RAPIDS GPU acceleration for forecasting
+# 9. (Optional) Install RAPIDS GPU acceleration for forecasting
 # ⚡ GPU Acceleration: Enables 10-100x faster forecasting with NVIDIA GPUs
 # Requirements:
 #   - NVIDIA GPU with CUDA 12.x support
@@ -122,15 +119,15 @@ python scripts/data/generate_historical_demand.py
 # Note: If RAPIDS is not installed, forecasting will use CPU fallback with XGBoost GPU support
 #       The system automatically detects GPU availability and uses it when available
 
-# 11-12. The Compose stack from step 5 already serves the API (:8001) and the UI
+# 10-11. The Compose stack from step 5 already serves the API (:8001) and the UI
 # (:3001). To run the API and UI from the host instead (hot reload), first stop
 # the containers that hold those ports, then start both from the host:
 docker compose -f deploy/compose/docker-compose.dev.yaml stop backend frontend nginx
 
-# 11. Start API server
+# 10. Start API server
 ./scripts/start_server.sh
 
-# 12. Start frontend (in another terminal)
+# 11. Start frontend (in another terminal)
 cd src/ui/web
 npm install
 npm start
@@ -253,12 +250,7 @@ POSTGRES_DB=warehouse
 DB_HOST=localhost
 DB_PORT=5435
 
-# Security (REQUIRED for production)
-JWT_SECRET_KEY=your-strong-random-secret-minimum-32-characters
 ENVIRONMENT=production  # Set to 'production' for production deployments
-
-# Admin User
-DEFAULT_ADMIN_PASSWORD=changeme  # Change in production!
 
 # Vector Database (Milvus)
 MILVUS_HOST=localhost
@@ -278,8 +270,7 @@ CORS_ORIGINS=http://localhost:3001,http://localhost:3000
 ```
 
 **⚠️ Security Notes:**
-- **Development**: `JWT_SECRET_KEY` is optional (uses default with warnings)
-- **Production**: `JWT_SECRET_KEY` is **REQUIRED** - application will fail to start if not set
+- The blueprint has no user login, so there are no user accounts or passwords to set. Governed writes need `MAIW_OPERATOR_WRITE_TOKEN` (see [docs/api/README.md](docs/api/README.md#authentication)).
 - Always use strong, unique passwords in production
 - Never commit `.env` files to version control
 
@@ -595,18 +586,9 @@ PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse
 - `data/postgres/004_inventory_movements_schema.sql`
 - `scripts/setup/create_model_tracking_tables.sql`
 
-### Create Default Users
-
-```bash
-# Docker (development)
-docker compose -f deploy/compose/docker-compose.dev.yaml exec backend python scripts/setup/create_default_users.py
-
-# Or from host (recommended for development)
-source env/bin/activate
-python scripts/setup/create_default_users.py
-```
-
-**⚠️ Security Note:** Users are created securely via the setup script using environment variables. The SQL schema does not contain hardcoded password hashes.
+The blueprint has no user login, so there are no users to create. The `users`
+table is the worker roster; `scripts/data/quick_demo_data.py` fills it with
+demo workers.
 
 ### Verify Deployment
 
@@ -635,7 +617,6 @@ Once deployed, access the application at:
 
 **⚠️ Change these in production!**
 
-- **API user** (`POST /api/v1/auth/login`): `admin` / `changeme` (or `DEFAULT_ADMIN_PASSWORD`)
 - **Database**: `warehouse` / `changeme` (or `POSTGRES_PASSWORD`)
 - **Grafana** (if enabled): `admin` / `changeme` (or `GRAFANA_ADMIN_PASSWORD`)
 
@@ -813,14 +794,8 @@ PGPASSWORD=${POSTGRES_PASSWORD:-changeme} psql -h localhost -p 5435 -U warehouse
 docker compose -f deploy/compose/docker-compose.dev.yaml logs backend
 
 # Verify environment variables
-docker compose -f deploy/compose/docker-compose.dev.yaml exec backend env | grep -E "DB_|PG|JWT_|POSTGRES_"
+docker compose -f deploy/compose/docker-compose.dev.yaml exec backend env | grep -E "DB_|PG|POSTGRES_"
 ```
-
-#### Password Not Working
-
-1. Check `DEFAULT_ADMIN_PASSWORD` in `.env`
-2. Recreate users: `python scripts/setup/create_default_users.py`
-3. Default password is `changeme` if not set
 
 #### Module Not Found Errors
 

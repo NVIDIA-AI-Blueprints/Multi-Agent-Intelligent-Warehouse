@@ -95,8 +95,6 @@ src/
 ├── services/           # API services
 │   ├── api.ts         # API client and types
 │   └── version.ts     # Version API service
-├── contexts/          # React contexts
-│   └── AuthContext.tsx # Authentication context
 ├── App.tsx            # Main app component
 └── index.tsx          # App entry point
 ```

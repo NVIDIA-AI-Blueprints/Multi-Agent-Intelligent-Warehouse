@@ -12,7 +12,6 @@ Packages stubbed here:
   redis        — Redis client (requires a running server)
   redis.asyncio — async Redis sub-package
   pymilvus     — Milvus vector-DB client
-  bcrypt       — password hashing (C extension)
 
 Actual database / cache / vector-search calls are patched at the individual
 test or fixture level using unittest.mock.
@@ -26,7 +25,6 @@ _STUBS = [
     "redis",
     "redis.asyncio",
     "pymilvus",
-    "bcrypt",
 ]
 
 for _mod in _STUBS:

@@ -112,8 +112,10 @@ async def test_validation_errors_never_log_submitted_values(canonical, caplog):
     secret = "S3cretPW-not-for-logs"
     with caplog.at_level(logging.DEBUG):
         async with running_canonical_app() as (_, client):
-            # A login missing `username`: pydantic's error input is the body.
-            resp = await client.post("/api/v1/auth/login", json={"password": secret})
+            # A turn missing `message`: pydantic's error input is the body.
+            resp = await client.post(
+                "/api/v1/copilot/turn", json={"conversation_id": secret}
+            )
     assert resp.status_code == 422
     assert secret not in caplog.text
     assert any("Validation error" in m for m in _messages(caplog))
@@ -129,17 +131,6 @@ async def test_path_values_cannot_forge_log_entries(canonical, caplog):
             ):
                 await client.get(path)
     _assert_single_line(caplog)
-
-
-async def test_login_username_is_sanitized_before_authentication(canonical, caplog):
-    forged = "nobody\r\nINFO admin logged in successfully"
-    with caplog.at_level(logging.DEBUG):
-        async with running_canonical_app() as (_, client):
-            await client.post(
-                "/api/v1/auth/login", json={"username": forged, "password": "x"}
-            )
-    _assert_single_line(caplog)
-    assert not any(m.startswith("INFO admin") for m in caplog.text.splitlines())
 
 
 async def test_sql_retriever_does_not_log_bound_parameters(caplog):

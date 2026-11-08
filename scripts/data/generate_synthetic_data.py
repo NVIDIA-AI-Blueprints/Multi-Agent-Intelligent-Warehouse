@@ -49,7 +49,6 @@ import psycopg
 from pymilvus import Collection, connections
 import redis
 import hashlib
-import bcrypt
 from faker import Faker
 
 # Configure logging
@@ -172,8 +171,11 @@ class SyntheticDataGenerator:
         logger.info(f"👥 Generating {count} users...")
         
         async with self.pg_conn.cursor() as cur:
+            # The blueprint has no login (#261). Bring databases created before
+            # that change in line with data/postgres/000_schema.sql.
+            await cur.execute("ALTER TABLE users DROP COLUMN IF EXISTS hashed_password")
+            await cur.execute("DROP TABLE IF EXISTS user_sessions")
             # Clear existing data
-            await cur.execute("DELETE FROM user_sessions")
             await cur.execute("DELETE FROM audit_log")
             await cur.execute("DELETE FROM users WHERE username != 'admin'")
             
@@ -185,13 +187,11 @@ class SyntheticDataGenerator:
                     username = f"{role}{i+1}"
                     email = f"{username}@warehouse.com"
                     full_name = fake.name()
-                    default_password = os.getenv("DEFAULT_USER_PASSWORD", "changeme")
-                    hashed_password = bcrypt.hashpw(default_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-                    
+
                     await cur.execute("""
-                        INSERT INTO users (username, email, full_name, role, status, hashed_password, created_at, last_login)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (username, email, full_name, role, 'active', hashed_password, 
+                        INSERT INTO users (username, email, full_name, role, status, created_at, last_login)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """, (username, email, full_name, role, 'active',
                           fake.date_time_between(start_date='-90d', end_date='-1d'),
                           fake.date_time_between(start_date='-7d', end_date='now')))
         

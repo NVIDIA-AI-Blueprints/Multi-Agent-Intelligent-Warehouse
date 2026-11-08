@@ -1,5 +1,9 @@
 # Security Scan Response: PyJWT Weak Encryption (CVE-2025-45768)
 
+> **Update:** the user login system was removed (issue #261). PyJWT and
+> `src/api/services/auth/jwt_handler.py` are no longer part of the application,
+> so CVE-2025-45768 no longer applies to it. This section is kept as a record.
+
 ## Executive Summary
 
 **Vulnerability**: PyJWT Weak Encryption via Insufficient HMAC and RSA Key Length (CVE-2025-45768)  

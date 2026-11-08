@@ -177,13 +177,6 @@ EXPECTED_MUTATING_ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/api/v1/demo/inject"): "demo-simulation",
     # bounded inference — ModelGateway only, internal token, no governance below
     ("POST", "/api/v1/inference"): "bounded-inference",
-    # identity management — own auth dependencies (admin / current user)
-    ("POST", "/api/v1/auth/register"): "identity",
-    ("POST", "/api/v1/auth/login"): "identity",
-    ("POST", "/api/v1/auth/refresh"): "identity",
-    ("PUT", "/api/v1/auth/me"): "identity",
-    ("POST", "/api/v1/auth/change-password"): "identity",
-    ("PUT", "/api/v1/auth/users/{user_id}"): "identity",
     # document workflow state — no warehouse mutation; inference via ModelGateway
     ("POST", "/api/v1/document/upload"): "document-workflow",
 }
@@ -209,6 +202,15 @@ def test_p1_01_legacy_chat_and_reasoning_not_mounted():
         "src.api.routers.mcp",
     ):
         assert forbidden not in modules
+
+
+def test_no_login_routes_are_mounted():
+    """The blueprint has no user login (#261): no /auth routes, no auth module."""
+    paths = {p for _, p, _ in _mounted()}
+    modules = {getattr(e, "__module__", "") for _, _, e in _mounted()}
+    assert not any(p.startswith("/api/v1/auth") for p in paths), sorted(paths)
+    assert "src.api.routers.auth" not in modules
+    assert ("GET", "/api/v1/operations/workers") in {(m, p) for m, p, _ in _mounted()}
 
 
 def test_document_approve_and_reject_not_mounted():
@@ -245,7 +247,7 @@ def test_p1_01_legacy_routers_mounted_read_only():
     allowed_legacy_mutations = {
         k
         for k, v in EXPECTED_MUTATING_ROUTES.items()
-        if v in {"bounded-inference", "identity", "document-workflow"}
+        if v in {"bounded-inference", "document-workflow"}
     }
     for method, path, endpoint in _mounted():
         module = getattr(endpoint, "__module__", "")

@@ -42,9 +42,9 @@ async def test_limiter_raises_its_own_429():
 
     class _Req:
         client = type("C", (), {"host": "10.0.0.9"})()
-        url = type("U", (), {"path": "/api/v1/auth/login"})()
+        url = type("U", (), {"path": "/api/v1/document/upload"})()
 
-    for _ in range(5):
+    for _ in range(10):
         assert await limiter.check_rate_limit(_Req()) is True
     with pytest.raises(HTTPException) as info:
         await limiter.check_rate_limit(_Req())
@@ -52,19 +52,17 @@ async def test_limiter_raises_its_own_429():
     assert "Retry-After" in info.value.headers
 
 
-async def test_canonical_app_answers_429_beyond_the_login_limit(canonical):
+async def test_canonical_app_answers_429_beyond_the_upload_limit(canonical):
     async with running_canonical_app() as (_, client):
         codes = []
         for _ in range(12):
-            r = await client.post(
-                "/api/v1/auth/login", json={"username": "x", "password": "y"}
-            )
+            r = await client.post("/api/v1/document/upload", json={})
             codes.append(r.status_code)
             if r.status_code == 429:
                 assert r.json()["detail"].startswith("Rate limit exceeded")
                 assert int(r.headers["Retry-After"]) >= 0
-    assert 429 not in codes[:5], codes
-    assert codes[5:] == [429] * 7, codes
+    assert 429 not in codes[:10], codes
+    assert codes[10:] == [429] * 2, codes
     assert 500 not in codes
 
 

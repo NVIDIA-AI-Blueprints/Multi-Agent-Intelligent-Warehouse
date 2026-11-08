@@ -128,8 +128,8 @@ async def mcp_tools(args: argparse.Namespace) -> None:
             ids["zone"],
         )
         await conn.execute(
-            "INSERT INTO users (username, email, full_name, role, status, hashed_password) "
-            "VALUES ($1, $2, 'CI smoke operator', 'operator', 'active', 'not-a-login')",
+            "INSERT INTO users (username, email, full_name, role, status) "
+            "VALUES ($1, $2, 'CI smoke operator', 'operator', 'active')",
             ids["worker"],
             f"{ids['worker']}@ci.invalid",
         )

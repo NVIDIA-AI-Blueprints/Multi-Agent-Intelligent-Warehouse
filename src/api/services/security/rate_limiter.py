@@ -109,7 +109,6 @@ class RateLimiter:
         self.limits = {
             "default": {"requests": 100, "window_seconds": 60},  # 100 req/min
             "/api/v1/chat": {"requests": 30, "window_seconds": 60},  # 30 req/min for chat
-            "/api/v1/auth/login": {"requests": 5, "window_seconds": 60},  # 5 req/min for login
             "/api/v1/document/upload": {"requests": 10, "window_seconds": 60},  # 10 req/min for uploads
             "/api/v1/health": {"requests": 1000, "window_seconds": 60},  # 1000 req/min for health
         }

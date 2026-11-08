@@ -41,7 +41,6 @@ import logging
 import os
 from datetime import datetime, timedelta
 import psycopg
-import bcrypt
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -159,8 +158,11 @@ class QuickDemoDataGenerator:
         logger.info("👥 Generating demo user data...")
         
         async with self.pg_conn.cursor() as cur:
+            # The blueprint has no login (#261). Bring databases created before
+            # that change in line with data/postgres/000_schema.sql.
+            await cur.execute("ALTER TABLE users DROP COLUMN IF EXISTS hashed_password")
+            await cur.execute("DROP TABLE IF EXISTS user_sessions")
             # Clear existing data
-            await cur.execute("DELETE FROM user_sessions")
             await cur.execute("DELETE FROM audit_log")
             await cur.execute("DELETE FROM users WHERE username != 'admin'")
             
@@ -180,14 +182,11 @@ class QuickDemoDataGenerator:
                 ("viewer2", "viewer2@warehouse.com", "Daniel Martinez", "viewer"),
             ]
             
-            default_password = os.getenv("DEFAULT_USER_PASSWORD", "changeme")
-            hashed_password = bcrypt.hashpw(default_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-            
             for username, email, full_name, role in demo_users:
                 await cur.execute("""
-                    INSERT INTO users (username, email, full_name, role, status, hashed_password, created_at, last_login)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                """, (username, email, full_name, role, 'active', hashed_password,
+                    INSERT INTO users (username, email, full_name, role, status, created_at, last_login)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (username, email, full_name, role, 'active',
                       datetime.now() - timedelta(days=30),
                       datetime.now() - timedelta(hours=random.randint(1, 24))))
         

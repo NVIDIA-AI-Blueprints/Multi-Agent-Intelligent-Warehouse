@@ -611,7 +611,6 @@ This notebook walks through the full 17-step journey — from environment valida
 |----------|-------------|-------------|
 | `NVIDIA_API_KEY` | All modes | NVIDIA API key (`nvapi-...`), from [build.nvidia.com](https://build.nvidia.com/) |
 | `POSTGRES_PASSWORD` | Full-stack only | PostgreSQL password — **not required for Demo Mode** |
-| `JWT_SECRET_KEY` | Full-stack only | JWT signing secret (min 32 chars) — **not required for Demo Mode** |
 
 > **Demo Mode (`MAIW_DEMO_MODE=true`) does not require PostgreSQL, Redis, Milvus, or Kafka.**
 

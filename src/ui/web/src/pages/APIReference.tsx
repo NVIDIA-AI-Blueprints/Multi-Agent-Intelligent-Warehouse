@@ -82,15 +82,11 @@ const APIReference: React.FC = () => {
       ]
     },
     {
-      name: "Authentication",
-      description: "User authentication and authorization",
+      name: "Workforce",
+      description: "Worker roster and workforce statistics (the blueprint has no user login)",
       endpoints: [
-        { method: "POST", path: "/api/v1/auth/login", description: "User login", status: "✅ Working" },
-        { method: "POST", path: "/api/v1/auth/logout", description: "User logout", status: "✅ Working" },
-        { method: "GET", path: "/api/v1/auth/profile", description: "Get user profile", status: "✅ Working" },
-        { method: "POST", path: "/api/v1/auth/refresh", description: "Refresh JWT token", status: "✅ Working" },
-        { method: "GET", path: "/api/v1/auth/users/public", description: "Get list of users for dropdown selection (public, no auth required)", status: "✅ Working" },
-        { method: "GET", path: "/api/v1/auth/users", description: "Get all users (admin only)", status: "✅ Working" }
+        { method: "GET", path: "/api/v1/operations/workers", description: "Active workers for assignment dropdowns", status: "✅ Working" },
+        { method: "GET", path: "/api/v1/operations/workforce", description: "Workforce and task statistics", status: "✅ Working" }
       ]
     },
     {
@@ -243,12 +239,12 @@ const APIReference: React.FC = () => {
         </Typography>
         <Typography variant="body1" sx={{ mb: 2 }}>
           Complete reference for all API endpoints in the Multi-Agent-Intelligent-Warehouse. 
-          This documentation covers authentication, agent operations, MCP framework, reasoning engine, and monitoring APIs.
+          This documentation covers access control, agent operations, MCP framework, reasoning engine, and monitoring APIs.
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 3 }}>
           <Chip label="REST API" color="primary" />
           <Chip label="OpenAPI/Swagger" color="secondary" />
-          <Chip label="JWT Authentication" color="info" />
+          <Chip label="Operator write token" color="info" />
           <Chip label="Real-time" color="warning" />
           <Chip label="Production Ready" color="success" />
         </Box>
@@ -258,7 +254,7 @@ const APIReference: React.FC = () => {
       <Alert severity="success" sx={{ mb: 4 }}>
         <AlertTitle>✅ All Core APIs Working</AlertTitle>
         All essential API endpoints are operational and tested. The system provides comprehensive REST API coverage 
-        with proper authentication, error handling, and documentation.
+        with operator-token write control, error handling, and documentation.
       </Alert>
 
       {/* Base URL */}
@@ -300,17 +296,20 @@ const APIReference: React.FC = () => {
             </InfoCard>
           </Grid>
           <Grid item xs={12} md={6}>
-            <InfoCard title="🔐 Authentication">
+            <InfoCard title="🔐 Access control">
               <Typography variant="body2" sx={{ mb: 2 }}>
-                All API requests require JWT authentication via Authorization header:
+                The blueprint has no user login and runs on a single trusted host. Read endpoints
+                need no credential. Governed operational writes need the operator write token,
+                which an operator proxy adds server-side; the browser never holds it.
               </Typography>
               <CodeBlock>
-{`Authorization: Bearer <jwt_token>
+{`X-Maiw-Operator-Token: <MAIW_OPERATOR_WRITE_TOKEN>
 
-# Example
-curl -H "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
-  -H "Content-Type: application/json"
-  https://api.warehouse-assistant.com/api/v1/chat`}
+# Example (on the API host)
+curl -X POST http://localhost:8001/api/v1/equipment/assign \\
+  -H "X-Maiw-Operator-Token: $MAIW_OPERATOR_WRITE_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{"asset_id": "FL-01", "assignee": "operator1"}'`}
               </CodeBlock>
             </InfoCard>
           </Grid>
@@ -463,14 +462,14 @@ curl -H "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
                 </ListItem>
                 <ListItem>
                   <ListItemText 
-                    primary="AUTHENTICATION_REQUIRED" 
-                    secondary="Valid JWT token required"
+                    primary="OPERATOR_WRITE_CREDENTIAL_REQUIRED" 
+                    secondary="Operational write sent without X-Maiw-Operator-Token"
                   />
                 </ListItem>
                 <ListItem>
                   <ListItemText 
-                    primary="INSUFFICIENT_PERMISSIONS" 
-                    secondary="User lacks required permissions"
+                    primary="INVALID_OPERATOR_WRITE_CREDENTIAL" 
+                    secondary="X-Maiw-Operator-Token does not match"
                   />
                 </ListItem>
                 <ListItem>

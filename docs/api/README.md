@@ -26,16 +26,16 @@ are not visible from the schema alone.
 
 ## Authentication
 
-There are three separate credentials. They are different authority domains and
-none of them substitutes for another.
+The blueprint has no user login: there are no user accounts, passwords or
+sessions. Read endpoints need no credential and are meant for the single trusted
+host. Two separate credentials gate the routes that change state or run
+inference; they are different authority domains and neither substitutes for
+the other.
 
 | Credential | Header | Authorises |
 |---|---|---|
-| User session (JWT) | `Authorization: Bearer <jwt>` | Identity endpoints under `/api/v1/auth/*` |
 | Operator write token (`MAIW_OPERATOR_WRITE_TOKEN`, ≥ 32 chars) | `X-Maiw-Operator-Token` | Operational writes: the governed equipment write routes and `/api/v1/executions/*` |
 | Inference internal token (`MAIW_INFERENCE_INTERNAL_TOKEN`) | `X-Maiw-Internal-Token` | Only `POST /api/v1/inference` (the sandbox inference boundary) |
-
-A JWT alone never authorises an operational write.
 
 ### Operator write credential
 
@@ -69,19 +69,6 @@ These denials return a typed body:
 
 The production UI image never holds the operator token and strips the header
 from browser requests, so governed writes from that UI are refused by design.
-
-### Identity endpoints
-
-`/api/v1/auth/*` (from `src/api/routers/auth.py`) is mounted in full, including
-`POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, `GET /api/v1/auth/me`,
-`GET /api/v1/auth/users` (admin) and the public
-`GET /api/v1/auth/users/public` (active users' `id`, `username`, `full_name`,
-`role`, for login dropdowns).
-
-`PUT /api/v1/auth/me` changes only the caller's own `email` and `full_name`. A
-body with any other field, including `role` or `status`, is refused with 422.
-Only an admin changes a user's role or status, through
-`PUT /api/v1/auth/users/{user_id}`.
 
 ## Endpoints mounted by the release app
 
@@ -194,6 +181,7 @@ path and are not shipped.
 |---|---|
 | GET | `/api/v1/operations/tasks`, `/api/v1/operations/tasks/{task_id}` |
 | GET | `/api/v1/operations/workforce` |
+| GET | `/api/v1/operations/workers` (active workers: `id`, `username`, `full_name`, `role`) |
 | GET | `/api/v1/safety/incidents`, `/api/v1/safety/incidents/{incident_id}` |
 | GET | `/api/v1/safety/policies`, `/api/v1/safety/policies/{policy_id}` |
 
@@ -242,14 +230,15 @@ implemented (no decision is recorded and nothing is sent to a WMS).
 
 `/api/v1/chat`, `/api/v1/reasoning`, every POST/PUT/PATCH/DELETE of the legacy
 routers above other than `POST /api/v1/document/upload` (including
-`POST /api/v1/migrations/migrate`). There is no WebSocket endpoint.
+`POST /api/v1/migrations/migrate`). There is no WebSocket endpoint and no
+`/api/v1/auth/*` (the login routes were removed; the worker roster is
+`GET /api/v1/operations/workers`).
 
 ## Rate limiting
 
 Requests are rate limited per client (`src/api/services/security/rate_limiter.py`;
-Redis-backed, with an in-memory fallback). Defaults: 100 requests/minute, with
-tighter limits on `POST /api/v1/auth/login` (5/min) and
-`POST /api/v1/document/upload` (10/min). A limited request receives HTTP 429 with
+Redis-backed, with an in-memory fallback). Defaults: 100 requests/minute, with a
+tighter limit on `POST /api/v1/document/upload` (10/min). A limited request receives HTTP 429 with
 a `Retry-After` header. `RATE_LIMIT_FAIL_MODE` controls what happens when the
 limiter itself fails. `/api/v1/health`, `/api/v1/health/simple`, `/docs` and
 `/openapi.json` are exempt.

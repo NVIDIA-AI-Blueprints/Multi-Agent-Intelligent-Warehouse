@@ -15,7 +15,7 @@
 # limitations under the License.
 
 """
-Test database connection and authentication
+Test the database connection and the worker roster table
 """
 
 import asyncio
@@ -28,17 +28,15 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.retrieval.structured import SQLRetriever
-from src.api.services.auth.user_service import UserService
 from tests.unit.test_utils import cleanup_async_resource
 
 
 @pytest.mark.asyncio
 async def test_connection():
-    """Test database connection and authentication."""
+    """Test the database connection and the worker roster table."""
     print("🔍 Testing database connection...")
 
     sql_retriever = None
-    user_service = None
 
     try:
         # Test SQL retriever
@@ -50,17 +48,9 @@ async def test_connection():
         result = await sql_retriever.fetch_one("SELECT 1 as test")
         print(f"✅ Simple query result: {result}")
 
-        # Test user service
-        user_service = UserService()
-        await user_service.initialize()
-        print("✅ User service initialized")
-
-        # Test user lookup
-        user = await user_service.get_user_for_auth("admin")
-        if user:
-            print(f"✅ Found user: {user.username}")
-        else:
-            print("❌ User not found")
+        # The users table is the worker roster (no logins)
+        roster = await sql_retriever.fetch_one("SELECT COUNT(*) AS workers FROM users")
+        print(f"✅ Worker roster rows: {roster['workers']}")
 
         print("✅ Database connection test completed")
 
@@ -73,7 +63,6 @@ async def test_connection():
     finally:
         # Cleanup
         await cleanup_async_resource(sql_retriever, "close")
-        await cleanup_async_resource(user_service, "close")
 
 
 if __name__ == "__main__":

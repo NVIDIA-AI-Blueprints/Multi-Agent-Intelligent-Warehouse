@@ -132,7 +132,7 @@ digests = set(probe.get("env_value_digests", []))
 names = set(probe.get("env_secret_names", []))
 leaked = []
 for var in ("MAIW_OPERATOR_WRITE_TOKEN", "NVIDIA_API_KEY", "MAIW_NIM_API_KEY",
-            "POSTGRES_PASSWORD", "JWT_SECRET_KEY"):
+            "POSTGRES_PASSWORD"):
     value = os.environ.get(var)
     if var in names or (value and hashlib.sha256(value.encode()).hexdigest()[:24] in digests):
         leaked.append(var)
