@@ -17,7 +17,7 @@ import {
   Button,
 } from '@mui/material';
 import ScienceIcon from '@mui/icons-material/Science';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import {
   CheckCircle as OkIcon,
   Error as ErrorIcon,

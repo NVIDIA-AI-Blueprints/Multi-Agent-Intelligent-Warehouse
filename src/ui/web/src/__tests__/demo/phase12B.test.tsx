@@ -348,7 +348,7 @@ describe('OperationalContextStrip', () => {
 // ── DemoShell routing tests ────────────────────────────────────────────────────
 
 describe('DemoShell — scenario routing', () => {
-  const { MemoryRouter } = require('react-router-dom');
+  const { MemoryRouter } = require('react-router');
 
   function renderShell(demoStatusValue: any) {
     useDemoStatus.mockReturnValue({

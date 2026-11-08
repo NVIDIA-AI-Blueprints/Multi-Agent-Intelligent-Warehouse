@@ -11,7 +11,7 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { nvidiaTheme } from '../../theme/nvidiaTheme';
 
 import StageContentPane from '../../components/demo/StageContentPane';

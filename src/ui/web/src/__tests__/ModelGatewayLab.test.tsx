@@ -16,7 +16,7 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { ThemeProvider } from '@mui/material/styles';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { nvidiaTheme } from '../theme/nvidiaTheme';
 import ModelGatewayLab from '../pages/ModelGatewayLab';
 import { modelLabAPI } from '../services/api';

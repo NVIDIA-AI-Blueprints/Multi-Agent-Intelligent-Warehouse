@@ -22,7 +22,7 @@ import {
   Alert,
   AlertTitle,
 } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import {
   ExpandMore as ExpandMoreIcon,
   Code as CodeIcon,

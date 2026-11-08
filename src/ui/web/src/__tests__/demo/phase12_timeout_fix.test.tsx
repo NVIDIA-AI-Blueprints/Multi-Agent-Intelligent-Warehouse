@@ -16,7 +16,7 @@ import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { nvidiaTheme } from '../../theme/nvidiaTheme';
 import ApproveStage from '../../components/demo/stages/ApproveStage';
 import { PendingApproval } from '../../services/demoAPI';

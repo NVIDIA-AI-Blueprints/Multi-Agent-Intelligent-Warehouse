@@ -44,7 +44,7 @@ import {
   AccountTree as AccountTreeIcon,
   Timeline as TimelineIcon,
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 const ArchitectureDiagrams: React.FC = () => {
   const navigate = useNavigate();
