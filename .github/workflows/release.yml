@@ -34,7 +34,7 @@ jobs:
 
     # semantic-release requires Node ^22.14.0 (see semantic-release docs/support/node-version.md)
     - name: Set up Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
         node-version: '22'
         cache: 'npm'
