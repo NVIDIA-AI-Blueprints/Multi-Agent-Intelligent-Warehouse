@@ -37,8 +37,15 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    # requirements.blocklist.txt lists packages that must never be installed,
+    # not dependencies. Dependabot read it as a requirements file and
+    # rewrote its comments (#297).
+    exclude-paths:
+      - "requirements.blocklist.txt"
     # Ignore major version updates for critical packages
     ignore:
+      # Blocklisted, never installed; belt and braces for exclude-paths.
+      - dependency-name: "langgraph-checkpoint-sqlite"
       - dependency-name: "fastapi"
         update-types: ["version-update:semver-major"]
       - dependency-name: "uvicorn"
@@ -98,6 +105,12 @@ updates:
       - "dependencies"
       - "docker"
       - "infrastructure"
+    # Node major versions are adopted deliberately, in every Dockerfile and
+    # the CI matrix together (#290 proposed Node 26 for the root Dockerfile
+    # only). Minor, patch and digest updates still arrive.
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
 
   # GitHub Actions - CI/CD workflows
   - package-ecosystem: "github-actions"

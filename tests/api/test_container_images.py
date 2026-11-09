@@ -87,6 +87,18 @@ def test_frontend_runtime_is_static_nginx_without_node():
     )
 
 
+def test_root_dockerfile_builds_ui_with_the_frontend_node_image():
+    """The root Dockerfile (used by docker-compose.ci.yml and
+    docker-compose.versioned.yaml) is not built in CI. Its UI build stage
+    must use the same pinned Node image as Dockerfile.frontend, which is."""
+    frontend = (REPO_ROOT / "Dockerfile.frontend").read_text()
+    pinned = re.search(r"^ARG NODE_IMAGE=(\S+)$", frontend, re.MULTILINE).group(1)
+    root = (REPO_ROOT / "Dockerfile").read_text()
+    assert re.search(
+        rf"^FROM {re.escape(pinned)} AS frontend-builder$", root, re.MULTILINE
+    )
+
+
 def test_frontend_proxy_never_forwards_operator_credential():
     conf = (REPO_ROOT / "deploy/docker/frontend-nginx.conf.template").read_text()
     assert 'proxy_set_header X-Maiw-Operator-Token "";' in conf
