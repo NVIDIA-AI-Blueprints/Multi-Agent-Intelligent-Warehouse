@@ -2,7 +2,7 @@ fastapi>=0.120.0,<0.163  # Lower bound: starlette>=0.49.1 support (nemoguardrail
 starlette>=1.10.0,<1.11  # Lower bound: the version CORE CI and the images install (pinned in requirements.docker.txt); nSpect reads the minimum as the installed version, and the old 0.49.1 minimum (needed by nemoguardrails 0.19.0+) carried known findings. Upper bound: newest minor CORE CI is tested on.
 uvicorn[standard]==0.54.0
 pydantic>=2.7
-httpx>=0.27.0
+httpx>=0.28.1
 python-dotenv>=1.0
 loguru>=0.7.3
 langgraph>=1.2.19  # Security: the version CORE CI and the images install; nSpect reads the minimum as the installed version, and the old 1.0.5 minimum carried known findings. Also covers CVE-2025-8709 (fixed in 1.0.5). Note: We use in-memory state (no SQLite checkpoint) as additional defense.
