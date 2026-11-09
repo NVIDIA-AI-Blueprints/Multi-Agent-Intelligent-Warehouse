@@ -4,7 +4,7 @@
 # =============================================================================
 # Frontend Build Stage
 # =============================================================================
-FROM node:20.19.0-alpine AS frontend-builder
+FROM node:26.13.0-alpine AS frontend-builder
 
 WORKDIR /app/src/ui/web
 
