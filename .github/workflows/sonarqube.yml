@@ -57,7 +57,7 @@ jobs:
     steps:
     - name: Resolve commit and CI run
       id: target
-      uses: actions/github-script@v7
+      uses: actions/github-script@v9
       env:
         CI_RUN_ID: ${{ inputs.ci_run_id }}
       with:
