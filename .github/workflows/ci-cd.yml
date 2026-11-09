@@ -148,7 +148,7 @@ jobs:
         retention-days: 7
 
     - name: Upload coverage reports
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v7
       with:
         files: ./coverage.xml
         flags: unittests
