@@ -27,7 +27,19 @@ _OBSERVE_PATTERNS: list[re.Pattern] = [
     re.compile(r"\bdid\s+it\s+(work|help|run|execute|succeed|go\s+through)\b", re.IGNORECASE),
     re.compile(r"\bdid\s+that\s+(work|help|execute|succeed|happen)\b", re.IGNORECASE),
     re.compile(r"\bdid\s+the\s+(action|execution|labor|allocation|worker)\b", re.IGNORECASE),
-    re.compile(r"\bwhat\s+happened\b", re.IGNORECASE),
+    # "What happened?" asks about the last action only when it stands alone or
+    # points at the action. "What happened to the carrier cutoff?" names
+    # warehouse state and is an ASK; matching the bare phrase sent it here,
+    # which answers "no governed action yet" or the last action's outcome (#287).
+    re.compile(r"\bwhat\s+(has\s+)?happened\s*[?.!]*\s*$", re.IGNORECASE),
+    re.compile(r"\bwhat\s+happened\s+(next|since|then|afterwards?|as\s+a\s+result)\b", re.IGNORECASE),
+    re.compile(
+        r"\bwhat\s+happened\s+(with|to|after)\s+"
+        r"(it|that|this|my\s+request|our\s+action|the\s+(action|execution|allocation|"
+        r"reassignment|dispatch|request|approval|change|recommendation))\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\bwhat\s+happened\s+(after|once|when)\s+(i|we|you)\b", re.IGNORECASE),
     re.compile(r"\bwhat\s+(was\s+the\s+|is\s+the\s+)?outcome\b", re.IGNORECASE),
     re.compile(r"\bwhat\s+(was\s+the\s+)?result\b", re.IGNORECASE),
     re.compile(r"\bany\s+(improvement|change|effect|impact)\b", re.IGNORECASE),
