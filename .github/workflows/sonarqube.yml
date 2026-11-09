@@ -104,7 +104,7 @@ jobs:
           core.info(`sha=${sha} ci_run_id=${runId} branch=${branch} pr=${prKey}`);
 
     - name: Checkout trusted scan tooling
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         ref: ${{ github.sha }}
         path: sonar-tools
@@ -116,7 +116,7 @@ jobs:
         persist-credentials: false
 
     - name: Checkout analyzed commit
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         ref: ${{ steps.target.outputs.sha }}
         path: source
