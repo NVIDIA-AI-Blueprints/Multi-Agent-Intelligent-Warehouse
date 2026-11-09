@@ -1,698 +1,142 @@
-name: Multi-Agent-Intelligent-Warehouse deployment test
-
-# This workflow strictly follows the 12-step deployment procedure from DEPLOYMENT.md:
-# 1. Clone repository
-# 2. Verify Node.js version (check_node_version.sh)
-# 3. Setup environment (setup_environment.sh)
-# 4. Configure environment variables (.env in deploy/compose/)
-# 5. Start infrastructure services (dev_up.sh)
-# 6. Wait for wosa-llm-nim (GET /v1/health/ready on :8000, up to 20 min, every 2 min)
-# 7. Run database migrations (5 SQL files via Docker Compose)
-# 8. Generate demo data (quick_demo_data.py)
-# 9. Generate historical demand data (generate_historical_demand.py)
-# 10. (Optional) Install RAPIDS GPU acceleration (install_rapids.sh)
-# 11. Start API server (start_server.sh)
-# 12. Start frontend (npm install + npm start)
+# Builds the Multi-Agent Intelligent Warehouse Demo Mode containers, waits for
+# the API and the UI to answer, then runs the UI E2E test suite from the shared
+# QA image.
 #
-# Post-deployment verification:
-# - Health checks: /health, /api/v1/health, /api/v1/health/simple
-# - Access points: Frontend (3001), API (8001), Docs, Metrics
-# - Integration tests
-# - MAIW UI tests: pytest -m maiw (blueprint-github-test image, --maiw-playground-url)
+# Required repository secrets:
+#   NVIDIA_API_KEY         NVIDIA API key for hosted inference (agent analysis
+#                          and Copilot).
+#   TEST_DOCKER_PULL_KEY   NVIDIA API key with pull access to
+#                          nvcr.io/rw983xdqtcdp/auto_test_team/blueprint-github-test-image.
+#                          If unset, the test step is skipped.
+#
+# Optional SMTP secrets (mail step skipped if any are missing):
+#   SMTP_USERNAME, SMTP_PASSWORD, SMTP_MAIL_TO, SMTP_MAIL_FROM
+
+name: Blueprint QA
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
+    inputs:
+      test_image:
+        description: QA test image
+        required: false
+        default: nvcr.io/rw983xdqtcdp/auto_test_team/blueprint-github-test-image:latest
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # Full Stack Deployment - Following DEPLOYMENT.md 13-Step Procedure
-  deploy-and-test:
-    # GPU ARC runners exist only in NVIDIA-AI-Blueprints; avoid infinite queue on forks.
-    if: github.repository == 'NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse'
-    #runs-on: ubuntu-latest
-    runs-on: arc-runners-org-nvidia-ai-bp-4-gpu
-    # The repository default token is read-only; checks: write lets the job
-    # post the separate "MAIW internal pytest (NGC)" commit check.
-    permissions:
-      contents: read
-      checks: write
-
+  multi-agent-intelligent-warehouse-ui:
+    name: Multi-Agent Intelligent Warehouse UI E2E
+    runs-on: arc-runners-org-nvidia-ai-bp-1-gpu
+    timeout-minutes: 120
+    env:
+      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      QA_TEST_IMAGE: ${{ inputs.test_image || 'nvcr.io/rw983xdqtcdp/auto_test_team/blueprint-github-test-image:latest' }}
+      API_URL: http://127.0.0.1:8001
+      UI_URL: http://127.0.0.1:3001
     steps:
-      # Step 1: Clone repository
-      - name: "Step 1: Clone repository"
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20  # Node.js 20.x LTS per DEPLOYMENT.md
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: 3.11
-          cache: 'pip'
-
-      # Step 2: Verify Node.js version (recommended before setup)
-      - name: "Step 2: Verify Node.js version"
-        run: |
-          echo "Running check_node_version.sh..."
-          chmod +x ./scripts/setup/check_node_version.sh
-          ./scripts/setup/check_node_version.sh
-
-      # Step 3: Setup environment
-      - name: "Step 3: Setup environment"
-        run: |
-          echo "Running setup_environment.sh..."
-          chmod +x ./scripts/setup/setup_environment.sh
-          ./scripts/setup/setup_environment.sh || echo "⚠️ Environment setup script completed"
-
-          # Ensure venv exists (script may create it)
-          if [ ! -d "env" ]; then
-            echo "Creating virtual environment..."
-            python -m venv env
-          fi
-
-          # Install dependencies
-          source env/bin/activate
-          pip install --upgrade pip
-          pip install -r requirements.txt
-
-      # Step 4: Configure environment variables (REQUIRED before starting services)
-      - name: "Step 4: Configure environment variables"
-        env:
-          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
-        run: |
-          echo "Creating .env file for Docker Compose (recommended location)..."
-          cp .env.example deploy/compose/.env
-
-          # Edit with test values
-          echo "NVIDIA_API_KEY=${NVIDIA_API_KEY}" >> deploy/compose/.env
-          echo "LLM_NIM_URL=https://integrate.api.nvidia.com/v1" >> deploy/compose/.env
-
-          # Governed writes for the e2e smoke / durability steps: the backend
-          # executes approved writes through the MCP containers and journals
-          # them.  The operator write token is random per run and masked.
-          sed -i 's/^MAIW_DEPLOYMENT_PROFILE=.*/MAIW_DEPLOYMENT_PROFILE=reference_governed/' deploy/compose/.env
-          OPERATOR_TOKEN=$(python3 -c "import secrets; print(secrets.token_hex(32))")
-          echo "::add-mask::${OPERATOR_TOKEN}"
-          echo "MAIW_OPERATOR_WRITE_TOKEN=${OPERATOR_TOKEN}" >> deploy/compose/.env
-
-          echo "✅ .env file configured at deploy/compose/.env"
-
-          # scripts/setup/dev_up.sh sources and edits .env in the repository root (cwd), not deploy/compose/.env
-          cp deploy/compose/.env .env
-          echo "✅ Root .env synced for dev_up.sh"
-
-      # Prerequisite: Authenticate Docker to NGC registry for private NIM image pulls
-      - name: "Authenticate Docker to nvcr.io"
-        env:
-          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
-        run: |
-          if [ -z "${NVIDIA_API_KEY}" ]; then
-            echo "❌ Missing required secret: NVIDIA_API_KEY"
-            echo "   Set NVIDIA_API_KEY to an NGC registry API key with Catalog/registry access."
-            exit 1
-          fi
-
-          echo "Logging into nvcr.io..."
-          echo "${NVIDIA_API_KEY}" | docker login nvcr.io -u '$oauthtoken' --password-stdin
-          echo "✅ Docker authenticated to nvcr.io"
-
-      # Inject NGC_API_KEY for llm-nim (CI only; keeps deploy/compose/docker-compose.dev.yaml unchanged in repo)
-      - name: "Patch docker-compose.dev.yaml (llm-nim NGC_API_KEY)"
-        run: |
-          python3 <<'PY'
-          from pathlib import Path
-          path = Path("deploy/compose/docker-compose.dev.yaml")
-          text = path.read_text().replace("\r\n", "\n")
-          # Avoid $ in workflow YAML (heredoc may leave $$ literal); build compose ${...} with chr(36)
-          d = chr(36)
-          marker = "      - NVIDIA_API_KEY=" + d + "{NVIDIA_API_KEY:-}\n"
-          ngc = "      - NGC_API_KEY=" + d + "{NVIDIA_API_KEY:-}\n"
-          if "NGC_API_KEY" in text:
-              print("NGC_API_KEY already present; skipping patch")
-          elif marker not in text:
-              raise SystemExit("patch anchor not found: expected llm-nim line " + repr(marker.strip()))
-          else:
-              path.write_text(text.replace(marker, marker + ngc, 1))
-              print("Patched llm-nim: inserted NGC_API_KEY after NVIDIA_API_KEY")
-          PY
-
-      # Authenticate to Docker Hub and Quay to avoid rate limits / pull access denied
-      - name: "Authenticate to Docker Hub and Quay (public image registries)"
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
-          QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
-          QUAY_PASSWORD: ${{ secrets.QUAY_PASSWORD }}
-        run: |
-          if [ -n "${DOCKERHUB_USERNAME}" ] && [ -n "${DOCKERHUB_PASSWORD}" ]; then
-            echo "${DOCKERHUB_PASSWORD}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
-            echo "✅ Authenticated to Docker Hub"
-          else
-            echo "⚠️  DOCKERHUB_USERNAME/DOCKERHUB_PASSWORD not set — pulling Docker Hub images anonymously (rate limits may apply)"
-          fi
-          if [ -n "${QUAY_USERNAME}" ] && [ -n "${QUAY_PASSWORD}" ]; then
-            echo "${QUAY_PASSWORD}" | docker login quay.io -u "${QUAY_USERNAME}" --password-stdin
-            echo "✅ Authenticated to quay.io"
-          else
-            echo "⚠️  QUAY_USERNAME/QUAY_PASSWORD not set — pulling quay.io images anonymously (rate limits may apply)"
-          fi
-
-      # Pre-pull infrastructure images from compose file — single source of truth, no tag drift
-      - name: "Pre-pull required compose images"
-        run: |
-          set -e
-          # Pull only infrastructure services (exclude llm-nim which needs GPU profile)
-          docker compose -f deploy/compose/docker-compose.dev.yaml pull \
-            etcd minio redis timescaledb kafka nginx milvus
-          echo "✅ All compose images pre-pulled"
-
-      # Step 5: Start infrastructure services
-      - name: "Step 5: Start infrastructure services"
-        run: |
-          echo "Running dev_up.sh..."
-          chmod +x ./scripts/setup/dev_up.sh
-          ./scripts/setup/dev_up.sh
-
-          # Wait for services to be ready
-          echo "Waiting for services to be ready..."
-          sleep 120
-          echo "Docker containers (docker ps --all):"
-          docker ps --all
-          echo "Docker logs (wosa-backend):"
-          docker logs wosa-backend
-          echo "✅ Infrastructure services started"
-
-      # Step 6: Ensure wosa-llm-nim (LLM NIM) is ready
-      # Skipped in CI: llm-nim runs under the 'gpu' profile and is not started here.
-      # CI uses LLM_NIM_URL=https://integrate.api.nvidia.com/v1 (hosted Nemotron API).
-      - name: "Step 6: Wait for wosa-llm-nim ready"
-        if: false
-        run: |
-          set -e
-          NIM_HEALTH_URL="http://127.0.0.1:8000/v1/health/ready"
-          INTERVAL_SEC=120
-          TIMEOUT_SEC=1200
-
-          echo "Checking wosa-llm-nim container..."
-          docker ps --all --filter "name=wosa-llm-nim" || true
-
-          echo "Polling ${NIM_HEALTH_URL} every ${INTERVAL_SEC}s (2 min), total timeout ${TIMEOUT_SEC}s (20 min)"
-          start_ts=$(date +%s)
-          attempt=1
-          while true; do
-            echo ""
-            echo "--- Attempt ${attempt} at $(date -u +"%Y-%m-%dT%H:%M:%SZ") ---"
-            http_code=$(curl -sS -o /tmp/wosa_nim_health.txt -w "%{http_code}" "$NIM_HEALTH_URL" || echo "000")
-            echo "Response body:"
-            cat /tmp/wosa_nim_health.txt
-            echo ""
-            echo "HTTP status code: ${http_code}"
-
-            if [ "$http_code" = "200" ]; then
-              echo "✅ wosa-llm-nim is ready (/v1/health/ready returned 200)"
-              exit 0
-            fi
-
-            now_ts=$(date +%s)
-            elapsed=$((now_ts - start_ts))
-            if [ "$elapsed" -ge "$TIMEOUT_SEC" ]; then
-              echo "❌ Timeout: wosa-llm-nim did not become ready within ${TIMEOUT_SEC}s (20 min)"
-              echo ""
-              echo "Docker logs (wosa-llm-nim, last 2000 lines):"
-              docker logs --tail 2000 wosa-llm-nim 2>&1 || echo "(could not read logs: container missing or stopped)"
-              exit 1
-            fi
-
-            remaining=$((TIMEOUT_SEC - elapsed))
-            sleep_sec=$INTERVAL_SEC
-            if [ "$remaining" -lt "$sleep_sec" ]; then
-              sleep_sec=$remaining
-            fi
-            echo "Not ready yet. Sleeping ${sleep_sec}s before next check (${elapsed}s elapsed, ${remaining}s remaining until timeout)..."
-            sleep "$sleep_sec"
-            attempt=$((attempt + 1))
-          done
-
-      # Step 7: Run database migrations
-      - name: "Step 7: Run database migrations"
-        run: |
-          source env/bin/activate
-
-          # Load environment variables from .env file (REQUIRED before running migrations)
-          set -a && source deploy/compose/.env && set +a
-
-          echo "Running database migrations (Docker Compose method)..."
-
-          # Migration 1/5
-          echo "Running 000_schema.sql..."
-          docker compose -f deploy/compose/docker-compose.dev.yaml exec -T timescaledb psql -U warehouse -d warehouse < data/postgres/000_schema.sql
-
-          # Migration 2/5
-          echo "Running 001_equipment_schema.sql..."
-          docker compose -f deploy/compose/docker-compose.dev.yaml exec -T timescaledb psql -U warehouse -d warehouse < data/postgres/001_equipment_schema.sql
-
-          # Migration 3/5
-          echo "Running 002_document_schema.sql..."
-          docker compose -f deploy/compose/docker-compose.dev.yaml exec -T timescaledb psql -U warehouse -d warehouse < data/postgres/002_document_schema.sql
-
-          # Migration 4/5
-          echo "Running 004_inventory_movements_schema.sql..."
-          docker compose -f deploy/compose/docker-compose.dev.yaml exec -T timescaledb psql -U warehouse -d warehouse < data/postgres/004_inventory_movements_schema.sql
-
-          # Migration 5/5
-          echo "Running create_model_tracking_tables.sql..."
-          docker compose -f deploy/compose/docker-compose.dev.yaml exec -T timescaledb psql -U warehouse -d warehouse < scripts/setup/create_model_tracking_tables.sql
-
-          echo "✅ All 5 migrations completed"
-
-      # Step 8: Generate demo data (optional but recommended)
-      - name: "Step 8: Generate demo data"
-        run: |
-          source env/bin/activate
-          set -a && source deploy/compose/.env && set +a
-
-          echo "Running quick_demo_data.py..."
-          python scripts/data/quick_demo_data.py
-          echo "✅ Demo data generated"
-
-      # Step 9: Generate historical demand data for forecasting (optional, required for Forecasting page)
-      - name: "Step 9: Generate historical demand data"
-        run: |
-          source env/bin/activate
-          set -a && source deploy/compose/.env && set +a
-
-          echo "Running generate_historical_demand.py..."
-          python scripts/data/generate_historical_demand.py || echo "⚠️ Historical demand generation failed (non-blocking)"
-          echo "✅ Historical demand data generated"
-
-      # Step 10: (Optional) Install RAPIDS GPU acceleration
-      - name: "Step 10: (Optional) Install RAPIDS GPU acceleration"
-        run: |
-          source env/bin/activate
-
-          echo "Installing RAPIDS GPU acceleration..."
-          chmod +x ./scripts/setup/install_rapids.sh
-          ./scripts/setup/install_rapids.sh || echo "⚠️ RAPIDS installation failed (will use CPU fallback)"
-
-          # RAPIDS may upgrade pandas to ≥3.0, which breaks nemoguardrails 0.23
-          # (requires pandas<3).  Re-pin after installation.
-          pip install --quiet 'pandas<3' || true
-
-          echo "✅ RAPIDS GPU acceleration setup completed"
-
-      # Step 11: Start API server
-      - name: "Step 11: Start API server"
-        run: |
-          source env/bin/activate
-          set -a && source deploy/compose/.env && set +a
-
-          PORT=${PORT:-8001}
-
-          # dev_up.sh (Step 5) builds and starts wosa-backend via Docker Compose
-          # on port 8001.  Check for the named container first; fall back to a
-          # port-level check if the container name is unexpected.
-          if docker ps --format '{{.Names}}' | grep -q '^wosa-backend$'; then
-            echo "wosa-backend Docker container is running — using it for health checks."
-          elif lsof -Pi :"$PORT" -sTCP:LISTEN -t >/dev/null 2>&1; then
-            echo "Port $PORT is already occupied by another process — using it."
-          else
-            echo "No existing API server found; starting local server..."
-            chmod +x ./scripts/start_server.sh
-            ./scripts/start_server.sh &
-            echo "Waiting for API server to start..."
-            sleep 20
-          fi
-          echo "✅ API server ready"
-
-      # Step 12: Start frontend
-      - name: "Step 12: Start frontend"
-        run: |
-          echo "Starting frontend..."
-          cd src/ui/web
-
-          # Fix EACCES when node_modules was created by root / a prior job
-          if command -v sudo >/dev/null 2>&1; then
-            sudo chown -R "$(id -u):$(id -g)" . || true
-          fi
-          rm -rf node_modules
-          npm cache clean --force
-
-          echo "Running npm ci (deterministic install from lockfile)..."
-          npm ci
-
-          echo "Starting frontend dev server in background..."
-          npm start &
-
-          # Wait for frontend to start
-          echo "Waiting for frontend to start..."
-          sleep 15
-
-          echo "✅ Frontend started"
-
-      # Post-Deployment: Verify health checks and access points
-      - name: "Verify: API health checks"
-        run: |
-          # Poll /api/v1/live (liveness probe — no DB/Redis/Milvus deps, always fast).
-          # The legacy /health path does not exist in maiw_api.app:app.
-          max_retries=30
-          retry_count=0
-
-          echo "Waiting for API server to be ready (polling /api/v1/live)..."
-          until curl -fsS http://localhost:8001/api/v1/live >/dev/null 2>&1 || [ $retry_count -eq $max_retries ]; do
-            echo "Attempt $((retry_count + 1))/$max_retries: API not ready yet..."
-            sleep 2
-            retry_count=$((retry_count + 1))
-          done
-
-          if [ $retry_count -eq $max_retries ]; then
-            echo "❌ API failed to start after $max_retries attempts"
-            echo "Docker status:"
-            docker ps --all --filter "name=wosa-backend"
-            echo "Docker logs (wosa-backend, last 50 lines):"
-            docker logs --tail 50 wosa-backend 2>&1 || true
-            exit 1
-          fi
-
-          echo "✅ API is ready!"
-
-          # Test canonical health endpoints
-          echo "Testing /api/v1/live..."
-          curl -fsS http://localhost:8001/api/v1/live | python3 -m json.tool
-
-          echo "Testing /api/v1/health..."
-          curl -fsS http://localhost:8001/api/v1/health | python3 -m json.tool
-
-          echo "Testing /api/v1/health/simple..."
-          curl -fsS http://localhost:8001/api/v1/health/simple | python3 -m json.tool
-
-          # Readiness gate: /api/v1/live only proves the process is up.
-          # /api/v1/ready returns 200 only when every critical component
-          # (persistence, database, model gateway, ...) is ready, else 503.
-          echo "Waiting for /api/v1/ready (critical components)..."
-          ready_code=000
-          for attempt in $(seq 1 30); do
-            ready_code=$(curl -s -o /tmp/maiw_ready.json -w '%{http_code}' http://localhost:8001/api/v1/ready || true)
-            [ "$ready_code" = "200" ] && break
-            echo "Attempt $attempt/30: /api/v1/ready -> HTTP $ready_code"
-            sleep 2
-          done
-          python3 -m json.tool /tmp/maiw_ready.json || cat /tmp/maiw_ready.json || true
-          if [ "$ready_code" != "200" ]; then
-            echo "❌ /api/v1/ready returned HTTP $ready_code (see failed_components above)"
-            docker logs --tail 80 wosa-backend 2>&1 || true
-            exit 1
-          fi
-
-          echo "✅ All health checks passed!"
-
-      # The four MCP domain servers (Dockerfile.mcp) must stay up and answer
-      # MCP initialize + tools/list.  The backend's /api/v1/ready does not
-      # cover them under the reference profile, where no MCP domain is required.
-      - name: "Verify: MCP domain servers"
-        run: |
-          failed=0
-          for c in wosa-mcp-inventory wosa-mcp-equipment wosa-mcp-labor wosa-mcp-wave; do
-            state=$(docker inspect -f '{{.State.Status}} restarts={{.RestartCount}}' "$c" 2>/dev/null || echo "missing")
-            echo "$c: $state"
-            if [ "$state" != "running restarts=0" ]; then
-              echo "❌ $c is not running cleanly; last log lines:"
-              docker logs --tail 30 "$c" 2>&1 || true
-              failed=1
-            fi
-          done
-          [ "$failed" -eq 0 ] || exit 1
-
-          python3 scripts/testing/probe_mcp_servers.py || {
-            for c in wosa-mcp-inventory wosa-mcp-equipment wosa-mcp-labor wosa-mcp-wave; do
-              echo "--- $c"; docker logs --tail 30 "$c" 2>&1 || true
-            done
-            exit 1
-          }
-          echo "✅ All MCP domain servers answered"
-
-      # Public end-to-end smoke (no internal images): disposable fixture rows,
-      # a read tool in every domain, a write tool in equipment/labor/wave, and
-      # each outcome checked in the tool result, the database and a read-back.
-      - name: "E2E: MCP tool calls"
-        run: |
-          source env/bin/activate
-          set -a && source deploy/compose/.env && set +a
-          python scripts/testing/smoke_e2e.py mcp-tools || {
-            for c in wosa-mcp-inventory wosa-mcp-equipment wosa-mcp-labor wosa-mcp-wave; do
-              echo "--- $c"; docker logs --tail 40 "$c" 2>&1 || true
-            done
-            exit 1
-          }
-
-      # Durability: create an execution record through the app (governed
-      # equipment release), restart the backend, read the same record back.
-      - name: "E2E: durability across backend restart"
-        run: |
-          source env/bin/activate
-          set -a && source deploy/compose/.env && set +a
-          STATE="${RUNNER_TEMP}/maiw_durability_record.json"
-          python scripts/testing/smoke_e2e.py durability-create --state-file "$STATE" || {
-            docker logs --tail 80 wosa-backend 2>&1 || true
-            exit 1
-          }
-
-          before=$(docker inspect -f '{{.State.StartedAt}}' wosa-backend)
-          docker restart wosa-backend
-          after=$(docker inspect -f '{{.State.StartedAt}}' wosa-backend)
-          echo "wosa-backend StartedAt: $before -> $after"
-          if [ "$before" = "$after" ]; then
-            echo "❌ wosa-backend did not restart"
-            exit 1
-          fi
-
-          ready_code=000
-          for attempt in $(seq 1 45); do
-            ready_code=$(curl -s -o /tmp/maiw_ready_restart.json -w '%{http_code}' http://localhost:8001/api/v1/ready || true)
-            [ "$ready_code" = "200" ] && break
-            sleep 2
-          done
-          if [ "$ready_code" != "200" ]; then
-            echo "❌ /api/v1/ready returned HTTP $ready_code after restart"
-            cat /tmp/maiw_ready_restart.json || true
-            docker logs --tail 80 wosa-backend 2>&1 || true
-            exit 1
-          fi
-          echo "✅ backend READY after restart"
-
-          python scripts/testing/smoke_e2e.py durability-verify --state-file "$STATE" || {
-            docker logs --tail 80 wosa-backend 2>&1 || true
-            exit 1
-          }
-
-      - name: "Verify: API access points"
-        run: |
-          echo "Verifying all API access points per DEPLOYMENT.md..."
-
-          # Test API Documentation endpoint
-          echo "Testing /docs endpoint..."
-          curl -f http://localhost:8001/docs &>/dev/null || echo "⚠️ /docs endpoint not accessible (may require browser)"
-
-          # Test Metrics endpoint (Prometheus format)
-          echo "Testing /api/v1/metrics endpoint..."
-          curl -f http://localhost:8001/api/v1/metrics || echo "⚠️ /api/v1/metrics not available"
-
-          # Test API version endpoint
-          echo "Testing /api/v1/version endpoint..."
-          curl -f http://localhost:8001/api/v1/version || echo "⚠️ /api/v1/version not available"
-
-          echo "✅ Access point verification completed!"
-
-      # #277: the bundled Prometheus joins the dev stack's network and must
-      # scrape the API (backend:8001) and the Postgres / Redis exporters.
-      - name: "Verify: monitoring stack scrapes the API"
+      - name: Deploy Demo Mode containers
         run: |
           set -euo pipefail
-          MON=(docker compose -f deploy/compose/docker-compose.monitoring.yaml)
-          export GRAFANA_ADMIN_PASSWORD=$(python3 -c "import secrets; print(secrets.token_hex(16))")
-          echo "::add-mask::${GRAFANA_ADMIN_PASSWORD}"
-          # Separate project (name: maiw-monitoring): this removes only the
-          # monitoring containers and volumes, never the dev stack.
-          trap '"${MON[@]}" down -v' EXIT
+          : "${NVIDIA_API_KEY:?NVIDIA_API_KEY secret missing}"
+          docker build -f Dockerfile.backend -t maiw-backend .
+          docker build -f Dockerfile.frontend -t maiw-frontend .
+          docker network create maiw-demo 2>/dev/null || true
+          docker run -d --name maiw-backend --network maiw-demo -p 127.0.0.1:8001:8001 \
+            -e NVIDIA_API_KEY \
+            -e MAIW_DEPLOYMENT_PROFILE=demo -e MAIW_DEMO_MODE=true \
+            -e MAIW_SANDBOX_MODE=disabled -e MAIW_PERSISTENCE_MODE=memory \
+            maiw-backend
+          docker run -d --name maiw-frontend --network maiw-demo -p 127.0.0.1:3001:8080 \
+            -e MAIW_API_UPSTREAM=http://maiw-backend:8001 \
+            maiw-frontend
 
-          docker network inspect compose_default >/dev/null
-          "${MON[@]}" up -d prometheus postgres-exporter redis-exporter
-
-          query() {
-            # Prints the first value, or "none" (also while Prometheus is starting).
-            curl -sf --get http://127.0.0.1:9090/api/v1/query --data-urlencode "query=$1" 2>/dev/null \
-              | python3 -c "import json,sys
-          try: r=json.load(sys.stdin)['data']['result']
-          except ValueError: r=[]
-          print(r[0]['value'][1] if r else 'none')" || true
-          }
-          for i in $(seq 1 24); do
-            api=$(query 'up{job="warehouse-api"}' || echo none)
-            pg=$(query 'pg_up' || echo none)
-            redis=$(query 'redis_up' || echo none)
-            echo "attempt $i: warehouse-api=$api pg_up=$pg redis_up=$redis"
-            if [ "$api" = 1 ] && [ "$pg" = 1 ] && [ "$redis" = 1 ]; then break; fi
-            sleep 5
-          done
-          [ "$api" = 1 ] && [ "$pg" = 1 ] && [ "$redis" = 1 ] || {
-            curl -s http://127.0.0.1:9090/api/v1/targets | python3 -m json.tool | head -80
-            "${MON[@]}" logs --tail 50
+          echo "Waiting for the API (READY, demo profile) and the UI to answer (up to 10 min)..."
+          if ! timeout 600 bash -c 'until curl -s "${API_URL}/api/v1/ready" | python3 -c "import json,sys; b=json.load(sys.stdin); sys.exit(0 if b.get(\"status\") == \"READY\" and b.get(\"profile\") == \"demo\" else 1)" > /dev/null 2>&1 && curl -fsS -o /dev/null "${UI_URL}/"; do sleep 10; done'; then
+            echo "::error::The API did not report READY with the demo profile, or the UI did not answer, within 10 minutes."
+            docker ps -a
+            curl -s "${API_URL}/api/v1/ready" || true
             exit 1
-          }
-          requests=$(query 'sum(http_requests_total{job="warehouse-api"})')
-          echo "http_requests_total (scraped): $requests"
-          [ "$requests" != none ]
-          echo "milvus: up=$(query 'up{job="milvus"}' || echo none) (informational)"
-          echo "✅ Prometheus scrapes the API, PostgreSQL and Redis"
+          fi
+          curl -s "${API_URL}/api/v1/ready"
+          echo
+          echo "API and UI are ready."
 
-      # A real pytest failure fails the job.  When the internal NGC test image
-      # is unavailable (no key / no org access) the step is skipped, but the
-      # skip is reported as E2E=NOT_RUN in the job summary, annotations and
-      # the result mail rather than passing silently.
-      - name: "Post-deploy: Run MAIW pytest (pytest -m maiw)"
-        id: maiw_pytest
+      - name: Run UI automation tests
         env:
           TEST_DOCKER_PULL_KEY: ${{ secrets.TEST_DOCKER_PULL_KEY }}
         run: |
-          set -e
-          echo "Waiting for MAIW frontend on http://127.0.0.1:3001 (required for Playwright UI tests)..."
-          max_retries=30
-          retry_count=0
-          until curl -f -s -o /dev/null http://127.0.0.1:3001/ || [ $retry_count -eq $max_retries ]; do
-            echo "Attempt $((retry_count + 1))/$max_retries: frontend not ready..."
-            sleep 2
-            retry_count=$((retry_count + 1))
-          done
-          if [ $retry_count -eq $max_retries ]; then
-            echo "❌ MAIW frontend not reachable on port 3001"
-            exit 1
-          fi
-          echo "✅ MAIW frontend is ready"
-
-          echo "Authenticating to nvcr.io for blueprint-github-test image pull..."
-          if [ -z "${TEST_DOCKER_PULL_KEY}" ]; then
-            echo "::warning title=MAIW pytest NOT RUN::TEST_DOCKER_PULL_KEY not set (requires internal NGC access)"
-            echo "E2E=NOT_RUN" >> "$GITHUB_OUTPUT"
-            echo "REASON=TEST_DOCKER_PULL_KEY not set (requires internal NGC access)" >> "$GITHUB_OUTPUT"
-            echo "### ⚠️ MAIW pytest NOT RUN — TEST_DOCKER_PULL_KEY not set" >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
+          set -euo pipefail
+          [ -n "${TEST_DOCKER_PULL_KEY:-}" ] || exit 0
           echo "${TEST_DOCKER_PULL_KEY}" | docker login nvcr.io -u '$oauthtoken' --password-stdin
+          docker pull "${QA_TEST_IMAGE}"
+          docker run --rm --net=host -v "$(pwd):/workspace" "${QA_TEST_IMAGE}" \
+            pytest -m maiw \
+              --maiw-playground-url="${UI_URL}" \
+              --reruns=2 --reruns-delay=15 \
+              --disable-warnings -v --timeout=240 \
+              --html=/workspace/maiw-ui-test.html --self-contained-html
 
-          echo "Pulling blueprint-github-test image for pytest..."
-          TEST_IMAGE="nvcr.io/rw983xdqtcdp/auto_test_team/blueprint-github-test-image:latest"
-          if ! docker pull "${TEST_IMAGE}"; then
-            echo "::warning title=MAIW pytest NOT RUN::could not pull ${TEST_IMAGE} (requires internal NGC org access)"
-            echo "E2E=NOT_RUN" >> "$GITHUB_OUTPUT"
-            echo "REASON=could not pull the internal test image (requires internal NGC org access)" >> "$GITHUB_OUTPUT"
-            echo "### ⚠️ MAIW pytest NOT RUN — could not pull the internal test image" >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
+      - name: Capture failure diagnostics
+        if: failure()
+        run: |
+          mkdir -p ci-diagnostics
+          docker ps -a > ci-diagnostics/docker-ps.txt 2>&1 || true
+          docker logs --timestamps --tail 300 maiw-backend > ci-diagnostics/maiw-backend.txt 2>&1 || true
+          docker logs --timestamps --tail 300 maiw-frontend > ci-diagnostics/maiw-frontend.txt 2>&1 || true
 
-          mkdir -p "${GITHUB_WORKSPACE}/reports"
-          echo "Running: pytest -m maiw --maiw-playground-url=http://127.0.0.1:3001"
-          set +e
-          docker run --net=host --rm \
-            -v "${GITHUB_WORKSPACE}/reports:/reports" \
-            "${TEST_IMAGE}" \
-            pytest -m maiw --maiw-playground-url=http://127.0.0.1:3001 --disable-warnings --self-contained-html --html=/reports/maiw_test_report.html
-          PYTEST_EXIT=$?
-          set -e
-
-          echo "Docker logs (wosa-frontend):"
-          docker logs wosa-frontend 2>&1 || true
-          echo "Docker logs (wosa-backend):"
-          docker logs wosa-backend 2>&1 || true
-
-          if [ "$PYTEST_EXIT" -eq 0 ]; then
-            echo "✅ MAIW pytest completed"
-            echo "E2E=PASSED" >> "$GITHUB_OUTPUT"
-            echo "### ✅ MAIW pytest passed" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "❌ MAIW pytest failed (exit code: ${PYTEST_EXIT})"
-            echo "E2E=FAILED" >> "$GITHUB_OUTPUT"
-            echo "### ❌ MAIW pytest failed (exit code ${PYTEST_EXIT})" >> "$GITHUB_STEP_SUMMARY"
-          fi
-          exit "$PYTEST_EXIT"
-
-      # The job above passes when the suite is NOT RUN (deployment and
-      # readiness only). Publish the suite's own result as a separate commit
-      # check so a NOT RUN cannot hide behind the green deployment check.
-      - name: "Report MAIW pytest as a commit check"
-        if: always()
-        env:
-          E2E: ${{ steps.maiw_pytest.outputs.E2E }}
-          REASON: ${{ steps.maiw_pytest.outputs.REASON }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python3 scripts/ci/report_maiw_pytest_check.py
-
-      - name: Upload MAIW pytest HTML report
+      - name: Upload report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: maiw-pytest-report
-          path: reports/maiw_test_report.html
+          name: maiw-ui-test
+          path: |
+            maiw-ui-test.html
+            ci-diagnostics/
           if-no-files-found: ignore
           retention-days: 30
 
-      - name: Upload production checklist
+      - name: Cleanup
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: production-deployment-checklist
-          path: production-checklist.md
-          if-no-files-found: ignore
-          retention-days: 90
-  
-      - name: Set result output
-        id: set_result
-        if: always()  
         run: |
-          if [ "${{ job.status }}" != "success" ]; then
-            RESULT=FAIL
-          elif [ "${{ steps.maiw_pytest.outputs.E2E }}" = "PASSED" ]; then
-            RESULT=PASS
-          else
-            RESULT="PASS (deployment and readiness only; MAIW pytest NOT RUN)"
-          fi
-          echo "RESULT=${RESULT}" >> $GITHUB_OUTPUT
-   
-      # Pinned to v7: the repository's allowed-actions list permits only this
-      # commit of dawidd6/action-send-mail. Any other SHA makes the whole
-      # workflow fail at startup; add the new SHA to the allowlist first.
-      - name: Send mail
-        uses: dawidd6/action-send-mail@6e71c855c9a091d80a519621b9fd3e8d252ca40c # v7
+          docker rm -f maiw-frontend maiw-backend 2>/dev/null || true
+          docker network rm maiw-demo 2>/dev/null || true
+          docker rmi maiw-backend maiw-frontend "${QA_TEST_IMAGE}" 2>/dev/null || true
+          docker image prune -f
+
+      - name: Detect SMTP
+        id: smtp
         if: always()
+        env:
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_MAIL_TO: ${{ secrets.SMTP_MAIL_TO }}
+          SMTP_MAIL_FROM: ${{ secrets.SMTP_MAIL_FROM }}
+        run: |
+          [ -n "${SMTP_USERNAME:-}${SMTP_PASSWORD:-}${SMTP_MAIL_TO:-}${SMTP_MAIL_FROM:-}" ] \
+            && [ -n "${SMTP_USERNAME:-}" ] && [ -n "${SMTP_PASSWORD:-}" ] \
+            && [ -n "${SMTP_MAIL_TO:-}" ] && [ -n "${SMTP_MAIL_FROM:-}" ] \
+            && echo "enabled=true" >> "$GITHUB_OUTPUT" \
+            || echo "enabled=false" >> "$GITHUB_OUTPUT"
+
+      - name: Send mail
+        if: always() && steps.smtp.outputs.enabled == 'true'
+        uses: dawidd6/action-send-mail@6e71c855c9a091d80a519621b9fd3e8d252ca40c
+        continue-on-error: true
         with:
           server_address: smtp.gmail.com
           server_port: 587
           username: ${{ secrets.SMTP_USERNAME }}
           password: ${{ secrets.SMTP_PASSWORD }}
-          
-          # Email details
-          # Same prefix as before, with the result appended, so a NOT RUN is
-          # visible without opening the mail.
-          subject: "QA Test Workflow Result for ${{ github.repository }}: ${{ steps.set_result.outputs.RESULT }}"
-          to: Github-Action-Blueprint-QA@nvidia.com
-          from: github-workflow-notification@gmail.com
+          subject: "QA Test Workflow Result for ${{ github.repository }}"
+          to: ${{ secrets.SMTP_MAIL_TO }}
+          from: ${{ secrets.SMTP_MAIL_FROM }}
           html_body: |
-            <p>Hello,</p>
-            
-            <p>The workflow for repository: <strong>${{ github.repository }}</strong> has completed.<br>
-            <strong>Result:</strong> ${{ steps.set_result.outputs.RESULT }}<br>
-            <strong>MAIW pytest:</strong> ${{ steps.maiw_pytest.outputs.E2E || 'NOT_RUN' }}</p>
-            
-            <p>You can review the details on GitHub:<br>
-            <a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}">${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}</a></p>
-            
-            <p>Thanks!</p>      
-
+            <p>Workflow for <strong>${{ github.repository }}</strong> finished: <strong>${{ job.status }}</strong></p>
+            <p><a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}">View run</a></p>
