@@ -414,7 +414,12 @@ class TestAgentFactSynthesis:
     async def test_deterministic_severity_is_high(
         self, labor_provider, wave_provider, equipment_provider
     ):
-        """Risk score for Scenario 001 = 50 (at_risk only) → severity HIGH, not CRITICAL."""
+        """Risk score for Scenario 001 = 80 → severity HIGH, not CRITICAL.
+
+        at_risk (+50) plus pending tasks with idle workers (+30, the
+        labor-allocation rule added in #92). The test was written before that
+        rule and expected 50 → medium (#287).
+        """
         from maiw_agents.operations.agent import OperationsCoordinationAgent
 
         snapshot = await _build_snapshot(labor_provider, wave_provider, equipment_provider)
@@ -424,10 +429,11 @@ class TestAgentFactSynthesis:
             scenario_context="Why is Wave 1 at risk?",
             trace_id="test-provenance-001c",
         )
-        assert assessment.severity == "medium", (
-            f"Scenario 001 deterministic score = 50 → should be 'medium' (threshold for high is 60), "
+        assert assessment.severity == "high", (
+            f"Scenario 001 deterministic score = 80 → should be 'high' (60 ≤ score < 90), "
             f"got {assessment.severity}. "
-            "at_risk(+50), available_workers=2 (not <2→+0), util=50% (not >85%→+0), no offline(+0)."
+            "at_risk(+50), pending tasks with idle workers (+30), available_workers=2 (not <2→+0), "
+            "util=50% (not >85%→+0), no offline(+0)."
         )
 
     @pytest.mark.asyncio

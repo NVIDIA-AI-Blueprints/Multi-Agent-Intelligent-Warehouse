@@ -211,10 +211,17 @@ async def test_scenario_reset_clears_completion_log():
     assert kpi_after.wave_completion_pct == 0.0
 
 
-# ── Test 7: stale_state has no CRITICAL wave risk ─────────────────────────────
+# ── Test 7: stale_state KPIs follow the seeded world ──────────────────────────
+#
+# This test used to assert that stale_state is not CRITICAL and that its clock
+# is not negative. Neither ever held (#287): the scenario is 45 minutes stale by
+# design (clock_offset_seconds -2700, pinned at 07:15 UTC by
+# tests/demo/test_demo_premerge_validation.py), and it seeds task-002, an
+# unassigned high-priority SHIP task with a deadline, which the KPI engine
+# rates CRITICAL. The scenario exists for the stale-state governance path.
 
 
-def test_stale_state_no_wave_critical():
+def test_stale_state_kpis_follow_the_seeded_world():
     import yaml
 
     data = yaml.safe_load((_SCENARIOS_DIR / "stale_state.yaml").read_text())
@@ -223,10 +230,20 @@ def test_stale_state_no_wave_critical():
     w = DemoWarehouseWorld()
     w.seed(initial, rng_seed=42)
     snap = DemoKPIEngine(w).compute()
-    assert (
-        snap.wave_risk_level != "critical"
-    ), f"stale_state should not be CRITICAL, got {snap.wave_risk_level}"
-    assert snap.sim_time_seconds >= 0
+
+    assert data["clock_offset_seconds"] == -2700
+    assert snap.sim_time_seconds == -2700
+    assert "07:15" in snap.clock_iso
+
+    ship = w.tasks["task-002"]
+    assert (ship.task_type, ship.status, ship.priority, ship.assigned_to) == (
+        "SHIP",
+        "pending",
+        "high",
+        None,
+    )
+    assert ship.deadline is not None
+    assert snap.wave_risk_level == "critical"
 
 
 # ── Test 8: No execution → no recovery in stale_state ────────────────────────

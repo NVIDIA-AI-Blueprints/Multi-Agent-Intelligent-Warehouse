@@ -4,6 +4,7 @@
 
 ```bash
 python -m pytest tests/unit/ tests/contract/ tests/mcp/ tests/api/ packages/maiw-agents/tests/ \
+  apps/api/tests/ apps/api/maiw_api/demo/tests/ \
   --timeout=120 \
   --ignore=tests/unit/test_all_agents.py \
   --ignore=tests/unit/test_basic.py \
@@ -36,7 +37,7 @@ Coverage covers the shipped app (`apps/`) and packages (`packages/`) as well as 
 total line coverage was 49.7% when the 48% floor was set (2026-11-01). CI fails below the
 floor. The Codecov upload is informational and does not gate CI.
 
-> **Note:** `ci-cd.yml` previously ran only `tests/unit/` (327 tests). As of Phase 9A it was corrected to run `tests/unit/ tests/contract/ tests/mcp/` (528 tests). Phase 9B adds `tests/api/` to the canonical command.
+> **Note:** `ci-cd.yml` previously ran only `tests/unit/` (327 tests). As of Phase 9A it was corrected to run `tests/unit/ tests/contract/ tests/mcp/` (528 tests). Phase 9B adds `tests/api/` to the canonical command. #287 adds `apps/api/tests/` and `apps/api/maiw_api/demo/tests/`, which no command ran: five of their tests had been failing unnoticed.
 
 All final phase reports MUST use this command. Any regression against the baseline is a blocker.
 
@@ -54,6 +55,8 @@ tests/contract/      ← MCP capability contract tests (in-memory MockProvider)
 tests/mcp/           ← MCP SDK protocol tests (FastMCP not importable — tests verify SDK v2 boundary)
 tests/api/           ← infrastructure-free API app/router tests (httpx ASGI transport)
 packages/maiw-agents/tests/  ← SOP Engine, runtimes, capability policy, proof SOPs
+apps/api/tests/      ← Copilot (intent, entity resolution, ACT, release gate) and demo world tests
+apps/api/maiw_api/demo/tests/  ← demo KPI engine, scenario evidence and provenance
 ```
 
 These tests run in < 10 seconds total. They require only the Python packages installed in the venv and no environment variables.

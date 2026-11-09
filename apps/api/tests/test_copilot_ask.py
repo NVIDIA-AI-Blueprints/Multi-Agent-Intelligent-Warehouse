@@ -266,8 +266,14 @@ class TestCopilotIntent:
         assert CopilotIntent.ASK == "ask"
 
     def test_intent_enum_count(self):
-        # Phase 15B: exactly 3 intents. SIMULATE not yet added.
-        assert len(CopilotIntent) == 3
+        # Phase 15B had 3 intents; #93 added OBSERVE_OUTCOME (post-action
+        # outcome questions). SIMULATE not yet added.
+        assert {i.value for i in CopilotIntent} == {
+            "ask",
+            "analyze",
+            "act",
+            "observe_outcome",
+        }
 
     def test_no_simulate_intent_yet(self):
         intent_values = {i.value for i in CopilotIntent}

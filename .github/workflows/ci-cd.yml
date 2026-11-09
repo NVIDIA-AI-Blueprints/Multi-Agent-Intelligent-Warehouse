@@ -103,6 +103,7 @@ jobs:
         # CORE CI: unit + contract + mcp + api — no infrastructure required. Integration/e2e live in main.yml.
         # Canonical command matches docs/architecture/TEST_STRATEGY.md CORE CI definition.
         pytest tests/unit tests/contract tests/mcp tests/api packages/maiw-agents/tests \
+          apps/api/tests apps/api/maiw_api/demo/tests \
           --timeout=120 \
           --ignore=tests/unit/test_mcp_integrated_planner_graph.py \
           --ignore=tests/unit/test_mcp_system.py \
