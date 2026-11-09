@@ -44,7 +44,7 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         fetch-depth: 0
     
@@ -167,7 +167,7 @@ jobs:
       actions: read
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
     
     # Pinned to the commit of the signed v0.36.0 tag (Trivy v0.70.0), not a
     # mutable branch or tag. Both scans include lockfile devDependencies,
@@ -239,7 +239,7 @@ jobs:
             build-args: "--build-arg MCP_DOMAIN=equipment"
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         fetch-depth: 0  # release tag for the SBOM version
 
