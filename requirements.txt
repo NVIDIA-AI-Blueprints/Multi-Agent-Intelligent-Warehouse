@@ -20,7 +20,7 @@ click>=8.5.0
 psycopg[binary]>=3.0.0
 websockets>=17.3
 paho-mqtt>=2.1.0
-pymodbus>=3.16.1
+pymodbus>=3.16.2
 bacpypes3>=0.0.110  # BACnet protocol library for IoT safety sensors (optional - only needed for BACnet integration)
 # ERP Integration
 requests>=2.34.2  # Fixed .netrc credentials leak (CVE-2024-47081), Session verify=False persistence MITM (CVE-2024-35195) and insecure temp file reuse in extract_zipped_paths (CVE-2026-25645, fixed in 2.33.0); 2.34.2 is what the images install
