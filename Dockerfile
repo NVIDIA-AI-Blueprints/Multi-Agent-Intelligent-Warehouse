@@ -4,7 +4,9 @@
 # =============================================================================
 # Frontend Build Stage
 # =============================================================================
-FROM node:20.19.0-alpine AS frontend-builder
+# Same Node image as Dockerfile.frontend's build stage, which CI builds and
+# scans; keep the two in step. Node 20 reached end of life in April 2026.
+FROM node:22.23.3-alpine3.24@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS frontend-builder
 
 WORKDIR /app/src/ui/web
 
