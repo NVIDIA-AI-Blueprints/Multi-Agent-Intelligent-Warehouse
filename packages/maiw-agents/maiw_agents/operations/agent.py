@@ -29,6 +29,53 @@ from ..common.utils import sanitize_prompt_input
 logger = logging.getLogger(__name__)
 
 
+def _first_json_object(
+    text: str, keys: tuple[str, ...] = ("summary", "recommendations")
+) -> dict | None:
+    """The first JSON object in ``text`` with one of ``keys``, else the first
+    JSON object, else None.
+
+    Accepts a bare object, one inside a markdown fence, or one surrounded by
+    prose that may quote other objects. Nested objects are decoded whole
+    (``json.JSONDecoder.raw_decode``), unlike a regex. A truncated object is
+    not an object.
+    """
+    decoder = json.JSONDecoder()
+    first: dict | None = None
+    start = text.find("{")
+    while start != -1:
+        try:
+            obj, end = decoder.raw_decode(text, start)
+        except ValueError:
+            start = text.find("{", start + 1)
+            continue
+        if isinstance(obj, dict):
+            if any(k in obj for k in keys):
+                return obj
+            if first is None:
+                first = obj
+        start = text.find("{", end)
+    return first
+
+
+def _unreadable_reply_reason(response: Any) -> str:
+    """Why a model reply held no JSON object, for the log and the summary."""
+    content = getattr(response, "content", "") or ""
+    finish = getattr(response, "finish_reason", None) or "unknown"
+    usage = getattr(response, "usage", None) or {}
+    details = usage.get("completion_tokens_details") or {}
+    parts = [f"finish_reason={finish}", f"{len(content)} characters"]
+    if usage.get("completion_tokens") is not None:
+        parts.append(f"completion_tokens={usage['completion_tokens']}")
+    if details.get("reasoning_tokens") is not None:
+        parts.append(f"reasoning_tokens={details['reasoning_tokens']}")
+    if finish == "length":
+        parts.insert(0, "cut off at the output token limit (LLM_MAX_TOKENS)")
+    elif not content.strip():
+        parts.insert(0, "empty reply")
+    return ", ".join(parts)
+
+
 @dataclass
 class OperationsQuery:
     """Structured operations query."""
@@ -1184,24 +1231,25 @@ class OperationsCoordinationAgent:
             )
         )
 
-        # Parse structured response — expect JSON
-        import json as _json
-
-        parsed: dict = {}
-        try:
-            parsed = _json.loads(response.content)
-        except Exception:
-            # Attempt to extract JSON block if wrapped in markdown
-            import re as _re
-
-            m = _re.search(
-                r"```(?:json)?\s*(\{.*?\})\s*```", response.content, _re.DOTALL
+        # Parse structured response — expect one JSON object, possibly wrapped
+        # in a markdown fence or surrounded by prose.
+        parsed = _first_json_object(response.content or "")
+        if parsed is None:
+            # An unreadable reply used to fall back to an empty assessment with
+            # no recommendations and no trace of why (#309 counterfactual rerun).
+            reason = _unreadable_reply_reason(response)
+            logger.warning(
+                "analyze_disruption: model reply is not a JSON assessment (%s); "
+                "no recommendations (trace_id=%s)",
+                reason,
+                trace_id,
             )
-            if m:
-                try:
-                    parsed = _json.loads(m.group(1))
-                except Exception:
-                    pass
+            parsed = {
+                "summary": (
+                    "The model reply could not be read as an assessment "
+                    f"({reason}); no recommendations."
+                )
+            }
 
         summary = parsed.get("summary", "Assessment produced — see facts_observed.")
         # Use the deterministic severity computed before the model call.
