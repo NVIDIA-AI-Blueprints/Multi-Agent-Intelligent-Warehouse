@@ -301,7 +301,7 @@ At `ScenarioWorld` construction time, all entity IDs referenced by overlay event
 | `stale_state` | Scenario YAML | none |
 | `state_drift` | Scenario YAML | none |
 
-Only `healthy_baseline` runs on the DataPack world (`DATAPACK_SCENARIOS` in `apps/api/maiw_api/demo/world_loader.py`). From #83 until #308 the scripted scenarios also did, but the overlays do not model them: their timed events named YAML ids absent from the DataPack, the DataPack world has no unassigned hero wave with a carrier-cutoff deadline, and the YAML clock offset and drift statuses were dropped. No disruption was recorded and recovery could never be detected. Moving them to the DataPack needs DataPack-native timelines, a hero wave and recovery thresholds sized for the DataPack world.
+Only `healthy_baseline` runs on the DataPack world (`DATAPACK_SCENARIOS` in `apps/api/maiw_api/demo/world_loader.py`). From #83 until #308 the scripted scenarios also did, but the overlays do not model them: their timed events named YAML ids absent from the DataPack, the DataPack world has no unassigned hero wave with a carrier-cutoff deadline, and the YAML clock offset and drift statuses were dropped. No disruption was recorded and recovery could never be detected. Moving them to the DataPack needs DataPack-native timelines, a hero wave and recovery thresholds sized for the DataPack world; DataPack work now progresses and has carrier-cutoff deadlines (see [Work progression](#work-progression)). The remaining steps are tracked in #309.
 
 ---
 
@@ -331,6 +331,17 @@ Reset       → DemoWarehouseWorld reconstructed from immutable sources
 ```
 
 Reset does not use a snapshot of the pre-disruption state. It re-runs the projection pipeline from the original immutable DataPack + ScenarioOverlay. This guarantees that the reset world is bit-for-bit identical to the initial world regardless of how many mutations occurred during the run.
+
+### Work progression
+
+Work in the DataPack world moves as the clock advances, by the same rules as in a YAML world:
+
+- **Deadlines.** Each task's deadline is its wave's earliest carrier cutoff, at that time of day on the simulation date (2026-08-23). The active wave, `wave-017`, is due at the FedEx Priority cutoff, 10:00.
+- **Work in progress.** A task in progress when the DataPack loads starts at the load time and completes after its processing duration (`_DEFAULT_PROCESSING_SECONDS` in `demo/world.py`; a PICK takes 300 s).
+- **Assigned tasks.** On each tick, an active worker with no task in progress starts its next assigned pending task: its current task first, then the lowest task id. Completing a task frees the worker for the next one.
+- **What waits.** Unassigned tasks stay pending until an allocation assigns them, and the tasks of absent workers stay pending.
+
+With no disruption, `healthy_baseline` starts with 119 pending tasks, drops to 40 after the first tick and finishes all 120 tasks after 15 minutes of simulated time. Wave risk stays `none` throughout.
 
 ---
 

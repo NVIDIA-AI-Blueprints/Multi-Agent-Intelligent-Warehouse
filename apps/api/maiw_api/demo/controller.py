@@ -664,7 +664,50 @@ class DemoScenarioController:
         self._tick_task = None
 
     def _advance_task_progression(self, elapsed: int) -> int:
-        """Advance in_progress task completion. Returns count of tasks completed this tick."""
+        """Complete due in_progress tasks, then start assigned pending tasks.
+
+        Returns the count of tasks completed this tick.
+        """
+        completed = self._complete_due_tasks(elapsed)
+        self._start_assigned_tasks(elapsed)
+        return completed
+
+    def _start_assigned_tasks(self, elapsed: int) -> int:
+        """Start pending tasks whose assigned worker is active and free.
+
+        A free worker has no task in progress. It starts its current task when
+        that is pending and assigned to it, else its lowest assigned task id.
+        Unassigned tasks wait for an allocation, and absent workers' tasks
+        stay pending. Returns the count of tasks started.
+        """
+        busy: set[str] = set()
+        queued: dict[str, list[Any]] = {}
+        for task in self.world.tasks.values():
+            if task.assigned_to is None:
+                continue
+            if task.status == "in_progress":
+                busy.add(task.assigned_to)
+            elif task.status == "pending":
+                queued.setdefault(task.assigned_to, []).append(task)
+
+        started = 0
+        for worker_id in sorted(queued):
+            worker = self.world.workers.get(worker_id)
+            if worker is None or worker.status != "active" or worker_id in busy:
+                continue
+            tasks = queued[worker_id]
+            task = next(
+                (t for t in tasks if t.task_id == worker.current_task_id),
+                min(tasks, key=lambda t: t.task_id),
+            )
+            task.status = "in_progress"
+            task.started_at_sim_seconds = elapsed
+            worker.current_task_id = task.task_id
+            started += 1
+        return started
+
+    def _complete_due_tasks(self, elapsed: int) -> int:
+        """Complete in_progress tasks that have run their duration."""
         completed = 0
         for task in self.world.tasks.values():
             if task.status != "in_progress":

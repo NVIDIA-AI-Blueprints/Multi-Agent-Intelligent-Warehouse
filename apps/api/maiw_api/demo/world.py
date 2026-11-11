@@ -236,8 +236,22 @@ class DemoWarehouseWorld:
             )
             self.inventory[inv_item.sku] = inv_item
 
+        wave_proj = builder.waves()
+        in_progress_ids = {
+            t.task_id
+            for wave in wave_proj.waves
+            for t in wave.tasks
+            if t.status.upper() == "IN_PROGRESS"
+        }
+
         labor_proj = builder.labor()
         for w in labor_proj.workers:
+            # A worker's current task is the one in progress, else the first
+            # assigned task, which progression starts first.
+            current = next(
+                (tid for tid in w.assigned_task_ids if tid in in_progress_ids),
+                w.assigned_task_ids[0] if w.assigned_task_ids else None,
+            )
             worker = WorkerState(
                 worker_id=w.worker_id,
                 username=w.username,
@@ -245,7 +259,7 @@ class DemoWarehouseWorld:
                 role=w.role,
                 status="on_leave" if w.is_absent else "active",
                 zone=None,
-                current_task_id=w.assigned_task_ids[0] if w.assigned_task_ids else None,
+                current_task_id=current,
             )
             self.workers[worker.worker_id] = worker
 
@@ -260,7 +274,6 @@ class DemoWarehouseWorld:
             )
             self.equipment[asset.asset_id] = asset
 
-        wave_proj = builder.waves()
         # TaskStatus values from graph are uppercase; demo world uses lowercase
         _status_map = {
             "PENDING": "pending",
@@ -269,6 +282,7 @@ class DemoWarehouseWorld:
             "BLOCKED": "pending",   # demo world has no BLOCKED status — treat as pending
         }
         for wave in wave_proj.waves:
+            deadline = self._wave_deadline(wave.carrier_cutoff_ids)
             for t in wave.tasks:
                 raw_status = t.status.upper()
                 demo_status = _status_map.get(raw_status, "pending")
@@ -279,11 +293,36 @@ class DemoWarehouseWorld:
                     status=demo_status,
                     assigned_to=t.assigned_worker_id,
                     priority=t.priority,
+                    deadline=deadline,
                 )
                 task.processing_duration_seconds = _DEFAULT_PROCESSING_SECONDS.get(
                     t.task_type, 300
                 )
+                if task.status == "in_progress":
+                    # Same rule as seed(): work in progress at load time
+                    # started now, so it completes after its duration.
+                    task.started_at_sim_seconds = self.clock.elapsed_seconds
                 self.tasks[task.task_id] = task
+
+    def _wave_deadline(self, cutoff_ids: list[str]) -> str | None:
+        """Deadline for a wave's tasks: its earliest carrier cutoff.
+
+        DataPack cutoffs carry a time of day on a fixed reference date; the
+        deadline is that time on the simulation clock's date.
+        """
+        if self._scenario_world is None or not cutoff_ids:
+            return None
+        graph = self._scenario_world.base_graph
+        times = [
+            entity.cutoff_time
+            for entity in (graph.get_entity(cid) for cid in cutoff_ids)
+            if entity is not None and getattr(entity, "cutoff_time", None) is not None
+        ]
+        if not times:
+            return None
+        earliest = min(times, key=lambda t: t.timetz().replace(tzinfo=None))
+        sim_date = SimulationClock._EPOCH.date()
+        return datetime.combine(sim_date, earliest.timetz()).isoformat()
 
     # ── seeding ──────────────────────────────────────────────────────────────
 
