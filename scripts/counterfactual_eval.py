@@ -33,6 +33,9 @@ TICK_SECONDS  = 60
 MAX_TICKS     = 30   # 1800 sim-seconds = 30 sim-minutes
 MAX_MAIW      = 10   # safety cap on MAIW cycles
 HORIZONS      = [300, 600, 900, 1200, 1800]  # fixed checkpoints (sim-seconds)
+# Hosted models rate-limit (HTTP 429, surfaced by the API as 503 MODEL
+# UNAVAILABLE). Wait and retry an analyze call instead of aborting the run.
+ANALYZE_RETRY_WAITS = (30, 60, 120)  # seconds
 ARTIFACTS_DIR = Path(__file__).parent.parent / "artifacts" / "demo"
 
 
@@ -63,6 +66,26 @@ def fmt_kpis(k: dict) -> dict:
         "equipment_operational_pct": k.get("equipment_operational_pct"),
         "time_to_recovery_seconds":  k.get("time_to_recovery_seconds"),
     }
+
+
+def _analyze_with_retry() -> dict | None:
+    """POST /demo/analyze, retrying 429/503/504 after ANALYZE_RETRY_WAITS.
+
+    Returns None when every attempt was rate-limited or unavailable; any other
+    HTTP error is raised.
+    """
+    for wait in (*ANALYZE_RETRY_WAITS, None):
+        try:
+            return post("/demo/analyze")
+        except requests.exceptions.HTTPError as exc:
+            status = exc.response.status_code if exc.response is not None else None
+            if status not in (429, 503, 504):
+                raise
+            if wait is None:
+                return None
+            print(f"    analyze HTTP {status} — retrying in {wait}s")
+            time.sleep(wait)
+    return None
 
 
 def _reset_and_start():
@@ -166,8 +189,16 @@ def run_maiw() -> dict:
         backlog_now = (status_pre.get("current_kpis") or {}).get("pending_backlog", 0)
         print(f"\n  [MAIW cycle {cycle_num}] backlog={backlog_now}")
 
-        analyze_resp = post("/demo/analyze")
+        analyze_resp = _analyze_with_retry()
+        if analyze_resp is None:
+            print("    analyze failed after retries — cycle skipped")
+            maiw_cycles.append({"cycle": cycle_num, "error": "analyze_unavailable"})
+            return
         assessment   = analyze_resp.get("assessment", {})
+        recs         = assessment.get("recommendations") or []
+        print(f"    model={assessment.get('model_id')}  recommendations={len(recs)}")
+        if not recs:
+            print(f"    summary: {str(assessment.get('summary'))[:200]}")
 
         pending = get("/demo/status").get("pending_approvals", [])
         approvals = []
@@ -187,6 +218,8 @@ def run_maiw() -> dict:
             "trace_id":    analyze_resp.get("trace_id"),
             "severity":    assessment.get("severity"),
             "model_id":    assessment.get("model_id"),
+            "recommendations": len(recs),
+            "summary":     assessment.get("summary"),
             "approvals":   approvals,
         })
 
