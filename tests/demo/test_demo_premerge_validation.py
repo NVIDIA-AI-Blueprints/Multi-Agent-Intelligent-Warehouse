@@ -19,7 +19,8 @@ Checks:
   3.  Equipment restore brings asset back to available
   4.  Wave delay inject sets pending task priorities to low
   5.  equipment_failure timed event fires at offset=60 s
-  6.  labor_constraint_wave_risk: worker_absence timed at offset=120 s;
+  6.  labor_constraint_wave_risk: worker_absence timed at offset=120 s
+      (from scenario start);
       cross-domain: LaborProvider sees capacity drop, WaveProvider still readable
   7.  stale_state clock is before shift start (EPOCH−2700 s)
   8.  state_drift initial world has AGVs in drift-indicating statuses
@@ -252,27 +253,30 @@ def test_equipment_failure_timed_event(ctrl):
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 6. labor_constraint: worker_absence at t=120 s; cross-domain coherence
+#    (DataPack world, #309: worker-000049, the YAML world's w-003)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
 def test_labor_constraint_cross_domain(ctrl):
     _run(ctrl.start("labor_constraint_wave_risk"))
+    assert ctrl.world._scenario_world is not None, "DataPack world expected"
 
     cap_before = _run(ctrl.providers.labor.get_labor_capacity(LaborCapacityRequest()))
-    active_before = cap_before.available_workers
+    active_before = cap_before.total_workers  # active workers
     _log("labor_constraint_wave_risk", f"  t=0:    active workers={active_before}")
 
     _run(ctrl.tick(120))
 
-    # Worker w-003 must be on_leave
-    w003 = ctrl.world.workers.get("w-003")
-    assert w003 is not None
-    assert w003.status == "on_leave"
+    # worker-000049 must be on_leave, and its unstarted task back in the pool
+    worker = ctrl.world.workers.get("worker-000049")
+    assert worker is not None
+    assert worker.status == "on_leave"
+    assert ctrl.world.tasks["task-000028"].assigned_to is None
 
     # LaborProvider must see reduced capacity (cross-domain: shared world)
     cap_after = _run(ctrl.providers.labor.get_labor_capacity(LaborCapacityRequest()))
-    active_after = cap_after.available_workers
-    assert active_after < active_before
+    active_after = cap_after.total_workers
+    assert active_after == active_before - 1
 
     # WaveProvider must still return tasks (cross-domain state assembly, not scripted)
     wave = _run(ctrl.providers.wave.get_wave(WaveGetRequest()))
@@ -280,7 +284,7 @@ def test_labor_constraint_cross_domain(ctrl):
 
     _log(
         "labor_constraint_wave_risk",
-        f"  t=120s: w-003 on_leave  active={active_before}→{active_after}  "
+        f"  t=120s: worker-000049 on_leave  active={active_before}→{active_after}  "
         f"wave_tasks_readable={len(wave.tasks)} (cross-domain ✓)",
     )
 

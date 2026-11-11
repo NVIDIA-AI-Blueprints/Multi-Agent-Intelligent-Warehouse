@@ -3,9 +3,9 @@
 """
 Equipment fault-injection targets are resolved from the ACTIVE demo world.
 
-``healthy_baseline`` runs on the DC-47 DataPack world (asset ids like
-``agv-000``); the scripted scenarios run on the worlds their YAML defines
-(``AGV-01`` …), as does any scenario when the DataPack is unavailable.  The UI
+Every scenario runs on the DC-47 DataPack world (asset ids like ``agv-000``)
+when it is available, and on the world its YAML defines (``AGV-01`` …) when it
+is not (#309).  The UI
 used to hard-code ``AGV-01`` and every equipment injection failed against the
 DataPack world.
 
@@ -29,8 +29,8 @@ from maiw_api.demo.controller import (
     reset_demo_controller,
 )
 
-# healthy_baseline runs on the DataPack world; the scripted scenarios run on
-# the worlds their YAML defines (#308).
+# Every scenario runs on the DataPack world; YAML_SCENARIO is run on its YAML
+# world by disabling the DataPack path, as when the DataPack is missing (#309).
 DATAPACK_SCENARIO = "healthy_baseline"
 YAML_SCENARIO = "labor_constraint_wave_risk"
 
@@ -56,7 +56,10 @@ def datapack_ctrl():
 
 @pytest.fixture
 def yaml_ctrl(monkeypatch):
-    """A scenario that runs on the world its YAML defines."""
+    """A scenario on the world its YAML defines (the DataPack fallback)."""
+    from maiw_api.demo import world_loader
+
+    monkeypatch.setattr(world_loader, "DATAPACK_SCENARIOS", frozenset())
     ctrl = DemoScenarioController()
     _run(ctrl.start(YAML_SCENARIO))
     assert ctrl.world._scenario_world is None, "expected the YAML fallback"

@@ -84,11 +84,14 @@ def _auto_generate(pack_dir: Path) -> None:
 # the DataPack world (#309). Before #308 the scripted scenarios ran on the
 # DataPack with their YAML timelines, whose ids (w-003, AGV-02) are not in
 # the DataPack, so no disruption was ever recorded.
-#
-# labor_constraint_wave_risk stays on its YAML world until the published
-# counterfactual is rerun on the DataPack (#309).
 DATAPACK_SCENARIOS: frozenset[str] = frozenset(
-    {"healthy_baseline", "equipment_failure", "stale_state", "state_drift"}
+    {
+        "healthy_baseline",
+        "equipment_failure",
+        "labor_constraint_wave_risk",
+        "stale_state",
+        "state_drift",
+    }
 )
 
 # Overlay presets for scenarios without a ``datapack`` block. A scenario with

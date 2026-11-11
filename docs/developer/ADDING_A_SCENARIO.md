@@ -90,9 +90,10 @@ Supported `type` values (`DemoScenarioController.inject` in
 `equipment_restore`, `low_stock`, `worker_absence`, `worker_return`,
 `task_deadline`, `wave_delay`.
 
-Without a `datapack` block, timed-event offsets are compared with the clock
-reading, which starts at `clock_offset_seconds`; an offset at or below
-`clock_offset_seconds` fires on the first tick.
+Timed-event offsets count from scenario start, whatever
+`clock_offset_seconds` is. (Before #309 they were compared with the clock
+reading, so an offset at or below `clock_offset_seconds` fired on the first
+tick.)
 
 ### Running on the DC-47 DataPack world
 
@@ -122,9 +123,12 @@ datapack:
 
 - **Work progresses.** Every task has its wave's carrier cutoff as deadline,
   and assigned tasks start and complete on their own (see "Work progression"
-  in [WAREHOUSE_WORLD_MODEL.md](WAREHOUSE_WORLD_MODEL.md)). To put a wave at
-  risk, unassign some of its pending tasks: wave risk counts pending tasks with
-  no worker, and `wave-017` is high priority and due at 10:00.
+  in [WAREHOUSE_WORLD_MODEL.md](WAREHOUSE_WORLD_MODEL.md)). Wave risk counts
+  pending tasks with no worker, and `wave-017` is high priority and due at
+  10:00. To put it at risk, make workers absent (`workers: {worker-000024:
+  {status: on_leave}}` or a `worker_absence` timed event): an absent worker's
+  tasks that have not started go back to the pool. Name tasks only when the
+  disruption is not an absence, as `equipment_failure` does.
 - **Size recovery for the world.** Assigned work drains in about 15 simulated
   minutes, so a `backlog_max` threshold is met without any intervention.
   `wave_risk_max_score: 25` means no task with a deadline is left without a

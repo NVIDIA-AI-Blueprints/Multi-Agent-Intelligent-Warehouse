@@ -841,62 +841,19 @@ async def _build_and_execute_proposal(
         }
 
 
-_WAVE_TASK_TYPES = frozenset({"PICK", "PACK", "SHIP", "RECEIVE", "PUTAWAY", "TRANSFER"})
-
-
 def _resolve_labor_allocation_target(rec: Any) -> tuple[str, list[str]]:
     """
-    Resolve a semantic labor target to a concrete (task_id, [worker_id]) pair.
-
-    The MAIW agent recommends at the semantic level ("wave_pending_tasks", "zone_A").
-    In production a task planner would supply concrete IDs. In the demo we ground
-    the recommendation against the current world state: pick the highest-priority
-    pending wave task and the first available worker, matched by zone when possible.
+    Resolve a semantic labor target to a concrete (task_id, [worker_id]) pair
+    against the current world (see ``demo.scheduling.labor_allocation_target``).
 
     Raises ValueError when no valid (task, worker) pair can be found — this causes
     _build_proposal to fail loudly rather than silently queuing a phantom proposal
     that would execute as a no-op and return success=True with no warehouse mutation.
     """
     from maiw_api.demo.controller import get_demo_controller as _get_ctrl
+    from maiw_api.demo.scheduling import labor_allocation_target
 
-    ctrl = _get_ctrl()
-    world = ctrl.world
-
-    pending = sorted(
-        [
-            t
-            for t in world.tasks.values()
-            if t.status == "pending" and t.task_type in _WAVE_TASK_TYPES
-        ],
-        key=lambda t: (
-            0 if t.priority == "high" else 1 if t.priority == "medium" else 2,
-            t.deadline or "9999",
-            t.task_id,
-        ),
-    )
-    available = [
-        w
-        for w in world.workers.values()
-        if w.status == "active" and w.current_task_id is None
-    ]
-    logger.debug(
-        "_resolve_labor_allocation_target: pending=%d available=%d",
-        len(pending),
-        len(available),
-    )
-
-    if not pending:
-        raise ValueError("CAPACITY_UNAVAILABLE: no pending wave tasks to allocate")
-    if not available:
-        raise ValueError(
-            f"CAPACITY_UNAVAILABLE: no idle workers available "
-            f"({sum(1 for w in world.workers.values() if w.status == 'active')} active workers all occupied)"
-        )
-
-    task = pending[0]
-    same_zone = [w for w in available if w.zone == task.zone]
-    worker = same_zone[0] if same_zone else available[0]
-    return task.task_id, [worker.worker_id]
+    return labor_allocation_target(_get_ctrl().world)
 
 
 async def _build_proposal(

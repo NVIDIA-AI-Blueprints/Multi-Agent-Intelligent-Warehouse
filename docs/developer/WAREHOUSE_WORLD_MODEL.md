@@ -297,13 +297,13 @@ At `ScenarioWorld` construction time, all entity IDs referenced by overlay event
 |---|---|---|
 | `healthy_baseline` | DataPack | No-disruption overlay |
 | `equipment_failure` | DataPack | Built from the YAML `datapack` block |
+| `labor_constraint_wave_risk` | DataPack | Built from the YAML `datapack` block (worker absences) |
 | `stale_state` | DataPack | Built from the YAML `datapack` block (no disruption events) |
 | `state_drift` | DataPack | Built from the YAML `datapack` block (inventory drift) |
-| `labor_constraint_wave_risk` | Scenario YAML | `labor_constraint_scenario()` (preview only) |
+
+The `maiw_world` presets (`labor_constraint_scenario()`, `equipment_failure_scenario()`) remain for previews and the `maiw_world` CLI; the demo API no longer uses them.
 
 A scripted scenario runs on the DataPack world through the `datapack` block of its YAML: a clock offset, `initial_state` overrides of named DataPack entities, timed events counted from scenario start and recovery thresholds sized for the DataPack world ([ADDING_A_SCENARIO.md](ADDING_A_SCENARIO.md)). Its overlay, which the World Explorer reads, is built from the same block, so both show the same disruptions; the World Explorer evaluates it at the time since scenario start. From #83 until #308 the scripted scenarios ran on the DataPack with their YAML timelines, whose ids are not in the DataPack, so no disruption was recorded and recovery could never be detected.
-
-`labor_constraint_wave_risk` stays on its YAML world until the published counterfactual has been rerun on the DataPack (#309).
 
 ---
 
@@ -341,7 +341,8 @@ Work in the DataPack world moves as the clock advances, by the same rules as in 
 - **Deadlines.** Each task's deadline is its wave's earliest carrier cutoff, at that time of day on the simulation date (2026-08-23). The active wave, `wave-017`, is due at the FedEx Priority cutoff, 10:00.
 - **Work in progress.** A task in progress when the DataPack loads starts at the load time and completes after its processing duration (`_DEFAULT_PROCESSING_SECONDS` in `demo/world.py`; a PICK takes 300 s).
 - **Assigned tasks.** On each tick, an active worker with no task in progress starts its next assigned pending task: its current task first, then the lowest task id. Completing a task frees the worker for the next one.
-- **What waits.** Unassigned tasks stay pending until an allocation assigns them, and the tasks of absent workers stay pending.
+- **What waits.** Unassigned tasks stay pending until an allocation assigns them.
+- **Absent workers.** When a worker is absent (from the start, a timed event or an inject), its assigned tasks that have not started go back to the pool without a worker, where wave risk counts them. A task already in progress finishes.
 
 With no disruption, `healthy_baseline` starts with 119 pending tasks, drops to 40 after the first tick and finishes all 120 tasks after 15 minutes of simulated time. Wave risk stays `none` throughout.
 
@@ -414,5 +415,4 @@ addressed if a concrete runtime need arises.
 1. **No removal** — the graph is add-only. Edge expiry is expressed temporally; explicit removal is not supported.
 2. **No thread safety** — the graph is not guarded by a lock. Safe for single-threaded simulation use.
 3. **No cross-graph linking API** — the Operational Graph references the Decision Graph (Phase 13) only by shared IDs. A formal linking layer is deferred to a future phase.
-4. **Labor scenario** — `labor_constraint_wave_risk` runs on its YAML world, not the DataPack (see Scenario migration status).
-5. **Automated reconciliation trigger** — not yet implemented (operator-initiated only; see Phase 10E).
+4. **Automated reconciliation trigger** — not yet implemented (operator-initiated only; see Phase 10E).

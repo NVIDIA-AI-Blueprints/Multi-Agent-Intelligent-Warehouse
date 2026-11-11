@@ -277,9 +277,32 @@ class DemoWarehouseWorld:
                     setattr(entity, key, value)
         self._settle_assignments()
 
+    def release_unstarted_tasks(self, worker_id: str) -> list[str]:
+        """Return a worker's assigned tasks that have not started to the pool.
+
+        Applied when a worker is absent: their pending tasks lose their
+        assignee and count towards wave risk until an allocation assigns them
+        again. A task already in progress is left to finish. Returns the
+        released task ids, sorted.
+        """
+        released = sorted(
+            t.task_id
+            for t in self.tasks.values()
+            if t.assigned_to == worker_id and t.status == "pending"
+        )
+        for task_id in released:
+            self.tasks[task_id].assigned_to = None
+        worker = self.workers.get(worker_id)
+        if worker is not None and worker.current_task_id in released:
+            worker.current_task_id = None
+        return released
+
     def _settle_assignments(self) -> None:
         """Make task progress and worker current tasks agree after overrides."""
         now = self.clock.elapsed_seconds
+        for worker in self.workers.values():
+            if worker.status != "active":
+                self.release_unstarted_tasks(worker.worker_id)
         for task in self.tasks.values():
             if task.status == "in_progress" and task.started_at_sim_seconds is None:
                 task.started_at_sim_seconds = now

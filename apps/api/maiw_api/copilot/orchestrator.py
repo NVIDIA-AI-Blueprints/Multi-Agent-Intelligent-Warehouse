@@ -32,6 +32,7 @@ import uuid
 from typing import Any
 
 from maiw_api.demo.scheduling import default_scheduled_for as _default_scheduled_for
+from maiw_api.demo.scheduling import labor_allocation_target as _labor_allocation_target
 
 from .models import CopilotActResult, GovernedActionRequest, MutationState
 
@@ -41,8 +42,6 @@ logger = logging.getLogger(__name__)
 _SAFETY_NO_MUTATION = "No warehouse changes have been made."
 _SAFETY_CONFIRMED   = "Execution confirmed."
 _SAFETY_UNKNOWN     = "Execution status uncertain — reconciliation required."
-
-_WAVE_TASK_TYPES = frozenset({"PICK", "PACK", "SHIP", "RECEIVE", "PUTAWAY", "TRANSFER"})
 
 
 class GovernedActionOrchestrator:
@@ -452,41 +451,9 @@ class GovernedActionOrchestrator:
         """
         Ground a labor allocation to concrete (task_id, [worker_id]) IDs.
 
-        Mirrors _resolve_labor_allocation_target() from routers/demo.py.
+        Same rule as the demo analyze route: ``labor_allocation_target``.
         """
-        world = getattr(self._ctrl, "world", None)
-        if world is None:
-            raise ValueError("CAPACITY_UNAVAILABLE: warehouse world not available")
-
-        pending = sorted(
-            [
-                t for t in world.tasks.values()
-                if t.status == "pending" and t.task_type in _WAVE_TASK_TYPES
-            ],
-            key=lambda t: (
-                0 if t.priority == "high" else 1 if t.priority == "medium" else 2,
-                t.deadline or "9999",
-                t.task_id,
-            ),
-        )
-        available = [
-            w for w in world.workers.values()
-            if w.status == "active" and w.current_task_id is None
-        ]
-
-        if not pending:
-            raise ValueError("CAPACITY_UNAVAILABLE: no pending wave tasks to allocate")
-        if not available:
-            raise ValueError(
-                f"CAPACITY_UNAVAILABLE: no idle workers available "
-                f"({sum(1 for w in world.workers.values() if w.status == 'active')} "
-                f"active workers all occupied)"
-            )
-
-        task = pending[0]
-        same_zone = [w for w in available if w.zone == task.zone]
-        worker = same_zone[0] if same_zone else available[0]
-        return task.task_id, [worker.worker_id]
+        return _labor_allocation_target(getattr(self._ctrl, "world", None))
 
     def _get_executor(self, domain: str) -> Any:
         """Return the domain executor from the runtime, or None if not wired."""
