@@ -90,9 +90,12 @@ Supported `type` values (`DemoScenarioController.inject` in
 `equipment_restore`, `low_stock`, `worker_absence`, `worker_return`,
 `task_deadline`, `wave_delay`.
 
-Scenario names listed in `SCENARIO_OVERLAYS`
-(`apps/api/maiw_api/demo/world_loader.py`) start from the DataPack world; any
-other scenario is seeded from its YAML `initial_state`.
+Scenario names listed in `DATAPACK_SCENARIOS`
+(`apps/api/maiw_api/demo/world_loader.py`, only `healthy_baseline` today)
+start from the DataPack world; any other scenario is seeded from its YAML
+`initial_state`. Timed events must name entities of the world the scenario
+runs on: `tests/unit/demo/test_scenario_worlds.py` checks this for every
+scenario file.
 
 ---
 

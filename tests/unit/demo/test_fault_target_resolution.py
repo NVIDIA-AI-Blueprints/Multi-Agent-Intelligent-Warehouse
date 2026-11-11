@@ -3,10 +3,11 @@
 """
 Equipment fault-injection targets are resolved from the ACTIVE demo world.
 
-Demo mode builds the world from the DC-47 DataPack (asset ids like
-``agv-000``); the scenario YAMLs (``AGV-01`` …) are only the fallback when the
-DataPack path is unavailable.  The UI used to hard-code ``AGV-01`` and every
-equipment injection failed against the DataPack world.
+``healthy_baseline`` runs on the DC-47 DataPack world (asset ids like
+``agv-000``); the scripted scenarios run on the worlds their YAML defines
+(``AGV-01`` …), as does any scenario when the DataPack is unavailable.  The UI
+used to hard-code ``AGV-01`` and every equipment injection failed against the
+DataPack world.
 
 Rule (DemoScenarioController.resolve_equipment_target), asset_id omitted:
     equipment_fault    eligible = status == "available"
@@ -28,7 +29,10 @@ from maiw_api.demo.controller import (
     reset_demo_controller,
 )
 
-SCENARIO = "labor_constraint_wave_risk"
+# healthy_baseline runs on the DataPack world; the scripted scenarios run on
+# the worlds their YAML defines (#308).
+DATAPACK_SCENARIO = "healthy_baseline"
+YAML_SCENARIO = "labor_constraint_wave_risk"
 
 
 def _run(coro):
@@ -45,19 +49,16 @@ def reset_singleton():
 @pytest.fixture
 def datapack_ctrl():
     ctrl = DemoScenarioController()
-    _run(ctrl.start(SCENARIO))
+    _run(ctrl.start(DATAPACK_SCENARIO))
     assert ctrl.world._scenario_world is not None, "expected the DataPack path"
     return ctrl
 
 
 @pytest.fixture
 def yaml_ctrl(monkeypatch):
-    """Force the legacy YAML fallback (DataPack path unavailable for SCENARIO)."""
-    import maiw_api.demo.world_loader as world_loader
-
-    monkeypatch.setattr(world_loader, "SCENARIO_OVERLAYS", {})
+    """A scenario that runs on the world its YAML defines."""
     ctrl = DemoScenarioController()
-    _run(ctrl.start(SCENARIO))
+    _run(ctrl.start(YAML_SCENARIO))
     assert ctrl.world._scenario_world is None, "expected the YAML fallback"
     return ctrl
 
@@ -89,7 +90,7 @@ class TestFaultResolutionDataPack:
         targets = []
         for _ in range(3):
             ctrl = DemoScenarioController()
-            _run(ctrl.start(SCENARIO))
+            _run(ctrl.start(DATAPACK_SCENARIO))
             targets.append(_fault(ctrl)["asset_id"])
         assert targets == ["agv-000"] * 3
 
@@ -233,7 +234,7 @@ class TestAmbiguousWriteArming:
 
     def test_restart_on_yaml_path_disarms_f06(self, yaml_ctrl):
         _fault(yaml_ctrl, simulate_ambiguous_write=True)
-        _run(yaml_ctrl.start(SCENARIO))
+        _run(yaml_ctrl.start(YAML_SCENARIO))
         assert yaml_ctrl.providers.equipment._post_mutation_fault is None
 
     def test_plain_fault_does_not_arm(self, datapack_ctrl):

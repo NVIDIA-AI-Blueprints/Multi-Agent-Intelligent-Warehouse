@@ -57,7 +57,9 @@ from maiw_contracts.inventory import InventoryLookupRequest
 
 # ── async helper (same pattern as tests/unit/demo/) ──────────────────────────
 def _run(coro):
-    return asyncio.get_event_loop().run_until_complete(coro)
+    # A fresh loop per call: asyncio.get_event_loop() raises once an earlier
+    # test in the same session has closed the default loop.
+    return asyncio.run(coro)
 
 
 # ── scenario registry ─────────────────────────────────────────────────────────

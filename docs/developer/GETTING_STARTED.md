@@ -132,16 +132,19 @@ Exit code 0 = PASS, 1 = FAIL.
 python -m maiw_world scenarios data/worlds/dc47-demo-v1
 ```
 
-| Scenario | Type | Description |
-|----------|------|-------------|
-| `labor_constraint_wave_risk` | DataPack-native | Understaffed shift, wave at risk |
-| `equipment_failure` | DataPack-native | Forklift offline |
-| `healthy_baseline` | DataPack-native | All systems nominal |
-| `stale_state` | Compatibility | healthy_baseline adapter |
-| `state_drift` | Compatibility | healthy_baseline adapter |
+| Scenario | World | Description |
+|----------|-------|-------------|
+| `labor_constraint_wave_risk` | Scenario YAML | Understaffed shift, wave at risk |
+| `equipment_failure` | Scenario YAML | AGV offline |
+| `healthy_baseline` | DC-47 DataPack | All systems nominal |
+| `stale_state` | Scenario YAML | State 45 minutes stale |
+| `state_drift` | Scenario YAML | Inventory and equipment drifted from the WMS |
 
-> **Note:** `stale_state` and `state_drift` currently use a healthy_baseline compatibility adapter.
-> Full migration is planned for a future phase.
+> **Note:** the scripted scenarios run on the worlds their YAML defines: their
+> timed events, clock offset, hero wave and recovery thresholds are written
+> for those worlds, and the DataPack overlays do not model them (#308). The
+> `maiw_world` overlays listed by the command above are previews of the
+> DataPack world; the demo API uses only `healthy_baseline`.
 
 ---
 
