@@ -74,8 +74,21 @@ def _auto_generate(pack_dir: Path) -> None:
 
 
 # ── Scenario overlay registry ────────────────────────────────────────────────
-# Maps demo scenario names → overlay kind for DataPack-native path.
-# Scenarios not listed here fall back to the legacy YAML path.
+# Demo scenarios the controller runs on the DataPack world. Every other
+# scenario runs on the world its YAML defines (initial_state,
+# clock_offset_seconds, timed_events, recovery).
+#
+# The scripted scenarios (labor_constraint_wave_risk, equipment_failure,
+# stale_state, state_drift) stay on their YAML worlds: the DataPack overlays
+# do not model them. Their timed events name YAML ids (w-003, AGV-02) that are
+# not in the DataPack, the DataPack world has no unassigned hero wave with a
+# carrier-cutoff deadline, and the YAML clock offset and drift statuses were
+# dropped, so no disruption was ever recorded and recovery could not be
+# detected (#308).
+DATAPACK_SCENARIOS: frozenset[str] = frozenset({"healthy_baseline"})
+
+# Maps scenario names → overlay kind for build_scenario_world(). Only the
+# names in DATAPACK_SCENARIOS are used by the demo controller.
 SCENARIO_OVERLAYS: dict[str, str] = {
     "labor_constraint_wave_risk": "labor_constraint",
     "equipment_failure":           "equipment_failure",
@@ -90,7 +103,8 @@ def build_scenario_world(scenario_name: str):
     Load canonical graph and apply scenario overlay by name.
 
     Falls back to a no-disruption healthy-baseline overlay for unknown kinds.
-    Use SCENARIO_OVERLAYS to check whether a scenario name is DataPack-native.
+    Use DATAPACK_SCENARIOS to check whether the demo controller runs a
+    scenario on the DataPack world.
     """
     from maiw_world.scenario import ScenarioOverlay, ScenarioWorld
 

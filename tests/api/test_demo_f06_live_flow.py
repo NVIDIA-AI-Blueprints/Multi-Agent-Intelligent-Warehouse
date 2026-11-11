@@ -35,7 +35,8 @@ from tests.api.canonical_harness import (
     running_canonical_app,
 )
 
-SCENARIO = "labor_constraint_wave_risk"
+# Runs on the DataPack world; the scripted scenarios run on their YAML worlds (#308).
+SCENARIO = "healthy_baseline"
 
 
 def _assessment(target: str, capability: str = "warehouse.equipment.assign") -> str:
@@ -91,7 +92,7 @@ def yaml_fallback(monkeypatch):
     """Force the legacy YAML world (DataPack path unavailable for SCENARIO)."""
     import maiw_api.demo.world_loader as world_loader
 
-    monkeypatch.setattr(world_loader, "SCENARIO_OVERLAYS", {})
+    monkeypatch.setattr(world_loader, "DATAPACK_SCENARIOS", frozenset())
 
 
 def _drain(queue) -> list[dict]:

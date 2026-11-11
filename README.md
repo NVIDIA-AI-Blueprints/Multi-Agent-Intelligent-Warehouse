@@ -715,6 +715,8 @@ Two warehouse worlds (same scenario, same seed) were advanced through the same d
 | Wave-risk exposure reduction | — | −86.7% |
 | MAIW governance cycles | 0 | 6 |
 
+Recorded on 2026-08-25 with hosted Nemotron 3 Super as the reasoning model. The control arm is deterministic and is checked on every pull request (`tests/unit/demo/test_scenario_worlds.py`). The MAIW arm depends on the model, so a rerun with another model gives different figures. From #83 to #308 the scenario ran on the DataPack world, where neither arm recorded a disruption; it runs on its YAML world again.
+
 Reproduce with:
 
 ```bash

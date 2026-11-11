@@ -232,6 +232,38 @@ class DemoScenarioController:
 
     # ── start ─────────────────────────────────────────────────────────────────
 
+    def _install_world(self, world: DemoWarehouseWorld) -> None:
+        """Make ``world`` the active world and rewire every provider to it.
+
+        Seeding the current world in place keeps existing provider references
+        valid; a new DemoWarehouseWorld needs new providers, and the MCP
+        server globals must point at them too.
+        """
+        from maiw_api.demo.providers.equipment import SimulationEquipmentProvider
+        from maiw_api.demo.providers.inventory import SimulationInventoryProvider
+        from maiw_api.demo.providers.labor import SimulationLaborProvider
+        from maiw_api.demo.providers.wave import SimulationWaveProvider
+
+        self.world = world
+        self.providers = SimulationProviders(
+            inventory=SimulationInventoryProvider(self.world),
+            equipment=SimulationEquipmentProvider(self.world, self.bus),
+            labor=SimulationLaborProvider(self.world, self.bus),
+            wave=SimulationWaveProvider(self.world, self.bus),
+        )
+        try:
+            from mcp_servers.equipment.server import configure_server as _cfg_eq
+            from mcp_servers.inventory.server import configure_server as _cfg_inv
+            from mcp_servers.labor.server import configure_server as _cfg_lab
+            from mcp_servers.wave.server import configure_server as _cfg_wave
+
+            _cfg_inv(self.providers.inventory)
+            _cfg_eq(self.providers.equipment)
+            _cfg_lab(self.providers.labor)
+            _cfg_wave(self.providers.wave)
+        except Exception as _cfg_exc:
+            logger.warning("Demo: MCP server rewire failed — %s", _cfg_exc)
+
     async def start(self, scenario_name: str) -> None:
         """Load and activate a scenario.  Replaces any currently active scenario."""
         files = list_scenario_files()
@@ -243,41 +275,19 @@ class DemoScenarioController:
         self._cancel_tick_task()
 
         # ── Phase 14E: DataPack-native path ──────────────────────────────────
-        # Try to build world from canonical DataPack + scenario overlay.
-        # Falls back to legacy YAML-seeded path if maiw-world is unavailable
-        # or the scenario is not yet in SCENARIO_OVERLAYS.
+        # Scenarios in DATAPACK_SCENARIOS run on the canonical DataPack +
+        # scenario overlay; all others (and these, if maiw-world or the
+        # DataPack is unavailable) run on the world their YAML defines.
         _used_datapack = False
         try:
-            from maiw_api.demo.world_loader import build_scenario_world, SCENARIO_OVERLAYS
-            if scenario_name in SCENARIO_OVERLAYS:
+            from maiw_api.demo.world_loader import (
+                DATAPACK_SCENARIOS,
+                build_scenario_world,
+            )
+
+            if scenario_name in DATAPACK_SCENARIOS:
                 scenario_world = build_scenario_world(scenario_name)
-                self.world = DemoWarehouseWorld(scenario_world=scenario_world)
-                # Rewire all providers to the new world instance
-                from maiw_api.demo.providers.equipment import SimulationEquipmentProvider
-                from maiw_api.demo.providers.inventory import SimulationInventoryProvider
-                from maiw_api.demo.providers.labor import SimulationLaborProvider
-                from maiw_api.demo.providers.wave import SimulationWaveProvider
-                self.providers = SimulationProviders(
-                    inventory=SimulationInventoryProvider(self.world),
-                    equipment=SimulationEquipmentProvider(self.world, self.bus),
-                    labor=SimulationLaborProvider(self.world, self.bus),
-                    wave=SimulationWaveProvider(self.world, self.bus),
-                )
-                # Re-wire MCP server globals to the new provider instances.
-                # The legacy YAML path mutates self.world in-place so existing
-                # provider references stay valid; the DataPack path creates a new
-                # DemoWarehouseWorld, so MCP servers must be updated explicitly.
-                try:
-                    from mcp_servers.equipment.server import configure_server as _cfg_eq
-                    from mcp_servers.inventory.server import configure_server as _cfg_inv
-                    from mcp_servers.labor.server import configure_server as _cfg_lab
-                    from mcp_servers.wave.server import configure_server as _cfg_wave
-                    _cfg_inv(self.providers.inventory)
-                    _cfg_eq(self.providers.equipment)
-                    _cfg_lab(self.providers.labor)
-                    _cfg_wave(self.providers.wave)
-                except Exception as _cfg_exc:
-                    logger.warning("Demo: MCP server rewire failed — %s", _cfg_exc)
+                self._install_world(DemoWarehouseWorld(scenario_world=scenario_world))
                 _used_datapack = True
         except (ImportError, FileNotFoundError) as exc:
             logger.debug(
@@ -286,6 +296,11 @@ class DemoScenarioController:
             )
 
         if not _used_datapack:
+            if self.world._scenario_world is not None:
+                # The previous scenario ran on the DataPack world. Seeding it
+                # in place would keep its DataPack reference, so reset() would
+                # rebuild the DataPack world and /world would report it.
+                self._install_world(DemoWarehouseWorld())
             # Legacy path: seed DemoWarehouseWorld from the scenario YAML initial_state
             self.world.seed(defn.initial_state, rng_seed=defn.rng_seed)
             # Providers survive on this path; drop any armed F06 fault.

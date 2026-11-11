@@ -35,7 +35,8 @@ from tests.api.canonical_harness import (
     running_canonical_app,
 )
 
-SCENARIO = "labor_constraint_wave_risk"
+# Runs on the DataPack world; the scripted scenarios run on their YAML worlds (#308).
+SCENARIO = "healthy_baseline"
 
 
 @pytest.fixture
