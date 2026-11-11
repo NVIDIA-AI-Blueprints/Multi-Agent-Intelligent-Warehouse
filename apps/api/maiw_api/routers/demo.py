@@ -192,11 +192,15 @@ async def inject_event(request: InjectRequest):
         404 ASSET_NOT_IN_ACTIVE_WORLD — explicit asset_id not in the active world
         409 NO_ELIGIBLE_ASSET         — asset_id omitted and nothing is eligible
 
-    Low stock:
-        {"event_type": "low_stock", "payload": {"sku": "SKU-1001", "quantity_available": 50}}
+    Low stock (sku optional, resolved from the active world when omitted):
+        {"event_type": "low_stock", "payload": {"quantity_available": 50}}
 
-    Worker absence:
-        {"event_type": "worker_absence", "payload": {"worker_id": "w-002"}}
+    Worker absence (worker_id optional, likewise):
+        {"event_type": "worker_absence", "payload": {}}
+
+    worker_return (worker_id) and task_deadline (task_id) resolve the same
+    way; errors are typed: 404 WORKER_ / SKU_ / TASK_NOT_IN_ACTIVE_WORLD,
+    409 NO_ELIGIBLE_WORKER / _SKU / _TASK.
     """
     from maiw_api.demo.controller import InjectTargetError
     from maiw_api.write_auth import TypedHTTPError

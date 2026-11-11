@@ -220,7 +220,7 @@ export default function FaultInjectionPanel({ scenarioId, sseEvents }: Props) {
       {
         label: 'INJECT WORKER ABSENCE',
         description: 'Simulate labor domain stress → worker_absence burst',
-        action: () => demoAPI.inject('worker_absence', { worker_id: 'w-003' }),
+        action: () => demoAPI.inject('worker_absence', {}),
         color: '#D29922',
         testId: 'inject-fault-F12',
       },
@@ -229,7 +229,7 @@ export default function FaultInjectionPanel({ scenarioId, sseEvents }: Props) {
       {
         label: 'INJECT TASK DEADLINE',
         description: 'Force urgent task — NIM timeout path triggered at capacity',
-        action: () => demoAPI.inject('task_deadline', { task_id: 'task-001', deadline: '2026-08-23T10:00:00Z' }),
+        action: () => demoAPI.inject('task_deadline', { deadline: '2026-08-23T10:00:00Z' }),
         color: '#D29922',
         testId: 'inject-fault-F01',
       },

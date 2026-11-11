@@ -56,19 +56,22 @@ const INJECT_EVENTS: InjectDef[] = [
     type: 'worker_absence',
     label: 'LABOR SHORT',
     color: '#D29922',
-    buildPayload: () => ({ worker_id: 'w-002' }),
+    // No worker_id: the backend picks an active worker with work from the active world.
+    buildPayload: () => ({}),
   },
   {
     type: 'worker_return',
     label: 'LABOR RETURN',
     color: '#3FB950',
-    buildPayload: () => ({ worker_id: 'w-002' }),
+    // No worker_id: the backend picks a worker who is not active.
+    buildPayload: () => ({}),
   },
   {
     type: 'low_stock',
     label: 'LOW STOCK',
     color: '#D29922',
-    buildPayload: () => ({ sku: 'SKU-1001', quantity_available: 50 }),
+    // No sku: the backend picks a SKU that is not yet low on stock.
+    buildPayload: () => ({ quantity_available: 50 }),
   },
   {
     type: 'wave_delay',

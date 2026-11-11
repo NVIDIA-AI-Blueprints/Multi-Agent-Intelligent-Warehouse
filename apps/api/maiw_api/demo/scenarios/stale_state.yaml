@@ -82,3 +82,26 @@ initial_state:
       deadline: "2026-08-23T10:00:00+00:00"
 
 timed_events: []
+
+# ── DC-47 DataPack world (#309) ───────────────────────────────────────────────
+# The demo runs this scenario on the DataPack world (DATAPACK_SCENARIOS in
+# demo/world_loader.py). The sections above define the YAML world, used when
+# the DataPack is unavailable. Ids are DataPack ids.
+datapack:
+  clock_offset_seconds: -2700  # 07:15, 45 min stale
+  initial_state:
+    equipment:
+      agv-000:                 # Stale: world says assigned
+        status: assigned
+        owner_user: worker-000000
+        battery_pct: 71.0
+      forklift-000:            # Stale assignment
+        status: assigned
+        owner_user: worker-000002
+    tasks:
+      # wave-017 picks (high priority, due 10:00) with no worker: the wave is
+      # critical by design.
+      task-000001:
+        assigned_to: null
+      task-000002:
+        assigned_to: null

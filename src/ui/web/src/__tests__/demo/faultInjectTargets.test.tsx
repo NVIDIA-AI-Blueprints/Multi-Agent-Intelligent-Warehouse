@@ -1,11 +1,11 @@
 /**
- * Equipment fault/restore injectors never hard-code an asset id.
+ * Fault injectors never hard-code an asset, worker, SKU or task id.
  *
- * Demo mode builds the active world from the DC-47 DataPack (asset ids such as
- * `agv-000`); `AGV-01` exists only in the scenario YAML fallback. Every
- * equipment injector omits asset_id so the backend resolves an eligible asset
- * from the ACTIVE world, and renders the resolved target (or the typed error)
- * from the response.
+ * Demo mode builds the active world from the DC-47 DataPack (ids such as
+ * `agv-000`, `worker-000000`, `sku-000000`); `AGV-01`, `w-002` and `SKU-1001`
+ * exist only in the scenario YAML fallback. Every injector omits its target so
+ * the backend resolves an eligible one from the ACTIVE world, and renders the
+ * resolved target (or the typed error) from the response.
  *
  * Covers: components/reliability/FaultInjectionPanel,
  *         components/demo/reliability/FaultInjectionPanel,
@@ -82,7 +82,10 @@ beforeEach(() => jest.clearAllMocks());
 describe('injectFeedback', () => {
   it('describes the resolved target', () => {
     expect(describeInjectTarget({ asset_id: 'agv-000', status: 'offline' })).toBe('Targeted agv-000');
-    expect(describeInjectTarget({ worker_id: 'w-1' })).toBeNull();
+    expect(describeInjectTarget({ worker_id: 'worker-000000', status: 'on_leave' })).toBe('Targeted worker-000000');
+    expect(describeInjectTarget({ sku: 'sku-000000', quantity_available: 50 })).toBe('Targeted sku-000000');
+    expect(describeInjectTarget({ task_id: 'task-000003', deadline: 'x' })).toBe('Targeted task-000003');
+    expect(describeInjectTarget({ status: 'offline' })).toBeNull();
     expect(describeInjectTarget(undefined)).toBeNull();
   });
 
@@ -160,11 +163,27 @@ describe('demo reliability FaultInjectionPanel', () => {
     expect(injectMock).toHaveBeenNthCalledWith(2, 'equipment_restore', { asset_id: 'agv-003' });
     expectNoHardCodedAsset();
   });
+
+  it('F12 sends no worker_id and shows the resolved worker', async () => {
+    injectMock.mockResolvedValue({ worker_id: 'worker-000001', status: 'on_leave' });
+    themed(<DemoFaultPanel scenarioId="F12" sseEvents={[]} />);
+    await act(async () => { fireEvent.click(screen.getByTestId('inject-fault-F12')); });
+    expect(await screen.findByTestId('inject-result')).toHaveTextContent('Targeted worker-000001');
+    expect(injectMock).toHaveBeenCalledWith('worker_absence', {});
+  });
+
+  it('F01 sends no task_id and shows the resolved task', async () => {
+    injectMock.mockResolvedValue({ task_id: 'task-000003', deadline: '2026-08-23T10:00:00Z' });
+    themed(<DemoFaultPanel scenarioId="F01" sseEvents={[]} />);
+    await act(async () => { fireEvent.click(screen.getByTestId('inject-fault-F01')); });
+    expect(await screen.findByTestId('inject-result')).toHaveTextContent('Targeted task-000003');
+    expect(injectMock).toHaveBeenCalledWith('task_deadline', { deadline: '2026-08-23T10:00:00Z' });
+  });
 });
 
 // ── components/demo/DemoControlBar ───────────────────────────────────────────
 
-describe('DemoControlBar equipment injectors', () => {
+describe('DemoControlBar injectors', () => {
   it('EQUIP FAULT sends no asset_id and shows the resolved target', async () => {
     injectMock.mockResolvedValue({ asset_id: 'agv-000', status: 'offline' });
     renderBar();
@@ -184,6 +203,18 @@ describe('DemoControlBar equipment injectors', () => {
     await waitFor(() => expect(screen.getByText('✓ EQUIP RESTORE · Targeted agv-000')).toBeInTheDocument());
     expect(injectMock).toHaveBeenCalledWith('equipment_restore', { new_status: 'available', battery_pct: 85 });
     expectNoHardCodedAsset();
+  });
+
+  it.each([
+    ['LABOR SHORT', 'worker_absence', {}, { worker_id: 'worker-000001', status: 'on_leave' }, 'worker-000001'],
+    ['LABOR RETURN', 'worker_return', {}, { worker_id: 'worker-000001', status: 'active' }, 'worker-000001'],
+    ['LOW STOCK', 'low_stock', { quantity_available: 50 }, { sku: 'sku-000000', quantity_available: 50 }, 'sku-000000'],
+  ])('%s sends no id and shows the resolved target', async (label, type, payload, result, target) => {
+    injectMock.mockResolvedValue(result);
+    renderBar();
+    await act(async () => { fireEvent.click(screen.getByText(label)); });
+    await waitFor(() => expect(screen.getByText(`✓ ${label} · Targeted ${target}`)).toBeInTheDocument());
+    expect(injectMock).toHaveBeenCalledWith(type, payload);
   });
 
   it('renders the typed error', async () => {

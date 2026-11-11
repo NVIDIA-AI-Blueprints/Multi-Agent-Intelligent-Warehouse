@@ -186,3 +186,42 @@ timed_events:
 recovery:
   wave_risk_max_score: 25
   backlog_max: 1
+
+# ── DC-47 DataPack world (#309) ───────────────────────────────────────────────
+# The demo runs this scenario on the DataPack world (DATAPACK_SCENARIOS in
+# demo/world_loader.py). The sections above define the YAML world, used when
+# the DataPack is unavailable. Ids are DataPack ids; timed-event offsets count
+# from scenario start.
+datapack:
+  clock_offset_seconds: 1800  # 08:30, 90 min before the FedEx Priority cutoff
+  initial_state:
+    equipment:
+      agv-000:                # Failed mid-wave: motor fault
+        status: offline
+        fault_code: E_MOTOR_OVERTEMP
+        battery_pct: 34.0
+      forklift-000:           # Already in scheduled maintenance
+        status: maintenance
+        next_pm_due: "2026-08-23T08:00:00+00:00"
+        last_maintenance: "2026-08-23T08:00:00+00:00"
+    tasks:
+      # wave-017 picks (high priority, due 10:00) that lost their equipment
+      # and wait for a worker.
+      task-000000:            # agv-000's pick, interrupted
+        status: pending
+        assigned_to: null
+      task-000024:            # forklift-000's pick
+        assigned_to: null
+  timed_events:
+    - offset_seconds: 60
+      type: equipment_fault
+      payload:
+        asset_id: "agv-001"
+        fault: "battery_critical"
+        new_status: "offline"
+        fault_code: "E_BATT_LOW"
+        battery_pct: 8.0
+  recovery:
+    # Every other task is assigned and progresses on its own, so recovery is
+    # the wave no longer at risk: no unassigned task with a deadline.
+    wave_risk_max_score: 25
