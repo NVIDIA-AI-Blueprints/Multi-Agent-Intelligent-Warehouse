@@ -1,8 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 """
-equipment_failure, stale_state and state_drift run on the DC-47 DataPack world
-(#309, step 2).
+The scripted scenarios run on the DC-47 DataPack world (#309).
 
 Each scenario's YAML has a ``datapack`` block: a clock offset, initial_state
 overrides of named DataPack entities, timed events counted from scenario
@@ -23,7 +22,12 @@ from maiw_contracts.labor import LaborAllocateRequest
 
 TICKS = 30
 TICK_SECONDS = 60
-MOVED = ["equipment_failure", "stale_state", "state_drift"]
+MOVED = [
+    "equipment_failure",
+    "labor_constraint_wave_risk",
+    "stale_state",
+    "state_drift",
+]
 
 
 def _run(coro):

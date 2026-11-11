@@ -102,17 +102,38 @@ def test_a_worker_runs_its_assigned_tasks_one_after_another(ctrl):
     assert all(ctrl.world.tasks[tid].status == "completed" for tid in task_ids)
 
 
-def test_absent_workers_tasks_stay_pending(ctrl):
+def test_absent_workers_unstarted_tasks_go_back_to_the_pool(ctrl):
     worker_id = next(
         t.assigned_to
         for t in sorted(ctrl.world.tasks.values(), key=lambda t: t.task_id)
         if t.status == "pending" and t.assigned_to
     )
-    _run(ctrl.inject("worker_absence", {"worker_id": worker_id}))
+    theirs = sorted(
+        t.task_id
+        for t in ctrl.world.tasks.values()
+        if t.assigned_to == worker_id and t.status == "pending"
+    )
+    result = _run(ctrl.inject("worker_absence", {"worker_id": worker_id}))
+    assert result["released_task_ids"] == theirs
+    assert ctrl.world.workers[worker_id].current_task_id is None
+
     for _ in range(5):
         _run(ctrl.tick(TICK_SECONDS))
-    theirs = [t for t in ctrl.world.tasks.values() if t.assigned_to == worker_id]
-    assert theirs and all(t.status == "pending" for t in theirs)
+    for task_id in theirs:
+        task = ctrl.world.tasks[task_id]
+        assert (task.status, task.assigned_to) == ("pending", None), task_id
+    # Released tasks are what wave risk counts.
+    assert DemoKPIEngine(ctrl.world).compute().wave_risk_level != "none"
+
+
+def test_an_absent_workers_task_in_progress_finishes(ctrl):
+    task = ctrl.world.tasks["task-000000"]  # in progress at load
+    worker_id = task.assigned_to
+    result = _run(ctrl.inject("worker_absence", {"worker_id": worker_id}))
+    assert "task-000000" not in result["released_task_ids"]
+    for _ in range(task.processing_duration_seconds // TICK_SECONDS):
+        _run(ctrl.tick(TICK_SECONDS))
+    assert task.status == "completed"
 
 
 def test_unassigned_pending_tasks_wait_for_an_allocation(ctrl):

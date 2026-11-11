@@ -197,12 +197,10 @@ class DemoScenarioController:
         self._tick_task: asyncio.Task | None = None
         self._next_event_idx: int = 0  # Index into self._timed_events
         # The active timeline and recovery thresholds: the YAML's, or its
-        # ``datapack`` block's on the DataPack world. Offsets of DataPack
-        # timed events count from scenario start; YAML offsets are compared
-        # with the clock reading (#309).
+        # ``datapack`` block's on the DataPack world. Timed-event offsets count
+        # from scenario start on both worlds (#309).
         self._timed_events: list[TimedEvent] = []
         self._recovery: dict[str, Any] = {}
-        self._events_from_scenario_start: bool = False
         self._kpi_history: list[dict] = []
         self._last_inject_wall_time: datetime | None = None
         self._last_analyze_wall_time: datetime | None = None
@@ -338,11 +336,9 @@ class DemoScenarioController:
         if _used_datapack and defn.datapack:
             self._timed_events = _parse_timed_events(defn.datapack.get("timed_events"))
             self._recovery = dict(defn.datapack.get("recovery") or {})
-            self._events_from_scenario_start = True
         else:
             self._timed_events = list(defn.timed_events)
             self._recovery = dict(defn.recovery)
-            self._events_from_scenario_start = False
 
         self._snapshot = self.world.snapshot()
         self._scenario = defn
@@ -878,11 +874,9 @@ class DemoScenarioController:
         if self._scenario is None:
             return
         events = self._timed_events
-        now = (
-            self.world.scenario_elapsed_seconds
-            if self._events_from_scenario_start
-            else elapsed
-        )
+        # Offsets count from scenario start, not from the clock reading, which
+        # starts at clock_offset_seconds (5400 s for the labor YAML world).
+        now = self.world.scenario_elapsed_seconds
         while (
             self._next_event_idx < len(events)
             and events[self._next_event_idx].offset_seconds <= now
@@ -960,7 +954,14 @@ class DemoScenarioController:
             if worker is None:
                 raise ValueError(f"Worker '{worker_id}' not found")
             worker.status = payload.get("new_status", "on_leave")
-            return {"worker_id": worker_id, "status": worker.status}
+            # An absent worker's tasks that have not started go back to the
+            # pool, where wave risk counts them (#309).
+            released = self.world.release_unstarted_tasks(worker_id)
+            return {
+                "worker_id": worker_id,
+                "status": worker.status,
+                "released_task_ids": released,
+            }
 
         if event_type == "worker_return":
             worker_id = payload["worker_id"]

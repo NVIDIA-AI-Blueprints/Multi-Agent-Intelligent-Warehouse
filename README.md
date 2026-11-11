@@ -715,13 +715,13 @@ Two warehouse worlds (same scenario, same seed) were advanced through the same d
 | Wave-risk exposure reduction | — | −86.7% |
 | MAIW governance cycles | 0 | 6 |
 
-Recorded on 2026-08-25 with hosted Nemotron 3 Super as the reasoning model. The control arm is deterministic and is checked on every pull request (`tests/unit/demo/test_scenario_worlds.py`). The MAIW arm depends on the model, so a rerun with another model gives different figures. From #83 to #308 the scenario ran on the DataPack world, where neither arm recorded a disruption; it runs on its YAML world again.
+Recorded on 2026-08-25 with hosted Nemotron 3 Super as the reasoning model, on the scenario's YAML world (six workers, seven tasks). Since #309 the scenario runs on the DC-47 DataPack world: three of 120 workers are absent and five wave-017 tasks are left without a worker. The control arm is deterministic and is checked on every pull request (`tests/unit/demo/test_scenario_worlds.py`): the wave stays critical and recovery is not reached. The MAIW arm depends on the model and has not yet been rerun on the DataPack world.
 
 Reproduce with:
 
 ```bash
 MAIW_DEMO_MODE=true MAIW_PERSISTENCE_MODE=memory uvicorn maiw_api.app:app --port 8001
-python scripts/counterfactual_eval.py   # generates artifacts/demo/labor_wave_control_vs_maiw.*
+python scripts/counterfactual_eval.py   # generates artifacts/demo/labor_wave_control_vs_maiw.* (MAIW_API_URL for another port)
 python scripts/trace_capture.py          # generates artifacts/demo/labor_constraint_wave_risk_trace.*
 ```
 

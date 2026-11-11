@@ -15,6 +15,7 @@ It does not alter simulation state to produce an attractive trace.
 """
 
 import json
+import os
 import sys
 import time
 from datetime import datetime, timezone
@@ -23,7 +24,8 @@ from pathlib import Path
 import requests
 
 # ── Config ────────────────────────────────────────────────────────────────────
-BASE_URL       = "http://localhost:8001/api/v1"
+# API root; override with MAIW_API_URL when it is not on localhost:8001.
+BASE_URL = os.environ.get("MAIW_API_URL", "http://localhost:8001").rstrip("/") + "/api/v1"
 SCENARIO_NAME  = "labor_constraint_wave_risk"
 TICK_SECONDS   = 60          # seconds per tick (matches UI default)
 MAX_TICKS      = 60          # maximum ticks before giving up (= 3600 sim-seconds)

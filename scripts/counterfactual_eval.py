@@ -18,6 +18,7 @@ Emits:
 """
 
 import json
+import os
 import sys
 import time
 from datetime import datetime, timezone
@@ -25,7 +26,8 @@ from pathlib import Path
 
 import requests
 
-BASE_URL      = "http://localhost:8001/api/v1"
+# API root; override with MAIW_API_URL when it is not on localhost:8001.
+BASE_URL = os.environ.get("MAIW_API_URL", "http://localhost:8001").rstrip("/") + "/api/v1"
 SCENARIO_NAME = "labor_constraint_wave_risk"
 TICK_SECONDS  = 60
 MAX_TICKS     = 30   # 1800 sim-seconds = 30 sim-minutes
@@ -461,5 +463,5 @@ if __name__ == "__main__":
         main()
     except requests.exceptions.ConnectionError:
         print(f"ERROR: Cannot connect to {BASE_URL}", file=sys.stderr)
-        print("Ensure: MAIW_DEMO_MODE=true env/bin/python -m uvicorn maiw_api.app:app --port 8001", file=sys.stderr)
+        print("Start the demo API (./scripts/start_demo_mode.sh) or set MAIW_API_URL", file=sys.stderr)
         sys.exit(1)

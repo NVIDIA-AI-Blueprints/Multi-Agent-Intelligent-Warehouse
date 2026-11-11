@@ -54,7 +54,11 @@ def datapack_ctrl():
 
 
 @pytest.fixture
-def yaml_ctrl():
+def yaml_ctrl(monkeypatch):
+    """labor_constraint_wave_risk on its YAML world (the DataPack fallback)."""
+    from maiw_api.demo import world_loader
+
+    monkeypatch.setattr(world_loader, "DATAPACK_SCENARIOS", frozenset())
     ctrl = _started("labor_constraint_wave_risk")
     assert ctrl.world._scenario_world is None
     return ctrl

@@ -173,3 +173,35 @@ timed_events:
 recovery:
   wave_risk_max_score: 25
   backlog_max: 1
+
+# ── DC-47 DataPack world (#309) ───────────────────────────────────────────────
+# The demo runs this scenario on the DataPack world (DATAPACK_SCENARIOS in
+# demo/world_loader.py). The sections above define the YAML world, used when
+# the DataPack is unavailable. Ids are DataPack ids; timed-event offsets count
+# from scenario start.
+#
+# Only the absent workers are named. An absent worker's tasks that have not
+# started go back to the pool without a worker, which is what puts wave-017
+# (high priority, due 10:00 at the FedEx Priority cutoff) at risk.
+datapack:
+  clock_offset_seconds: 5400  # 09:30, 90 min into shift, 30 min before the cutoff
+  initial_state:
+    workers:
+      worker-000024:          # Absent: wave-017 task-000012 (PICK), task-000017 (PUTAWAY)
+        status: on_leave
+      worker-000038:          # Absent: wave-017 task-000021 (PICK), task-000022 (PACK)
+        status: on_leave
+  timed_events:
+    # Started task-000027 on the first tick; task-000028 (PACK) goes back to
+    # the pool.
+    - offset_seconds: 120
+      type: worker_absence
+      payload:
+        worker_id: "worker-000049"
+        new_status: "on_leave"
+        reason: "unexpected_absence"
+  recovery:
+    # Assigned work drains by itself in about 15 simulated minutes, so a
+    # backlog threshold would be met without intervention. Recovered: no task
+    # with a deadline is left without a worker.
+    wave_risk_max_score: 25

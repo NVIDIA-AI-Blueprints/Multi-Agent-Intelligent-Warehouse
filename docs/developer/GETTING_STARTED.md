@@ -134,7 +134,7 @@ python -m maiw_world scenarios data/worlds/dc47-demo-v1
 
 | Scenario | World | Description |
 |----------|-------|-------------|
-| `labor_constraint_wave_risk` | Scenario YAML | Understaffed shift, wave at risk |
+| `labor_constraint_wave_risk` | DC-47 DataPack | Three workers absent, five wave-017 tasks without a worker |
 | `equipment_failure` | DC-47 DataPack | AGVs offline, two wave-017 picks without a worker |
 | `healthy_baseline` | DC-47 DataPack | All systems nominal |
 | `stale_state` | DC-47 DataPack | State 45 minutes stale |
@@ -143,9 +143,8 @@ python -m maiw_world scenarios data/worlds/dc47-demo-v1
 > **Note:** a scripted scenario runs on the DataPack world through the
 > `datapack` block of its YAML (DataPack ids, clock offset, timed events
 > counted from scenario start, recovery thresholds); see
-> [ADDING_A_SCENARIO.md](ADDING_A_SCENARIO.md). `labor_constraint_wave_risk`
-> stays on its YAML world until the published counterfactual is rerun (#309).
-> The `maiw_world` overlays listed by the command above are previews; the demo
+> [ADDING_A_SCENARIO.md](ADDING_A_SCENARIO.md). Every scenario falls back to
+> the world its YAML defines when the DataPack is unavailable. The `maiw_world` overlays listed by the command above are previews; the demo
 > API builds a DataPack scenario's overlay from its `datapack` block.
 
 ---
