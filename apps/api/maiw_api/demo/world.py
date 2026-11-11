@@ -172,8 +172,12 @@ class DemoWarehouseWorld:
         self,
         scenario_config: dict | None = None,          # existing — keep for backward compat
         scenario_world: "ScenarioWorld | None" = None,  # NEW — Phase 14E path
+        datapack_setup: dict[str, Any] | None = None,
     ) -> None:
         self.clock = SimulationClock()
+        # Clock reading when the scenario started; timed events on the
+        # DataPack world count their offsets from here.
+        self._start_seconds: int = 0
         self.inventory: dict[str, InventoryItem] = {}  # sku → item
         self.equipment: dict[str, EquipmentAsset] = {}  # asset_id → asset
         self.workers: dict[str, WorkerState] = {}  # worker_id → worker
@@ -191,14 +195,15 @@ class DemoWarehouseWorld:
         )
         # Phase 14E: scenario world reference for projection-based init/reset
         self._scenario_world: "ScenarioWorld | None" = scenario_world
+        # The scenario YAML's ``datapack`` block: clock_offset_seconds and
+        # initial_state overrides applied after projection (#309).
+        self._datapack_setup: dict[str, Any] = dict(datapack_setup or {})
         self._datapack_checksum: str | None = None
 
         if scenario_world is not None:
             # Initialize from DataPack projections
             try:
-                from maiw_world.projections import WarehouseProjectionBuilder
-                builder = WarehouseProjectionBuilder(scenario_world, at_offset=0.0)
-                self._init_from_projections(builder)
+                self._load_datapack()
                 # Capture checksum from the base graph (DataPack must remain unchanged)
                 from maiw_world.datapack import compute_semantic_checksum
                 self._datapack_checksum = compute_semantic_checksum(
@@ -212,6 +217,92 @@ class DemoWarehouseWorld:
             self.seed(scenario_config)
 
     # ── Phase 14E: projection-based init ────────────────────────────────────
+
+    @property
+    def scenario_elapsed_seconds(self) -> int:
+        """Simulated seconds since the scenario started."""
+        return self.clock.elapsed_seconds - self._start_seconds
+
+    def _load_datapack(self) -> None:
+        """Build the world from the DataPack projections and the scenario's
+        ``datapack`` block. Used at start and on reset."""
+        from maiw_world.projections import WarehouseProjectionBuilder
+
+        offset = int(self._datapack_setup.get("clock_offset_seconds", 0))
+        self.clock = SimulationClock(seed_seconds=offset)
+        self._start_seconds = offset
+        builder = WarehouseProjectionBuilder(self._scenario_world, at_offset=0.0)
+        self._init_from_projections(builder)
+        self._apply_overrides(self._datapack_setup.get("initial_state") or {})
+
+    _OVERRIDE_SECTIONS: dict[str, str] = {
+        "equipment": "equipment",
+        "workers": "workers",
+        "tasks": "tasks",
+        "inventory": "inventory",
+    }
+    _DATETIME_FIELDS = frozenset({"next_pm_due", "last_maintenance"})
+
+    def _apply_overrides(self, state: dict[str, Any]) -> None:
+        """Set fields of named DataPack entities, e.g.
+        ``{"equipment": {"agv-000": {"status": "offline"}}}``.
+
+        Unknown sections, ids and fields raise ValueError, so a scenario that
+        names an entity the DataPack does not have fails at start instead of
+        running without its disruption (#308).
+        """
+        for section, entries in state.items():
+            if section not in self._OVERRIDE_SECTIONS:
+                raise ValueError(
+                    f"datapack.initial_state: unknown section {section!r} "
+                    f"(expected one of {sorted(self._OVERRIDE_SECTIONS)})"
+                )
+            collection = getattr(self, self._OVERRIDE_SECTIONS[section])
+            for entity_id, changes in (entries or {}).items():
+                entity = collection.get(entity_id)
+                if entity is None:
+                    raise ValueError(
+                        f"datapack.initial_state.{section}: {entity_id!r} is not "
+                        "in the DataPack world"
+                    )
+                fields = list(entity.__dataclass_fields__)
+                for key, value in (changes or {}).items():
+                    if key not in fields or key == fields[0]:
+                        raise ValueError(
+                            f"datapack.initial_state.{section}.{entity_id}: "
+                            f"cannot set {key!r}"
+                        )
+                    if key in self._DATETIME_FIELDS and isinstance(value, str):
+                        value = datetime.fromisoformat(value)
+                    setattr(entity, key, value)
+        self._settle_assignments()
+
+    def _settle_assignments(self) -> None:
+        """Make task progress and worker current tasks agree after overrides."""
+        now = self.clock.elapsed_seconds
+        for task in self.tasks.values():
+            if task.status == "in_progress" and task.started_at_sim_seconds is None:
+                task.started_at_sim_seconds = now
+            elif task.status != "in_progress":
+                task.started_at_sim_seconds = None
+        for worker in self.workers.values():
+            current = self.tasks.get(worker.current_task_id or "")
+            if (
+                current is not None
+                and current.assigned_to == worker.worker_id
+                and current.status in ("pending", "in_progress")
+            ):
+                continue
+            mine = sorted(
+                (
+                    t
+                    for t in self.tasks.values()
+                    if t.assigned_to == worker.worker_id
+                    and t.status in ("pending", "in_progress")
+                ),
+                key=lambda t: (t.status != "in_progress", t.task_id),
+            )
+            worker.current_task_id = mine[0].task_id if mine else None
 
     def _init_from_projections(self, builder: Any) -> None:
         """Populate world collections from WarehouseProjectionBuilder output."""
@@ -330,6 +421,7 @@ class DemoWarehouseWorld:
         """Populate world from a scenario ``data`` dict. Clears previous state."""
         self._rng = random.Random(rng_seed)
         self.clock = SimulationClock(seed_seconds=data.get("clock_offset_seconds", 0))
+        self._start_seconds = self.clock.elapsed_seconds
         self.inventory.clear()
         self.equipment.clear()
         self.workers.clear()
@@ -408,10 +500,7 @@ class DemoWarehouseWorld:
         if self._scenario_world is not None:
             # Rebuild from projections — not from snapshot
             try:
-                from maiw_world.projections import WarehouseProjectionBuilder
-                builder = WarehouseProjectionBuilder(self._scenario_world, at_offset=0.0)
-                self.clock = SimulationClock()
-                self._init_from_projections(builder)
+                self._load_datapack()
             except ImportError:
                 pass
         elif snap is not None:

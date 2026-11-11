@@ -296,12 +296,14 @@ At `ScenarioWorld` construction time, all entity IDs referenced by overlay event
 | Scenario name | World the demo API runs | DataPack overlay (`build_scenario_world`) |
 |---|---|---|
 | `healthy_baseline` | DataPack | No-disruption overlay |
+| `equipment_failure` | DataPack | Built from the YAML `datapack` block |
+| `stale_state` | DataPack | Built from the YAML `datapack` block (no disruption events) |
+| `state_drift` | DataPack | Built from the YAML `datapack` block (inventory drift) |
 | `labor_constraint_wave_risk` | Scenario YAML | `labor_constraint_scenario()` (preview only) |
-| `equipment_failure` | Scenario YAML | `equipment_failure_scenario()` (preview only) |
-| `stale_state` | Scenario YAML | none |
-| `state_drift` | Scenario YAML | none |
 
-Only `healthy_baseline` runs on the DataPack world (`DATAPACK_SCENARIOS` in `apps/api/maiw_api/demo/world_loader.py`). From #83 until #308 the scripted scenarios also did, but the overlays do not model them: their timed events named YAML ids absent from the DataPack, the DataPack world has no unassigned hero wave with a carrier-cutoff deadline, and the YAML clock offset and drift statuses were dropped. No disruption was recorded and recovery could never be detected. Moving them to the DataPack needs DataPack-native timelines, a hero wave and recovery thresholds sized for the DataPack world; DataPack work now progresses and has carrier-cutoff deadlines (see [Work progression](#work-progression)). The remaining steps are tracked in #309.
+A scripted scenario runs on the DataPack world through the `datapack` block of its YAML: a clock offset, `initial_state` overrides of named DataPack entities, timed events counted from scenario start and recovery thresholds sized for the DataPack world ([ADDING_A_SCENARIO.md](ADDING_A_SCENARIO.md)). Its overlay, which the World Explorer reads, is built from the same block, so both show the same disruptions; the World Explorer evaluates it at the time since scenario start. From #83 until #308 the scripted scenarios ran on the DataPack with their YAML timelines, whose ids are not in the DataPack, so no disruption was recorded and recovery could never be detected.
+
+`labor_constraint_wave_risk` stays on its YAML world until the published counterfactual has been rerun on the DataPack (#309).
 
 ---
 
@@ -412,5 +414,5 @@ addressed if a concrete runtime need arises.
 1. **No removal** — the graph is add-only. Edge expiry is expressed temporally; explicit removal is not supported.
 2. **No thread safety** — the graph is not guarded by a lock. Safe for single-threaded simulation use.
 3. **No cross-graph linking API** — the Operational Graph references the Decision Graph (Phase 13) only by shared IDs. A formal linking layer is deferred to a future phase.
-4. **Scripted scenarios** — `labor_constraint_wave_risk`, `equipment_failure`, `stale_state` and `state_drift` run on their YAML worlds, not the DataPack (see Scenario migration status).
+4. **Labor scenario** — `labor_constraint_wave_risk` runs on its YAML world, not the DataPack (see Scenario migration status).
 5. **Automated reconciliation trigger** — not yet implemented (operator-initiated only; see Phase 10E).

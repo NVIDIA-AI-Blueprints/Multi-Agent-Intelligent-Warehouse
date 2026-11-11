@@ -53,6 +53,15 @@ _DISRUPTION_EVENT_TYPES = frozenset(
 # Manual equipment injections whose target is resolved from the ACTIVE world.
 _EQUIPMENT_TARGETED_EVENT_TYPES = frozenset({"equipment_fault", "equipment_restore"})
 
+# Other manual injections with a target that is optional and resolved from the
+# ACTIVE world: event type → (payload key, world collection, error noun).
+_OTHER_TARGETED_EVENT_TYPES: dict[str, tuple[str, str, str]] = {
+    "worker_absence": ("worker_id", "workers", "WORKER"),
+    "worker_return": ("worker_id", "workers", "WORKER"),
+    "low_stock": ("sku", "inventory", "SKU"),
+    "task_deadline": ("task_id", "tasks", "TASK"),
+}
+
 
 class InjectTargetError(ValueError):
     """
@@ -94,6 +103,9 @@ class ScenarioDefinition:
     initial_state: dict[str, Any]
     timed_events: list[TimedEvent]
     recovery: dict  # recovery threshold conditions; empty dict = no recovery tracking
+    # The YAML's ``datapack`` block: how the scenario runs on the DataPack
+    # world (clock_offset_seconds, initial_state, timed_events, recovery).
+    datapack: dict[str, Any] = field(default_factory=dict)
 
     def metadata(self) -> dict[str, Any]:
         return {
@@ -104,17 +116,22 @@ class ScenarioDefinition:
         }
 
 
-def _load_scenario_file(path: Path) -> ScenarioDefinition:
-    with open(path) as f:
-        raw = yaml.safe_load(f)
-    timed_events = [
+def _parse_timed_events(raw_events: list | None) -> list[TimedEvent]:
+    events = [
         TimedEvent(
             offset_seconds=e["offset_seconds"],
             type=e["type"],
             payload=e.get("payload", {}),
         )
-        for e in (raw.get("timed_events") or [])
+        for e in (raw_events or [])
     ]
+    return sorted(events, key=lambda e: e.offset_seconds)
+
+
+def _load_scenario_file(path: Path) -> ScenarioDefinition:
+    with open(path) as f:
+        raw = yaml.safe_load(f)
+    timed_events = _parse_timed_events(raw.get("timed_events"))
     # Merge clock_offset_seconds into initial_state for world.seed()
     initial_state = dict(raw.get("initial_state", {}))
     initial_state["clock_offset_seconds"] = raw.get("clock_offset_seconds", 0)
@@ -128,6 +145,7 @@ def _load_scenario_file(path: Path) -> ScenarioDefinition:
         initial_state=initial_state,
         timed_events=timed_events,
         recovery=raw.get("recovery", {}),
+        datapack=raw.get("datapack") or {},
     )
 
 
@@ -177,7 +195,14 @@ class DemoScenarioController:
         self._snapshot: dict[str, Any] | None = None
         self._paused: bool = False
         self._tick_task: asyncio.Task | None = None
-        self._next_event_idx: int = 0  # Index into scenario.timed_events
+        self._next_event_idx: int = 0  # Index into self._timed_events
+        # The active timeline and recovery thresholds: the YAML's, or its
+        # ``datapack`` block's on the DataPack world. Offsets of DataPack
+        # timed events count from scenario start; YAML offsets are compared
+        # with the clock reading (#309).
+        self._timed_events: list[TimedEvent] = []
+        self._recovery: dict[str, Any] = {}
+        self._events_from_scenario_start: bool = False
         self._kpi_history: list[dict] = []
         self._last_inject_wall_time: datetime | None = None
         self._last_analyze_wall_time: datetime | None = None
@@ -287,7 +312,11 @@ class DemoScenarioController:
 
             if scenario_name in DATAPACK_SCENARIOS:
                 scenario_world = build_scenario_world(scenario_name)
-                self._install_world(DemoWarehouseWorld(scenario_world=scenario_world))
+                self._install_world(
+                    DemoWarehouseWorld(
+                        scenario_world=scenario_world, datapack_setup=defn.datapack
+                    )
+                )
                 _used_datapack = True
         except (ImportError, FileNotFoundError) as exc:
             logger.debug(
@@ -305,6 +334,15 @@ class DemoScenarioController:
             self.world.seed(defn.initial_state, rng_seed=defn.rng_seed)
             # Providers survive on this path; drop any armed F06 fault.
             self.providers.equipment.disarm_post_mutation_fault()
+
+        if _used_datapack and defn.datapack:
+            self._timed_events = _parse_timed_events(defn.datapack.get("timed_events"))
+            self._recovery = dict(defn.datapack.get("recovery") or {})
+            self._events_from_scenario_start = True
+        else:
+            self._timed_events = list(defn.timed_events)
+            self._recovery = dict(defn.recovery)
+            self._events_from_scenario_start = False
 
         self._snapshot = self.world.snapshot()
         self._scenario = defn
@@ -433,7 +471,9 @@ class DemoScenarioController:
         For equipment_fault / equipment_restore ``asset_id`` is optional: when
         omitted the target is resolved from the ACTIVE world (DataPack or YAML)
         by ``resolve_equipment_target``.  The result always carries the
-        ``asset_id`` actually used.
+        ``asset_id`` actually used.  Likewise ``worker_id`` (worker_absence,
+        worker_return), ``sku`` (low_stock) and ``task_id`` (task_deadline),
+        resolved by ``resolve_inject_target``.
         """
         if not self.active:
             raise RuntimeError("No active scenario")
@@ -446,6 +486,11 @@ class DemoScenarioController:
                 **payload,
                 "asset_id": self.resolve_equipment_target(event_type, payload),
             }
+        elif event_type in _OTHER_TARGETED_EVENT_TYPES:
+            key = _OTHER_TARGETED_EVENT_TYPES[event_type][0]
+            explicit = _requested_id(payload, key) is not None
+            resolution = "explicit" if explicit else "resolved"
+            payload = {**payload, key: self.resolve_inject_target(event_type, payload)}
 
         result = await self._apply_event(event_type, payload)
         if resolution is not None:
@@ -529,6 +574,76 @@ class DemoScenarioController:
                 world_source=world_source,
             )
         return min(eligible, key=rank).asset_id
+
+    def resolve_inject_target(self, event_type: str, payload: dict[str, Any]) -> str:
+        """
+        Return the worker, SKU or task a worker_absence, worker_return,
+        low_stock or task_deadline injection applies to.
+
+        Explicit id → used as-is if it exists in the active world, otherwise
+        ``<NOUN>_NOT_IN_ACTIVE_WORLD`` (404).  Omitted id → deterministic
+        resolution (same world → same target), lowest id in plain string order
+        among:
+
+            worker_absence  active workers, those with a current task first
+            worker_return   workers not active
+            low_stock       SKUs not already low on stock
+            task_deadline   pending tasks, high/critical priority first
+
+        Nothing eligible → ``NO_ELIGIBLE_<NOUN>`` (409).  The DataPack world's
+        ids (``worker-000000``, ``sku-000000``) differ from the YAML world's
+        (``w-001``, ``SKU-1001``), so the UI sends no id.
+        """
+        key, collection_name, noun = _OTHER_TARGETED_EVENT_TYPES[event_type]
+        collection = getattr(self.world, collection_name)
+        world_source = "datapack" if self.world._scenario_world is not None else "yaml"
+        requested = _requested_id(payload, key)
+        if requested is not None:
+            if requested not in collection:
+                raise InjectTargetError(
+                    404,
+                    f"{noun}_NOT_IN_ACTIVE_WORLD",
+                    f"{key} {requested!r} is not in the active demo world "
+                    f"(scenario={self.scenario_name!r}, source={world_source}); "
+                    f"omit {key} to target an eligible one",
+                    **{key: requested, "world_source": world_source},
+                )
+            return requested
+
+        if event_type == "worker_absence":
+            rule = "status == 'active', with a current task first"
+            ranked = [
+                ((w.current_task_id is None, wid), wid)
+                for wid, w in collection.items()
+                if w.status == "active"
+            ]
+        elif event_type == "worker_return":
+            rule = "status != 'active'"
+            ranked = [
+                ((wid,), wid) for wid, w in collection.items() if w.status != "active"
+            ]
+        elif event_type == "low_stock":
+            rule = "not low on stock"
+            ranked = [
+                ((sku,), sku) for sku, item in collection.items() if not item.is_low_stock
+            ]
+        else:  # task_deadline
+            rule = "status == 'pending', high/critical priority first"
+            ranked = [
+                ((t.priority not in ("high", "critical"), tid), tid)
+                for tid, t in collection.items()
+                if t.status == "pending"
+            ]
+        if not ranked:
+            raise InjectTargetError(
+                409,
+                f"NO_ELIGIBLE_{noun}",
+                f"nothing eligible for {event_type} in the active demo world "
+                f"(scenario={self.scenario_name!r}, source={world_source}, "
+                f"rule: {rule})",
+                world_source=world_source,
+            )
+        return min(ranked)[1]
 
     # ── pending approvals ─────────────────────────────────────────────────────
 
@@ -729,14 +844,14 @@ class DemoScenarioController:
 
     def _check_recovery(self, elapsed: int) -> bool:
         """Check if recovery conditions are met. Returns True if newly recovered."""
-        if not self._scenario or not self._scenario.recovery:
+        if not self._scenario or not self._recovery:
             return False
         if self._recovery_sim_time is not None:
             return False  # already detected
         if self.world._disruption_sim_time is None:
             return False  # no disruption recorded yet
 
-        r = self._scenario.recovery
+        r = self._recovery
         from maiw_api.demo.kpi import DemoKPIEngine
 
         kpi = DemoKPIEngine(self.world, self._last_analyze_wall_time).compute()
@@ -762,10 +877,15 @@ class DemoScenarioController:
         """Process any timed events whose offset_seconds <= current elapsed."""
         if self._scenario is None:
             return
-        events = self._scenario.timed_events
+        events = self._timed_events
+        now = (
+            self.world.scenario_elapsed_seconds
+            if self._events_from_scenario_start
+            else elapsed
+        )
         while (
             self._next_event_idx < len(events)
-            and events[self._next_event_idx].offset_seconds <= elapsed
+            and events[self._next_event_idx].offset_seconds <= now
         ):
             ev = events[self._next_event_idx]
             self._next_event_idx += 1
@@ -873,7 +993,12 @@ class DemoScenarioController:
 
 def _requested_asset_id(payload: dict[str, Any]) -> str | None:
     """The explicitly requested asset_id, or None when omitted / blank."""
-    value = payload.get("asset_id")
+    return _requested_id(payload, "asset_id")
+
+
+def _requested_id(payload: dict[str, Any], key: str) -> str | None:
+    """The explicitly requested ``payload[key]``, or None when omitted / blank."""
+    value = payload.get(key)
     if value is None:
         return None
     value = str(value).strip()

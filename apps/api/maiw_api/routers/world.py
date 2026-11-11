@@ -783,7 +783,9 @@ async def get_world_summary(runtime: MAIWRuntime = Depends(_runtime)) -> WorldSu
                 sw = getattr(world, "_scenario_world", None)
                 if sw is not None:
                     overlay = sw.overlay
-                    elapsed = getattr(getattr(world, "clock", None), "elapsed_seconds", 0.0)
+                    # Overlay offsets count from scenario start, not from
+                    # the clock reading (stale_state starts at -2700 s).
+                    elapsed = getattr(world, "scenario_elapsed_seconds", 0.0)
                     disruptions = sw.active_disruptions(at_offset=elapsed)
                     severity = sw.disruption_severity(at_offset=elapsed)
                     scenario_summary = ScenarioSummaryModel(
@@ -895,7 +897,10 @@ async def get_world_changes(runtime: MAIWRuntime = Depends(_runtime)) -> WorldCh
         )
 
     overlay = scenario_world.overlay
-    severity = scenario_world.disruption_severity(at_offset=elapsed)
+    # Overlay offsets count from scenario start, not from the clock reading.
+    severity = scenario_world.disruption_severity(
+        at_offset=float(getattr(world, "scenario_elapsed_seconds", elapsed))
+    )
 
     # ── Build event DTOs — temporal order ────────────────────────────────────
     sorted_events = sorted(overlay.events, key=lambda e: (e.sim_time_offset_seconds, e.event_id))

@@ -221,28 +221,31 @@ def test_wave_delay_sets_low_priority(ctrl):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 5. equipment_failure: timed event fires AGV-02 offline at t=60 s
+# 5. equipment_failure: timed event fires agv-001 offline at t=60 s
+#    (DataPack world, #309: the YAML world's AGV-02)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
 def test_equipment_failure_timed_event(ctrl):
     _run(ctrl.start("equipment_failure"))
+    assert ctrl.world._scenario_world is not None, "DataPack world expected"
 
-    agv02 = ctrl.world.equipment.get("AGV-02")
-    assert agv02 is not None
-    _log("equipment_failure", f"  t=0:   AGV-02 status={agv02.status}")
+    agv = ctrl.world.equipment.get("agv-001")
+    assert agv is not None
+    assert agv.status == "available"
+    _log("equipment_failure", f"  t=0:   agv-001 status={agv.status}")
 
     _run(ctrl.tick(60))
 
-    agv02_after = ctrl.world.equipment["AGV-02"]
-    assert agv02_after.status == "offline"
-    assert agv02_after.fault_code == "E_BATT_LOW"
-    assert agv02_after.battery_pct == 8.0
+    agv_after = ctrl.world.equipment["agv-001"]
+    assert agv_after.status == "offline"
+    assert agv_after.fault_code == "E_BATT_LOW"
+    assert agv_after.battery_pct == 8.0
 
     s = ctrl.status()
     _log(
         "equipment_failure",
-        f"  t=60s: AGV-02 → offline (fault=E_BATT_LOW, battery=8%)  "
+        f"  t=60s: agv-001 → offline (fault=E_BATT_LOW, battery=8%)  "
         f"eq_offline={s['world']['equipment']['offline']}",
     )
 

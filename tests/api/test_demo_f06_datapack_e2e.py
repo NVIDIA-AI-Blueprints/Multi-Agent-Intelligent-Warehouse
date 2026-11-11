@@ -266,3 +266,51 @@ async def test_inject_targeting_errors_are_typed(demo_app_env):
         )
         assert r.status_code == 200, r.text
         assert r.json()["result"]["asset_id"] == faulted
+
+
+async def test_worker_stock_and_task_injections_resolve_from_the_datapack_world(
+    demo_app_env,
+):
+    """The control bar's LABOR SHORT / LABOR RETURN / LOW STOCK buttons sent
+    the YAML ids w-002 and SKU-1001, which the DataPack world lacks (#309)."""
+    async with running_canonical_app() as (app, client):
+        await client.post(f"/api/v1/demo/scenario/{SCENARIO}/start")
+
+        async def inject(event_type, payload):
+            return await client.post(
+                "/api/v1/demo/inject",
+                json={"event_type": event_type, "payload": payload},
+            )
+
+        r = await inject("worker_return", {})
+        assert r.status_code == 409, r.text
+        assert r.json()["code"] == "NO_ELIGIBLE_WORKER"
+
+        r = await inject("worker_absence", {"worker_id": "w-002"})
+        assert r.status_code == 404, r.text
+        assert r.json()["code"] == "WORKER_NOT_IN_ACTIVE_WORLD"
+        assert r.json()["worker_id"] == "w-002"
+
+        r = await inject("worker_absence", {})
+        assert r.status_code == 200, r.text
+        absent = r.json()["result"]
+        assert absent["status"] == "on_leave"
+        assert absent["target_resolution"] == "resolved"
+        assert absent["worker_id"].startswith("worker-")
+
+        r = await inject("worker_return", {})
+        assert r.status_code == 200, r.text
+        assert r.json()["result"]["worker_id"] == absent["worker_id"]
+
+        r = await inject("low_stock", {"quantity_available": 50})
+        assert r.status_code == 200, r.text
+        stock = r.json()["result"]
+        assert stock["sku"].startswith("sku-") and stock["is_low_stock"] is True
+
+        r = await inject("low_stock", {"sku": "SKU-1001", "quantity_available": 50})
+        assert r.status_code == 404, r.text
+        assert r.json()["code"] == "SKU_NOT_IN_ACTIVE_WORLD"
+
+        r = await inject("task_deadline", {"deadline": "2026-08-23T09:00:00+00:00"})
+        assert r.status_code == 200, r.text
+        assert r.json()["result"]["task_id"].startswith("task-")

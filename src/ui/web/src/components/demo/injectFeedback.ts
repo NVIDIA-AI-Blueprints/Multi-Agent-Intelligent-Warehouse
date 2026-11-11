@@ -1,11 +1,11 @@
 /**
  * Operator feedback for POST /demo/inject, plus error text for any demo API call.
  *
- * Equipment fault/restore injections omit asset_id: the backend resolves the
- * target from the ACTIVE demo world (DataPack or YAML fallback) and returns
- * the asset it used, so the UI needs no warehouse-topology knowledge.
+ * Injections omit their target (asset_id, worker_id, sku, task_id): the
+ * backend resolves it from the ACTIVE demo world (DataPack or YAML fallback)
+ * and returns the one it used, so the UI needs no warehouse-topology knowledge.
  * Targeting failures come back as typed errors:
- *   404 ASSET_NOT_IN_ACTIVE_WORLD · 409 NO_ELIGIBLE_ASSET
+ *   404 ASSET_NOT_IN_ACTIVE_WORLD · 409 NO_ELIGIBLE_ASSET (and WORKER_, SKU_, TASK_)
  *   body: { error: true, code, message, status_code, ... }
  */
 
@@ -13,10 +13,16 @@ type Obj = Record<string, unknown>;
 
 const asObj = (v: unknown): Obj | null => (v && typeof v === 'object' ? (v as Obj) : null);
 
-/** "Targeted agv-000" when the inject result names an asset, else null. */
+const TARGET_KEYS = ['asset_id', 'worker_id', 'sku', 'task_id'] as const;
+
+/** "Targeted agv-000" when the inject result names its target, else null. */
 export function describeInjectTarget(result: unknown): string | null {
-  const assetId = asObj(result)?.asset_id;
-  return typeof assetId === 'string' && assetId ? `Targeted ${assetId}` : null;
+  const obj = asObj(result);
+  for (const key of TARGET_KEYS) {
+    const id = obj?.[key];
+    if (typeof id === 'string' && id) return `Targeted ${id}`;
+  }
+  return null;
 }
 
 /** "CODE: message" from { code | error, message } when both are strings. */

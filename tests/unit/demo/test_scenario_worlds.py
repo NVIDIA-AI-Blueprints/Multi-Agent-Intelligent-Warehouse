@@ -75,7 +75,7 @@ def test_the_scripted_scenarios_are_known():
 def test_every_timed_event_targets_an_entity_of_the_active_world(name):
     ctrl = _started(name)
     source = "DataPack" if ctrl.world._scenario_world is not None else "YAML"
-    for ev in ctrl._scenario.timed_events:
+    for ev in ctrl._timed_events:  # the YAML's, or its datapack block's
         for key, collection in _TARGET_COLLECTIONS.items():
             if key in ev.payload:
                 assert ev.payload[key] in getattr(ctrl.world, collection), (
@@ -113,8 +113,9 @@ def test_labor_constraint_control_arm_matches_the_published_control():
 
 def test_equipment_failure_takes_the_scripted_agv_offline():
     ctrl = _started("equipment_failure")
+    assert ctrl.world._scenario_world is not None  # DataPack world (#309)
     _run(ctrl.tick(TICK_SECONDS))
-    assert ctrl.world.equipment["AGV-02"].status == "offline"
+    assert ctrl.world.equipment["agv-001"].status == "offline"
     assert ctrl.world._disruption_sim_time is not None
 
 

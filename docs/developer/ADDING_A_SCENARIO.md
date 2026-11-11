@@ -90,12 +90,54 @@ Supported `type` values (`DemoScenarioController.inject` in
 `equipment_restore`, `low_stock`, `worker_absence`, `worker_return`,
 `task_deadline`, `wave_delay`.
 
+Without a `datapack` block, timed-event offsets are compared with the clock
+reading, which starts at `clock_offset_seconds`; an offset at or below
+`clock_offset_seconds` fires on the first tick.
+
+### Running on the DC-47 DataPack world
+
 Scenario names listed in `DATAPACK_SCENARIOS`
-(`apps/api/maiw_api/demo/world_loader.py`, only `healthy_baseline` today)
-start from the DataPack world; any other scenario is seeded from its YAML
-`initial_state`. Timed events must name entities of the world the scenario
-runs on: `tests/unit/demo/test_scenario_worlds.py` checks this for every
-scenario file.
+(`apps/api/maiw_api/demo/world_loader.py`) start from the DC-47 DataPack
+world: 120 workers, 24 equipment assets, 25,000 SKUs and three waves of 40
+tasks. The YAML `initial_state`, `timed_events` and `recovery` above then
+apply only when the DataPack is unavailable. The scenario describes itself on
+the DataPack world in a `datapack` block, with DataPack ids:
+
+```yaml
+datapack:
+  clock_offset_seconds: 1800    # simulation clock at start (08:30)
+  initial_state:                # fields set on named DataPack entities
+    equipment:
+      agv-000: {status: offline, fault_code: E_MOTOR_OVERTEMP}
+    tasks:
+      task-000024: {assigned_to: null}   # a wave-017 pick with no worker
+    # also: workers (by worker_id), inventory (by sku)
+  timed_events:                 # offsets count from scenario start
+    - offset_seconds: 60
+      type: equipment_fault
+      payload: {asset_id: agv-001, new_status: offline, fault_code: E_BATT_LOW}
+  recovery:
+    wave_risk_max_score: 25
+```
+
+- **Work progresses.** Every task has its wave's carrier cutoff as deadline,
+  and assigned tasks start and complete on their own (see "Work progression"
+  in [WAREHOUSE_WORLD_MODEL.md](WAREHOUSE_WORLD_MODEL.md)). To put a wave at
+  risk, unassign some of its pending tasks: wave risk counts pending tasks with
+  no worker, and `wave-017` is high priority and due at 10:00.
+- **Size recovery for the world.** Assigned work drains in about 15 simulated
+  minutes, so a `backlog_max` threshold is met without any intervention.
+  `wave_risk_max_score: 25` means no task with a deadline is left without a
+  worker.
+- **Unknown ids fail at start.** An `initial_state` id or field the DataPack
+  lacks raises an error when the scenario starts, instead of running without
+  its disruption (#308).
+- **The World Explorer shows the block.** The scenario's overlay is built
+  from it: offline equipment, absent workers and inventory quantities at
+  offset 0, then the timed events.
+
+Timed events must name entities of the world the scenario runs on:
+`tests/unit/demo/test_scenario_worlds.py` checks this for every scenario file.
 
 ---
 

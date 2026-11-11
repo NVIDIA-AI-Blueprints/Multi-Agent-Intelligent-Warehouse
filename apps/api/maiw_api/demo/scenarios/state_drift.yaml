@@ -140,3 +140,22 @@ initial_state:
       priority: "high"
 
 timed_events: []
+
+# ── DC-47 DataPack world (#309) ───────────────────────────────────────────────
+# The demo runs this scenario on the DataPack world (DATAPACK_SCENARIOS in
+# demo/world_loader.py). The sections above define the YAML world, used when
+# the DataPack is unavailable. Ids are DataPack ids.
+datapack:
+  clock_offset_seconds: 3600  # 1 hour into shift
+  initial_state:
+    inventory:
+      sku-000000:
+        quantity_available: 360     # Below reorder_point=380 — drift
+      sku-000001:
+        quantity_available: 610     # Below reorder_point=631 — drift
+      sku-000002:
+        quantity_available: 590     # Below reorder_point=605 — drift
+    equipment:
+      agv-001:                      # WMS says available — drift
+        status: charging
+        battery_pct: 23.0

@@ -111,14 +111,12 @@ class TestDemoScenarioControllerTick:
 
     def test_tick_fires_timed_events(self, ctrl):
         _run(ctrl.start("equipment_failure"))
-        # equipment_failure has a timed_event at +60s (AGV-02 battery critical)
-        # Tick past it
+        # equipment_failure has a timed_event at +60s (agv-001 battery
+        # critical on the DataPack world, #309). Tick past it.
         _run(ctrl.tick(120))
-        # AGV-02 should have changed (battery_pct dropped based on timed event)
-        agv02 = ctrl.world.equipment.get("AGV-02")
-        if agv02:
-            # If timed event fired, battery should be low
-            assert agv02.battery_pct < 50 or agv02.status != "available"
+        agv = ctrl.world.equipment["agv-001"]
+        assert agv.status == "offline"
+        assert agv.battery_pct == 8.0
 
 
 class TestDemoScenarioControllerReset:
