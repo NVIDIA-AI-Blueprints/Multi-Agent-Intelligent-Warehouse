@@ -466,6 +466,10 @@ async def analyze_disruption():
             "model_id": assessment.model_id,
             "routing_rule": assessment.routing_rule,
             "routing_reason": assessment.routing_reason,
+            # Set when the preferred role was disabled and another served the
+            # request (HIGH prefers Super, which is off by default → Ultra).
+            "fallback_from": assessment.fallback_from,
+            "fallback_reason": assessment.fallback_reason,
             "latency_ms": assessment.latency_ms,
             "recommendations_count": len(assessment.recommendations),
             "trace_id": trace_id,
@@ -599,6 +603,8 @@ async def analyze_disruption():
             "model_id": assessment.model_id,
             "routing_rule": assessment.routing_rule,
             "routing_reason": assessment.routing_reason,
+            "fallback_from": assessment.fallback_from,
+            "fallback_reason": assessment.fallback_reason,
             "latency_ms": assessment.latency_ms,
         },
         "proposal_results": proposal_results,

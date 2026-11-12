@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-11-12T20:02:36.494928+00:00",
+  "captured_at": "2026-11-12T22:33:28.719150+00:00",
   "scenario": "labor_constraint_wave_risk",
   "warehouse_id": "DC-47",
   "scenario_meta": {
@@ -29,24 +29,26 @@
     "state_freshness_seconds": null,
     "time_to_recovery_seconds": null
   },
-  "trace_id": "911f381b-bfa3-47fb-aac8-0d9ebfadd575",
-  "snapshot_id": "5f942c80-8021-402f-9c88-6f1b7fb00bfa",
-  "maiw_wall_secs": 30.492,
+  "trace_id": "cce77793-0196-446f-8701-7449aa891fa2",
+  "snapshot_id": "a4c12c69-02b8-4923-a509-3b54985b85b8",
+  "maiw_wall_secs": 21.774,
   "analysis": {
-    "trace_id": "911f381b-bfa3-47fb-aac8-0d9ebfadd575",
-    "snapshot_id": "5f942c80-8021-402f-9c88-6f1b7fb00bfa",
+    "trace_id": "cce77793-0196-446f-8701-7449aa891fa2",
+    "snapshot_id": "a4c12c69-02b8-4923-a509-3b54985b85b8",
     "observe": {
       "domains_assembled": [],
       "freshness": null,
-      "snapshot_id": "5f942c80-8021-402f-9c88-6f1b7fb00bfa"
+      "snapshot_id": "a4c12c69-02b8-4923-a509-3b54985b85b8"
     },
     "reason": {
       "model_id": "nvidia/nemotron-3-ultra-550b-a55b",
       "routing_rule": "high_reasoning",
       "routing_reason": "reasoning=HIGH requires Super",
-      "latency_ms": 29142.784982919693,
+      "fallback_from": "super",
+      "fallback_reason": "role=super is disabled or policy-ineligible; escalated to ultra",
+      "latency_ms": 20491.970974951982,
       "severity": "critical",
-      "summary": "DC-47 has 40 idle workers while 4 pending wave tasks remain unassigned, creating a labor allocation failure. Additionally, 4 tasks are formally at-risk with a carrier cutoff approaching in under 24 hours.",
+      "summary": "DC-47 has a critical labor allocation failure: 40 workers are idle while 4 pending wave tasks remain unassigned, and 4 tasks are formally at-risk with a carrier cutoff at 2026-08-23T10:00:00Z. Equipment is fully available.",
       "facts_observed": [
         "Equipment: 24 total, 24 available",
         "Labor: 118 total, 40 idle (active with no task), 66% utilization",
@@ -65,17 +67,17 @@
         "domain": "labor",
         "capability": "warehouse.labor.allocate",
         "target": "unassigned_pending_tasks",
-        "objective": "Assign idle workers to the 4 pending tasks that currently have no worker allocated",
-        "rationale": "40 workers are idle while 4 pending tasks have assigned_to=null; this allocation failure is the primary bottleneck preventing work from starting",
+        "objective": "Assign idle workers to the 4 pending tasks that have no worker allocated so work can begin immediately",
+        "rationale": "40 workers are idle while 4 pending tasks have assigned_to=null, creating an allocation failure that directly blocks wave progress despite ample labor capacity",
         "priority": "critical",
         "subtype": null
       },
       {
         "domain": "wave",
         "capability": "warehouse.wave.reprioritize",
-        "target": "current_wave",
-        "objective": "Reprioritize wave tasks to ensure at-risk tasks and carrier-cutoff deadlines are met first",
-        "rationale": "4 tasks are formally at-risk and the nearest carrier cutoff is 2026-08-23T10:00:00Z; once workers are allocated, sequencing must align with deadline pressure",
+        "target": "at_risk_tasks",
+        "objective": "Reprioritize the wave to ensure the 4 formally at-risk tasks are sequenced ahead of lower-priority work before carrier cutoff",
+        "rationale": "4 tasks are flagged at-risk with a hard carrier deadline in ~2 hours; reprioritization ensures they are worked first once labor is allocated",
         "priority": "high",
         "subtype": null
       }
@@ -89,17 +91,17 @@
         "phase": "PROPOSE",
         "index": 0,
         "action": "warehouse.labor.allocate",
-        "proposal_id": "83105201-7b92-43fa-988c-c39dbe568183",
+        "proposal_id": "b9fc849a-4813-4596-9514-ee42ae3704b8",
         "risk_level": "medium",
-        "trace_id": "911f381b-bfa3-47fb-aac8-0d9ebfadd575"
+        "trace_id": "cce77793-0196-446f-8701-7449aa891fa2"
       },
       {
         "phase": "PROPOSE",
         "index": 1,
         "action": "warehouse.wave.reprioritize",
-        "proposal_id": "79e48cdf-7cb6-4a04-88c6-fb655ab6c9fb",
+        "proposal_id": "e7fa245b-8688-47e5-9d46-7ae2ed317bd1",
         "risk_level": "medium",
-        "trace_id": "911f381b-bfa3-47fb-aac8-0d9ebfadd575"
+        "trace_id": "cce77793-0196-446f-8701-7449aa891fa2"
       }
     ],
     "decisions": [
@@ -107,8 +109,8 @@
         "phase": "DECIDE",
         "index": 0,
         "outcome": "requires_human_approval",
-        "proposal_id": "83105201-7b92-43fa-988c-c39dbe568183",
-        "decision_id": "5e3065be-728e-42d8-8f54-d7c054d4b289",
+        "proposal_id": "b9fc849a-4813-4596-9514-ee42ae3704b8",
+        "decision_id": "e030347d-609f-49f5-a4c0-626319879de7",
         "violations": [
           {
             "rule": "approval.required",
@@ -119,14 +121,14 @@
             }
           }
         ],
-        "trace_id": "911f381b-bfa3-47fb-aac8-0d9ebfadd575"
+        "trace_id": "cce77793-0196-446f-8701-7449aa891fa2"
       },
       {
         "phase": "DECIDE",
         "index": 1,
         "outcome": "requires_human_approval",
-        "proposal_id": "79e48cdf-7cb6-4a04-88c6-fb655ab6c9fb",
-        "decision_id": "ac9605d9-965c-4d02-9efb-8db5b21690f8",
+        "proposal_id": "e7fa245b-8688-47e5-9d46-7ae2ed317bd1",
+        "decision_id": "12a33d59-b5df-422a-a112-3a3d7bb823d2",
         "violations": [
           {
             "rule": "approval.required",
@@ -137,7 +139,7 @@
             }
           }
         ],
-        "trace_id": "911f381b-bfa3-47fb-aac8-0d9ebfadd575"
+        "trace_id": "cce77793-0196-446f-8701-7449aa891fa2"
       }
     ],
     "executions": [],
@@ -168,7 +170,7 @@
       "simulated_throughput": 0.0,
       "projected_service_level": 100.0,
       "equipment_operational_pct": 100.0,
-      "state_freshness_seconds": 30.5,
+      "state_freshness_seconds": 21.8,
       "time_to_recovery_seconds": null
     },
     "kpi_delta": {
@@ -186,8 +188,8 @@
     },
     "timing": {
       "time_to_detect_ms": null,
-      "time_to_decision_ms": 30445.8,
-      "time_to_execution_ms": 31.2
+      "time_to_decision_ms": 21729.2,
+      "time_to_execution_ms": 31.0
     }
   },
   "tick_trajectory": [
@@ -208,7 +210,7 @@
         "simulated_throughput": 0.0,
         "projected_service_level": 100.0,
         "equipment_operational_pct": 100.0,
-        "state_freshness_seconds": 50.3,
+        "state_freshness_seconds": 9.4,
         "time_to_recovery_seconds": null
       },
       "maiw_cycle_run": 2
@@ -230,7 +232,7 @@
         "simulated_throughput": 0.0,
         "projected_service_level": 100.0,
         "equipment_operational_pct": 100.0,
-        "state_freshness_seconds": 40.4,
+        "state_freshness_seconds": 25.5,
         "time_to_recovery_seconds": null
       },
       "maiw_cycle_run": 3
@@ -252,7 +254,7 @@
         "simulated_throughput": 0.0,
         "projected_service_level": 100.0,
         "equipment_operational_pct": 100.0,
-        "state_freshness_seconds": 27.3,
+        "state_freshness_seconds": 32.8,
         "time_to_recovery_seconds": null
       },
       "maiw_cycle_run": 4
@@ -274,7 +276,7 @@
         "simulated_throughput": 29.0,
         "projected_service_level": 100.0,
         "equipment_operational_pct": 100.0,
-        "state_freshness_seconds": 29.4,
+        "state_freshness_seconds": 33.2,
         "time_to_recovery_seconds": null
       },
       "maiw_cycle_run": 5
@@ -296,7 +298,7 @@
         "simulated_throughput": 31.0,
         "projected_service_level": 100.0,
         "equipment_operational_pct": 100.0,
-        "state_freshness_seconds": 10.0,
+        "state_freshness_seconds": 11.6,
         "time_to_recovery_seconds": 180.0
       },
       "maiw_cycle_run": 6,
@@ -319,7 +321,7 @@
         "simulated_throughput": 58.0,
         "projected_service_level": 100.0,
         "equipment_operational_pct": 100.0,
-        "state_freshness_seconds": 20.0,
+        "state_freshness_seconds": 21.8,
         "time_to_recovery_seconds": 180.0
       },
       "maiw_cycle_run": 7
@@ -337,15 +339,15 @@
   "maiw_cycles": [
     {
       "cycle": 1,
-      "trace_id": "911f381b-bfa3-47fb-aac8-0d9ebfadd575",
-      "snapshot_id": "5f942c80-8021-402f-9c88-6f1b7fb00bfa",
+      "trace_id": "cce77793-0196-446f-8701-7449aa891fa2",
+      "snapshot_id": "a4c12c69-02b8-4923-a509-3b54985b85b8",
       "model_id": "nvidia/nemotron-3-ultra-550b-a55b",
       "severity": "critical",
-      "summary": "DC-47 has 40 idle workers while 4 pending wave tasks remain unassigned, creating a labor allocation failure. Additionally, 4 tasks are formally at-risk with a carrier cutoff approaching in under 24 hours.",
+      "summary": "DC-47 has a critical labor allocation failure: 40 workers are idle while 4 pending wave tasks remain unassigned, and 4 tasks are formally at-risk with a carrier cutoff at 2026-08-23T10:00:00Z. Equipment is fully available.",
       "recommendations_count": 2,
       "approvals": [
         {
-          "pending_id": "929d9842-decb-472e-9383-b1bf6c8c6269",
+          "pending_id": "50eb07b1-cbdd-44b1-b6ec-d400c92f8ee2",
           "capability": "warehouse.labor.allocate",
           "result": {
             "ok": true,
@@ -357,16 +359,16 @@
             "capability": "warehouse.labor.allocate",
             "domain": "labor",
             "target": "task-000012",
-            "proposal_id": "83105201-7b92-43fa-988c-c39dbe568183",
-            "original_decision_id": "5e3065be-728e-42d8-8f54-d7c054d4b289",
-            "approval_id": "5e150fc4-db2a-4489-b0cf-79b404f65baf",
-            "execution_id": "ac975cef-0de9-4a77-a7f6-156c74a7b1f2",
-            "trace_id": "911f381b-bfa3-47fb-aac8-0d9ebfadd575",
+            "proposal_id": "b9fc849a-4813-4596-9514-ee42ae3704b8",
+            "original_decision_id": "e030347d-609f-49f5-a4c0-626319879de7",
+            "approval_id": "7bbe9ecb-08b7-416a-97c3-32980dbb841d",
+            "execution_id": "a657735f-eb8b-4e3a-a87e-85aa79745a32",
+            "trace_id": "cce77793-0196-446f-8701-7449aa891fa2",
             "dispatch_status": "dispatched_response_received"
           }
         },
         {
-          "pending_id": "7f60e7db-1eb1-4f9a-af2b-e911b8732c1d",
+          "pending_id": "b2b62968-31e8-4f36-b044-4a144f140e21",
           "capability": "warehouse.wave.reprioritize",
           "result": {
             "ok": true,
@@ -377,34 +379,34 @@
             "reconciliation_required": false,
             "capability": "warehouse.wave.reprioritize",
             "domain": "wave",
-            "target": "current_wave",
-            "proposal_id": "79e48cdf-7cb6-4a04-88c6-fb655ab6c9fb",
-            "original_decision_id": "ac9605d9-965c-4d02-9efb-8db5b21690f8",
-            "approval_id": "fd8bcae5-79b3-4adc-abd0-8ab9746dfb14",
-            "execution_id": "e8f09e43-0d4d-4ff4-9cfb-895e21aa287f",
-            "trace_id": "911f381b-bfa3-47fb-aac8-0d9ebfadd575",
+            "target": "at_risk_tasks",
+            "proposal_id": "e7fa245b-8688-47e5-9d46-7ae2ed317bd1",
+            "original_decision_id": "12a33d59-b5df-422a-a112-3a3d7bb823d2",
+            "approval_id": "951703ba-8942-4366-806b-4359aa2198d7",
+            "execution_id": "4a659dcb-5444-4fc1-be27-4fb526e30a57",
+            "trace_id": "cce77793-0196-446f-8701-7449aa891fa2",
             "dispatch_status": "dispatched_response_received"
           }
         }
       ],
       "timing": {
         "time_to_detect_ms": null,
-        "time_to_decision_ms": 30445.8,
-        "time_to_execution_ms": 31.2
+        "time_to_decision_ms": 21729.2,
+        "time_to_execution_ms": 31.0
       },
-      "maiw_wall_secs": 30.492
+      "maiw_wall_secs": 21.774
     },
     {
       "cycle": 2,
-      "trace_id": "bf7040f9-b248-4522-9d50-297b1d0f0ac7",
-      "snapshot_id": "75ebc309-dc65-4c1a-8de7-eda8d814835e",
+      "trace_id": "3cb746a8-1006-419a-858a-72a44d07977a",
+      "snapshot_id": "65cb2a26-fcee-4656-9655-ec1c49c0cf7c",
       "model_id": "nvidia/nemotron-3-ultra-550b-a55b",
       "severity": "critical",
-      "summary": "Warehouse DC-47 has 39 idle workers while 3 pending tasks remain unassigned, creating a labor allocation failure. Additionally, 3 tasks are formally at-risk with a carrier cutoff at 2026-08-23T10:00:00Z.",
-      "recommendations_count": 2,
+      "summary": "DC-47 has 39 idle workers while 3 pending wave tasks remain unassigned, creating a labor allocation failure that threatens the imminent carrier cutoff. Three tasks are formally at-risk, compounding the urgency.",
+      "recommendations_count": 1,
       "approvals": [
         {
-          "pending_id": "6b41893b-beca-4e71-9594-440856b13bed",
+          "pending_id": "ce214589-311e-4c08-943a-8c37bb673b95",
           "capability": "warehouse.labor.allocate",
           "result": {
             "ok": true,
@@ -416,55 +418,33 @@
             "capability": "warehouse.labor.allocate",
             "domain": "labor",
             "target": "task-000017",
-            "proposal_id": "c515422c-d0e7-4cb6-bcf4-6e9a524fa2ae",
-            "original_decision_id": "c811c3e3-7e88-4727-8024-09bd35236028",
-            "approval_id": "95fe2b6a-ad8f-4d6c-b65d-004ed5a06ab2",
-            "execution_id": "27d7bb07-38af-4d8a-81d3-c4c6909de5ba",
-            "trace_id": "bf7040f9-b248-4522-9d50-297b1d0f0ac7",
+            "proposal_id": "f2adc389-15ed-4666-a976-36d9ea6298aa",
+            "original_decision_id": "f2127dde-eb30-455c-951d-d55cf6e8d2e1",
+            "approval_id": "9d0fb85b-1841-4b68-b0c9-5c480069c19e",
+            "execution_id": "0b467f6b-ec17-4433-829a-4041b0e6d85b",
+            "trace_id": "3cb746a8-1006-419a-858a-72a44d07977a",
             "dispatch_status": "dispatched_response_received"
-          }
-        },
-        {
-          "pending_id": "14b68662-57d6-4df3-84d9-831a59d25eb2",
-          "capability": "warehouse.wave.reprioritize",
-          "result": {
-            "ok": true,
-            "status": "no_op",
-            "outcome": "no_op",
-            "executed": false,
-            "success": true,
-            "reconciliation_required": false,
-            "capability": "warehouse.wave.reprioritize",
-            "domain": "wave",
-            "target": "current wave",
-            "proposal_id": "3292d93a-d654-4e5f-89d8-9f8ad6ecabbf",
-            "original_decision_id": "4b212888-a516-4293-b08c-74d20f78775a",
-            "approval_id": "b0bcfd25-44a4-4909-a820-69c5f62f3672",
-            "execution_id": "ad723b34-18fe-4c92-8f98-a523e1c2f79e",
-            "trace_id": "bf7040f9-b248-4522-9d50-297b1d0f0ac7",
-            "dispatch_status": "dispatched_response_received",
-            "server_disposition": "malformed:NoneType"
           }
         }
       ],
       "timing": {
         "time_to_detect_ms": null,
-        "time_to_decision_ms": 49771.8,
-        "time_to_execution_ms": 32.4
+        "time_to_decision_ms": 9071.7,
+        "time_to_execution_ms": 32.9
       },
-      "maiw_wall_secs": 49.819
+      "maiw_wall_secs": 9.118
     },
     {
       "cycle": 3,
-      "trace_id": "88815c84-abcc-4864-b12d-3b59189d51be",
-      "snapshot_id": "a23843fd-69fb-43ae-bbd1-3e1e6c1588ea",
+      "trace_id": "929158f0-752f-4be4-b6b3-de495eb757fd",
+      "snapshot_id": "b1e54665-95eb-42e5-9db9-12fec7bce844",
       "model_id": "nvidia/nemotron-3-ultra-550b-a55b",
       "severity": "critical",
-      "summary": "38 idle workers are not assigned to 3 pending wave tasks, creating a labor allocation failure while 3 tasks are formally at-risk and the carrier cutoff approaches.",
+      "summary": "38 workers are idle while 3 pending wave tasks remain unassigned, creating a labor allocation failure that threatens the 2026-08-23T10:00:00 carrier cutoff alongside 3 formally at-risk tasks.",
       "recommendations_count": 1,
       "approvals": [
         {
-          "pending_id": "7cf9832c-8956-4467-b181-9bbdda1af92a",
+          "pending_id": "49f0b417-7cea-4230-afc6-42cbee2bd3a8",
           "capability": "warehouse.labor.allocate",
           "result": {
             "ok": true,
@@ -476,33 +456,33 @@
             "capability": "warehouse.labor.allocate",
             "domain": "labor",
             "target": "task-000021",
-            "proposal_id": "04e500ce-f375-453b-8572-bbcfaab58403",
-            "original_decision_id": "8b3627ba-fa74-4ea8-8ead-cad35f1b0cb5",
-            "approval_id": "dc0cf170-7ff5-445d-8db9-c5855ab720e9",
-            "execution_id": "16ef72a7-e893-4f21-9bc9-724e6a00ac48",
-            "trace_id": "88815c84-abcc-4864-b12d-3b59189d51be",
+            "proposal_id": "9e10531b-672f-4d3a-8b08-a8bacf693982",
+            "original_decision_id": "4c48fb74-2811-4c74-98e0-e64eb3fb4988",
+            "approval_id": "47c4465b-ad76-4251-9d2c-f2a57b367511",
+            "execution_id": "546d3802-72d0-47c9-a6dd-f8dc39d2ea0f",
+            "trace_id": "929158f0-752f-4be4-b6b3-de495eb757fd",
             "dispatch_status": "dispatched_response_received"
           }
         }
       ],
       "timing": {
         "time_to_detect_ms": null,
-        "time_to_decision_ms": 40116.1,
-        "time_to_execution_ms": 30.2
+        "time_to_decision_ms": 25227.4,
+        "time_to_execution_ms": 32.1
       },
-      "maiw_wall_secs": 40.159
+      "maiw_wall_secs": 25.273
     },
     {
       "cycle": 4,
-      "trace_id": "db41b187-0a31-406f-af29-f0b3fd75f5f2",
-      "snapshot_id": "3aaf61d2-a03c-4521-9bcd-914aa4903926",
+      "trace_id": "8fd6db7c-9047-4fc1-9114-1b29222ea257",
+      "snapshot_id": "44d8600a-b9ff-4241-a249-1cf764bb7027",
       "model_id": "nvidia/nemotron-3-ultra-550b-a55b",
       "severity": "critical",
-      "summary": "DC-47 has a labor allocation failure: 37 idle workers are not assigned to 2 pending wave tasks (assigned_to=null), while 2 tasks are formally at-risk ahead of the 2026-08-23T10:00:00Z carrier cutoff.",
+      "summary": "37 idle workers are not assigned to 2 pending wave tasks, creating a labor allocation failure; 2 tasks are formally at-risk with carrier cutoff approaching in 2 hours.",
       "recommendations_count": 2,
       "approvals": [
         {
-          "pending_id": "d8c9d5f9-5f6c-42a3-a900-95d190e6f190",
+          "pending_id": "c8db6c78-c936-475e-9a1a-6f58f5c4a37b",
           "capability": "warehouse.labor.allocate",
           "result": {
             "ok": true,
@@ -514,16 +494,16 @@
             "capability": "warehouse.labor.allocate",
             "domain": "labor",
             "target": "task-000022",
-            "proposal_id": "34551404-55ef-4c0f-a319-13d182fca3aa",
-            "original_decision_id": "10c2439c-84bb-415d-9202-45e6393e7e23",
-            "approval_id": "23c9d0fb-ab73-4b70-afde-481dac2f54a5",
-            "execution_id": "47741be9-c2f7-42ed-b219-65f87cddf2fd",
-            "trace_id": "db41b187-0a31-406f-af29-f0b3fd75f5f2",
+            "proposal_id": "e0f10431-8752-4c38-8582-bf3d3ca309ab",
+            "original_decision_id": "4366441d-b7aa-42ea-b9c6-c514d5ac93a7",
+            "approval_id": "d8abafaf-e780-4436-83ba-32cbdceea928",
+            "execution_id": "c07a022b-39c1-4df4-8f15-21306942a168",
+            "trace_id": "8fd6db7c-9047-4fc1-9114-1b29222ea257",
             "dispatch_status": "dispatched_response_received"
           }
         },
         {
-          "pending_id": "2ac392de-110a-4dd1-821f-48835fc8716c",
+          "pending_id": "57b9c51a-fa0a-4ed4-a34e-cda6e89d12d2",
           "capability": "warehouse.wave.reprioritize",
           "result": {
             "ok": true,
@@ -535,11 +515,11 @@
             "capability": "warehouse.wave.reprioritize",
             "domain": "wave",
             "target": "at_risk_tasks",
-            "proposal_id": "031578b0-ceaa-45d4-a683-6a30987f3179",
-            "original_decision_id": "43c087fe-27fb-4e2f-9200-c6c2c51307ed",
-            "approval_id": "0cafbf9a-750f-4240-8e57-2b2cceef8013",
-            "execution_id": "8943cb2f-e4a6-44e7-bc29-fd7405745657",
-            "trace_id": "db41b187-0a31-406f-af29-f0b3fd75f5f2",
+            "proposal_id": "ee49cab7-13e9-4cb9-8bdf-7c39633b7e02",
+            "original_decision_id": "cb42b465-35c6-4c34-b0c2-119b8680a39e",
+            "approval_id": "704abde7-92a1-45e3-a319-094d6dd5b6ff",
+            "execution_id": "1cdef854-a13d-49b0-976a-1516dae9c3e4",
+            "trace_id": "8fd6db7c-9047-4fc1-9114-1b29222ea257",
             "dispatch_status": "dispatched_response_received",
             "server_disposition": "malformed:NoneType"
           }
@@ -547,22 +527,22 @@
       ],
       "timing": {
         "time_to_detect_ms": null,
-        "time_to_decision_ms": 26699.0,
-        "time_to_execution_ms": 33.7
+        "time_to_decision_ms": 32178.1,
+        "time_to_execution_ms": 30.3
       },
-      "maiw_wall_secs": 26.748
+      "maiw_wall_secs": 32.223
     },
     {
       "cycle": 5,
-      "trace_id": "57c1a959-fe9e-4d23-83e6-4cd71c249509",
-      "snapshot_id": "9ea52091-79da-4539-9a40-0577bdf21d90",
+      "trace_id": "9396bce3-00eb-4fcb-8750-50f4bfb32ed8",
+      "snapshot_id": "9750ae9f-14bd-4859-b3b6-55b915202f3d",
       "model_id": "nvidia/nemotron-3-ultra-550b-a55b",
       "severity": "critical",
-      "summary": "DC-47 has 51 idle workers while 1 pending task remains unassigned, creating a labor allocation failure; 1 task is formally at-risk with carrier cutoff approaching in 2 hours.",
+      "summary": "Warehouse DC-47 has 51 idle workers while 1 pending task remains unassigned, creating a labor allocation failure. One task is formally at-risk with carrier cutoff approaching at 2026-08-23T10:00:00Z.",
       "recommendations_count": 2,
       "approvals": [
         {
-          "pending_id": "1776e6d1-75da-4ed4-908f-1884d8253920",
+          "pending_id": "9614e6a3-f7e0-4233-be95-b626253f767f",
           "capability": "warehouse.labor.allocate",
           "result": {
             "ok": true,
@@ -574,16 +554,16 @@
             "capability": "warehouse.labor.allocate",
             "domain": "labor",
             "target": "task-000028",
-            "proposal_id": "ec67fd15-618a-448b-9e2e-c9e9559b006c",
-            "original_decision_id": "324cd8cf-d159-4eb3-8653-7b9f97be6734",
-            "approval_id": "cade390e-6639-44e1-95ae-c4c778719e2c",
-            "execution_id": "3c3c3d49-1542-4371-a7b5-3443b6c94a47",
-            "trace_id": "57c1a959-fe9e-4d23-83e6-4cd71c249509",
+            "proposal_id": "e9907c00-ffd4-4e09-9be7-d3caf8a39b88",
+            "original_decision_id": "1af29fee-6ab1-4bbd-ab3f-0598392a4fac",
+            "approval_id": "e5d27b9e-6f39-4b0d-9e60-ed932d9195ac",
+            "execution_id": "5e2c84b4-0c33-4b5a-83b5-8a33fb0b7c61",
+            "trace_id": "9396bce3-00eb-4fcb-8750-50f4bfb32ed8",
             "dispatch_status": "dispatched_response_received"
           }
         },
         {
-          "pending_id": "46192f35-cd24-4e6d-9f27-4b3fa73eab91",
+          "pending_id": "bb67d473-45f5-4d24-a33a-61b8203717b7",
           "capability": "warehouse.wave.reprioritize",
           "result": {
             "ok": true,
@@ -594,12 +574,12 @@
             "reconciliation_required": false,
             "capability": "warehouse.wave.reprioritize",
             "domain": "wave",
-            "target": "active_wave",
-            "proposal_id": "b5d03fef-866d-492d-ad73-ea684b6aa259",
-            "original_decision_id": "e134fe73-27b0-4c60-ae1b-e13dc5ecac0b",
-            "approval_id": "0ec67a1a-7d62-4007-ac5e-4e5a69fc05d6",
-            "execution_id": "942da5d1-f288-405f-8982-8b912f2155e2",
-            "trace_id": "57c1a959-fe9e-4d23-83e6-4cd71c249509",
+            "target": "current_wave",
+            "proposal_id": "178dc166-1415-484f-9a4c-4a3b57c9514c",
+            "original_decision_id": "f0ca245c-aa5b-4784-b74a-45e802a352a2",
+            "approval_id": "a025999c-f001-4b57-99ba-21fa608cb8e5",
+            "execution_id": "2938e05d-c4fd-4465-b9fe-65b66b0b06d7",
+            "trace_id": "9396bce3-00eb-4fcb-8750-50f4bfb32ed8",
             "dispatch_status": "dispatched_response_received",
             "server_disposition": "malformed:NoneType"
           }
@@ -607,22 +587,22 @@
       ],
       "timing": {
         "time_to_detect_ms": null,
-        "time_to_decision_ms": 28827.8,
-        "time_to_execution_ms": 32.0
+        "time_to_decision_ms": 32591.4,
+        "time_to_execution_ms": 30.7
       },
-      "maiw_wall_secs": 28.873
+      "maiw_wall_secs": 32.637
     },
     {
       "cycle": 6,
-      "trace_id": "e905cfa7-cae9-46cf-adad-52bdf2a85593",
-      "snapshot_id": "e3e2b07d-e9e8-4621-891f-d2190009ae80",
+      "trace_id": "916c7d51-f28f-4a5d-aada-e414b6f9fb62",
+      "snapshot_id": "416cb658-359a-471f-a8ab-cafff748b69a",
       "model_id": "nvidia/nemotron-3-ultra-550b-a55b",
       "severity": "high",
-      "summary": "DC-47 has 52 idle workers while 23 wave tasks remain pending and unassigned, indicating a labor allocation failure rather than a labor surplus. Equipment is fully available with no constraints.",
+      "summary": "52 workers are idle while 23 wave tasks remain pending and unassigned, creating a labor allocation failure despite 56% overall utilization. Carrier cutoff at 2026-08-23T10:00:00Z adds urgency.",
       "recommendations_count": 1,
       "approvals": [
         {
-          "pending_id": "43cafae8-04dc-4214-aad7-d8c4fd9bd95c",
+          "pending_id": "6e69cee0-b346-468c-9e32-e0510e3fd828",
           "capability": "warehouse.labor.allocate",
           "result": {
             "ok": true,
@@ -634,33 +614,33 @@
             "capability": "warehouse.labor.allocate",
             "domain": "labor",
             "target": "task-000011",
-            "proposal_id": "7e478bcc-c6fa-4d8a-882e-98458fd42d46",
-            "original_decision_id": "2e2b4ce0-005c-4758-a71c-fbad968ffa53",
-            "approval_id": "0a792a3d-7794-4180-9ea1-b37b6e88ce7e",
-            "execution_id": "8280477a-c287-4251-ac65-e4502c79fbd4",
-            "trace_id": "e905cfa7-cae9-46cf-adad-52bdf2a85593",
+            "proposal_id": "31cebda8-f740-42f7-9d84-500f318bfc00",
+            "original_decision_id": "f74eb467-bf8b-41ef-b93d-355a316090bb",
+            "approval_id": "5792da2a-21f3-4f20-8f35-561c8265acc3",
+            "execution_id": "b1210ee7-3d83-4861-8f43-33c94b1f5406",
+            "trace_id": "916c7d51-f28f-4a5d-aada-e414b6f9fb62",
             "dispatch_status": "dispatched_response_received"
           }
         }
       ],
       "timing": {
         "time_to_detect_ms": null,
-        "time_to_decision_ms": 9701.1,
-        "time_to_execution_ms": 31.1
+        "time_to_decision_ms": 11312.5,
+        "time_to_execution_ms": 34.1
       },
-      "maiw_wall_secs": 9.746
+      "maiw_wall_secs": 11.361
     },
     {
       "cycle": 7,
-      "trace_id": "902c6d66-4f0f-4dfa-9253-c4ad38cc4145",
-      "snapshot_id": "298521ac-fa14-4a6b-bf4f-ba8af640cc00",
+      "trace_id": "9595334c-b48f-4fab-9035-767be0e1137b",
+      "snapshot_id": "7d37eb21-ef00-41d2-839b-e0e4d5ecb6fe",
       "model_id": "nvidia/nemotron-3-ultra-550b-a55b",
       "severity": "high",
-      "summary": "DC-47 has 68 idle workers while 13 wave tasks remain pending and unassigned, creating a labor allocation failure that risks missing the 10:00 UTC carrier cutoff despite full equipment availability.",
+      "summary": "68 workers are idle while 13 wave tasks remain pending and unassigned, indicating a labor allocation failure rather than a labor surplus. Equipment is fully available with no constraints.",
       "recommendations_count": 1,
       "approvals": [
         {
-          "pending_id": "f5443c90-ba4f-4f58-abf2-e49699a3baf8",
+          "pending_id": "bdeace65-f2c8-4431-b6b6-619b0ee2a597",
           "capability": "warehouse.labor.allocate",
           "result": {
             "ok": true,
@@ -672,26 +652,26 @@
             "capability": "warehouse.labor.allocate",
             "domain": "labor",
             "target": "task-000073",
-            "proposal_id": "ab556f84-637b-4ee5-a274-f5a864c55de0",
-            "original_decision_id": "b87466bc-a6a7-4b8b-a3ed-7d42458d75d4",
-            "approval_id": "15cbaa14-a81b-4708-9d64-c82db04f01bf",
-            "execution_id": "de520b9a-919d-4ea0-816b-48289fb90e9b",
-            "trace_id": "902c6d66-4f0f-4dfa-9253-c4ad38cc4145",
+            "proposal_id": "7b93d24e-2719-4173-97a9-c4e5f2d45dec",
+            "original_decision_id": "0ad646c2-9368-459b-9ea6-4dd3f1a5079a",
+            "approval_id": "5fff1d6d-7bac-462f-9ed7-80aa62185a9b",
+            "execution_id": "2ae2d603-047b-4499-960d-a976eaa35cef",
+            "trace_id": "9595334c-b48f-4fab-9035-767be0e1137b",
             "dispatch_status": "dispatched_response_received"
           }
         }
       ],
       "timing": {
         "time_to_detect_ms": null,
-        "time_to_decision_ms": 19643.9,
-        "time_to_execution_ms": 30.4
+        "time_to_decision_ms": 21442.9,
+        "time_to_execution_ms": 30.2
       },
-      "maiw_wall_secs": 19.688
+      "maiw_wall_secs": 21.487
     }
   ],
   "approval_results": [
     {
-      "pending_id": "929d9842-decb-472e-9383-b1bf6c8c6269",
+      "pending_id": "50eb07b1-cbdd-44b1-b6ec-d400c92f8ee2",
       "capability": "warehouse.labor.allocate",
       "result": {
         "ok": true,
@@ -703,16 +683,16 @@
         "capability": "warehouse.labor.allocate",
         "domain": "labor",
         "target": "task-000012",
-        "proposal_id": "83105201-7b92-43fa-988c-c39dbe568183",
-        "original_decision_id": "5e3065be-728e-42d8-8f54-d7c054d4b289",
-        "approval_id": "5e150fc4-db2a-4489-b0cf-79b404f65baf",
-        "execution_id": "ac975cef-0de9-4a77-a7f6-156c74a7b1f2",
-        "trace_id": "911f381b-bfa3-47fb-aac8-0d9ebfadd575",
+        "proposal_id": "b9fc849a-4813-4596-9514-ee42ae3704b8",
+        "original_decision_id": "e030347d-609f-49f5-a4c0-626319879de7",
+        "approval_id": "7bbe9ecb-08b7-416a-97c3-32980dbb841d",
+        "execution_id": "a657735f-eb8b-4e3a-a87e-85aa79745a32",
+        "trace_id": "cce77793-0196-446f-8701-7449aa891fa2",
         "dispatch_status": "dispatched_response_received"
       }
     },
     {
-      "pending_id": "7f60e7db-1eb1-4f9a-af2b-e911b8732c1d",
+      "pending_id": "b2b62968-31e8-4f36-b044-4a144f140e21",
       "capability": "warehouse.wave.reprioritize",
       "result": {
         "ok": true,
@@ -723,17 +703,17 @@
         "reconciliation_required": false,
         "capability": "warehouse.wave.reprioritize",
         "domain": "wave",
-        "target": "current_wave",
-        "proposal_id": "79e48cdf-7cb6-4a04-88c6-fb655ab6c9fb",
-        "original_decision_id": "ac9605d9-965c-4d02-9efb-8db5b21690f8",
-        "approval_id": "fd8bcae5-79b3-4adc-abd0-8ab9746dfb14",
-        "execution_id": "e8f09e43-0d4d-4ff4-9cfb-895e21aa287f",
-        "trace_id": "911f381b-bfa3-47fb-aac8-0d9ebfadd575",
+        "target": "at_risk_tasks",
+        "proposal_id": "e7fa245b-8688-47e5-9d46-7ae2ed317bd1",
+        "original_decision_id": "12a33d59-b5df-422a-a112-3a3d7bb823d2",
+        "approval_id": "951703ba-8942-4366-806b-4359aa2198d7",
+        "execution_id": "4a659dcb-5444-4fc1-be27-4fb526e30a57",
+        "trace_id": "cce77793-0196-446f-8701-7449aa891fa2",
         "dispatch_status": "dispatched_response_received"
       }
     },
     {
-      "pending_id": "6b41893b-beca-4e71-9594-440856b13bed",
+      "pending_id": "ce214589-311e-4c08-943a-8c37bb673b95",
       "capability": "warehouse.labor.allocate",
       "result": {
         "ok": true,
@@ -745,38 +725,16 @@
         "capability": "warehouse.labor.allocate",
         "domain": "labor",
         "target": "task-000017",
-        "proposal_id": "c515422c-d0e7-4cb6-bcf4-6e9a524fa2ae",
-        "original_decision_id": "c811c3e3-7e88-4727-8024-09bd35236028",
-        "approval_id": "95fe2b6a-ad8f-4d6c-b65d-004ed5a06ab2",
-        "execution_id": "27d7bb07-38af-4d8a-81d3-c4c6909de5ba",
-        "trace_id": "bf7040f9-b248-4522-9d50-297b1d0f0ac7",
+        "proposal_id": "f2adc389-15ed-4666-a976-36d9ea6298aa",
+        "original_decision_id": "f2127dde-eb30-455c-951d-d55cf6e8d2e1",
+        "approval_id": "9d0fb85b-1841-4b68-b0c9-5c480069c19e",
+        "execution_id": "0b467f6b-ec17-4433-829a-4041b0e6d85b",
+        "trace_id": "3cb746a8-1006-419a-858a-72a44d07977a",
         "dispatch_status": "dispatched_response_received"
       }
     },
     {
-      "pending_id": "14b68662-57d6-4df3-84d9-831a59d25eb2",
-      "capability": "warehouse.wave.reprioritize",
-      "result": {
-        "ok": true,
-        "status": "no_op",
-        "outcome": "no_op",
-        "executed": false,
-        "success": true,
-        "reconciliation_required": false,
-        "capability": "warehouse.wave.reprioritize",
-        "domain": "wave",
-        "target": "current wave",
-        "proposal_id": "3292d93a-d654-4e5f-89d8-9f8ad6ecabbf",
-        "original_decision_id": "4b212888-a516-4293-b08c-74d20f78775a",
-        "approval_id": "b0bcfd25-44a4-4909-a820-69c5f62f3672",
-        "execution_id": "ad723b34-18fe-4c92-8f98-a523e1c2f79e",
-        "trace_id": "bf7040f9-b248-4522-9d50-297b1d0f0ac7",
-        "dispatch_status": "dispatched_response_received",
-        "server_disposition": "malformed:NoneType"
-      }
-    },
-    {
-      "pending_id": "7cf9832c-8956-4467-b181-9bbdda1af92a",
+      "pending_id": "49f0b417-7cea-4230-afc6-42cbee2bd3a8",
       "capability": "warehouse.labor.allocate",
       "result": {
         "ok": true,
@@ -788,16 +746,16 @@
         "capability": "warehouse.labor.allocate",
         "domain": "labor",
         "target": "task-000021",
-        "proposal_id": "04e500ce-f375-453b-8572-bbcfaab58403",
-        "original_decision_id": "8b3627ba-fa74-4ea8-8ead-cad35f1b0cb5",
-        "approval_id": "dc0cf170-7ff5-445d-8db9-c5855ab720e9",
-        "execution_id": "16ef72a7-e893-4f21-9bc9-724e6a00ac48",
-        "trace_id": "88815c84-abcc-4864-b12d-3b59189d51be",
+        "proposal_id": "9e10531b-672f-4d3a-8b08-a8bacf693982",
+        "original_decision_id": "4c48fb74-2811-4c74-98e0-e64eb3fb4988",
+        "approval_id": "47c4465b-ad76-4251-9d2c-f2a57b367511",
+        "execution_id": "546d3802-72d0-47c9-a6dd-f8dc39d2ea0f",
+        "trace_id": "929158f0-752f-4be4-b6b3-de495eb757fd",
         "dispatch_status": "dispatched_response_received"
       }
     },
     {
-      "pending_id": "d8c9d5f9-5f6c-42a3-a900-95d190e6f190",
+      "pending_id": "c8db6c78-c936-475e-9a1a-6f58f5c4a37b",
       "capability": "warehouse.labor.allocate",
       "result": {
         "ok": true,
@@ -809,16 +767,16 @@
         "capability": "warehouse.labor.allocate",
         "domain": "labor",
         "target": "task-000022",
-        "proposal_id": "34551404-55ef-4c0f-a319-13d182fca3aa",
-        "original_decision_id": "10c2439c-84bb-415d-9202-45e6393e7e23",
-        "approval_id": "23c9d0fb-ab73-4b70-afde-481dac2f54a5",
-        "execution_id": "47741be9-c2f7-42ed-b219-65f87cddf2fd",
-        "trace_id": "db41b187-0a31-406f-af29-f0b3fd75f5f2",
+        "proposal_id": "e0f10431-8752-4c38-8582-bf3d3ca309ab",
+        "original_decision_id": "4366441d-b7aa-42ea-b9c6-c514d5ac93a7",
+        "approval_id": "d8abafaf-e780-4436-83ba-32cbdceea928",
+        "execution_id": "c07a022b-39c1-4df4-8f15-21306942a168",
+        "trace_id": "8fd6db7c-9047-4fc1-9114-1b29222ea257",
         "dispatch_status": "dispatched_response_received"
       }
     },
     {
-      "pending_id": "2ac392de-110a-4dd1-821f-48835fc8716c",
+      "pending_id": "57b9c51a-fa0a-4ed4-a34e-cda6e89d12d2",
       "capability": "warehouse.wave.reprioritize",
       "result": {
         "ok": true,
@@ -830,17 +788,17 @@
         "capability": "warehouse.wave.reprioritize",
         "domain": "wave",
         "target": "at_risk_tasks",
-        "proposal_id": "031578b0-ceaa-45d4-a683-6a30987f3179",
-        "original_decision_id": "43c087fe-27fb-4e2f-9200-c6c2c51307ed",
-        "approval_id": "0cafbf9a-750f-4240-8e57-2b2cceef8013",
-        "execution_id": "8943cb2f-e4a6-44e7-bc29-fd7405745657",
-        "trace_id": "db41b187-0a31-406f-af29-f0b3fd75f5f2",
+        "proposal_id": "ee49cab7-13e9-4cb9-8bdf-7c39633b7e02",
+        "original_decision_id": "cb42b465-35c6-4c34-b0c2-119b8680a39e",
+        "approval_id": "704abde7-92a1-45e3-a319-094d6dd5b6ff",
+        "execution_id": "1cdef854-a13d-49b0-976a-1516dae9c3e4",
+        "trace_id": "8fd6db7c-9047-4fc1-9114-1b29222ea257",
         "dispatch_status": "dispatched_response_received",
         "server_disposition": "malformed:NoneType"
       }
     },
     {
-      "pending_id": "1776e6d1-75da-4ed4-908f-1884d8253920",
+      "pending_id": "9614e6a3-f7e0-4233-be95-b626253f767f",
       "capability": "warehouse.labor.allocate",
       "result": {
         "ok": true,
@@ -852,16 +810,16 @@
         "capability": "warehouse.labor.allocate",
         "domain": "labor",
         "target": "task-000028",
-        "proposal_id": "ec67fd15-618a-448b-9e2e-c9e9559b006c",
-        "original_decision_id": "324cd8cf-d159-4eb3-8653-7b9f97be6734",
-        "approval_id": "cade390e-6639-44e1-95ae-c4c778719e2c",
-        "execution_id": "3c3c3d49-1542-4371-a7b5-3443b6c94a47",
-        "trace_id": "57c1a959-fe9e-4d23-83e6-4cd71c249509",
+        "proposal_id": "e9907c00-ffd4-4e09-9be7-d3caf8a39b88",
+        "original_decision_id": "1af29fee-6ab1-4bbd-ab3f-0598392a4fac",
+        "approval_id": "e5d27b9e-6f39-4b0d-9e60-ed932d9195ac",
+        "execution_id": "5e2c84b4-0c33-4b5a-83b5-8a33fb0b7c61",
+        "trace_id": "9396bce3-00eb-4fcb-8750-50f4bfb32ed8",
         "dispatch_status": "dispatched_response_received"
       }
     },
     {
-      "pending_id": "46192f35-cd24-4e6d-9f27-4b3fa73eab91",
+      "pending_id": "bb67d473-45f5-4d24-a33a-61b8203717b7",
       "capability": "warehouse.wave.reprioritize",
       "result": {
         "ok": true,
@@ -872,18 +830,18 @@
         "reconciliation_required": false,
         "capability": "warehouse.wave.reprioritize",
         "domain": "wave",
-        "target": "active_wave",
-        "proposal_id": "b5d03fef-866d-492d-ad73-ea684b6aa259",
-        "original_decision_id": "e134fe73-27b0-4c60-ae1b-e13dc5ecac0b",
-        "approval_id": "0ec67a1a-7d62-4007-ac5e-4e5a69fc05d6",
-        "execution_id": "942da5d1-f288-405f-8982-8b912f2155e2",
-        "trace_id": "57c1a959-fe9e-4d23-83e6-4cd71c249509",
+        "target": "current_wave",
+        "proposal_id": "178dc166-1415-484f-9a4c-4a3b57c9514c",
+        "original_decision_id": "f0ca245c-aa5b-4784-b74a-45e802a352a2",
+        "approval_id": "a025999c-f001-4b57-99ba-21fa608cb8e5",
+        "execution_id": "2938e05d-c4fd-4465-b9fe-65b66b0b06d7",
+        "trace_id": "9396bce3-00eb-4fcb-8750-50f4bfb32ed8",
         "dispatch_status": "dispatched_response_received",
         "server_disposition": "malformed:NoneType"
       }
     },
     {
-      "pending_id": "43cafae8-04dc-4214-aad7-d8c4fd9bd95c",
+      "pending_id": "6e69cee0-b346-468c-9e32-e0510e3fd828",
       "capability": "warehouse.labor.allocate",
       "result": {
         "ok": true,
@@ -895,16 +853,16 @@
         "capability": "warehouse.labor.allocate",
         "domain": "labor",
         "target": "task-000011",
-        "proposal_id": "7e478bcc-c6fa-4d8a-882e-98458fd42d46",
-        "original_decision_id": "2e2b4ce0-005c-4758-a71c-fbad968ffa53",
-        "approval_id": "0a792a3d-7794-4180-9ea1-b37b6e88ce7e",
-        "execution_id": "8280477a-c287-4251-ac65-e4502c79fbd4",
-        "trace_id": "e905cfa7-cae9-46cf-adad-52bdf2a85593",
+        "proposal_id": "31cebda8-f740-42f7-9d84-500f318bfc00",
+        "original_decision_id": "f74eb467-bf8b-41ef-b93d-355a316090bb",
+        "approval_id": "5792da2a-21f3-4f20-8f35-561c8265acc3",
+        "execution_id": "b1210ee7-3d83-4861-8f43-33c94b1f5406",
+        "trace_id": "916c7d51-f28f-4a5d-aada-e414b6f9fb62",
         "dispatch_status": "dispatched_response_received"
       }
     },
     {
-      "pending_id": "f5443c90-ba4f-4f58-abf2-e49699a3baf8",
+      "pending_id": "bdeace65-f2c8-4431-b6b6-619b0ee2a597",
       "capability": "warehouse.labor.allocate",
       "result": {
         "ok": true,
@@ -916,11 +874,11 @@
         "capability": "warehouse.labor.allocate",
         "domain": "labor",
         "target": "task-000073",
-        "proposal_id": "ab556f84-637b-4ee5-a274-f5a864c55de0",
-        "original_decision_id": "b87466bc-a6a7-4b8b-a3ed-7d42458d75d4",
-        "approval_id": "15cbaa14-a81b-4708-9d64-c82db04f01bf",
-        "execution_id": "de520b9a-919d-4ea0-816b-48289fb90e9b",
-        "trace_id": "902c6d66-4f0f-4dfa-9253-c4ad38cc4145",
+        "proposal_id": "7b93d24e-2719-4173-97a9-c4e5f2d45dec",
+        "original_decision_id": "0ad646c2-9368-459b-9ea6-4dd3f1a5079a",
+        "approval_id": "5fff1d6d-7bac-462f-9ed7-80aa62185a9b",
+        "execution_id": "2ae2d603-047b-4499-960d-a976eaa35cef",
+        "trace_id": "9595334c-b48f-4fab-9035-767be0e1137b",
         "dispatch_status": "dispatched_response_received"
       }
     }
@@ -937,7 +895,7 @@
     "simulated_throughput": 58.0,
     "projected_service_level": 100.0,
     "equipment_operational_pct": 100.0,
-    "state_freshness_seconds": 20.0,
+    "state_freshness_seconds": 21.8,
     "time_to_recovery_seconds": 180.0
   },
   "delta_from_disruption": {
@@ -948,5 +906,5 @@
     "projected_service_level": 0.0,
     "labor_utilization_pct": -23.4
   },
-  "capture_duration_secs": 211.1
+  "capture_duration_secs": 158.7
 }

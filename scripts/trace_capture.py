@@ -195,6 +195,8 @@ def run() -> dict:
                     "model_id":              assessment.get("model_id"),
                     "routing_rule":          assessment.get("routing_rule"),
                     "routing_reason":        assessment.get("routing_reason"),
+                    "fallback_from":         assessment.get("fallback_from"),
+                    "fallback_reason":       assessment.get("fallback_reason"),
                     "latency_ms":            assessment.get("latency_ms"),
                     "severity":              assessment.get("severity"),
                     "summary":               assessment.get("summary"),
@@ -399,6 +401,10 @@ def render_md(t: dict) -> str:
     lines.append(f"model_id           : {r.get('model_id','—')}")
     lines.append(f"routing_rule       : {r.get('routing_rule','—')}")
     lines.append(f"routing_reason     : {r.get('routing_reason','—')}")
+    if r.get("fallback_from"):
+        # routing_reason names the preferred role; say which one actually served.
+        lines.append(f"fallback_from      : {r['fallback_from']}")
+        lines.append(f"fallback_reason    : {r.get('fallback_reason') or '—'}")
     lines.append(f"model_latency_ms   : {r.get('latency_ms','—')}")
     lines.append(f"severity           : {r.get('severity','—')}")
     lines.append(f"domains_affected   : {r.get('domains_affected','—')}")

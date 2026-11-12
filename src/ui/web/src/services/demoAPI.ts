@@ -80,6 +80,9 @@ export interface AnalysisAssessment {
   model_id: string;
   routing_rule: string;
   routing_reason: string;
+  /** Set when the preferred role was unavailable and another role served the request. */
+  fallback_from?: string | null;
+  fallback_reason?: string | null;
   latency_ms: number;
 }
 
