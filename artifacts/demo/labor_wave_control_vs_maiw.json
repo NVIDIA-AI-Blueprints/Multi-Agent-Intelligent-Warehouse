@@ -1,5 +1,5 @@
 {
-  "evaluated_at": "2026-08-25T05:26:18.201162+00:00",
+  "evaluated_at": "2026-11-12T18:18:17.927601+00:00",
   "scenario": "labor_constraint_wave_risk",
   "horizon_seconds": 1800,
   "tick_seconds": 60,
@@ -9,14 +9,14 @@
     "t0_kpis": {
       "sim_time_seconds": 5400,
       "clock_iso": "2026-08-23T09:30:00+00:00",
-      "pending_backlog": 5,
+      "pending_backlog": 119,
       "wave_risk_score": 95.0,
       "wave_risk_level": "critical",
       "wave_completion_pct": 0.0,
       "simulated_throughput": 0.0,
-      "projected_service_level": 0.0,
-      "labor_availability_pct": 66.7,
-      "labor_utilization_pct": 50.0,
+      "projected_service_level": 100.0,
+      "labor_availability_pct": 98.3,
+      "labor_utilization_pct": 66.1,
       "equipment_operational_pct": 100.0,
       "time_to_recovery_seconds": null
     },
@@ -26,10 +26,10 @@
       "pending_backlog": 5,
       "wave_risk_score": 95.0,
       "wave_risk_level": "critical",
-      "wave_completion_pct": 28.6,
-      "simulated_throughput": 2.0,
+      "wave_completion_pct": 95.8,
+      "simulated_throughput": 115.0,
       "projected_service_level": 0.0,
-      "labor_availability_pct": 50.0,
+      "labor_availability_pct": 97.5,
       "labor_utilization_pct": 0.0,
       "equipment_operational_pct": 100.0,
       "time_to_recovery_seconds": null
@@ -38,17 +38,18 @@
       {
         "tick": 1,
         "elapsed_seconds": 5460,
+        "scenario_seconds": 60,
         "kpis": {
           "sim_time_seconds": 5460,
           "clock_iso": "2026-08-23T09:31:00+00:00",
-          "pending_backlog": 5,
+          "pending_backlog": 42,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
           "wave_completion_pct": 0.0,
           "simulated_throughput": 0.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
-          "labor_utilization_pct": 66.7,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 98.3,
+          "labor_utilization_pct": 66.1,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
         }
@@ -56,17 +57,18 @@
       {
         "tick": 2,
         "elapsed_seconds": 5520,
+        "scenario_seconds": 120,
         "kpis": {
           "sim_time_seconds": 5520,
           "clock_iso": "2026-08-23T09:32:00+00:00",
-          "pending_backlog": 5,
+          "pending_backlog": 42,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
           "wave_completion_pct": 0.0,
           "simulated_throughput": 0.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
-          "labor_utilization_pct": 66.7,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 65.8,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
         }
@@ -74,17 +76,18 @@
       {
         "tick": 3,
         "elapsed_seconds": 5580,
+        "scenario_seconds": 180,
         "kpis": {
           "sim_time_seconds": 5580,
           "clock_iso": "2026-08-23T09:33:00+00:00",
-          "pending_backlog": 5,
+          "pending_backlog": 42,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
           "wave_completion_pct": 0.0,
           "simulated_throughput": 0.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
-          "labor_utilization_pct": 66.7,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 65.8,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
         }
@@ -92,17 +95,18 @@
       {
         "tick": 4,
         "elapsed_seconds": 5640,
+        "scenario_seconds": 240,
         "kpis": {
           "sim_time_seconds": 5640,
           "clock_iso": "2026-08-23T09:34:00+00:00",
-          "pending_backlog": 5,
+          "pending_backlog": 28,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 0.0,
-          "simulated_throughput": 0.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
-          "labor_utilization_pct": 66.7,
+          "wave_completion_pct": 24.2,
+          "simulated_throughput": 29.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 53.0,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
         }
@@ -110,17 +114,18 @@
       {
         "tick": 5,
         "elapsed_seconds": 5700,
+        "scenario_seconds": 300,
         "kpis": {
           "sim_time_seconds": 5700,
           "clock_iso": "2026-08-23T09:35:00+00:00",
-          "pending_backlog": 5,
+          "pending_backlog": 28,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 28.6,
-          "simulated_throughput": 2.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
-          "labor_utilization_pct": 0.0,
+          "wave_completion_pct": 25.0,
+          "simulated_throughput": 30.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 52.1,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
         }
@@ -128,17 +133,18 @@
       {
         "tick": 6,
         "elapsed_seconds": 5760,
+        "scenario_seconds": 360,
         "kpis": {
           "sim_time_seconds": 5760,
           "clock_iso": "2026-08-23T09:36:00+00:00",
-          "pending_backlog": 5,
+          "pending_backlog": 19,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 28.6,
-          "simulated_throughput": 2.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
-          "labor_utilization_pct": 0.0,
+          "wave_completion_pct": 46.7,
+          "simulated_throughput": 56.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 38.5,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
         }
@@ -146,17 +152,18 @@
       {
         "tick": 7,
         "elapsed_seconds": 5820,
+        "scenario_seconds": 420,
         "kpis": {
           "sim_time_seconds": 5820,
           "clock_iso": "2026-08-23T09:37:00+00:00",
-          "pending_backlog": 5,
+          "pending_backlog": 12,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 28.6,
-          "simulated_throughput": 2.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
-          "labor_utilization_pct": 0.0,
+          "wave_completion_pct": 65.0,
+          "simulated_throughput": 78.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 25.6,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
         }
@@ -164,17 +171,18 @@
       {
         "tick": 8,
         "elapsed_seconds": 5880,
+        "scenario_seconds": 480,
         "kpis": {
           "sim_time_seconds": 5880,
           "clock_iso": "2026-08-23T09:38:00+00:00",
-          "pending_backlog": 5,
+          "pending_backlog": 12,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 28.6,
-          "simulated_throughput": 2.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
-          "labor_utilization_pct": 0.0,
+          "wave_completion_pct": 65.0,
+          "simulated_throughput": 78.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 25.6,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
         }
@@ -182,17 +190,18 @@
       {
         "tick": 9,
         "elapsed_seconds": 5940,
+        "scenario_seconds": 540,
         "kpis": {
           "sim_time_seconds": 5940,
           "clock_iso": "2026-08-23T09:39:00+00:00",
-          "pending_backlog": 5,
+          "pending_backlog": 10,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 28.6,
-          "simulated_throughput": 2.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
-          "labor_utilization_pct": 0.0,
+          "wave_completion_pct": 74.2,
+          "simulated_throughput": 89.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 17.9,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
         }
@@ -200,17 +209,18 @@
       {
         "tick": 10,
         "elapsed_seconds": 6000,
+        "scenario_seconds": 600,
         "kpis": {
           "sim_time_seconds": 6000,
           "clock_iso": "2026-08-23T09:40:00+00:00",
-          "pending_backlog": 5,
+          "pending_backlog": 6,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 28.6,
-          "simulated_throughput": 2.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
-          "labor_utilization_pct": 0.0,
+          "wave_completion_pct": 82.5,
+          "simulated_throughput": 99.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 12.8,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
         }
@@ -218,17 +228,18 @@
       {
         "tick": 11,
         "elapsed_seconds": 6060,
+        "scenario_seconds": 660,
         "kpis": {
           "sim_time_seconds": 6060,
           "clock_iso": "2026-08-23T09:41:00+00:00",
-          "pending_backlog": 5,
+          "pending_backlog": 6,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 28.6,
-          "simulated_throughput": 2.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
-          "labor_utilization_pct": 0.0,
+          "wave_completion_pct": 82.5,
+          "simulated_throughput": 99.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 12.8,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
         }
@@ -236,17 +247,18 @@
       {
         "tick": 12,
         "elapsed_seconds": 6120,
+        "scenario_seconds": 720,
         "kpis": {
           "sim_time_seconds": 6120,
           "clock_iso": "2026-08-23T09:42:00+00:00",
           "pending_backlog": 5,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 28.6,
-          "simulated_throughput": 2.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
-          "labor_utilization_pct": 0.0,
+          "wave_completion_pct": 88.3,
+          "simulated_throughput": 106.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 7.7,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
         }
@@ -254,17 +266,18 @@
       {
         "tick": 13,
         "elapsed_seconds": 6180,
+        "scenario_seconds": 780,
         "kpis": {
           "sim_time_seconds": 6180,
           "clock_iso": "2026-08-23T09:43:00+00:00",
           "pending_backlog": 5,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 28.6,
-          "simulated_throughput": 2.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
-          "labor_utilization_pct": 0.0,
+          "wave_completion_pct": 90.0,
+          "simulated_throughput": 108.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 6.0,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
         }
@@ -272,17 +285,18 @@
       {
         "tick": 14,
         "elapsed_seconds": 6240,
+        "scenario_seconds": 840,
         "kpis": {
           "sim_time_seconds": 6240,
           "clock_iso": "2026-08-23T09:44:00+00:00",
           "pending_backlog": 5,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 28.6,
-          "simulated_throughput": 2.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
-          "labor_utilization_pct": 0.0,
+          "wave_completion_pct": 90.0,
+          "simulated_throughput": 108.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 6.0,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
         }
@@ -290,16 +304,17 @@
       {
         "tick": 15,
         "elapsed_seconds": 6300,
+        "scenario_seconds": 900,
         "kpis": {
           "sim_time_seconds": 6300,
           "clock_iso": "2026-08-23T09:45:00+00:00",
           "pending_backlog": 5,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 28.6,
-          "simulated_throughput": 2.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
+          "wave_completion_pct": 95.8,
+          "simulated_throughput": 115.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
           "labor_utilization_pct": 0.0,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
@@ -308,16 +323,17 @@
       {
         "tick": 16,
         "elapsed_seconds": 6360,
+        "scenario_seconds": 960,
         "kpis": {
           "sim_time_seconds": 6360,
           "clock_iso": "2026-08-23T09:46:00+00:00",
           "pending_backlog": 5,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 28.6,
-          "simulated_throughput": 2.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
+          "wave_completion_pct": 95.8,
+          "simulated_throughput": 115.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
           "labor_utilization_pct": 0.0,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
@@ -326,16 +342,17 @@
       {
         "tick": 17,
         "elapsed_seconds": 6420,
+        "scenario_seconds": 1020,
         "kpis": {
           "sim_time_seconds": 6420,
           "clock_iso": "2026-08-23T09:47:00+00:00",
           "pending_backlog": 5,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 28.6,
-          "simulated_throughput": 2.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
+          "wave_completion_pct": 95.8,
+          "simulated_throughput": 115.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
           "labor_utilization_pct": 0.0,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
@@ -344,16 +361,17 @@
       {
         "tick": 18,
         "elapsed_seconds": 6480,
+        "scenario_seconds": 1080,
         "kpis": {
           "sim_time_seconds": 6480,
           "clock_iso": "2026-08-23T09:48:00+00:00",
           "pending_backlog": 5,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 28.6,
-          "simulated_throughput": 2.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
+          "wave_completion_pct": 95.8,
+          "simulated_throughput": 115.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
           "labor_utilization_pct": 0.0,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
@@ -362,16 +380,17 @@
       {
         "tick": 19,
         "elapsed_seconds": 6540,
+        "scenario_seconds": 1140,
         "kpis": {
           "sim_time_seconds": 6540,
           "clock_iso": "2026-08-23T09:49:00+00:00",
           "pending_backlog": 5,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 28.6,
-          "simulated_throughput": 2.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
+          "wave_completion_pct": 95.8,
+          "simulated_throughput": 115.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
           "labor_utilization_pct": 0.0,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
@@ -380,16 +399,17 @@
       {
         "tick": 20,
         "elapsed_seconds": 6600,
+        "scenario_seconds": 1200,
         "kpis": {
           "sim_time_seconds": 6600,
           "clock_iso": "2026-08-23T09:50:00+00:00",
           "pending_backlog": 5,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 28.6,
-          "simulated_throughput": 2.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
+          "wave_completion_pct": 95.8,
+          "simulated_throughput": 115.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
           "labor_utilization_pct": 0.0,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
@@ -398,16 +418,17 @@
       {
         "tick": 21,
         "elapsed_seconds": 6660,
+        "scenario_seconds": 1260,
         "kpis": {
           "sim_time_seconds": 6660,
           "clock_iso": "2026-08-23T09:51:00+00:00",
           "pending_backlog": 5,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 28.6,
-          "simulated_throughput": 2.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
+          "wave_completion_pct": 95.8,
+          "simulated_throughput": 115.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
           "labor_utilization_pct": 0.0,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
@@ -416,16 +437,17 @@
       {
         "tick": 22,
         "elapsed_seconds": 6720,
+        "scenario_seconds": 1320,
         "kpis": {
           "sim_time_seconds": 6720,
           "clock_iso": "2026-08-23T09:52:00+00:00",
           "pending_backlog": 5,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 28.6,
-          "simulated_throughput": 2.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
+          "wave_completion_pct": 95.8,
+          "simulated_throughput": 115.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
           "labor_utilization_pct": 0.0,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
@@ -434,16 +456,17 @@
       {
         "tick": 23,
         "elapsed_seconds": 6780,
+        "scenario_seconds": 1380,
         "kpis": {
           "sim_time_seconds": 6780,
           "clock_iso": "2026-08-23T09:53:00+00:00",
           "pending_backlog": 5,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 28.6,
-          "simulated_throughput": 2.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
+          "wave_completion_pct": 95.8,
+          "simulated_throughput": 115.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
           "labor_utilization_pct": 0.0,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
@@ -452,16 +475,17 @@
       {
         "tick": 24,
         "elapsed_seconds": 6840,
+        "scenario_seconds": 1440,
         "kpis": {
           "sim_time_seconds": 6840,
           "clock_iso": "2026-08-23T09:54:00+00:00",
           "pending_backlog": 5,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 28.6,
-          "simulated_throughput": 2.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
+          "wave_completion_pct": 95.8,
+          "simulated_throughput": 115.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
           "labor_utilization_pct": 0.0,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
@@ -470,16 +494,17 @@
       {
         "tick": 25,
         "elapsed_seconds": 6900,
+        "scenario_seconds": 1500,
         "kpis": {
           "sim_time_seconds": 6900,
           "clock_iso": "2026-08-23T09:55:00+00:00",
           "pending_backlog": 5,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 28.6,
-          "simulated_throughput": 2.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
+          "wave_completion_pct": 95.8,
+          "simulated_throughput": 115.0,
+          "projected_service_level": 80.0,
+          "labor_availability_pct": 97.5,
           "labor_utilization_pct": 0.0,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
@@ -488,16 +513,17 @@
       {
         "tick": 26,
         "elapsed_seconds": 6960,
+        "scenario_seconds": 1560,
         "kpis": {
           "sim_time_seconds": 6960,
           "clock_iso": "2026-08-23T09:56:00+00:00",
           "pending_backlog": 5,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 28.6,
-          "simulated_throughput": 2.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
+          "wave_completion_pct": 95.8,
+          "simulated_throughput": 115.0,
+          "projected_service_level": 40.0,
+          "labor_availability_pct": 97.5,
           "labor_utilization_pct": 0.0,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
@@ -506,16 +532,17 @@
       {
         "tick": 27,
         "elapsed_seconds": 7020,
+        "scenario_seconds": 1620,
         "kpis": {
           "sim_time_seconds": 7020,
           "clock_iso": "2026-08-23T09:57:00+00:00",
           "pending_backlog": 5,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 28.6,
-          "simulated_throughput": 2.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
+          "wave_completion_pct": 95.8,
+          "simulated_throughput": 115.0,
+          "projected_service_level": 40.0,
+          "labor_availability_pct": 97.5,
           "labor_utilization_pct": 0.0,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
@@ -524,16 +551,17 @@
       {
         "tick": 28,
         "elapsed_seconds": 7080,
+        "scenario_seconds": 1680,
         "kpis": {
           "sim_time_seconds": 7080,
           "clock_iso": "2026-08-23T09:58:00+00:00",
           "pending_backlog": 5,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 28.6,
-          "simulated_throughput": 2.0,
+          "wave_completion_pct": 95.8,
+          "simulated_throughput": 115.0,
           "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
+          "labor_availability_pct": 97.5,
           "labor_utilization_pct": 0.0,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
@@ -542,16 +570,17 @@
       {
         "tick": 29,
         "elapsed_seconds": 7140,
+        "scenario_seconds": 1740,
         "kpis": {
           "sim_time_seconds": 7140,
           "clock_iso": "2026-08-23T09:59:00+00:00",
           "pending_backlog": 5,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 28.6,
-          "simulated_throughput": 2.0,
+          "wave_completion_pct": 95.8,
+          "simulated_throughput": 115.0,
           "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
+          "labor_availability_pct": 97.5,
           "labor_utilization_pct": 0.0,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
@@ -560,16 +589,17 @@
       {
         "tick": 30,
         "elapsed_seconds": 7200,
+        "scenario_seconds": 1800,
         "kpis": {
           "sim_time_seconds": 7200,
           "clock_iso": "2026-08-23T10:00:00+00:00",
           "pending_backlog": 5,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
-          "wave_completion_pct": 28.6,
-          "simulated_throughput": 2.0,
+          "wave_completion_pct": 95.8,
+          "simulated_throughput": 115.0,
           "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
+          "labor_availability_pct": 97.5,
           "labor_utilization_pct": 0.0,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
@@ -577,9 +607,9 @@
       }
     ],
     "recovery": null,
-    "peak_backlog": 5,
+    "peak_backlog": 42,
     "peak_wave_risk_score": 95.0,
-    "backlog_auc": 9000,
+    "backlog_auc": 20520,
     "wave_risk_auc": 171000.0
   },
   "maiw": {
@@ -587,46 +617,47 @@
     "t0_kpis": {
       "sim_time_seconds": 5400,
       "clock_iso": "2026-08-23T09:30:00+00:00",
-      "pending_backlog": 5,
+      "pending_backlog": 119,
       "wave_risk_score": 95.0,
       "wave_risk_level": "critical",
       "wave_completion_pct": 0.0,
       "simulated_throughput": 0.0,
-      "projected_service_level": 0.0,
-      "labor_availability_pct": 66.7,
-      "labor_utilization_pct": 50.0,
+      "projected_service_level": 100.0,
+      "labor_availability_pct": 98.3,
+      "labor_utilization_pct": 66.1,
       "equipment_operational_pct": 100.0,
       "time_to_recovery_seconds": null
     },
     "final_kpis": {
-      "sim_time_seconds": 5820,
-      "clock_iso": "2026-08-23T09:37:00+00:00",
+      "sim_time_seconds": 7200,
+      "clock_iso": "2026-08-23T10:00:00+00:00",
       "pending_backlog": 0,
       "wave_risk_score": 0.0,
       "wave_risk_level": "none",
-      "wave_completion_pct": 71.4,
-      "simulated_throughput": 5.0,
-      "projected_service_level": 0.0,
-      "labor_availability_pct": 50.0,
-      "labor_utilization_pct": 66.7,
+      "wave_completion_pct": 100.0,
+      "simulated_throughput": 120.0,
+      "projected_service_level": 100.0,
+      "labor_availability_pct": 97.5,
+      "labor_utilization_pct": 0.0,
       "equipment_operational_pct": 100.0,
-      "time_to_recovery_seconds": 300.0
+      "time_to_recovery_seconds": 180.0
     },
     "trajectory": [
       {
         "tick": 1,
         "elapsed_seconds": 5460,
+        "scenario_seconds": 60,
         "kpis": {
           "sim_time_seconds": 5460,
           "clock_iso": "2026-08-23T09:31:00+00:00",
-          "pending_backlog": 3,
+          "pending_backlog": 40,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
           "wave_completion_pct": 0.0,
           "simulated_throughput": 0.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
-          "labor_utilization_pct": 100.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 98.3,
+          "labor_utilization_pct": 67.8,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
         },
@@ -635,17 +666,18 @@
       {
         "tick": 2,
         "elapsed_seconds": 5520,
+        "scenario_seconds": 120,
         "kpis": {
           "sim_time_seconds": 5520,
           "clock_iso": "2026-08-23T09:32:00+00:00",
-          "pending_backlog": 3,
+          "pending_backlog": 39,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
           "wave_completion_pct": 0.0,
           "simulated_throughput": 0.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
-          "labor_utilization_pct": 100.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 68.4,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
         },
@@ -654,17 +686,18 @@
       {
         "tick": 3,
         "elapsed_seconds": 5580,
+        "scenario_seconds": 180,
         "kpis": {
           "sim_time_seconds": 5580,
           "clock_iso": "2026-08-23T09:33:00+00:00",
-          "pending_backlog": 3,
+          "pending_backlog": 38,
           "wave_risk_score": 95.0,
           "wave_risk_level": "critical",
           "wave_completion_pct": 0.0,
           "simulated_throughput": 0.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
-          "labor_utilization_pct": 100.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 69.2,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
         },
@@ -673,17 +706,18 @@
       {
         "tick": 4,
         "elapsed_seconds": 5640,
+        "scenario_seconds": 240,
         "kpis": {
           "sim_time_seconds": 5640,
           "clock_iso": "2026-08-23T09:34:00+00:00",
-          "pending_backlog": 3,
-          "wave_risk_score": 95.0,
-          "wave_risk_level": "critical",
-          "wave_completion_pct": 0.0,
-          "simulated_throughput": 0.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
-          "labor_utilization_pct": 100.0,
+          "pending_backlog": 23,
+          "wave_risk_score": 0.0,
+          "wave_risk_level": "none",
+          "wave_completion_pct": 24.2,
+          "simulated_throughput": 29.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 57.3,
           "equipment_operational_pct": 100.0,
           "time_to_recovery_seconds": null
         },
@@ -692,126 +726,536 @@
       {
         "tick": 5,
         "elapsed_seconds": 5700,
+        "scenario_seconds": 300,
         "kpis": {
           "sim_time_seconds": 5700,
           "clock_iso": "2026-08-23T09:35:00+00:00",
-          "pending_backlog": 0,
+          "pending_backlog": 22,
           "wave_risk_score": 0.0,
           "wave_risk_level": "none",
-          "wave_completion_pct": 57.1,
-          "simulated_throughput": 4.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
-          "labor_utilization_pct": 100.0,
+          "wave_completion_pct": 25.8,
+          "simulated_throughput": 31.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 56.4,
           "equipment_operational_pct": 100.0,
-          "time_to_recovery_seconds": null
+          "time_to_recovery_seconds": 180.0
         },
-        "maiw_cycle": 6
+        "maiw_cycle": 6,
+        "recovery_detected": true
       },
       {
         "tick": 6,
         "elapsed_seconds": 5760,
+        "scenario_seconds": 360,
         "kpis": {
           "sim_time_seconds": 5760,
           "clock_iso": "2026-08-23T09:36:00+00:00",
-          "pending_backlog": 0,
+          "pending_backlog": 12,
           "wave_risk_score": 0.0,
           "wave_risk_level": "none",
-          "wave_completion_pct": 57.1,
-          "simulated_throughput": 4.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
-          "labor_utilization_pct": 100.0,
+          "wave_completion_pct": 48.3,
+          "simulated_throughput": 58.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 42.7,
           "equipment_operational_pct": 100.0,
-          "time_to_recovery_seconds": 300.0
+          "time_to_recovery_seconds": 180.0
         },
-        "recovery_detected": true
+        "maiw_cycle": 7
       },
       {
         "tick": 7,
         "elapsed_seconds": 5820,
+        "scenario_seconds": 420,
         "kpis": {
           "sim_time_seconds": 5820,
           "clock_iso": "2026-08-23T09:37:00+00:00",
+          "pending_backlog": 4,
+          "wave_risk_score": 0.0,
+          "wave_risk_level": "none",
+          "wave_completion_pct": 69.2,
+          "simulated_throughput": 83.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 28.2,
+          "equipment_operational_pct": 100.0,
+          "time_to_recovery_seconds": 180.0
+        },
+        "maiw_cycle": 8
+      },
+      {
+        "tick": 8,
+        "elapsed_seconds": 5880,
+        "scenario_seconds": 480,
+        "kpis": {
+          "sim_time_seconds": 5880,
+          "clock_iso": "2026-08-23T09:38:00+00:00",
+          "pending_backlog": 3,
+          "wave_risk_score": 0.0,
+          "wave_risk_level": "none",
+          "wave_completion_pct": 69.2,
+          "simulated_throughput": 83.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 29.1,
+          "equipment_operational_pct": 100.0,
+          "time_to_recovery_seconds": 180.0
+        },
+        "maiw_cycle": 9
+      },
+      {
+        "tick": 9,
+        "elapsed_seconds": 5940,
+        "scenario_seconds": 540,
+        "kpis": {
+          "sim_time_seconds": 5940,
+          "clock_iso": "2026-08-23T09:39:00+00:00",
+          "pending_backlog": 1,
+          "wave_risk_score": 0.0,
+          "wave_risk_level": "none",
+          "wave_completion_pct": 79.2,
+          "simulated_throughput": 95.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 20.5,
+          "equipment_operational_pct": 100.0,
+          "time_to_recovery_seconds": 180.0
+        },
+        "maiw_cycle": 10
+      },
+      {
+        "tick": 10,
+        "elapsed_seconds": 6000,
+        "scenario_seconds": 600,
+        "kpis": {
+          "sim_time_seconds": 6000,
+          "clock_iso": "2026-08-23T09:40:00+00:00",
           "pending_backlog": 0,
           "wave_risk_score": 0.0,
           "wave_risk_level": "none",
-          "wave_completion_pct": 71.4,
-          "simulated_throughput": 5.0,
-          "projected_service_level": 0.0,
-          "labor_availability_pct": 50.0,
-          "labor_utilization_pct": 66.7,
+          "wave_completion_pct": 87.5,
+          "simulated_throughput": 105.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 12.8,
           "equipment_operational_pct": 100.0,
-          "time_to_recovery_seconds": 300.0
+          "time_to_recovery_seconds": 180.0
+        }
+      },
+      {
+        "tick": 11,
+        "elapsed_seconds": 6060,
+        "scenario_seconds": 660,
+        "kpis": {
+          "sim_time_seconds": 6060,
+          "clock_iso": "2026-08-23T09:41:00+00:00",
+          "pending_backlog": 0,
+          "wave_risk_score": 0.0,
+          "wave_risk_level": "none",
+          "wave_completion_pct": 89.2,
+          "simulated_throughput": 107.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 11.1,
+          "equipment_operational_pct": 100.0,
+          "time_to_recovery_seconds": 180.0
+        }
+      },
+      {
+        "tick": 12,
+        "elapsed_seconds": 6120,
+        "scenario_seconds": 720,
+        "kpis": {
+          "sim_time_seconds": 6120,
+          "clock_iso": "2026-08-23T09:42:00+00:00",
+          "pending_backlog": 0,
+          "wave_risk_score": 0.0,
+          "wave_risk_level": "none",
+          "wave_completion_pct": 95.0,
+          "simulated_throughput": 114.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 5.1,
+          "equipment_operational_pct": 100.0,
+          "time_to_recovery_seconds": 180.0
+        }
+      },
+      {
+        "tick": 13,
+        "elapsed_seconds": 6180,
+        "scenario_seconds": 780,
+        "kpis": {
+          "sim_time_seconds": 6180,
+          "clock_iso": "2026-08-23T09:43:00+00:00",
+          "pending_backlog": 0,
+          "wave_risk_score": 0.0,
+          "wave_risk_level": "none",
+          "wave_completion_pct": 96.7,
+          "simulated_throughput": 116.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 3.4,
+          "equipment_operational_pct": 100.0,
+          "time_to_recovery_seconds": 180.0
+        }
+      },
+      {
+        "tick": 14,
+        "elapsed_seconds": 6240,
+        "scenario_seconds": 840,
+        "kpis": {
+          "sim_time_seconds": 6240,
+          "clock_iso": "2026-08-23T09:44:00+00:00",
+          "pending_backlog": 0,
+          "wave_risk_score": 0.0,
+          "wave_risk_level": "none",
+          "wave_completion_pct": 98.3,
+          "simulated_throughput": 118.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 1.7,
+          "equipment_operational_pct": 100.0,
+          "time_to_recovery_seconds": 180.0
+        }
+      },
+      {
+        "tick": 15,
+        "elapsed_seconds": 6300,
+        "scenario_seconds": 900,
+        "kpis": {
+          "sim_time_seconds": 6300,
+          "clock_iso": "2026-08-23T09:45:00+00:00",
+          "pending_backlog": 0,
+          "wave_risk_score": 0.0,
+          "wave_risk_level": "none",
+          "wave_completion_pct": 100.0,
+          "simulated_throughput": 120.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 0.0,
+          "equipment_operational_pct": 100.0,
+          "time_to_recovery_seconds": 180.0
+        }
+      },
+      {
+        "tick": 16,
+        "elapsed_seconds": 6360,
+        "scenario_seconds": 960,
+        "kpis": {
+          "sim_time_seconds": 6360,
+          "clock_iso": "2026-08-23T09:46:00+00:00",
+          "pending_backlog": 0,
+          "wave_risk_score": 0.0,
+          "wave_risk_level": "none",
+          "wave_completion_pct": 100.0,
+          "simulated_throughput": 120.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 0.0,
+          "equipment_operational_pct": 100.0,
+          "time_to_recovery_seconds": 180.0
+        }
+      },
+      {
+        "tick": 17,
+        "elapsed_seconds": 6420,
+        "scenario_seconds": 1020,
+        "kpis": {
+          "sim_time_seconds": 6420,
+          "clock_iso": "2026-08-23T09:47:00+00:00",
+          "pending_backlog": 0,
+          "wave_risk_score": 0.0,
+          "wave_risk_level": "none",
+          "wave_completion_pct": 100.0,
+          "simulated_throughput": 120.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 0.0,
+          "equipment_operational_pct": 100.0,
+          "time_to_recovery_seconds": 180.0
+        }
+      },
+      {
+        "tick": 18,
+        "elapsed_seconds": 6480,
+        "scenario_seconds": 1080,
+        "kpis": {
+          "sim_time_seconds": 6480,
+          "clock_iso": "2026-08-23T09:48:00+00:00",
+          "pending_backlog": 0,
+          "wave_risk_score": 0.0,
+          "wave_risk_level": "none",
+          "wave_completion_pct": 100.0,
+          "simulated_throughput": 120.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 0.0,
+          "equipment_operational_pct": 100.0,
+          "time_to_recovery_seconds": 180.0
+        }
+      },
+      {
+        "tick": 19,
+        "elapsed_seconds": 6540,
+        "scenario_seconds": 1140,
+        "kpis": {
+          "sim_time_seconds": 6540,
+          "clock_iso": "2026-08-23T09:49:00+00:00",
+          "pending_backlog": 0,
+          "wave_risk_score": 0.0,
+          "wave_risk_level": "none",
+          "wave_completion_pct": 100.0,
+          "simulated_throughput": 120.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 0.0,
+          "equipment_operational_pct": 100.0,
+          "time_to_recovery_seconds": 180.0
+        }
+      },
+      {
+        "tick": 20,
+        "elapsed_seconds": 6600,
+        "scenario_seconds": 1200,
+        "kpis": {
+          "sim_time_seconds": 6600,
+          "clock_iso": "2026-08-23T09:50:00+00:00",
+          "pending_backlog": 0,
+          "wave_risk_score": 0.0,
+          "wave_risk_level": "none",
+          "wave_completion_pct": 100.0,
+          "simulated_throughput": 120.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 0.0,
+          "equipment_operational_pct": 100.0,
+          "time_to_recovery_seconds": 180.0
+        }
+      },
+      {
+        "tick": 21,
+        "elapsed_seconds": 6660,
+        "scenario_seconds": 1260,
+        "kpis": {
+          "sim_time_seconds": 6660,
+          "clock_iso": "2026-08-23T09:51:00+00:00",
+          "pending_backlog": 0,
+          "wave_risk_score": 0.0,
+          "wave_risk_level": "none",
+          "wave_completion_pct": 100.0,
+          "simulated_throughput": 120.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 0.0,
+          "equipment_operational_pct": 100.0,
+          "time_to_recovery_seconds": 180.0
+        }
+      },
+      {
+        "tick": 22,
+        "elapsed_seconds": 6720,
+        "scenario_seconds": 1320,
+        "kpis": {
+          "sim_time_seconds": 6720,
+          "clock_iso": "2026-08-23T09:52:00+00:00",
+          "pending_backlog": 0,
+          "wave_risk_score": 0.0,
+          "wave_risk_level": "none",
+          "wave_completion_pct": 100.0,
+          "simulated_throughput": 120.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 0.0,
+          "equipment_operational_pct": 100.0,
+          "time_to_recovery_seconds": 180.0
+        }
+      },
+      {
+        "tick": 23,
+        "elapsed_seconds": 6780,
+        "scenario_seconds": 1380,
+        "kpis": {
+          "sim_time_seconds": 6780,
+          "clock_iso": "2026-08-23T09:53:00+00:00",
+          "pending_backlog": 0,
+          "wave_risk_score": 0.0,
+          "wave_risk_level": "none",
+          "wave_completion_pct": 100.0,
+          "simulated_throughput": 120.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 0.0,
+          "equipment_operational_pct": 100.0,
+          "time_to_recovery_seconds": 180.0
+        }
+      },
+      {
+        "tick": 24,
+        "elapsed_seconds": 6840,
+        "scenario_seconds": 1440,
+        "kpis": {
+          "sim_time_seconds": 6840,
+          "clock_iso": "2026-08-23T09:54:00+00:00",
+          "pending_backlog": 0,
+          "wave_risk_score": 0.0,
+          "wave_risk_level": "none",
+          "wave_completion_pct": 100.0,
+          "simulated_throughput": 120.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 0.0,
+          "equipment_operational_pct": 100.0,
+          "time_to_recovery_seconds": 180.0
+        }
+      },
+      {
+        "tick": 25,
+        "elapsed_seconds": 6900,
+        "scenario_seconds": 1500,
+        "kpis": {
+          "sim_time_seconds": 6900,
+          "clock_iso": "2026-08-23T09:55:00+00:00",
+          "pending_backlog": 0,
+          "wave_risk_score": 0.0,
+          "wave_risk_level": "none",
+          "wave_completion_pct": 100.0,
+          "simulated_throughput": 120.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 0.0,
+          "equipment_operational_pct": 100.0,
+          "time_to_recovery_seconds": 180.0
+        }
+      },
+      {
+        "tick": 26,
+        "elapsed_seconds": 6960,
+        "scenario_seconds": 1560,
+        "kpis": {
+          "sim_time_seconds": 6960,
+          "clock_iso": "2026-08-23T09:56:00+00:00",
+          "pending_backlog": 0,
+          "wave_risk_score": 0.0,
+          "wave_risk_level": "none",
+          "wave_completion_pct": 100.0,
+          "simulated_throughput": 120.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 0.0,
+          "equipment_operational_pct": 100.0,
+          "time_to_recovery_seconds": 180.0
+        }
+      },
+      {
+        "tick": 27,
+        "elapsed_seconds": 7020,
+        "scenario_seconds": 1620,
+        "kpis": {
+          "sim_time_seconds": 7020,
+          "clock_iso": "2026-08-23T09:57:00+00:00",
+          "pending_backlog": 0,
+          "wave_risk_score": 0.0,
+          "wave_risk_level": "none",
+          "wave_completion_pct": 100.0,
+          "simulated_throughput": 120.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 0.0,
+          "equipment_operational_pct": 100.0,
+          "time_to_recovery_seconds": 180.0
+        }
+      },
+      {
+        "tick": 28,
+        "elapsed_seconds": 7080,
+        "scenario_seconds": 1680,
+        "kpis": {
+          "sim_time_seconds": 7080,
+          "clock_iso": "2026-08-23T09:58:00+00:00",
+          "pending_backlog": 0,
+          "wave_risk_score": 0.0,
+          "wave_risk_level": "none",
+          "wave_completion_pct": 100.0,
+          "simulated_throughput": 120.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 0.0,
+          "equipment_operational_pct": 100.0,
+          "time_to_recovery_seconds": 180.0
+        }
+      },
+      {
+        "tick": 29,
+        "elapsed_seconds": 7140,
+        "scenario_seconds": 1740,
+        "kpis": {
+          "sim_time_seconds": 7140,
+          "clock_iso": "2026-08-23T09:59:00+00:00",
+          "pending_backlog": 0,
+          "wave_risk_score": 0.0,
+          "wave_risk_level": "none",
+          "wave_completion_pct": 100.0,
+          "simulated_throughput": 120.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 0.0,
+          "equipment_operational_pct": 100.0,
+          "time_to_recovery_seconds": 180.0
+        }
+      },
+      {
+        "tick": 30,
+        "elapsed_seconds": 7200,
+        "scenario_seconds": 1800,
+        "kpis": {
+          "sim_time_seconds": 7200,
+          "clock_iso": "2026-08-23T10:00:00+00:00",
+          "pending_backlog": 0,
+          "wave_risk_score": 0.0,
+          "wave_risk_level": "none",
+          "wave_completion_pct": 100.0,
+          "simulated_throughput": 120.0,
+          "projected_service_level": 100.0,
+          "labor_availability_pct": 97.5,
+          "labor_utilization_pct": 0.0,
+          "equipment_operational_pct": 100.0,
+          "time_to_recovery_seconds": 180.0
         }
       }
     ],
     "recovery": {
-      "detected_at_tick": 6,
-      "sim_time_seconds": 5760,
-      "time_to_recovery_secs": 300.0,
+      "detected_at_tick": 5,
+      "sim_time_seconds": 5700,
+      "time_to_recovery_secs": 180.0,
       "wave_risk_level": "none",
       "wave_risk_score": 0.0,
-      "pending_backlog": 0,
-      "wave_completion_pct": 57.1
+      "pending_backlog": 22,
+      "wave_completion_pct": 25.8
     },
     "maiw_cycles": [
       {
         "cycle": 1,
-        "trace_id": "969e224c-b02f-4e2c-a2ff-4959c6f374c3",
-        "severity": "high",
-        "model_id": "nvidia/nemotron-3-super-120b-a12b",
+        "trace_id": "d617dbe3-0ffb-4e90-b098-f798d19d8391",
+        "severity": "critical",
+        "model_id": "nvidia/nemotron-3-ultra-550b-a55b",
+        "recommendations": 1,
+        "summary": "40 idle workers are not assigned to 4 pending wave tasks (assigned_to=null), creating a labor allocation failure that directly drives 4 at-risk tasks and threatens the 2026-08-23T10:00:00 carrier cutoff.",
         "approvals": [
           {
             "capability": "warehouse.labor.allocate",
             "ok": true,
             "status": "executed"
-          },
-          {
-            "capability": "warehouse.labor.allocate",
-            "ok": true,
-            "status": "executed"
-          },
-          {
-            "capability": "warehouse.labor.allocate",
-            "ok": false,
-            "status": "CAPACITY_UNAVAILABLE"
           }
         ]
       },
       {
         "cycle": 2,
-        "trace_id": "ad89e637-a78b-497a-9cd1-0d0d75f56ebc",
-        "severity": "high",
-        "model_id": "nvidia/nemotron-3-super-120b-a12b",
-        "approvals": []
-      },
-      {
-        "cycle": 3,
-        "trace_id": "4ea1432b-2f8e-4fb1-9ce7-0877fd1f24b8",
-        "severity": "high",
-        "model_id": "nvidia/nemotron-3-super-120b-a12b",
-        "approvals": []
-      },
-      {
-        "cycle": 4,
-        "trace_id": "f53f9312-70d8-4949-9dda-b2faf951e35d",
-        "severity": "high",
-        "model_id": "nvidia/nemotron-3-super-120b-a12b",
-        "approvals": []
-      },
-      {
-        "cycle": 5,
-        "trace_id": "c23fa6b4-e3b3-4e9e-a661-4e0c21fae768",
-        "severity": "high",
-        "model_id": "nvidia/nemotron-3-super-120b-a12b",
-        "approvals": []
-      },
-      {
-        "cycle": 6,
-        "trace_id": "66236417-0174-4e92-a288-7892d428547d",
-        "severity": "high",
-        "model_id": "nvidia/nemotron-3-super-120b-a12b",
+        "trace_id": "9969b1cb-85c5-484f-9c54-8ca7041b301a",
+        "severity": "critical",
+        "model_id": "nvidia/nemotron-3-ultra-550b-a55b",
+        "recommendations": 2,
+        "summary": "Significant idle labor capacity is not being assigned to pending work: 39 workers are idle while 3 pending wave tasks have no worker allocated, 3 tasks are formally at-risk, and the nearest carrier cutoff is 2026-08-23T10:00:00Z.",
         "approvals": [
           {
             "capability": "warehouse.labor.allocate",
@@ -819,10 +1263,145 @@
             "status": "executed"
           },
           {
+            "capability": "warehouse.wave.reprioritize",
+            "ok": true,
+            "status": "executed"
+          }
+        ]
+      },
+      {
+        "cycle": 3,
+        "trace_id": "c6b7e76b-6204-43df-b96c-75a5960bd468",
+        "severity": "critical",
+        "model_id": "nvidia/nemotron-3-ultra-550b-a55b",
+        "recommendations": 1,
+        "summary": "DC-47 has 38 idle workers while 3 pending wave tasks remain unassigned, creating a labor allocation failure that threatens the 10:00 UTC carrier cutoff. Equipment is fully available with no constraints.",
+        "approvals": [
+          {
+            "capability": "warehouse.labor.allocate",
+            "ok": true,
+            "status": "executed"
+          }
+        ]
+      },
+      {
+        "cycle": 4,
+        "trace_id": "7f3d9a9a-3c27-4179-a6bc-bcf06492abcf",
+        "severity": "critical",
+        "model_id": "nvidia/nemotron-3-ultra-550b-a55b",
+        "recommendations": 2,
+        "summary": "DC-47 has 37 idle workers while 2 pending wave tasks remain unassigned, creating a labor allocation failure that threatens the imminent carrier cutoff at 2026-08-23T10:00:00Z. Two tasks are formally at-risk, compounding the wave completion risk.",
+        "approvals": [
+          {
             "capability": "warehouse.labor.allocate",
             "ok": true,
             "status": "executed"
           },
+          {
+            "capability": "warehouse.wave.reprioritize",
+            "ok": true,
+            "status": "no_op"
+          }
+        ]
+      },
+      {
+        "cycle": 5,
+        "trace_id": "6b392b5b-f911-4833-92d4-1a6db803d41b",
+        "severity": "critical",
+        "model_id": "nvidia/nemotron-3-ultra-550b-a55b",
+        "recommendations": 2,
+        "summary": "Significant idle labor capacity (51 workers) is not being assigned to pending work while 1 wave task remains unassigned and 1 task is formally at-risk with carrier cutoff at 2026-08-23T10:00:00Z.",
+        "approvals": [
+          {
+            "capability": "warehouse.labor.allocate",
+            "ok": true,
+            "status": "executed"
+          },
+          {
+            "capability": "warehouse.wave.reprioritize",
+            "ok": true,
+            "status": "no_op"
+          }
+        ]
+      },
+      {
+        "cycle": 6,
+        "trace_id": "7ce93782-0730-4908-8b1a-f6b2143f04ab",
+        "severity": "high",
+        "model_id": "nvidia/nemotron-3-ultra-550b-a55b",
+        "recommendations": 2,
+        "summary": "DC-47 has 52 idle workers while 23 wave tasks remain unassigned, creating a labor allocation failure that threatens the 10:00 carrier cutoff. Equipment is fully available with 24/24 assets operational.",
+        "approvals": [
+          {
+            "capability": "warehouse.labor.allocate",
+            "ok": true,
+            "status": "executed"
+          },
+          {
+            "capability": "warehouse.wave.reprioritize",
+            "ok": true,
+            "status": "no_op"
+          }
+        ]
+      },
+      {
+        "cycle": 7,
+        "trace_id": "bce876f7-6709-4e6c-af78-562065f39b8c",
+        "severity": "high",
+        "model_id": "nvidia/nemotron-3-ultra-550b-a55b",
+        "recommendations": 1,
+        "summary": "DC-47 has 68 idle workers while 13 wave tasks remain pending and unassigned, creating a labor allocation failure despite 42% overall utilization. Carrier cutoff is today at 10:00 UTC with no at-risk tasks formally flagged.",
+        "approvals": [
+          {
+            "capability": "warehouse.labor.allocate",
+            "ok": true,
+            "status": "executed"
+          }
+        ]
+      },
+      {
+        "cycle": 8,
+        "trace_id": "cc1fbf24-19db-4bb1-83c2-d3afd36fe45b",
+        "severity": "medium",
+        "model_id": "nvidia/nemotron-3-ultra-550b-a55b",
+        "recommendations": 2,
+        "summary": "85 workers are idle while 5 wave tasks remain unassigned, creating a labor allocation failure that risks missing the carrier cutoff at 2026-08-23T10:00:00Z.",
+        "approvals": [
+          {
+            "capability": "warehouse.labor.allocate",
+            "ok": true,
+            "status": "executed"
+          },
+          {
+            "capability": "warehouse.wave.reprioritize",
+            "ok": true,
+            "status": "no_op"
+          }
+        ]
+      },
+      {
+        "cycle": 9,
+        "trace_id": "adc8de56-da50-4779-a43b-4aaaf20d6c1a",
+        "severity": "medium",
+        "model_id": "nvidia/nemotron-3-ultra-550b-a55b",
+        "recommendations": 1,
+        "summary": "DC-47 has a severe labor allocation failure: 84 workers (72% of workforce) are idle while 4 wave tasks remain pending and unassigned, creating an operational bottleneck despite zero equipment constraints and no formally at-risk tasks.",
+        "approvals": [
+          {
+            "capability": "warehouse.labor.allocate",
+            "ok": true,
+            "status": "executed"
+          }
+        ]
+      },
+      {
+        "cycle": 10,
+        "trace_id": "a3fe2a7c-7528-41e4-8aab-504bed80de48",
+        "severity": "medium",
+        "model_id": "nvidia/nemotron-3-ultra-550b-a55b",
+        "recommendations": 1,
+        "summary": "DC-47 has a severe labor allocation failure: 94 workers are idle while 2 wave tasks remain pending and unassigned, creating an operational bottleneck despite full equipment availability and zero formally at-risk tasks.",
+        "approvals": [
           {
             "capability": "warehouse.labor.allocate",
             "ok": true,
@@ -831,136 +1410,137 @@
         ]
       }
     ],
-    "peak_backlog": 3,
+    "peak_backlog": 40,
     "peak_wave_risk_score": 95.0,
-    "backlog_auc": 720,
-    "wave_risk_auc": 22800.0
+    "backlog_auc": 10920,
+    "wave_risk_auc": 17100.0
   },
   "comparison": {
     "control_recovery_seconds": null,
-    "maiw_recovery_seconds": 300.0,
+    "maiw_recovery_seconds": 180.0,
     "recovery_delta_seconds": null,
     "control_never_recovered": true,
-    "peak_backlog_control": 5,
-    "peak_backlog_maiw": 3,
-    "backlog_auc_control": 9000,
-    "backlog_auc_maiw": 720,
-    "backlog_auc_reduction_pct": 92.0,
+    "peak_backlog_control": 42,
+    "peak_backlog_maiw": 40,
+    "backlog_auc_control": 20520,
+    "backlog_auc_maiw": 10920,
+    "backlog_auc_reduction_pct": 46.8,
     "wave_risk_auc_control": 171000.0,
-    "wave_risk_auc_maiw": 22800.0,
-    "wave_risk_auc_reduction_pct": 86.7,
+    "wave_risk_auc_maiw": 17100.0,
+    "wave_risk_auc_reduction_pct": 90.0,
+    "auc_window_ticks": 30,
     "at_horizon": {
       "300s": {
         "wave_risk_score": {
-          "control": null,
-          "maiw": null
+          "control": 95.0,
+          "maiw": 0.0
         },
         "pending_backlog": {
-          "control": null,
-          "maiw": null
+          "control": 28,
+          "maiw": 22
         },
         "wave_completion_pct": {
-          "control": null,
-          "maiw": null
+          "control": 25.0,
+          "maiw": 25.8
         },
         "simulated_throughput": {
-          "control": null,
-          "maiw": null
+          "control": 30.0,
+          "maiw": 31.0
         },
         "projected_service_level": {
-          "control": null,
-          "maiw": null
+          "control": 100.0,
+          "maiw": 100.0
         }
       },
       "600s": {
         "wave_risk_score": {
-          "control": null,
-          "maiw": null
+          "control": 95.0,
+          "maiw": 0.0
         },
         "pending_backlog": {
-          "control": null,
-          "maiw": null
+          "control": 6,
+          "maiw": 0
         },
         "wave_completion_pct": {
-          "control": null,
-          "maiw": null
+          "control": 82.5,
+          "maiw": 87.5
         },
         "simulated_throughput": {
-          "control": null,
-          "maiw": null
+          "control": 99.0,
+          "maiw": 105.0
         },
         "projected_service_level": {
-          "control": null,
-          "maiw": null
+          "control": 100.0,
+          "maiw": 100.0
         }
       },
       "900s": {
         "wave_risk_score": {
-          "control": null,
-          "maiw": null
+          "control": 95.0,
+          "maiw": 0.0
         },
         "pending_backlog": {
-          "control": null,
-          "maiw": null
+          "control": 5,
+          "maiw": 0
         },
         "wave_completion_pct": {
-          "control": null,
-          "maiw": null
+          "control": 95.8,
+          "maiw": 100.0
         },
         "simulated_throughput": {
-          "control": null,
-          "maiw": null
+          "control": 115.0,
+          "maiw": 120.0
         },
         "projected_service_level": {
-          "control": null,
-          "maiw": null
+          "control": 100.0,
+          "maiw": 100.0
         }
       },
       "1200s": {
         "wave_risk_score": {
-          "control": null,
-          "maiw": null
+          "control": 95.0,
+          "maiw": 0.0
         },
         "pending_backlog": {
-          "control": null,
-          "maiw": null
+          "control": 5,
+          "maiw": 0
         },
         "wave_completion_pct": {
-          "control": null,
-          "maiw": null
+          "control": 95.8,
+          "maiw": 100.0
         },
         "simulated_throughput": {
-          "control": null,
-          "maiw": null
+          "control": 115.0,
+          "maiw": 120.0
         },
         "projected_service_level": {
-          "control": null,
-          "maiw": null
+          "control": 100.0,
+          "maiw": 100.0
         }
       },
       "1800s": {
         "wave_risk_score": {
-          "control": null,
-          "maiw": null
+          "control": 95.0,
+          "maiw": 0.0
         },
         "pending_backlog": {
-          "control": null,
-          "maiw": null
+          "control": 5,
+          "maiw": 0
         },
         "wave_completion_pct": {
-          "control": null,
-          "maiw": null
+          "control": 95.8,
+          "maiw": 100.0
         },
         "simulated_throughput": {
-          "control": null,
-          "maiw": null
+          "control": 115.0,
+          "maiw": 120.0
         },
         "projected_service_level": {
-          "control": null,
-          "maiw": null
+          "control": 0.0,
+          "maiw": 100.0
         }
       }
     }
   },
-  "eval_duration_secs": 20.4
+  "eval_duration_secs": 289.9
 }

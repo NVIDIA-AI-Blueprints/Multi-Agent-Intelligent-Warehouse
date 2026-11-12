@@ -8,14 +8,15 @@ is frozen and matches the established reliability reference. This test does NOT
 run the full simulation (which requires NIM + MCP infrastructure) — it validates
 the structural invariants of the scenario definition.
 
-Published baseline (established in Phase 10D / Batch 5):
+Published baseline (rerun 2026-11-12 on the DC-47 DataPack world with
+hosted Nemotron 3 Ultra, #309; both runs compared over the same 30 ticks):
   Scenario:   labor_constraint_wave_risk
   Seed:       42
   Offset:     5400s (shift 1.5h in)
   CONTROL:    no recovery within 1800 simulated seconds
-  MAIW:       recovery ~300 simulated seconds
-              backlog reduction ~92%
-              wave-risk reduction ~86.7%
+  MAIW:       recovery 180 simulated seconds after the disruption
+              backlog AUC reduction 46.8%
+              wave-risk AUC reduction 90.0%
 
 Any deviation from the frozen scenario config invalidates the published metrics.
 """
@@ -48,9 +49,9 @@ FROZEN_DISRUPTION_EVENT_TYPES = {"worker_absence"}
 BASELINE_METRICS = {
     "control_recovery_reached": False,
     "control_time_limit_s": 1800,
-    "maiw_time_to_recovery_s": 300,
-    "backlog_reduction_pct": 92.0,
-    "wave_risk_reduction_pct": 86.7,
+    "maiw_time_to_recovery_s": 180,
+    "backlog_reduction_pct": 46.8,
+    "wave_risk_reduction_pct": 90.0,
 }
 
 
@@ -128,9 +129,9 @@ def test_scenario_has_wave_tasks(scenario_yaml):
 
 def test_baseline_metrics_documented():
     """Baseline metrics must be defined (documentation invariant)."""
-    assert BASELINE_METRICS["maiw_time_to_recovery_s"] == 300
-    assert BASELINE_METRICS["backlog_reduction_pct"] == 92.0
-    assert BASELINE_METRICS["wave_risk_reduction_pct"] == 86.7
+    assert BASELINE_METRICS["maiw_time_to_recovery_s"] == 180
+    assert BASELINE_METRICS["backlog_reduction_pct"] == 46.8
+    assert BASELINE_METRICS["wave_risk_reduction_pct"] == 90.0
     assert BASELINE_METRICS["control_recovery_reached"] is False
 
 
