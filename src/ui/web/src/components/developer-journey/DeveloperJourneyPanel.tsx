@@ -256,8 +256,12 @@ function ModelPanel({ identity, analysisResult, copilotTurn, onNavigate }: {
 
   const latencyMs = copilotTurn?.latency_ms ?? analysisResult?.assessment?.latency_ms ?? null;
 
-  const fallbackFrom = copilotTurn?.fallback_from ?? null;
-  const fallbackReason = copilotTurn?.fallback_reason ?? null;
+  const fallbackFrom = copilotTurn?.fallback_from
+    ?? analysisResult?.assessment?.fallback_from
+    ?? null;
+  const fallbackReason = copilotTurn?.fallback_reason
+    ?? analysisResult?.assessment?.fallback_reason
+    ?? null;
   const selectedRole = copilotTurn?.selected_role ?? null;
   const requestedRole = copilotTurn?.requested_role ?? null;
 

@@ -368,6 +368,9 @@ export default function AgenticReasoningCanvas({ analysisResult, expertMode }: A
                 {assessment!.routing_reason && (
                   <MonoText color="#484F58" size="0.62rem">{assessment!.routing_reason}</MonoText>
                 )}
+                {assessment!.fallback_reason && (
+                  <MonoText color="#484F58" size="0.62rem">{assessment!.fallback_reason}</MonoText>
+                )}
               </Box>
             )}
           </Box>

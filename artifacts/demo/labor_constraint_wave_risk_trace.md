@@ -1,6 +1,6 @@
 # MAIW Trace — labor_constraint_wave_risk
 
-Captured: 2026-11-12T20:02:36.494928+00:00  
+Captured: 2026-11-12T22:33:28.719150+00:00  
 Warehouse: `DC-47`  
 
 ## SCENARIO
@@ -26,14 +26,14 @@ equipment_oper      : 100.0%
 
 ## RUN MAIW
 ```
-trace_id    : 911f381b-bfa3-47fb-aac8-0d9ebfadd575
-snapshot_id : 5f942c80-8021-402f-9c88-6f1b7fb00bfa
+trace_id    : cce77793-0196-446f-8701-7449aa891fa2
+snapshot_id : a4c12c69-02b8-4923-a509-3b54985b85b8
 ```
 
 ### OBSERVE
 ```
 domains_assembled : []
-snapshot_id       : 5f942c80-8021-402f-9c88-6f1b7fb00bfa
+snapshot_id       : a4c12c69-02b8-4923-a509-3b54985b85b8
 freshness         : None
 ```
 
@@ -42,7 +42,9 @@ freshness         : None
 model_id           : nvidia/nemotron-3-ultra-550b-a55b
 routing_rule       : high_reasoning
 routing_reason     : reasoning=HIGH requires Super
-model_latency_ms   : 29142.784982919693
+fallback_from      : super
+fallback_reason    : role=super is disabled or policy-ineligible; escalated to ultra
+model_latency_ms   : 20491.970974951982
 severity           : critical
 domains_affected   : ['wave', 'labor']
 recommendations    : 2
@@ -50,7 +52,7 @@ skills_consulted   : ['warehouse.labor.allocate', 'warehouse.wave.reprioritize']
 ```
 
 ### ASSESS
-**Summary:** DC-47 has 40 idle workers while 4 pending wave tasks remain unassigned, creating a labor allocation failure. Additionally, 4 tasks are formally at-risk with a carrier cutoff approaching in under 24 hours.
+**Summary:** DC-47 has a critical labor allocation failure: 40 workers are idle while 4 pending wave tasks remain unassigned, and 4 tasks are formally at-risk with a carrier cutoff at 2026-08-23T10:00:00Z. Equipment is fully available.
 
 **Facts observed:**
 - Equipment: 24 total, 24 available
@@ -64,25 +66,25 @@ skills_consulted   : ['warehouse.labor.allocate', 'warehouse.wave.reprioritize']
 **rec[0]** `warehouse.labor.allocate` → `unassigned_pending_tasks`
 - domain   : labor
 - priority : critical
-- objective: Assign idle workers to the 4 pending tasks that currently have no worker allocated
-- rationale: 40 workers are idle while 4 pending tasks have assigned_to=null; this allocation failure is the primary bottleneck preventing work from starting
+- objective: Assign idle workers to the 4 pending tasks that have no worker allocated so work can begin immediately
+- rationale: 40 workers are idle while 4 pending tasks have assigned_to=null, creating an allocation failure that directly blocks wave progress despite ample labor capacity
 
-**rec[1]** `warehouse.wave.reprioritize` → `current_wave`
+**rec[1]** `warehouse.wave.reprioritize` → `at_risk_tasks`
 - domain   : wave
 - priority : high
-- objective: Reprioritize wave tasks to ensure at-risk tasks and carrier-cutoff deadlines are met first
-- rationale: 4 tasks are formally at-risk and the nearest carrier cutoff is 2026-08-23T10:00:00Z; once workers are allocated, sequencing must align with deadline pressure
+- objective: Reprioritize the wave to ensure the 4 formally at-risk tasks are sequenced ahead of lower-priority work before carrier cutoff
+- rationale: 4 tasks are flagged at-risk with a hard carrier deadline in ~2 hours; reprioritization ensures they are worked first once labor is allocated
 
 ### PROPOSE
 ```
 index: 0
 action: warehouse.labor.allocate
-proposal_id: 83105201-7b92-43fa-988c-c39dbe568183
+proposal_id: b9fc849a-4813-4596-9514-ee42ae3704b8
 risk_level: medium
 ---
 index: 1
 action: warehouse.wave.reprioritize
-proposal_id: 79e48cdf-7cb6-4a04-88c6-fb655ab6c9fb
+proposal_id: e7fa245b-8688-47e5-9d46-7ae2ed317bd1
 risk_level: medium
 ---
 ```
@@ -91,14 +93,14 @@ risk_level: medium
 ```
 index: 0
 outcome: requires_human_approval
-proposal_id: 83105201-7b92-43fa-988c-c39dbe568183
-decision_id: 5e3065be-728e-42d8-8f54-d7c054d4b289
+proposal_id: b9fc849a-4813-4596-9514-ee42ae3704b8
+decision_id: e030347d-609f-49f5-a4c0-626319879de7
 violations: [{'rule': 'approval.required', 'message': 'risk_level=medium with requires_approval=True requires human approval', 'details': {'risk_level': 'medium', 'requires_approval': True}}]
 ---
 index: 1
 outcome: requires_human_approval
-proposal_id: 79e48cdf-7cb6-4a04-88c6-fb655ab6c9fb
-decision_id: ac9605d9-965c-4d02-9efb-8db5b21690f8
+proposal_id: e7fa245b-8688-47e5-9d46-7ae2ed317bd1
+decision_id: 12a33d59-b5df-422a-a112-3a3d7bb823d2
 violations: [{'rule': 'approval.required', 'message': 'risk_level=medium with requires_approval=True requires human approval', 'details': {'risk_level': 'medium', 'requires_approval': True}}]
 ---
 ```
@@ -116,55 +118,51 @@ violations: [{'rule': 'approval.required', 'message': 'risk_level=medium with re
 ### TIMING
 ```
 time_to_detect_ms   : None
-time_to_decision_ms : 30445.8
-time_to_execution_ms: 31.2
+time_to_decision_ms : 21729.2
+time_to_execution_ms: 31.0
 ```
 
 ### OPERATOR APPROVAL
 ```
 capability   : warehouse.labor.allocate
 outcome      : SUCCESS  status=executed
-exec_success : True  exec_id=ac975cef-0de9-4a77-a7f6-156c74a7b1f2
+exec_success : True  exec_id=a657735f-eb8b-4e3a-a87e-85aa79745a32
 ---
 capability   : warehouse.wave.reprioritize
 outcome      : SUCCESS  status=executed
-exec_success : True  exec_id=e8f09e43-0d4d-4ff4-9cfb-895e21aa287f
+exec_success : True  exec_id=4a659dcb-5444-4fc1-be27-4fb526e30a57
 ---
 capability   : warehouse.labor.allocate
 outcome      : SUCCESS  status=executed
-exec_success : True  exec_id=27d7bb07-38af-4d8a-81d3-c4c6909de5ba
----
-capability   : warehouse.wave.reprioritize
-outcome      : SUCCESS  status=no_op
-exec_success : True  exec_id=ad723b34-18fe-4c92-8f98-a523e1c2f79e
+exec_success : True  exec_id=0b467f6b-ec17-4433-829a-4041b0e6d85b
 ---
 capability   : warehouse.labor.allocate
 outcome      : SUCCESS  status=executed
-exec_success : True  exec_id=16ef72a7-e893-4f21-9bc9-724e6a00ac48
+exec_success : True  exec_id=546d3802-72d0-47c9-a6dd-f8dc39d2ea0f
 ---
 capability   : warehouse.labor.allocate
 outcome      : SUCCESS  status=executed
-exec_success : True  exec_id=47741be9-c2f7-42ed-b219-65f87cddf2fd
+exec_success : True  exec_id=c07a022b-39c1-4df4-8f15-21306942a168
 ---
 capability   : warehouse.wave.reprioritize
 outcome      : SUCCESS  status=no_op
-exec_success : True  exec_id=8943cb2f-e4a6-44e7-bc29-fd7405745657
+exec_success : True  exec_id=1cdef854-a13d-49b0-976a-1516dae9c3e4
 ---
 capability   : warehouse.labor.allocate
 outcome      : SUCCESS  status=executed
-exec_success : True  exec_id=3c3c3d49-1542-4371-a7b5-3443b6c94a47
+exec_success : True  exec_id=5e2c84b4-0c33-4b5a-83b5-8a33fb0b7c61
 ---
 capability   : warehouse.wave.reprioritize
 outcome      : SUCCESS  status=no_op
-exec_success : True  exec_id=942da5d1-f288-405f-8982-8b912f2155e2
+exec_success : True  exec_id=2938e05d-c4fd-4465-b9fe-65b66b0b06d7
 ---
 capability   : warehouse.labor.allocate
 outcome      : SUCCESS  status=executed
-exec_success : True  exec_id=8280477a-c287-4251-ac65-e4502c79fbd4
+exec_success : True  exec_id=b1210ee7-3d83-4861-8f43-33c94b1f5406
 ---
 capability   : warehouse.labor.allocate
 outcome      : SUCCESS  status=executed
-exec_success : True  exec_id=de520b9a-919d-4ea0-816b-48289fb90e9b
+exec_success : True  exec_id=2ae2d603-047b-4499-960d-a976eaa35cef
 ---
 ```
 
@@ -213,4 +211,4 @@ proj_service_level  : 100.0%
 ```
 
 ---
-*Capture duration: 211.1s wall time*
+*Capture duration: 158.7s wall time*

@@ -329,19 +329,29 @@ export function buildDeveloperTrace(params: BuildDeveloperTraceParams): Develope
         const model_id = rec.model_id ?? assessment?.model_id;
         const routing_rule = rec.routing_rule ?? assessment?.routing_rule;
         const routing_reason = rec.routing_reason ?? assessment?.routing_reason;
+        // routing_reason names the preferred role; when it was unavailable the
+        // router fell back (HIGH prefers Super, off by default → Ultra).
+        const fallback_from = rec.fallback_from ?? assessment?.fallback_from ?? null;
+        const fallback_reason = rec.fallback_reason ?? assessment?.fallback_reason ?? null;
+        const routingDetail = [
+          routing_reason ? `reason=${routing_reason}` : null,
+          fallback_from ? `fallback_from=${fallback_from}` : null,
+        ].filter(Boolean).join(' · ');
 
         // 1. MODEL_ROUTING
         const routingEv: DeveloperTraceEvent = {
           id: nextId(),
           category: 'MODEL_ROUTING',
           label: `Routing rule: ${routing_rule ?? 'unknown'}`,
-          detail: routing_reason ? `reason=${routing_reason}` : undefined,
+          detail: routingDetail || undefined,
           actor: 'ModelGateway (DERIVED)',
           actorSource: 'DERIVED',
           timingSource: match ? match.source : 'NOT_INSTRUMENTED',
           metadata: {
             routing_rule: routing_rule ?? null,
             routing_reason: routing_reason ?? null,
+            fallback_from,
+            fallback_reason,
           },
         };
 
