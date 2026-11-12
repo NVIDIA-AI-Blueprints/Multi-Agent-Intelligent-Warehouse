@@ -710,12 +710,13 @@ Two warehouse worlds (same scenario, same seed) were advanced through the same d
 
 | Metric | Control | MAIW |
 |--------|---------|------|
-| Time to recovery | not reached | 300s (5 sim-min) |
-| Backlog AUC reduction | — | −92% |
-| Wave-risk exposure reduction | — | −86.7% |
-| MAIW governance cycles | 0 | 6 |
+| Time to recovery (after the disruption) | not reached | 180s (3 sim-min) |
+| Backlog AUC reduction | — | −46.8% |
+| Wave-risk exposure reduction | — | −90.0% |
+| Wave-017 completion at 1800s | 95.8% (5 tasks left) | 100% |
+| MAIW governance cycles | 0 | 10 (the script's cap) |
 
-Recorded on 2026-08-25 with hosted Nemotron 3 Super as the reasoning model, on the scenario's YAML world (six workers, seven tasks). Since #309 the scenario runs on the DC-47 DataPack world: three of 120 workers are absent and five wave-017 tasks are left without a worker. The control arm is deterministic and is checked on every pull request (`tests/unit/demo/test_scenario_worlds.py`): the wave stays critical and recovery is not reached. The MAIW arm depends on the model and has not yet been rerun on the DataPack world.
+Recorded on 2026-11-12 on the DC-47 DataPack world, with hosted Nemotron 3 Ultra as the reasoning model. Three of 120 workers are absent and five wave-017 tasks are left without a worker. Both runs cover the same 30 ticks of 60 s, and the reductions compare the areas under the curve over those ticks. The control arm is deterministic and is checked on every pull request (`tests/unit/demo/test_scenario_worlds.py`): the wave stays critical and recovery is not reached. The MAIW arm depends on the model, so a rerun can differ.
 
 Reproduce with:
 

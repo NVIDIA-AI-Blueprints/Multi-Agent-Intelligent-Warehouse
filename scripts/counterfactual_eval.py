@@ -7,7 +7,11 @@ Runs the labor_constraint_wave_risk scenario twice against the same API:
   CONTROL  — same initial state, same timed events, ticks only (no MAIW)
   MAIW     — same initial state, same timed events, ticks + MAIW governance
 
-Records per-tick KPIs for both runs and computes a comparison.
+Records per-tick KPIs for both runs and computes a comparison. Both runs
+cover the same MAX_TICKS window, and the area-under-curve figures are summed
+over the ticks both runs share, so a run that recovers early is not credited
+for the ticks it skipped. Horizon checkpoints count seconds from the scenario
+start: DataPack scenarios start the simulation clock at an offset (#309).
 
 Label: Deterministic Counterfactual Simulation — same seed, same disruption,
        MAIW intervention vs no intervention.
@@ -97,16 +101,33 @@ def _reset_and_start():
     return resp.get("status", {})
 
 
+def _scenario_start(t0_kpis: dict, first_tick_elapsed: int) -> int:
+    """Simulation-clock seconds at which the scenario started.
+
+    DataPack scenarios start the clock at an offset (clock_offset_seconds), so
+    the tick response's elapsed_seconds is not time since the scenario start.
+    """
+    start = t0_kpis.get("sim_time_seconds")
+    if start is None:
+        start = first_tick_elapsed - TICK_SECONDS
+    return int(start)
+
+
 def _snapshot_at(horizon_s: int, trajectory: list[dict]) -> dict | None:
-    """Return the KPI snapshot closest to the given sim-second horizon."""
+    """Return the last KPI snapshot at or before horizon_s seconds into the scenario."""
     best = None
     for snap in trajectory:
-        elapsed = snap.get("elapsed_seconds", 0)
+        elapsed = snap.get("scenario_seconds", snap.get("elapsed_seconds", 0))
         if elapsed <= horizon_s:
             best = snap
         else:
             break
     return best.get("kpis") if best else None
+
+
+def _auc(trajectory: list[dict], metric: str, ticks: int) -> int | float:
+    """Sum of metric × TICK_SECONDS over the first `ticks` snapshots."""
+    return sum((s["kpis"].get(metric, 0) or 0) * TICK_SECONDS for s in trajectory[:ticks])
 
 
 # ── Run CONTROL ───────────────────────────────────────────────────────────────
@@ -120,6 +141,7 @@ def run_control() -> dict:
 
     trajectory: list[dict] = []
     recovery: dict | None = None
+    start_s: int | None = None
 
     for tick_num in range(1, MAX_TICKS + 1):
         tick_resp = post("/demo/tick", {"seconds": TICK_SECONDS})
@@ -127,9 +149,12 @@ def run_control() -> dict:
         kpis_raw  = (get("/demo/status").get("current_kpis") or {})
         kpis      = fmt_kpis(kpis_raw)
 
+        if start_s is None:
+            start_s = _scenario_start(t0, elapsed)
         snap = {
             "tick":              tick_num,
             "elapsed_seconds":   elapsed,
+            "scenario_seconds":  elapsed - start_s,
             "kpis":              kpis,
         }
 
@@ -150,7 +175,7 @@ def run_control() -> dict:
         bl  = kpis.get("pending_backlog", "?")
         lvl = (kpis.get("wave_risk_level") or "?").upper()
         wc  = kpis.get("wave_completion_pct", 0)
-        print(f"  tick {tick_num:02d} | +{elapsed}s | {lvl:8s} backlog={bl} wave={wc:.0f}%")
+        print(f"  tick {tick_num:02d} | +{elapsed - start_s}s | {lvl:8s} backlog={bl} wave={wc:.0f}%")
 
     final_raw = (get("/demo/status").get("current_kpis") or {})
 
@@ -182,6 +207,7 @@ def run_maiw() -> dict:
 
     trajectory: list[dict] = []
     recovery: dict | None = None
+    start_s: int | None = None
     maiw_cycles: list[dict] = []
 
     def _run_cycle(cycle_num: int):
@@ -233,10 +259,13 @@ def run_maiw() -> dict:
         kpis_raw  = (status_resp.get("current_kpis") or {})
         kpis      = fmt_kpis(kpis_raw)
 
+        if start_s is None:
+            start_s = _scenario_start(t0, elapsed)
         snap = {
-            "tick":            tick_num,
-            "elapsed_seconds": elapsed,
-            "kpis":            kpis,
+            "tick":             tick_num,
+            "elapsed_seconds":  elapsed,
+            "scenario_seconds": elapsed - start_s,
+            "kpis":             kpis,
         }
 
         # Interleave: trigger another MAIW cycle when backlog > 0 and no pending approvals
@@ -269,11 +298,9 @@ def run_maiw() -> dict:
         wc  = kpis.get("wave_completion_pct", 0)
         mc  = f"  [MAIW cycle {snap['maiw_cycle']}]" if snap.get("maiw_cycle") else ""
         rc  = "  ◀ RECOVERY" if snap.get("recovery_detected") else ""
-        print(f"  tick {tick_num:02d} | +{elapsed}s | {lvl:8s} backlog={bl} wave={wc:.0f}%{mc}{rc}")
-
-        if recovery and tick_num >= recovery["detected_at_tick"] + 1:
-            print("  Recovery confirmed — stopping MAIW tick loop.")
-            break
+        print(f"  tick {tick_num:02d} | +{elapsed - start_s}s | {lvl:8s} backlog={bl} wave={wc:.0f}%{mc}{rc}")
+        # No early stop at recovery: the MAIW run covers the same window as
+        # the control run, so the AUC comparison is like for like.
 
     final_raw = (get("/demo/status").get("current_kpis") or {})
 
@@ -321,12 +348,15 @@ def compute_comparison(ctrl: dict, maiw: dict) -> dict:
     ctrl_ttr = (ctrl.get("recovery") or {}).get("time_to_recovery_secs")
     maiw_ttr = (maiw.get("recovery") or {}).get("time_to_recovery_secs")
 
-    c_auc = ctrl["backlog_auc"]
-    m_auc = maiw["backlog_auc"]
+    # Sum both runs over the ticks they share, so a shorter run is never
+    # credited with the area it did not cover.
+    window = min(len(ctrl["trajectory"]), len(maiw["trajectory"]))
+    c_auc = _auc(ctrl["trajectory"], "pending_backlog", window)
+    m_auc = _auc(maiw["trajectory"], "pending_backlog", window)
     auc_reduction = round((c_auc - m_auc) / max(c_auc, 1) * 100, 1) if c_auc else None
 
-    cr_auc = ctrl["wave_risk_auc"]
-    mr_auc = maiw["wave_risk_auc"]
+    cr_auc = _auc(ctrl["trajectory"], "wave_risk_score", window)
+    mr_auc = _auc(maiw["trajectory"], "wave_risk_score", window)
     risk_auc_reduction = round((cr_auc - mr_auc) / max(cr_auc, 1) * 100, 1) if cr_auc else None
 
     return {
@@ -343,6 +373,7 @@ def compute_comparison(ctrl: dict, maiw: dict) -> dict:
         "wave_risk_auc_control":      cr_auc,
         "wave_risk_auc_maiw":         mr_auc,
         "wave_risk_auc_reduction_pct": risk_auc_reduction,
+        "auc_window_ticks":           window,
         "at_horizon":                 horizon_comparison,
     }
 
@@ -374,7 +405,7 @@ def render_md(result: dict) -> str:
     lines.append(f"  Wave compl @300s : {c300.get('control', '—')}")
     lines.append("")
     lines.append("MAIW")
-    lines.append(f"  Recovery         : {'not reached' if maiw_ttr is None else str(maiw_ttr) + 's (' + str(round(maiw_ttr/60,1)) + ' sim-min)'}")
+    lines.append(f"  Recovery         : {'not reached' if maiw_ttr is None else str(maiw_ttr) + 's after the disruption (' + str(round(maiw_ttr/60,1)) + ' sim-min)'}")
     lines.append(f"  Peak backlog     : {maiw['peak_backlog']}")
     lines.append(f"  Wave compl @300s : {c300.get('maiw', '—')}")
     lines.append(f"  MAIW cycles      : {len(maiw.get('maiw_cycles', []))}")
@@ -389,6 +420,8 @@ def render_md(result: dict) -> str:
 
     lines.append(f"  Backlog AUC      : {cmp.get('backlog_auc_reduction_pct', '—')}% reduction with MAIW")
     lines.append(f"  Wave risk AUC    : {cmp.get('wave_risk_auc_reduction_pct', '—')}% reduction with MAIW")
+    if cmp.get("auc_window_ticks") is not None:
+        lines.append(f"  AUC window       : first {cmp['auc_window_ticks']} ticks of both runs")
     lines.append("```")
 
     # ── HORIZON TABLE ──
@@ -423,7 +456,7 @@ def render_md(result: dict) -> str:
     for run_key, run_label, traj in [("control", "CONTROL", ctrl["trajectory"]), ("maiw", "MAIW", maiw["trajectory"])]:
         lines.append(f"\n## {run_label} TRAJECTORY")
         lines.append("```")
-        lines.append(f"{'tick':>4}  {'elapsed':>7}  {'risk_lv':>8}  {'risk_sc':>7}  {'backlog':>7}  {'wave_%':>6}  {'recov':>5}")
+        lines.append(f"{'tick':>4}  {'scenario':>8}  {'risk_lv':>8}  {'risk_sc':>7}  {'backlog':>7}  {'wave_%':>6}  {'recov':>5}")
         lines.append("─" * 60)
         for snap in traj:
             k   = snap.get("kpis", {})
@@ -432,7 +465,7 @@ def render_md(result: dict) -> str:
             lvl = (k.get("wave_risk_level") or "?").upper()[:4]
             lines.append(
                 f"{snap['tick']:>4}  "
-                f"+{snap['elapsed_seconds']:>6}s  "
+                f"+{snap.get('scenario_seconds', snap['elapsed_seconds']):>7}s  "
                 f"{lvl:>8}  "
                 f"{str(k.get('wave_risk_score','?')):>7}  "
                 f"{str(k.get('pending_backlog','?')):>7}  "

@@ -35,10 +35,22 @@ This produces two files:
 ### Interpreting results
 
 The markdown report shows:
-- **Recovery time** — ticks until wave backlog drops below 10%
-- **Backlog reduction** — percentage of pending tasks cleared
-- **Wave risk reduction** — OTIF risk score change
-- **Constraint** — resource constraint that MAIW resolved
+- **Recovery time:** seconds from the disruption until the scenario's
+  recovery condition holds. For `labor_constraint_wave_risk`, that condition
+  is a wave risk score of 25 or less.
+- **Backlog AUC reduction:** how much smaller the pending backlog's area
+  under the curve (task·seconds) is in the MAIW run than in the control run.
+- **Wave risk AUC reduction:** the same comparison for the wave risk score
+  (score·seconds).
+- **KPI at fixed horizons:** backlog, wave risk, completion, throughput and
+  service level at 300, 600, 900, 1200 and 1800 seconds into the scenario.
+
+Both runs tick through the whole horizon (30 ticks of 60 s); the MAIW run does
+not stop when it recovers. Each area under the curve is summed over the ticks
+both runs share (`comparison.auc_window_ticks`), so a run can't look better by
+ending early. Horizons and the trajectory's `scenario_seconds` count from the
+scenario start. DataPack scenarios start the simulation clock at an offset, so
+`elapsed_seconds` is the simulation clock, not time into the scenario.
 
 A result is meaningful only when:
 - `rng_seed` is identical between runs (same initial state)
@@ -50,11 +62,15 @@ before re-running unless you want to measure a different disruption.
 
 ### Canonical baseline (Scenario 001 — labor_constraint_wave_risk)
 
-| Metric | CONTROL | MAIW | Delta |
-|--------|---------|------|-------|
-| Recovery | Not reached (>1800s) | 300s | −1500s |
-| Backlog reduction | — | 92% | — |
-| Wave risk reduction | — | 86.7% | — |
+Recorded on 2026-11-12 on the DC-47 DataPack world, with hosted Nemotron 3
+Ultra as the reasoning model, over the same 30 ticks in both runs:
+
+| Metric | CONTROL | MAIW |
+|--------|---------|------|
+| Recovery (after the disruption) | Not reached (>1800s) | 180s |
+| Backlog AUC reduction | — | 46.8% |
+| Wave risk AUC reduction | — | 90.0% |
+| Pending tasks at 1800s | 5 | 0 |
 
 **Any deviation from these numbers requires investigation before accepting
 new evaluation results.** The baseline is frozen in
