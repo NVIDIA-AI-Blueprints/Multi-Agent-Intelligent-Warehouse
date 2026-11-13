@@ -171,7 +171,7 @@ def _version_display() -> str:
 
         return version_service.get_version_display()
     except Exception:
-        return "0.0.0-dev"
+        return "0.0.0+unknown (unknown)"
 
 
 @router.get("/live")
@@ -698,7 +698,9 @@ async def metrics():
 async def get_version():
     _fallback = {
         "status": "ok",
-        "version": "0.0.0-dev",
+        "version": "0.0.0+unknown",
+        "build": "unknown",
+        "commit": "unknown",
         "git_sha": "unknown",
         "build_time": datetime.utcnow().isoformat(),
         "environment": os.getenv("ENVIRONMENT", "development"),
@@ -723,7 +725,9 @@ async def get_version():
 async def get_detailed_version():
     _fallback = {
         "status": "ok",
-        "version": "0.0.0-dev",
+        "version": "0.0.0+unknown",
+        "build": "unknown",
+        "commit": "unknown",
         "git_sha": "unknown",
         "git_branch": "unknown",
         "build_time": datetime.utcnow().isoformat(),

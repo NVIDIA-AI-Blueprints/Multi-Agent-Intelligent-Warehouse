@@ -7,8 +7,8 @@
 #     after the base image was built are applied at build time.
 #   - Runtime stage installs no extra OS packages: no curl (healthcheck uses
 #     Python), no git (.git is excluded from the build context, so git could
-#     never resolve a version here; the version service already falls back to
-#     the VERSION build arg), no poppler-utils (pdf2image is not in
+#     never resolve a version here; the version service reads the
+#     MAIW_BUILD_DESCRIBE and GIT_SHA build args instead), no poppler-utils (pdf2image is not in
 #     requirements.docker.txt, so nothing in this image can call poppler).
 #   - No build tooling (gcc/g++, pip, setuptools, wheel) is shipped in the
 #     runtime stage.
@@ -99,14 +99,19 @@ COPY data/config/guardrails/ ./data/config/guardrails/
 RUN pip install --no-cache-dir -e apps/api \
     && python -m pip uninstall -y pip
 
-# Build arguments for version injection
+# Build arguments for version injection.  The image has no .git, so the
+# build passes `git describe` output (MAIW_BUILD_DESCRIBE) and the commit
+# (GIT_SHA); /api/v1/version derives the version from them
+# (src/api/services/version.py).  scripts/setup/dev_up.sh sets both.
 ARG VERSION=0.0.0
 ARG GIT_SHA=unknown
 ARG BUILD_TIME=unknown
+ARG MAIW_BUILD_DESCRIBE=
 
 # Set environment variables
 ENV VERSION=$VERSION
 ENV GIT_SHA=$GIT_SHA
+ENV MAIW_BUILD_DESCRIBE=$MAIW_BUILD_DESCRIBE
 ENV BUILD_TIME=$BUILD_TIME
 ENV DOCKER_IMAGE=warehouse-assistant:$VERSION
 ENV PYTHONPATH=/app

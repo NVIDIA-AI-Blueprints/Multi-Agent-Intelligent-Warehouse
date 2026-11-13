@@ -529,6 +529,22 @@ jobs:
 
           echo "✅ Access point verification completed!"
 
+      # The backend image has no .git: dev_up.sh passes `git describe` and the
+      # commit in as build arguments, and /api/v1/version must report them.
+      - name: "Verify: /api/v1/version identifies this build"
+        run: |
+          expected="$(git rev-parse HEAD)"
+          body="$(curl -fsS http://localhost:8001/api/v1/version)"
+          echo "${body}"
+          python3 - "${expected}" "${body}" <<'PY'
+          import json, sys
+          expected, body = sys.argv[1], json.loads(sys.argv[2])
+          assert body["commit"] == expected, f"/api/v1/version commit {body['commit']} is not the checkout {expected}"
+          assert body["build"] in ("release", "development"), body
+          assert body["version"] != "0.0.0+unknown", body
+          print(f"OK: {body['version']} ({body['build']}, {body['commit'][:12]})")
+          PY
+
       # #277: the bundled Prometheus joins the dev stack's network and must
       # scrape the API (backend:8001) and the Postgres / Redis exporters.
       - name: "Verify: monitoring stack scrapes the API"
