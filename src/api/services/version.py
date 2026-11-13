@@ -21,16 +21,128 @@ This service provides comprehensive version information including:
 - Build timestamp and metadata
 - Environment information
 - Docker image details
+
+The version identifies the build; no release number is written in the code.
+It is resolved, in order, from:
+
+1. ``MAIW_APP_VERSION``: an explicit version, reported as given.
+2. ``git describe`` of this checkout (running from source):
+   on a release tag ``v2.1.1``                -> ``2.1.1`` (build ``release``)
+   43 commits after it                        -> ``2.1.1+43.g18f2d6d0b1ae``
+   with uncommitted changes                   -> ``...+...dirty``
+   no release tag in the history (shallow)    -> ``0.0.0+g18f2d6d0b1ae``
+   (everything but an exact, clean tag is build ``development``; ``+`` is
+   SemVer build metadata, so the number is never a guess at the next release)
+3. ``MAIW_BUILD_DESCRIBE``: the same ``git describe`` output, baked into a
+   container image at build time (images have no ``.git``).
+4. ``VERSION``, the older image build argument, unless it is a placeholder
+   (``0.0.0``, ``latest``, ``unknown``), reported as build ``declared``.
+5. ``0.0.0+unknown`` (build ``unknown``).
+
+The commit is ``git rev-parse HEAD``, else ``GIT_SHA`` from the image build.
 """
 
 import os
+import re
 import subprocess
 import sys
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, Any, Optional
+from pathlib import Path
+from typing import Dict, Any, Mapping, Optional
 import logging
 
 logger = logging.getLogger(__name__)
+
+# The checkout this module belongs to; git runs here, not in the caller's cwd.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_PLACEHOLDERS = {"", "unknown", "latest", "none", "0.0.0", "0.0.0-dev"}
+_DESCRIBE_ARGS = ["describe", "--tags", "--match", "v[0-9]*", "--long", "--dirty", "--abbrev=12"]
+_TAG_DESCRIBE = re.compile(
+    r"^v?(?P<base>\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)"
+    r"-(?P<distance>\d+)-g(?P<sha>[0-9a-f]{7,40})(?P<dirty>-dirty)?$"
+)
+_BARE_DESCRIBE = re.compile(r"^(?P<sha>[0-9a-f]{7,40})(?P<dirty>-dirty)?$")
+
+
+@dataclass(frozen=True)
+class BuildIdentity:
+    """What this build is: version, kind of build, commit, and where it came from."""
+
+    version: str
+    build: str  # release | development | declared | unknown
+    commit: str  # full SHA when known, else an abbreviated one, else "unknown"
+    source: str  # MAIW_APP_VERSION | git | MAIW_BUILD_DESCRIBE | VERSION | none
+
+
+def version_from_describe(describe: str) -> Optional[tuple]:
+    """Turn ``git describe --long --dirty`` output into (version, build, sha)."""
+    describe = (describe or "").strip()
+    match = _TAG_DESCRIBE.match(describe)
+    if match:
+        distance = int(match["distance"])
+        dirty = bool(match["dirty"])
+        if distance == 0 and not dirty:
+            return match["base"], "release", match["sha"]
+        meta = [str(distance), f"g{match['sha']}"] if distance else []
+        if dirty:
+            meta.append("dirty")
+        return f"{match['base']}+{'.'.join(meta)}", "development", match["sha"]
+    match = _BARE_DESCRIBE.match(describe)
+    if match:
+        meta = f"g{match['sha']}" + (".dirty" if match["dirty"] else "")
+        return f"0.0.0+{meta}", "development", match["sha"]
+    return None
+
+
+def _git(*args: str) -> Optional[str]:
+    """Run git in this checkout; None when there is no checkout or git fails."""
+    if not (_REPO_ROOT / ".git").exists():
+        return None
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10,
+            cwd=_REPO_ROOT,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return None
+    return result.stdout.strip() or None
+
+
+def _env(env: Mapping[str, str], key: str) -> Optional[str]:
+    value = (env.get(key) or "").strip()
+    return None if value.lower() in _PLACEHOLDERS else value
+
+
+def resolve_build_identity(env: Optional[Mapping[str, str]] = None) -> BuildIdentity:
+    """Resolve the build identity (see the module docstring for the order)."""
+    env = os.environ if env is None else env
+    commit = _git("rev-parse", "HEAD") or _env(env, "GIT_SHA") or "unknown"
+
+    explicit = (env.get("MAIW_APP_VERSION") or "").strip()
+    if explicit:
+        return BuildIdentity(explicit, "declared", commit, "MAIW_APP_VERSION")
+
+    candidates = [
+        ("git", _git(*_DESCRIBE_ARGS) or _git("describe", "--always", "--dirty", "--abbrev=12")),
+        ("MAIW_BUILD_DESCRIBE", _env(env, "MAIW_BUILD_DESCRIBE")),
+    ]
+    for source, describe in candidates:
+        parsed = version_from_describe(describe) if describe else None
+        if parsed:
+            version, build, sha = parsed
+            if commit == "unknown":
+                commit = sha
+            return BuildIdentity(version, build, commit, source)
+
+    declared = _env(env, "VERSION")
+    if declared:
+        return BuildIdentity(declared.lstrip("v"), "declared", commit, "VERSION")
+    return BuildIdentity("0.0.0+unknown", "unknown", commit, "none")
 
 
 class VersionService:
@@ -43,8 +155,10 @@ class VersionService:
 
     def __init__(self):
         """Initialize the version service."""
-        self.version = self._get_version()
-        self.git_sha = self._get_git_sha()
+        self.identity = resolve_build_identity()
+        self.version = self.identity.version
+        self.commit = self.identity.commit
+        self.git_sha = self.commit[:8]
         env_build_time = os.getenv("BUILD_TIME", "").strip()
         self.build_time = (
             env_build_time
@@ -52,64 +166,6 @@ class VersionService:
             else datetime.utcnow().isoformat()
         )
         self.build_info = self._get_build_info()
-
-    def _get_version(self) -> str:
-        """
-        Get version from git tag or fallback to environment variable.
-
-        Returns:
-            str: Version string (e.g., "1.0.0", "1.0.0-dev")
-        """
-        try:
-            # Try to get version from git tag
-            result = subprocess.run(
-                ["git", "describe", "--tags", "--always"],
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=10,
-            )
-            version = result.stdout.strip()
-            logger.info(f"Git version: {version}")
-            return version
-        except (
-            subprocess.CalledProcessError,
-            subprocess.TimeoutExpired,
-            FileNotFoundError,
-        ) as e:
-            logger.warning(f"Could not get git version: {e}")
-            # Fallback to environment variable or default
-            return os.getenv("VERSION", "0.0.0-dev")
-
-    def _get_git_sha(self) -> str:
-        """
-        Get current git commit SHA.
-
-        Returns:
-            str: Short git SHA (8 characters)
-        """
-        try:
-            result = subprocess.run(
-                ["git", "rev-parse", "HEAD"],
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=10,
-            )
-            sha = result.stdout.strip()[:8]
-            logger.info(f"Git SHA: {sha}")
-            return sha
-        except (
-            subprocess.CalledProcessError,
-            subprocess.TimeoutExpired,
-            FileNotFoundError,
-        ) as e:
-            logger.warning(f"Could not get git SHA: {e}")
-            # Container images have no git; Dockerfile.backend bakes GIT_SHA in.
-            env_sha = os.getenv("GIT_SHA", "").strip()
-            if env_sha and env_sha != "unknown":
-                return env_sha[:8]
-            return "unknown"
 
     def _get_commit_count(self) -> int:
         """
@@ -125,6 +181,7 @@ class VersionService:
                 text=True,
                 check=True,
                 timeout=10,
+                cwd=_REPO_ROOT,
             )
             count = int(result.stdout.strip())
             logger.info(f"Commit count: {count}")
@@ -152,6 +209,7 @@ class VersionService:
                 text=True,
                 check=True,
                 timeout=10,
+                cwd=_REPO_ROOT,
             )
             branch = result.stdout.strip()
             logger.info(f"Git branch: {branch}")
@@ -173,6 +231,9 @@ class VersionService:
         """
         return {
             "version": self.version,
+            "build": self.identity.build,
+            "version_source": self.identity.source,
+            "commit": self.commit,
             "git_sha": self.git_sha,
             "git_branch": self._get_branch_name(),
             "build_time": self.build_time,
@@ -193,6 +254,8 @@ class VersionService:
         """
         return {
             "version": self.version,
+            "build": self.identity.build,
+            "commit": self.commit,
             "git_sha": self.git_sha,
             "build_time": self.build_time,
             "environment": os.getenv("ENVIRONMENT", "development"),
@@ -241,7 +304,7 @@ class VersionService:
         Returns:
             str: Short version string
         """
-        return self.version.split("-")[0]  # Remove pre-release info
+        return re.split(r"[-+]", self.version)[0]  # Drop pre-release and build metadata
 
 
 # Global instance

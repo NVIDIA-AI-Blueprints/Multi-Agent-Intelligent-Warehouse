@@ -43,6 +43,18 @@ echo "Cleaning up existing containers..."
 "${COMPOSE[@]}" -f deploy/compose/docker-compose.dev.yaml down --remove-orphans
 docker rm -f wosa-timescaledb >/dev/null 2>&1 || true
 
+# Build identity for the backend image's /api/v1/version: the image has no
+# .git, so pass `git describe` and the commit as build arguments
+# (deploy/compose/docker-compose.dev.yaml).  `up -d` reuses an image that
+# already exists; rebuild it (`up -d --build`) after changing the checkout.
+if git rev-parse --git-dir >/dev/null 2>&1; then
+    MAIW_BUILD_DESCRIBE="${MAIW_BUILD_DESCRIBE:-$(git describe --tags --match 'v[0-9]*' --long --dirty --abbrev=12 2>/dev/null \
+        || git describe --always --dirty --abbrev=12)}"
+    GIT_SHA="${GIT_SHA:-$(git rev-parse HEAD)}"
+    export MAIW_BUILD_DESCRIBE GIT_SHA
+    echo "Build identity: ${MAIW_BUILD_DESCRIBE} (${GIT_SHA})"
+fi
+
 # 3) Bring up all services
 echo "Starting infrastructure services..."
 "${COMPOSE[@]}" -f deploy/compose/docker-compose.dev.yaml up -d
