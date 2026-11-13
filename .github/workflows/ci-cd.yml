@@ -131,6 +131,12 @@ jobs:
           --cov-report=xml \
           --cov-report=term-missing
     
+    # A separate invocation: packages/maiw-world/tests is a package named
+    # "tests", which collides with the repository's tests/ package when both
+    # are collected in one pytest process (docs/architecture/TEST_STRATEGY.md).
+    - name: Run maiw-world package tests
+      run: pytest packages/maiw-world/tests --timeout=120
+
     - name: Run Node.js tests
       run: |
         cd src/ui/web
