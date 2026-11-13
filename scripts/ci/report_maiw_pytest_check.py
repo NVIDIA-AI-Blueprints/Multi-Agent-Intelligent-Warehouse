@@ -20,7 +20,8 @@ so a commit chosen as a release candidate shows plainly whether the suite
 ran (docs/operations/RELEASING.md).
 
 Environment: E2E, REASON (from the pytest step), RUN_URL, GITHUB_TOKEN,
-GITHUB_REPOSITORY, GITHUB_SHA, GITHUB_API_URL. ``--dry-run`` prints the
+GITHUB_REPOSITORY, GITHUB_API_URL, and CHECK_HEAD_SHA (the pull request's
+head commit) or else GITHUB_SHA. ``--dry-run`` prints the
 request body instead of sending it. A failed request only warns: reporting
 must not change the deployment result.
 """
@@ -85,7 +86,7 @@ def main(argv: list[str]) -> int:
         os.environ.get("E2E", ""),
         os.environ.get("REASON", ""),
         os.environ.get("RUN_URL", ""),
-        os.environ.get("GITHUB_SHA", ""),
+        os.environ.get("CHECK_HEAD_SHA") or os.environ.get("GITHUB_SHA", ""),
     )
     if "--dry-run" in argv:
         print(json.dumps(body, indent=2))
