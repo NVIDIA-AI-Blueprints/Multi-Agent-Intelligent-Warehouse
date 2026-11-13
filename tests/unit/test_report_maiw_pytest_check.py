@@ -82,3 +82,18 @@ def test_post_failure_only_warns(monkeypatch, capsys):
     assert "::warning title=MAIW pytest check not posted::network down" in (
         capsys.readouterr().out
     )
+
+
+@pytest.mark.parametrize(
+    ("head_sha", "expected"),
+    [("pr-head-sha", "pr-head-sha"), ("", "merge-sha")],
+)
+def test_check_goes_on_the_pull_request_head_commit(
+    monkeypatch, capsys, head_sha, expected
+):
+    # On a pull request GITHUB_SHA is the temporary merge commit.
+    monkeypatch.setenv("E2E", "PASSED")
+    monkeypatch.setenv("GITHUB_SHA", "merge-sha")
+    monkeypatch.setenv("CHECK_HEAD_SHA", head_sha)
+    assert report.main(["--dry-run"]) == 0
+    assert json.loads(capsys.readouterr().out)["head_sha"] == expected
