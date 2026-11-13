@@ -28,11 +28,13 @@ It is resolved, in order, from:
 1. ``MAIW_APP_VERSION``: an explicit version, reported as given.
 2. ``git describe`` of this checkout (running from source):
    on a release tag ``v2.1.1``                -> ``2.1.1`` (build ``release``)
-   43 commits after it                        -> ``2.1.1+43.g18f2d6d0b1ae``
+   43 commits after it                        -> ``2.1.1+43.g18f2d6d``
    with uncommitted changes                   -> ``...+...dirty``
-   no release tag in the history (shallow)    -> ``0.0.0+g18f2d6d0b1ae``
+   no release tag in the history (shallow)    -> ``0.0.0+g18f2d6d``
    (everything but an exact, clean tag is build ``development``; ``+`` is
-   SemVer build metadata, so the number is never a guess at the next release)
+   SemVer build metadata, so the number is never a guess at the next release;
+   for a clean checkout it is the same string
+   ``scripts/security/release_version.sh`` stamps on SBOMs and SonarQube)
 3. ``MAIW_BUILD_DESCRIBE``: the same ``git describe`` output, baked into a
    container image at build time (images have no ``.git``).
 4. ``VERSION``, the older image build argument, unless it is a placeholder
@@ -57,7 +59,7 @@ logger = logging.getLogger(__name__)
 # The checkout this module belongs to; git runs here, not in the caller's cwd.
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _PLACEHOLDERS = {"", "unknown", "latest", "none", "0.0.0", "0.0.0-dev"}
-_DESCRIBE_ARGS = ["describe", "--tags", "--match", "v[0-9]*", "--long", "--dirty", "--abbrev=12"]
+_DESCRIBE_ARGS = ["describe", "--tags", "--match", "v[0-9]*", "--long", "--dirty", "--abbrev=7"]
 _TAG_DESCRIBE = re.compile(
     r"^v?(?P<base>\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)"
     r"-(?P<distance>\d+)-g(?P<sha>[0-9a-f]{7,40})(?P<dirty>-dirty)?$"
@@ -128,7 +130,7 @@ def resolve_build_identity(env: Optional[Mapping[str, str]] = None) -> BuildIden
         return BuildIdentity(explicit, "declared", commit, "MAIW_APP_VERSION")
 
     candidates = [
-        ("git", _git(*_DESCRIBE_ARGS) or _git("describe", "--always", "--dirty", "--abbrev=12")),
+        ("git", _git(*_DESCRIBE_ARGS) or _git("describe", "--always", "--dirty", "--abbrev=7")),
         ("MAIW_BUILD_DESCRIBE", _env(env, "MAIW_BUILD_DESCRIBE")),
     ]
     for source, describe in candidates:

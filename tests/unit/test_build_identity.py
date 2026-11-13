@@ -17,7 +17,7 @@ from src.api.services.version import resolve_build_identity, version_from_descri
 
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
 GIT += ["-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false"]
-IMAGE_SHA = "6d1395b0c0ffee00000000000000000000000001"
+IMAGE_SHA = "6d1395bee00000000000000000000000001"
 
 
 def _git(repo, *args):
@@ -63,7 +63,7 @@ def test_development_build_counts_commits_after_the_release(repo):
     sha = _commit(repo, "c")
     identity = resolve_build_identity({})
     # Build metadata, not a guess at the next release number.
-    assert identity.version == f"9.8.7+2.g{sha[:12]}"
+    assert identity.version == f"9.8.7+2.g{sha[:7]}"
     assert (identity.build, identity.commit, identity.source) == (
         "development",
         sha,
@@ -84,7 +84,7 @@ def test_only_release_tags_count(repo):
     _git(repo, "tag", "v9.8.7")
     sha = _commit(repo, "b")
     _git(repo, "tag", "phase-14-baseline")
-    assert resolve_build_identity({}).version == f"9.8.7+1.g{sha[:12]}"
+    assert resolve_build_identity({}).version == f"9.8.7+1.g{sha[:7]}"
 
 
 def test_history_without_a_release_tag_still_names_the_commit(repo):
@@ -92,7 +92,7 @@ def test_history_without_a_release_tag_still_names_the_commit(repo):
     sha = _commit(repo, "a")
     identity = resolve_build_identity({})
     assert (identity.version, identity.build, identity.commit) == (
-        f"0.0.0+g{sha[:12]}",
+        f"0.0.0+g{sha[:7]}",
         "development",
         sha,
     )
@@ -110,11 +110,11 @@ def test_git_wins_over_the_image_build_environment(repo):
 @pytest.mark.parametrize(
     ("describe", "version", "build"),
     [
-        ("v2.1.1-0-g6d1395b0c0ff", "2.1.1", "release"),
-        ("v2.1.1-43-g18f2d6d0b1ae", "2.1.1+43.g18f2d6d0b1ae", "development"),
+        ("v2.1.1-0-g6d1395b", "2.1.1", "release"),
+        ("v2.1.1-43-g18f2d6d", "2.1.1+43.g18f2d6d", "development"),
         (
-            "v2.1.1-43-g18f2d6d0b1ae-dirty",
-            "2.1.1+43.g18f2d6d0b1ae.dirty",
+            "v2.1.1-43-g18f2d6d-dirty",
+            "2.1.1+43.g18f2d6d.dirty",
             "development",
         ),
     ],
@@ -129,8 +129,8 @@ def test_image_reports_the_build_it_was_made_from(image, describe, version, buil
 
 
 def test_image_without_a_commit_takes_it_from_describe(image):
-    identity = resolve_build_identity({"MAIW_BUILD_DESCRIBE": "v2.1.1-3-g18f2d6d0b1ae"})
-    assert identity.commit == "18f2d6d0b1ae"
+    identity = resolve_build_identity({"MAIW_BUILD_DESCRIBE": "v2.1.1-3-g18f2d6d"})
+    assert identity.commit == "18f2d6d"
 
 
 @pytest.mark.parametrize("placeholder", ["", "0.0.0", "latest", "unknown"])
@@ -173,10 +173,27 @@ def test_describe_parsing(describe, expected):
 
 def test_version_service_reports_build_and_full_commit(image, monkeypatch):
     monkeypatch.delenv("MAIW_APP_VERSION", raising=False)
-    monkeypatch.setenv("MAIW_BUILD_DESCRIBE", "v2.1.1-43-g18f2d6d0b1ae")
+    monkeypatch.setenv("MAIW_BUILD_DESCRIBE", "v2.1.1-43-g18f2d6d")
     monkeypatch.setenv("GIT_SHA", IMAGE_SHA)
     info = version_module.VersionService().get_version_info()
-    assert info["version"] == "2.1.1+43.g18f2d6d0b1ae"
+    assert info["version"] == "2.1.1+43.g18f2d6d"
     assert info["build"] == "development"
     assert info["commit"] == IMAGE_SHA
     assert info["git_sha"] == IMAGE_SHA[:8]
+
+
+@pytest.mark.parametrize("tagged", [True, False])
+def test_api_version_matches_the_sbom_and_sonar_stamp(repo, tagged):
+    """Same string as scripts/security/release_version.sh for a clean checkout."""
+    _commit(repo, "a")
+    _git(repo, "tag", "v9.8.7")
+    if not tagged:
+        _commit(repo, "b")
+    script = (
+        version_module.Path(__file__).resolve().parents[2]
+        / "scripts/security/release_version.sh"
+    )
+    stamp = subprocess.run(
+        ["bash", str(script)], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    assert resolve_build_identity({}).version == stamp

@@ -48,8 +48,8 @@ docker rm -f wosa-timescaledb >/dev/null 2>&1 || true
 # (deploy/compose/docker-compose.dev.yaml).  `up -d` reuses an image that
 # already exists; rebuild it (`up -d --build`) after changing the checkout.
 if git rev-parse --git-dir >/dev/null 2>&1; then
-    MAIW_BUILD_DESCRIBE="${MAIW_BUILD_DESCRIBE:-$(git describe --tags --match 'v[0-9]*' --long --dirty --abbrev=12 2>/dev/null \
-        || git describe --always --dirty --abbrev=12)}"
+    MAIW_BUILD_DESCRIBE="${MAIW_BUILD_DESCRIBE:-$(git describe --tags --match 'v[0-9]*' --long --dirty --abbrev=7 2>/dev/null \
+        || git describe --always --dirty --abbrev=7)}"
     GIT_SHA="${GIT_SHA:-$(git rev-parse HEAD)}"
     export MAIW_BUILD_DESCRIBE GIT_SHA
     echo "Build identity: ${MAIW_BUILD_DESCRIBE} (${GIT_SHA})"

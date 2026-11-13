@@ -602,7 +602,7 @@ curl http://localhost:8001/api/v1/version
 
 `/api/v1/version` identifies the build. `version` is the release (`2.1.1`) on a
 release tag; otherwise it carries the commits since that release as SemVer build
-metadata (`2.1.1+43.g18f2d6d0b1ae`, `.dirty` with uncommitted changes) and `build`
+metadata (`2.1.1+43.g18f2d6d`, `.dirty` with uncommitted changes) and `build`
 is `development`. `commit` is the full commit. From source it comes from `git`; the
 Compose image has no `.git`, so `scripts/setup/dev_up.sh` passes it in as build
 arguments. An image built some other way reports `0.0.0+unknown` unless
