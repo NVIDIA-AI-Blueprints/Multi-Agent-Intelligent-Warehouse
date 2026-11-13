@@ -45,7 +45,7 @@ Legend:
 | Area | SonarQube | CodeQL | Dependency scanning | Secret scanning | CI tests | Coverage measured | SBOM |
 |---|---|---|---|---|---|---|---|
 | `apps/` | ❌ (scope was `src`) → ✅ #226 | ⚠️ not run on main since 2026-08-17 → ✅ #226 | ✅ via `requirements*.txt`; ⚠️ `apps/api/pyproject.toml` not read by Dependabot | ✅ | ⚠️ `tests/api` covers it; `apps/api/tests` (7 files) and `apps/api/maiw_api/demo/tests` (3) are **not run** | ✅ | ✅ backend image → #228 |
-| `packages/` | ❌ → ✅ #226 | ⚠️ → ✅ #226 | ⚠️ per-package `pyproject.toml` not read by Dependabot; resolved versions are in the image scans and SBOMs | ✅ | ⚠️ only `packages/maiw-agents/tests`; `packages/maiw-world/tests` (12 files) **not run** | ✅ | ✅ (images) |
+| `packages/` | ❌ → ✅ #226 | ⚠️ → ✅ #226 | ⚠️ per-package `pyproject.toml` not read by Dependabot; resolved versions are in the image scans and SBOMs | ✅ | ✅ `packages/maiw-agents/tests`; `packages/maiw-world/tests` (12 files) as its own CI step since 2026-11 | ✅ | ✅ (images) |
 | `mcp_servers/` | ❌ → ✅ #226 | ⚠️ → ✅ #226 | ✅ (MCP image) | ✅ | ✅ `tests/mcp` | ❌ not in `--cov` | ✅ MCP image → #228 |
 | `src/` (Python) | ⚠️ last analysis 2026-01-05 → ✅ #226 | ⚠️ → ✅ #226 | ✅ | ✅ | ✅ unit, contract and api, but **21 files `--ignore`d**; `src/adapters/{wms,iot}/tests` not run | ✅ | ✅ (images) |
 | `src/ui/web` | ⚠️ (in `src`), stale | ⚠️ → ✅ #226 | ✅ Dependabot npm, Trivy fs (dev dependencies included) | ✅ | ✅ Jest (991 tests) | ❌ disabled in CI | ✅ UI bundle → #228 |
@@ -59,7 +59,7 @@ Legend:
 
 1. **Test files never run in CI:**
    - 21 files are explicitly `--ignore`d in the CORE pytest command;
-   - 24 more sit in directories CI does not collect: `apps/api/tests`, `apps/api/maiw_api/demo/tests`, `packages/maiw-world/tests`, `src/adapters/{wms,iot}/tests`;
+   - 24 more sat in directories CI did not collect: `apps/api/tests` and `apps/api/maiw_api/demo/tests` (run since #287), `packages/maiw-world/tests` (run since 2026-11), and `src/adapters/{wms,iot}/tests` (still not run; 21 of 51 fail);
    - `tests/integration`, `performance`, `quality`, `demo` and `real_sandbox` are not part of CORE CI.
 2. **Coverage:** `mcp_servers/` is not measured, and UI (Jest) coverage is disabled because of an Istanbul and Node incompatibility.
 3. **Dependabot:** it reads only the root Python manifests. Per-package `pyproject.toml` files and Dockerfile `ARG` base images are not tracked. Image scanning (#222) compensates for the runtime images.
