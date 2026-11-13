@@ -24,6 +24,11 @@ on:
   push:
     branches:
       - main
+  # Pull requests to main run the same deployment so "deploy-and-test" can be
+  # a required check before merging (docs/operations/MERGE_PROTECTION.md).
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 concurrency:
@@ -35,8 +40,11 @@ jobs:
   deploy-and-test:
     # GPU ARC runners exist only in NVIDIA-AI-Blueprints; avoid infinite queue on forks.
     if: github.repository == 'NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse'
-    #runs-on: ubuntu-latest
-    runs-on: arc-runners-org-nvidia-ai-bp-4-gpu
+    # Pull requests from forks get no repository secrets, and their code must
+    # not run on the self-hosted GPU runner: they get a GitHub-hosted runner
+    # and fail at the first step, so the required check stays red until a
+    # maintainer pushes the branch to this repository.
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'ubuntu-latest' || 'arc-runners-org-nvidia-ai-bp-4-gpu' }}
     # The repository default token is read-only; checks: write lets the job
     # post the separate "MAIW internal pytest (NGC)" commit check.
     permissions:
@@ -44,6 +52,12 @@ jobs:
       checks: write
 
     steps:
+      - name: "Refuse pull requests from forks"
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "::error title=Deployment test NOT RUN::Pull requests from forks cannot run the GPU deployment test (no repository secrets, no self-hosted runner). A maintainer must push the branch to NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse and open the pull request from there."
+          exit 1
+
       # Step 1: Clone repository
       - name: "Step 1: Clone repository"
         uses: actions/checkout@v7
@@ -118,6 +132,10 @@ jobs:
           if [ -z "${NVIDIA_API_KEY}" ]; then
             echo "❌ Missing required secret: NVIDIA_API_KEY"
             echo "   Set NVIDIA_API_KEY to an NGC registry API key with Catalog/registry access."
+            if [ "${GITHUB_ACTOR}" = "dependabot[bot]" ]; then
+              echo "   Dependabot runs read Dependabot secrets, not Actions secrets: add"
+              echo "   NVIDIA_API_KEY under Settings > Secrets and variables > Dependabot."
+            fi
             exit 1
           fi
 
@@ -632,6 +650,9 @@ jobs:
           E2E: ${{ steps.maiw_pytest.outputs.E2E }}
           REASON: ${{ steps.maiw_pytest.outputs.REASON }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          # On a pull request GITHUB_SHA is the temporary merge commit; post
+          # the check on the pull request's head commit so it shows there.
+          CHECK_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python3 scripts/ci/report_maiw_pytest_check.py
 
@@ -669,9 +690,11 @@ jobs:
       # Pinned to v7: the repository's allowed-actions list permits only this
       # commit of dawidd6/action-send-mail. Any other SHA makes the whole
       # workflow fail at startup; add the new SHA to the allowlist first.
+      # Pull request runs are reported on the pull request itself; the QA list
+      # receives results for main and manual runs only.
       - name: Send mail
         uses: dawidd6/action-send-mail@6e71c855c9a091d80a519621b9fd3e8d252ca40c # v7
-        if: always()
+        if: always() && github.event_name != 'pull_request'
         with:
           server_address: smtp.gmail.com
           server_port: 587
