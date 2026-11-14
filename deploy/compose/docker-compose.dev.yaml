@@ -102,6 +102,11 @@ services:
     build:
       context: ../..
       dockerfile: Dockerfile.backend
+      # Build identity for /api/v1/version; scripts/setup/dev_up.sh exports
+      # both from git.  Unset, the API reports 0.0.0+unknown.
+      args:
+        MAIW_BUILD_DESCRIBE: ${MAIW_BUILD_DESCRIBE:-}
+        GIT_SHA: ${GIT_SHA:-unknown}
     container_name: wosa-backend
     ports:
       - "${MAIW_PUBLISH_ADDRESS:-127.0.0.1}:8001:8001"

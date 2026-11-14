@@ -34,7 +34,14 @@ class Settings:
 
     @property
     def app_version(self) -> str:
-        return os.getenv("MAIW_APP_VERSION", "0.1.0")
+        """The build's version: ``MAIW_APP_VERSION`` if set, else derived from
+        git or the image build (``src/api/services/version.py``)."""
+        explicit = os.getenv("MAIW_APP_VERSION", "").strip()
+        if explicit:
+            return explicit
+        from src.api.services.version import version_service
+
+        return version_service.version
 
     @property
     def app_description(self) -> str:

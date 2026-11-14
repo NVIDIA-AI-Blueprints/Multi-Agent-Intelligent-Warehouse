@@ -600,6 +600,16 @@ curl http://localhost:8001/api/v1/ready
 curl http://localhost:8001/api/v1/version
 ```
 
+`/api/v1/version` identifies the build. `version` is the release (`2.1.1`) on a
+release tag; otherwise it carries the commits since that release as SemVer build
+metadata (`2.1.1+43.g18f2d6d`, `.dirty` with uncommitted changes) and `build`
+is `development`. `commit` is the full commit. From source it comes from `git`; the
+Compose image has no `.git`, so `scripts/setup/dev_up.sh` passes it in as build
+arguments. An image built some other way reports `0.0.0+unknown` unless
+`MAIW_BUILD_DESCRIBE` (output of `git describe --tags --match 'v[0-9]*' --long --dirty`)
+and `GIT_SHA` are passed as build arguments. `MAIW_APP_VERSION` overrides the version
+(reported as `build: declared`).
+
 ## Access Points
 
 Once deployed, access the application at:
