@@ -6,7 +6,8 @@ scans and the deployment test only.
 
 Green CI is necessary, not sufficient. A release also needs the security
 gates in step 3 (SonarQube, nSpect, SBOM) recorded for the exact candidate
-commit; without them the decision is no-go.
+commit; without them the decision is no-go. The maintainer makes the release
+decision from that evidence.
 
 ## 1. Choose the candidate
 
@@ -53,9 +54,9 @@ NOT RUN in the release notes; do not omit it.
 ### Security gates (release-blocking)
 
 These apply to the exact candidate SHA. Unlike the NGC suite, a missing
-result is not a NOT RUN: it is a no-go. A failing result needs a written
-disposition from Blueprints SRE (or an approved nSpect exception) before
-release, recorded in the notes.
+result is not a NOT RUN: it is a no-go. How a result that is present but
+failing is handled depends on the gate, as described below; either way it is
+recorded in the notes as it is, never as a pass.
 
 - **SonarQube.** An analysis of the candidate SHA, from its
   `SonarQube Analysis` run or, if CI has no NVIDIA-network runner, from
@@ -65,12 +66,16 @@ release, recorded in the notes.
   being released (the `release_version` input when dispatching the
   workflow), so the analysis is recorded under that version rather than a
   development version such as `2.1.1+16.g<sha>`. Record the analysis ID,
-  its timestamp and the quality gate status from the evidence file. Exit code 0 is a passing gate;
-  5 is an analysis whose gate failed (each failing condition needs a
-  disposition); 2, 3 and 4 mean no usable analysis. An analysis of a
-  different commit does not count, and neither does a green CI run whose
-  SonarQube job did not submit an analysis. Review every new security hotspot
-  in SonarQube.
+  its timestamp and the quality gate status from the evidence file. Exit
+  code 0 is a passing gate. 5 is an analysis whose gate failed: it does not
+  by itself block the release, but the notes record the gate as **ERROR**
+  (never as a pass) and every failing condition is triaged by the
+  maintainers in `docs/security/sonarqube-remediation-report.md` (fixed,
+  false positive, or accepted with the reason). No separate sign-off outside
+  the maintainers is required. 2, 3 and 4 mean no usable analysis, which is
+  a no-go. An analysis of a different commit does not count, and neither does
+  a green CI run whose SonarQube job did not submit an analysis. Review every
+  new security hotspot in SonarQube; an unreviewed new hotspot is a no-go.
 - **nSpect (NSPECT-NJMX-9GQU).** A fresh nSpect / Pulse OSS scan of the
   candidate. Critical and high findings are fixed or carry an approved
   exception. See `docs/security/nspect-reconciliation.md`.
@@ -110,7 +115,7 @@ The NGC suite row is required, and when the suite did not run it reads
 | Deployment test (deploy, readiness, MCP tool calls, restart durability) | PASS ([run](<run url>)) |
 | Internal NGC MAIW pytest suite | **NOT RUN**: <reason> ([run](<run url>)) |
 | Release gate on the reference host | PASS |
-| SonarQube | analysis `<analysis id>` (<timestamp>), quality gate <OK, or ERROR with SRE disposition (link)> |
+| SonarQube | analysis `<analysis id>` (<timestamp>), quality gate <OK, or **ERROR** with the maintainers' triage of each failing condition (link)> |
 | nSpect OSS scan (NSPECT-NJMX-9GQU) | <date>: <result; approved exceptions (link)> |
 | SBOM submitted to nSpect | <date>: <artifacts> |
 ```

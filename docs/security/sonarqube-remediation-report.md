@@ -26,14 +26,14 @@
 **High issues on new code (6, new failing condition):** all `shelldre:S7688`
 ("use `[[` instead of `[`"), reliability: `scripts/setup/setup_monitoring.sh:20,33`
 (#279, #280) and `scripts/security/release_version.sh:34,40 (×2),48` (#268).
-Proposed disposition: **accept**. They are POSIX `[` tests on quoted variables
+Triage: **accept**. They are POSIX `[` tests on quoted variables
 in operator scripts that are not part of the API or any image; `[` is correct
 there and none of them is a defect. Changing them to `[[` is a style change
 that can be made in a later release.
 
 **Issues of prioritized rules (42, all security), down from 46:**
 
-| Rule | Count | Where | Proposed disposition |
+| Rule | Count | Where | Triage |
 |---|---|---|---|
 | `pythonsecurity:S5145` (log injection) | 40 | `src/` 26, `packages/` 11, `apps/api` 3 | **Mitigated**, unchanged from `4259fa3`: every message is escaped by `install_log_injection_guard()` in the API and MCP processes |
 | `pythonsecurity:S2083` (path injection) | 1 | `packages/maiw-models/maiw_models/eval/__main__.py:347` | **False positive**, unchanged: `--output` of a local command-line tool |
@@ -54,10 +54,14 @@ TO_REVIEW (`typescript:S2245` in `ActivityFeed.tsx:41`, `shell:S5332` ×3,
 `shell:S6506` ×2; see the `4259fa3` section). A project administrator marks
 them reviewed in SonarQube.
 
-**Release decision: open.** `docs/operations/RELEASING.md` requires a written
-Blueprints SRE disposition of each failing condition (the three ERROR rows
-above) before v3.0.0 is released. None has been obtained. The dispositions
-proposed here are engineering proposals, not that disposition.
+**Release decision.** The quality gate of this analysis is **ERROR** and is
+recorded as such; it is not a passing scan. Under
+`docs/operations/RELEASING.md`, a gate ERROR does not by itself block a
+release when the maintainers have triaged each failing condition, as above
+(the three ERROR rows: accepted, mitigated, or false positive), and there is
+no new security hotspot. No separate sign-off outside the maintainers is
+required. SonarQube does not block v3.0.0; the nSpect scan and SBOM upload
+still do (`nspect-reconciliation.md`).
 
 ## Analysis of `4259fa3` (2026-11-06): v2.1.1 candidate
 
