@@ -1,8 +1,7 @@
 # MAIW v3.0.0 — Release Notes
 
-> **DRAFT — not tagged, not published.** Two release-blocking security gates are
-> still open (nSpect scan and SBOM upload); see "Validation". Remove this block
-> when publication is approved.
+> **DRAFT — not tagged, not published.** Every release gate is recorded for
+> `1c96c2e` (see "Validation"). Remove this block when publication is approved.
 
 **Status:** release candidate, not yet released. **Validated code commit:**
 `main` `1c96c2e735d1661a97110d9e26738eed0d9d7e19` (PR #321). Previous release:
@@ -31,9 +30,9 @@ Under Semantic Versioning both are major changes. The advisory
 | Internal NGC MAIW pytest suite | **NOT RUN**: could not pull the internal test image (requires internal NGC org access) ([run](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/actions/runs/43630324382)) |
 | Release gate on the reference host | PASS (2026-11-15, on `1c96c2e`; details below). The first live-call run hit HTTP 503 from hosted Ultra; the counted run reached the provider for all four calls |
 | SonarQube | analysis `dea59560-2068-4486-84b6-d9a6fb450a2e` of `1c96c2e` (analysis date 2026-11-15 16:56:21 UTC, gate computed 16:58:20 UTC), version `3.0.0`, quality gate **ERROR**: 6 new HIGH issues, 42 issues of prioritized security rules, 134 HIGH issues overall; 0 blocker issues; new-code coverage 93.9%; **0 new security hotspots**. The gate failed; this is not a passing scan. Each failing condition is triaged by the maintainers in [sonarqube-remediation-report.md](docs/security/sonarqube-remediation-report.md#analysis-of-1c96c2e-2026-11-15-v300-candidate): the 6 new HIGH issues are `shelldre:S7688` (`[` instead of `[[`) in two operator scripts, accepted; of the 42 prioritized-rule issues, 40 are `pythonsecurity:S5145` log injection, mitigated by the process-wide log guard, and 2 are false positives; the 134 HIGH issues are 84 S7688 shell style, 49 maintainability and the same S2083 false positive. Under RELEASING.md a gate ERROR with this triage does not block the release. Run manually from an NVIDIA-network host with `scripts/security/run_sonar_scan.sh` and the CI run's `sonar-coverage` artifact. CI's own SonarQube job for this commit ([run](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/actions/runs/43632460971)) could not resolve `sonar.nvidia.com` and submitted no analysis |
-| nSpect OSS scan (NSPECT-NJMX-9GQU) | **NOT RUN (release-blocking)**: no scan of `1c96c2e` has been confirmed by the program owner. An older scan does not count |
+| nSpect OSS scan (NSPECT-NJMX-9GQU) | **PASS** (2026-11-15): program version **MAIW v3.0.0**, source `multi-agent-intelligent-warehouse.git` at `1c96c2e735d1661a97110d9e26738eed0d9d7e19`, on-demand scan completed (last scan 2026-11-15 13:43, nSpect display time): **0 Critical, 2 High, 8 Medium, 3 Low**, no scan or clone failures. Both High findings carry Not Affected exception **EXC-MOOT-B57E**, approved 2026-11-15 for that branch; see "nSpect findings" below |
 | SBOMs stamped with the release version | PASS: [CI run](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/actions/runs/43736730172) dispatched on `1c96c2e` with `release_version=3.0.0`; `sbom-backend`, `sbom-frontend` (frontend image and UI bundle) and `sbom-mcp` each record `maiw:git_sha=1c96c2e735d1661a97110d9e26738eed0d9d7e19` and `maiw:release_version=3.0.0`, and pass `validate_sbom.py` |
-| SBOM submitted to nSpect | **NOT RUN (release-blocking)**: upload file prepared, not yet uploaded: `maiw-v3.0.0-1c96c2e.cdx.json`, CycloneDX 1.6, 1639 components, sha256 `3abea3726ca937b3135a0da6c41ece591d70b04cd4bbf0df2c25a318756ae683` |
+| SBOM submitted to nSpect | **PASS** (2026-11-15): `maiw-v3.0.0-1c96c2e.cdx.json` uploaded to MAIW v3.0.0 (Actions → Manage SBOM → Upload an SBOM, type Custom). It merges the SBOMs of the CI run above: CycloneDX 1.6, 1639 components, sha256 `3abea3726ca937b3135a0da6c41ece591d70b04cd4bbf0df2c25a318756ae683` (the uploader's local copy matches). The copy nSpect returns parses to identical content (same serial number and components) |
 
 ### Release gate on the reference host (2026-11-15)
 
@@ -113,6 +112,28 @@ risk returned 503 `MODEL_UNAVAILABLE` because the hosted endpoint answered
 - Self-service profile updates were restricted to personal fields (#275) before the routes were removed.
 - The Copilot no longer runs recommendations from questions or negations ([#258](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/issues/258)).
 - Pull requests to `main` must pass seven required checks (tests, CodeQL, Security Scan, image scans). The GPU deployment test, which holds repository credentials, runs only after merge or on demand (#319, #322).
+
+## nSpect findings for MAIW v3.0.0
+
+The scan of `1c96c2e` has 13 findings, all in the UI's npm lockfile
+(`src/ui/web/package-lock.json`); none is in a shipped image (the frontend
+image serves static files from nginx and contains no npm packages). They are
+the 16 findings of v2.1.1 less three that v3.0.0 fixes: `react-router`
+(upgraded to v7), `serialize-javascript` (override raised to 7.1.4) and the
+`requests` minimum (raised). No finding is new.
+
+| Severity | Package | Disposition |
+|---|---|---|
+| High | `react-dev-utils` 12.0.1 (BDSA-2026-18203 / CVE-2026-14802) | **EXC-MOOT-B57E**, Not Affected, justification `requires_configuration`. `openBrowser` never runs: the UI start script sets `BROWSER=${BROWSER:-none}`, pinned by `src/ui/web/src/__tests__/devServerNoAutoBrowser.test.ts`. Development server only. No fixed release exists |
+| High | `svgo` 2.8.4 (BDSA-2026-27126 / CVE-2026-73650) | **EXC-MOOT-B57E**, Not Affected, justification `code_not_present`. GHSA-2p49-hgcm-8545 lists 2.8.3 as the 2.x fix, so 2.8.4 contains it. Build-time only (`postcss-svgo`); the top-level `svgo` is 4.1.0 |
+| Medium | `react-is` 19.2.5 | Mismatch: the advisory covers `react-server-dom-*`, not `react-is` |
+| Medium | `postcss-selector-parser` 6.1.5 | GitHub's advisory lists 6.1.5 as fixed; discrepancy |
+| Medium (6), Low (3) | `uri-js` 4.4.1 (2 Medium), `uuid` 8.3.2 (Medium and Low), `inflight` 1.0.6, `braces` 3.0.3, `minimatch` 9.0.9, `@tootallnate/once` 1.1.2 (Low), `glob` 10.5.0 (Low) | `react-scripts` build and development-server chain, not in the browser bundle or any image |
+
+EXC-MOOT-B57E (Source Repo Exception, branch `1c96c2e…`) re-files, for the
+v3.0.0 program version, the two v2.1.1 exceptions EXC-HPU1-JZI6 and
+EXC-TNK9-0X62, which are bound to the v2.1.1 branch `4259fa3` and do not
+cover this scan. Details: `docs/security/nspect-reconciliation.md`.
 
 ## Fixes and additions
 

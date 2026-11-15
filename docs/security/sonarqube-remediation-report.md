@@ -60,8 +60,8 @@ recorded as such; it is not a passing scan. Under
 release when the maintainers have triaged each failing condition, as above
 (the three ERROR rows: accepted, mitigated, or false positive), and there is
 no new security hotspot. No separate sign-off outside the maintainers is
-required. SonarQube does not block v3.0.0; the nSpect scan and SBOM upload
-still do (`nspect-reconciliation.md`).
+required. SonarQube does not block v3.0.0. The nSpect scan and SBOM upload
+were recorded on 2026-11-15 (`nspect-reconciliation.md`).
 
 ## Analysis of `4259fa3` (2026-11-06): v2.1.1 candidate
 

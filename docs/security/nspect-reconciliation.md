@@ -2,17 +2,28 @@
 
 ## MAIW v3.0.0 (candidate `1c96c2e`)
 
-Prepared 2026-11-15. **Nothing has been confirmed in nSpect for this
-candidate yet.** Both items below are release-blocking
-(`docs/operations/RELEASING.md`); the v2.1.1 scan of `4259fa3` does not count.
+Recorded 2026-11-15. The program-side state below was set up and observed in
+nSpect by the program owner (NVIDIA SSO) and relayed as screenshots; no
+automation read from or wrote to nSpect. Times are nSpect display times.
 
 | Item | State |
 |---|---|
-| Program version | **Not created**: owner creates **MAIW v3.0.0** (clone ConneX from v2.1.1 as before) |
-| Registered source | Owner registers `ssh://git@github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse.git` at commit `1c96c2e735d1661a97110d9e26738eed0d9d7e19` |
-| OSS scan | **NOT RUN**: owner starts a fresh scan of that commit and records the scan date and Critical / High / Medium / Low counts here |
-| Exceptions | To check after the scan. EXC-HPU1-JZI6 (`react-dev-utils`, Not Affected) and EXC-TNK9-0X62 (`svgo`, Resolved) were approved for v2.1.1; the owner confirms whether they carry over to the v3.0.0 program version or must be filed again. Every remaining Critical or High needs a fix or an approved exception |
-| SBOM | **Prepared, not uploaded** (below) |
+| Program version | **MAIW v3.0.0**, created 2026-11-15 (planned release date 2026-11-18, External: General Use, Published To GitHub), cloned from MAIW v2.1.1 with ConneX and attributes; builds not cloned. No child programs in ConneX |
+| Registered source | Component `Multi-Agent-Intelligent-Warehouse`: `ssh://git@github.com/NVIDIA-AI-Blueprints/multi-agent-intelligent-warehouse.git` at `1c96c2e735d1661a97110d9e26738eed0d9d7e19`, reporting enabled, no SBOM name (nSpect scanning). No builds, binary artifacts, container images or Helm charts, as for v2.1.1 |
+| OSS scan | On-demand scan, started 2026-11-15 13:14, completed (last scan 13:43): **0 Critical, 2 High, 8 Medium, 3 Low**. Program Scan Health: no scan failures, no clone failures. Security Risk Report: 0 verified secrets, 0 high-risk licences |
+| Exceptions | **EXC-MOOT-B57E** (Source Repo Exception, Not Affected, branch `1c96c2e…`), created 2026-11-15 14:48 and approved the same day; covers both High findings (below). EXC-HPU1-JZI6 and EXC-TNK9-0X62 are bound to the v2.1.1 branch `4259fa3`, and Allowed Vulnerabilities was empty for MAIW v3.0.0 before EXC-MOOT-B57E |
+| SBOM | **Uploaded** 2026-11-15 (below) |
+
+### Findings
+
+The 16 findings of v2.1.1 less `react-router`, `serialize-javascript` and the
+`requests` minimum, which v3.0.0 fixes; none is new. Dispositions are in
+`RELEASE_NOTES_v3.0.0.md` ("nSpect findings for MAIW v3.0.0").
+
+| Finding | Exception (EXC-MOOT-B57E) | Evidence, re-checked at `1c96c2e` |
+|---|---|---|
+| `react-dev-utils` 12.0.1, BDSA-2026-18203 / CVE-2026-14802 (CVSS 8.9, SLA breach 2027-02-13) | Not Affected, `requires_configuration` | The UI start script sets `BROWSER=${BROWSER:-none}`; `src/ui/web/src/__tests__/devServerNoAutoBrowser.test.ts` pins it. Development server only |
+| `svgo` 2.8.4, BDSA-2026-27126 / CVE-2026-73650 (CVSS 7.4, SLA breach 2027-02-13) | Not Affected, `code_not_present` | GHSA-2p49-hgcm-8545: affected < 2.8.3, fixed in 2.8.3. Resolved under `postcss-svgo`; the top-level `svgo` is 4.1.0. Build time only |
 
 ### SBOM to submit
 
@@ -41,15 +52,14 @@ added or edited):
 | File | `maiw-v3.0.0-1c96c2e.cdx.json`, CycloneDX 1.6, **1639 components**, sha256 `3abea3726ca937b3135a0da6c41ece591d70b04cd4bbf0df2c25a318756ae683` |
 | Identity | `metadata.component` = Multi-Agent-Intelligent-Warehouse 3.0.0; `maiw:artifact=maiw-release`, `maiw:git_sha=1c96c2e735d1661a97110d9e26738eed0d9d7e19`, `maiw:release_version=3.0.0`; inputs and their sha256 recorded as `merged-from:*` properties |
 | Checks | `validate_sbom.py` from `1c96c2e` (schema, ≥ 1000 components, tool recorded): valid; no dangling dependency references |
-| Upload | **NOT RUN**: owner uploads it under **Actions → Manage SBOM → Upload an SBOM** on MAIW v3.0.0 and records the upload date and that the local sha256 matches |
+| Upload | **Uploaded** 2026-11-15 21:23 under **Actions → Manage SBOM → Upload an SBOM** on MAIW v3.0.0, type "Custom", with no program attributes (not partner- or commercially provided). The uploader's local copy has the sha256 above. nSpect's returned copy has a different sha256 (re-serialized) but parses to identical content: same serial number `urn:uuid:e8235098-b302-42d6-9308-5656fabae8f5`, 1639 components |
 
 ### Remaining owner steps for v3.0.0
 
-1. Create program version MAIW v3.0.0 with source commit `1c96c2e`, run the
-   OSS scan, and record the date and counts above.
-2. Fix or file exceptions for any Critical or High finding; link the
-   approved exceptions here.
-3. Upload `maiw-v3.0.0-1c96c2e.cdx.json` and record the confirmation.
+None for the release gate. Optional: generate the Version and ConneX SBOMs
+under Manage SBOM step 4, and link the SonarQube project under Security
+Analysis (registration summary: "no source code is being analyzed by static
+analysis tools").
 
 ## MAIW v2.1.1 (candidate `4259fa3`)
 
@@ -64,7 +74,7 @@ from or wrote to nSpect.
 | OSS scan | Repository `…multi-agent-intelligent-warehouse--4259fa37aa3676bbcc3378f00d067d9bdcc01174`, last scan 2026-11-05 17:57 (nSpect display time): **0 Critical, 2 High, 10 Medium, 4 Low** |
 | Package inventory | npm rows match the UI SBOM (`maiw-ui-bundle.cdx.json`) version for version. Python rows are the minimums in `requirements.txt` (for example `requests` 2.32.4 and `xgboost` 3.2.0), not installed versions: the images install `requests` 2.34.2 and the backend image has no `xgboost` |
 | SBOM | Uploaded 2026-11-06 under Manage SBOM → Upload an SBOM (see below) |
-| Exceptions | `react-dev-utils`: Not Affected exception **EXC-HPU1-JZI6** (Launch nAbler / Exception Tracker), filed and approved 2026-11-06. `svgo`: Resolved exception **EXC-TNK9-0X62**, filed and approved 2026-11-06. Approvals as reported by the program owner |
+| Exceptions | `react-dev-utils`: Not Affected exception **EXC-HPU1-JZI6** (Launch nAbler / Exception Tracker), filed and approved 2026-11-06. `svgo`: exception **EXC-TNK9-0X62**, filed and approved 2026-11-06; recorded here at the time as Resolved, but Exception Tracker shows its category as **Not Affected** (checked 2026-11-15). Approvals as reported by the program owner |
 | Registered builds or images | None. Binary and container-image sources are not registered: no image is distributed; Compose builds them locally |
 
 ### Findings
