@@ -4,7 +4,60 @@
 |---|---|
 | **Analysis triaged** | SonarQube project `TEGRASW_Blueprints-SRE_warehouse-operational-assistant_Multi-Agent-Intelligent-Warehouse`, last analysis **2026-01-05 22:01 UTC of `4df9a41`** (scope `src/` only). Read through the anonymous web API on 2026-11-02. |
 | **Code triaged** | `main` at `0fbcb69` (after v2.1.0, `2fdd9fe`) |
-| **Fresh analysis** | **Latest: `4259fa3` (v2.1.1 candidate) on 2026-11-06**, see [Analysis of `4259fa3`](#analysis-of-4259fa3-2026-11-06-v211-candidate) below. Before it: `ff5ce22` on 2026-11-03, see [Analysis of `ff5ce22`](#analysis-of-ff5ce22-2026-11-03); the first full-scope analysis was of `0ee535a` on 2026-11-02 ([Fresh analysis](#fresh-analysis-of-0ee535a-2026-11-02)). Both were run manually from an NVIDIA-network host, because CI still has no NVIDIA-network runner. The sections after it are the original triage of the January analysis. Their dispositions are engineering dispositions; they must be confirmed against the fresh analysis and recorded in SonarQube by a project administrator. |
+| **Fresh analysis** | **Latest: `1c96c2e` (v3.0.0 candidate) on 2026-11-15**, see [Analysis of `1c96c2e`](#analysis-of-1c96c2e-2026-11-15-v300-candidate) below. Before it: `4259fa3` (v2.1.1 candidate) on 2026-11-06, see [Analysis of `4259fa3`](#analysis-of-4259fa3-2026-11-06-v211-candidate); `ff5ce22` on 2026-11-03, see [Analysis of `ff5ce22`](#analysis-of-ff5ce22-2026-11-03); the first full-scope analysis was of `0ee535a` on 2026-11-02 ([Fresh analysis](#fresh-analysis-of-0ee535a-2026-11-02)). Both were run manually from an NVIDIA-network host, because CI still has no NVIDIA-network runner. The sections after it are the original triage of the January analysis. Their dispositions are engineering dispositions; they must be confirmed against the fresh analysis and recorded in SonarQube by a project administrator. |
+
+## Analysis of `1c96c2e` (2026-11-15): v3.0.0 candidate
+
+| | |
+|---|---|
+| **Analysis** | `dea59560-2068-4486-84b6-d9a6fb450a2e` (analysis date 16:56:21 UTC, gate computed 16:58:20 UTC; background task `5f5e72f2-5d11-4ee1-9fed-c804f908c3c9`), `main` at `1c96c2e735d1661a97110d9e26738eed0d9d7e19`, version `3.0.0` (`MAIW_RELEASE_VERSION=3.0.0`, no tag), with the CORE pytest `coverage.xml` of that commit's CI/CD Pipeline run ([43630324310](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/actions/runs/43630324310), artifact `sonar-coverage`, sha256 `17f878ee…318e4`). Run with `scripts/security/run_sonar_scan.sh` from a standalone clone on an NVIDIA-network host; the script exited 5 (analysis recorded, quality gate failed). A first attempt from a `git worktree` checkout exited 4 without submitting anything: the scanner container cannot read a worktree's `.git` file. Use a clone |
+| **Quality gate** | **ERROR**, gate "Security", same profiles as `4259fa3`. New code is measured from the previous version (`2.1.1-rc.1`) |
+
+| Gate condition | Fails when | Actual | Status |
+|---|---|---|---|
+| Coverage | < 0% | 38.1% | OK |
+| Coverage on new code | < 0% | 93.9% | OK |
+| Blocker issues | > 0 | 0 | OK |
+| Blocker issues on new code | > 0 | 0 | OK |
+| High issues on new code | > 0 | 6 | **ERROR** (new since `4259fa3`) |
+| Issues of prioritized rules | > 0 | 42 | ERROR |
+| High issues | > 0 | 134 | ERROR |
+
+**High issues on new code (6, new failing condition):** all `shelldre:S7688`
+("use `[[` instead of `[`"), reliability: `scripts/setup/setup_monitoring.sh:20,33`
+(#279, #280) and `scripts/security/release_version.sh:34,40 (×2),48` (#268).
+Proposed disposition: **accept**. They are POSIX `[` tests on quoted variables
+in operator scripts that are not part of the API or any image; `[` is correct
+there and none of them is a defect. Changing them to `[[` is a style change
+that can be made in a later release.
+
+**Issues of prioritized rules (42, all security), down from 46:**
+
+| Rule | Count | Where | Proposed disposition |
+|---|---|---|---|
+| `pythonsecurity:S5145` (log injection) | 40 | `src/` 26, `packages/` 11, `apps/api` 3 | **Mitigated**, unchanged from `4259fa3`: every message is escaped by `install_log_injection_guard()` in the API and MCP processes |
+| `pythonsecurity:S2083` (path injection) | 1 | `packages/maiw-models/maiw_models/eval/__main__.py:347` | **False positive**, unchanged: `--output` of a local command-line tool |
+| `pythonsecurity:S7044` (URL from user data) | 1 | `scripts/testing/smoke_e2e.py:320` | **False positive**, unchanged: a test script's own `--api` argument |
+
+The four `python:S2068` hard-coded `changeme` credentials of `4259fa3` are
+gone: the scripts that held them were removed or fixed with the login system
+(#261).
+
+**High issues (134):** reliability 84, all `shelldre:S7688` (78 before plus the
+6 new ones); maintainability 49 (`typescript:S3776` 30, `plsql:S1192` 12,
+`typescript:S2004` 3, `typescript:S3735` 2, `javascript:S3776` 1,
+`shelldre:S131` 1); security 1 (the `S2083` false positive). By location:
+`scripts/` 85, `src/ui/` 39, `tests/` 9, `packages/maiw-models` 1.
+
+**Security hotspots:** **0 new.** The same 6 older hotspots remain
+TO_REVIEW (`typescript:S2245` in `ActivityFeed.tsx:41`, `shell:S5332` ×3,
+`shell:S6506` ×2; see the `4259fa3` section). A project administrator marks
+them reviewed in SonarQube.
+
+**Release decision: open.** `docs/operations/RELEASING.md` requires a written
+Blueprints SRE disposition of each failing condition (the three ERROR rows
+above) before v3.0.0 is released. None has been obtained. The dispositions
+proposed here are engineering proposals, not that disposition.
 
 ## Analysis of `4259fa3` (2026-11-06): v2.1.1 candidate
 

@@ -1,5 +1,56 @@
 # nSpect Reconciliation: NSPECT-NJMX-9GQU
 
+## MAIW v3.0.0 (candidate `1c96c2e`)
+
+Prepared 2026-11-15. **Nothing has been confirmed in nSpect for this
+candidate yet.** Both items below are release-blocking
+(`docs/operations/RELEASING.md`); the v2.1.1 scan of `4259fa3` does not count.
+
+| Item | State |
+|---|---|
+| Program version | **Not created**: owner creates **MAIW v3.0.0** (clone ConneX from v2.1.1 as before) |
+| Registered source | Owner registers `ssh://git@github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse.git` at commit `1c96c2e735d1661a97110d9e26738eed0d9d7e19` |
+| OSS scan | **NOT RUN**: owner starts a fresh scan of that commit and records the scan date and Critical / High / Medium / Low counts here |
+| Exceptions | To check after the scan. EXC-HPU1-JZI6 (`react-dev-utils`, Not Affected) and EXC-TNK9-0X62 (`svgo`, Resolved) were approved for v2.1.1; the owner confirms whether they carry over to the v3.0.0 program version or must be filed again. Every remaining Critical or High needs a fix or an approved exception |
+| SBOM | **Prepared, not uploaded** (below) |
+
+### SBOM to submit
+
+The four CI SBOMs of `1c96c2e` come from
+[CI run 43736730172](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/actions/runs/43736730172)
+(CI/CD Pipeline dispatched on `main` at `1c96c2e` with `release_version=3.0.0`;
+artifacts `sbom-backend`, `sbom-frontend`, `sbom-mcp`, kept until 2027-02-13).
+Each records `maiw:git_sha=1c96c2e735d1661a97110d9e26738eed0d9d7e19` and
+`maiw:release_version=3.0.0` and passes `scripts/security/validate_sbom.py`;
+no re-stamping was needed.
+
+| File | Components | sha256 |
+|---|---|---|
+| `maiw-backend.cdx.json` | 187 | `967bdff7eb7455bd5ded5c8d829aab7b9dd5ef924f80ffec5dcdbc9d20f649e7` |
+| `maiw-frontend.cdx.json` | 71 | `d28236b83cc87349e008a439893fba895a596b424a4e23d2fe31ea06fa16dd1c` |
+| `maiw-ui-bundle.cdx.json` | 1365 | `3007f209c0bfe741b24075c12dc2bfad8e31464f63f90c8ae6c03c2488f8859c` |
+| `maiw-mcp.cdx.json` | 154 | `dc968f424c835536773fc72c76c9f26c3cde64253365732281797c9f1b8f0707` |
+
+nSpect's form takes one file, so they are merged as for v2.1.1 (each image or
+bundle becomes a component the release depends on; components kept flat, a
+`bom-ref` in more than one input listed once, dependencies unioned, nothing
+added or edited):
+
+| | |
+|---|---|
+| File | `maiw-v3.0.0-1c96c2e.cdx.json`, CycloneDX 1.6, **1639 components**, sha256 `3abea3726ca937b3135a0da6c41ece591d70b04cd4bbf0df2c25a318756ae683` |
+| Identity | `metadata.component` = Multi-Agent-Intelligent-Warehouse 3.0.0; `maiw:artifact=maiw-release`, `maiw:git_sha=1c96c2e735d1661a97110d9e26738eed0d9d7e19`, `maiw:release_version=3.0.0`; inputs and their sha256 recorded as `merged-from:*` properties |
+| Checks | `validate_sbom.py` from `1c96c2e` (schema, ≥ 1000 components, tool recorded): valid; no dangling dependency references |
+| Upload | **NOT RUN**: owner uploads it under **Actions → Manage SBOM → Upload an SBOM** on MAIW v3.0.0 and records the upload date and that the local sha256 matches |
+
+### Remaining owner steps for v3.0.0
+
+1. Create program version MAIW v3.0.0 with source commit `1c96c2e`, run the
+   OSS scan, and record the date and counts above.
+2. Fix or file exceptions for any Critical or High finding; link the
+   approved exceptions here.
+3. Upload `maiw-v3.0.0-1c96c2e.cdx.json` and record the confirmation.
+
 ## MAIW v2.1.1 (candidate `4259fa3`)
 
 Recorded 2026-11-06. The program-side state below was observed in nSpect by
