@@ -1,11 +1,10 @@
 # MAIW v3.0.0 — Release Notes
 
-> **DRAFT — not tagged, not published.** Every release gate is recorded for
-> `1c96c2e` (see "Validation"). Remove this block when publication is approved.
-
-**Status:** release candidate, not yet released. **Validated code commit:**
-`main` `1c96c2e735d1661a97110d9e26738eed0d9d7e19` (PR #321). Previous release:
-`v2.1.1` (tag → `6d1395b`, validated code `4259fa3`).
+**Status:** released 2026-11-15. **Validated code commit:** `main`
+`1c96c2e735d1661a97110d9e26738eed0d9d7e19` (PR #321). Tag `v3.0.0` is on the
+`main` commit that merges these notes (#323); it differs from the validated
+code commit only in documentation. Previous release: `v2.1.1` (tag →
+`6d1395b`, validated code `4259fa3`).
 
 v3.0.0 removes the unused login system (its routes, settings and stored
 password hashes), moves every scripted demo scenario to the DC-47 DataPack
