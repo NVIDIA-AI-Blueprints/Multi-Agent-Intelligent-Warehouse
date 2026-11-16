@@ -3,6 +3,7 @@
 ### Security
 
 * build: `Dockerfile.mcp` pins its base image by tag and digest (`python:3.11.18-slim-trixie@sha256:07d48240…`), as `Dockerfile.backend` does, instead of the floating `python:3.11-slim`. Each rebuild could otherwise pick up a different Python patch release or Debian base; Dependabot now proposes the updates. The digest is the one `python:3.11-slim` resolved to on 2026-11-16, so today's image is unchanged. A test keeps the pin
+* build: the UI build stage of `Dockerfile.frontend` and the root `Dockerfile` moves from Node `22.23.4-alpine3.24` to `22.23.5-alpine3.24` (pinned by digest, [#325](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/325)). Node is used only to build the UI bundle; the frontend image ships nginx
 
 ## [3.0.0](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/compare/v2.1.1...v3.0.0) (2026-11-15)
 
