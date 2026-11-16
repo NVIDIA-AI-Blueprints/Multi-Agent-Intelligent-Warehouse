@@ -1,9 +1,9 @@
 """
 Container image hardening guards (NSPECT-NJMX-9GQU).
 
-Static checks on the Dockerfiles that produce the published images
-(``bpf-maiw-backend`` <- Dockerfile.backend, ``bpf-maiw-frontend`` <-
-Dockerfile.frontend) so the remediated surface does not silently regress.
+Static checks on the Dockerfiles that produce the MAIW images
+(Dockerfile.backend, Dockerfile.frontend, Dockerfile.mcp) so the remediated
+surface does not silently regress.
 """
 
 from __future__ import annotations

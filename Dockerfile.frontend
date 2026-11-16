@@ -1,4 +1,4 @@
-# Frontend (MAIW web UI) production image — published as bpf-maiw-frontend.
+# Frontend (MAIW web UI) production image (built locally by Compose; not published).
 # Also used by deploy/compose/docker-compose.dev.yaml (service: frontend).
 #
 # Multi-stage build (NSPECT-NJMX-9GQU):
