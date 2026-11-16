@@ -4,6 +4,7 @@
 
 * build: `Dockerfile.mcp` pins its base image by tag and digest (`python:3.11.18-slim-trixie@sha256:07d48240…`), instead of the floating `python:3.11-slim`. Each rebuild could otherwise pick up a different Python patch release or Debian base. The digest is the one `python:3.11-slim` resolved to on 2026-11-16, so today's image is unchanged. A test keeps the pin
 * build: the root `Dockerfile`'s two Python stages use the same pinned image instead of the floating `python:3.11-slim` (same digest today, so no change in content), and a test keeps them equal to `Dockerfile.mcp` and keeps the copied `site-packages` path on the image's Python version. `Dockerfile.mcp` now names the image in `FROM` rather than an `ARG` default, because Dependabot does not update `ARG` defaults; Dependabot proposes Python patch and digest updates for both files in one PR. Dependabot no longer proposes Python minor or major versions (#326 proposed 3.15 for the root `Dockerfile` only, which would not build) or loguru 0.8, which fastembed does not allow yet (#329)
+* build: the UI build stage of `Dockerfile.frontend` and the root `Dockerfile` moves from Node `22.23.4-alpine3.24` to `22.23.5-alpine3.24` (pinned by digest, [#325](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/325)). Node is used only to build the UI bundle; the frontend image ships nginx
 
 ### Documentation
 
