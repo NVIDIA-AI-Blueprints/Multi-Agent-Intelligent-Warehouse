@@ -2,8 +2,13 @@
 
 ### Security
 
-* build: `Dockerfile.mcp` pins its base image by tag and digest (`python:3.11.18-slim-trixie@sha256:07d48240…`), as `Dockerfile.backend` does, instead of the floating `python:3.11-slim`. Each rebuild could otherwise pick up a different Python patch release or Debian base; Dependabot now proposes the updates. The digest is the one `python:3.11-slim` resolved to on 2026-11-16, so today's image is unchanged. A test keeps the pin
+* build: `Dockerfile.mcp` pins its base image by tag and digest (`python:3.11.18-slim-trixie@sha256:07d48240…`), instead of the floating `python:3.11-slim`. Each rebuild could otherwise pick up a different Python patch release or Debian base. The digest is the one `python:3.11-slim` resolved to on 2026-11-16, so today's image is unchanged. A test keeps the pin
+* build: the root `Dockerfile`'s two Python stages use the same pinned image instead of the floating `python:3.11-slim` (same digest today, so no change in content), and a test keeps them equal to `Dockerfile.mcp` and keeps the copied `site-packages` path on the image's Python version. `Dockerfile.mcp` now names the image in `FROM` rather than an `ARG` default, because Dependabot does not update `ARG` defaults; Dependabot proposes Python patch and digest updates for both files in one PR. Dependabot no longer proposes Python minor or major versions (#326 proposed 3.15 for the root `Dockerfile` only, which would not build) or loguru 0.8, which fastembed does not allow yet (#329)
 * build: the UI build stage of `Dockerfile.frontend` and the root `Dockerfile` moves from Node `22.23.4-alpine3.24` to `22.23.5-alpine3.24` (pinned by digest, [#325](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/pull/325)). Node is used only to build the UI bundle; the frontend image ships nginx
+
+### Documentation
+
+* security: `docs/security/nspect-reconciliation.md` records the program owner's 2026-11-16 decisions: the `bpf-maiw-backend` and `bpf-maiw-frontend` images are not used or distributed, so they are not registered; program version v0.2-test is End of Life; v0.1 stays active because of an open legal compliance request. This closes the v2.1.0 owner steps "v0.2-test" and "Artifacts". `sbom-generation.md`, `DEPLOYMENT_ARCHITECTURE.md`, the backend and frontend Dockerfile header comments and the image-test docstring no longer say the images are published as `bpf-maiw-*`
 
 ## [3.0.0](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/compare/v2.1.1...v3.0.0) (2026-11-15)
 

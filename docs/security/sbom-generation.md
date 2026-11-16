@@ -7,14 +7,14 @@ MAIW publishes CycloneDX 1.6 JSON SBOMs for everything it builds. Every CI run p
 | Deliverable | How it is distributed | SBOM |
 |---|---|---|
 | Source | GitHub repository and tagged releases (v2.1.0 → `2fdd9fe`). Nothing is published to PyPI or npm. | The image SBOMs below record the resolved Python packages; the UI bundle SBOM records the npm packages |
-| Backend image (`Dockerfile.backend`) | Built by Compose. The Dockerfile notes it is published internally as `bpf-maiw-backend`, but no workflow in this repository pushes it. | `maiw-backend.cdx.json`: Debian packages + Python packages |
+| Backend image (`Dockerfile.backend`) | Built by Compose. No workflow in this repository pushes it. Earlier internal builds named `bpf-maiw-backend` are not used or distributed | `maiw-backend.cdx.json`: Debian packages + Python packages |
 | Frontend image (`Dockerfile.frontend`) | As above (`bpf-maiw-frontend`) | `maiw-frontend.cdx.json`: Alpine packages + nginx |
 | Web UI bundle (static JS inside the frontend image) | Compiled from `src/ui/web` at image build time | `maiw-ui-bundle.cdx.json`: production npm dependencies from `src/ui/web/package-lock.json`. An image scan cannot see them, because only the compiled bundle ships. |
 | MCP domain images (`Dockerfile.mcp` ×4) | Built locally by Compose only | `maiw-mcp.cdx.json`. The four images differ only in server code, so one SBOM (equipment) covers their packages. |
 | Third-party images (TimescaleDB, Redis, Kafka, etcd, MinIO, Milvus, nginx, NIM) | Pulled from their publishers; MAIW does not redistribute them | Not generated here; they are the publishers' artifacts |
 | Helm chart | None in this repository | — |
 
-**Owner confirmation needed:** whether `bpf-maiw-backend` and `bpf-maiw-frontend` are actually published, where, and whether they should be registered as nSpect artifacts. nSpect currently shows no registered binary or container image.
+**Images in nSpect:** the program owner confirmed on 2026-11-16 that `bpf-maiw-backend` and `bpf-maiw-frontend` are not used or distributed, so they are not registered as nSpect artifacts; no binary or container image is registered. See [nspect-reconciliation.md](nspect-reconciliation.md), "Older program versions and unregistered images".
 
 ## Contents and validation
 

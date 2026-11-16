@@ -61,6 +61,17 @@ under Manage SBOM step 4, and link the SonarQube project under Security
 Analysis (registration summary: "no source code is being analyzed by static
 analysis tools").
 
+### Older program versions and unregistered images
+
+Recorded 2026-11-16 from the program owner's review of the program's
+container-scanning view; the decisions are the program owner's.
+
+| Item | State |
+|---|---|
+| `bpf-maiw-backend:1.0.0`, `bpf-maiw-frontend:1.0.0` | Container scans under the program (last scanned 2026-11-14), not attached to any program version. Not built by any workflow in this repository (the frontend derives from an internal base image, not the pinned public one); `1.0.0` is not a MAIW release. **Not used or distributed** (program owner, 2026-11-16), so they are not registered as release artifacts and their findings do not apply to a MAIW release. The images built from this repository are scanned by CI (Trivy) and described by the CI SBOMs |
+| Program version **Multi-Agent Intelligent Warehouse v0.2-test** | Created 2026-05-09 ("adds container + helm chart artifacts"); its images came from internal registries and were built from older code. **Not used or distributed**; marked **End of Life** in nSpect on 2026-11-16, so its findings no longer count against the program |
+| Program version **Multi-Agent Intelligent Warehouse v0.1** | The first published version. Left **active**: nSpect does not allow End of Life while the version has an open legal compliance request. It does not affect v3.0.0 |
+
 ## MAIW v2.1.1 (candidate `4259fa3`)
 
 Recorded 2026-11-06. The program-side state below was observed in nSpect by
@@ -137,7 +148,7 @@ report for child programs.
 | SonarQube latest analysis | **2026-01-05 22:01 UTC, `4df9a41`, version "1.0.0", quality gate ERROR** | SonarQube API (anonymous) |
 | SonarQube analysis of `2fdd9fe` | **None** | `GET /api/project_analyses/search`: no analysis has that revision |
 | SBOM for v2.1.0 | Generated locally from `2fdd9fe`, CycloneDX 1.6, all schema-valid; not uploaded | See "SBOM" below |
-| Registered builds or images | No workflow publishes images. The Dockerfiles say "published as `bpf-maiw-backend` / `bpf-maiw-frontend`". | Owner to confirm |
+| Registered builds or images | No workflow publishes images. The Dockerfiles said "published as `bpf-maiw-backend` / `bpf-maiw-frontend`". | Owner to confirm. Closed 2026-11-16: not used or distributed (see v3.0.0, "Older program versions and unregistered images") |
 
 ### Reconciliation
 
@@ -150,10 +161,10 @@ report for child programs.
 | Current OSS findings | The historical langchain and aiohttp findings do not match shipped versions; svgo 1.3.2 is replaced by 4.1.0 through an npm override | `oss-vulnerability-remediation.md`; #227 removes the stale manifests. A fresh nSpect scan is needed. |
 | Current static-analysis findings | 11 open S5145 findings triaged; 6 were reachable and are fixed in #229, together with a credential-logging issue | `sonarqube-remediation-report.md` |
 | "Scan health: no failures in two days" | Not evidence of scanning. SonarQube had not run since 2026-07-29 (dispatch-only placeholder), so there was nothing to fail. | — |
-| `v0.2-test` rows in reports | Not from this repository: no `v0.2*` tag exists upstream | Owner: check whether an old test registration or release in the program feeds the v2.1.0 report, and archive or separate it |
+| `v0.2-test` rows in reports | Not from this repository: no `v0.2*` tag exists upstream | Owner: check whether an old test registration or release in the program feeds the v2.1.0 report, and archive or separate it. Closed 2026-11-16: program version v0.2-test, marked End of Life |
 | Security exceptions | None requested here | Possible: undici (release tooling, not shipped). svgo is fixed by the npm override; evidence in the OSS document |
 | SBOM | Available (see below); **not uploaded** | Owner: Manage SBOM |
-| Registered builds | Zero | Owner: decide whether `bpf-maiw-*` images are release artifacts; if so, register them and attach their image SBOMs |
+| Registered builds | Zero | Owner: decide whether `bpf-maiw-*` images are release artifacts; if so, register them and attach their image SBOMs. Closed 2026-11-16: not distributed, so not registered |
 
 ### SBOM for the v2.1.0 commit
 
@@ -179,11 +190,11 @@ The files are not committed. Regenerate them with `git checkout v2.1.0 && script
    - Run **SonarQube Analysis** for the release candidate.
    - Record the analysis (ID, timestamp, quality gate) in nSpect.
 2. **OSS:** trigger a fresh nSpect / Pulse scan of the release candidate after #227 is merged, and compare it with `oss-vulnerability-remediation.md`.
-3. **v0.2-test:** identify which program release or registration the `v0.2-test` rows belong to, and stop them aggregating into v2.1.0.
+3. ~~**v0.2-test:** identify which program release or registration the `v0.2-test` rows belong to, and stop them aggregating into v2.1.0.~~ Closed 2026-11-16: they belong to program version v0.2-test, whose images are not used or distributed; it is marked End of Life.
 4. **SBOM:**
    - Under **Actions → Manage SBOM**, check whether direct CycloneDX upload is supported.
    - If it is, upload the release candidate's `sbom-*` CI artifacts, or the v2.1.0 files listed above.
    - Record the response.
-5. **Artifacts:** decide whether `bpf-maiw-backend` and `bpf-maiw-frontend` are distributed. If they are, register them, with their image digests and SBOMs.
+5. ~~**Artifacts:** decide whether `bpf-maiw-backend` and `bpf-maiw-frontend` are distributed. If they are, register them, with their image digests and SBOMs.~~ Closed 2026-11-16: not used or distributed, so not registered.
 6. **Exceptions:** if undici is not remediated, file exceptions with the reachability evidence. `.nspect-allowlist.toml` could exclude the root release tooling, which is not shipped; that is a policy decision, so the file is unchanged.
 7. **Release identity:** v2.1.0 (`2fdd9fe`) predates the security fixes in #222–#229. If the registered release must carry them, register the next tag (for example v2.1.1, cut from `main` after these PRs are merged) rather than re-pointing v2.1.0.

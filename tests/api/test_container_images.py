@@ -1,9 +1,9 @@
 """
 Container image hardening guards (NSPECT-NJMX-9GQU).
 
-Static checks on the Dockerfiles that produce the published images
-(``bpf-maiw-backend`` <- Dockerfile.backend, ``bpf-maiw-frontend`` <-
-Dockerfile.frontend) so the remediated surface does not silently regress.
+Static checks on the Dockerfiles that produce the MAIW images
+(Dockerfile.backend, Dockerfile.frontend, Dockerfile.mcp) so the remediated
+surface does not silently regress.
 """
 
 from __future__ import annotations
@@ -44,16 +44,33 @@ def test_backend_base_is_python_313_trixie_pinned_by_digest():
     assert "/usr/local/lib/python3.13/site-packages" in text
 
 
+_PY311_PINNED = r"python:3\.11\.\d+-slim-trixie@sha256:[0-9a-f]{64}"
+
+
 def test_mcp_base_is_python_311_trixie_pinned_by_digest():
     """Dockerfile.mcp used the floating ``python:3.11-slim`` tag, so each build
-    could get a different Python patch release or Debian base. Pin it by tag
-    and digest, as Dockerfile.backend does."""
+    could get a different Python patch release or Debian base. It is pinned by
+    tag and digest in FROM itself: Dependabot does not update ARG defaults."""
     text = (REPO_ROOT / "Dockerfile.mcp").read_text()
-    m = re.search(r"^ARG PYTHON_IMAGE=(\S+)$", text, re.MULTILINE)
-    assert m, "Dockerfile.mcp must pin its base via ARG PYTHON_IMAGE"
-    assert re.match(r"python:3\.11\.\d+-slim-trixie@sha256:[0-9a-f]{64}$", m.group(1))
     froms = re.findall(r"^FROM (\S+)", text, re.MULTILINE)
-    assert froms and all(f == "${PYTHON_IMAGE}" for f in froms)
+    assert froms and all(re.fullmatch(_PY311_PINNED, f) for f in froms)
+
+
+def test_root_dockerfile_python_matches_mcp_and_site_packages_path():
+    """The root Dockerfile (docker-compose.ci.yml, docker-compose.versioned.yaml)
+    is not built in CI. Its Python stages use the same pinned image as
+    Dockerfile.mcp, which is, and the site-packages path it copies matches that
+    image's Python minor version (#326 proposed 3.15 with the 3.11 path)."""
+    mcp = re.findall(
+        r"^FROM (\S+)", (REPO_ROOT / "Dockerfile.mcp").read_text(), re.MULTILINE
+    )
+    root = (REPO_ROOT / "Dockerfile").read_text()
+    pythons = re.findall(r"^FROM (python:\S+) AS \S+$", root, re.MULTILINE)
+    assert len(pythons) == 2 and set(pythons) == set(mcp)
+    assert not re.search(r"^FROM python:(?!3\.11\.)", root, re.MULTILINE)
+    minor = re.match(r"python:(\d+\.\d+)\.", pythons[0]).group(1)
+    paths = set(re.findall(r"/usr/local/lib/python(\d+\.\d+)/site-packages", root))
+    assert paths == {minor}
 
 
 def test_backend_runtime_stage_ships_no_extra_tools():

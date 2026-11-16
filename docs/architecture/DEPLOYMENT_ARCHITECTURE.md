@@ -107,7 +107,7 @@ External:
 
 | Field | Value |
 |---|---|
-| Dockerfile | `Dockerfile.backend` (published as `bpf-maiw-backend`) |
+| Dockerfile | `Dockerfile.backend` |
 | Base image | `python:3.13.x-slim-trixie` (Debian 13), pinned by digest |
 | Entrypoint | `uvicorn maiw_api.app:app --host 0.0.0.0 --port 8001` |
 | Port | `8001` |
@@ -150,7 +150,7 @@ scalable. See [Stateless MCP Invariant](#stateless-mcp-invariant).
 
 | Field | Value |
 |---|---|
-| Dockerfile | `Dockerfile.frontend` (published as `bpf-maiw-frontend`) |
+| Dockerfile | `Dockerfile.frontend` |
 | Build stage | `node:22.x-alpine` — `npm ci` + `npm run build` (not shipped) |
 | Runtime image | `nginxinc/nginx-unprivileged:1.30.x-alpine` (non-root, no Node.js/npm) |
 | Container port | `8080` (compose publishes `3001:8080`) |
