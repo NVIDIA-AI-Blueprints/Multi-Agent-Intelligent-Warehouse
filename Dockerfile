@@ -38,7 +38,7 @@ RUN npm run build
 # =============================================================================
 # Backend Dependencies Stage
 # =============================================================================
-FROM python:3.11-slim AS backend-deps
+FROM python:3.15-slim AS backend-deps
 
 WORKDIR /app
 
@@ -65,7 +65,7 @@ RUN pip install --no-cache-dir \
 # =============================================================================
 # Final Runtime Stage
 # =============================================================================
-FROM python:3.11-slim AS final
+FROM python:3.15-slim AS final
 
 # Set working directory
 WORKDIR /app
