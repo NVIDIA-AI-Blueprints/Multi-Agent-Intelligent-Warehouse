@@ -1,4 +1,4 @@
-fastapi==0.162.5  # exact version CORE CI is tested on; keep within requirements.txt range
+fastapi==0.162.7  # exact version CORE CI is tested on; keep within requirements.txt range
 starlette==1.10.0  # exact version CORE CI is tested on; keep within requirements.txt range
 uvicorn[standard]==0.54.0
 pydantic>=2.7
