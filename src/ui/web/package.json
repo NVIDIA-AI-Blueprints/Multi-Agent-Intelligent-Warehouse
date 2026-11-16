@@ -95,7 +95,7 @@
     "identity-obj-proxy": "^3.0.0",
     "license-checker": "^25.0.1",
     "babel-plugin-istanbul": "^6.1.1",
-    "@babel/core": "^7.23.0",
+    "@babel/core": "^7.29.13",
     "@babel/preset-env": "^7.29.14"
   },
   "overrides": {
