@@ -10,13 +10,14 @@
 #   MAIW_MCP_TRANSPORT=streamable-http
 #   MAIW_MCP_INVENTORY_PORT=8765   (or EQUIPMENT/LABOR/WAVE variants)
 #
-# Base: Python 3.11 on Debian 13 (trixie), pinned by tag + digest like
-# Dockerfile.backend, so a rebuild cannot silently pick up a different Python
-# or Debian release; Dependabot proposes tag and digest updates.
+# Base: Python 3.11 on Debian 13 (trixie), pinned by tag + digest, so a
+# rebuild cannot silently pick up a different Python or Debian release. It is
+# written in FROM, not in an ARG default, because Dependabot only updates FROM
+# lines; it proposes patch and digest updates for this file and the root
+# Dockerfile together (same image, kept equal by a test). Python minor and
+# major versions are adopted deliberately (.github/dependabot.yml).
 
-ARG PYTHON_IMAGE=python:3.11.18-slim-trixie@sha256:07d4824036af339fa1b6ef769cc99d9c10a141769538b52b3b597c84f7a7b535
-
-FROM ${PYTHON_IMAGE} AS base
+FROM python:3.11.18-slim-trixie@sha256:07d4824036af339fa1b6ef769cc99d9c10a141769538b52b3b597c84f7a7b535 AS base
 
 ARG MCP_DOMAIN=inventory
 
