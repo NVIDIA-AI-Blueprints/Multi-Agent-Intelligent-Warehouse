@@ -52,6 +52,11 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "langchain"
         update-types: ["version-update:semver-major"]
+      # fastembed (pulled in by nemoguardrails) requires loguru<0.8, up to
+      # fastembed 0.9.1; raising the floor made pip backtrack into an
+      # unbuildable pandas (#329). Remove once fastembed allows loguru 0.8.
+      - dependency-name: "loguru"
+        versions: [">= 0.8.0"]
 
   # Node.js dependencies - Frontend UI
   - package-ecosystem: "npm"
@@ -108,9 +113,18 @@ updates:
     # Node major versions are adopted deliberately, in every Dockerfile and
     # the CI matrix together (#290 proposed Node 26 for the root Dockerfile
     # only). Minor, patch and digest updates still arrive.
+    #
+    # Python minor and major versions are adopted deliberately too: CI runs on
+    # 3.11, the backend image on 3.13, and the root Dockerfile copies a
+    # version-specific site-packages path (#326 proposed 3.11 -> 3.15 for the
+    # root Dockerfile only). Patch and digest updates still arrive. Dependabot
+    # only updates FROM lines, not ARG defaults (Dockerfile.backend,
+    # Dockerfile.frontend), so those are bumped by hand.
     ignore:
       - dependency-name: "node"
         update-types: ["version-update:semver-major"]
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
   # GitHub Actions - CI/CD workflows
   - package-ecosystem: "github-actions"

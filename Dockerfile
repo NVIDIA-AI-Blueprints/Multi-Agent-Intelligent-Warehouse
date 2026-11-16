@@ -38,7 +38,10 @@ RUN npm run build
 # =============================================================================
 # Backend Dependencies Stage
 # =============================================================================
-FROM python:3.11-slim AS backend-deps
+# Same Python image as Dockerfile.mcp, pinned by tag + digest (it was the
+# floating python:3.11-slim). The final stage copies site-packages from
+# /usr/local/lib/python3.11, so a Python minor change must update that path.
+FROM python:3.11.18-slim-trixie@sha256:07d4824036af339fa1b6ef769cc99d9c10a141769538b52b3b597c84f7a7b535 AS backend-deps
 
 WORKDIR /app
 
@@ -65,7 +68,7 @@ RUN pip install --no-cache-dir \
 # =============================================================================
 # Final Runtime Stage
 # =============================================================================
-FROM python:3.11-slim AS final
+FROM python:3.11.18-slim-trixie@sha256:07d4824036af339fa1b6ef769cc99d9c10a141769538b52b3b597c84f7a7b535 AS final
 
 # Set working directory
 WORKDIR /app
