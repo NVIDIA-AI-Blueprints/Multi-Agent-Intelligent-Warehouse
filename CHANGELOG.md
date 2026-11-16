@@ -1,3 +1,9 @@
+## Unreleased
+
+### Security
+
+* build: `Dockerfile.mcp` pins its base image by tag and digest (`python:3.11.18-slim-trixie@sha256:07d48240…`), as `Dockerfile.backend` does, instead of the floating `python:3.11-slim`. Each rebuild could otherwise pick up a different Python patch release or Debian base; Dependabot now proposes the updates. The digest is the one `python:3.11-slim` resolved to on 2026-11-16, so today's image is unchanged. A test keeps the pin
+
 ## [3.0.0](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/compare/v2.1.1...v3.0.0) (2026-11-15)
 
 Validated code commit: `main` `1c96c2e`. Changes since [v2.1.1](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/releases/tag/v2.1.1). **Breaking:** `/api/v1/auth/*` is removed and re-applying the schema drops stored password hashes; see "Compatibility" in [RELEASE_NOTES_v3.0.0.md](RELEASE_NOTES_v3.0.0.md), which also has the validation table.
