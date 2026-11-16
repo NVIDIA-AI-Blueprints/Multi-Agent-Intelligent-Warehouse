@@ -1,5 +1,66 @@
 # nSpect Reconciliation: NSPECT-NJMX-9GQU
 
+## MAIW v3.0.0 (candidate `1c96c2e`)
+
+Recorded 2026-11-15. The program-side state below was set up and observed in
+nSpect by the program owner (NVIDIA SSO) and relayed as screenshots; no
+automation read from or wrote to nSpect. Times are nSpect display times.
+
+| Item | State |
+|---|---|
+| Program version | **MAIW v3.0.0**, created 2026-11-15 (planned release date 2026-11-18, External: General Use, Published To GitHub), cloned from MAIW v2.1.1 with ConneX and attributes; builds not cloned. No child programs in ConneX |
+| Registered source | Component `Multi-Agent-Intelligent-Warehouse`: `ssh://git@github.com/NVIDIA-AI-Blueprints/multi-agent-intelligent-warehouse.git` at `1c96c2e735d1661a97110d9e26738eed0d9d7e19`, reporting enabled, no SBOM name (nSpect scanning). No builds, binary artifacts, container images or Helm charts, as for v2.1.1 |
+| OSS scan | On-demand scan, started 2026-11-15 13:14, completed (last scan 13:43): **0 Critical, 2 High, 8 Medium, 3 Low**. Program Scan Health: no scan failures, no clone failures. Security Risk Report: 0 verified secrets, 0 high-risk licences |
+| Exceptions | **EXC-MOOT-B57E** (Source Repo Exception, Not Affected, branch `1c96c2e…`), created 2026-11-15 14:48 and approved the same day; covers both High findings (below). EXC-HPU1-JZI6 and EXC-TNK9-0X62 are bound to the v2.1.1 branch `4259fa3`, and Allowed Vulnerabilities was empty for MAIW v3.0.0 before EXC-MOOT-B57E |
+| SBOM | **Uploaded** 2026-11-15 (below) |
+
+### Findings
+
+The 16 findings of v2.1.1 less `react-router`, `serialize-javascript` and the
+`requests` minimum, which v3.0.0 fixes; none is new. Dispositions are in
+`RELEASE_NOTES_v3.0.0.md` ("nSpect findings for MAIW v3.0.0").
+
+| Finding | Exception (EXC-MOOT-B57E) | Evidence, re-checked at `1c96c2e` |
+|---|---|---|
+| `react-dev-utils` 12.0.1, BDSA-2026-18203 / CVE-2026-14802 (CVSS 8.9, SLA breach 2027-02-13) | Not Affected, `requires_configuration` | The UI start script sets `BROWSER=${BROWSER:-none}`; `src/ui/web/src/__tests__/devServerNoAutoBrowser.test.ts` pins it. Development server only |
+| `svgo` 2.8.4, BDSA-2026-27126 / CVE-2026-73650 (CVSS 7.4, SLA breach 2027-02-13) | Not Affected, `code_not_present` | GHSA-2p49-hgcm-8545: affected < 2.8.3, fixed in 2.8.3. Resolved under `postcss-svgo`; the top-level `svgo` is 4.1.0. Build time only |
+
+### SBOM to submit
+
+The four CI SBOMs of `1c96c2e` come from
+[CI run 43736730172](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/actions/runs/43736730172)
+(CI/CD Pipeline dispatched on `main` at `1c96c2e` with `release_version=3.0.0`;
+artifacts `sbom-backend`, `sbom-frontend`, `sbom-mcp`, kept until 2027-02-13).
+Each records `maiw:git_sha=1c96c2e735d1661a97110d9e26738eed0d9d7e19` and
+`maiw:release_version=3.0.0` and passes `scripts/security/validate_sbom.py`;
+no re-stamping was needed.
+
+| File | Components | sha256 |
+|---|---|---|
+| `maiw-backend.cdx.json` | 187 | `967bdff7eb7455bd5ded5c8d829aab7b9dd5ef924f80ffec5dcdbc9d20f649e7` |
+| `maiw-frontend.cdx.json` | 71 | `d28236b83cc87349e008a439893fba895a596b424a4e23d2fe31ea06fa16dd1c` |
+| `maiw-ui-bundle.cdx.json` | 1365 | `3007f209c0bfe741b24075c12dc2bfad8e31464f63f90c8ae6c03c2488f8859c` |
+| `maiw-mcp.cdx.json` | 154 | `dc968f424c835536773fc72c76c9f26c3cde64253365732281797c9f1b8f0707` |
+
+nSpect's form takes one file, so they are merged as for v2.1.1 (each image or
+bundle becomes a component the release depends on; components kept flat, a
+`bom-ref` in more than one input listed once, dependencies unioned, nothing
+added or edited):
+
+| | |
+|---|---|
+| File | `maiw-v3.0.0-1c96c2e.cdx.json`, CycloneDX 1.6, **1639 components**, sha256 `3abea3726ca937b3135a0da6c41ece591d70b04cd4bbf0df2c25a318756ae683` |
+| Identity | `metadata.component` = Multi-Agent-Intelligent-Warehouse 3.0.0; `maiw:artifact=maiw-release`, `maiw:git_sha=1c96c2e735d1661a97110d9e26738eed0d9d7e19`, `maiw:release_version=3.0.0`; inputs and their sha256 recorded as `merged-from:*` properties |
+| Checks | `validate_sbom.py` from `1c96c2e` (schema, ≥ 1000 components, tool recorded): valid; no dangling dependency references |
+| Upload | **Uploaded** 2026-11-15 21:23 under **Actions → Manage SBOM → Upload an SBOM** on MAIW v3.0.0, type "Custom", with no program attributes (not partner- or commercially provided). The uploader's local copy has the sha256 above. nSpect's returned copy has a different sha256 (re-serialized) but parses to identical content: same serial number `urn:uuid:e8235098-b302-42d6-9308-5656fabae8f5`, 1639 components |
+
+### Remaining owner steps for v3.0.0
+
+None for the release gate. Optional: generate the Version and ConneX SBOMs
+under Manage SBOM step 4, and link the SonarQube project under Security
+Analysis (registration summary: "no source code is being analyzed by static
+analysis tools").
+
 ## MAIW v2.1.1 (candidate `4259fa3`)
 
 Recorded 2026-11-06. The program-side state below was observed in nSpect by
@@ -13,7 +74,7 @@ from or wrote to nSpect.
 | OSS scan | Repository `…multi-agent-intelligent-warehouse--4259fa37aa3676bbcc3378f00d067d9bdcc01174`, last scan 2026-11-05 17:57 (nSpect display time): **0 Critical, 2 High, 10 Medium, 4 Low** |
 | Package inventory | npm rows match the UI SBOM (`maiw-ui-bundle.cdx.json`) version for version. Python rows are the minimums in `requirements.txt` (for example `requests` 2.32.4 and `xgboost` 3.2.0), not installed versions: the images install `requests` 2.34.2 and the backend image has no `xgboost` |
 | SBOM | Uploaded 2026-11-06 under Manage SBOM → Upload an SBOM (see below) |
-| Exceptions | `react-dev-utils`: Not Affected exception **EXC-HPU1-JZI6** (Launch nAbler / Exception Tracker), filed and approved 2026-11-06. `svgo`: Resolved exception **EXC-TNK9-0X62**, filed and approved 2026-11-06. Approvals as reported by the program owner |
+| Exceptions | `react-dev-utils`: Not Affected exception **EXC-HPU1-JZI6** (Launch nAbler / Exception Tracker), filed and approved 2026-11-06. `svgo`: exception **EXC-TNK9-0X62**, filed and approved 2026-11-06; recorded here at the time as Resolved, but Exception Tracker shows its category as **Not Affected** (checked 2026-11-15). Approvals as reported by the program owner |
 | Registered builds or images | None. Binary and container-image sources are not registered: no image is distributed; Compose builds them locally |
 
 ### Findings
