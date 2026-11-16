@@ -61,7 +61,9 @@ def test_root_dockerfile_python_matches_mcp_and_site_packages_path():
     is not built in CI. Its Python stages use the same pinned image as
     Dockerfile.mcp, which is, and the site-packages path it copies matches that
     image's Python minor version (#326 proposed 3.15 with the 3.11 path)."""
-    mcp = re.findall(r"^FROM (\S+)", (REPO_ROOT / "Dockerfile.mcp").read_text(), re.MULTILINE)
+    mcp = re.findall(
+        r"^FROM (\S+)", (REPO_ROOT / "Dockerfile.mcp").read_text(), re.MULTILINE
+    )
     root = (REPO_ROOT / "Dockerfile").read_text()
     pythons = re.findall(r"^FROM (python:\S+) AS \S+$", root, re.MULTILINE)
     assert len(pythons) == 2 and set(pythons) == set(mcp)
