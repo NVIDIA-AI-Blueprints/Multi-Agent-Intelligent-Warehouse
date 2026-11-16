@@ -44,6 +44,18 @@ def test_backend_base_is_python_313_trixie_pinned_by_digest():
     assert "/usr/local/lib/python3.13/site-packages" in text
 
 
+def test_mcp_base_is_python_311_trixie_pinned_by_digest():
+    """Dockerfile.mcp used the floating ``python:3.11-slim`` tag, so each build
+    could get a different Python patch release or Debian base. Pin it by tag
+    and digest, as Dockerfile.backend does."""
+    text = (REPO_ROOT / "Dockerfile.mcp").read_text()
+    m = re.search(r"^ARG PYTHON_IMAGE=(\S+)$", text, re.MULTILINE)
+    assert m, "Dockerfile.mcp must pin its base via ARG PYTHON_IMAGE"
+    assert re.match(r"python:3\.11\.\d+-slim-trixie@sha256:[0-9a-f]{64}$", m.group(1))
+    froms = re.findall(r"^FROM (\S+)", text, re.MULTILINE)
+    assert froms and all(f == "${PYTHON_IMAGE}" for f in froms)
+
+
 def test_backend_runtime_stage_ships_no_extra_tools():
     stages = _stages((REPO_ROOT / "Dockerfile.backend").read_text())
     final = _instructions(stages["final"])
