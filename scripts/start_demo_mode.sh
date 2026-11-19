@@ -26,6 +26,11 @@
 # To start the frontend (in a separate terminal):
 #   cd src/ui/web && npm start
 #   Open http://localhost:3001 → OPERATIONS
+# The UI proxies /api to localhost:8001; with another DEMO_PORT start it with
+#   MAIW_API_PROXY_TARGET=http://localhost:<DEMO_PORT> npm start
+# A UI on a port other than 3000/3001 (PORT=<port> npm start) can change state
+# only if this API runs with CORS_ORIGINS=http://localhost:<port>; otherwise
+# actions fail with 403 CROSS_ORIGIN_REQUEST_FORBIDDEN.
 
 set -euo pipefail
 
@@ -151,8 +156,14 @@ echo "    labor_constraint_wave_risk    — understaffed shift, wave priority co
 echo "    stale_state                   — agent reasons on outdated snapshot"
 echo "    state_drift                   — warehouse state changes between propose and execute"
 echo ""
+UI_START="cd src/ui/web && npm start"
+if [[ "${DEMO_PORT}" != "8001" ]]; then
+    UI_START="cd src/ui/web && MAIW_API_PROXY_TARGET=http://localhost:${DEMO_PORT} npm start"
+fi
 echo "  Next steps:"
-echo "    1. In a separate terminal: cd src/ui/web && npm start"
+echo "    1. In a separate terminal: ${UI_START}"
+echo "       (UI on a port other than 3000/3001: PORT=<port>, and start this API"
+echo "        with CORS_ORIGINS=http://localhost:<port>, or actions get 403)"
 echo "    2. Open http://localhost:3001 → OPERATIONS"
 echo "    3. Select 'labor_constraint_wave_risk' and click START"
 echo "─────────────────────────────────────────────────────"

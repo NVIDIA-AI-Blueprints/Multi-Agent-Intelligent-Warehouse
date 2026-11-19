@@ -74,6 +74,10 @@ MAIW_DEMO_MODE=true MAIW_PERSISTENCE_MODE=memory uvicorn maiw_api.app:app --relo
 # 6. Start the frontend (in a second terminal; proxies /api to localhost:8001)
 cd src/ui/web && npm install && npm start
 # Runs at http://localhost:3001 (bound to 127.0.0.1; see DEPLOYMENT.md for remote access)
+# Other ports: if the API is not on 8001, start the UI with
+#   MAIW_API_PROXY_TARGET=http://localhost:<api-port> npm start
+# For a UI port other than 3000/3001 (PORT=<port> npm start), start the API with
+#   CORS_ORIGINS=http://localhost:<port>, or actions fail with 403 (see Troubleshooting)
 ```
 
 > For a durable local run set `MAIW_PERSISTENCE_ROOT` to a writable directory instead of `MAIW_PERSISTENCE_MODE=memory`; the reference deployment (`scripts/start_reference_deployment.sh`) is always file-backed.
