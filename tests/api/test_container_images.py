@@ -110,7 +110,7 @@ def test_frontend_runtime_is_static_nginx_without_node():
         re.MULTILINE,
     )
     assert re.search(
-        r"^ARG NGINX_IMAGE=nginxinc/nginx-unprivileged:\S+-alpine\S*@sha256:[0-9a-f]{64}$",
+        r"^ARG NGINX_IMAGE=(nginxinc|ghcr\.io/nginx)/nginx-unprivileged:\S+-alpine\S*@sha256:[0-9a-f]{64}$",
         text,
         re.MULTILINE,
     )
