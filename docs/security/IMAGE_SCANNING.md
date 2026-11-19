@@ -21,7 +21,7 @@ The image scan exists because the repository scan cannot see what an image conta
 | Image | Base | HIGH | CRITICAL | Fixable |
 |---|---|---|---|---|
 | backend | `python:3.13.16-slim-trixie` (Debian 13.7) | 45 | 0 | 0 |
-| frontend | `nginxinc/nginx-unprivileged:1.30.6-alpine3.24` | 0 | 0 | 0 |
+| frontend | `ghcr.io/nginx/nginx-unprivileged:1.30.7-alpine3.24` | 0 | 0 | 0 |
 | mcp | `python:3.11-slim` (Debian 13.7) | 45 | 0 | 0 |
 
 **Disclosed risk:** the backend and MCP images each carry 45 HIGH findings that have no fix. They are all in Debian packages with no fixed version published yet:
@@ -31,6 +31,7 @@ The image scan exists because the repository scan cannot see what an image conta
 Both Dockerfiles run `apt-get upgrade`, so the next CI build picks up each fix when Debian publishes it. A published fix that does not reach the image fails the image gate.
 
 Changes that reached this baseline:
+- **frontend (2026-11-19):** nginx 1.30.6 → 1.30.7, for six findings (4 CRITICAL, 2 HIGH) published after the baseline: CVE-2026-113425, CVE-2026-118899, CVE-2026-121810, CVE-2026-123007, CVE-2026-123633 and CVE-2026-123634. The image is now pulled from GHCR (`ghcr.io/nginx/nginx-unprivileged`), where nginx published 1.30.7 on 2026-11-18; the Docker Hub copy (`nginxinc/`) had no 1.30.7 tag. Both are built by the same workflow in [nginx/docker-nginx-unprivileged](https://github.com/nginx/docker-nginx-unprivileged).
 - **frontend:** nginx 1.30.5 → 1.30.6, for three HIGH findings. nginx comes from nginx.org's Alpine repository, so the Dockerfile's `apk upgrade` does not update it; the base image has to change. Dependabot does not update `ARG` image defaults, so check this scan when an nginx advisory appears.
 - **mcp:**
   - Removed `setuptools`, `wheel` and `pip` after installation, which clears HIGH findings in `jaraco.context` 5.3.0 and `wheel` 0.45.1 (both vendored in `setuptools`).
