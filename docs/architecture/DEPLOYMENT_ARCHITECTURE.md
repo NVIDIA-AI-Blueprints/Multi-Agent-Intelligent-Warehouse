@@ -152,7 +152,7 @@ scalable. See [Stateless MCP Invariant](#stateless-mcp-invariant).
 |---|---|
 | Dockerfile | `Dockerfile.frontend` |
 | Build stage | `node:22.x-alpine` — `npm ci` + `npm run build` (not shipped) |
-| Runtime image | `nginxinc/nginx-unprivileged:1.30.x-alpine` (non-root, no Node.js/npm) |
+| Runtime image | `ghcr.io/nginx/nginx-unprivileged:1.30.x-alpine` (non-root, no Node.js/npm) |
 | Container port | `8080` (compose publishes `3001:8080`) |
 | API dependency | nginx proxies `/api/` to `MAIW_API_UPSTREAM` (default `http://backend:8001`) |
 | Healthcheck | `GET /healthz` |
