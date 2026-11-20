@@ -48,8 +48,10 @@ const PROFILES: FaultProfile[] = [
     name: 'CIRCUIT OPEN',
     desc: 'Labor MCP domain circuit breaker trips',
     safetyBehavior: 'Labor: CIRCUIT OPEN. Equipment/Inventory: HEALTHY (domain isolation).',
-    injectEventType: 'worker_absence' as InjectEventType,
-    injectPayload: { worker_id: 'w-fault-sim' },
+    // Demo Mode cannot trip a domain circuit: no inject event does, so this
+    // is proven in tests only. For a live labor shortage use LABOR SHORT in
+    // the Demo Control Bar.
+    injectEventType: null, // test-infrastructure only
   },
 ];
 
