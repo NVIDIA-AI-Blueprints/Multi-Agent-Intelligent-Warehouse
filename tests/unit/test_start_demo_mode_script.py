@@ -70,6 +70,13 @@ def fake_repo(tmp_path: Path) -> Path:
 
 
 def _run(root: Path, tmp_path: Path, extra: dict | None = None) -> tuple[list, dict]:
+    args, exec_env, _ = _run_with_output(root, tmp_path, extra)
+    return args, exec_env
+
+
+def _run_with_output(
+    root: Path, tmp_path: Path, extra: dict | None = None
+) -> tuple[list, dict, str]:
     out = tmp_path / "exec"
     env = {
         "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
@@ -93,7 +100,7 @@ def _run(root: Path, tmp_path: Path, extra: dict | None = None) -> tuple[list, d
         for line in Path(f"{out}.env").read_text().splitlines()
         if "=" in line
     )
-    return args, exec_env
+    return args, exec_env, proc.stdout
 
 
 def _host_port(args: list) -> tuple[str, str]:
@@ -200,3 +207,14 @@ def test_missing_interpreter_fails_with_quickstart_hint(fake_repo, tmp_path):
     )
     assert proc.returncode == 1
     assert "python3 -m venv .venv" in proc.stdout
+
+
+def test_frontend_hint_follows_an_alternate_demo_port(fake_repo, tmp_path):
+    _write_stub(fake_repo / ".venv" / "bin" / "python")
+    port = str(_free_port())
+    _, _, stdout = _run_with_output(fake_repo, tmp_path, {"DEMO_PORT": port})
+    assert (
+        f"cd src/ui/web && MAIW_API_PROXY_TARGET=http://localhost:{port} npm start"
+        in stdout
+    )
+    assert "CORS_ORIGINS=http://localhost:<port>" in stdout

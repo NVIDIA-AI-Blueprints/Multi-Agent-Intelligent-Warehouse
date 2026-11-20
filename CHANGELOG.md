@@ -13,6 +13,7 @@
 
 ### Documentation
 
+* demo: `scripts/start_demo_mode.sh` prints a frontend command that reaches the API it started. With `DEMO_PORT` other than 8001 it now prints `MAIW_API_PROXY_TARGET=http://localhost:<DEMO_PORT> npm start`; before, it printed plain `npm start`, whose dev-server proxy targets port 8001 and so reached whatever else listens there, not the demo API. The script header, its startup summary and README quick start step 6 also say that a UI on a port other than 3000 or 3001 needs that origin in the API's `CORS_ORIGINS`, or every action fails with `403 CROSS_ORIGIN_REQUEST_FORBIDDEN`
 * security: `docs/security/nspect-reconciliation.md` records the program owner's 2026-11-16 decisions: the `bpf-maiw-backend` and `bpf-maiw-frontend` images are not used or distributed, so they are not registered; program version v0.2-test is End of Life; v0.1 stays active because of an open legal compliance request. This closes the v2.1.0 owner steps "v0.2-test" and "Artifacts". `sbom-generation.md`, `DEPLOYMENT_ARCHITECTURE.md`, the backend and frontend Dockerfile header comments and the image-test docstring no longer say the images are published as `bpf-maiw-*`
 
 ## [3.0.0](https://github.com/NVIDIA-AI-Blueprints/Multi-Agent-Intelligent-Warehouse/compare/v2.1.1...v3.0.0) (2026-11-15)
