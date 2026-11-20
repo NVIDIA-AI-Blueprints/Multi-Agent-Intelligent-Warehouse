@@ -219,7 +219,7 @@ export default function FaultInjectionPanel({ scenarioId, sseEvents }: Props) {
     F12: [
       {
         label: 'INJECT WORKER ABSENCE',
-        description: 'Simulate labor domain stress → worker_absence burst',
+        description: 'Mark one worker absent. Does not trip the labor circuit; that is proven in tests only',
         action: () => demoAPI.inject('worker_absence', {}),
         color: '#D29922',
         testId: 'inject-fault-F12',

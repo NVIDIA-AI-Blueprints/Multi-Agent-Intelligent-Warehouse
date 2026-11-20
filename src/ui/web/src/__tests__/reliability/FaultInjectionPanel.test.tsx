@@ -37,16 +37,24 @@ describe('FaultInjectionPanel', () => {
     expect(screen.getByText(/DEMO FAULT INJECTION/i)).toBeInTheDocument();
   });
 
-  it('shows TEST ONLY for non-injectable profiles (F01, F06, F08)', () => {
+  it('shows TEST ONLY for non-injectable profiles (F01, F06, F08, F12)', () => {
     wrap();
     const testOnlyLabels = screen.getAllByText('TEST ONLY');
-    expect(testOnlyLabels.length).toBe(3);
+    expect(testOnlyLabels.length).toBe(4);
   });
 
-  it('shows INJECT buttons for injectable profiles (F10, F12)', () => {
+  it('shows an INJECT button only for F10', () => {
     wrap();
     const injectButtons = screen.getAllByText('INJECT');
-    expect(injectButtons.length).toBe(2);
+    expect(injectButtons.length).toBe(1);
+  });
+
+  it('F12 is test-only: Demo Mode has no event that trips a domain circuit', () => {
+    wrap(true);
+    const f12Row = screen.getByText('F12').parentElement as HTMLElement;
+    expect(f12Row).toHaveTextContent('CIRCUIT OPEN');
+    expect(f12Row).toHaveTextContent('TEST ONLY');
+    expect(f12Row.querySelector('button')).toBeNull();
   });
 
   it('calls demoAPI.inject when INJECT clicked for F10 — backend resolves the asset', async () => {

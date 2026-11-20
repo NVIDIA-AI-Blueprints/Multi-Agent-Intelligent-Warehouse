@@ -125,7 +125,7 @@ panel needs only a backend running with `MAIW_DEMO_MODE=true`.
 
 (The RELIABILITY nav tab, `/command`, also shows a Fault Injection panel when
 the frontend is started with `REACT_APP_FAULT_INJECTION_ENABLED=true` in
-`src/ui/web/.env`, but there F06 is marked TEST ONLY and cannot be injected.)
+`src/ui/web/.env`, but there F06 and F12 are marked TEST ONLY and cannot be injected.)
 
 ### Recommended fault injection sequence
 
@@ -161,13 +161,23 @@ the frontend is started with `REACT_APP_FAULT_INJECTION_ENABLED=true` in
    and execution time — outcome is **CONFLICT**
 4. Safety scorecard shows `stale_decisions_blocked: 1`
 
-#### F12 — Circuit Open
+#### F12 — Circuit Open (proven in tests, not injectable)
 
-1. Inject **F12 — Circuit Open** (simulates worker absence event)
-2. Observe: Domain Health panel shows `labor: CIRCUIT OPEN`
-3. Attempt to execute a labor action — it is blocked
-4. The other domains (equipment, wave, inventory) remain **HEALTHY**
-5. Narrate domain isolation: one domain's outage cannot affect others
+Demo Mode has no event that trips a domain circuit breaker, so the Domain
+Health panel stays **HEALTHY** for every domain. The circuit trip and domain
+isolation are proven by
+`tests/unit/reliability/test_scenario_001_faults.py::test_f12_circuit_open_isolates_domain`:
+after the labor circuit opens, labor reports `CIRCUIT OPEN` while equipment and
+inventory stay `HEALTHY`.
+
+The F12 button in OPERATIONS (**INJECT WORKER ABSENCE**) and **LABOR SHORT**
+in the Demo Control Bar only mark one worker absent. Use them to show a labor
+shortage (labor availability drops), not a circuit trip.
+
+**What to narrate:**
+> "Each warehouse domain has its own circuit breaker. If the labor system goes
+> down, its circuit opens and equipment and inventory keep working. That is
+> proven in CI; the demo world cannot take a real MCP server down."
 
 ---
 
