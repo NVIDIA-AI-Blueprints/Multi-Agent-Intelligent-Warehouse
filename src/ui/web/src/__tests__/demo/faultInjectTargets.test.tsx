@@ -85,6 +85,7 @@ describe('injectFeedback', () => {
     expect(describeInjectTarget({ worker_id: 'worker-000000', status: 'on_leave' })).toBe('Targeted worker-000000');
     expect(describeInjectTarget({ sku: 'sku-000000', quantity_available: 50 })).toBe('Targeted sku-000000');
     expect(describeInjectTarget({ task_id: 'task-000003', deadline: 'x' })).toBe('Targeted task-000003');
+    expect(describeInjectTarget({ domain: 'labor', circuit_state: 'open' })).toBe('Targeted labor');
     expect(describeInjectTarget({ status: 'offline' })).toBeNull();
     expect(describeInjectTarget(undefined)).toBeNull();
   });
@@ -164,12 +165,14 @@ describe('demo reliability FaultInjectionPanel', () => {
     expectNoHardCodedAsset();
   });
 
-  it('F12 sends no worker_id and shows the resolved worker', async () => {
-    injectMock.mockResolvedValue({ worker_id: 'worker-000001', status: 'on_leave' });
+  it('F12 opens the labor MCP circuit and RESTORE closes it', async () => {
+    injectMock.mockResolvedValue({ domain: 'labor', circuit_state: 'open' });
     themed(<DemoFaultPanel scenarioId="F12" sseEvents={[]} />);
     await act(async () => { fireEvent.click(screen.getByTestId('inject-fault-F12')); });
-    expect(await screen.findByTestId('inject-result')).toHaveTextContent('Targeted worker-000001');
-    expect(injectMock).toHaveBeenCalledWith('worker_absence', {});
+    expect(await screen.findByTestId('inject-result')).toHaveTextContent('Targeted labor');
+    expect(injectMock).toHaveBeenCalledWith('mcp_outage', { domain: 'labor' });
+    await act(async () => { fireEvent.click(screen.getByTestId('restore-fault-F12')); });
+    expect(injectMock).toHaveBeenLastCalledWith('mcp_restore', { domain: 'labor' });
   });
 
   it('F01 sends no task_id and shows the resolved task', async () => {

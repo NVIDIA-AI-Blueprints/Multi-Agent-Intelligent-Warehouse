@@ -12,7 +12,9 @@
  * an eligible asset from the ACTIVE demo world and returns it ("Targeted …").
  * F06 sets simulate_ambiguous_write: the backend arms a one-shot lost-response
  * fault on that asset's next committed write (UNKNOWN → no retry → reconcile).
- * F12/F01 have no direct inject — operator notes walk through manual steps.
+ * F12 sends mcp_outage { domain: 'labor' }: the labor MCP server becomes unreachable
+ * and its circuit breaker trips (RESTORE LABOR MCP ends it).
+ * F01 has no direct inject — operator notes walk through manual steps.
  *
  * RECONCILE NOW enables when the backend publishes RECONCILIATION_REQUIRED for
  * a governed execution that ended UNKNOWN (SSE: top-level execution_id/domain
@@ -218,11 +220,18 @@ export default function FaultInjectionPanel({ scenarioId, sseEvents }: Props) {
     ],
     F12: [
       {
-        label: 'INJECT WORKER ABSENCE',
-        description: 'Mark one worker absent. Does not trip the labor circuit; that is proven in tests only',
-        action: () => demoAPI.inject('worker_absence', {}),
+        label: 'INJECT LABOR MCP OUTAGE',
+        description: 'Labor MCP server unreachable → labor circuit opens; MAIW refuses to analyze or approve until restored',
+        action: () => demoAPI.inject('mcp_outage', { domain: 'labor' }),
         color: '#D29922',
         testId: 'inject-fault-F12',
+      },
+      {
+        label: 'RESTORE LABOR MCP',
+        description: 'Labor MCP server reachable again → labor circuit closes',
+        action: () => demoAPI.inject('mcp_restore', { domain: 'labor' }),
+        color: '#3FB950',
+        testId: 'restore-fault-F12',
       },
     ],
     F01: [

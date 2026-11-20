@@ -125,7 +125,7 @@ panel needs only a backend running with `MAIW_DEMO_MODE=true`.
 
 (The RELIABILITY nav tab, `/command`, also shows a Fault Injection panel when
 the frontend is started with `REACT_APP_FAULT_INJECTION_ENABLED=true` in
-`src/ui/web/.env`, but there F06 and F12 are marked TEST ONLY and cannot be injected.)
+`src/ui/web/.env`, but there F06 is marked TEST ONLY and cannot be injected.)
 
 ### Recommended fault injection sequence
 
@@ -161,23 +161,34 @@ the frontend is started with `REACT_APP_FAULT_INJECTION_ENABLED=true` in
    and execution time — outcome is **CONFLICT**
 4. Safety scorecard shows `stale_decisions_blocked: 1`
 
-#### F12 — Circuit Open (proven in tests, not injectable)
+#### F12 — Circuit Open
 
-Demo Mode has no event that trips a domain circuit breaker, so the Domain
-Health panel stays **HEALTHY** for every domain. The circuit trip and domain
-isolation are proven by
-`tests/unit/reliability/test_scenario_001_faults.py::test_f12_circuit_open_isolates_domain`:
-after the labor circuit opens, labor reports `CIRCUIT OPEN` while equipment and
-inventory stay `HEALTHY`.
-
-The F12 button in OPERATIONS (**INJECT WORKER ABSENCE**) and **LABOR SHORT**
-in the Demo Control Bar only mark one worker absent. Use them to show a labor
-shortage (labor availability drops), not a circuit trip.
+1. Click **INJECT LABOR MCP OUTAGE** (on `/command`: F12 **INJECT**). The
+   labor MCP server becomes unreachable for the API, and the real labor
+   circuit breaker trips after its failure threshold of refused connections
+   (`MAIW_CIRCUIT_FAILURE_THRESHOLD`, default 5). Nothing is sent to the
+   server.
+2. Observe: Domain Health shows `labor: CIRCUIT OPEN`; equipment, wave and
+   inventory stay **HEALTHY**; MAIW status is **DEGRADED**. The activity feed
+   shows a `CIRCUIT_OPEN` event.
+3. Click **RUN MAIW** (or approve a pending action): it is refused with
+   **503 MCP CIRCUIT OPEN**. Analysis and approval need every domain's state,
+   so MAIW does not decide on partial state. The model is not called and
+   nothing is written. An approval attempted now is used up; run MAIW again
+   after the restore.
+4. The outage lasts until restored: after the cooldown
+   (`MAIW_CIRCUIT_COOLDOWN_SECONDS`, default 30) the breaker lets one probe
+   through, which also fails to connect, so the circuit opens again.
+5. Click **RESTORE LABOR MCP** (on `/command`: **RESTORE**). The circuit
+   closes and MAIW is HEALTHY again; RUN MAIW and approvals work. **RESET**
+   or starting a scenario also ends the outage.
 
 **What to narrate:**
-> "Each warehouse domain has its own circuit breaker. If the labor system goes
-> down, its circuit opens and equipment and inventory keep working. That is
-> proven in CI; the demo world cannot take a real MCP server down."
+> "Each warehouse domain has its own circuit breaker. The labor system is
+> down, so its circuit is open and labor calls are refused before anything is
+> sent. The other circuits stay closed. MAIW will not decide without labor
+> data, so it stops proposing and executing instead of guessing, and the
+> safety counters stay at zero. When labor comes back, it carries on."
 
 ---
 

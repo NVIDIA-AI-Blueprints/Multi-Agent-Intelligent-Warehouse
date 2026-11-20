@@ -59,7 +59,7 @@ Mark each item **[PASS]**, **[FAIL]**, or **[N/A]** with a note.
 | R3 | F06: Reconciliation resolves to CONFIRMED_EXECUTED | | |
 | R4 | F06: `duplicate_writes: 0` remains zero after reconcile | | |
 | R5 | F10 (State Drift): executor returns CONFLICT, `stale_decisions_blocked` increments | | |
-| R6 | F12 (Circuit Open): marked TEST ONLY on `/command`; its OPERATIONS button (INJECT WORKER ABSENCE) marks one worker absent and all four domains stay HEALTHY. The circuit trip itself is covered by `test_f12_circuit_open_isolates_domain` | | |
+| R6 | F12 (Circuit Open): `labor: CIRCUIT OPEN` and MAIW DEGRADED shown, equipment, wave and inventory remain HEALTHY; RUN MAIW is refused with MCP CIRCUIT OPEN and nothing is written; RESTORE returns labor to HEALTHY | | |
 | R7 | Safety Scorecard shows no violations after any fault injection | | |
 
 ---

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import { nvidiaTheme } from '../../theme/nvidiaTheme';
@@ -37,24 +37,30 @@ describe('FaultInjectionPanel', () => {
     expect(screen.getByText(/DEMO FAULT INJECTION/i)).toBeInTheDocument();
   });
 
-  it('shows TEST ONLY for non-injectable profiles (F01, F06, F08, F12)', () => {
+  it('shows TEST ONLY for non-injectable profiles (F01, F06, F08)', () => {
     wrap();
     const testOnlyLabels = screen.getAllByText('TEST ONLY');
-    expect(testOnlyLabels.length).toBe(4);
+    expect(testOnlyLabels.length).toBe(3);
   });
 
-  it('shows an INJECT button only for F10', () => {
+  it('shows INJECT buttons for injectable profiles (F10, F12)', () => {
     wrap();
     const injectButtons = screen.getAllByText('INJECT');
-    expect(injectButtons.length).toBe(1);
+    expect(injectButtons.length).toBe(2);
   });
 
-  it('F12 is test-only: Demo Mode has no event that trips a domain circuit', () => {
+  it('F12 opens the labor circuit (mcp_outage) and offers RESTORE (mcp_restore)', async () => {
+    (demoAPI.inject as jest.Mock).mockResolvedValueOnce({ domain: 'labor', circuit_state: 'open' });
     wrap(true);
     const f12Row = screen.getByText('F12').parentElement as HTMLElement;
-    expect(f12Row).toHaveTextContent('CIRCUIT OPEN');
-    expect(f12Row).toHaveTextContent('TEST ONLY');
-    expect(f12Row.querySelector('button')).toBeNull();
+    fireEvent.click(within(f12Row).getByText('INJECT'));
+    await waitFor(() => expect(demoAPI.inject).toHaveBeenCalledWith('mcp_outage', { domain: 'labor' }));
+    expect(await screen.findByTestId('fault-inject-feedback')).toHaveTextContent('F12 · Targeted labor');
+
+    fireEvent.click(within(f12Row).getByText('RESTORE'));
+    await waitFor(() => expect(demoAPI.inject).toHaveBeenLastCalledWith('mcp_restore', { domain: 'labor' }));
+    expect(await screen.findByTestId('fault-inject-feedback')).toHaveTextContent('F12 · restored');
+    expect(within(f12Row).getByText('INJECT')).toBeInTheDocument();
   });
 
   it('calls demoAPI.inject when INJECT clicked for F10 — backend resolves the asset', async () => {
