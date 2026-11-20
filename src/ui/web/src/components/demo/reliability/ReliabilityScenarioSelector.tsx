@@ -50,7 +50,7 @@ export const FAULT_SCENARIOS: FaultScenario[] = [
     id: 'F12',
     title: 'Labor MCP Circuit Open',
     subtitle: 'Labor domain unavailable; others healthy',
-    expected: 'Labor unavailable → runtime DEGRADED; Equipment/Inventory remain available',
+    expected: 'Labor circuit open → runtime DEGRADED; other circuits stay closed; no decision on partial state',
     narrative: ['CIRCUIT_OPEN', 'SAFETY', 'DEGRADED'],
     domain: 'labor',
   },

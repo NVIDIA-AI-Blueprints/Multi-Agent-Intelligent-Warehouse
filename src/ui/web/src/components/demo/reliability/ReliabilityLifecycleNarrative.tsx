@@ -152,7 +152,7 @@ const F12_STEPS: NarrativeStep[] = [
   {
     id: 'safety',
     label: 'SAFETY',
-    sublabel: 'Domain isolated — Equipment/Inventory remain available',
+    sublabel: 'Domain isolated — other circuits stay closed; nothing written',
     completed: (e) => e.some(ev => ev.category === 'CIRCUIT_OPEN'),
   },
   {

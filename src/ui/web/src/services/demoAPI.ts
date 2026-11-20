@@ -56,7 +56,11 @@ export type InjectEventType =
   | 'worker_absence'
   | 'worker_return'
   | 'task_deadline'
-  | 'wave_delay';
+  | 'wave_delay'
+  // Demo fault F12: payload { domain }; the domain's MCP server becomes
+  // unreachable and its circuit breaker trips, until mcp_restore.
+  | 'mcp_outage'
+  | 'mcp_restore';
 
 export interface RecommendedAction {
   domain: 'equipment' | 'labor' | 'wave' | 'inventory';

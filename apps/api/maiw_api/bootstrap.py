@@ -108,6 +108,9 @@ class MAIWRuntime:
     # Circuit breakers — per-domain isolation and NIM/ModelGateway isolation
     circuit_registry: Any = None  # maiw_mcp.DomainCircuitRegistry (per-MCP-domain)
     nim_circuit: Any = None  # maiw_mcp.CircuitBreaker (NIM/ModelGateway)
+    # Demo-only MCP outages (fault F12): {domain: {capability: original route}}.
+    # See maiw_api.demo.mcp_outage; always empty outside Demo Mode.
+    demo_mcp_outages: dict = field(default_factory=dict)
 
     # Execution registries — single-process idempotency + reconciliation state
     equipment_registry: Any = None  # maiw_execution.ExecutionRegistry

@@ -10,6 +10,9 @@ interface FaultProfile {
   safetyBehavior: string;
   injectEventType: InjectEventType | null;
   injectPayload?: Record<string, any>;
+  /** Ends the fault; offered as RESTORE once the fault was injected. */
+  restoreEventType?: InjectEventType;
+  restorePayload?: Record<string, unknown>;
 }
 
 const PROFILES: FaultProfile[] = [
@@ -46,12 +49,15 @@ const PROFILES: FaultProfile[] = [
   {
     id: 'F12',
     name: 'CIRCUIT OPEN',
-    desc: 'Labor MCP domain circuit breaker trips',
-    safetyBehavior: 'Labor: CIRCUIT OPEN. Equipment/Inventory: HEALTHY (domain isolation).',
-    // Demo Mode cannot trip a domain circuit: no inject event does, so this
-    // is proven in tests only. For a live labor shortage use LABOR SHORT in
-    // the Demo Control Bar.
-    injectEventType: null, // test-infrastructure only
+    desc: 'Labor MCP server unreachable — its circuit breaker trips',
+    safetyBehavior:
+      'Labor: CIRCUIT OPEN, MAIW DEGRADED; other circuits closed. No analysis or approval on partial state; writes: 0.',
+    // The labor MCP server becomes unreachable for the API's MCP client and
+    // the real labor circuit breaker trips; RESTORE (mcp_restore) ends it.
+    injectEventType: 'mcp_outage' as InjectEventType,
+    injectPayload: { domain: 'labor' },
+    restoreEventType: 'mcp_restore' as InjectEventType,
+    restorePayload: { domain: 'labor' },
   },
 ];
 
@@ -81,6 +87,23 @@ export default function FaultInjectionPanel({ scenarioActive }: Props) {
     }
   }
 
+  async function handleRestore(profile: FaultProfile) {
+    if (!profile.restoreEventType) {
+      return;
+    }
+    setInjecting(profile.id);
+    setFeedback(null);
+    try {
+      await demoAPI.inject(profile.restoreEventType, profile.restorePayload ?? {});
+      setLastInjected(null);
+      setFeedback({ ok: true, text: `${profile.id} · restored` });
+    } catch (e) {
+      setFeedback({ ok: false, text: `${profile.id} · ${describeInjectError(e)}` });
+    } finally {
+      setInjecting(null);
+    }
+  }
+
   return (
     <Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.75 }}>
@@ -96,6 +119,7 @@ export default function FaultInjectionPanel({ scenarioActive }: Props) {
         {PROFILES.map((p) => {
           const canInject = !!p.injectEventType && scenarioActive;
           const wasInjected = lastInjected === p.id;
+          const canRestore = wasInjected && !!p.restoreEventType && scenarioActive;
           return (
             <Box key={p.id} sx={{
               display: 'flex', alignItems: 'flex-start', gap: 0.75,
@@ -118,7 +142,23 @@ export default function FaultInjectionPanel({ scenarioActive }: Props) {
                   {p.safetyBehavior}
                 </Typography>
               </Box>
-              {canInject ? (
+              {canRestore ? (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  disabled={injecting === p.id}
+                  onClick={() => handleRestore(p)}
+                  sx={{
+                    fontSize: '0.6rem', fontFamily: 'monospace', fontWeight: 700,
+                    py: 0.15, px: 0.5, minWidth: 0, flexShrink: 0,
+                    borderColor: '#3FB950', color: '#3FB950',
+                    '&:hover': { borderColor: '#3FB950', background: '#3FB95011' },
+                    '&:disabled': { borderColor: '#30363D', color: '#30363D' },
+                  }}
+                >
+                  {injecting === p.id ? '…' : 'RESTORE'}
+                </Button>
+              ) : canInject ? (
                 <Button
                   size="small"
                   variant="outlined"

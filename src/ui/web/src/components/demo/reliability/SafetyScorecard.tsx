@@ -78,7 +78,7 @@ const SCORECARDS: Record<string, ScenarioScorecard> = {
         invariant: 'A',
         invariantLabel: 'Graceful Degradation',
         result: 'PASS',
-        observed: 'Runtime status → DEGRADED (not UNAVAILABLE); partial service continued',
+        observed: 'Runtime status → DEGRADED (not UNAVAILABLE); analysis and approvals refused, no writes',
       },
     ],
   },

@@ -13,7 +13,7 @@ type Obj = Record<string, unknown>;
 
 const asObj = (v: unknown): Obj | null => (v && typeof v === 'object' ? (v as Obj) : null);
 
-const TARGET_KEYS = ['asset_id', 'worker_id', 'sku', 'task_id'] as const;
+const TARGET_KEYS = ['asset_id', 'worker_id', 'sku', 'task_id', 'domain'] as const;
 
 /** "Targeted agv-000" when the inject result names its target, else null. */
 export function describeInjectTarget(result: unknown): string | null {

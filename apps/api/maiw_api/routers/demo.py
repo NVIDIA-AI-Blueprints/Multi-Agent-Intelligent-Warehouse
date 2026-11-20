@@ -89,7 +89,8 @@ class InjectRequest(BaseModel):
         ...,
         description=(
             "equipment_fault | equipment_restore | low_stock | "
-            "worker_absence | worker_return | task_deadline | wave_delay"
+            "worker_absence | worker_return | task_deadline | wave_delay | "
+            "mcp_outage | mcp_restore"
         ),
     )
     payload: dict[str, Any] = Field(default_factory=dict)
@@ -108,6 +109,16 @@ async def list_scenarios():
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
 
 
+async def _end_demo_mcp_outages() -> None:
+    """A scenario (re)start begins with every MCP domain reachable."""
+    from maiw_api.bootstrap import get_runtime
+    from maiw_api.demo.mcp_outage import end_all_outages
+
+    restored = end_all_outages(await get_runtime())
+    if restored:
+        logger.info("Demo MCP outages ended on scenario start/reset: %s", restored)
+
+
 @router.post("/demo/scenario/{name}/start")
 async def start_scenario(name: str):
     """Load and activate a named scenario.  Replaces any active scenario."""
@@ -116,6 +127,7 @@ async def start_scenario(name: str):
         await ctrl.start(name)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    await _end_demo_mcp_outages()
     return {"ok": True, "scenario": name, "status": ctrl.status()}
 
 
@@ -149,6 +161,7 @@ async def reset_scenario():
         await ctrl.reset()
     except RuntimeError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    await _end_demo_mcp_outages()
     return {"ok": True, "scenario": ctrl.scenario_name, "status": ctrl.status()}
 
 
@@ -201,11 +214,21 @@ async def inject_event(request: InjectRequest):
     worker_return (worker_id) and task_deadline (task_id) resolve the same
     way; errors are typed: 404 WORKER_ / SKU_ / TASK_NOT_IN_ACTIVE_WORLD,
     409 NO_ELIGIBLE_WORKER / _SKU / _TASK.
+
+    MCP domain outage (fault F12; see ``maiw_api.demo.mcp_outage``): the
+    domain's MCP server becomes unreachable and its circuit breaker trips;
+    writes to it are rejected before dispatch.  ``mcp_restore`` ends it:
+        {"event_type": "mcp_outage", "payload": {"domain": "labor"}}
+        {"event_type": "mcp_restore", "payload": {"domain": "labor"}}
+    Errors are typed: 422 UNKNOWN_MCP_DOMAIN, 409 MCP_DOMAIN_NOT_CONFIGURED,
+    503 MCP_LAYER_UNAVAILABLE.
     """
     from maiw_api.demo.controller import InjectTargetError
     from maiw_api.write_auth import TypedHTTPError
 
     ctrl = _get_controller()
+    if request.event_type in ("mcp_outage", "mcp_restore"):
+        return await _inject_mcp_outage(ctrl, request)
     try:
         result = await ctrl.inject(request.event_type, request.payload)
     except RuntimeError as exc:
@@ -216,6 +239,58 @@ async def inject_event(request: InjectRequest):
         ) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"ok": True, "event_type": request.event_type, "result": result}
+
+
+async def _inject_mcp_outage(ctrl: Any, request: InjectRequest) -> dict:
+    """mcp_outage / mcp_restore: open or close one MCP domain (demo only)."""
+    from maiw_api.bootstrap import get_runtime
+    from maiw_api.demo.events import ScenarioEvent
+    from maiw_api.demo.mcp_outage import OutageError, end_outage, start_outage
+    from maiw_api.write_auth import TypedHTTPError
+
+    if not ctrl.active:
+        raise HTTPException(status_code=409, detail="No active scenario")
+    runtime = await get_runtime()
+    domain = request.payload.get("domain")
+    try:
+        if request.event_type == "mcp_outage":
+            result = await start_outage(runtime, domain)
+        else:
+            result = end_outage(runtime, domain)
+    except OutageError as exc:
+        raise TypedHTTPError(exc.status_code, exc.code, exc.message) from exc
+
+    sim_time = ctrl.world.clock.elapsed_seconds
+    await ctrl.bus.publish_inject(
+        event_type=request.event_type,
+        detail=str(request.payload),
+        sim_time_seconds=sim_time,
+    )
+    if request.event_type == "mcp_outage":
+        await ctrl.bus.publish(
+            ScenarioEvent(
+                category="CIRCUIT_OPEN",
+                message=(
+                    f"{domain} MCP unreachable: circuit {result['circuit_state']}; "
+                    f"{domain} writes are rejected before dispatch"
+                ),
+                detail=(
+                    f"refused_connections={result['refused_connections']} "
+                    f"cooldown_seconds={result['cooldown_seconds']}"
+                ),
+                sim_time_seconds=sim_time,
+                domain=domain,
+            )
+        )
+    else:
+        await ctrl.bus.publish(
+            ScenarioEvent(
+                category="STATE",
+                message=f"{domain} MCP restored: circuit {result['circuit_state']}",
+                sim_time_seconds=sim_time,
+            )
+        )
     return {"ok": True, "event_type": request.event_type, "result": result}
 
 
@@ -230,6 +305,31 @@ async def demo_status():
 
 
 # ── Typed failure → HTTP mapping ─────────────────────────────────────────────
+
+
+def _raise_if_mcp_circuit_open(exc: BaseException, context: str) -> None:
+    """
+    503 MCP CIRCUIT OPEN when state assembly failed because a domain's MCP
+    circuit breaker is open (e.g. demo fault F12).  Analysis and approval need
+    every domain's state, so MAIW refuses to decide rather than decide on
+    partial state; nothing is analyzed or executed.
+    """
+    from maiw_mcp.errors import MCPCircuitOpen  # noqa: PLC0415
+    from maiw_state.errors import StateAssemblyError  # noqa: PLC0415
+
+    if isinstance(exc, StateAssemblyError) and isinstance(exc.cause, MCPCircuitOpen):
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "MCP CIRCUIT OPEN",
+                "message": (
+                    f"{context}: the {exc.domain} MCP circuit is open, so "
+                    f"{exc.domain} state cannot be read; MAIW does not decide "
+                    "on partial state and nothing was executed"
+                ),
+                "domain": exc.domain,
+            },
+        ) from exc
 
 
 def _raise_typed_http(exc: BaseException, context: str) -> None:
@@ -403,6 +503,7 @@ async def analyze_disruption():
         snapshot = WarehouseStateSnapshot.seal(state)
     except Exception as exc:
         await bus.publish_observe("State assembly failed", str(exc), trace_id=trace_id)
+        _raise_if_mcp_circuit_open(exc, "state assembly")
         _raise_typed_http(exc, "state assembly")
         logger.exception("State assembly failed (trace_id=%s)", trace_id)
         raise HTTPException(
@@ -1199,6 +1300,7 @@ async def approve_proposal(request: ApproveRequest):
         )
         fresh_snapshot = WarehouseStateSnapshot.seal(fresh_state)
     except Exception as exc:
+        _raise_if_mcp_circuit_open(exc, "approval state read")
         logger.exception("State unavailable (trace_id=%s)", trace_id)
         raise HTTPException(
             status_code=503, detail="State unavailable; see the API log."
