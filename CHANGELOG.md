@@ -9,6 +9,8 @@
 
 ### Bug Fixes
 
+* ui: the RELIABILITY page (`/command`) no longer misleads in Demo Mode. **Current operational risks** stayed on "loading state data" forever, because it read the legacy equipment and task routes, which need PostgreSQL; in Demo Mode it now lists risks from the simulation KPIs (wave risk, pending approvals, equipment, labor, backlog, low stock), and elsewhere it says "state data unavailable" once those routes fail. The **Models** panel hard-coded Ultra as DISABLED and every other role as READY, though no API reports per-role status and the analysis routes to Ultra by default; it now marks only the role that served the last analysis (LAST USED) and shows the Model Gateway status from `/api/v1/runtime/status`
+
 * ui, deps: the `@babel/core` override in `src/ui/web/package.json` follows the dev dependency (`"$@babel/core"`) instead of repeating `^7.23.0`. When Dependabot raised the dev dependency (to 7.29.13), npm rejected the now-different override (`EOVERRIDE: Override for @babel/core conflicts with direct dependency`), so the weekly npm update job failed and `@babel/core` was never updated. The override still forces one `@babel/core` for the whole tree, as added for coverage (`babel-plugin-istanbul`); the lockfile is unchanged
 
 ### Documentation

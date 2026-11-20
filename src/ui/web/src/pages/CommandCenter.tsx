@@ -22,6 +22,7 @@ import {
   DECISION_STATUS_COLOR,
   DECISION_STATUS_DOT,
 } from '../constants/authorityStates';
+import { deriveDemoRisks, emptyRisksText, getModelRole, MODEL_ROLES, RiskItem } from './commandCenterState';
 
 const FAULT_INJECTION_ENABLED = process.env.REACT_APP_FAULT_INJECTION_ENABLED === 'true';
 
@@ -80,15 +81,6 @@ function RiskRow({ icon, text, color }: { icon: string; text: string; color: str
       <Typography sx={{ fontFamily: 'monospace', fontSize: '0.72rem', color: '#8B949E' }}>{text}</Typography>
     </Box>
   );
-}
-
-function getModelRole(modelId: string): string {
-  const lower = modelId.toLowerCase();
-  if (lower.includes('super')) return 'Super';
-  if (lower.includes('ultra')) return 'Ultra';
-  if (lower.includes('nano')) return 'Nano';
-  if (lower.includes('lightning')) return 'Lightning';
-  return '';
 }
 
 const DECISION_STORAGE = 'maiw_decision_history';
@@ -241,8 +233,8 @@ const CommandCenter: React.FC = () => {
     }
   };
 
-  const { data: equipment } = useQuery({ queryKey: ['equipment'], queryFn: equipmentAPI.getAllAssets, retry: 1, staleTime: 30000 });
-  const { data: tasks } = useQuery({ queryKey: ['tasks'], queryFn: operationsAPI.getTasks, retry: 1, staleTime: 30000 });
+  const { data: equipment, isError: equipmentError } = useQuery({ queryKey: ['equipment'], queryFn: equipmentAPI.getAllAssets, retry: 1, staleTime: 30000 });
+  const { data: tasks, isError: tasksError } = useQuery({ queryKey: ['tasks'], queryFn: operationsAPI.getTasks, retry: 1, staleTime: 30000 });
   const { data: workforce } = useQuery({ queryKey: ['workforce'], queryFn: operationsAPI.getWorkforceStatus, retry: 1, staleTime: 30000 });
   const { data: incidents } = useQuery({ queryKey: ['incidents'], queryFn: safetyAPI.getIncidents, retry: 1, staleTime: 30000 });
   const { data: mcpStatus } = useQuery({ queryKey: ['mcp-status'], queryFn: mcpAPI.getStatus, retry: 1, staleTime: 30000 });
@@ -291,15 +283,21 @@ const CommandCenter: React.FC = () => {
 
   const mostRecentPending = decisions.find(r => getDecisionStatus(r) === 'requires_human_approval');
 
-  // Operational risks (derived, no fabrication)
-  const risks: { icon: string; text: string; color: string }[] = [];
-  if (maintenanceAssets > 0) risks.push({ icon: '⚠', text: `${maintenanceAssets} equipment item${maintenanceAssets > 1 ? 's' : ''} need maintenance`, color: '#D29922' });
-  if (pendingTasks > 3) risks.push({ icon: '⚠', text: `${pendingTasks} tasks pending — operations backlog`, color: '#D29922' });
-  if (openIncidents > 0) risks.push({ icon: '⚠', text: `${openIncidents} open safety incident${openIncidents > 1 ? 's' : ''}`, color: '#F85149' });
-  if (pendingApprovals > 0) risks.push({ icon: '⚠', text: `${pendingApprovals} action${pendingApprovals > 1 ? 's' : ''} awaiting human approval`, color: '#D29922' });
-  if (laborPct > 0 && laborPct < 70) risks.push({ icon: '⚠', text: `Labor utilization low (${laborPct}%)`, color: '#D29922' });
-  if (equipPct > 0 && equipPct >= 90) risks.push({ icon: '✓', text: `Equipment capacity healthy (${equipPct}%)`, color: '#3FB950' });
-  if (risks.length === 0 && totalAssets > 0) risks.push({ icon: '✓', text: 'No active operational risks detected', color: '#3FB950' });
+  // Operational risks (derived, no fabrication). Demo Mode has no PostgreSQL,
+  // so the legacy routes above fail there; use the simulation's KPIs instead.
+  const demoKpis = isDemoMode ? demoStatus?.current_kpis : null;
+  const legacyRisks: RiskItem[] = [];
+  if (maintenanceAssets > 0) legacyRisks.push({ icon: '⚠', text: `${maintenanceAssets} equipment item${maintenanceAssets > 1 ? 's' : ''} need maintenance`, color: '#D29922' });
+  if (pendingTasks > 3) legacyRisks.push({ icon: '⚠', text: `${pendingTasks} tasks pending — operations backlog`, color: '#D29922' });
+  if (openIncidents > 0) legacyRisks.push({ icon: '⚠', text: `${openIncidents} open safety incident${openIncidents > 1 ? 's' : ''}`, color: '#F85149' });
+  if (pendingApprovals > 0) legacyRisks.push({ icon: '⚠', text: `${pendingApprovals} action${pendingApprovals > 1 ? 's' : ''} awaiting human approval`, color: '#D29922' });
+  if (laborPct > 0 && laborPct < 70) legacyRisks.push({ icon: '⚠', text: `Labor utilization low (${laborPct}%)`, color: '#D29922' });
+  if (equipPct > 0 && equipPct >= 90) legacyRisks.push({ icon: '✓', text: `Equipment capacity healthy (${equipPct}%)`, color: '#3FB950' });
+  if (legacyRisks.length === 0 && totalAssets > 0) legacyRisks.push({ icon: '✓', text: 'No active operational risks detected', color: '#3FB950' });
+  const risks = demoKpis
+    ? deriveDemoRisks(demoKpis, demoStatus?.pending_approvals?.length ?? 0)
+    : legacyRisks;
+  const risksPlaceholder = emptyRisksText(!demoKpis && (equipmentError || tasksError));
 
   const activeModelRole = analysisResult ? getModelRole(analysisResult.assessment.model_id) : null;
 
@@ -379,20 +377,27 @@ const CommandCenter: React.FC = () => {
                 <Typography sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.6rem', color: '#8B949E', letterSpacing: '0.1em' }}>
                   MODELS
                 </Typography>
+                {runtime?.model_gateway_status && (
+                  <Typography sx={{
+                    fontFamily: 'monospace', fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.06em',
+                    color: runtime.model_gateway_status === 'HEALTHY' ? '#3FB950' : '#D29922',
+                  }}>
+                    {runtime.model_gateway_status}
+                  </Typography>
+                )}
               </Box>
               <Box sx={{ p: 1 }}>
-                {(['Lightning', 'Nano', 'Super', 'Ultra'] as const).map((role) => {
-                  const isDisabled = role === 'Ultra';
+                {/* No per-role status API exists: mark only the role that served the
+                    last analysis, and show the gateway's own status in the header. */}
+                {MODEL_ROLES.map((role) => {
                   const isActive = activeModelRole === role;
                   return (
                     <Box key={role} sx={{ display: 'flex', alignItems: 'center', py: 0.35, gap: 0.75 }}>
-                      <Dot color={isDisabled ? '#21262D' : '#3FB950'} glow={isActive} />
-                      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.72rem', color: isActive ? '#76B900' : isDisabled ? '#30363D' : '#C9D1D9', flexGrow: 1 }}>
+                      <Dot color={isActive ? '#3FB950' : '#484F58'} glow={isActive} />
+                      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.72rem', color: isActive ? '#76B900' : '#C9D1D9', flexGrow: 1 }}>
                         {role}
                       </Typography>
-                      {isActive && <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#76B900' }}>ACTIVE</Typography>}
-                      {!isActive && !isDisabled && <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#484F58' }}>READY</Typography>}
-                      {isDisabled && <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#30363D' }}>DISABLED</Typography>}
+                      {isActive && <Typography sx={{ fontFamily: 'monospace', fontSize: '0.6rem', color: '#76B900' }}>LAST USED</Typography>}
                     </Box>
                   );
                 })}
@@ -624,7 +629,7 @@ const CommandCenter: React.FC = () => {
                 <Box sx={{ p: 1 }}>
                   {risks.length === 0 ? (
                     <Typography sx={{ fontFamily: 'monospace', fontSize: '0.72rem', color: '#484F58' }}>
-                      — loading state data —
+                      {risksPlaceholder}
                     </Typography>
                   ) : (
                     risks.slice(0, 3).map((r, i) => <RiskRow key={i} {...r} />)
@@ -692,7 +697,7 @@ const CommandCenter: React.FC = () => {
                 <Box sx={{ p: 1.5, flex: 1, overflow: 'auto' }}>
                   {risks.length === 0 ? (
                     <Typography sx={{ fontFamily: 'monospace', fontSize: '0.72rem', color: '#484F58' }}>
-                      — loading state data —
+                      {risksPlaceholder}
                     </Typography>
                   ) : (
                     risks.map((r, i) => <RiskRow key={i} {...r} />)
